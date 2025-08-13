@@ -1,9 +1,9 @@
 import "./LendingRegistry.sol";
 import "./CollateralVault.sol";
+import "./RateStrategy.sol";
 import "./LiquidityPool.sol";
 import "./PriceOracle.sol";
 import "../Admin/FeeCollector.sol";
-import "../Tokens/TokenFactory.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
@@ -19,54 +19,42 @@ contract record LendingPool is Ownable {
     // EVENTS
     // ═══════════════════════════════════════════════════════════════════════════════
  
-    event Deposited(address indexed user, address indexed asset, uint amount);
-    event Withdrawn(address indexed user, address indexed asset, uint amount);
-    event Borrowed(address indexed user, address indexed asset, uint amount);
-    event Repaid(address indexed user, address indexed asset, uint amount);
-    event Liquidated(address indexed borrower, address indexed asset, uint repaidAmount, address indexed collateralAsset, uint collateralSeized);
-    event SuppliedCollateral(address indexed user, address indexed asset, uint amount);
-    event WithdrawnCollateral(address indexed user, address indexed asset, uint amount);
-    event ExchangeRateUpdated(address indexed asset, uint newRate);
-    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor);
-    event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
-    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
-    event ReservesSwept(uint amount, address to);
+    event Deposited(address indexed user, address indexed asset, uint256 amount);
+    event Withdrawn(address indexed user, address indexed asset, uint256 amount);
+    event Borrowed(address indexed user, address indexed asset, uint256 amount);
+    event Repaid(address indexed user, address indexed asset, uint256 amount);
+    event Liquidated(address indexed borrower, address indexed asset, uint256 repaidAmount, address indexed collateralAsset, uint256 collateralSeized);
+    event SuppliedCollateral(address indexed user, address indexed asset, uint256 amount);
+    event WithdrawnCollateral(address indexed user, address indexed asset, uint256 amount);
+    event ExchangeRateUpdated(address indexed asset, uint256 newRate);
+    event InterestDistributed(address indexed asset, uint256 totalInterest, uint256 reserveCut, uint256 supplierCut);
+    event AssetConfigured(address indexed asset, uint256 ltv, uint256 liquidationThreshold, uint256 liquidationBonus, uint256 interestRate, uint256 reserveFactor);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
     // ═══════════════════════════════════════════════════════════════════════════════
 
     struct LoanInfo {
-        uint scaledDebt;     // user debt in index-scaled units
-        uint lastUpdated;    // optional metadata
+        uint256 principalBalance;     // Current principal balance (decreases with certain repayment scenarios)
+        uint256 interestOwed;         // Unpaid interest based on last interest calculated time
+        uint256 lastIntCalculated;    // Last time interest was calculated
+        uint256 lastUpdated;          // Last time loan was updated
     }
+    //@adrian okay so this exists now, but we'll remove these individual LoanInfos and want to know how this will impact the backend and UI
 
     struct AssetConfig {
-        uint ltv;                    // Loan-to-Value ratio (max initial borrow) in basis points
-        uint liquidationThreshold;   // Liquidation threshold in basis points  
-        uint liquidationBonus;       // Liquidation bonus in basis points
-        uint interestRate;          // Interest rate in basis points
-        uint reserveFactor;         // Reserve factor in basis points (percentage to protocol treasury)
+        uint256 ltv;                    // Loan-to-Value ratio (max initial borrow) in basis points
+        uint256 liquidationThreshold;   // Liquidation threshold in basis points  
+        uint256 liquidationBonus;       // Liquidation bonus in basis points
+        uint256 interestRate;          // Interest rate in basis points
+        uint256 reserveFactor;         // Reserve factor in basis points (percentage to protocol treasury)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    // ── Interest index (global) ───────────────────────────────────────────────────────
-    uint public RAY = 1e27;
-    uint public SECONDS_PER_YEAR = 31536000;
-
-    uint public borrowIndex;    // global borrow index (init to RAY in constructor)
-    uint public lastAccrual;    // last global accrual timestamp
-    uint public totalScaledDebt; // sum of all users' scaled debt
-    uint public reservesAccrued; // protocol reserves accrued in underlying units
-
-    // ── System-wide debt ceilings ─────────────────────────────────────────────────────
-    uint public debtCeilingAsset; // cap in underlying asset units (18d); 0 disables
-    uint public debtCeilingUSD;   // cap in USD 1e18; 0 disables
-
-   // Loan Management - One loan per user
+    // Loan Management - One loan per user
     mapping(address => LoanInfo) public record userLoan; // user => single loan
 
     // Asset Configuration
@@ -78,6 +66,12 @@ contract record LendingPool is Ownable {
     // Single Borrowable Asset
     address public borrowableAsset; // The one asset that can be borrowed
     address public mToken; // mToken for the borrowable asset
+
+    // ───────────────────────────────────────────────────────────────────────────
+    // NEW: Aggregate principal tracking so exchange rate reflects outstanding
+    // debt.  Increases on borrow, decreases on principal repayment / liquidation.
+    // ───────────────────────────────────────────────────────────────────────────
+    uint256 public totalBorrowPrincipal;
     
     // External Contracts
     LendingRegistry public registry;
@@ -96,9 +90,8 @@ contract record LendingPool is Ownable {
         poolConfigurator = _poolConfigurator;
         tokenFactory = TokenFactory(_tokenFactory);
         feeCollector = FeeCollector(_feeCollector);
-        borrowIndex = RAY;
-        lastAccrual = uint(block.timestamp);
     }
+    // @adrian where are borrowableAsset and mToken set?
 
     modifier onlyPoolConfigurator() {
         require(msg.sender == address(poolConfigurator), "Caller is not PoolConfigurator");
@@ -122,6 +115,10 @@ contract record LendingPool is Ownable {
         return registry.collateralVault();
     }
 
+    function _rateStrategy() internal view returns (RateStrategy) {
+        return registry.rateStrategy();
+    }
+
     function _priceOracle() internal view returns (PriceOracle) {
         return registry.priceOracle();
     }
@@ -134,19 +131,19 @@ contract record LendingPool is Ownable {
      * @notice Deposit liquidity and receive interest-bearing mTokens
      * @param amount The amount to deposit
      */
-    function depositLiquidity(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function depositLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
+        //@adrian why onlyTokenFactory() modifier here? is it to try and sure we're initialized? if so, what about mToken? and shouldn't we be more careful?
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
         
         // Check that borrowable asset has lending parameters configured
         AssetConfig memory config = assetConfigs[borrowableAsset];
         require(config.interestRate > 0, "Interest rate not configured");
-    
-        _accrue(); // ensure borrow index & reserves are up-to-date before mint calc
+        require(config.reserveFactor > 0, "Reserve factor not configured"); 
         
         // Calculate current exchange rate and corresponding mToken amount to mint
-        uint exchangeRate = getExchangeRate();
-        uint mTokenAmount = (amount * 1e18) / exchangeRate;
+        uint256 exchangeRate = getExchangeRate();
+        uint256 mTokenAmount = (amount * 1e18) / exchangeRate;
         require(mTokenAmount > 0, "Deposit too small");
 
         // Transfer underlying and mint mTokens via LiquidityPool
@@ -160,16 +157,13 @@ contract record LendingPool is Ownable {
      * @notice Withdraw liquidity by specifying underlying asset amount
      * @param amount The amount of underlying assets to withdraw
      */
-    function withdrawLiquidity(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function withdrawLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
-
-        _accrue(); // ensure borrow index & reserves are up-to-date before burn calc
         
         // Calculate mTokens to burn based on current exchange rate
-        uint exchangeRate = getExchangeRate();
-        // ceilDiv: (a + b - 1) / b
-        uint mTokensToBurn = (amount * 1e18 + exchangeRate - 1) / exchangeRate;
+        uint256 exchangeRate = getExchangeRate();
+        uint256 mTokensToBurn = (amount * 1e18) / exchangeRate;
         
         require(IERC20(mToken).balanceOf(msg.sender) >= mTokensToBurn, "Insufficient mToken balance");
         
@@ -190,7 +184,7 @@ contract record LendingPool is Ownable {
      * @param amount The amount of collateral to supply
      * @dev User must approve CollateralVault to spend their tokens before calling this function
      */
-    function supplyCollateral(address asset, uint amount) external onlyTokenFactory(asset) {
+    function supplyCollateral(address asset, uint256 amount) external onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
         
         // Check that asset is configured as eligible collateral
@@ -210,18 +204,17 @@ contract record LendingPool is Ownable {
      * @notice Withdraw collateral assets from the vault (only if user remains healthy)
      * @param asset The collateral asset address
      * @param amount The amount of collateral to withdraw
+     * @param collateralAssets Array of all collateral assets to check for health (from off-chain indexing)
      */
-    function withdrawCollateral(address asset, uint amount) external onlyTokenFactory(asset) {
+    function withdrawCollateral(address asset, uint256 amount) external onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
 
-        uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
+        uint256 totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
         require(totalCollateral >= amount, "Insufficient collateral");
 
-        _accrue(); // ensure borrow index & reserves are up-to-date before health check
-
         // health check to ensure the user remains solvent after withdrawal
-        uint currentBorrow = _getTotalBorrowValue(msg.sender); // in USD
-        uint newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // in USD
+        uint256 currentBorrow = _getTotalBorrowValue(msg.sender); // in USD
+        uint256 newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // in USD
         require(currentBorrow <= newMaxBorrow, "Withdrawal would exceed existing loan");
         
         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amount);
@@ -234,30 +227,31 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-    * @notice Borrow against total collateral supplied
-    * @param amount The amount to borrow (underlying units, 18 decimals)
-    * @dev Uses global borrow index; enforces system-wide debt ceilings.
-    */
-    function borrow(uint amount) external onlyTokenFactory(borrowableAsset) {
+     * @notice Borrow against total collateral supplied
+     * @param amount The amount to borrow
+     * @dev User can only have one active borrow position at a time
+     */
+    function borrow(uint256 amount) external onlyTokenFactory(borrowableAsset){
         require(amount > 0, "Invalid amount");
+    
+        uint256 maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
 
-        // 1) bring index & reserves current, then enforce global caps
-        _accrue();
-        _checkDebtLimits(amount);
+        LoanInfo storage loan = userLoan[msg.sender];
+        uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
+        
+        // Get up-to-date debt (without mutating state)
+        (uint256 accruedInterest, uint256 currentOwed) = _accrueInterest(loan, interestRate);
 
-        // 2) user-level collateral check (asset units)
-        uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
-        uint currentOwed = getUserDebt(msg.sender); // index-based
         require(currentOwed + amount <= maxBorrowAmount, "Insufficient collateral for borrow");
 
-        // 3) update index-based loan storage
-        LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amount * RAY) / borrowIndex;
-        loan.scaledDebt += scaledAdd;
+        // Update state after borrow
+        loan.principalBalance += amount;
+        // Track aggregate outstanding principal for accurate exchange-rate math
+        totalBorrowPrincipal += amount;
+        loan.interestOwed += accruedInterest;  // Add any accrued interest to interestOwed
+        loan.lastIntCalculated = block.timestamp;
         loan.lastUpdated = block.timestamp;
-        totalScaledDebt += scaledAdd;
 
-        // 4) move funds
         LiquidityPool(_liquidityPool()).borrow(amount, msg.sender);
 
         emit Borrowed(msg.sender, borrowableAsset, amount);
@@ -266,62 +260,94 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
     // REPAYMENT OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
-    /**
-    * @notice Repay part or all of the caller’s outstanding debt (index-based)
-    * @param amount Repayment amount in underlying units (18 decimals)
-    */
-    function repay(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function repay(uint256 amount) external onlyTokenFactory(borrowableAsset) {
         LoanInfo storage loan = userLoan[msg.sender];
-        require(loan.scaledDebt > 0, "No active loan");
+        require(loan.principalBalance > 0, "No active loan");
         require(amount > 0, "Invalid repayment");
 
-        // Bring index & reserves current
-        _accrue();
+        uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
 
-        // Compute current owed from scaled debt
-        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
-        require(owed > 0, "Nothing to repay");
+        // Get up-to-date debt 
+        (uint256 accruedInterest, uint256 totalOwed) = _accrueInterest(loan, interestRate);
+        require(totalOwed > 0, "Nothing to repay");
+        //@adrian a bit weird that this is what's preventing the under-1hour 0interest case; you just can't repay for the first hour
+        //@adrian actually, no, this only checks totalOwed not accruedInterest, so you still do get a free 1-hr loan!
+        //@adrian also while we're at it, how is totalOwed==0 possible if loan.principalBalance>0 is already asserted?
+        
+        // Update interestOwed with newly accrued interest
+        loan.interestOwed += accruedInterest;
+        uint256 totalInterest = loan.interestOwed;
 
-        // Clamp to what's owed
-        uint repayAmount = amount > owed ? owed : amount;
+        // Clamp to total owed
+        uint256 repayAmount = amount > totalOwed ? totalOwed : amount;
 
-        // Move funds into the pool
+        // Calculate principal and interest portions of the repayment
+        uint256 principalPortion;
+        uint256 interestPortion;
+        
+        if (repayAmount >= totalOwed) { //@adrian > should be unreachable
+            // Full repayment
+            principalPortion = loan.principalBalance;
+            interestPortion = loan.interestOwed;
+        } else {
+            // Partial repayment - pay interest first, then principal
+            if (repayAmount <= loan.interestOwed) {
+                // Payment only covers (part of) interest
+                principalPortion = 0;//@adrian this looks wrong
+                interestPortion = repayAmount;
+            } else {
+                // Payment covers all interest plus some principal
+                interestPortion = loan.interestOwed;
+                principalPortion = repayAmount - loan.interestOwed;
+            }
+        }
+
+        // Transfer repayment to LiquidityPool
         LiquidityPool(_liquidityPool()).repay(repayAmount, msg.sender);
 
-        // Convert repayAmount to scaled units and reduce debt
-        uint scaledDelta = (repayAmount * RAY) / borrowIndex;
-        if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
+        // Distribute the interest portion (transfer reserve cut out of the pool)
+        if (interestPortion > 0) {
+            distributeInterest(interestPortion);
+        }//@adrian I think this is changing anyways
 
-        loan.scaledDebt -= scaledDelta;
-        totalScaledDebt -= scaledDelta;
-
-        if (loan.scaledDebt == 0) {
+        if (repayAmount >= totalOwed) {
+            //full repayment - close loan
             delete userLoan[msg.sender];
         } else {
+            // Partial repayment — update loan state
+            loan.principalBalance -= principalPortion;
+            loan.interestOwed -= interestPortion;
+            loan.lastIntCalculated = block.timestamp;
             loan.lastUpdated = block.timestamp;
         }
 
+        // Adjust aggregate principal tracker
+        if (principalPortion > 0) {
+            require(totalBorrowPrincipal >= principalPortion, "Principal tracker underflow");
+            totalBorrowPrincipal -= principalPortion;
+        }
+
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
-    }
+    }   
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDATION OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-    * @notice Liquidate an unhealthy position
-    * @param collateralAsset The collateral asset to seize
-    * @param borrower The address of the borrower being liquidated
-    * @param debtToCover Amount of debt (in borrowableAsset units) the liquidator is repaying
-    * Requirements:
-    *  - Borrower health factor must be < 1e18 (unsafe)
-    *  - If health factor >= 0.95e18, liquidator may repay at most 50% of outstanding debt
-    *  - Otherwise liquidator may repay up to 100% of outstanding debt
-    */
+     * @notice Liquidate an unhealthy position
+     * @param collateralAsset The collateral asset to seize
+     * @param borrower The address of the borrower being liquidated
+     * @param debtToCover Amount of debt (in borrowableAsset units) the liquidator is repaying
+     * Requirements:
+     *  - Borrower health factor must be < 1e18 (unsafe)
+     *  - If health factor >= 0.95e18, liquidator may repay at most 50% of outstanding debt
+     *  - Otherwise liquidator may repay up to 100% of outstanding debt
+     */
     function liquidationCall(
         address collateralAsset,
         address borrower,
-        uint debtToCover
+        uint256 debtToCover
     ) external onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
@@ -330,46 +356,77 @@ contract record LendingPool is Ownable {
         // Ensure collateral asset is configured and has liquidation parameters
         AssetConfig memory cConfig = assetConfigs[collateralAsset];
         require(cConfig.liquidationBonus >= 10000, "Asset not eligible for liquidation");
+        // @adrian why is this the condition?
 
-        // NEW: accrue globally and read index-based debt
-        _accrue();
+        // Fetch loan info & total debt
+        LoanInfo storage loan = userLoan[borrower];
+        require(loan.principalBalance > 0, "Borrower has no debt");
 
-        uint totalOwed = getUserDebt(borrower);
-        require(totalOwed > 0, "Borrower has no debt");
+        uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
+        (uint256 accruedInterest, uint256 totalOwed) = _accrueInterest(loan, interestRate);
 
-        uint health = getHealthFactor(borrower); // 1e18 scaled
+        uint256 health = getHealthFactor(borrower); // 1e18 scaled
         require(health < 1e18, "Position healthy");
 
         // Determine max allowed repayment
-        uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
+        uint256 maxRepay;
+        if (health < 95e16) { // 0.95 * 1e18 
+            maxRepay = totalOwed; // full liquidation allowed
+        } else {
+            maxRepay = totalOwed / 2; // 50%
+        }//@adrian is this made clear in the UI?
+
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
 
         // Collect repayment from liquidator into LiquidityPool
         LiquidityPool(_liquidityPool()).repay(debtToCover, msg.sender);
 
-        // NEW: reduce borrower scaled debt (index-based)
-        LoanInfo storage loan = userLoan[borrower];
-        uint scaledDelta = (debtToCover * RAY) / borrowIndex;
-        if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
-        loan.scaledDebt -= scaledDelta;
-        totalScaledDebt -= scaledDelta;
+        // Apply repayment to loan (interest first)
+        uint256 newInterestOwed = loan.interestOwed + accruedInterest;
+        uint256 repaidPrincipal;
+        uint256 repaidInterest;
 
-        if (loan.scaledDebt == 0) {
+        if (debtToCover <= newInterestOwed) {
+            // All goes to interest
+            repaidInterest = debtToCover;
+            loan.interestOwed = newInterestOwed - debtToCover;
+        } else {
+            // Pay off all interest, remainder to principal
+            repaidInterest = newInterestOwed;
+            repaidPrincipal = debtToCover - newInterestOwed;
+            loan.interestOwed = 0;
+            loan.principalBalance -= repaidPrincipal;
+        }
+
+        // Distribute protocol interest cut if any
+        if (repaidInterest > 0) {
+            distributeInterest(repaidInterest);
+        }
+
+        // If loan fully repaid, delete the record
+        if (loan.principalBalance == 0 && loan.interestOwed == 0) {
             delete userLoan[borrower];
         } else {
+            loan.lastIntCalculated = block.timestamp;
             loan.lastUpdated = block.timestamp;
         }
 
+        // Adjust aggregate principal tracker for the portion of principal actually repaid
+        if (repaidPrincipal > 0) {
+            require(totalBorrowPrincipal >= repaidPrincipal, "Principal tracker underflow");
+            totalBorrowPrincipal -= repaidPrincipal;
+        }
+
         // Calculate collateral to seize
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        uint256 priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
+        uint256 priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
         require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
 
-        uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
+        uint256 collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
         // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
 
         // Ensure borrower has enough collateral
-        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        uint256 borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
         if (collateralToSeize > borrowerCollateral) {
             collateralToSeize = borrowerCollateral; // seize all remaining
         }
@@ -393,13 +450,6 @@ contract record LendingPool is Ownable {
         return userLoan[user];
     }
 
-    // Index-based user debt (public view)
-    function getUserDebt(address user) public view returns (uint debt) {
-        LoanInfo memory loan = userLoan[user];
-        if (loan.scaledDebt == 0) return 0;
-        return (loan.scaledDebt * borrowIndex) / RAY;
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════════
     // HEALTH & RISK CALCULATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -407,11 +457,12 @@ contract record LendingPool is Ownable {
     /**
      * @notice Get user's health factor (Aave style - uses liquidation thresholds)
      * @param user The user address
+     * @param collateralAssets Array of collateral assets to check (from off-chain indexing)
      * @return Health factor scaled by 1e18 (1.0e18 = 100% = liquidation threshold)
      */
-    function getHealthFactor(address user) public view returns (uint) {
-        uint totalCollateralValue = _getTotalCollateralValueForHealth(user);
-        uint totalBorrowValue = _getTotalBorrowValue(user);
+    function getHealthFactor(address user) public view returns (uint256) {
+        uint256 totalCollateralValue = _getTotalCollateralValueForHealth(user);
+        uint256 totalBorrowValue = _getTotalBorrowValue(user);
         
         if (totalBorrowValue == 0) return 2**256 - 1; // No debt = infinite health
         if (totalCollateralValue == 0) return 0; // No collateral = 0 health
@@ -435,11 +486,11 @@ contract record LendingPool is Ownable {
      */
     function configureAsset(
         address asset,
-        uint ltv,
-        uint liquidationThreshold,
-        uint liquidationBonus,
-        uint interestRate,
-        uint reserveFactor
+        uint256 ltv,
+        uint256 liquidationThreshold,
+        uint256 liquidationBonus,
+        uint256 interestRate,
+        uint256 reserveFactor
     ) external onlyPoolConfigurator {
         require(asset != address(0) && tokenFactory.isTokenActive(asset), "Invalid or inactive asset"); 
         require(ltv <= liquidationThreshold, "LTV must be <= liquidation threshold");
@@ -469,7 +520,7 @@ contract record LendingPool is Ownable {
      * @param asset The asset address
      * @return ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor
      */
-    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint) {
+    function getAssetConfig(address asset) external view returns (uint256, uint256, uint256, uint256, uint256) {
         AssetConfig memory config = assetConfigs[asset];
         return (config.ltv, config.liquidationThreshold, config.liquidationBonus, config.interestRate, config.reserveFactor);
     }
@@ -480,90 +531,61 @@ contract record LendingPool is Ownable {
 
     /**
      * @notice Get exchange rate for the borrowable asset 
-     * @dev mTokens are minted/burned using this rate; it reflects cash + accrued borrower receivable − protocol reserves.
-     * @return Exchange rate in 1e18 scale (1e18 = 1 underlying per mToken)
+     * @dev In this model, mTokens are always minted 1:1 with deposits
+     * @dev The exchange rate shows how much underlying each mToken is worth
+     * @return Exchange rate in 18 decimals (1e18 = 1:1 ratio, >1e18 = appreciation)
      */
-    function getExchangeRate() public view returns (uint) {
+    function getExchangeRate() public view returns (uint256) {
         if (mToken == address(0)) return 1e18;
-
-        uint totalSupply_ = IERC20(mToken).totalSupply();
+        
+        uint256 totalSupply_ = IERC20(mToken).totalSupply();
         if (totalSupply_ == 0) {
             return 1e18; // Initial 1:1 ratio
         }
+        
+        uint256 cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
 
-        uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
-        uint debt = _totalDebt(); // index-based system debt
-
-        // Suppliers' claimable underlying excludes protocol reserves
-        uint underlying = cash + debt;
-        if (reservesAccrued < underlying) {
-            underlying -= reservesAccrued;
-        } else {
-            // Extreme guard: if reserves exceed assets (shouldn't happen), floor at cash
-            underlying = cash;
-        }
+        // Include outstanding principal so the rate never dips below 1 when cash is lent out
+        uint256 underlying = cash + totalBorrowPrincipal;
 
         if (underlying == 0) {
-            return 1e18; // Fallback to 1:1 if no assets
+            return 1e18; // Fallback to 1:1 if no underlying/cash
         }
 
+        // Exchange rate = (cash + outstanding principal) / total mToken supply
         return (underlying * 1e18) / totalSupply_;
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════
-    // INTEREST ACCRUAL & SYSTEM CEILINGS (INTERNALS)
+    // INTEREST DISTRIBUTION
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    /// @notice Returns total system debt in underlying units.
-    function _totalDebt() internal view returns (uint) {
-        return (totalScaledDebt * borrowIndex) / RAY;
-    }
-
-    /// @notice APR (bps) used by `_accrue()` (static per-asset rate).
-    function _currentAprBps() internal view returns (uint) {
-        return assetConfigs[borrowableAsset].interestRate;
-    }
-
-    /// @notice Accrues interest globally into the borrow index and protocol reserves.
-    function _accrue() internal {
-        uint ts = uint(block.timestamp);
-        uint last = lastAccrual;
-        if (ts == last) return;
-
-        uint idx0 = borrowIndex;
-        uint dt = uint(ts - last);
-
-        uint rateBps = _currentAprBps();
-        // factorRAY = (APR * dt / YEAR) in RAY
-        uint factorRAY = (rateBps * RAY * dt) / (10000 * SECONDS_PER_YEAR);
-
-        uint idx1 = (idx0 * (RAY + factorRAY)) / RAY;
-        borrowIndex = idx1;
-        lastAccrual = ts;
-
-        if (totalScaledDebt > 0) {
-            uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
-            uint rf = assetConfigs[borrowableAsset].reserveFactor; // bps
-            if (rf > 0 && interestDelta > 0) {
-                reservesAccrued += (interestDelta * rf) / 10000;
-            }
-            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued);
+    /**
+     * @notice Distribute interest from borrower repayments
+     * @param totalInterest Total interest amount to distribute
+     */
+    function distributeInterest(uint256 totalInterest) internal onlyTokenFactory(borrowableAsset){
+        if (totalInterest == 0) return;
+        
+        uint256 assetReserveFactor = assetConfigs[borrowableAsset].reserveFactor;
+        if (assetReserveFactor == 0) assetReserveFactor = 1000; // Default 10%
+        
+        // Calculate reserve cut (to protocol treasury)
+        uint256 reserveCut = (totalInterest * assetReserveFactor) / 10000;
+        uint256 supplierCut = totalInterest - reserveCut;
+        
+        // The full repayment (including interest) is already in the LiquidityPool
+        // We need to transfer the reserve cut out to the fee collector
+        // The remaining amount stays in the pool and increases the exchange rate
+        
+        if (reserveCut > 0 && address(feeCollector) != address(0)) {
+            // Transfer reserve cut directly from LiquidityPool to fee collector
+            LiquidityPool liquidityPool = _liquidityPool();
+            liquidityPool.transferReserve(reserveCut, address(feeCollector));
         }
-    }
-
-    /// @notice Enforce system-wide debt ceilings (asset & USD) for a proposed new borrow amount.
-    function _checkDebtLimits(uint addAmount) internal view {
-        uint newDebt = _totalDebt() + addAmount;
-
-        if (debtCeilingAsset > 0) {
-            require(newDebt <= debtCeilingAsset, "Debt ceiling (asset) exceeded");
-        }
-        if (debtCeilingUSD > 0) {
-            uint p = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
-            require(p > 0, "No oracle price");
-            uint newUsd = (newDebt * p) / 1e18;
-            require(newUsd <= debtCeilingUSD, "Debt ceiling (USD) exceeded");
-        }
+        
+        emit InterestDistributed(borrowableAsset, totalInterest, reserveCut, supplierCut);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -579,7 +601,7 @@ contract record LendingPool is Ownable {
     }
     /**
      * @notice Set the single borrowable asset
-     * @param _asset The asset that can be borrowed
+     * @param asset The asset that can be borrowed
      */
     function setBorrowableAsset(address _asset) external onlyPoolConfigurator {
         require(_asset != address(0) && tokenFactory.isTokenActive(_asset), "Invalid or inactive asset");
@@ -601,46 +623,40 @@ contract record LendingPool is Ownable {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
-
-    /// @notice Sets system-wide debt ceilings (0 disables a ceiling)
-    function setDebtCeilings(uint assetUnits, uint usdValue) external onlyPoolConfigurator {
-        debtCeilingAsset = assetUnits;
-        debtCeilingUSD = usdValue;
-        emit DebtCeilingsUpdated(assetUnits, usdValue);
-    }
-
-    /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
-    function sweepReserves(uint amount) external onlyPoolConfigurator {
-        if (amount == 0 || reservesAccrued == 0) return;
-
-        uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
-        uint toSend = amount;
-        if (toSend > reservesAccrued) toSend = reservesAccrued;
-        if (toSend > cash) toSend = cash;
-
-        if (toSend > 0 && address(feeCollector) != address(0)) {
-            LiquidityPool(_liquidityPool()).transferReserve(toSend, address(feeCollector));
-            reservesAccrued -= toSend;
-            emit ReservesSwept(toSend, address(feeCollector));
-        }
-    }
     
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
+    /**
+    * @notice Calculates interest accrued since last update using RateStrategy
+    * @param loan The user's loan data
+    * @param interestRate The annual interest rate in basis points
+    * @return accruedInterest The newly accrued interest
+    * @return newTotalOwed current outstanding + accrued interest
+    */
+    function _accrueInterest(LoanInfo memory loan, uint256 interestRate) internal view returns (uint256 accruedInterest, uint256 newTotalOwed) {
+        if (loan.principalBalance == 0) return (0, 0);
+
+        accruedInterest = RateStrategy(_rateStrategy()).calculateInterest(
+            loan.principalBalance,
+            interestRate,
+            loan.lastIntCalculated
+        );
+
+        newTotalOwed = loan.principalBalance + loan.interestOwed + accruedInterest;
+        return (accruedInterest, newTotalOwed);
+    } 
 
     // @dev Calculate liquidation-weighted collateral value for a user (iterates configuredAssets)
-    function _getTotalCollateralValueForHealth(address user) internal view returns (uint) {
-        uint totalValue = 0;
-        CollateralVault vault = _collateralVault();
-        PriceOracle oracle = _priceOracle();
-      for (uint i = 0; i < configuredAssets.length; i++) {
+    function _getTotalCollateralValueForHealth(address user) internal view returns (uint256) {
+        uint256 totalValue = 0;
+        for (uint256 i = 0; i < configuredAssets.length; i++) {
             address asset = configuredAssets[i];
-            uint collateralAmount = vault.userCollaterals(user, asset);
+            uint256 collateralAmount = CollateralVault(_collateralVault()).userCollaterals(user, asset);
             if (collateralAmount == 0) continue;
 
-            uint price = oracle.getAssetPrice(asset);
-            uint liqThreshold = assetConfigs[asset].liquidationThreshold;
+            uint256 price = PriceOracle(_priceOracle()).getAssetPrice(asset);
+            uint256 liqThreshold = assetConfigs[asset].liquidationThreshold;
             if (price == 0 || liqThreshold == 0) continue;
 
             totalValue += (collateralAmount * price * liqThreshold) / (1e18 * 10000);
@@ -653,15 +669,21 @@ contract record LendingPool is Ownable {
      * @param user The user address
      * @return Total borrow value in USD (18 decimals)
      */
-    function _getTotalBorrowValue(address user) internal view returns (uint) {
-        uint debt = getUserDebt(user); // scaledDebt * borrowIndex / RAY
-        if (debt == 0) return 0;
+    function _getTotalBorrowValue(address user) internal view returns (uint256) {
+        LoanInfo memory loan = userLoan[user];
+        if (loan.principalBalance == 0) return 0;
 
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // USD 1e18
+        uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
+
+        // Simulate interest accrual 
+        (, uint256 totalOwed) = _accrueInterest(loan, interestRate);
+        if (totalOwed == 0) return 0;
+
+        uint256 price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
         if (price == 0) return 0;
 
-        // USD value (18 decimals)
-        return (debt * price) / 1e18;
+        // Return USD value (18 decimals)
+        return (totalOwed * price) / 1e18;
     }
 
     /**
@@ -671,17 +693,17 @@ contract record LendingPool is Ownable {
      * @param excludeAmount Amount to exclude from the excluded asset
      * @return maxBorrowAmount Maximum amount user can borrow in borrowableAsset units
      */
-    function calculateMaxBorrowingPower(address user, address excludeAsset, uint excludeAmount) public view returns (uint) {
-        uint totalCollateralValue = 0;
+    function calculateMaxBorrowingPower(address user, address excludeAsset, uint256 excludeAmount) public view returns (uint256) {
+        uint256 totalCollateralValue = 0;
         
         // Check all configured assets - only count if it's configured as collateral (ltv > 0)
-        for (uint i = 0; i < configuredAssets.length; i++) {
+        for (uint256 i = 0; i < configuredAssets.length; i++) {
             address asset = configuredAssets[i];
-            uint ltv = assetConfigs[asset].ltv;
+            uint256 ltv = assetConfigs[asset].ltv;
             
             // Only process assets that are configured as collateral
             if (ltv > 0) {
-                uint collateralAmount = CollateralVault(_collateralVault()).userCollaterals(user, asset);
+                uint256 collateralAmount = CollateralVault(_collateralVault()).userCollaterals(user, asset);
                 
                 // If this is the asset being excluded (for withdrawal simulation), reduce the amount
                 if (asset == excludeAsset) {
@@ -693,11 +715,11 @@ contract record LendingPool is Ownable {
                 }
                 
                 if (collateralAmount > 0) {
-                    uint price = PriceOracle(_priceOracle()).getAssetPrice(asset);
+                    uint256 price = PriceOracle(_priceOracle()).getAssetPrice(asset);
                     
                     if (price > 0) {
                         // Calculate borrowable value using LTV (max borrowing power)
-                        uint assetBorrowableValue = (collateralAmount * price * ltv) / (1e18 * 10000);
+                        uint256 assetBorrowableValue = (collateralAmount * price * ltv) / (1e18 * 10000);
                         totalCollateralValue += assetBorrowableValue;
                     }
                 }
@@ -705,65 +727,11 @@ contract record LendingPool is Ownable {
         }
         
         // Convert total borrowable value back to borrowableAsset units
-        uint borrowableAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
+        uint256 borrowableAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
         if (borrowableAssetPrice == 0) {
             return 0;
         }
         
         return (totalCollateralValue * 1e18) / borrowableAssetPrice;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // PREVIEW FUNCTIONS
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    /**
-    * @notice Preview the borrow index as if interest were accrued at the current block timestamp.
-    * @dev
-    *  - Read-only projection: DOES NOT modify state (no writes to `borrowIndex` or `lastAccrual`).
-    *  - Uses simple-interest over elapsed time since `lastAccrual` at the static APR from `assetConfigs[borrowableAsset].interestRate`.
-    *  - If `block.timestamp == lastAccrual`, returns the current `borrowIndex` unchanged.
-    *  - Units: RAY (1e27).
-    * @return projectedIndex The projected borrow index in RAY units.
-    */
-    function previewBorrowIndex() public view returns (uint projectedIndex) {
-        if (block.timestamp == lastAccrual) return borrowIndex;
-        uint dt = uint(block.timestamp - lastAccrual);
-        uint rateBps = assetConfigs[borrowableAsset].interestRate; // static APR in bps
-        uint factorRAY = (rateBps * RAY * dt) / (10000 * SECONDS_PER_YEAR);
-        return (borrowIndex * (RAY + factorRAY)) / RAY;
-    }
-
-    /**
-    * @notice Preview a user's debt using the projected borrow index at the current block timestamp.
-    * @dev
-    *  - Read-only projection: NO state changes.
-    *  - Computes `debt = user.scaledDebt * previewBorrowIndex() / RAY`.
-    *  - Units: underlying asset decimals (typically 18).
-    *  - The returned value may differ slightly from on-chain results if state changes occur before your tx executes.
-    * @param user The account to preview.
-    * @return debtPreview The user’s projected debt in underlying units.
-    */
-    function getUserDebtPreview(address user) public view returns (uint debtPreview) {
-        uint idx = previewBorrowIndex();
-        return (userLoan[user].scaledDebt * idx) / RAY;
-    }
-
-    /**
-    * @notice Preview the USD notional of a user's debt at the current block timestamp.
-    * @dev
-    *  - Read-only projection combining `getUserDebtPreview(user)` with the current oracle price.
-    *  - Returns 0 if the user has no debt or if the oracle price is 0.
-    *  - Units: 1e18 USD.
-    *  - The returned value can change by the time a transaction is mined (e.g., if utilization or prices move).
-    * @param user The account to preview.
-    * @return usdValuePreview The projected USD value of the user’s debt (1e18).
-    */
-    function getTotalBorrowValuePreview(address user) public view returns (uint usdValuePreview) {
-        uint debt = getUserDebtPreview(user);
-        if (debt == 0) return 0;
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
-        if (price == 0) return 0;
-        return (debt * price) / 1e18;
     }
 } 

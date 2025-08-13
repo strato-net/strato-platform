@@ -33,7 +33,7 @@ export const calculateAccruedInterest = (
   loan: LoanInfo,
   interestRate: number,
   currentTime: number
-): { accruedInterest: string; newTotalOwed: string } => {
+): { accruedInterest: string; newTotalOwed: string } => { //@adrian now we just call getUserDebt
   if (toBig(loan.principalBalance) === 0n) {
     return { accruedInterest: "0", newTotalOwed: "0" };
   }

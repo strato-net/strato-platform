@@ -1,0 +1,12 @@
+{
+  "name": "pool-and-tokens-deployment",
+  "version": "1.0.0",
+  "description": "Deployment scripts for creating tokens and pool contracts",
+  "main": "deployTokensAndPool.js",
+  "scripts": {
+    "deploy": "node deployment-scripts/poolAndTokens/deployTokensAndPool.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}
