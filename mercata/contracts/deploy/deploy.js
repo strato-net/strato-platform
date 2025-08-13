@@ -54,7 +54,7 @@ async function main() {
     console.log(`Lending Pool: ${deployedContract.managers.lendingPool}`);
     console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
-    console.log(`Mercata ETH Bridge: ${deployedContract.managers.mercataEthBridge}`);
+    console.log(`Mercata Bridge: ${deployedContract.managers.mercataBridge}`);
     console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
     console.log(`Pool Factory: ${deployedContract.managers.poolFactory}`);
     console.log(`Token Factory: ${deployedContract.managers.tokenFactory}`);
@@ -82,7 +82,7 @@ async function main() {
       LENDING_POOL: deployedContract.managers.lendingPool,
       LENDING_REGISTRY: deployedContract.managers.lendingRegistry,
       POOL_CONFIGURATOR: deployedContract.managers.poolConfigurator,
-      MERCATA_BRIDGE: deployedContract.managers.mercataEthBridge,
+      MERCATA_BRIDGE: deployedContract.managers.mercataBridge,
       ON_RAMP: deployedContract.managers.onRamp,
       MERCATA_CORE: deployedContract.address,
     };
