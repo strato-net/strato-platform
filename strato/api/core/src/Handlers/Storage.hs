@@ -24,6 +24,7 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Strato.Model.Address
 import Control.Arrow ((***))
+import Control.Monad (unless)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.Aeson
@@ -148,8 +149,9 @@ instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
                     -- Note: a join is done in StorageInfo
                     fmap (\v -> addrStRef E.^. AddressStateRefAddress E.==. E.val v) qsAddress
                   ]
-
-          E.where_ (foldl1 (E.&&.) criteria2)
+          
+          unless (null criteria2) $
+            E.where_ (foldl1 (E.&&.) criteria2)
 
           E.offset . fromIntegral $ fromMaybe 0 qsOffset
           case qsAddress of
