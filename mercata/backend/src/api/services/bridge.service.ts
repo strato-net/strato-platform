@@ -57,18 +57,13 @@ export const getBridgeStatus = async (
     }
 
     const params = {
-      select: `withdrawals:${MercataBridge}-withdrawals(id,destChainId,token,user,dest,amount,requestedAt,bridgeStatus)`,
+      select: "withdrawalId:key,withdrawalInfo:value",
       "value->>user": `eq.${userAddress}`,
     };
 
-    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
+    const { data: withdrawals } = await cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, { params });
 
-    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
-      return [];
-    }
-
-    const withdrawals = bridgeData[0].withdrawals || [];
-    return withdrawals;
+    return withdrawals || [];
   } catch (error) {
     throw error;
   }
@@ -80,25 +75,19 @@ export const getBridgeableTokens = async (
 ) => {
   try {
     const params = {
-      select: `assets:${MercataBridge}-assets(*)`,
+      select: "stratoTokenAddress:key,assetInfo:value",
       "value->>enabled": "eq.true",
       "value->>chainId": `eq.${chainId}`
     };
 
-    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, { params });
-
-    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
-      return [];
-    }
-
-    const assets = bridgeData[0].assets || [];
+    const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
     
     if (assets.length === 0) {
       return [];
     }
 
     // Get token addresses from assets
-    const tokenAddresses = assets.map((asset: any) => asset.stratoToken);
+    const tokenAddresses = assets.map((asset: any) => asset.assetInfo?.stratoToken).filter(Boolean);
     
     // Fetch token metadata
     const tokenParams = {
@@ -115,9 +104,10 @@ export const getBridgeableTokens = async (
     });
     
     return assets.map((asset: any) => ({
-      ...asset,
-      stratoTokenName: tokenMap.get(asset.stratoToken)?._name || "",
-      stratoTokenSymbol: tokenMap.get(asset.stratoToken)?._symbol || ""
+      stratoTokenAddress: asset.stratoTokenAddress,
+      stratoTokenName: tokenMap.get(asset.assetInfo?.stratoToken)?._name || "",
+      stratoTokenSymbol: tokenMap.get(asset.assetInfo?.stratoToken)?._symbol || "",
+      ...asset.assetInfo
     }));
   } catch (error) {
     throw error;
@@ -126,19 +116,18 @@ export const getBridgeableTokens = async (
 
 export const getNetworkConfigs = async (accessToken: string) => {
   try {
-    const { data: bridgeData } = await cirrus.get(accessToken, `/${MercataBridge}`, {
+    const { data: chains } = await cirrus.get(accessToken, `/${MercataBridge}-chains`, {
       params: {
-        select: `chains:${MercataBridge}-chains(*)`,
+        select: "chainId:key,ChainInfo:value",
         "value->>enabled": "eq.true"
       }
     });
 
-    if (!bridgeData || !Array.isArray(bridgeData) || bridgeData.length === 0) {
-      throw new Error("No bridge data found");
-    }
-
-    const chains = bridgeData[0].chains || [];
-    return chains;
+    // Return array of key-value pairs
+    return chains.map((chain: any) => ({
+      chainId: chain.chainId,
+      chainInfo: chain.ChainInfo
+    }));
   } catch (error) {
     throw error;
   }

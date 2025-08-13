@@ -57,12 +57,7 @@ class BridgeController {
     try {
       const { accessToken } = req;
       const result = await getNetworkConfigs(accessToken);
-      const configData = {
-        ...result,
-        showTestnet: process.env.NODE_ENV !== "production" ? true : false,
-      };
-
-      res.json(configData);
+      res.json(result);
     } catch (error: any) {
       next(error);
     }
