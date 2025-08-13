@@ -141,7 +141,8 @@ contract record LendingPool is Ownable {
         // Check that borrowable asset has lending parameters configured
         AssetConfig memory config = assetConfigs[borrowableAsset];
         require(config.interestRate > 0, "Interest rate not configured");
-    
+        //@adrian reserve factor positive check removed here
+
         _accrue(); // ensure borrow index & reserves are up-to-date before mint calc
         
         // Calculate current exchange rate and corresponding mToken amount to mint
@@ -521,7 +522,7 @@ contract record LendingPool is Ownable {
 
     /// @notice APR (bps) used by `_accrue()` (static per-asset rate).
     function _currentAprBps() internal view returns (uint) {
-        return assetConfigs[borrowableAsset].interestRate;
+        return assetConfigs[borrowableAsset].interestRate; //@adrian kind of sketchy that this can change; your interest rate is not locked in
     }
 
     /// @notice Accrues interest globally into the borrow index and protocol reserves.
@@ -530,7 +531,7 @@ contract record LendingPool is Ownable {
         uint last = lastAccrual;
         if (ts == last) return;
 
-        uint idx0 = borrowIndex;
+        uint idx0 = borrowIndex; //@adrian a global borrow index seems weird- wait, this is not a timestamp
         uint dt = uint(ts - last);
 
         uint rateBps = _currentAprBps();
@@ -544,6 +545,7 @@ contract record LendingPool is Ownable {
         if (totalScaledDebt > 0) {
             uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
             uint rf = assetConfigs[borrowableAsset].reserveFactor; // bps
+            //@adrian why would it be the borrowableAsset's reserve factor? I thought assetconfigs and reserve factors are for collateral
             if (rf > 0 && interestDelta > 0) {
                 reservesAccrued += (interestDelta * rf) / 10000;
             }

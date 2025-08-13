@@ -1,4 +1,3 @@
-my nginx container is stuck in Restarting
 adnan@BA-25:~/Documents/Lending_Protocol_Aug2025/strato-platform$ docker compose logs nginx
 WARN[0000] The "NODE_HOST" variable is not set. Defaulting to a blank string. 
 WARN[0000] The "NODE_HOST" variable is not set. Defaulting to a blank string. 

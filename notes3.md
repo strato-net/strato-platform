@@ -1,0 +1,20 @@
+- Removed public/external functions:
+	- none
+- Added public/external functions:
+	- function getUserDebt(address user) public view returns (uint debt)
+	- function setDebtCeilings(uint assetUnits, uint usdValue) external onlyPoolConfigurator
+	- function sweepReserves(uint amount) external onlyPoolConfigurator
+	- function previewBorrowIndex() public view returns (uint projectedIndex)
+	- function getUserDebtPreview(address user) public view returns (uint debtPreview)
+	- function getTotalBorrowValuePreview(address user) public view returns (uint usdValuePreview)
+- Backend Changes:
+	- New way to calculate Total Amount Owed; just call getUserDebt(user)
+		- Don't we want to call getUserDebtPreview instead?
+		- This is in mercata/backend/src/api/helpers/lending.helper.ts, `newTotalOwed`, which comes from calculateAccruedInterest now
+	- Change LoanInfo type, also in lending.helper.ts
+		- AssetConfig in lending.helper.ts already doesn't match AssetConfig in LendingPool.sol
+- Frontend Changes:
+	- http://localhost/dashboard/borrow > Borrow > Currently Borrowed --> Total Amount Owed
+	- http://localhost/dashboard/borrow > Your Position > Total Borrowed --> Total Amount Owed
+		- Confirmed that this change is correct
+	- http://localhost/dashboard/borrow > Repay > Total Amount Due --> Total Amount Owed

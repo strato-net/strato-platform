@@ -134,7 +134,7 @@ contract record LendingPool is Ownable {
     function depositLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
         //@adrian why onlyTokenFactory() modifier here? is it to try and sure we're initialized? if so, what about mToken? and shouldn't we be more careful?
         require(amount > 0, "Invalid amount");
-        require(mToken != address(0), "mToken not set");
+        require(mToken != address(0), "mToken not set"); //@adrian these initialization checks should all be combined
         
         // Check that borrowable asset has lending parameters configured
         AssetConfig memory config = assetConfigs[borrowableAsset];
@@ -569,6 +569,7 @@ contract record LendingPool is Ownable {
         
         uint256 assetReserveFactor = assetConfigs[borrowableAsset].reserveFactor;
         if (assetReserveFactor == 0) assetReserveFactor = 1000; // Default 10%
+        //@adrian another case of bad initialization checks
         
         // Calculate reserve cut (to protocol treasury)
         uint256 reserveCut = (totalInterest * assetReserveFactor) / 10000;
