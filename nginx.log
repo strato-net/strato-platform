@@ -1,0 +1,174 @@
+my nginx container is stuck in Restarting
+adnan@BA-25:~/Documents/Lending_Protocol_Aug2025/strato-platform$ docker compose logs nginx
+WARN[0000] The "NODE_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "NODE_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "LENDING_REGISTRY" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "BRIDGE_API_BASE_URL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "WAGMI_PROJECT_ID" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "NODE_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "NODE_NAME" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "ADMIN_EMAIL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PROMETHEUS_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SENDGRID_API_KEY" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_HOSTNAME" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_PORT_API" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "MONITOR_URL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "addBootnodes" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "appFetchLimit" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "averageTxsPerBlock" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockstanbul" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockstanbulBlockPeriodMs" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockstanbulRoundPeriodS" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockTime" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "bootnode" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "connectionTimeout" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugFail" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugPort" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugWSHost" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugWSPort" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "evmDebugMode" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "FILE_SERVER_URL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "gasLimit" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "lazyBlocks" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "maxConn" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "maxReturnedHeaders" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "maxTxsPerBlock" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "minBlockDifficulty" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "network" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "networkID" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "NOTIFICATION_SERVER_URL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "numMinPeers" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "OAUTH_VAULT_PROXY_ALT_CLIENT_ID" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "OAUTH_VAULT_PROXY_ALT_CLIENT_SECRET" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "OAUTH_RESERVE_SECONDS" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "P2P_DEBUG_LOG" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "redisBDBNumber" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "seqEventsBatchSize" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "seqEventsCostHeuristic" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "seqMaxEventsPerIter" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "seqMaxUsPerIter" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "seqRTSOPTs" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SLIPSTREAM_OPTIONAL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "strictBlockstanbul" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "strictGas" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "strictGasLimit" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "svmTrace" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "sqlDiff" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "svmDev" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "txSizeLimit" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "userRegistryAddress" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "userRegistryCodeHash" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "useBuiltinUserRegistry" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "useCustomGenesis" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "useWalletsByDefault" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "VAULT_URL" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "VAULT_PROXY_DEBUG" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "VM_DEBUGGER" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "vmRunnerRTSOPTs" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "APEX_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockstanbul" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "blockTime" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugPort" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "debugWSPort" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "DOCS_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "OAUTH_SCOPE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "POSTGREST_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "PROMETHEUS_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SERVE_LOGS" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SMD_DEV_MODE" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SMD_DEV_MODE_HOST_IP" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "SMD_HOST" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "sslCertFileType" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STATS_ENABLED" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_HOSTNAME" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_PORT_API" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_PORT_API2" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "STRATO_PORT_LOGS" variable is not set. Defaulting to a blank string. 
+WARN[0000] The "VM_DEBUGGER" variable is not set. Defaulting to a blank string. 
+WARN[0000] /home/adnan/Documents/Lending_Protocol_Aug2025/strato-platform/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion 
+nginx-1  | Waiting for Strato api to be available...
+nginx-1  |   Check at Wed Aug 13 19:12:39 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:40 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:41 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:42 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:43 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:44 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:45 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:46 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:47 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:48 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:49 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:50 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:51 UTC 2025
+nginx-1  |   Check at Wed Aug 13 19:12:52 UTC 2025
+nginx-1  | Strato api is available
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:12:56 [emerg] 116#116: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:12:56 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:12:56 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:12:57 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:12:58 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:13:00 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:13:03 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:13:10 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:13:23 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | Waiting for apex to be available...
+nginx-1  | apex is available
+nginx-1  | Waiting for VaultProxy to be available with node key added to Vault...
+nginx-1  | VaultProxy is available
+nginx-1  | nginx is now running. See the logs below...
+nginx-1  | 2025/08/13 19:13:49 [emerg] 9#9: unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
+nginx-1  | nginx: [emerg] unexpected end of file, expecting "}" in /usr/local/openresty/nginx/conf/nginx.conf:354
