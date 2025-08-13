@@ -85,6 +85,7 @@ The name of the smart contract will be `RewardsEngine`
   - the asset (token) on which it was triggered
   - the multiplier - factor to use when calculating a reward
   - owner - address that can trigger that action
+  - createdAt - timestamp when the action was added
 
   For example, in a scenario where there is:
   - one Lending pool (USDST) address 0x001
@@ -118,6 +119,11 @@ The name of the smart contract will be `RewardsEngine`
   - `lastSeenAmount`: a `unit` holding last seen amount for a given `Action`
     (this is only needed for feature "Estimate Accrued Reward")
 
+  Note: When a UserBalance is first created for a given action/reward combination,
+  if no previous balance exists, the initial `modifiedAt` should be set to the
+  action's `createdAt` timestamp to properly calculate accrued rewards from when
+  the action was first available.
+
   We need a field called `balances`.
 
   It should map from `action type` to mapping
@@ -129,48 +135,76 @@ The name of the smart contract will be `RewardsEngine`
   `RewardBalance` to `UserBalance`, we must modify balances when `Action` is
   removed or added.
 
-### Update rewards
+### Update rewards (IMPLEMENTED)
 
   We must introduce function `update` which will have the following
   parameters.
 
-  - `caller`: an `address` of a caller (e.g Liquidity Pool)
-  - `type`: type of an `Action` that is triggering the update
-  - `assets`: an array of `Token`s.
-
-     Both the `type` and each asset in `assets` identify the list of `Action`s
-     that will be updated. Each `Action` has an `owner` and that `owner` must be
-     the same as the `caller`.
-  - `amounts`: an array of amounts, each representing current amount for each of the assets
-     The length of `assets` and `amunts` must be identical
+  - `actionType`: type of an `Action` that is triggering the update (string)
+  - `assets`: an array of asset addresses
+  - `amounts`: an array of amounts, each representing the liquidity amount before the current transaction
+     The length of `assets` and `amounts` must be identical
   - `user`: an `address` of a user
 
-  The function will identify `Action`s that are updated.
+  The function will identify `Action`s that are updated by matching `actionType` and each `asset`.
+  Each `Action` has an `owner` and that `owner` must be the same as `msg.sender` (caller authorization).
+
   Then for each `Action`
      for each `Reward token`
-	     find a user and in `balances`
-	     - we check the modifier value for action, for a `Reward` token
-	     - we calculate delta: how much time has passed since last update of a
-           given `Action`
-	     - we calculate accrued value as `accrued = amount` * `multiplier value` * `delta`
-           and we add that value to existing `balance` (`balance` += `accrued`)
-	     - we modify the `modifiedAt` with current timestamp
-	     - we modify the `lastSeenAmount` to `amount`
+	     find a user in `balances`
+	     - we get the multiplier factor for the action's multiplier and the reward token
+	     - we calculate time delta: how much time has passed since last update (`modifiedAt`)
+	     - we calculate accrued value as `accrued = amount * multiplier_factor * time_delta`
+           and we add that value to existing `balance` (`balance += accrued`)
+	     - we update the `modifiedAt` with current timestamp
+	     - we update the `lastSeenAmount` to the provided `amount`
 
-   Lastly as a result we want to return current balance. That will be a list of
-   `CurrentBalance` for a given user where `CurrentBalance` holds:
+  Key implementation details:
+  - For first-time users, `modifiedAt` is initialized to the action's `createdAt` timestamp
+  - The `amount` parameter represents the liquidity state before the current transaction
+  - Rewards are always calculated using the provided `amount`, not the stored `lastSeenAmount`
+  - User balances are created on-demand when first accessed
 
-   - `rewardToken`
-   - `action`
-   - `currentBalance`
+   The function returns a list of `CurrentBalance` for the given user where `CurrentBalance` holds:
 
-### Reward claim
+   - `rewardToken`: address of the reward token
+   - `actionType`: the action type string
+   - `asset`: the asset address
+   - `currentBalance`: the updated balance amount
 
-  TBD
+### TODO Reward claim
 
-### Estimate CurrentBalance Reward
+  implement today
 
-  TBD
+### TODO function modifiers
+
+ `update` should be called by owners only
+ `claim` only user should be allowed to claim rewards
+
+### Estimate CurrentBalance Reward (IMPLEMENTED)
+
+  We need a function to estimate how much rewards a user would have at the current moment
+  without updating their balances. This is useful for displaying potential rewards in UIs.
+
+  The function `estimateRewards` takes the following parameters:
+  - `userAddress`: address of the user to estimate rewards for
+  - `actionKeys`: array of `ActionKey` structs identifying which actions to estimate
+
+  Where `ActionKey` contains:
+  - `actionType`: string identifying the type of action
+  - `asset`: address of the asset for the action
+
+  The function returns an array of `CurrentBalance` structs (same as `update` function).
+
+  Key implementation details:
+  - Uses the shared `calculateAccruedReward` utility function
+  - For existing user balances, calculates potential accrued rewards using `lastSeenAmount`
+  - The `lastSeenAmount` represents the user's liquidity state from their last interaction
+  - Does not modify any state (view function)
+  - If user has no balance for an action, returns the stored balance (typically 0)
+
+  The calculation logic is identical to `update`, but uses `lastSeenAmount` instead of
+  the provided `amount` parameter, allowing estimation without knowing current liquidity amounts.
 
 ### Ownership Controls (IMPLEMENTED)
 

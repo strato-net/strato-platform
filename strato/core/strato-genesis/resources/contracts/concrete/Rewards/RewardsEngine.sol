@@ -16,6 +16,7 @@ contract record RewardsEngine is Ownable {
     event MultiplierRemoved(string indexed name);
     event ActionAdded(string indexed actionType, address indexed asset, string multiplierName);
     event ActionRemoved(string indexed actionType, address indexed asset);
+    event RewardsUpdated(address indexed user, string indexed actionType, address indexed asset);
 
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -35,6 +36,7 @@ contract record RewardsEngine is Ownable {
         address asset;
         string multiplierName;
         address owner;
+        uint256 createdAt;         // timestamp when Action was added
     }
 
     struct UserBalance {
@@ -42,6 +44,18 @@ contract record RewardsEngine is Ownable {
         uint256 createdAt;         // timestamp when UserBalance was created
         uint256 modifiedAt;        // timestamp when balance was last modified
         uint256 lastSeenAmount;    // last seen amount for a given Action (for estimate feature)
+    }
+
+    struct CurrentBalance {
+        address rewardToken;
+        string actionType;
+        address asset;
+        uint256 currentBalance;
+    }
+
+    struct ActionKey {
+        string actionType;
+        address asset;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -286,11 +300,12 @@ contract record RewardsEngine is Ownable {
             actionType: actionType,
             asset: asset,
             multiplierName: multiplierName,
-            owner: owner
+            owner: owner,
+            createdAt: block.timestamp
         });
 
-        // Initialize balances structure for this action
-        // Note: UserBalance structs will be created on-demand when users interact with the system
+        // Note: balances[actionType][asset][rewardToken][user] mappings are automatically
+        // available in Solidity. UserBalance structs will be created on-demand when users interact.
 
         emit ActionAdded(actionType, asset, multiplierName);
     }
@@ -312,6 +327,138 @@ contract record RewardsEngine is Ownable {
         delete actions[actionType][asset];
 
         emit ActionRemoved(actionType, asset);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // REWARD CALCULATION UTILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function calculateAccruedReward(
+        UserBalance storage userBalance,
+        uint256 amount,
+        uint256 multiplierFactor
+    ) internal view returns (uint256) {
+        uint256 currentTime = block.timestamp;
+        uint256 timeDelta = currentTime - userBalance.modifiedAt;
+	return (amount * delta * multiplierFactor) / seconds_in_year
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // UPDATE REWARDS FUNCTIONALITY
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function update(
+        string calldata actionType,
+        address[] calldata assets,
+        uint256[] calldata amounts,
+        address user
+    ) external returns (CurrentBalance[] memory) {
+        require(bytes(actionType).length > 0, "RewardsEngine: Empty action type");
+        require(assets.length == amounts.length, "RewardsEngine: Array length mismatch");
+        require(user != address(0), "RewardsEngine: Invalid user address");
+
+        CurrentBalance[] memory currentBalances = new CurrentBalance[](assets.length * rewardTokens.length);
+        uint256 resultIndex = 0;
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+            uint256 amount = amounts[i];
+
+            // Check that action exists and caller is authorized
+            Action storage action = actions[actionType][asset];
+            require(bytes(action.actionType).length > 0, "RewardsEngine: Action not found");
+            require(action.owner == msg.sender, "RewardsEngine: Unauthorized caller");
+
+            // Get the multiplier for this action
+            Multiplier storage multiplier = multipliers[action.multiplierName];
+
+            // Update rewards for each reward token
+            for (uint256 j = 0; j < rewardTokens.length; j++) {
+                address rewardToken = address(rewardTokens[j]);
+
+                UserBalance storage userBalance = balances[actionType][asset][rewardToken][user];
+
+                uint256 currentTime = block.timestamp;
+                uint256 multiplierFactor = multiplier.factors[rewardToken];
+
+                // Initialize user balance if this is the first time
+                if (userBalance.createdAt == 0) {
+                    userBalance.createdAt = currentTime;
+                    userBalance.modifiedAt = action.createdAt; // Use action's creation time
+                    userBalance.balance = 0; // Start with zero balance
+                }
+
+                // Calculate and add accrued rewards
+                uint256 accruedReward = calculateAccruedReward(userBalance, amount, multiplierFactor);
+                userBalance.balance += accruedReward;
+                userBalance.modifiedAt = currentTime;
+                userBalance.lastSeenAmount = amount;
+
+                currentBalances[resultIndex] = CurrentBalance({
+                    rewardToken: rewardToken,
+                    actionType: actionType,
+                    asset: asset,
+                    currentBalance: userBalance.balance
+                });
+                resultIndex++;
+            }
+
+            emit RewardsUpdated(user, actionType, asset);
+        }
+
+        return currentBalances;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // ESTIMATE REWARDS FUNCTIONALITY
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function estimateRewards(
+        address userAddress,
+        ActionKey[] calldata actionKeys
+    ) external view returns (CurrentBalance[] memory) {
+        require(userAddress != address(0), "RewardsEngine: Invalid user address");
+
+        CurrentBalance[] memory estimatedBalances = new CurrentBalance[](actionKeys.length * rewardTokens.length);
+        uint256 resultIndex = 0;
+
+        for (uint256 i = 0; i < actionKeys.length; i++) {
+            string calldata actionType = actionKeys[i].actionType;
+            address asset = actionKeys[i].asset;
+
+            // Check that action exists
+            Action storage action = actions[actionType][asset];
+            require(bytes(action.actionType).length > 0, "RewardsEngine: Action not found");
+
+            // Get the multiplier for this action
+            Multiplier storage multiplier = multipliers[action.multiplierName];
+
+            // Estimate rewards for each reward token
+            for (uint256 j = 0; j < rewardTokens.length; j++) {
+                address rewardToken = address(rewardTokens[j]);
+
+                UserBalance storage userBalance = balances[actionType][asset][rewardToken][userAddress];
+                uint256 multiplierFactor = multiplier.factors[rewardToken];
+
+                uint256 estimatedBalance = userBalance.balance;
+
+                // Add potential accrued rewards using lastSeenAmount
+                if (userBalance.createdAt > 0) {
+                    uint256 accruedReward = calculateAccruedReward(userBalance, userBalance.lastSeenAmount, multiplierFactor);
+                    estimatedBalance += accruedReward;
+                }
+
+                estimatedBalances[resultIndex] = CurrentBalance({
+                    rewardToken: rewardToken,
+                    actionType: actionType,
+                    asset: asset,
+                    currentBalance: estimatedBalance
+                });
+                resultIndex++;
+            }
+        }
+
+        return estimatedBalances;
     }
 
 }
