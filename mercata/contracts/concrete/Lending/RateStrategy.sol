@@ -14,6 +14,7 @@
         uint256 hoursElapsed = durationSeconds / 3600; // whole hours only; <1h accrues 0 interest
         if (hoursElapsed == 0) return 0;
         // 8760 hours in a year; divide by 10_000 to convert rate from basis points (bps) to a percentage
+        // @adrian it's not a percentage is it; it's a decimal. It doesn't give X such that X / 100 = rate.
         return (principal * rate * hoursElapsed) / (8760 * 10000);
     }
 }

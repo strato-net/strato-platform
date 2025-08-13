@@ -40,6 +40,7 @@ contract record LendingPool is Ownable {
         uint256 lastIntCalculated;    // Last time interest was calculated
         uint256 lastUpdated;          // Last time loan was updated
     }
+    //@adrian okay so this exists now, but we'll remove these individual LoanInfos and want to know how this will impact the backend and UI
 
     struct AssetConfig {
         uint256 ltv;                    // Loan-to-Value ratio (max initial borrow) in basis points
@@ -90,6 +91,7 @@ contract record LendingPool is Ownable {
         tokenFactory = TokenFactory(_tokenFactory);
         feeCollector = FeeCollector(_feeCollector);
     }
+    // @adrian where are borrowableAsset and mToken set?
 
     modifier onlyPoolConfigurator() {
         require(msg.sender == address(poolConfigurator), "Caller is not PoolConfigurator");
@@ -130,6 +132,7 @@ contract record LendingPool is Ownable {
      * @param amount The amount to deposit
      */
     function depositLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
+        //@adrian why onlyTokenFactory() modifier here? is it to try and sure we're initialized? if so, what about mToken? and shouldn't we be more careful?
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
         
@@ -267,7 +270,10 @@ contract record LendingPool is Ownable {
         // Get up-to-date debt 
         (uint256 accruedInterest, uint256 totalOwed) = _accrueInterest(loan, interestRate);
         require(totalOwed > 0, "Nothing to repay");
-
+        //@adrian a bit weird that this is what's preventing the under-1hour 0interest case; you just can't repay for the first hour
+        //@adrian actually, no, this only checks totalOwed not accruedInterest, so you still do get a free 1-hr loan!
+        //@adrian also while we're at it, how is totalOwed==0 possible if loan.principalBalance>0 is already asserted?
+        
         // Update interestOwed with newly accrued interest
         loan.interestOwed += accruedInterest;
         uint256 totalInterest = loan.interestOwed;
@@ -279,7 +285,7 @@ contract record LendingPool is Ownable {
         uint256 principalPortion;
         uint256 interestPortion;
         
-        if (repayAmount >= totalOwed) {
+        if (repayAmount >= totalOwed) { //@adrian > should be unreachable
             // Full repayment
             principalPortion = loan.principalBalance;
             interestPortion = loan.interestOwed;
@@ -287,7 +293,7 @@ contract record LendingPool is Ownable {
             // Partial repayment - pay interest first, then principal
             if (repayAmount <= loan.interestOwed) {
                 // Payment only covers (part of) interest
-                principalPortion = 0;
+                principalPortion = 0;//@adrian this looks wrong
                 interestPortion = repayAmount;
             } else {
                 // Payment covers all interest plus some principal
@@ -302,7 +308,7 @@ contract record LendingPool is Ownable {
         // Distribute the interest portion (transfer reserve cut out of the pool)
         if (interestPortion > 0) {
             distributeInterest(interestPortion);
-        }
+        }//@adrian I think this is changing anyways
 
         if (repayAmount >= totalOwed) {
             //full repayment - close loan
@@ -350,6 +356,7 @@ contract record LendingPool is Ownable {
         // Ensure collateral asset is configured and has liquidation parameters
         AssetConfig memory cConfig = assetConfigs[collateralAsset];
         require(cConfig.liquidationBonus >= 10000, "Asset not eligible for liquidation");
+        // @adrian why is this the condition?
 
         // Fetch loan info & total debt
         LoanInfo storage loan = userLoan[borrower];
@@ -363,11 +370,11 @@ contract record LendingPool is Ownable {
 
         // Determine max allowed repayment
         uint256 maxRepay;
-        if (health < 95e16) { // 0.95 * 1e18
+        if (health < 95e16) { // 0.95 * 1e18 
             maxRepay = totalOwed; // full liquidation allowed
         } else {
             maxRepay = totalOwed / 2; // 50%
-        }
+        }//@adrian is this made clear in the UI?
 
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
 
