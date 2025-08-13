@@ -1,5 +1,14 @@
 import { logError } from "../utils/logger";
 
+// Constants
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+export const ERC20_ABI = [
+  "function transfer(address to, uint256 amount) public returns (bool)",
+];
+
+export const DEPOSIT_EVENT_SIGNATURE = '0x8f678ca000000000000000000000000000000000000000000000000000000000';
+
 const config = {
   auth: {
     baUsername: process.env.BA_USERNAME,

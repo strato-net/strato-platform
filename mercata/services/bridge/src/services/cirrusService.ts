@@ -98,7 +98,38 @@ export const getWithdrawalsByStatus = async (status: string): Promise<any[]> => 
       }
     });
     
-    return Array.isArray(data) ? data : [];
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map(item => ({
+        ...item.value,
+        id: item.key,
+        withdrawalId: item.key
+      }));
+    }
+    return [];
+  } catch (error) {
+    throw error; // Let the caller handle logging
+  }
+};
+
+// Get deposits by status (reusable function)
+export const getDepositsByStatus = async (status: string): Promise<any[]> => {
+  try {
+    const data = await cirrus.get(`/${MERCATA_URL}-deposits`, {
+      params: {
+        "value->>bridgeStatus": `eq.${status}`,
+        address: `eq.${config.bridge.address}`,
+        order: "value->>requestedAt.asc"
+      }
+    });
+    
+    if (Array.isArray(data) && data.length > 0) {
+      return data.map(item => ({
+        ...item.value,
+        id: item.key,
+        depositId: item.key
+      }));
+    }
+    return [];
   } catch (error) {
     throw error; // Let the caller handle logging
   }

@@ -10,40 +10,32 @@ export const bridgeOut = async (
   accessToken: string,
   body: Record<string, string | undefined>
 ) => {
-  try {
-    const { destChainId, token, amount, destAddress } = body;
+  const { destChainId, token, amount, destAddress } = body;
 
-    const bridgeContractName = extractContractName(MercataBridge);
-    const bridgeContractAddress = constants.mercataBridge;
-    
-    if (!bridgeContractAddress) {
-      throw new Error("Bridge contract address not configured");
-    }
-
-    const tx = buildFunctionTx({
-      contractName: bridgeContractName,
-      contractAddress: bridgeContractAddress,
-      method: "requestWithdrawal",
-      args: {
-        destChainId,
-        token,
-        amount,
-        destAddress
-      },
-    });
-
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
-
-    return {
-      status,
-      hash,
-      message: "Withdrawal request submitted successfully"
-    };
-  } catch (error) {
-    throw error;
+  if (!constants.mercataBridge) {
+    throw new Error("Bridge contract address not configured");
   }
+
+  const tx = buildFunctionTx([
+    {
+      contractName: extractContractName(Token),
+      contractAddress: token || "",
+      method: "approve",
+      args: { spender: constants.mercataBridge, value: amount },
+    },
+    {
+      contractName: extractContractName(MercataBridge),
+      contractAddress: constants.mercataBridge,
+      method: "requestWithdrawal",
+      args: { destChainId, token, amount, destAddress },
+    }
+  ]);
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash, message: "Withdrawal request submitted successfully" };
 };
 
 export const getBridgeStatus = async (

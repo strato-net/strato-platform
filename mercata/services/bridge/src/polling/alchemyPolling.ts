@@ -14,7 +14,7 @@ import {
 import { logError } from '../utils/logger';
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
-const DEPOSIT_EVENT_SIGNATURE = '0x8f678ca000000000000000000000000000000000000000000000000000000000';
+import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 
 const updateLastProcessedBlock = async (
   chainId: number,

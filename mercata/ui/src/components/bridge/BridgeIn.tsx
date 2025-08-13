@@ -25,7 +25,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from '@/context/UserContext';
 import BridgeWalletStatus from './BridgeWalletStatus';
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { safeParseUnits } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
 import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import { parseUnits } from "ethers";
 
@@ -57,7 +57,6 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
   const {
     loading: contextLoading,
     bridgeIn: bridgeInAPI,
-    formatBalance,
     getBridgeableTokens,
   } = useBridgeContext();
 
@@ -206,6 +205,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
           if (nativeBalance) {
             const formattedBalance = formatBalance(
               nativeBalance.value,
+              undefined,
               nativeBalance.decimals
             );
             if (mounted) {
@@ -237,6 +237,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
           if (tokenBalanceData) {
             const formattedBalance = formatBalance(
               tokenBalanceData.value,
+              undefined,
               tokenBalanceData.decimals
             );
             if (mounted) {
@@ -531,7 +532,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
           const balance = await client.getBalance({
             address: address as `0x${string}`,
           });
-          const formattedBalance = formatBalance(balance, 18);
+          const formattedBalance = formatBalance(balance, undefined, 18);
           setTokenBalance(formattedBalance);
         } else {
           const balance = await client.readContract({
@@ -548,7 +549,7 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet, networkChainId }) => {
             functionName: "balanceOf",
             args: [address as `0x${string}`],
           });
-          const formattedBalance = formatBalance(balance, parseInt(selectedToken.extDecimals));
+          const formattedBalance = formatBalance(balance, undefined, parseInt(selectedToken.extDecimals));
           setTokenBalance(formattedBalance);
         }
 

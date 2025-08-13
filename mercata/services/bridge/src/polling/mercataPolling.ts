@@ -6,7 +6,8 @@ import {
   handleRejectedWithdrawalBatch
 } from "../services/bridgeService";
 import { 
-  getWithdrawalsByStatus
+  getWithdrawalsByStatus,
+  getDepositsByStatus
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatus } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
@@ -33,7 +34,7 @@ export const startDepositInitiatedPolling = async () => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
   const poll = async () => {
     try {
-      const depositStatus = await getWithdrawalsByStatus("1");
+      const depositStatus = await getDepositsByStatus("1");
       
       if (depositStatus.length > 0) {
         await confirmDepositBatch(depositStatus);

@@ -15,7 +15,7 @@ import {
 import { useAccount, useChainId } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { roundToDecimals, safeParseUnits } from "@/utils/numberUtils";
+import { roundToDecimals, safeParseUnits, formatBalance } from "@/utils/numberUtils";
 import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
@@ -46,7 +46,6 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
     loading: contextLoading,
     bridgeOut: bridgeOutAPI,
     getBalance,
-    formatBalance,
     getBridgeableTokens,
   } = useBridgeContext();
 
@@ -135,6 +134,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
           if (mounted && balanceData?.balance) {
             const formattedBalance = formatBalance(
               balanceData.balance,
+              undefined,
               parseInt(selectedToken.extDecimals)
             );
             setTokenBalance(formattedBalance);
@@ -163,7 +163,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
     return () => {
       mounted = false;
     };
-  }, [ selectedToken, getBalance, formatBalance]);
+  }, [ selectedToken, getBalance]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -282,6 +282,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
         if (balanceData?.balance) {
           const formattedBalance = formatBalance(
             balanceData.balance,
+            undefined,
             parseInt(selectedToken.extDecimals)
           );
           setTokenBalance(formattedBalance);
