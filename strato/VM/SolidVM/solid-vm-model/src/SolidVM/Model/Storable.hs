@@ -51,9 +51,6 @@ data BasicValue
   | BAccount !NamedAccount
   | BEnumVal !SolidString !SolidString !Word32
   | BContract !SolidString !NamedAccount
-  | -- The sole purpose of this sentinel is to make slipstream reserve
-    -- a column for this mapping
-    BMappingSentinel
   | BDefault -- Indicates a not present value
   deriving (Show, Read, Eq, Generic, NFData, Hashable, Binary)
 
@@ -113,7 +110,6 @@ isDefault (BBool b) = not b
 isDefault (BAccount a) = a == unspecifiedChain 0x0
 isDefault (BEnumVal _ _ w) = w == 0
 isDefault (BContract _ a) = a == unspecifiedChain 0x0
-isDefault BMappingSentinel = False
 isDefault BDefault = True
 
 instance Format BasicValue where
@@ -125,7 +121,6 @@ instance Format BasicValue where
   format (BAccount a) = "account(" ++ show a ++ ")"
   format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
   format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
-  format BMappingSentinel = "<MappingSentinel>"
   format BDefault = "<unknown>"
 
 formatBasicValueForSQL :: BasicValue -> Text
@@ -137,7 +132,6 @@ formatBasicValueForSQL (BBool False) = "false"
 formatBasicValueForSQL (BAccount a) = T.pack $ show a
 formatBasicValueForSQL (BEnumVal n1 n2 w) = labelToText n1 <> "." <> labelToText n2 <> "." <> T.pack (show w)
 formatBasicValueForSQL (BContract _ a) = T.pack $ show a
-formatBasicValueForSQL BMappingSentinel = "<MappingSentinel>"
 formatBasicValueForSQL BDefault = ""
 
 --function that gives index type, wrap in map index 
@@ -351,7 +345,6 @@ instance RLPSerializable BasicValue where
     BAccount a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
-    BMappingSentinel -> RLPArray [RLPScalar 6]
     BDecimal v -> RLPArray [RLPScalar 7, rlpEncode v]
   rlpDecode x@(RLPArray ((RLPScalar t) : s)) =
     case (t, s) of
@@ -361,7 +354,6 @@ instance RLPSerializable BasicValue where
       (3, [f]) -> BAccount $ rlpDecode f
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
-      (6, []) -> BMappingSentinel
       (7, [f]) -> BDecimal (rlpDecode f)
       _ -> error $ "invalid type or data length for BasicValue: " ++ show x
   rlpDecode (RLPString "") = BDefault
