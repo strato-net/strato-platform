@@ -13,6 +13,14 @@ contract DepositRouter is
     PausableUpgradeable,
     UUPSUpgradeable
 {
+    // ============ Custom Errors ============
+    error TokenNotAllowed();
+    error UseDepositETH();
+    error BelowMinimum();
+    error InvalidAddress();
+    error ETHTransferFailed();
+    error ArrayLengthMismatch();
+
     //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public constant PERMIT2 =
         IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
@@ -59,9 +67,9 @@ contract DepositRouter is
         uint256 deadline,
         bytes calldata signature
     ) external whenNotPaused nonReentrant {
-        require(allowedTokens[token], "Token not allowed");
-        require(token != address(0), "Use depositETH()");
-        require(amount >= minDepositAmount[token], "Below minimum");
+        if (!allowedTokens[token]) revert TokenNotAllowed();
+        if (token == address(0)) revert UseDepositETH();
+        if (amount < minDepositAmount[token]) revert BelowMinimum();
 
         depositId++;
 
@@ -95,13 +103,13 @@ contract DepositRouter is
     function depositETH(
         address stratoAddress
     ) external payable whenNotPaused nonReentrant {
-        require(allowedTokens[address(0)], "ETH not allowed");
-        require(msg.value >= minDepositAmount[address(0)], "Below minimum");
+        if (!allowedTokens[address(0)]) revert TokenNotAllowed();
+        if (msg.value < minDepositAmount[address(0)]) revert BelowMinimum();
 
         depositId++;
 
         (bool success, ) = gnosisSafe.call{value: msg.value}("");
-        require(success, "ETH transfer failed");
+        if (!success) revert ETHTransferFailed();
 
         emit DepositRouted(
             address(0),
@@ -130,11 +138,12 @@ contract DepositRouter is
         bool[] calldata allowed,
         uint256[] calldata minAmounts
     ) external onlyOwner {
-        require(
-            tokens.length == allowed.length &&
-                tokens.length == minAmounts.length,
-            "Array length mismatch"
-        );
+        if (
+            tokens.length != allowed.length ||
+            tokens.length != minAmounts.length
+        ) {
+            revert ArrayLengthMismatch();
+        }
 
         for (uint256 i = 0; i < tokens.length; i++) {
             allowedTokens[tokens[i]] = allowed[i];
