@@ -34,6 +34,7 @@ export const calculateAccruedInterest = (
   interestRate: number,
   currentTime: number
 ): { accruedInterest: string; newTotalOwed: string } => { //@adrian now we just call getUserDebt
+  
   if (toBig(loan.principalBalance) === 0n) {
     return { accruedInterest: "0", newTotalOwed: "0" };
   }
@@ -178,6 +179,7 @@ export const simulateLoan = (
   }
 
   const maxAvailableToBorrowUSD = maxBorrowingPowerUSD - toBig(newTotalOwed);
+  //@adrian this shouldn't need changed
 
   // Calculate health factor using newTotalOwed directly
   const healthFactor = calculateHealthFactor(totalCollateralValue, newTotalOwed);
@@ -303,7 +305,7 @@ export const calculateTotalUSDSTSupplied = (
  * @param currentTime Current timestamp
  * @returns Total borrowed amount including accrued interest
  */
-export const calculateTotalBorrowed = (
+export const calculateTotalBorrowed = ( //@adrian this might also be simplified now
   loans: any[],
   interestRate: number,
   currentTime: number

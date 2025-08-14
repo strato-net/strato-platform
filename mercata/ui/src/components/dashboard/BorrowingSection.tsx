@@ -87,7 +87,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Current Borrowed</span>
+                <span className="text-gray-600 text-sm sm:text-base">Total Amount Owed</span>
                 <span className="font-semibold text-sm sm:text-base">
                   {currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,

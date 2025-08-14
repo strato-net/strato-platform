@@ -118,7 +118,7 @@ export const useLendingMetrics = () => {
   }, [depositableTokens]);
 
   // Calculate Current Borrowed
-  const currentBorrowed = useMemo(() => {
+  const currentBorrowed = useMemo(() => {//@adrian needs changed
     if (!loanList || loanList.length === 0) return "$0.00";
     
     let totalBorrowed = 0;
