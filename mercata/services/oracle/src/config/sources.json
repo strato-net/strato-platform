@@ -1,32 +1,40 @@
 {
   "Alchemy": {
-    "urlTemplate": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
-    "apiKeyEnvVar": "ALCHEMY_API_KEY",
+    "url": "https://api.g.alchemy.com/prices/v1/${API_KEY}/tokens/by-address",
     "method": "POST",
-    "requestBody": {
-      "addresses": [
-        {
-          "network": "eth-mainnet",
-          "address": "${tokenAddress}"
-        }
-      ]
-    },
-    "parsePath": "data[0].prices[0].value",
-    "feedTimestampPath": "data[0].prices[0].lastUpdatedAt"
+    "body": "addresses",
+    "parse": "data[].prices[0].value",
+    "timestamp": "data[0].prices[0].lastUpdatedAt",
+    "batchMode": true,
+    "apiKeyEnvVar": "ALCHEMY_API_KEY"
+  },
+  "CoinMarketCap": {
+    "url": "https://pro-api.coinmarketcap.com/v2/cryptocurrency/quotes/latest",
+    "params": "symbol,convert=USD",
+    "headers": "X-CMC_PRO_API_KEY",
+    "parse": "data.{symbol}[0].quote.USD.price",
+    "timestamp": "data.{firstSymbol}[0].quote.USD.last_updated",
+    "batchMode": true,
+    "apiKeyEnvVar": "COINMARKETCAP_API_KEY"
   },
   "Metals.dev": {
-    "urlTemplate": "https://api.metals.dev/v1/latest?api_key=${API_KEY}&currency=USD&unit=toz",
-    "apiKeyEnvVar": "METALS_API_KEY",
-    "parsePath": "metals.${metal}",
-    "feedTimestampPath": "timestamps.metal"
+    "url": "https://api.metals.dev/v1/latest",
+    "params": "api_key,currency=USD,unit=toz,metals",
+    "parse": "metals.{metal}",
+    "timestamp": "timestamps.metal",
+    "batchMode": true,
+    "apiKeyEnvVar": "METALS_DEV_API_KEY",
+    "symbolMapping": {
+      "XAU": "gold",
+      "XAG": "silver"
+    }
   },
-  "LBMA": {
-    "urlTemplate": "https://api.lbma.org.uk/json/lbma-${metal}",
-    "parsePath": "0.usd",
-    "feedTimestampPath": "0.date"
-  },
-  "CoinGecko": {
-    "urlTemplate": "https://api.coingecko.com/api/v3/simple/price?ids=${coinId}&vs_currencies=usd&precision=full",
-    "parsePath": "${coinId}.usd"
+  "MetalsAPI": {
+    "url": "https://metals-api.com/api/latest",
+    "params": "access_key,base=USD,symbols",
+    "parse": "rates.USD{symbol}",
+    "timestamp": "timestamp",
+    "batchMode": true,
+    "apiKeyEnvVar": "METALS_API_API_KEY"
   }
 } 
