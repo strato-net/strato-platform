@@ -47,8 +47,10 @@ trap 'cleanup' INT
 # but for some reason wasn't set up to work in Linux
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   STRATO_HOSTNAME=172.17.0.1
+  STRATO_IP=$STRATO_HOSTNAME
 else
   STRATO_HOSTNAME=host.docker.internal
+  STRATO_IP=127.0.0.1
 fi
 
 export STRATO_HOSTNAME
@@ -77,7 +79,7 @@ then
     PGPASSWORD=api createdb -h localhost -U postgres cirrus
 
     echo "Running setup"
-    strato-setup -p api -K localhost --network=helium > logs/strato-setup 2>&1
+    strato-setup -p api -K localhost --network=helium --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
     echo "Setup complete"
 fi
 
