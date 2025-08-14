@@ -107,8 +107,8 @@ poolConfiguratorAddress = 0x1006
 lendingRegistryAddress :: Address
 lendingRegistryAddress = 0x1007
 
-mercataEthBridgeAddress :: Address
-mercataEthBridgeAddress = 0x1008
+mercataBridgeAddress :: Address
+mercataBridgeAddress = 0x1008
 
 onRampAddress :: Address
 onRampAddress = 0x1009
@@ -181,7 +181,7 @@ genesisBlock  =
               , (".lendingPool", BContract "LendingPool" $ unspecifiedChain lendingPoolAddress)
               , (".poolConfigurator", BContract "PoolConfigurator" $ unspecifiedChain poolConfiguratorAddress)
               , (".lendingRegistry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
-              , (".mercataEthBridge", BContract "MercataEthBridge" $ unspecifiedChain mercataEthBridgeAddress)
+              , (".mercataBridge", BContract "MercataBridge" $ unspecifiedChain mercataBridgeAddress)
               , (".onRamp", BContract "OnRamp" $ unspecifiedChain onRampAddress)
               , (".poolFactory", BContract "PoolFactory" $ unspecifiedChain poolFactoryAddress)
               , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
@@ -197,7 +197,7 @@ genesisBlock  =
             , lendingPool
             , poolConfigurator
             , lendingRegistry
-            , mercataEthBridge
+            , mercataBridge
             , onRamp
             , poolFactory
             , tokenFactory
@@ -309,7 +309,7 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
             ++ allBalances
-            ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)] else []
+            ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataBridgeAddress <> ">", BBool True)] else []
             ++ (if root == usdstAddress
                   then [ ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
                        , ("._balances<a:c7f483b3ddb99d510570a8b7760aebda941c766d>", BInteger $ 1000 * oneE18) -- bob
@@ -377,6 +377,14 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
   , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
   , (".totalBorrowPrincipal", BInteger sigma)
+  , (".RAY", BInteger 1_000_000_000_000_000_000_000_000_000)
+  , (".SECONDS_PER_YEAR", BInteger 31536000)
+  , (".borrowIndex", BInteger 1_000_000_000_000_000_000_000_000_000)
+  , (".lastAccrual", BInteger 1755144000) -- August 14th, 2025, 12:00:00 AM
+  , (".totalScaledDebt", BInteger . sum $ M.elems $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  , (".reservesAccrued", BInteger 0)
+  , (".debtCeilingAsset", BInteger 0)
+  , (".debtCeilingUSD", BInteger 0)
   ] ++
   [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.interestRate", BInteger 500)
@@ -395,10 +403,8 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   ]
   ) (zip [1 :: Integer ..] GR.reserves)
     ++ concatMap (\(bwr, amt) -> (if amt > 0 then
-  [ (".userLoan<a:" <> addrBS bwr <> ">.principalBalance", BInteger amt)
-  , (".userLoan<a:" <> addrBS bwr <> ">.interestOwed", BInteger 0)
-  , (".userLoan<a:" <> addrBS bwr <> ">.lastIntCalculated", BInteger 1752552000) -- July 15th, 2025, 12:00:00 AM
-  , (".userLoan<a:" <> addrBS bwr <> ">.lastUpdated", BInteger 1752552000) -- July 15th, 2025, 12:00:00 AM
+  [ (".userLoan<a:" <> addrBS bwr <> ">.scaledDebt", BInteger amt)
+  , (".userLoan<a:" <> addrBS bwr <> ">.lastUpdated", BInteger 1755144000) -- August 14th, 2025, 12:00:00 AM
   ] else [])
   ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
 
@@ -449,11 +455,11 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAcc
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
-mercataEthBridge :: AccountInfo
-mercataEthBridge = SolidVMContractWithStorage mercataEthBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ createdByBlockApps mercataAddress ++
-  [ (".owner", BAccount $ unspecifiedChain blockappsAddress)
-  , (".relayer", BAccount $ unspecifiedChain blockappsAddress)
+mercataBridge :: AccountInfo
+mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ ownedByBlockApps mercataAddress ++
+  [ (".relayer", BAccount $ unspecifiedChain blockappsAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+  , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
   ]
 
 onRamp :: AccountInfo
@@ -505,7 +511,7 @@ voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddr
      , (".admin", BAccount $ unspecifiedChain blockappsAddress)
      , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
      , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
-     , (".minters<a:" <> addrBS mercataEthBridgeAddress <> ">", BBool True)
+     , (".minters<a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
      , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 1_000_000 * oneE18)
      ]
 
