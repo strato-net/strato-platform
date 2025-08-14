@@ -151,7 +151,7 @@ require("dotenv").config();
   };
 
   // --- Borrower loan helper (principal + interest) via Cirrus ---
-  const getUserDebt = async () => {
+  const getUserDebt = async () => {//@adrian needs changed
     try {
       const rows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
@@ -174,6 +174,31 @@ require("dotenv").config();
       return BigInt(pStr) + BigInt(iStr);
     } catch {
       return 0n;
+    }
+  };
+
+  //@adrian added this
+  const getUserDebtPreview = async () => {
+    try {
+      const body = {
+        txs: [
+          {
+            payload: {
+              contractName: "LendingPool",
+              contractAddress: cfg.LENDING_POOL,
+              method: "getUserDebtPreview",
+              args: { user: USER_ADDRESS },
+            },
+            type: "FUNCTION",
+          },
+        ],
+        txParams: { gasLimit: 150000, gasPrice: 1 },
+      };
+      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });//copied from getHealthFactor
+      if (data[0]?.status !== "Success") throw new Error("HF call failed");
+      return BigInt(data[0].data.contents[0] || 0);
+    } catch {
+      return 0n; // is this really a good default?
     }
   };
 

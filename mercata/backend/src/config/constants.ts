@@ -3,7 +3,7 @@ import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry } fro
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
   key = "/key",
-  state = "/contracts/tate/:contractAddress/state",
+  state = "/contracts/tate/:contractAddress/state", //@adrian why tate?
   identity = "/identity",
   result = "/transactions/results",
 }
@@ -60,7 +60,7 @@ export const constants = (() => {
     "tokenBBalance::text",
     `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
   ];
-  const registrySelectFields = [
+  const registrySelectFields = [ //@adrian may need changed?
     "address",
     "lendingPool:lendingPool_fkey(" +
       "address," +

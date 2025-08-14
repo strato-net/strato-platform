@@ -54,7 +54,7 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     // ── Interest index (global) ───────────────────────────────────────────────────────
-    uint public RAY = 1e27;
+    uint public RAY = 1e27; //@adrian why not constant?
     uint public SECONDS_PER_YEAR = 31536000;
 
     uint public borrowIndex;    // global borrow index (init to RAY in constructor)
@@ -748,7 +748,7 @@ contract record LendingPool is Ownable {
     */
     function getUserDebtPreview(address user) public view returns (uint debtPreview) {
         uint idx = previewBorrowIndex();
-        return (userLoan[user].scaledDebt * idx) / RAY;
+        return (userLoan[user].scaledDebt * idx) / RAY;//@adrian why does scaledDebt not need updated?
     }
 
     /**

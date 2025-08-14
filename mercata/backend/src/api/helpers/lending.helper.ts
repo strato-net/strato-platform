@@ -3,14 +3,12 @@ import { constants } from "../../config/constants";
 export const toBig = (v: string | number | bigint) => BigInt(v);
 const { DECIMALS } = constants;
 
-export interface LoanInfo {
-  principalBalance: string;
-  interestOwed: string;
-  lastIntCalculated: string;
-  lastUpdated: string;
+export interface LoanInfo { //@adrian updated
+  scaledDebt: number;     // user debt in index-scaled units
+  lastUpdated: string;    // optional metadata
 }
 
-export interface AssetConfig {
+export interface AssetConfig { //@adrian doesn't match old contract, leaving for now
   interestRate: number;
   liquidationThreshold: number;
   price: string;
@@ -34,38 +32,17 @@ export const calculateAccruedInterest = (
   interestRate: number,
   currentTime: number
 ): { accruedInterest: string; newTotalOwed: string } => { //@adrian now we just call getUserDebt
-  
-  if (toBig(loan.principalBalance) === 0n) {
-    return { accruedInterest: "0", newTotalOwed: "0" };
-  }
 
-  // Calculate time elapsed since last interest calculation
-  const timeElapsed = Math.max(0, currentTime - Number(loan.lastIntCalculated));
-  const hoursElapsed = BigInt(Math.floor(timeElapsed / 3600)); // Convert to hours
+  //TODO preview, not just current state
 
-  // Calculate NEW interest since last calculation: (principal * rate * hours) / (8760 * 10000)
-  // 8760 hours per year, 10000 for basis points
-  const newInterest = (
-    (toBig(loan.principalBalance) * BigInt(interestRate) * hoursElapsed) /
-    BigInt(8760 * 10000)
-  );
+  //TODO get borrowIndex, RAY
+  const borrowIndex = 2e27;
+  const RAY = 1e27;
 
-  // Calculate TOTAL accrued interest (existing interestOwed + new interest)
-  const totalAccruedInterest = toBig(loan.interestOwed) + newInterest;
+  const accruedInterest = 0
+  const newTotalOwed = (loan.scaledDebt * borrowIndex) / RAY;
 
-  // Calculate new total owed
-  const newTotalOwed = (
-    toBig(loan.principalBalance) + 
-    totalAccruedInterest
-  ).toString();
-  //@adrian rework: call getUserDebtPreview, which takes address that's not passed here yet
-
-
-
-  return { 
-    accruedInterest: totalAccruedInterest.toString(), 
-    newTotalOwed 
-  };
+  return { accruedInterest: accruedInterest.toString(), newTotalOwed: newTotalOwed.toString() };
 };
 
 /**
@@ -128,6 +105,7 @@ export const calculateHealthFactor = (
  * @returns Complete loan simulation with all calculated values
  */
 export const simulateLoan = (
+  userAddress: string, //is this the right type for address?
   loan: LoanInfo | null,
   collaterals: CollateralInfo[],
   assetConfigs: Map<string, AssetConfig>,
@@ -141,9 +119,7 @@ export const simulateLoan = (
 
   // If no loan exists, create a default empty loan
   const defaultLoan: LoanInfo = {
-    principalBalance: "0",
-    interestOwed: "0",
-    lastIntCalculated: currentTime.toString(),
+    scaledDebt: 0,
     lastUpdated: currentTime.toString(),
   };
 
@@ -186,16 +162,13 @@ export const simulateLoan = (
 
   return {
     // Original loan data from contract
-    principalBalance: actualLoan.principalBalance,
-    interestOwed: actualLoan.interestOwed,
-    lastIntCalculated: actualLoan.lastIntCalculated,
-    lastUpdated: actualLoan.lastUpdated,
+    ...actualLoan,
     
     // Calculated values
     healthFactor: healthFactorToPercentage(healthFactor),
     healthFactorRaw: healthFactor,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
-    accruedInterest,
+    accruedInterest,//@adrian we don't have this anymore (unless/until we derive it)
     interestRate: borrowableAssetConfig.interestRate / 100,
     totalAmountOwed: newTotalOwed,
     totalCollateralValueUSD: totalCollateralValue,
@@ -314,14 +287,9 @@ export const calculateTotalBorrowed = ( //@adrian this might also be simplified 
   
   for (const loanEntry of loans) {
     const loan = loanEntry.LoanInfo;
-    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {
+    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {//@adrian update
       const { newTotalOwed } = calculateAccruedInterest(
-        {
-          principalBalance: loan.principalBalance,
-          interestOwed: loan.interestOwed || "0",
-          lastIntCalculated: loan.lastIntCalculated || currentTime.toString(),
-          lastUpdated: loan.lastUpdated || currentTime.toString(),
-        },
+        loan,
         interestRate,
         currentTime
       );

@@ -66,7 +66,7 @@ export const getPool = async (
   }
 
   return poolData;
-};
+}; //@adrian shouldn't need changed
 
 export const depositLiquidity = async (
   accessToken: string,
@@ -313,7 +313,7 @@ export const liquidityAndBalance = async (
 ) => {
   // Fetch pool data with optimized query
   const registry = await getPool(accessToken, undefined);
-  
+  //@adrian maybe needs changed
   const { borrowableAsset, mToken, assetConfigs, userLoan, totalBorrowPrincipal } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
 
@@ -361,6 +361,7 @@ export const liquidityAndBalance = async (
   // Calculate all pool metrics in parallel
   const currentTime = Math.floor(Date.now() / 1000);
   const totalUSDSTSupplied = (toBig(availableLiquidity) + toBig(totalBorrowPrincipal)).toString();
+  //@adrian change this; actually, figure out why this is the calculation to begin with
   
   const [
     exchangeRate,
@@ -369,7 +370,7 @@ export const liquidityAndBalance = async (
     apyData
   ] = await Promise.all([
     Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
-    Promise.resolve(calculateTotalBorrowed(
+    Promise.resolve(calculateTotalBorrowed(//@adrian change this
       userLoan || [], 
       borrowableAssetConfig?.interestRate || 0, 
       currentTime
@@ -473,9 +474,12 @@ export const getLoan = async (
         amount: c.amount,
       }));
 
-    return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+    return simulateLoan(userAddress, userLoan, userCollaterals, assetConfigs, currentTime);
     //@adrian needs user address passed in now, because will call getUserDebtPreview
   }
+
+  //@adrian some usage of the below should be changed;
+  //instead of aggregating here we can just call _____
 
   // If userAddress is undefined, return simulated loans for all users
   const allLoans: any[] = [];
@@ -498,7 +502,7 @@ export const getLoan = async (
       }));
 
     // Simulate loan for this user
-    const simulatedLoan = simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+    const simulatedLoan = simulateLoan(userAddr, userLoan, userCollaterals, assetConfigs, currentTime);
     
     // Add user address to the result
     allLoans.push({
@@ -545,7 +549,7 @@ export const executeLiquidation = async (
     repayAmount = toBig(options.repayAmount);
   } else {
     // --- Calculate total owed (principal + stored interest) ---
-    const totalOwed = toBig(loan.principalBalance) + toBig(loan.interestOwed || 0);
+    const totalOwed = toBig(loan.principalBalance) + toBig(loan.interestOwed || 0);//@adrian change this
 
     // Determine close-factor debt limit (100 % or 50 %) based on latest health factor
     const priceMap = new Map<string, string>();
@@ -784,7 +788,7 @@ export const listLoansForLiquidation = async (
     });
 
     const userColls = collMap.get(userAddr) || [];
-    const sim = simulateLoan(loan, userColls, acMap, currentTime);
+    const sim = simulateLoan(userAddr, loan, userColls, acMap, currentTime);
     const hf = sim.healthFactor; // already percentage (e.g. 0.85)
 
     const include = margin === undefined ? hf < 1 : hf >= 1 && hf < 1 + margin;

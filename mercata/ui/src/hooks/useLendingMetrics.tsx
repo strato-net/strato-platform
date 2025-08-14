@@ -144,7 +144,7 @@ export const useLendingMetrics = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
-  }, [loanList]);
+  }, [loanList]); //@adrian be sure to update depList
 
   // Calculate Average Interest Rate
   const averageInterestRate = useMemo(() => {
