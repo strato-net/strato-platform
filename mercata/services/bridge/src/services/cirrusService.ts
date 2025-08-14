@@ -128,25 +128,21 @@ export const isTokenEnabled = async (tokenAddress: string): Promise<boolean> => 
 export const getSafeTxHashFromEvents = async (
   withdrawalIds: string[]
 ): Promise<Record<string, string | null>> => {
-  // normalize & de-duplicate ids
   const ids = [...new Set(withdrawalIds)];
-
-  // prefill result with nulls
   const result = Object.fromEntries(ids.map((id) => [id, null])) as Record<string, string | null>;
 
-  const params: Record<string, string> = {
-    event_name: "eq.WithdrawalPending",
-    address: `eq.${config.bridge.address}`,
-    select: "attributes",
-    "attributes->>id": `in.(${ids.join(",")})`,
-  };
+  const data = await cirrus.get(`/${MERCATA_URL}-WithdrawalPending`, {
+    params: { 
+      address: `eq.${config.bridge.address}`,
+      withdrawalId: `in.(${ids.join(",")})`,
+      select: "withdrawalId,custodyTxHash"
+    }
+  });
 
-  const data = await cirrus.get("/event", { params });
-
-  for (const event of (Array.isArray(data) ? data : [])) {
-    const id = event?.attributes?.id;
-    const custodyTxHash = event?.attributes?.custodyTxHash;
-    if (id && custodyTxHash && id in result) result[id] = custodyTxHash;
+  for (const item of (Array.isArray(data) ? data : [])) {
+    const withdrawalId = item?.withdrawalId;
+    const custodyTxHash = item?.custodyTxHash;
+    if (withdrawalId && custodyTxHash && withdrawalId in result) result[withdrawalId] = custodyTxHash;
   }
 
   return result;

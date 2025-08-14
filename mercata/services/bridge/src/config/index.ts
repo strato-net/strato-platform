@@ -7,7 +7,8 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-export const DEPOSIT_EVENT_SIGNATURE = '0x8f678ca000000000000000000000000000000000000000000000000000000000';
+// DepositRouted(address,uint256,address,address,uint256)
+export const DEPOSIT_EVENT_SIGNATURE = '0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207';
 
 const config = {
   auth: {
