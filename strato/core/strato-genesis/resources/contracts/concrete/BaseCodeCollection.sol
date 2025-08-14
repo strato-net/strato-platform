@@ -1,5 +1,6 @@
 //ERC20
 import "../abstract/ERC20/ERC20.sol";
+import "../abstract/ERC20/utils/ReentrancyGuard.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
 //Generic token
