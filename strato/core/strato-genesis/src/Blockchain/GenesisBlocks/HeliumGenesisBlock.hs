@@ -381,7 +381,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".SECONDS_PER_YEAR", BInteger 31536000)
   , (".borrowIndex", BInteger 1_000_000_000_000_000_000_000_000_000)
   , (".lastAccrual", BInteger 1755144000) -- August 14th, 2025, 12:00:00 AM
-  , (".totalScaledDebt", sum $ M.elems $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  , (".totalScaledDebt", BInteger . sum $ M.elems $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
   , (".reservesAccrued", BInteger 0)
   , (".debtCeilingAsset", BInteger 0)
   , (".debtCeilingUSD", BInteger 0)
