@@ -57,6 +57,9 @@ export const calculateAccruedInterest = (
     toBig(loan.principalBalance) + 
     totalAccruedInterest
   ).toString();
+  //@adrian rework: call getUserDebtPreview, which takes address that's not passed here yet
+
+
 
   return { 
     accruedInterest: totalAccruedInterest.toString(), 
@@ -150,7 +153,7 @@ export const simulateLoan = (
     actualLoan,
     borrowableAssetConfig.interestRate,
     currentTime
-  );
+  );//@adrian needs changed
 
   // Calculate total collateral value for health
   const totalCollateralValue = calculateTotalCollateralValueForHealth(

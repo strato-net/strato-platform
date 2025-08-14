@@ -99,7 +99,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Currently borrowed</span>
+          <span className="text-sm text-gray-500">Current amount owed</span>
           <span className="font-medium">
             USDST {loans?.totalAmountOwed ? formatUnits(loans.totalAmountOwed, 18) : "0.00"}
           </span>

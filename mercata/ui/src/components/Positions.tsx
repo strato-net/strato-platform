@@ -104,7 +104,7 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
           <div className="space-y-8">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <span className="text-gray-600 text-sm font-medium">Total Borrowed</span>
+                <span className="text-gray-600 text-sm font-medium">Total Amount Owed</span>
                 <span className="font-semibold text-lg">
                   {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
                 </span>
@@ -145,7 +145,7 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
                 </span>
               </div>
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
+                <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total amount owed.">
                   <span className="text-gray-600 text-sm font-medium">Interest Rate</span>
                 </InfoTooltip>
                 <span className="font-semibold text-lg">{loanData?.interestRate || 0}%</span>

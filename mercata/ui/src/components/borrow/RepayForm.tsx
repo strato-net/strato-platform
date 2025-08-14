@@ -102,7 +102,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
         </div>
         
         <div className="flex justify-between items-center font-bold pt-2 border-t">
-          <span>Total Amount Due</span>
+          <span>Total Amount Owed</span>
           <span className="text-lg">USDST {formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
         </div>
       </div>

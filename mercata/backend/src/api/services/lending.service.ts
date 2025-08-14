@@ -474,6 +474,7 @@ export const getLoan = async (
       }));
 
     return simulateLoan(userLoan, userCollaterals, assetConfigs, currentTime);
+    //@adrian needs user address passed in now, because will call getUserDebtPreview
   }
 
   // If userAddress is undefined, return simulated loans for all users
