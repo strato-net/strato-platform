@@ -20,7 +20,7 @@ filesToEmbed = [
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
   "contracts/concrete/BaseCodeCollection.sol",
-  "contracts/concrete/Bridge/MercataEthBridge.sol",
+  "contracts/concrete/Bridge/MercataBridge.sol",
   "contracts/concrete/Enums/RestStatus.sol",
   "contracts/concrete/Lending/CollateralVault.sol",
   "contracts/concrete/Lending/LendingPool.sol",
