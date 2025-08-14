@@ -827,7 +827,6 @@ spec = do
                        ]
 
     it "should be able to insert into a mapping" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingSet.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 3) . length
@@ -837,10 +836,9 @@ spec = do
           [Field "us", MapIndex (INum 999999)],
           [Field "us", MapIndex (INum 10)]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 4, BInteger 21, BDefault]
+        `shouldReturn` [BDefault, BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
@@ -851,7 +849,7 @@ spec = do
           [Field "y"],
           [Field "z"]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BDefault]
+        `shouldReturn` [BDefault, BInteger 343, BInteger 343, BDefault]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol"
@@ -2700,13 +2698,12 @@ contract qq {
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
-    liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
     runBS
       [r|
 contract qq {
   mapping(string => uint) assoc;
 }|]
-    getFields ["assoc"] `shouldReturn` [BMappingSentinel]
+    getFields ["assoc"] `shouldReturn` [BDefault]
 
   it "can compare contracts to int literals" . runTest $ do
     runBS

@@ -213,7 +213,6 @@ fromBasic = \case
   BAccount a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
-  BMappingSentinel -> ValueMapping M.empty
   BDefault -> SimpleValue $ ValueAddress 0x0
 
 fromIndex :: IndexType -> V.SimpleValue

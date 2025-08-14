@@ -247,7 +247,6 @@ spec = do
                 (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77),
                 (fromList [Field "strukt", Field "first_field"], BInteger 887),
                 (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES"),
-                (fromList [Field "set"], BMappingSentinel),
                 (fromList [Field "set", MapIndex (INum 22)], BBool True),
                 (fromList [Field "set", MapIndex (INum 23)], BBool True),
                 (fromList [Field "set", MapIndex (INum 46)], BBool True)
@@ -281,8 +280,7 @@ spec = do
       let input =
             map
               toInput
-              [ (singleton "strMap", BMappingSentinel),
-                (fromList [Field "strMap", MapIndex (IText "ok")], BInteger 17),
+              [ (fromList [Field "strMap", MapIndex (IText "ok")], BInteger 17),
                 (fromList [Field "strMap", MapIndex (IText "\x76\x90\x00\x90")], BInteger 81)
               ]
           got = decodeSolidVMValues input
@@ -327,10 +325,6 @@ spec = do
       got
         `shouldBe` [("owner", SimpleValue $ ValueAccount $ unspecifiedChain 0xdeadbeef)]
 
-    it "can decode an empty mapping" $ do
-      let input = toInputMap [(singleton "mp", BMappingSentinel)]
-      decodeCacheValues input [] `shouldBe` [("mp", ValueMapping M.empty)]
-
     it "can decode everything (with empty cache)" $ do
       let input =
             toInputMap
@@ -349,7 +343,6 @@ spec = do
                 --                , (fromList [Field "array_of_nums", Field "length"], BInteger 4)
                 --                , (fromList [Field "strukt", Field "first_field"], BInteger 887)
                 --                , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
-                --                , (fromList [Field "set"], BMappingSentinel)
                 --                , (fromList [Field "set", MapIndex (INum 22)], BBool True)
                 --                , (fromList [Field "set", MapIndex (INum 23)], BBool True)
                 --                , (fromList [Field "set", MapIndex (INum 46)], BBool True)

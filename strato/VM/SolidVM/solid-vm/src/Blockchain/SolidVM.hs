@@ -66,7 +66,7 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
-import Control.Lens hiding (Context, assign, from, to)
+import Control.Lens hiding (Context, assign, from, to, uncons)
 import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
@@ -864,10 +864,10 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
           setVar pVar (SArray newVec)
           return Nothing
         _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseStatement st)
-    SMap typ theMap -> do
+    SMap theMap -> do
       theIndex <- getVar =<< expToVar indExp Nothing
       let newMap = M.insert theIndex srcVar theMap
-      setVar pVar (SMap typ newMap)
+      setVar pVar (SMap newMap)
       return Nothing
     _ -> do
       -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
@@ -1298,7 +1298,7 @@ expToVar' (CC.BoolLiteral _ b) _ = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) _ = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
 expToVar' (CC.Variable _ "bytes32ToString") _ = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") _ = return $ Constant SAddressToAscii
-expToVar' (CC.Variable _ "bytes") _ = return $ Constant $ SBuiltinFunction "identity" Nothing
+expToVar' (CC.Variable _ "bytes") _ = return $ Constant $ SFunction "identity" Nothing
 expToVar' (CC.Variable _ "now") _ = Constant . SInteger . round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv
 expToVar' (CC.Variable _ name) _ = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) _ = do
@@ -1365,7 +1365,7 @@ expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "bytes32ToString") _ = do
   return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.MemberAccess _ (CC.Variable _ "Util") "b32") _ = do
   --TODO- remove this hardcoded case
-  return $ Constant $ SBuiltinFunction "identity" Nothing
+  return $ Constant $ SFunction "identity" Nothing
 expToVar' (CC.MemberAccess _ (CC.Variable _ "string") "concat") _ = do
   return $ Constant $ SStringConcat
 expToVar' x@(CC.MemberAccess _ expr name) _ = do
@@ -1500,23 +1500,21 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) _ = do
           if (fromIntegral i) >= length theVector
             then indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
             else return $ theVector V.! fromIntegral i
-        (SMap valType theMap, _) -> case theMap M.!? theIndex of
+        (SMap theMap, _) -> case theMap M.!? theIndex of
           Just v -> return v
-          Nothing -> case valType of
-            SVMType.Int{} -> pure $ Constant $ SInteger 0
-            SVMType.String{} -> pure $ Constant $ SString ""
-            SVMType.Bytes{} -> pure $ Constant $ SString ""
-            SVMType.Decimal -> pure $ Constant $ SDecimal 0.0
-            SVMType.Bool -> pure $ Constant $ SBool False
-            SVMType.Address p -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
-            SVMType.Account p -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
-            SVMType.Struct _ n -> pure $ Constant $ SStruct n M.empty
-            SVMType.Enum _ t (Just (n:_)) -> pure $ Constant $ SEnumVal t n 0
-            SVMType.Enum _ t _ -> pure $ Constant $ SEnumVal t "" 0
-            SVMType.Array _ _ -> pure $ Constant $ SArray mempty
-            SVMType.Contract n -> pure $ Constant $ SContractItem (unspecifiedChain 0x0) n
-            SVMType.Mapping _ _ t -> pure $ Constant $ SMap t M.empty
-            _ -> internalError "Type of Mapping not allowed" (show valType)
+          Nothing -> traverse getVar (fmap fst . uncons $ M.elems theMap) >>= \case
+            Nothing -> pure $ Constant SNULL
+            Just SInteger{} -> pure $ Constant $ SInteger 0
+            Just SString{} -> pure $ Constant $ SString ""
+            Just SDecimal{} -> pure $ Constant $ SDecimal 0.0
+            Just SBool{} -> pure $ Constant $ SBool False
+            Just (SAccount _ p) -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
+            Just (SStruct n _) -> pure $ Constant $ SStruct n M.empty
+            Just (SEnumVal t n _) -> pure $ Constant $ SEnumVal t n 0
+            Just (SArray _) -> pure $ Constant $ SArray mempty
+            Just (SContractItem _ n) -> pure $ Constant $ SContractItem (unspecifiedChain 0x0) n
+            Just (SMap _) -> pure $ Constant $ SMap M.empty
+            _ -> internalError "Type of Mapping not allowed" theMap
         (SReference _, _) -> Constant . SReference <$> expToPath x
         _ -> typeError "unsupported types for index access" $ unparseExpression x
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
@@ -1562,7 +1560,7 @@ expToVar' (CC.Binary _ "<" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   logVals val1 val2
-  case (val1, val2) of
+  case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 < i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 < v2
     _ -> typeError "binary '<' on non-ints" (val1, val2)
@@ -1570,7 +1568,7 @@ expToVar' (CC.Binary _ ">" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   logVals val1 val2
-  case (val1, val2) of
+  case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 > i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 > v2
     _ -> typeError "binary '>' on non-ints" (val1, val2)
@@ -1578,7 +1576,7 @@ expToVar' (CC.Binary _ ">=" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   logVals val1 val2
-  case (val1, val2) of
+  case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 >= i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 >= v2
     _ -> typeError "binary '>=' used on non-ints" (val1, val2)
@@ -1586,7 +1584,7 @@ expToVar' (CC.Binary _ "<=" expr1 expr2) _ = do
   val1 <- getVar =<< expToVar expr1 Nothing
   val2 <- getVar =<< expToVar expr2 Nothing
   logVals val1 val2
-  case (val1, val2) of
+  case (defaultToInt val1, defaultToInt val2) of
     (SInteger i1, SInteger i2) -> return $ Constant $ SBool $ i1 <= i2
     (SDecimal v1, SDecimal v2) -> return $ Constant $ SBool $ v1 <= v2
     _ -> typeError "binary '<=' used on non-ints" (val1, val2)
@@ -1789,10 +1787,10 @@ expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
                 x -> todo "expToVar'/FunctionCall" x
-            Constant (SBuiltinFunction name o) -> case argVals of
-              OrderedVals vs -> Constant <$> callBuiltin name vs o
+            Constant (SFunction name Nothing) -> case argVals of
+              OrderedVals vs -> Constant <$> callBuiltin name vs
               NamedVals {} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
-            Constant (SFunction funcName func) -> do
+            Constant (SFunction funcName (Just func)) -> do
               ro <- readOnly <$> getCurrentCallInfo
               contract' <- getCurrentContract
               address <- getCurrentAddress
@@ -2022,10 +2020,10 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) _
           setVar pVar (SArray newVec)
           return $ Constant $ SBool True
         _ -> typeError ("array index value (" ++ (show indVal) ++ ") is not an integer") (unparseExpression ep)
-    SMap typ theMap -> do
+    SMap theMap -> do
       theIndex <- getVar =<< expToVar indExp Nothing
       let newMap = M.insert theIndex srcVar theMap
-      setVar pVar (SMap typ newMap)
+      setVar pVar (SMap newMap)
       return $ Constant $ SBool True
     _ -> do
       -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
@@ -2102,17 +2100,32 @@ evaluateAccountMember a False itemName = do
   result <- callWithResult from a CC.DefaultCall Nothing itemName False (OrderedVals [])
   return . Constant . fromMaybe SNULL $ result
 
+defaultToInt :: Value -> Value
+defaultToInt SNULL = SInteger 0
+defaultToInt x     = x
+
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 expToVarAdd expr1 expr2 = do
-  i1 <- getVar =<< expToVar expr1 Nothing
-  i2 <- getVar =<< expToVar expr2 Nothing
-  case (i1, i2) of
-    (SInteger a, SInteger b) -> return . Constant . SInteger $ a + b
-    (SString a, SString b) -> return . Constant . SString $ a ++ b
-    (SDecimal a, SDecimal b) -> return . Constant . SDecimal $ a + b
-    (SDecimal a, SInteger b) -> return . Constant . SDecimal $ a + (Decimal 0 b)
-    (SInteger a, SDecimal b) -> return . Constant . SDecimal $ (Decimal 0 a) + b
-    _ -> typeError "expToVarAdd" (i1, i2)
+  i1' <- getVar =<< expToVar expr1 Nothing
+  i2' <- getVar =<< expToVar expr2 Nothing
+  let addEm i1 i2 = case i1 of
+        SInteger a -> case defaultToInt i2 of
+          SInteger b -> return . Constant . SInteger $ a + b
+          SDecimal b -> return . Constant . SDecimal $ (Decimal 0 a) + b
+          _ -> typeError "expToVarAdd" (i1, i2)
+        SDecimal a -> case defaultToInt i2 of
+          SInteger b -> return . Constant . SDecimal $ a + (Decimal 0 b)
+          SDecimal b -> return . Constant . SDecimal $ a + b
+          _ -> typeError "expToVarAdd" (i1, i2)
+        SString a -> case i2 of
+          SString b -> return . Constant . SString $ a ++ b
+          SNULL -> return . Constant $ SString a
+          _ -> typeError "expToVarAdd" (i1, i2)
+        SNULL -> case i2 of
+          SNULL -> return $ Constant SNULL
+          _ -> addEm i2 i1
+        _ -> typeError "expToVarAdd" (i1, i2)
+  addEm i1' i2'
 
 --decMod operation, implements % w Data.Decimal library functions
 decMod :: Decimal -> Decimal -> Decimal
@@ -2131,7 +2144,7 @@ expToVarArith intOp decOp expr1 expr2 valType = do
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
-  case (i1, i2, valType') of
+  case (defaultToInt i1, defaultToInt i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
     (SInteger a, SInteger b, SVMType.Decimal) -> return . Constant . SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)
     (SDecimal a, SDecimal b, _) -> do
@@ -2159,7 +2172,7 @@ expToVarDivide intOp decOp expr1 expr2 valType = do
   i1 <- getVar =<< expToVar expr1 Nothing
   i2 <- getVar =<< expToVar expr2 Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType 
-  case (i1, i2, valType') of
+  case (defaultToInt i1, defaultToInt i2, valType') of
     (SInteger a, SInteger b, (SVMType.Int _ _)) -> return . Constant . SInteger $ a `intOp` b
     (SInteger a, SInteger b, SVMType.Decimal) -> 
       return $ Constant $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
@@ -2196,7 +2209,7 @@ binopAssign' intOp decOp lhs rhs valType = do
   curValue <- readVal lhs
   varToAssign <- expToVar lhs Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
-  next <- case (curValue, delta, valType') of
+  next <- case (defaultToInt curValue, defaultToInt delta, valType') of
     (SInteger c, SInteger d, (SVMType.Int _ _)) -> pure . SInteger $ c `intOp` d
     (SInteger a, SInteger b, SVMType.Decimal) -> pure . SDecimal $ (Decimal 0 a) `decOp` (Decimal 0 b)
     (SDecimal a, SDecimal b, _) -> do
@@ -2228,7 +2241,7 @@ binopDivide intOp decOp lhs rhs valType = do
   curValue <- readVal lhs
   varToAssign <- expToVar lhs Nothing
   let valType' = fromMaybe (SVMType.Int (Just True) Nothing) valType
-  next <- case (curValue, delta, valType') of
+  next <- case (defaultToInt curValue, defaultToInt delta, valType') of
     (SInteger c, SInteger d, (SVMType.Int _ _)) -> pure . SInteger $ c `intOp` d
     (SInteger a, SInteger b, SVMType.Decimal) -> 
       return $ SDecimal $ roundTo 0 ((Decimal 0 a) `decOp` (Decimal 0 b))
@@ -2254,7 +2267,7 @@ addAndAssign lhs rhs = do
   delta <- readVal rhs
   curValue <- readVal lhs
   varToAssign <- expToVar lhs Nothing
-  next <- case (curValue, delta) of
+  next <- case (defaultToInt curValue, defaultToInt delta) of
     (SInteger c, SInteger d) -> pure . SInteger $ c + d
     (SString c, SString d) -> pure . SString $ c ++ d
     (SDecimal c, SDecimal d) -> pure . SDecimal $ c + d
@@ -2281,6 +2294,7 @@ intBuiltin [SDecimal v] = SInteger (decimalMantissa $ roundTo 0 v)
 intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
+intBuiltin [SNULL] = SInteger 0
 intBuiltin args = typeError "numeric cast - invalid args" args
 
 integerToValue :: Either String Integer -> Value
@@ -2295,6 +2309,7 @@ decimalBuiltin [SString str] =
     Right deci -> SDecimal deci
     Left e -> typeError e str
 decimalBuiltin [SDecimal v] = SDecimal v
+decimalBuiltin [SNULL] = SDecimal $ Decimal 0 0
 decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer
@@ -2312,57 +2327,60 @@ castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
 castToAncestor a _ = 
     return $ SAccount (NamedAccount (a^.namedAccountAddress) MainChain) False
 
-callBuiltin :: MonadSM m => SolidString -> [Value] -> Maybe Value -> m Value
-callBuiltin "string" [SString s] _ = return $ SString s
-callBuiltin "string" [SAccount a _] _ = return . SString $ show a
-callBuiltin "string" [SInteger i] _ = return . SString $ show i
-callBuiltin "string" [SBool b] _ = return . SString $ bool "false" "true" b
-callBuiltin "string" vs _ = typeError "string cast" vs
-callBuiltin "address" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
-callBuiltin "address" [SAccount na b] _ = return $ SAccount (unspecifiedChain (_namedAccountAddress na)) b
-callBuiltin "address" [SContract _ a] _ = return $ SAccount a False
-callBuiltin "address" [ss@(SString s)] _ =
+callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
+callBuiltin "string" [SString s] = return $ SString s
+callBuiltin "string" [SAccount a _] = return . SString $ show a
+callBuiltin "string" [SInteger i] = return . SString $ show i
+callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
+callBuiltin "string" [SNULL] = return $ SString ""
+callBuiltin "string" vs = typeError "string cast" vs
+callBuiltin "address" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
+callBuiltin "address" [SAccount na b] = return $ SAccount (unspecifiedChain (_namedAccountAddress na)) b
+callBuiltin "address" [SContract _ a] = return $ SAccount a False
+callBuiltin "address" [ss@(SString s)] =
   maybe
     (typeError "address cast" ss)
     (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain))
     $ readMaybe s
-callBuiltin "address" vs _ = typeError "address cast" vs
-callBuiltin "account" [SInteger a] _ = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
-callBuiltin "account" [a@SAccount {}] _ = return a
-callBuiltin "account" [SContract _ a] _ = return $ SAccount a False
-callBuiltin "account" [ss@(SString s)] _ =
+callBuiltin "address" [SNULL] = return $ SAccount (unspecifiedChain 0) False
+callBuiltin "address" vs = typeError "address cast" vs
+callBuiltin "account" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
+callBuiltin "account" [a@SAccount {}] = return a
+callBuiltin "account" [SContract _ a] = return $ SAccount a False
+callBuiltin "account" [ss@(SString s)] =
   maybe
     (typeError "account cast" ss)
     (return . ((flip SAccount) False))
     $ readMaybe s
-callBuiltin "account" [SInteger a, SInteger b] _ = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
-callBuiltin "account" [SInteger a, SString "main"] _ = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString "self"] _ = do
+callBuiltin "account" [SInteger a, SInteger b] = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
+callBuiltin "account" [SInteger a, SString "main"] = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
+callBuiltin "account" [SInteger a, SString "self"] = do
   pure . ((flip SAccount) False) $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString ('0' : 'x' : xs)] _ = do
+callBuiltin "account" [SInteger a, SString ('0' : 'x' : xs)] = do
   return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16 * n + (hexChar $ CHAR.toUpper c)) 0
-callBuiltin "account" [SInteger a, SString name] _ = unspecifiedChain (fromIntegral a) `castToAncestor` name
-callBuiltin "account" [(SAccount a _), SInteger b] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
-callBuiltin "account" [(SAccount a _), SString "main"] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [(SAccount a _), SString "self"] _ = do
+callBuiltin "account" [SInteger a, SString name] = unspecifiedChain (fromIntegral a) `castToAncestor` name
+callBuiltin "account" [(SAccount a _), SInteger b] = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
+callBuiltin "account" [(SAccount a _), SString "main"] = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
+callBuiltin "account" [(SAccount a _), SString "self"] = do
   pure . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] _ = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
+callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
   where
     hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
     base16ToIntegral = foldl' (\n c -> 16 * n + (hexChar $ CHAR.toUpper c)) 0
-callBuiltin "account" [(SAccount a _), SString name] _ = a `castToAncestor` name
-callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a + b) `mod` c
-callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] _ = return . SInteger $ (a * b) `mod` c
-callBuiltin ("blockhash") [SInteger blockNum] _ | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
-callBuiltin ("blockhash") [SInteger blockNum] _ = do
+callBuiltin "account" [(SAccount a _), SString name] = a `castToAncestor` name
+callBuiltin "account" [SNULL] = return $ SAccount (unspecifiedChain 0) False
+callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a + b) `mod` c
+callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a * b) `mod` c
+callBuiltin ("blockhash") [SInteger blockNum] | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
+callBuiltin ("blockhash") [SInteger blockNum] = do
   env' <- getEnv
   let curBlock = Env.blockHeader env'
   maybeTheHash <- getBlockHashWithNumber blockNum (BlockHeader.parentHash curBlock)
   maybe (invalidArguments "the block number given does not exist" [blockNum]) (return . SString . BC.unpack . keccak256ToByteString) maybeTheHash
-callBuiltin ("selfdestruct") [SAccount a _] _ = do
+callBuiltin ("selfdestruct") [SAccount a _] = do
   contract' <- getCurrentAddress
   contractBalance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy @AddressState) contract'
   _destroyRes <- A.adjustWithDefault_ (A.Proxy @AddressState) contract' $ \newAddressState ->
@@ -2370,21 +2388,21 @@ callBuiltin ("selfdestruct") [SAccount a _] _ = do
   sendRes <- pay "selfdestruct function" contract' (a^.namedAccountAddress) contractBalance
   _purgeRes <- purgeStorageMap contract'
   return $ SBool sendRes
-callBuiltin "account" vs _ = typeError "account cast" vs
-callBuiltin "bool" [SBool b] _ = return $ SBool b
-callBuiltin "bool" [SString "true"] _ = return $ SBool True
-callBuiltin "bool" [SString "false"] _ = return $ SBool False
-callBuiltin "bool" vs _ = typeError "bool cast" vs
-callBuiltin "byte" [SInteger n] _ = return $ SInteger (n .&. 0xff)
-callBuiltin "byte" vs _ = typeError "byte cast" vs
-callBuiltin "uint" args _ = return $ intBuiltin args
-callBuiltin "int" args _ = return $ intBuiltin args
-callBuiltin "decimal" args _ = return $ decimalBuiltin args
-callBuiltin "push" [v] (Just o) = typeError "push (called as func, not as method)" (v, o)
-callBuiltin "call" [v] (Just o) = typeError "call (called as a function, not as a method)" (v, o)
-callBuiltin "identity" [v] Nothing = return v
-callBuiltin "keccak256" args Nothing = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
-callBuiltin "ecrecover" [SString h, SInteger v, r', s'] _ = case B16.decode (BC.pack h) of
+callBuiltin "account" vs = typeError "account cast" vs
+callBuiltin "bool" [SBool b] = return $ SBool b
+callBuiltin "bool" [SString "true"] = return $ SBool True
+callBuiltin "bool" [SString "false"] = return $ SBool False
+callBuiltin "bool" [SNULL] = return $ SBool False
+callBuiltin "bool" vs = typeError "bool cast" vs
+callBuiltin "byte" [SInteger n] = return $ SInteger (n .&. 0xff)
+callBuiltin "byte" [SNULL] = return $ SInteger 0
+callBuiltin "byte" vs = typeError "byte cast" vs
+callBuiltin "uint" args = return $ intBuiltin args
+callBuiltin "int" args = return $ intBuiltin args
+callBuiltin "decimal" args = return $ decimalBuiltin args
+callBuiltin "identity" [v] = return v
+callBuiltin "keccak256" args = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
   Right bytestringHash -> do
     rIntHash <- case r' of
@@ -2405,21 +2423,21 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] _ = case B16.decode (BC.
     case theSignerAddress of
       Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
       Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
-callBuiltin "sha256" args Nothing = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
-callBuiltin "ripemd160" args Nothing = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
-callBuiltin ("payable") [SAccount a _] _ = return $ SAccount a True
-callBuiltin "require" (SBool cond : msg) Nothing = do
+callBuiltin "sha256" args = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "ripemd160" args = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin ("payable") [SAccount a _] = return $ SAccount a True
+callBuiltin "require" (SBool cond : msg) = do
   case msg of
     [] -> require cond Nothing
     (m : _) -> require cond (Just $ show m)
   return SNULL
-callBuiltin "assert" [SBool cond] Nothing = SNULL <$ assert cond
-callBuiltin "getUserCert" [SAccount a _] _ = do
+callBuiltin "assert" [SBool cond] = SNULL <$ assert cond
+callBuiltin "getUserCert" [SAccount a _] = do
   --Add others
   curContract <- getCurrentContract
   maybeCert <- A.select (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
   return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
-callBuiltin "getCertField" [(SAccount a _), (SString certField)] _ = do
+callBuiltin "getCertField" [(SAccount a _), (SString certField)] = do
   --Add others
   maybeField <- A.select (A.Proxy @X509CertificateField) $ ((a ^. namedAccountAddress), ((T.pack $ show certField)))
   case maybeField of
@@ -2431,7 +2449,7 @@ callBuiltin "getCertField" [(SAccount a _), (SString certField)] _ = do
 -- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
+callBuiltin "verifyCert" [SString cert, SString pubkey] = do
   let ex509Cert = bytesToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
   case (ex509Cert, ePublicKey) of
@@ -2453,7 +2471,7 @@ callBuiltin "verifyCert" [SString cert, SString pubkey] _ = do
 -- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] _ = do
+callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] = do
   let ex509Cert = bytesToCert . BC.pack $ cert
   let ePublicKey = bsToPub $ BC.pack pubkey
   case (ex509Cert, ePublicKey) of
@@ -2474,7 +2492,7 @@ callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] _ = do
 -- Expects the signature as a DER/PEM format encoded string
 -- Expects the public key to be in PEM format
 -- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] _ = do
+callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] = do
   let eMesgBs = B16.decode $ BC.pack msg
   case eMesgBs of
     Right mesgBs -> do
@@ -2497,10 +2515,10 @@ callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] _
                     )
               return $ SBool isValid
     Left err -> malformedData "Could not decode hex string" err
-callBuiltin "parseCert" [SString cert] _ = do
+callBuiltin "parseCert" [SString cert] = do
   curContract <- getCurrentContract
   return $ certificateMap (Just cert) curContract
-callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals) _ = do
+callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
 
@@ -2534,7 +2552,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
                                    ]
       pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) _ = do
+callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
@@ -2567,13 +2585,13 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
                                    ]
       pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin x args _ = unknownFunction ("callBuiltin " ++ show args) x
+callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
 certificateMap :: Maybe String -> CC.Contract -> Value
 certificateMap maybeCert _ =
   case maybeCert of
-    Nothing -> SMap stringToString emptyCertMap
-    Just cert -> SMap stringToString (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
+    Nothing -> SMap emptyCertMap
+    Just cert -> SMap (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
   where
     subject cert = getCertSubject =<< (eitherToMaybe . bytesToCert . BC.pack $ cert)
     rawCert cert = eitherToMaybe . bytesToCert . BC.pack $ cert
@@ -2613,13 +2631,6 @@ certificateMap maybeCert _ =
                 (SString "expirationDate", Constant . SString $ "")
               ]
        in M.union fieldsToUpdate $ emptyFields
-    stringToString =
-      SVMType.Mapping
-        { SVMType.dynamic = Nothing,
-          SVMType.key = SVMType.String Nothing,
-          SVMType.value = SVMType.String Nothing
-        }
-
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
 runTheConstructors from to hsh cc contractName' argVals = do
