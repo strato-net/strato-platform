@@ -281,6 +281,10 @@ main = do
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
   tbqueue <- newTBQueueIO txQueueSize
 
+  let bindIP = "0.0.0.0"
+--               "172.17.0.1"
+--               "127.0.0.1"
+
   let env =
         BlocEnv
           { txSizeLimit = flags_txSizeLimit,
@@ -292,7 +296,7 @@ main = do
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault
           }
-  runSettings (setPort 3000 $ setHost (fromString "127.0.0.1") defaultSettings) $ app env theDoc urlMap
+  runSettings (setPort 3000 $ setHost (fromString bindIP) defaultSettings) $ app env theDoc urlMap
 
 app :: BlocEnv -> Swagger -> Metadata.UrlMap -> Application
 app blocEnv theDoc urlMap =
