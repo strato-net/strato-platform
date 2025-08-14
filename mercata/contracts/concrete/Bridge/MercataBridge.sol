@@ -125,16 +125,16 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
 
     /*  WITHDRAWAL FLOW  */
     event WithdrawalRequested(  // user locked tokens in bridge
-        uint256 indexed id,
+        uint256 indexed withdrawalId,
         uint256 indexed destChainId,
         address token,
         uint256 amount,
         address indexed user,
         address dest
     );
-    event WithdrawalPending(uint256 indexed id, string custodyTxHash);
-    event WithdrawalCompleted  (uint256 indexed id, string custodyTxHash);
-    event WithdrawalAborted    (uint256 indexed id);
+    event WithdrawalPending(uint256 indexed withdrawalId, string custodyTxHash);
+    event WithdrawalCompleted  (uint256 indexed withdrawalId, string custodyTxHash);
+    event WithdrawalAborted    (uint256 indexed withdrawalId);
 
     /*  ADMIN  */
     event TokenLimitUpdated(address indexed token, uint256 maxPerTx);
