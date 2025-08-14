@@ -31,11 +31,10 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   NODE_URL=https://node5.mercata-testnet.blockapps.net \
   BASE_URL=http://localhost \
   POOL_FACTORY=0x100a \
-  LENDING_POOL=0x1005 \
+  LENDING_REGISTRY=0x1007 \
   ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
-  POOL_CONFIGURATOR=0x1006 \
   npm run dev
 ```
 - `NETWORK` options are: `testnet|prod`.
@@ -89,10 +88,9 @@ sudo \
   ssl=true \
   BASE_URL=host-url-here \
   POOL_FACTORY=0x100a \
-  LENDING_POOL=0x1005 \
+  LENDING_REGISTRY=0x1007 \
   ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
-  POOL_CONFIGURATOR=0x1006 \
   docker compose up -d --build
 ```
