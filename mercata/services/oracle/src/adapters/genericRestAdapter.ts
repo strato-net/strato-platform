@@ -1,125 +1,10 @@
-import axios from 'axios';
-import { logInfo, logError } from '../utils/logger';
+import { apiRequest } from '../utils/apiClient';
+import { SourceConfig, BatchPriceResult, Asset } from '../types';
+import { logError } from '../utils/logger';
 
-export interface FeedConfig {
-    name: string;
-    source: string;
-    targetAssetAddress: string;
-    cron: string;
-    apiParams: Record<string, any>;
-    minPrice?: number;
-    maxPrice?: number;
-}
-
-export interface SourceConfig {
-    name?: string;
-    apiKeyEnvVar?: string;
-    urlTemplate: string;
-    parsePath: string;
-    feedTimestampPath?: string;
-    headers?: Record<string, string>;
-    method?: string;
-    requestBody?: any;
-}
-
-export async function fetchGenericPrice(feedConfig: FeedConfig, sourceConfig: SourceConfig): Promise<{
-    price: number;
-    feedTimestamp: string;
-}> {
-    try {
-        const apiKey = sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] : '';
-        let url = sourceConfig.urlTemplate;
-
-        // Replace placeholders in URL
-        for (const paramKey in feedConfig.apiParams) {
-            url = url.replace(`\${${paramKey}}`, String(feedConfig.apiParams[paramKey]));
-        }
-        if (apiKey) {
-            url = url.replace('${API_KEY}', apiKey);
-        }
-
-        // Prepare request options
-        const requestOptions: any = {
-            method: sourceConfig.method || 'GET',
-            url: url,
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...sourceConfig.headers,
-            }
-        };
-
-        // Add authorization header if API key exists
-        if (apiKey && sourceConfig.apiKeyEnvVar) {
-            if (sourceConfig.name === 'Alchemy') {
-                requestOptions.headers['Authorization'] = `Bearer ${apiKey}`;
-            }
-        }
-
-        // Handle POST request body if present
-        if (sourceConfig.requestBody) {
-            let requestBody = JSON.parse(JSON.stringify(sourceConfig.requestBody)); // Deep clone
-            
-            // Replace placeholders in request body
-            const bodyStr = JSON.stringify(requestBody);
-            let processedBodyStr = bodyStr;
-            
-            for (const paramKey in feedConfig.apiParams) {
-                processedBodyStr = processedBodyStr.replace(new RegExp(`\\$\\{${paramKey}\\}`, 'g'), String(feedConfig.apiParams[paramKey]));
-            }
-            processedBodyStr = processedBodyStr.replace(/\$\{API_KEY\}/g, apiKey || '');
-            
-            requestOptions.data = JSON.parse(processedBodyStr);
-        }
-
-        logInfo('GenericAdapter', `Fetching ${feedConfig.name} from ${url.replace(apiKey || 'NO_API_KEY', '***')} (${requestOptions.method})`);
-
-        const response = await axios(requestOptions);
-
-        // Handle dynamic parse path replacement (e.g., metals.${metal})
-        let parsePath = sourceConfig.parsePath;
-        for (const paramKey in feedConfig.apiParams) {
-            parsePath = parsePath.replace(`\${${paramKey}}`, String(feedConfig.apiParams[paramKey]));
-        }
-
-        // Debug logging for metals API
-        if (feedConfig.source === 'Metals.dev') {
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - Original parsePath: ${sourceConfig.parsePath}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - Final parsePath: ${parsePath}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - metals.gold: ${response.data.metals?.gold}`);
-            logInfo('GenericAdapter', `[DEBUG] ${feedConfig.name} - metals.silver: ${response.data.metals?.silver}`);
-        }
-
-        const priceUSD = extractNestedProperty(response.data, parsePath);
-        const feedTimestamp = sourceConfig.feedTimestampPath 
-            ? extractNestedProperty(response.data, sourceConfig.feedTimestampPath) || new Date().toISOString()
-            : new Date().toISOString();
-
-        if (!priceUSD || isNaN(parseFloat(priceUSD))) {
-            throw new Error(`Invalid price data received for ${feedConfig.name}: ${priceUSD}`);
-        }
-
-        const price = Math.floor(parseFloat(priceUSD) * 1e18); // Convert to 18-decimal format
-
-        // Validate price bounds if specified
-        if (feedConfig.minPrice !== undefined && price < feedConfig.minPrice) {
-            throw new Error(`Price ${price} for ${feedConfig.name} is below minimum bound ${feedConfig.minPrice}`);
-        }
-        if (feedConfig.maxPrice !== undefined && price > feedConfig.maxPrice) {
-            throw new Error(`Price ${price} for ${feedConfig.name} is above maximum bound ${feedConfig.maxPrice}`);
-        }
-
-        logInfo('GenericAdapter', `${feedConfig.name} → $${priceUSD} @ feedTimestamp: ${feedTimestamp}`);
-
-        return {
-            price,
-            feedTimestamp
-        };
-
-    } catch (error) {
-        logError('GenericAdapter', error as Error);
-        throw error;
-    }
+// Helper functions for simplified configuration
+function getApiKey(sourceConfig: SourceConfig): string {
+    return sourceConfig.apiKeyEnvVar ? process.env[sourceConfig.apiKeyEnvVar] || '' : '';
 }
 
 export function extractNestedProperty(obj: any, path: string): any {
@@ -130,4 +15,201 @@ export function extractNestedProperty(obj: any, path: string): any {
         const accessKey = key.replace(/\[(\d+)\]/g, '.$1');
         return accessKey.split('.').reduce((nested, k) => nested?.[k], o);
     }, obj);
+}
+
+export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConfig): Promise<BatchPriceResult> {
+    const apiKey = getApiKey(sourceConfig);
+    const url = buildBatchUrl(sourceConfig, assets, apiKey);
+    const requestOptions = buildBatchRequestOptions(sourceConfig, url, apiKey, assets);
+    
+    const response = await apiRequest(requestOptions, { logPrefix: 'GenericRestAdapter' });
+    
+    // Check for API error responses that don't throw HTTP errors
+    if (response.data && response.data.success === false) {
+        const errorMessage = response.data.error?.message || response.data.error || 'API returned error response';
+        throw new Error(`${sourceConfig.url}: ${errorMessage}`);
+    }
+    
+    return parseBatchResponse(response.data, sourceConfig, assets);
+}
+
+function buildBatchUrl(sourceConfig: SourceConfig, assets: Asset[], apiKey: string): string {
+    let url = sourceConfig.url;
+    
+    // Replace API key placeholder
+    if (apiKey) {
+        url = url.replace(/\$\{API_KEY\}/g, apiKey);
+    }
+    
+    // Add URL parameters
+    if (sourceConfig.params) {
+        const params = sourceConfig.params.split(',').map(p => p.trim());
+        const queryParams = new URLSearchParams();
+        
+        params.forEach(param => {
+            if (param === 'api_key' && apiKey) {
+                queryParams.append('api_key', apiKey);
+            } else if (param === 'access_key' && apiKey) {
+                queryParams.append('access_key', apiKey);
+            } else if (param === 'symbol') {
+                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
+                queryParams.append('symbol', symbols);
+            } else if (param === 'symbols') {
+                const symbols = assets.map(asset => asset.name.split('-')[0]).join(',');
+                queryParams.append('symbols', symbols);
+            } else if (param === 'metals') {
+                const metals = assets.map(asset => {
+                    const symbol = asset.name.split('-')[0];
+                    return sourceConfig.symbolMapping?.[symbol] || symbol;
+                }).join(',');
+                queryParams.append('metals', metals);
+            } else if (param.startsWith('currency=')) {
+                queryParams.append('currency', param.split('=')[1]);
+            } else if (param.startsWith('convert=')) {
+                queryParams.append('convert', param.split('=')[1]);
+            } else if (param.startsWith('base=')) {
+                queryParams.append('base', param.split('=')[1]);
+            } else if (param.startsWith('currencies=')) {
+                queryParams.append('currencies', param.split('=')[1]);
+            } else if (param.startsWith('unit=')) {
+                queryParams.append('unit', param.split('=')[1]);
+            }
+        });
+        
+        if (queryParams.toString()) {
+            url += '?' + queryParams.toString();
+        }
+    }
+    
+    return url;
+}
+
+function buildBatchRequestOptions(sourceConfig: SourceConfig, url: string, apiKey: string, assets: Asset[]): any {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    };
+
+    // Add authorization headers
+    if (sourceConfig.headers) {
+        const headerNames = sourceConfig.headers.split(',').map(h => h.trim());
+        headerNames.forEach(headerName => {
+            if (headerName === 'X-CMC_PRO_API_KEY' && apiKey) {
+                headers[headerName] = apiKey;
+            }
+        });
+    }
+
+    const requestOptions: any = {
+        method: sourceConfig.method || 'GET',
+        url,
+        headers
+    };
+
+    // Handle POST request body
+    if (sourceConfig.body && sourceConfig.method === 'POST') {
+        if (sourceConfig.body === 'addresses') {
+            requestOptions.data = {
+                addresses: assets.map(asset => ({
+                    network: "eth-mainnet",
+                    address: asset.tokenAddress
+                }))
+            };
+        }
+    }
+
+    return requestOptions;
+}
+
+/**
+ * Parses batch API responses based on source configuration
+ * Supports multiple response formats: array-based, object-based, and metals-specific
+ */
+function parseBatchResponse(
+    data: any, 
+    sourceConfig: SourceConfig, 
+    assets: Asset[]
+): BatchPriceResult {
+    const result: BatchPriceResult = {};
+    
+    if (!assets || !Array.isArray(assets)) {
+        throw new Error('Batch feed must have assets array');
+    }
+    
+    const parsePattern = sourceConfig.parse;
+    const timestampPattern = sourceConfig.timestamp;
+    
+    // Handle array-based responses (like Alchemy)
+    if (parsePattern === 'data[].prices[0].value' && data.data && Array.isArray(data.data)) {
+        data.data.forEach((item: any, index: number) => {
+            const asset = assets[index];
+            if (item.prices && item.prices.length > 0) {
+                const priceUSD = parseFloat(item.prices[0].value);
+                const price = Math.floor(priceUSD * 1e18);
+                const feedTimestamp = item.prices[0].lastUpdatedAt || new Date().toISOString();
+                result[asset.name] = { price, feedTimestamp };
+            }
+        });
+        
+    // Handle object-based responses with symbols as keys (like CoinMarketCap)
+    } else if (parsePattern.includes('data.{symbol}[0].quote.USD.price') && data.data && typeof data.data === 'object') {
+        assets.forEach(asset => {
+            const symbol = asset.name.split('-')[0];
+            const symbolData = data.data[symbol];
+            if (symbolData && symbolData[0] && symbolData[0].quote && symbolData[0].quote.USD) {
+                const priceUSD = parseFloat(symbolData[0].quote.USD.price);
+                const price = Math.floor(priceUSD * 1e18);
+                const feedTimestamp = symbolData[0].quote.USD.last_updated || new Date().toISOString();
+                result[asset.name] = { price, feedTimestamp };
+            }
+        });
+        
+    // Handle metals-specific response structures
+    } else if (parsePattern.includes('metals.{metal}') || parsePattern.includes('rates.USD{symbol}')) {
+        assets.forEach(asset => {
+            let priceUSD: number;
+            let feedTimestamp: string;
+            
+            if (parsePattern.includes('metals.{metal}')) {
+                // Metals.dev format
+                const symbol = asset.name.split('-')[0];
+                const metalKey = sourceConfig.symbolMapping?.[symbol] || symbol;
+                priceUSD = parseFloat(data.metals[metalKey]);
+                feedTimestamp = data.timestamps?.metal || new Date().toISOString();
+            } else {
+                // MetalPriceAPI format
+                const symbol = asset.name.split('-')[0];
+                const rateKey = `USD${symbol}`;
+                priceUSD = parseFloat(data.rates[rateKey]);
+                feedTimestamp = data.timestamp ? new Date(data.timestamp * 1000).toISOString() : new Date().toISOString();
+            }
+            
+            if (!isNaN(priceUSD)) {
+                const price = Math.floor(priceUSD * 1e18);
+                result[asset.name] = { price, feedTimestamp };
+            }
+        });
+        
+    // Generic fallback for other response formats
+    } else {
+        assets.forEach(asset => {
+            try {
+                const symbol = asset.name.split('-')[0];
+                const assetParsePath = parsePattern.replace(/\{symbol\}/g, symbol);
+                const priceUSD = extractNestedProperty(data, assetParsePath);
+                
+                if (priceUSD && !isNaN(parseFloat(priceUSD))) {
+                    const price = Math.floor(parseFloat(priceUSD) * 1e18);
+                    const feedTimestamp = timestampPattern 
+                        ? extractNestedProperty(data, timestampPattern) || new Date().toISOString()
+                        : new Date().toISOString();
+                    result[asset.name] = { price, feedTimestamp };
+                }
+            } catch (error) {
+                logError('GenericRestAdapter', new Error(`Failed to parse price for ${asset.name}: ${error}`));
+            }
+        });
+    }
+    
+    return result;
 } 

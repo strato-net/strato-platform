@@ -1,84 +1,138 @@
 import dotenv from 'dotenv';
-import * as feedsConfig from '../config/feeds.json';
-import * as sourcesConfig from '../config/sources.json';
-import cron from 'node-cron';
 import { oauthClient } from './oauth';
+import { logInfo, logError } from './logger';
+
+const feedsConfig = require('../config/feeds.json');
+const sourcesConfig = require('../config/sources.json');
+const assetsConfig = require('../config/assets.json');
 
 dotenv.config();
 
-export function validateConfig(): boolean {
-    console.log('=== Validating Oracle Configuration ===\n');
-    
-    let errors: string[] = [];
-    let warnings: string[] = [];
+export async function validateConfig(): Promise<boolean> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    const usedSources = new Set<string>();
 
-    // Validate environment variables
-    console.log('1. Checking Environment Variables...');
     const requiredEnvVars = [
-        'STRATO_NODE_URL',
-        'OAUTH_DISCOVERY_URL',
-        'OAUTH_CLIENT_ID',
-        'OAUTH_CLIENT_SECRET',
-        'USERNAME',
-        'PASSWORD',
-        'PRICE_ORACLE_ADDRESS',
-        'ALCHEMY_API_KEY'
+        'STRATO_NODE_URL', 'OAUTH_DISCOVERY_URL', 'OAUTH_CLIENT_ID',
+        'OAUTH_CLIENT_SECRET', 'USERNAME', 'PASSWORD', 'PRICE_ORACLE_ADDRESS'
     ];
 
     requiredEnvVars.forEach(varName => {
         if (!process.env[varName]) {
             errors.push(`Missing required environment variable: ${varName}`);
-        } else {
-            console.log(`   ✅ ${varName}: Set`);
         }
     });
 
-    // Validate OAuth configuration
-    console.log('\n2. Checking OAuth Configuration...');
     if (process.env.OAUTH_DISCOVERY_URL && process.env.OAUTH_CLIENT_ID && process.env.OAUTH_CLIENT_SECRET) {
-        console.log('   ✅ OAuth credentials configured');
-        
-        // Test OAuth connection
-        oauthClient.validateToken()
-            .then(isValid => {
-                if (isValid) {
-                    console.log('   ✅ OAuth connection test successful');
-                } else {
-                    warnings.push('OAuth connection test failed - check credentials');
-                }
-            })
-            .catch(error => {
-                warnings.push(`OAuth connection test error: ${(error as Error).message}`);
-            });
+        try {
+            const isValid = await oauthClient().validateToken();
+            if (!isValid) {
+                errors.push('OAuth authentication failed - check credentials');
+            }
+        } catch (error) {
+            errors.push(`OAuth authentication error: ${(error as Error).message}`);
+        }
     } else {
         errors.push('Incomplete OAuth configuration');
     }
-
-    // Validate feeds configuration
-    console.log('\n3. Checking Feeds Configuration...');
+    
     if (!feedsConfig.feeds || !Array.isArray(feedsConfig.feeds)) {
         errors.push('feeds.json must contain a "feeds" array');
     } else {
-        console.log(`   ✅ Found ${feedsConfig.feeds.length} feeds`);
-        
         feedsConfig.feeds.forEach((feed: any, index: number) => {
             const feedPrefix = `   Feed ${index + 1} (${feed.name}):`;
             
             // Check required fields
             if (!feed.name) errors.push(`${feedPrefix} Missing name`);
-            if (!feed.source) errors.push(`${feedPrefix} Missing source`);
-            if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
-            if (!feed.cron) errors.push(`${feedPrefix} Missing cron`);
-            if (!feed.apiParams) errors.push(`${feedPrefix} Missing apiParams`);
             
-            // Validate cron expression
-            if (feed.cron && !cron.validate(feed.cron)) {
-                errors.push(`${feedPrefix} Invalid cron expression: ${feed.cron}`);
-            }
+            // Check if this is a batch feed
+            const isBatchFeed = feed.assets && Array.isArray(feed.assets);
             
-            // Check if source exists
-            if (feed.source && !(sourcesConfig as any)[feed.source]) {
-                errors.push(`${feedPrefix} Unknown source: ${feed.source}`);
+            if (isBatchFeed) {
+                // Validate batch feed structure
+                if (!feed.sources || !Array.isArray(feed.sources)) {
+                    errors.push(`${feedPrefix} Missing or invalid sources array`);
+                }
+                
+                // Validate sources array for batch feeds
+                if (feed.sources && Array.isArray(feed.sources)) {
+                    feed.sources.forEach((sourceName: string, sourceIndex: number) => {
+                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
+                        
+                        if (!sourceName) {
+                            errors.push(`${sourcePrefix} Missing source name`);
+                        } else if (!(sourcesConfig as any)[sourceName]) {
+                            errors.push(`${sourcePrefix} Unknown source: ${sourceName}`);
+                        } else {
+                            usedSources.add(sourceName);
+                        }
+                    });
+                }
+                
+                // Validate assets array (now just asset keys)
+                if (!feed.assets || !Array.isArray(feed.assets) || feed.assets.length === 0) {
+                    errors.push(`${feedPrefix} Missing or invalid assets array`);
+                } else {
+                    // Load assets registry to validate asset keys
+                    feed.assets.forEach((assetKey: string, assetIndex: number) => {
+                        const assetPrefix = `${feedPrefix} Asset ${assetIndex + 1}:`;
+                        
+                        if (!assetKey) {
+                            errors.push(`${assetPrefix} Missing asset key`);
+                        } else if (!assetsConfig.assets[assetKey]) {
+                            errors.push(`${assetPrefix} Unknown asset key: ${assetKey}`);
+                        } else {
+                            const asset = assetsConfig.assets[assetKey];
+                            
+                            // Validate targetAssetAddress format
+                            if (asset.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(asset.targetAssetAddress)) {
+                                errors.push(`${assetPrefix} Invalid targetAssetAddress format: ${asset.targetAssetAddress}`);
+                            }
+                            
+                            // Validate tokenAddress format for crypto assets
+                            if (asset.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(asset.tokenAddress)) {
+                                errors.push(`${assetPrefix} Invalid tokenAddress format: ${asset.tokenAddress}`);
+                            }
+                        }
+                    });
+                }
+            } else {
+                // Validate individual feed structure (legacy)
+                if (!feed.sources || !Array.isArray(feed.sources)) {
+                    errors.push(`${feedPrefix} Missing or invalid sources array`);
+                }
+                if (!feed.targetAssetAddress) errors.push(`${feedPrefix} Missing targetAssetAddress`);
+                
+                // Validate sources array
+                if (feed.sources && Array.isArray(feed.sources)) {
+                    feed.sources.forEach((source: any, sourceIndex: number) => {
+                        const sourcePrefix = `${feedPrefix} Source ${sourceIndex + 1}:`;
+                        
+                        if (!source.name) {
+                            errors.push(`${sourcePrefix} Missing source name`);
+                        } else if (!(sourcesConfig as any)[source.name]) {
+                            errors.push(`${sourcePrefix} Unknown source: ${source.name}`);
+                        } else {
+                            usedSources.add(source.name);
+                        }
+                    });
+                }
+                
+                // Validate feed structure consistency
+                if (!feed.tokenAddress && !feed.symbol) {
+                    errors.push(`${feedPrefix} Must have either tokenAddress (for crypto) or symbol (for metals)`);
+                }
+                
+                // Validate tokenAddress format (if present)
+                if (feed.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(feed.tokenAddress)) {
+                    errors.push(`${feedPrefix} Invalid tokenAddress format: ${feed.tokenAddress}`);
+                }
+                
+                // Validate targetAssetAddress format
+                if (feed.targetAssetAddress && !/^[a-fA-F0-9]{40}$/.test(feed.targetAssetAddress)) {
+                    errors.push(`${feedPrefix} Invalid targetAssetAddress format: ${feed.targetAssetAddress}`);
+                }
             }
             
             // Validate price bounds
@@ -86,64 +140,46 @@ export function validateConfig(): boolean {
                 errors.push(`${feedPrefix} minPrice must be less than maxPrice`);
             }
             
-            if (errors.length === 0) {
-                console.log(`   ✅ ${feed.name}: Valid`);
-            }
         });
     }
 
-    // Validate sources configuration
-    console.log('\n4. Checking Sources Configuration...');
+    // Validate sources
     const sourceNames = Object.keys(sourcesConfig);
-    console.log(`   ✅ Found ${sourceNames.length} sources: ${sourceNames.join(', ')}`);
-    
     sourceNames.forEach(sourceName => {
-        const source = (sourcesConfig as any)[sourceName];
+        const source = sourcesConfig[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
-        if (!source.urlTemplate) {
-            errors.push(`${sourcePrefix} Missing urlTemplate`);
+        if (!source.url) {
+            errors.push(`${sourcePrefix} Missing url`);
         }
-        if (!source.parsePath) {
-            errors.push(`${sourcePrefix} Missing parsePath`);
+
+        if (!source.parse) {
+            errors.push(`${sourcePrefix} Missing parse pattern`);
         }
-        
-        // Check if API key is required and available
-        if (source.apiKeyEnvVar) {
-            if (!process.env[source.apiKeyEnvVar]) {
-                warnings.push(`${sourcePrefix} API key ${source.apiKeyEnvVar} not set`);
-            } else {
-                console.log(`   ✅ ${sourceName}: API key available`);
-            }
+
+        // Check if API key environment variable exists
+        if (source.apiKeyEnvVar && !process.env[source.apiKeyEnvVar]) {
+            errors.push(`Missing required API key for source ${sourceName}: ${source.apiKeyEnvVar}`);
         }
     });
 
-    // Print results
-    console.log('\n=== Validation Results ===');
-    
     if (errors.length > 0) {
-        console.log('\n❌ ERRORS:');
-        errors.forEach(error => console.log(`   ${error}`));
+        logError('ConfigValidator', new Error(`Configuration errors:\n${errors.map(error => `   ${error}`).join('\n')}`));
+        return false;
     }
     
     if (warnings.length > 0) {
-        console.log('\n⚠️  WARNINGS:');
-        warnings.forEach(warning => console.log(`   ${warning}`));
+        logInfo('ConfigValidator', `Warnings:\n${warnings.map(warning => `   ${warning}`).join('\n')}`);
     }
     
-    if (errors.length === 0) {
-        console.log('\n✅ Configuration is valid!');
-        if (warnings.length === 0) {
-            console.log('✅ No warnings found.');
-        }
-        return true;
-    } else {
-        console.log(`\n❌ Found ${errors.length} error(s) and ${warnings.length} warning(s)`);
-        return false;
-    }
+    return true;
 }
 
 if (require.main === module) {
-    const isValid = validateConfig();
-    process.exit(isValid ? 0 : 1);
+    validateConfig().then(isValid => {
+        process.exit(isValid ? 0 : 1);
+    }).catch(error => {
+        logError('ConfigValidator', new Error(`Validation error: ${error}`));
+        process.exit(1);
+    });
 } 
