@@ -29,10 +29,10 @@ const config = {
     contractAddress: process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e",
   },
   polling: {
-    bridgeInInterval: 5 * 60 * 1000,    // 5 minutes (was 100 seconds)
-    bridgeOutInterval: 5 * 60 * 1000,   // 5 minutes (was 3 minutes)
-    withdrawalInterval: 2 * 60 * 1000,  // 2 minutes (was 10 seconds)
-    ethereumDepositInterval: 5 * 60 * 1000, // 5 minutes (was 2 minutes)
+    bridgeInInterval: 1 * 60 * 1000,    // 5 minutes (was 100 seconds)
+    bridgeOutInterval: 1 * 60 * 1000,   // 1 minute (was 3 minutes)
+    withdrawalInterval: 1 * 60 * 1000,  // 1 minute (was 10 seconds)
+    ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
   },
   strato: {
     gas: {

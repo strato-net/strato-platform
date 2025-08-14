@@ -7,7 +7,8 @@ import {
 } from "../services/bridgeService";
 import { 
   getWithdrawalsByStatus,
-  getDepositsByStatus
+  getDepositsByStatus,
+  getSafeTxHashFromEvents
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatus } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
@@ -49,34 +50,45 @@ export const startDepositInitiatedPolling = async () => {
 };
 
 export const startWithdrawalTxPolling = async () => {
-  const pollingInterval = config.polling.bridgeOutInterval || 5 * 60 * 1000;
+  const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
+
   const poll = async () => {
     try {
-      const data = await getWithdrawalsByStatus("2");
+      const pending = await getWithdrawalsByStatus("2");
+      if (!Array.isArray(pending) || pending.length === 0) return;
 
-      if (!Array.isArray(data) || data.length === 0) {
-        return;
-      }
+      const idOf = (t: any) => String(t.id ?? t.withdrawalId);
+      const ids = pending.map(idOf);
+      const hashMap = await getSafeTxHashFromEvents(ids);
 
-      for (const transaction of data) {
-        try {
-          // Get the destChainId from the withdrawal data
-          const destChainId = BigInt(transaction.destChainId);
-          const status = await monitorSafeTransactionStatus(transaction.key, destChainId);
-          
-          if (status === 'executed') {
-            await finaliseWithdrawalBatch([transaction]);
-          } else if (status === 'rejected') {
-            await handleRejectedWithdrawalBatch([transaction]);
+      const toFinalize: any[] = [];
+      const toReject: any[] = [];
+
+      await Promise.all(
+        pending.map(async (tx) => {
+          const safeTxHash = hashMap[idOf(tx)];
+          if (!safeTxHash) {
+            toReject.push(tx);
+            return;
           }
-          // Skip pending transactions
-        } catch (err: any) {
-          // Continue processing other transactions even if one fails
-          continue;
-        }
-      }
+
+          try {
+            const status = await monitorSafeTransactionStatus(
+              safeTxHash,
+              BigInt(tx.destChainId)
+            );
+            if (status === "executed") toFinalize.push(tx);
+            else if (status === "rejected") toReject.push(tx);
+          } catch (_) {
+            toReject.push(tx);
+          }
+        })
+      );
+
+      if (toFinalize.length) await finaliseWithdrawalBatch(toFinalize);
+      if (toReject.length) await handleRejectedWithdrawalBatch(toReject);
     } catch (e: any) {
-      logError('MercataPolling', e as Error, { operation: 'startWithdrawalTxPolling' });
+      logError("MercataPolling", e as Error, { operation: "startWithdrawalTxPolling" });
     }
   };
 
