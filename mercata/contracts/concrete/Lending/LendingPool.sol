@@ -26,7 +26,7 @@ contract record LendingPool is Ownable {
     event Liquidated(address indexed borrower, address indexed asset, uint repaidAmount, address indexed collateralAsset, uint collateralSeized);
     event SuppliedCollateral(address indexed user, address indexed asset, uint amount);
     event WithdrawnCollateral(address indexed user, address indexed asset, uint amount);
-    event ExchangeRateUpdated(address indexed asset, uint newRate);
+    event ExchangeRateUpdated(address indexed asset, uint newRate); //this needs to be output more often, then used in backend
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
@@ -496,13 +496,14 @@ contract record LendingPool is Ownable {
         uint debt = _totalDebt(); // index-based system debt
 
         // Suppliers' claimable underlying excludes protocol reserves
-        uint underlying = cash + debt;
+        uint underlying = cash + debt
         if (reservesAccrued < underlying) {
             underlying -= reservesAccrued;
         } else {
             // Extreme guard: if reserves exceed assets (shouldn't happen), floor at cash
             underlying = cash;
         }
+        // nice case: underlying = cash + debt - reservesAccrued
 
         if (underlying == 0) {
             return 1e18; // Fallback to 1:1 if no assets

@@ -60,13 +60,17 @@ export const constants = (() => {
     "tokenBBalance::text",
     `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
   ];
-  const registrySelectFields = [ //@adrian may need changed?
+  const registrySelectFields = [
     "address",
     "lendingPool:lendingPool_fkey(" +
       "address," +
       "borrowableAsset," +
       "mToken," +
-      "totalBorrowPrincipal::text," +
+      "borrowIndex::text," +
+      "totalScaledDebt::text," +
+      "reservesAccrued::text," +
+      "debtCeilingAsset::text," +
+      "debtCeilingUSD::text," +
       `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value),` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +

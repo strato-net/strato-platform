@@ -27,22 +27,15 @@ export interface CollateralInfo {
  * @param currentTime Current timestamp in seconds
  * @returns accruedInterest and newTotalOwed
  */
-export const calculateAccruedInterest = (
+export const calculateUserDebt = ( //@adrian this is wrong, needs updated
   loan: LoanInfo,
-  interestRate: number,
-  currentTime: number
-): { accruedInterest: string; newTotalOwed: string } => { //@adrian now we just call getUserDebt
+  borrowIndex: string,
+  RAY: string
+): string => { //@adrian now we just call getUserDebt
 
   //TODO preview, not just current state
-
-  //TODO get borrowIndex, RAY
-  const borrowIndex = 2e27;
-  const RAY = 1e27;
-
-  const accruedInterest = 0
-  const newTotalOwed = (loan.scaledDebt * borrowIndex) / RAY;
-
-  return { accruedInterest: accruedInterest.toString(), newTotalOwed: newTotalOwed.toString() };
+  const newTotalOwed = (BigInt(loan.scaledDebt) * toBig(borrowIndex)) / toBig(RAY)
+  return newTotalOwed.toString();
 };
 
 /**
@@ -76,6 +69,9 @@ export const calculateTotalCollateralValueForHealth = (
   return totalValue.toString();
 };
 
+//@adrian TODO implement if desired
+export const calculateAccruedInterest = () => {return "0";};
+
 /**
  * Simulates the smart contract's getHealthFactor function
  * @param totalCollateralValue Total collateral value for health calculation
@@ -105,7 +101,6 @@ export const calculateHealthFactor = (
  * @returns Complete loan simulation with all calculated values
  */
 export const simulateLoan = (
-  userAddress: string, //is this the right type for address?
   loan: LoanInfo | null,
   collaterals: CollateralInfo[],
   assetConfigs: Map<string, AssetConfig>,
@@ -126,10 +121,11 @@ export const simulateLoan = (
   const actualLoan = loan || defaultLoan;
 
   // Calculate interest and total owed
-  const { accruedInterest, newTotalOwed } = calculateAccruedInterest(
+  const accruedInterest = calculateAccruedInterest();
+  const newTotalOwed = calculateUserDebt(
     actualLoan,
-    borrowableAssetConfig.interestRate,
-    currentTime
+    borrowableAssetConfig.interestRate.toString(),
+    currentTime.toString()
   );//@adrian needs changed
 
   // Calculate total collateral value for health
@@ -241,19 +237,37 @@ export const calculateCollateralMetrics = (
  * @returns Exchange rate scaled by 1e18
  */
 export const calculateExchangeRate = (
-  totalMTokenSupply: string,
-  totalUSDSTSupplied: string
+  totalMTokenSupplyS: string,
+  totalCashS: string, // @adrian needs calculated
+  totalDebtS: string, // @adrian needs calculated
+  reservesAccruedS: string // @adrian needs pulled from cirrus
 ): string => {
-  const mTokenSupply = toBig(totalMTokenSupply);
-  const underlying = toBig(totalUSDSTSupplied);
+  const mTokenSupply = toBig(totalMTokenSupplyS);
+  const totalCash = toBig(totalCashS);
+  const totalDebt = toBig(totalDebtS);
+  const reservesAccrued = toBig(reservesAccruedS);
   
-  if (mTokenSupply === 0n || underlying === 0n) {
+  if (mTokenSupply === 0n) {
     return DECIMALS.toString(); // Default 1:1 ratio
   }
-  
-  // Exchange rate = totalUSDSTSupplied / totalMTokenSupply (scaled by 1e18)
+
+  let underlying = totalCash + totalDebt;
+
+  if (reservesAccrued < underlying) {
+    underlying -= reservesAccrued;
+  } else {
+    underlying = totalCash;
+  }
+
+  if (underlying === 0n) {
+    return DECIMALS.toString(); // Default 1:1 ratio
+  }
+
   return ((underlying * DECIMALS) / mTokenSupply).toString();
 };
+//@adrian exchangeRate is wrong, needs updated, was already wrong
+//maybe use exchangeRateUpdated event to get this
+// also the checks are not here that are in the contract
 
 /**
  * Calculate total USDST supplied based on mToken supply and exchange rate
@@ -278,26 +292,14 @@ export const calculateTotalUSDSTSupplied = (
  * @param currentTime Current timestamp
  * @returns Total borrowed amount including accrued interest
  */
-export const calculateTotalBorrowed = ( //@adrian this might also be simplified now
-  loans: any[],
-  interestRate: number,
-  currentTime: number
+export const calculateSystemDebt = ( //@adrian this might also be simplified now
+  totalScaledDebt: string,
+  borrowIndex: string,
+  RAY: string
 ): string => {
-  let totalBorrowed = 0n;
-  
-  for (const loanEntry of loans) {
-    const loan = loanEntry.LoanInfo;
-    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {//@adrian update
-      const { newTotalOwed } = calculateAccruedInterest(
-        loan,
-        interestRate,
-        currentTime
-      );
-      totalBorrowed += toBig(newTotalOwed);
-    }
-  }
-  
-  return totalBorrowed.toString();
+  // TODO preview mode
+  const systemDebt = (toBig(totalScaledDebt) * toBig(borrowIndex)) / toBig(RAY);
+  return systemDebt.toString();
 };
 
 /**

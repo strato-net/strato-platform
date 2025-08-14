@@ -43,11 +43,11 @@ export const createCompletePriceMap = async (
   }
 
   // Add mToken price
-  try {
+  try { //@adrian maybe change several things here
     const lendingData = await getLendingRegistry(accessToken, undefined, {
-      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,totalBorrowPrincipal::text),liquidityPool:liquidityPool_fkey(address)"
+      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,RAY,borrowIndex,lastAccrual,totalScaledDebt,reservesAccrued,debtCeilingAsset,debtCeilingUSD),liquidityPool:liquidityPool_fkey(address)"
     });
-    const { borrowableAsset, mToken, totalBorrowPrincipal } = lendingData.lendingPool || {};
+    const { borrowableAsset, mToken, RAY, borrowIndex, lastAccrual, totalScaledDebt, reservesAccrued, debtCeilingAsset, debtCeilingUSD } = lendingData.lendingPool || {};
     
     if (borrowableAsset && mToken && lendingData.liquidityPool?.address) {
       const borrowableAssetPrice = priceMap.get(borrowableAsset) || "0";
@@ -67,11 +67,10 @@ export const createCompletePriceMap = async (
         const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
         
         const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
-        const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === lendingData.liquidityPool.address)?.balance || "0";
-        
-        const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(totalBorrowPrincipal || "0")).toString();
-        const exchangeRate = calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied);
-        
+        const totalCash = borrowableToken?.balances?.find((b: any) => b.user === lendingData.liquidityPool.address)?.balance || "0";
+        const totalDebt = (totalScaledDebt * borrowIndex) / RAY;
+        const exchangeRate = calculateExchangeRate(totalMTokenSupply, totalCash.toString(), totalDebt.toString(), reservesAccrued.toString());
+  
         // mToken price = borrowable asset price * exchange rate
         const mTokenPrice = (BigInt(borrowableAssetPrice.toString()) * BigInt(exchangeRate)) / BigInt(10 ** 18);
         

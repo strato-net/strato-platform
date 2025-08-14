@@ -11,7 +11,7 @@ import {
   AssetConfig, 
   calculateCollateralMetrics,
   calculateExchangeRate,
-  calculateTotalBorrowed,
+  calculateSystemDebt,
   calculateUtilizationRate,
   calculateTotalCollateralValue,
   calculateTotalCollateralValueForHealth,
@@ -312,9 +312,9 @@ export const liquidityAndBalance = async (
   userAddress: string,
 ) => {
   // Fetch pool data with optimized query
-  const registry = await getPool(accessToken, undefined);
+  const registry = await getPool(accessToken, undefined); //@adrian mess with this to get bonus data from cirrus
   //@adrian maybe needs changed
-  const { borrowableAsset, mToken, assetConfigs, userLoan, totalBorrowPrincipal } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, userLoan, totalScaledDebt, borrowIndex, RAY } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
 
   if (!borrowableAsset || !mToken) {
@@ -338,7 +338,7 @@ export const liquidityAndBalance = async (
 
   // Extract total supply values with fallbacks
   const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
-  const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0";
+  const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === registry.liquidityPool?.address)?.balance || "0"; // @adrian THIS NEEDS TO BE LESS RESERVES_ACCRUED
   // Get borrowable asset config
   const borrowableAssetConfig = assetConfigs?.find((config: any) => config.asset === borrowableAsset)?.AssetConfig;
 
@@ -362,18 +362,19 @@ export const liquidityAndBalance = async (
   const currentTime = Math.floor(Date.now() / 1000);
   const totalUSDSTSupplied = (toBig(availableLiquidity) + toBig(totalBorrowPrincipal)).toString();
   //@adrian change this; actually, figure out why this is the calculation to begin with
-  
+  // + debt, not + principal; so calculate below @adrian
+
   const [
     exchangeRate,
     totalBorrowed,
     totalCollateralValue,
     apyData
   ] = await Promise.all([
-    Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied)),
-    Promise.resolve(calculateTotalBorrowed(//@adrian change this
-      userLoan || [], 
-      borrowableAssetConfig?.interestRate || 0, 
-      currentTime
+    Promise.resolve(calculateExchangeRate(totalMTokenSupply, totalCash.toString(), totalDebt.toString(), reservesAccrued.toString())),//@adrian TODO update
+    Promise.resolve(calculateSystemDebt(//@adrian change this
+      totalScaledDebt.toString(),
+      borrowIndex.toString(),
+      RAY.toString()
     )),
     Promise.resolve(calculateTotalCollateralValue(
       assetConfigs || [], 
@@ -398,7 +399,7 @@ export const liquidityAndBalance = async (
     : 0n;
   
   // Pool's available liquidity (cash in the pool)
-  const poolAvailableLiquidity = BigInt(availableLiquidity);
+  const poolAvailableLiquidity = BigInt(availableLiquidity); //@adrian this should be a problem
   
   // Max withdrawable is the minimum of user's USDST value and pool's available liquidity
   const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
@@ -421,15 +422,16 @@ export const liquidityAndBalance = async (
       withdrawValue: userUSDSTValue.toString(),
     },
     // Pool metrics
-    totalUSDSTSupplied,
+    totalUSDSTSupplied,//:somethingElse(), will be broken for now
     totalBorrowed,
-    utilizationRate,
-    availableLiquidity,
+    utilizationRate, //@adrian something here
+    availableLiquidity, //@adrian this is incorrect rn
     totalCollateralValue,
     supplyAPY: Math.floor(supplyAPY * 100) / 100,
     maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
     borrowAPY: Math.floor(apyData.borrowAPY * 100) / 100,
     exchangeRate,
+    // New UI elements, changes here <--> UI
   };
 };
 
