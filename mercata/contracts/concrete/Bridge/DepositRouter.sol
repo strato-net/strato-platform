@@ -20,6 +20,10 @@ contract DepositRouter is
     error InvalidAddress();
     error ETHTransferFailed();
     error ArrayLengthMismatch();
+    error NoProposalActive();
+    error ProposalStillPending();
+    error ProposalExpired();
+    error SameAddressProposed();
 
     //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public constant PERMIT2 =
@@ -27,6 +31,12 @@ contract DepositRouter is
 
     address private gnosisSafe;
     uint256 public depositId;
+
+    // Two-step safe change security
+    address public proposedSafe;
+    uint256 public safeChangeProposedAt;
+    uint256 public constant SAFE_CHANGE_DELAY = 48 hours;
+    uint256 public constant MAX_SAFE_CHANGE_DELAY = 7 days;
 
     mapping(address => bool) public allowedTokens;
     mapping(address => uint256) public minDepositAmount;
@@ -41,6 +51,13 @@ contract DepositRouter is
 
     event TokenAllowlistUpdated(address indexed token, bool allowed);
     event MinDepositAmountSet(address indexed token, uint256 minAmount);
+    event GnosisSafeProposed(
+        address indexed currentSafe,
+        address indexed proposedSafe,
+        uint256 executeAfter
+    );
+    event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+    event GnosisSafeProposalCancelled(address indexed proposedSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -56,6 +73,7 @@ contract DepositRouter is
         __Pausable_init();
         __UUPSUpgradeable_init();
 
+        if (gnosisSafe_ == address(0)) revert InvalidAddress();
         gnosisSafe = gnosisSafe_;
     }
 
@@ -153,6 +171,49 @@ contract DepositRouter is
         }
     }
 
+    function proposeSafeChange(address newSafe) external onlyOwner {
+        if (newSafe == address(0)) revert InvalidAddress();
+        if (newSafe == gnosisSafe) revert SameAddressProposed();
+
+        proposedSafe = newSafe;
+        safeChangeProposedAt = block.timestamp;
+
+        emit GnosisSafeProposed(
+            gnosisSafe,
+            newSafe,
+            block.timestamp + SAFE_CHANGE_DELAY
+        );
+    }
+
+    function confirmSafeChange() external onlyOwner {
+        if (block.timestamp < safeChangeProposedAt + SAFE_CHANGE_DELAY) {
+            revert ProposalStillPending();
+        }
+        if (block.timestamp > safeChangeProposedAt + MAX_SAFE_CHANGE_DELAY) {
+            revert ProposalExpired();
+        }
+
+        address oldSafe = gnosisSafe;
+        address newSafe = proposedSafe;
+
+        proposedSafe = address(0);
+        safeChangeProposedAt = 0;
+
+        gnosisSafe = newSafe;
+
+        emit GnosisSafeUpdated(oldSafe, newSafe);
+    }
+
+    function cancelSafeChangeProposal() external onlyOwner {
+        if (proposedSafe == address(0)) revert NoProposalActive();
+
+        address cancelled = proposedSafe;
+        proposedSafe = address(0);
+        safeChangeProposedAt = 0;
+
+        emit GnosisSafeProposalCancelled(cancelled);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
@@ -179,6 +240,31 @@ contract DepositRouter is
 
     function getGnosisSafe() public view returns (address) {
         return gnosisSafe;
+    }
+
+    function getSafeChangeProposal()
+        external
+        view
+        returns (
+            address proposed,
+            uint256 proposedAt,
+            uint256 canExecuteAt,
+            uint256 expiresAt,
+            bool canExecute,
+            bool hasExpired
+        )
+    {
+        proposed = proposedSafe;
+        proposedAt = safeChangeProposedAt;
+
+        if (proposed != address(0)) {
+            canExecuteAt = proposedAt + SAFE_CHANGE_DELAY;
+            expiresAt = canExecuteAt + MAX_SAFE_CHANGE_DELAY;
+            canExecute =
+                block.timestamp >= canExecuteAt &&
+                block.timestamp <= expiresAt;
+            hasExpired = block.timestamp > expiresAt;
+        }
     }
 
     function version() external pure virtual returns (string memory) {
