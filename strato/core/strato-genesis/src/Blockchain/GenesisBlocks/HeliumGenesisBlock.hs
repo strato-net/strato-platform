@@ -457,8 +457,7 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAcc
 
 mercataBridge :: AccountInfo
 mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ ownedByBlockApps mercataAddress ++
-  [ (".owner", BAccount $ unspecifiedChain blockappsAddress)
-  , (".relayer", BAccount $ unspecifiedChain blockappsAddress)
+  [ (".relayer", BAccount $ unspecifiedChain blockappsAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
   ]
