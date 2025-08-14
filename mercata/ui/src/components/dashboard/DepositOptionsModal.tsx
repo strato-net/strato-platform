@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { CreditCard, ArrowLeftRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 
 interface DepositOptionsModalProps {
   isOpen: boolean;
@@ -10,12 +9,6 @@ interface DepositOptionsModalProps {
 }
 
 const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptionsModalProps) => {
-  const navigate = useNavigate();
-
-  const handleBridgeClick = () => {
-    onClose();
-    navigate('/dashboard/bridge');
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -43,16 +36,17 @@ const DepositOptionsModal = ({ isOpen, onClose, onSelectOption }: DepositOptions
 
           <Button
             variant="outline"
-            className="h-auto p-6 flex flex-col items-center gap-3 hover:bg-gray-50"
-            onClick={handleBridgeClick}
+            className="h-auto p-6 flex flex-col items-center gap-3 hover:bg-gray-50 opacity-50 cursor-not-allowed"
+            onClick={(e) => e.preventDefault()}
+            disabled
           >
-            <div className="w-12 h-12 rounded-full bg-purple-50 flex items-center justify-center">
-              <ArrowLeftRight className="h-6 w-6 text-purple-600" />
+            <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center">
+              <ArrowLeftRight className="h-6 w-6 text-gray-400" />
             </div>
             <div className="text-center">
-              <h3 className="font-medium">Bridge Assets</h3>
-              <p className="text-sm text-gray-500 mt-1">
-                Bridge assets between Ethereum and STRATO
+              <h3 className="font-medium text-gray-500">Bridge Assets</h3>
+              <p className="text-sm text-gray-400 mt-1">
+                Temporarily disabled - coming soon
               </p>
             </div>
           </Button>

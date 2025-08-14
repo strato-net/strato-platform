@@ -21,6 +21,20 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Check if this is a known wallet conflict error that we can ignore
+    const errorMessage = error?.message || '';
+    const isWalletConflict = 
+      errorMessage.includes('Cannot redefine property: ethereum') ||
+      errorMessage.includes('Cannot set property ethereum') ||
+      errorMessage.includes('already has ethereum defined');
+    
+    if (isWalletConflict) {
+      console.warn('Wallet extension conflict detected but handled gracefully');
+      // Reset the error state for wallet conflicts
+      this.setState({ hasError: false });
+      return;
+    }
+    
     console.error('Wallet provider error caught:', error, errorInfo);
   }
 

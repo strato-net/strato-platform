@@ -11,18 +11,18 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
 
 interface PoolParticipationProps {
-  liquidityInfo: any;
-  loadingLiquidity: any;
-  lpTokens: any;
-  loadingLpTokens: any;
+  liquidityInfo?: any;
+  loadingLiquidity?: any;
+  lpTokens?: any;
+  loadingLpTokens?: any;
   shouldPreventFlash?: boolean;
 }
 
 export default function MyPoolParticipationSection({ 
-  liquidityInfo, 
-  loadingLiquidity, 
-  lpTokens, 
-  loadingLpTokens,
+  liquidityInfo = null, 
+  loadingLiquidity = false, 
+  lpTokens = [], 
+  loadingLpTokens = false,
   shouldPreventFlash = false
 }: PoolParticipationProps) {
   
@@ -96,7 +96,7 @@ export default function MyPoolParticipationSection({
             ) : null}
 
             {/* LP Token Rows */}
-            {lpTokens.length > 0 ? (
+            {lpTokens && lpTokens.length > 0 ? (
               <div className="space-y-2">
                 {lpTokens.map((lpToken, idx) => {
                   const tokenAddress = lpToken?.lpToken?.address || `token-${idx}`;

@@ -2,6 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import UsdstBalanceBox from "@/components/layouts/UsdstBalanceBox";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import "@/utils/walletConflictHandler";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { WagmiProvider } from "wagmi";
@@ -18,6 +19,8 @@ import { SwapProvider } from "@/context/SwapContext";
 import { OracleProvider } from "@/context/OracleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
+import Home from "./pages/Home";
+import Portfolio from "./pages/Portfolio";
 import SwapAsset from "./pages/SwapAsset";
 import Transfer from "./pages/Transfer";
 import DepositsPage from "./pages/DepositsPage";
@@ -144,6 +147,22 @@ const App = () => {
                                     element={
                                       <ProtectedRoute>
                                         <Dashboard />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/dashboard/home"
+                                    element={
+                                      <ProtectedRoute>
+                                        <Home />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+                                  <Route
+                                    path="/dashboard/portfolio"
+                                    element={
+                                      <ProtectedRoute>
+                                        <Portfolio />
                                       </ProtectedRoute>
                                     }
                                   />
