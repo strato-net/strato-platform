@@ -136,4 +136,11 @@ contract Describe_Mercata {
         string h2 = keccak256(t);
         require(h == h2, "Hashes don't match");
     }
+
+    function it_can_add_from_an_uninitialized_map() {
+        mapping (string => uint) nums;
+        mapping (string => string) strs;
+        require(3 + nums["hello"] == 3, "Mapping should return 0, instead got " + string(nums["hello"]));
+        require(strs["hello"] + "yo" + strs["goodbye"] == "yo", "Mapping should return empty string, instead got " + strs["hello"]);
+    }
 }
