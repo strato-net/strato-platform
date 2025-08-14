@@ -49,11 +49,11 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
   STRATO_HOSTNAME=172.17.0.1
 else
   STRATO_HOSTNAME=host.docker.internal
-  export HTTP_PORT=8080 #You can change this to 80 for Linux, Mac seems to forbid it
 fi
 
 export STRATO_HOSTNAME
 
+export HTTP_PORT=8080 #You can change this to 80 for Linux, Mac seems to forbid it
 export NODE_HOST="localhost:8080"
 export blocHost=$STRATO_HOSTNAME:3000
 
