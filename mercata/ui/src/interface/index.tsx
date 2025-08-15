@@ -305,6 +305,8 @@ export interface LiquidityData {
   totalUSDSTSupplied: string;
   utilizationRate: number;
   maxWithdrawableUSDST: string;
+  borrowIndex?: string;           // RAY (1e27)
+  reservesAccrued?: string;       // underlying (1e18)
 
   // new (optional)
   totalAmountOwed?: string;

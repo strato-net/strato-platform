@@ -5,6 +5,7 @@ import { CollateralData, NewLoanData } from "@/interface";
 import { formatUnits } from "ethers";
 import { formatBalance } from "@/utils/numberUtils";
 import { useMobileTooltip } from "@/hooks/use-mobile-tooltip";
+import { useLendingContext } from "@/context/LendingContext";
 
 interface BorrowingSectionProps {
   userCollaterals: CollateralData[];
@@ -91,7 +92,20 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
 
   return `rgb(${red}, ${green}, 0)`;
 }
-  
+  const { liquidityInfo } = useLendingContext();
+  const borrowIndexDisplay = (() => {
+    try {
+      const idx = liquidityInfo?.borrowIndex;
+      if (!idx) return "0";
+      const s = formatUnits(BigInt(idx), 27);
+      const [w, f = ""] = s.split(".");
+      return f ? `${w}.${f.slice(0, 5)}` : w;
+    } catch {
+      return "0";
+    }
+  })();
+
+
   return (
     <Card className="border border-gray-100 shadow-sm">
       <CardHeader className="pb-4">
@@ -135,6 +149,12 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
                 <span className="font-semibold text-lg">
                   {formatBalance(loanData?.maxAvailableToBorrowUSD || 0n, "USDST", 18, 2, 2)}
                 </span>
+              </div>
+              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
+                <InfoTooltip content="Global borrow index for the lending pool.">
+                  <span className="text-gray-600 text-sm font-medium">Borrow Index</span>
+                </InfoTooltip>
+                <span className="font-semibold text-lg">{borrowIndexDisplay}</span>
               </div>
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
                 <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">

@@ -248,7 +248,7 @@ export const collateralAndBalance = async (
   }
 
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
-  const userCollaterals = registry.collateralVault.userCollaterals || [];
+  const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
   const userTokens = await getBalance(accessToken, userAddress, {
     address: `in.(${assets.join(",")})`, select: `address,user:key,balance:value::text,token:${Token}(_name,_symbol,_owner,_totalSupply::text,customDecimals,images:${Token}-images(value))`
   });
@@ -466,6 +466,9 @@ export const liquidityAndBalance = async (
     maxSupplyAPY: Math.floor(apyData.supplyAPY * 100) / 100,
     borrowAPY: Math.floor(apyData.borrowAPY * 100) / 100,
     exchangeRate,
+    // Additional pool metrics
+    borrowIndex: borrowIndexStr.toString(),
+    reservesAccrued: reservesAccruedStr.toString(),
     // New index-based fields for UI:
     totalAmountOwed,
     totalAmountOwedPreview,
