@@ -9,5 +9,5 @@ endif
 all: build
 
 build:
-	docker build -t $(BASIL_DOCKER_TAG) .
-	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)
+	sudo docker build -t $(BASIL_DOCKER_TAG) .
+	sudo docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)

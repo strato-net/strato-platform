@@ -13,5 +13,5 @@ endif
 all: build
 
 build:
-	docker build --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(BASIL_DOCKER_TAG) api/
-	docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)
+	sudo docker build --build-arg STRATO_VERSION=$(STRATO_VERSION) -t $(BASIL_DOCKER_TAG) api/
+	sudo docker tag $(BASIL_DOCKER_TAG) $(ECR_DOCKER_TAG)

@@ -67,18 +67,18 @@ smd:
 
 mercata-backend:
 	@echo Now building mercata-backend...
-	docker build -t ${REPO_URL}mercata-backend:${VERSION} ./mercata/backend
-	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
+	sudo docker build -t ${REPO_URL}mercata-backend:${VERSION} ./mercata/backend
+	sudo docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
     	
 mercata-ui:
 	@echo Now building mercata-ui...
-	docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
-	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
+	sudo docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
+	sudo docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
 
 mercata-bridge:
 	@echo Now building mercata-bridge...
-	docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
-	docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}
+	sudo docker build -t ${REPO_URL}mercata-bridge:${VERSION} ./mercata/services/bridge
+	sudo docker tag ${REPO_URL}mercata-bridge:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	echo "${REPO_URL}mercata-bridge:${VERSION}" > bridge_image_tag
 	echo "${REPO_AWS_ECR_URL_MERCATA}bridge:${VERSION}" > bridge_image_tag_ecr
@@ -95,8 +95,8 @@ mercata-oracle:
 
 mercata-stripe:
 	@echo Now building mercata-stripe...
-	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
-	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}
+	sudo docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
+	sudo docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}
 	# TODO: #dcpush - replace with proper docker compose push flow
 	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_image_tag
 	echo "${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}" > stripe_image_tag_ecr
