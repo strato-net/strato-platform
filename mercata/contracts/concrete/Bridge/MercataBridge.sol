@@ -20,13 +20,12 @@
     ───────────────────────────────────────────────────────────────────────── */
 
 import "../../abstract/ERC20/access/Ownable.sol";
-import "../../abstract/ERC20/utils/ReentrancyGuard.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
 /* ───────────────────────────────────────────────────────────────────────── */
-contract record MercataBridge is Ownable, ReentrancyGuard {
+contract record MercataBridge is Ownable {
 /* --------------------------------------------------------------------- */
 /*                            ─  ENUMS  ─                               */
 /* --------------------------------------------------------------------- */
@@ -286,7 +285,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         require(tokenFactory.isTokenActive(token), "MB: inactive token");
         AssetInfo memory a = assets[token];
@@ -321,7 +319,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         uint256 n = srcChainIds.length;
         require(
@@ -364,7 +361,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         DepositInfo storage d = deposits[srcChainId][srcTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
@@ -383,7 +379,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         uint256 n = srcChainIds.length;
         require(n == srcTxHashes.length, "MB: len");
@@ -418,7 +413,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     )
         external
         whenWithdrawalsOpen
-        nonReentrant
         returns (uint256 id)
     {
         require(tokenFactory.isTokenActive(token),"MB: inactive");
@@ -459,7 +453,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.INITIATED,"MB: bad state");
@@ -476,7 +469,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         uint256 n = ids.length;
         require(n == custodyTxHashes.length, "MB: len");
@@ -499,7 +491,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,"MB: bad state");
@@ -518,7 +509,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         uint256 n = ids.length;
         require(n == custodyTxHashes.length, "MB: len");
@@ -541,7 +531,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
      * escrowed tokens.  Covers the scenario where Custody tx is never signed
      * or relayer disappears.
      */
-    function abortWithdrawal(uint256 id) external nonReentrant {
+    function abortWithdrawal(uint256 id) external {
         WithdrawalInfo storage w = withdrawals[id];
         require(
             w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,
@@ -564,7 +554,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         emit WithdrawalAborted(id);
     }
 
-    function abortWithdrawalBatch(uint256[] calldata ids) external nonReentrant {
+    function abortWithdrawalBatch(uint256[] calldata ids) external {
         uint256 n = ids.length;
         require(n > 0, "MB: empty");
 
