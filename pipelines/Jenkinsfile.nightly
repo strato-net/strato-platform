@@ -32,7 +32,7 @@ pipeline {
       steps {
         dir ('strato-worktree') {
           sh 'rm -rf .docker-work'
-          sh 'REPO=private make all'
+          sh 'REPO=private make docker'
         }
       }
     }
