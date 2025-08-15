@@ -260,6 +260,8 @@ contract record LendingPool is Ownable {
         // 4) move funds
         LiquidityPool(_liquidityPool()).borrow(amount, msg.sender);
 
+        // exchange rate reflects: cash ↓, debt ↑ (after _accrue)
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());   
         emit Borrowed(msg.sender, borrowableAsset, amount);
     }
 
@@ -300,7 +302,8 @@ contract record LendingPool is Ownable {
         } else {
             loan.lastUpdated = block.timestamp;
         }
-
+        // debt ↓ (after _accrue and scaledDebt reduction)
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
     }
 
@@ -377,6 +380,8 @@ contract record LendingPool is Ownable {
         // Transfer collateral to liquidator
         CollateralVault(_collateralVault()).seizeCollateral(borrower, msg.sender, collateralAsset, collateralToSeize);
 
+        // cash ↑, debt ↓ (after _accrue and debt reduction)
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
     }
 
@@ -447,6 +452,8 @@ contract record LendingPool is Ownable {
         require(liquidationBonus >= 10000 && liquidationBonus <= 12500, "Invalid liquidation bonus"); // 100-125%
         require(interestRate <= 10000, "Interest rate too high"); // Max 100%
         require(reserveFactor <= 5000, "Reserve factor too high"); // Max 50%
+
+        _accrue();
         
         // If this is a new asset, add it to configuredAssets array
         if (assetConfigs[asset].ltv == 0 && assetConfigs[asset].liquidationThreshold == 0) {
@@ -612,7 +619,7 @@ contract record LendingPool is Ownable {
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
     function sweepReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0 || reservesAccrued == 0) return;
-
+        _accrue();
         uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
         uint toSend = amount;
         if (toSend > reservesAccrued) toSend = reservesAccrued;

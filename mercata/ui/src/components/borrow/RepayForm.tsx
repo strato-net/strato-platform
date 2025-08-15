@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { formatUnits } from "ethers";
+import { formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { REPAY_FEE } from "@/lib/constants";
@@ -74,9 +74,13 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
   };
 
   const handleRepay = () => {
-    onRepay(repayAmount);
-    setRepayAmount("");
-    setRepayDisplayAmount("");
+    const feeWei = safeParseUnits(REPAY_FEE, 18);
+    const totalOwedWei = BigInt(loans?.totalAmountOwed || "0");
+    const inputWei = safeParseUnits(repayAmount || "0", 18);
+    const availableWei = BigInt(usdstBalance || "0") > feeWei ? (BigInt(usdstBalance || "0") - feeWei) : 0n;
+    const repayWei = inputWei > totalOwedWei ? totalOwedWei : (inputWei > availableWei ? availableWei : inputWei);
+    onRepay(formatUnits(repayWei, 18));
+    setRepayAmount(""); setRepayDisplayAmount("");
   };
 
   if (!loans) {
@@ -87,24 +91,30 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     );
   }
 
+  const feeWei = safeParseUnits(REPAY_FEE, 18);           // bigint
+  const balWei = BigInt(usdstBalance || "0");             // bigint
+  const availWei = balWei > feeWei ? (balWei - feeWei) : 0n;
+
   return (
     <div className="space-y-4 pt-4">
       {/* Loan Details */}
       <div className="space-y-2">
         <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Principal Balance</span>
-          <span className="font-medium">USDST {formatUnits(loans?.principalBalance || 0, 18)}</span>
+          <span className="text-sm text-gray-500">Total Amount Owed</span>
+          <span className="font-normal">
+            USDST {formatUnits(BigInt(loans?.totalAmountOwed ?? "0"), 18)}
+          </span>
         </div>
+
+        {loans?.totalAmountOwedPreview && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-gray-500">Projected Debt</span>
+            <span className="font-medium">
+              USDST {formatUnits(BigInt(loans?.totalAmountOwedPreview ?? "0"), 18)}
+            </span>
+          </div>
+        )}
         
-        <div className="flex justify-between items-center">
-          <span className="text-sm text-gray-500">Accrued Interest</span>
-          <span className="font-medium">USDST {formatUnits(loans?.accruedInterest || 0, 18)}</span>
-        </div>
-        
-        <div className="flex justify-between items-center font-bold pt-2 border-t">
-          <span>Total Amount Due</span>
-          <span className="text-lg">USDST {formatUnits(loans?.totalAmountOwed || 0, 18)}</span>
-        </div>
       </div>
 
       {/* Repay Amount Input */}
@@ -164,9 +174,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
         
         {/* USDST Balance Display */}
         <div className="text-xs text-gray-500">
-          Your USDST Balance: {formatCurrency(formatUnits(usdstBalance || "0", 18))} USDST ({formatCurrency(formatUnits(BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) > 0n ? BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18) : 0n, 18))} USDST available for repayment)
-        </div>
-        
+          Your USDST Balance: {formatCurrency(formatUnits(balWei, 18))} USDST ({formatCurrency(formatUnits(availWei, 18))} USDST available for repayment)
+        </div>  
+
         {/* Balance validation warnings */}
         {(() => {
           const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
@@ -235,7 +245,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
                 const remaining = totalOwed - repayAmountWei;
                 return `${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))} USDST`;
               } catch {
-                return `${formatCurrency(formatUnits(loans?.totalAmountOwed || 0, 18))} USDST`;
+                return `${formatCurrency(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18))} USDST`;
               }
             })()}
           </span>

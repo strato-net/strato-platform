@@ -105,7 +105,7 @@ const Borrow = () => {
       setModalLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: safeParseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -131,7 +131,7 @@ const Borrow = () => {
       setModalLoading(true);
       await withdrawCollateral({
         asset: asset.address,
-        amount: safeParseUnits(amount, 18).toString(),
+        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
       });
       toast({
         title: "Withdraw Initiated",
