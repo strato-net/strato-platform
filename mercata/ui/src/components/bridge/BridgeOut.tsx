@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,11 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useAccount, useChainId } from "wagmi";
+import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import { roundToDecimals, safeParseUnits, formatBalance } from "@/utils/numberUtils";
-import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
 interface Token {
@@ -32,21 +31,18 @@ interface Token {
 }
 
 interface BridgeOutProps {
-  showTestnet: boolean;
   networkChainId: string | null;
 }
 
-const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) => {
+const BridgeOut: React.FC<BridgeOutProps> = ({ networkChainId }) => {
   const { address, isConnected } = useAccount();
-  const chainId = useChainId();
   const { toast } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
-    loading: contextLoading,
     bridgeOut: bridgeOutAPI,
     getBalance,
-    getBridgeableTokens,
+    bridgeableTokens,
+    availableNetworks,
   } = useBridgeContext();
 
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
@@ -55,142 +51,60 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
   const [isLoading, setIsLoading] = useState(false);
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
-  const [fromChain, setFromChain] = useState<string>("STRATO");
-  const [toChain, setToChain] = useState<string>(showTestnet ? "Sepolia" : "Ethereum");
-  const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedToNetwork, setSelectedToNetwork] = useState<string | null>(null);
 
-  // Expected network validation - use chainId from bridgeInTokens API response
-  // BridgeOut should validate against the same network as BridgeIn
-  // For BridgeOut, user can bridge out from STRATO regardless of current network
-  // No need to force them to be on a specific network
-  const isCorrectNetwork = true; // Always allow bridge out operations
-  
- 
-
-  // Fetch network tokens
   useEffect(() => {
-    const loadBridgeOutTokens = async () => {
-      try {
-        // Use the networkChainId prop passed from BridgeWidget
-        if (!networkChainId) {
-          console.log("No networkChainId available yet");
-          return;
-        }
-        
-        console.log("Using networkChainId from props:", networkChainId);
-        
-        // Fetch bridgeable tokens with the networkChainId from props
-        const tokens = await getBridgeableTokens(networkChainId);
-        setBridgeOutTokens(tokens);
-        
-        if (!selectedToken && tokens.length > 0) {
-          setSelectedToken(tokens[0]);
-        }
-        
-      } catch (error) {
-        console.error('Error fetching bridge out tokens:', error);
-      }
-    };
+    if (!selectedToNetwork && availableNetworks.length) {
+      setSelectedToNetwork(availableNetworks[0].chainName);
+    }
+    if (bridgeableTokens.length && !selectedToken) {
+      setSelectedToken(bridgeableTokens[0]);
+    }
+  }, [availableNetworks, bridgeableTokens, selectedToNetwork, selectedToken]);
 
-    loadBridgeOutTokens();
-  }, [getBridgeableTokens, networkChainId]);
-
-  // Network validation - following existing error handling pattern
-  // Removed since BridgeOut doesn't require specific network connection
-  // useEffect(() => {
-  //   if (isConnected && chainId && expectedChainId) {
-  //     if (chainId !== expectedChainId) {
-  //       setNetworkError(getNetworkErrorMessage({
-  //         networkName: expectedNetworkName,
-  //         tokenSymbol: selectedToken?.stratoTokenSymbol || "tokens",
-  //         direction: "out"
-  //       }));
-  //     } else {
-  //       setNetworkError("");
-  //     }
-  //   } else if (isConnected && !selectedToken) {
-  //     setNetworkError(getTokenSelectionErrorMessage("out"));
-  //   } else {
-  //     setNetworkError("");
-  //   }
-  // }, [chainId, isConnected, selectedToken, expectedChainId, expectedNetworkName]);
-
-
-  // Balance update effect
   useEffect(() => {
     let mounted = true;
-    let isInitialFetch = true;
-
-    const updateBalance = async () => {
+    const fetch = async () => {
+      if (!selectedToken?.stratoTokenAddress) return;
+      setIsBalanceLoading(true);
       try {
-        if (isInitialFetch) {
-          setIsBalanceLoading(true);
-          setTokenBalance("0");
-        }
-
-        if (selectedToken?.stratoTokenAddress ) {
-          const balanceData = await getBalance(selectedToken.stratoTokenAddress);
-
-          if (mounted && balanceData?.balance) {
-            const formattedBalance = formatBalance(
-              balanceData.balance,
-              undefined,
-              parseInt(selectedToken.extDecimals)
-            );
-            setTokenBalance(formattedBalance);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching balance:", error);
-        if (mounted) {
-          setTokenBalance("0");
-        }
+        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
+        const formatted = formatBalance(balance, undefined, parseInt(selectedToken.extDecimals));
+        if (mounted) setTokenBalance(formatted);
+      } catch {
+        if (mounted) setTokenBalance("0");
       } finally {
-        if (mounted) {
-          setIsBalanceLoading(false);
-          isInitialFetch = false;
-        }
+        if (mounted) setIsBalanceLoading(false);
       }
     };
-
-    if (isInitialFetch) {
-      updateBalance();
-    } else {
-      const timeout = setTimeout(updateBalance, 1000);
-      return () => clearTimeout(timeout);
-    }
-
+    fetch();
     return () => {
       mounted = false;
     };
-  }, [ selectedToken, getBalance]);
+  }, [selectedToken, getBalance]);
+
+  const decimals = useMemo(() => (selectedToken ? parseInt(selectedToken.extDecimals) : 18), [selectedToken]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
       setAmountError("");
       return true;
     }
-
-    const numericAmount = parseFloat(value);
-    const numericBalance = parseFloat(tokenBalance);
-
-    if (isNaN(numericAmount)) {
+    const n = Number(value);
+    const bal = Number(tokenBalance);
+    if (Number.isNaN(n)) {
       setAmountError("Please enter a valid number");
       return false;
     }
-
-    if (numericAmount <= 0) {
+    if (n <= 0) {
       setAmountError("Amount must be greater than 0");
       return false;
     }
-
-    if (numericAmount > numericBalance) {
-      setAmountError(
-        `Insufficient balance. Maximum amount: ${tokenBalance} ${selectedToken?.stratoTokenSymbol}`
-      );
+    if (n > bal) {
+      setAmountError(`Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.stratoTokenSymbol ?? ""}`);
       return false;
     }
-
     setAmountError("");
     return true;
   };
@@ -203,96 +117,55 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
     }
   };
 
-  const handlePercentageClick = (percentageAmount: string) => {
-    setAmount(percentageAmount);
-    validateAmount(percentageAmount);
+  const handlePercentageClick = (p: string) => {
+    setAmount(p);
+    validateAmount(p);
   };
 
   const showConfirmModal = () => {
-    // Network validation - following existing error handling pattern
-    if (!isCorrectNetwork) {
-      toast({
-        title: "Wrong Network",
-        description: "Network validation is not required for bridge out operations",
-        variant: "destructive",
-      });
-      return;
-    }
-
     if (!selectedToken?.stratoTokenAddress || !address) {
-      toast({
-        title: "Error",
-        description: "Invalid configuration",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Invalid configuration", variant: "destructive" });
       return;
     }
+    if (!selectedToNetwork) {
+      toast({ title: "Select Network", description: "Please choose a destination network.", variant: "destructive" });
+      return;
+    }
+    if (!validateAmount(amount)) return;
     setIsModalOpen(true);
   };
 
-  const handleModalCancel = () => {
-    setIsModalOpen(false);
-  };
+  const handleModalCancel = () => setIsModalOpen(false);
 
   const handleBridgeOut = async () => {
-    // Network validation - following existing error handling pattern
-    if (!isCorrectNetwork) {
-      toast({
-        title: "Wrong Network",
-        description: "Network validation is not required for bridge out operations",
-        variant: "destructive",
-      });
-      setIsModalOpen(false);
-      return;
-    }
-
+    if (!selectedToken || !address || !selectedToNetwork) return;
     setIsModalOpen(false);
     setIsLoading(true);
-    toast({
-      title: "Preparing transaction...",
-      description: "Please wait while we prepare your transaction",
-    });
+    toast({ title: "Preparing transaction...", description: "Please wait while we prepare your transaction" });
 
     try {
-      // Round amount to token's decimal places before sending
-      
-      // Convert amount to smallest unit (10^18 format)
-      const amountInSmallestUnit = Math.floor(parseFloat(amount) * Math.pow(10, 18)).toString();
-      
-      console.log("Debug - networkChainId:", networkChainId);
-      console.log("Debug - networkChainId type:", typeof networkChainId);
-      console.log("Debug - destChainId being sent:", String(networkChainId));
-      console.log("Debug - amount conversion:", `${amount} -> ${amountInSmallestUnit}`);
-      
+      const amountInSmallestUnit = safeParseUnits(amount || "0", decimals).toString();
       const response = await bridgeOutAPI({
-        amount: amountInSmallestUnit, // Send amount in smallest unit (10^18 format)
-        destAddress: address, // Changed from toAddress to destAddress
+        amount: amountInSmallestUnit,
+        destAddress: address,
         token: selectedToken.stratoTokenAddress,
-        destChainId: String(networkChainId), // Ensure it's a string
+        destChainId: String(networkChainId ?? ""),
       });
 
       if (response?.success) {
         toast({
           title: "Transaction Proposed Successfully",
-           description: `Your tokens have been burned and ${amount} ${selectedToken?.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval. Please wait for some time.`,
+          description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
-
-        // Refresh balance after successful transaction
-        const balanceData = await getBalance(selectedToken.stratoTokenAddress);
-        if (balanceData?.balance) {
-          const formattedBalance = formatBalance(
-            balanceData.balance,
-            undefined,
-            parseInt(selectedToken.extDecimals)
-          );
-          setTokenBalance(formattedBalance);
-        }
+        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
+        const formatted = formatBalance(balance, undefined, decimals);
+        setTokenBalance(formatted);
+        setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
       }
     } catch (error) {
       console.error("Bridge transaction failed:", error);
-      // Error toast is now handled globally by fetch wrapper
     } finally {
       setIsLoading(false);
     }
@@ -301,25 +174,27 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
   return (
     <div className="space-y-6">
       <BridgeWalletStatus />
+
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>
-          <Input
-            id="from-chain"
-            value={fromChain}
-            disabled
-            className="bg-gray-50"
-          />
+          <Input id="from-chain" value="STRATO" disabled className="bg-gray-50" />
         </div>
 
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="to">To Network</Label>
-          <Input
-            id="to-chain"
-            value={toChain}
-            disabled
-            className="bg-gray-50"
-          />
+          <Select value={selectedToNetwork || ""} onValueChange={setSelectedToNetwork}>
+            <SelectTrigger id="to-network">
+              <SelectValue placeholder="Select network" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableNetworks.map((n) => (
+                <SelectItem key={n.chainId} value={n.chainName}>
+                  {n.chainName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -327,24 +202,20 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
         <Label htmlFor="asset">Select Asset</Label>
         <Select
           value={selectedToken?.stratoTokenSymbol || ""}
-          onValueChange={(value) => {
-            const token = bridgeOutTokens.find((t) => t.stratoTokenSymbol === value);
-            if (token) {
-              setSelectedToken(token);
-            }
+          onValueChange={(val) => {
+            const t = bridgeableTokens.find((x) => x.stratoTokenSymbol === val);
+            if (t) setSelectedToken(t);
           }}
         >
           <SelectTrigger id="from-token">
             <SelectValue>
-              {selectedToken
-                ? `${selectedToken.stratoTokenName} (${selectedToken.stratoTokenSymbol})`
-                : "Select asset"}
+              {selectedToken ? `${selectedToken.stratoTokenName} (${selectedToken.stratoTokenSymbol})` : "Select asset"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {bridgeOutTokens.map((token) => (
-              <SelectItem key={token.stratoTokenSymbol} value={token.stratoTokenSymbol}>
-                {token.stratoTokenName} ({token.stratoTokenSymbol})
+            {bridgeableTokens.map((t) => (
+              <SelectItem key={t.stratoTokenSymbol} value={t.stratoTokenSymbol}>
+                {t.stratoTokenName} ({t.stratoTokenSymbol})
               </SelectItem>
             ))}
           </SelectContent>
@@ -358,52 +229,50 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
-          placeholder="0.00"
-          className={`w-full ${
-            amountError ? "border-red-500 focus:ring-red-400" : ""
-          }`}
+          placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
+          className={`w-full ${amountError ? "border-red-500 focus:ring-red-400" : ""}`}
           value={amount}
           onChange={handleAmountChange}
+          disabled={!isConnected}
         />
-        {amountError && (
-          <p className="text-sm text-red-500">{amountError}</p>
+        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+        {isConnected && (
+          <PercentageButtons
+            value={amount}
+            maxValue={safeParseUnits(tokenBalance, decimals).toString()}
+            onChange={handlePercentageClick}
+            className="mt-2"
+          />
         )}
-        <PercentageButtons
-          value={amount}
-          maxValue={safeParseUnits(tokenBalance,18).toString()}
-          onChange={handlePercentageClick}
-          className="mt-2"
-        />
         {amount && selectedToken && (
-          <p className="text-sm text-gray-500">
-            Amount will be rounded down to {selectedToken.extDecimals} decimal places
-          </p>
+          <p className="text-sm text-gray-500">Amount will be rounded down to {selectedToken.extDecimals} decimal places</p>
         )}
-        <div className="flex items-center gap-2 mt-1">
-          {isBalanceLoading ? (
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">
-                Fetching balance...
-              </p>
-            </div>
-          ) : (
-            tokenBalance && (
-              <div className="space-y-2">
-                <div className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
-                </div>
-                {selectedToken?.extSymbol && (
-                  <div className="text-sm">
-                    <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                      You will receive {amount ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount} ` : ''} {selectedToken?.extName} ({selectedToken?.extSymbol}) on {toChain} network
-                    </p>
-                  </div>
-                )}
+        {isConnected && (
+          <div className="flex items-center gap-2 mt-1">
+            {isBalanceLoading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                <p className="text-sm text-gray-500">Fetching balance...</p>
               </div>
-            )
-          )}
-        </div>
+            ) : (
+              tokenBalance && (
+                <div className="space-y-2">
+                  <div className="text-sm text-gray-500">
+                    Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
+                  </div>
+                  {selectedToken?.extSymbol && (
+                    <div className="text-sm">
+                      <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
+                        You will receive {amount ? `${selectedToken ? roundToDecimals(amount, decimals) : amount} ` : ""}
+                        {selectedToken?.extName} ({selectedToken?.extSymbol}) on {selectedToNetwork || "selected"} network
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )
+            )}
+          </div>
+        )}
       </div>
 
       <div className="bg-gray-50 p-4 rounded-md space-y-2">
@@ -418,7 +287,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
       </div>
 
       <div className="text-sm text-gray-500">
-        <p>• Bridge assets between STRATO and {toChain} networks</p>
+        <p>• Bridge assets between STRATO and external networks</p>
         <p>• Small bridge fee applies</p>
         <p>• Transaction time varies by network congestion</p>
       </div>
@@ -426,7 +295,7 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
       <div className="flex justify-end gap-4">
         <Button
           onClick={showConfirmModal}
-          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected || amountError || !isCorrectNetwork)}
+          disabled={Boolean(isLoading || !amount || !selectedToken || !isConnected || amountError || !selectedToNetwork)}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Bridge Assets"}
@@ -453,12 +322,14 @@ const BridgeOut: React.FC<BridgeOutProps> = ({ showTestnet, networkChainId }) =>
           <div className="bg-gray-50 p-4 rounded-md">
             <p className="font-medium">Transaction Details:</p>
             <div className="mt-2 space-y-2">
-              <p>From: {fromChain}</p>
-              <p>To: {toChain}</p>
-              <p>Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount} {selectedToken?.stratoTokenSymbol}</p>
+              <p>From: STRATO</p>
+              <p>To: {selectedToNetwork || "Not selected"}</p>
+              <p>
+                Amount: {selectedToken ? roundToDecimals(amount, decimals) : amount} {selectedToken?.stratoTokenSymbol}
+              </p>
               {selectedToken?.extSymbol && (
                 <p className="text-blue-600">
-                  You will receive {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount} {selectedToken?.extName} ({selectedToken?.extSymbol}) on {toChain} network
+                  You will receive {selectedToken ? roundToDecimals(amount, decimals) : amount} {selectedToken?.extName} ({selectedToken?.extSymbol}) on {selectedToNetwork || "selected"} network
                 </p>
               )}
             </div>

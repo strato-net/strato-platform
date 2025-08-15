@@ -2,7 +2,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import { extractContractName } from "../../utils/utils";
+import { extractContractName, ensureHexPrefix } from "../../utils/utils";
 
 const { MercataBridge, Token } = constants;
 
@@ -61,60 +61,39 @@ export const getBridgeStatus = async (
   }
 };
 
-export const getBridgeableTokens = async (
-  accessToken: string,
-  chainId: string
-) => {
-  try {
-    const params = {
-      select: "stratoTokenAddress:key,assetInfo:value",
-      "value->>enabled": "eq.true",
-      "value->>chainId": `eq.${chainId}`
-    };
-
-    const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
-    
-    if (assets.length === 0) {
-      return [];
-    }
-
-    // Get token addresses and fetch metadata
-    const tokenAddresses = assets.map((asset: any) => asset.stratoTokenAddress).filter(Boolean);
-    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, { 
-      params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
-    });
-    
-    // Create token metadata map
-    const tokenMap = new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol }]));
-    return assets.map((asset: any) => {
-      const tokenInfo = tokenMap.get(asset.stratoTokenAddress) as { name: string; symbol: string } | undefined;
-      return {
-        stratoTokenAddress: asset.stratoTokenAddress,
-        stratoTokenName: tokenInfo?.name || "",
-        stratoTokenSymbol: tokenInfo?.symbol || "",
-        ...asset.assetInfo
-      };
-    });
-  } catch (error) {
-    throw error;
-  }
+export const getBridgeableTokens = async (accessToken: string, chainId: string) => {
+  const params = {
+    select: "stratoTokenAddress:key,assetInfo:value",
+    "value->>enabled": "eq.true",
+    "value->>chainId": `eq.${chainId}`
+  };
+  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
+  if (!assets.length) return [];
+  const tokenAddresses = assets.map((a: any) => a.stratoTokenAddress).filter(Boolean);
+  const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
+    params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
+  });
+  const tokenMap = new Map(tokenData.map((t: any) => [t.address, { name: t._name, symbol: t._symbol }]));
+  return assets.map((a: any) => {
+    const info = tokenMap.get(a.stratoTokenAddress) as { name?: string; symbol?: string } | undefined;
+    if (a.assetInfo.extToken) a.assetInfo.extToken = ensureHexPrefix(a.assetInfo.extToken);
+    return { stratoTokenAddress: a.stratoTokenAddress, stratoTokenName: info?.name || "", stratoTokenSymbol: info?.symbol || "", ...a.assetInfo };
+  });
 };
 
 export const getNetworkConfigs = async (accessToken: string) => {
   try {
-    const { data: chains } = await cirrus.get(accessToken, `/${MercataBridge}-chains`, {
+    const { data } = await cirrus.get(accessToken, `/${MercataBridge}-chains`, {
       params: {
         select: "chainId:key,ChainInfo:value",
         "value->>enabled": "eq.true"
       }
     });
-
-    // Return array of key-value pairs
-    return chains.map((chain: any) => ({
-      chainId: chain.chainId,
-      chainInfo: chain.ChainInfo
-    }));
-  } catch (error) {
-    throw error;
+    return data.map((c: any) => {
+      if (c.ChainInfo.depositRouter) c.ChainInfo.depositRouter = ensureHexPrefix(c.ChainInfo.depositRouter);
+      return { chainId: c.chainId, chainInfo: c.ChainInfo };
+    });
+  } catch (e) {
+    throw e;
   }
 };

@@ -9,41 +9,33 @@ import BridgeOut from './BridgeOut';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const [showTestnet, setShowTestnet] = useState(false);
   const [chainId, setChainId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { getNetworkConfig } = useBridgeContext();
+  const { loadNetworksAndTokens, availableNetworks } = useBridgeContext();
 
-  // Fetch network configuration on component mount
+  // Load networks on component mount
   useEffect(() => {
-    const fetchNetworkConfig = async () => {
+    const initializeBridge = async () => {
       try {
         setLoading(true);
-        const networkConfig = await getNetworkConfig();
-        
-        console.log('Raw network config response:', networkConfig);
-        
-        // Extract chainId from the first chain in the response
-        if (networkConfig && networkConfig.length > 0) {
-          const firstChain = networkConfig[0];
-          const extractedChainId = firstChain.chainId;
-          setChainId(extractedChainId);
-          console.log(`Successfully extracted chain ID: ${extractedChainId}`);
-        } else {
-          console.log('No chains found in network config');
-          setChainId(null);
-        }
+        await loadNetworksAndTokens();
       } catch (error) {
-        console.error('Error fetching network config:', error);
-        setChainId(null);
+        console.error('Error initializing bridge:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchNetworkConfig();
-  }, [getNetworkConfig]);
+    initializeBridge();
+  }, [loadNetworksAndTokens]);
+
+  // Set chainId when availableNetworks changes
+  useEffect(() => {
+    if (availableNetworks && availableNetworks.length > 0) {
+      setChainId(availableNetworks[0].chainId);
+    }
+  }, [availableNetworks]);
 
   if (loading) {
     return (
@@ -89,9 +81,9 @@ const BridgeWidget = () => {
         />
         <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
           {activeTab === 'bridgeIn' ? (
-            <BridgeIn showTestnet={showTestnet} networkChainId={chainId} />
+            <BridgeIn networkChainId={chainId} />
           ) : (
-            <BridgeOut showTestnet={showTestnet} networkChainId={chainId} />
+            <BridgeOut networkChainId={chainId} />
           )}
         </div>
       </div>

@@ -1,110 +1,131 @@
-export const NATIVE_TOKEN_ADDRESS =
-  "0x0000000000000000000000000000000000000000";
+import type { Chain } from 'viem';
+import { defineChain } from 'viem/utils';
 
-export const BRIDGE_TOKEN_ADDRESS = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
-export const BRIDGE_TOKEN_ADDRESS_ETH = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
-export const BRIDGE_TOKEN_ADDRESS_USDC = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS_USDC;
+export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-export const BRIDGE_ABI = [
+export const DEPOSIT_ROUTER_ABI = [
   {
-    inputs: [
-      {
-        internalType: "address",
-        name: "token",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "recipient",
-        type: "address",
-      },
-    ],
-    name: "bridge",
+    inputs: [{ name: "stratoAddress", type: "address" }],
+    name: "depositETH",
     outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    stateMutability: "payable",
+    type: "function"
   },
+  {
+    inputs: [{ name: "token", type: "address" }],
+    name: "getTokenConfig",
+    outputs: [
+      { name: "allowed", type: "bool" },
+      { name: "minAmount", type: "uint256" }
+    ],
+    stateMutability: "view",
+    type: "function"
+  },
+  {
+    inputs: [],
+    name: "TokenNotAllowed",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "UseDepositETH",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "BelowMinimum",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "InvalidAddress",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "ETHTransferFailed",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "ArrayLengthMismatch",
+    type: "error"
+  },
+  {
+    inputs: [],
+    name: "SameAddressProposed",
+    type: "error"
+  }
 ] as const;
 
-export const TESTNET_TOKENS = [
-  {
-    symbol: "SepoliaETH",
-    name: "Sepolia Ether",
-  },
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-  },
-];
+const chainCache = new Map<number, Chain>();
 
-export const MAINNET_TOKENS = [
-  {
-    symbol: "ETH",
-    name: "Ethereum",
-  },
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-  },
-];
-
-export const TOKEN_ADDRESSES: { [key: string]: { [key: string]: string } } = {
-  Ethereum: {
-    ETH: NATIVE_TOKEN_ADDRESS, // TODO: change to the correct address
-    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  },
-  Sepolia: {
-    SepoliaETH: NATIVE_TOKEN_ADDRESS,
-    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  },
+type ChainHints = {
+  name?: string;
+  rpcUrl?: string;
+  blockExplorerUrl?: string;
+  nativeSymbol?: string;
+  nativeName?: string;
+  decimals?: number;
 };
 
-export const NETWORK_CONFIGS = {
-  Sepolia: {
-    name: "Sepolia",
-    chain: "sepolia",
-    chainId: 11155111,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png",
-    rpc: ["https://rpc.sepolia.org"],
-    nativeCurrency: {
-      name: "Sepolia Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    shortName: "sep",
-    infoURL: "https://sepolia.etherscan.io",
-    explorers: [
-      {
-        name: "Etherscan",
-        url: "https://sepolia.etherscan.io",
-        standard: "EIP3091",
-      },
-    ],
-  },
-  Ethereum: {
-    name: "Ethereum",
-    chain: "ethereum",
-    chainId: 1,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png",
-    rpc: ["https://eth.llamarpc.com"],
-    nativeCurrency: {
-      name: "Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    shortName: "eth",
-    infoURL: "https://etherscan.io",
-    explorers: [
-      {
-        name: "Etherscan",
-        url: "https://etherscan.io",
-        standard: "EIP3091",
-      },
-    ],
-  }
-};
+export async function resolveViemChain(chainId: number | string, hints: ChainHints = {}): Promise<Chain> {
+  const id = typeof chainId === 'string' ? Number(chainId) : chainId;
+  if (Number.isNaN(id)) throw new Error(`Invalid chainId: ${chainId}`);
+
+  const cached = chainCache.get(id);
+  if (cached) return cached;
+
+  try {
+    const chains = await import('viem/chains');
+    switch (id) {
+      case 1: return cache(id, chains.mainnet);
+      case 11155111: return cache(id, chains.sepolia);
+      case 137: return cache(id, chains.polygon);
+      case 80002: return cache(id, chains.polygonAmoy);
+      case 10: return cache(id, chains.optimism);
+      case 8453: return cache(id, chains.base);
+      case 42161: return cache(id, chains.arbitrum);
+      case 42170: return cache(id, chains.arbitrumNova);
+      case 56: return cache(id, chains.bsc);
+      case 43114: return cache(id, chains.avalanche);
+      default: break;
+    }
+  } catch {}
+
+  const {
+    name = `Chain ${id}`,
+    rpcUrl,
+    blockExplorerUrl,
+    nativeName = 'Ether',
+    nativeSymbol = 'ETH',
+    decimals = 18,
+  } = hints;
+
+  const defined = defineChain({
+    id,
+    name,
+    nativeCurrency: { name: nativeName, symbol: nativeSymbol, decimals },
+    rpcUrls: rpcUrl ? { default: { http: [rpcUrl] }, public: { http: [rpcUrl] } } : { default: { http: [] }, public: { http: [] } },
+    blockExplorers: blockExplorerUrl ? { default: { name: 'explorer', url: blockExplorerUrl } } : undefined,
+  });
+
+  return cache(id, defined);
+}
+
+function cache(id: number, c: Chain): Chain {
+  chainCache.set(id, c);
+  return c;
+}
+
+export async function primeChainsFromApi(configs: Array<{ chainId: string | number; chainName?: string; rpcUrl?: string; explorer?: string }>) {
+  await Promise.all(
+    (configs || []).map((cfg) =>
+      resolveViemChain(cfg.chainId, {
+        name: cfg.chainName,
+        rpcUrl: cfg.rpcUrl,
+        blockExplorerUrl: cfg.explorer,
+      })
+    )
+  );
+}
