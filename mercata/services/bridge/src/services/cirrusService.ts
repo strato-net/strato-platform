@@ -104,6 +104,8 @@ export const getDepositsByStatus = async (status: string): Promise<any[]> => {
   if (Array.isArray(data) && data.length > 0) {
     return data.map(item => ({
       ...item.value,
+      srcChainId: item.key,
+      srcTxHash: item.key2,
       id: item.key,
       depositId: item.key
     }));

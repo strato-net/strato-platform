@@ -19,7 +19,7 @@ export const depositBatch = async (deposits: any[]) => {
     const tokens = deposits.map(deposit => deposit.token);
     const amounts = deposits.map(deposit => deposit.amount);
     const users = deposits.map(deposit => deposit.user);
-    console.log("deposits", deposits);
+
     const result = await execute({
       contractName: 'MercataBridge',
       contractAddress: config.bridge.address,
