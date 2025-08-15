@@ -427,14 +427,12 @@ contract record Pool is Ownable {
 
     function _mintLiquidityAfterZap(
         uint256 tokenBContribution,
-        uint256 tokenAContribution,
-        uint256 minLiquidity
+        uint256 tokenAContribution
     ) internal returns (uint256 liquidityMinted) {
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this)) - tokenBContribution;
         liquidityMinted = tokenBContribution * totalLiquidity / tokenBReserve;
         
-        require(liquidityMinted >= minLiquidity, "SLIPPAGE_LP");
         lpToken.mint(msg.sender, liquidityMinted);
         emit AddLiquidity(msg.sender, tokenBContribution, tokenAContribution);
         _updateStateVars();
@@ -443,16 +441,14 @@ contract record Pool is Ownable {
     /// @notice Add liquidity with a single token (zap-in)
     /// @param isAToB True if depositing tokenA only, false if depositing tokenB only
     /// @param amountIn Amount of the single token supplied by the user
-    /// @param minLiquidity Minimum LP tokens expected (slippage protection)
     /// @param deadline Expiry timestamp
     /// @return liquidityMinted Amount of LP tokens minted to the user
     function addLiquiditySingleToken(
         bool isAToB,
         uint256 amountIn,
-        uint256 minLiquidity,
         uint256 deadline
     ) external returns (uint256 liquidityMinted) {
-        require(amountIn > 0 && minLiquidity > 0, "Invalid inputs");
+        require(amountIn > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
 
@@ -476,6 +472,6 @@ contract record Pool is Ownable {
             tokenAContribution = amountOut;
         }
 
-        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution, minLiquidity);
+        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
     }
 }
