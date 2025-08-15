@@ -67,6 +67,45 @@ Linux)
         Ubuntu|"Linux Mint")
             echo "Installing STRATO Mercata dependencies on Ubuntu or Mint Linux."
             sudo apt -q update
+            
+            # Install git
+            sudo apt install -qy --no-install-recommends git
+            
+            # Install Docker
+            sudo apt install -qy --no-install-recommends \
+                ca-certificates \
+                curl \
+                gnupg \
+                lsb-release
+            sudo mkdir -p /etc/apt/keyrings
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            
+            # Set Ubuntu codename - for Linux Mint, use the Ubuntu base codename
+            if [ "$DISTRO_NAME" = "Linux Mint" ]; then
+                UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
+            else
+                UBUNTU_CODENAME=$(lsb_release -cs)
+            fi
+            
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt -q update
+            sudo apt install -qy --no-install-recommends \
+                docker-ce \
+                docker-ce-cli \
+                containerd.io \
+                docker-buildx-plugin \
+                docker-compose-plugin
+            
+            # Install Haskell GHC and Stack
+            sudo apt install -qy --no-install-recommends \
+                build-essential \
+                curl \
+                libtinfo-dev \
+                libgmp-dev \
+                zlib1g-dev
+            curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            
+            # Install STRATO dependencies
             sudo apt install -qy --no-install-recommends \
                 libleveldb-dev \
                 liblzma-dev \
