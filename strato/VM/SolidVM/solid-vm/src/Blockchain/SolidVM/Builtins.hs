@@ -68,16 +68,16 @@ ecPairing = maybe False doPairing . toTrios
         toTrios [] = Just []
         toTrios _ = Nothing
         doPairing trios =
-          let toFq    :: Integer -> Fq
-              toFq    = fromInteger
+          let toFq :: Integer -> Fq
+              toFq = fromInteger
 
-              toFq2   :: (Integer,Integer) -> Fq2
+              toFq2 :: (Integer,Integer) -> Fq2
               toFq2 (u,v) = fromList [fromInteger u, fromInteger v]
 
-              toG1    :: (Integer,Integer) -> G1'
+              toG1 :: (Integer,Integer) -> G1'
               toG1 (x,y) = A (toFq x) (toFq y)
 
-              toG2    :: ((Integer,Integer), (Integer,Integer)) -> G2'
+              toG2 :: ((Integer,Integer), (Integer,Integer)) -> G2'
               toG2 (x2,y2) = A (toFq2 x2) (toFq2 y2)
 
               acc :: GT'

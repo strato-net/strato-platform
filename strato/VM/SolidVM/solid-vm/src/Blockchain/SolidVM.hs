@@ -2807,9 +2807,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
   unlessM (validateFunctionArguments theFunction argVals) $
    typeError
      "the argument values do not match up with the function signature" 
-     (theFunction, argVals)
-     -- (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
-     --  in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+     (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
+      in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
         OrderedVals vs ->
