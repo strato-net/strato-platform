@@ -2,7 +2,8 @@ import { config } from '../config';
 import { execute } from '../utils/stratoHelper';
 import {
   getLastProcessedBlock,
-  getEnabledChains
+  getEnabledChains,
+  getEnabledAssets
 } from '../services/cirrusService';
 import { depositBatch } from '../services/bridgeService';
 import {
@@ -14,6 +15,20 @@ import { logError } from '../utils/logger';
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
+
+const getStratoTokenMapping = async (chainId: number): Promise<Map<string, string>> => {
+  const enabledAssets = await getEnabledAssets();
+  const mapping = new Map<string, string>();
+  
+  for (const asset of enabledAssets) {
+    if (asset.chainId === chainId.toString() && asset.extToken) {
+      const extTokenWith0x = asset.extToken.startsWith('0x') ? asset.extToken : `0x${asset.extToken}`;
+      mapping.set(extTokenWith0x.toLowerCase(), asset.stratoToken);
+    }
+  }
+  
+  return mapping;
+};
 
 const updateLastProcessedBlock = async (
   chainId: number,
@@ -30,22 +45,27 @@ const updateLastProcessedBlock = async (
   });
 };
 
-const parseDepositEvent = (log: any, chainId: number) => {
-  try {
-    const token = log.topics[1];
-    const stratoAddress = log.topics[3];
-    const amount = log.data.substring(0, 66);
+  const parseDepositEvents = async (logs: any[], chainId: number) => {
+    const tokenMapping = await getStratoTokenMapping(chainId);
+    return logs.map(log => {
+      const externalToken = log.topics[1];
+      const stratoAddress = log.topics[3];
+      const amount = log.data.substring(0, 66);
 
+      // Convert 32-byte padded address to 20-byte standard address
+      const normalizedToken = '0x' + externalToken.toLowerCase().slice(-40);
+      const stratoToken = tokenMapping.get(normalizedToken);
+      if (!stratoToken) {
+        return null;
+      }
     return {
       srcChainId: chainId,
       srcTxHash: log.transactionHash,
-      token,
+      token: stratoToken,
       amount,
       user: stratoAddress
     };
-  } catch (error) {
-    return null;
-  }
+  });
 };
 
 const pollChainForDeposits = async (chain: any) => {
@@ -59,7 +79,9 @@ const pollChainForDeposits = async (chain: any) => {
     if (!isChainConfigured(chainId)) return;
 
     const currentBlock = await getCurrentBlockNumber(chainId);
-    if (currentBlock <= lastProcessedBlock) return;
+    if (currentBlock <= lastProcessedBlock) {
+      return;
+    }
 
     const logs = await getChainLogs(
       chainId,
@@ -74,22 +96,17 @@ const pollChainForDeposits = async (chain: any) => {
       return;
     }
 
-    const validDeposits = logs
-      .map(log => parseDepositEvent(log, chainId))
-      .filter((depositData, index) => {
-        if (!depositData) {
-          logError('AlchemyPolling', new Error('Failed to parse deposit event'), { 
-            operation: 'parseDepositEvent', 
-            chainId, 
-            txHash: logs[index].transactionHash,
-            log: logs[index]
-          });
-        }
-        return depositData;
-      });
+    const validDeposits = await parseDepositEvents(logs, chainId);
+    
+    const filteredDeposits = validDeposits.filter(deposit => deposit !== null);
+    const failedParses = validDeposits.length - filteredDeposits.length;
 
-    if (validDeposits.length > 0) {
-      await depositBatch(validDeposits);
+    if (failedParses > 0) {
+      return;
+    }
+
+    if (filteredDeposits.length > 0) {
+      await depositBatch(filteredDeposits);
     }
 
     await updateLastProcessedBlock(chainId, currentBlock);
