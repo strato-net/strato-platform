@@ -104,7 +104,7 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
           <div className="space-y-8">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <span className="text-gray-600 text-sm font-medium">Total Borrowed</span>
+                <span className="text-gray-600 text-sm font-medium">Total Amount Owed</span>
                 <span className="font-semibold text-lg">
                   {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
                 </span>
@@ -137,18 +137,10 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
                 </span>
               </div>
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
-                <InfoTooltip content="Accumulated interest on your borrowed amount. This increases over time and should be repaid along with your principal.">
-                  <span className="text-gray-600 text-sm font-medium">Interest Owed</span>
-                </InfoTooltip>
-                <span className="font-semibold text-lg">
-                  {formatBalance(loanData?.accruedInterest || 0n, "USDST", 18, 2, 2)}
-                </span>
-              </div>
-              <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
                 <InfoTooltip content="Annual percentage rate you pay on borrowed amounts. This rate applies to your total borrowed amount.">
                   <span className="text-gray-600 text-sm font-medium">Interest Rate</span>
                 </InfoTooltip>
-                <span className="font-semibold text-lg">{loanData?.interestRate || 0}%</span>
+                <span className="font-semibold text-lg">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
               </div>
             </div>
           </div>

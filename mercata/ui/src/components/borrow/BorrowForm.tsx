@@ -88,6 +88,13 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     setHealthImpact(res)
   },[borrowAmount, loans])
 
+  const interestRateDisplay = (() => {
+    const raw = (loans as any)?.interestRate; // bps
+    const num = Number(raw);
+    if (!isFinite(num)) return "-";
+    return `${(num / 100).toFixed(2)}%`;
+  })();
+
   return (
     <div className="space-y-4 pt-4">
       {/* Loan Details */}
@@ -99,7 +106,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           </span>
         </div>
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Currently borrowed</span>
+          <span className="text-sm text-gray-500">Total Amount Owed</span>
           <span className="font-medium">
             USDST {loans?.totalAmountOwed ? formatUnits(loans.totalAmountOwed, 18) : "0.00"}
           </span>
@@ -107,7 +114,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <div className="flex justify-between">
           <span className="text-sm text-gray-500">Interest Rate</span>
           <span className="font-medium">
-            {loans?.interestRate ? `${loans.interestRate.toFixed(2)}%` : "-"}
+            {interestRateDisplay}
           </span>
         </div>
       </div>
@@ -218,29 +225,27 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
 
         if (isZeroAvailable) {
           return (
-            <div className="px-4 py-3 bg-gray-50 rounded-md text-sm">
-              {Array.isArray(eligibleCollateralTokens) && eligibleCollateralTokens.length === 0 ? (
-                <p className="font-bold">
-                  ⚠️ You cannot currently borrow any USDST because you do not have any eligible collateral to borrow against.
-                  You will need to buy or swap other assets for ETH, BTC, GOLDST or SILVST which you can borrow against. ⚠️
-                </p>
-              ) : (
-                <p className="font-bold">
-                  ⚠️ You cannot currently borrow any USDST because you have not made any of your collateral available to borrow against.
-                  Return to the main Borrow page and click on Supply for some of your collateral ⚠️
-                </p>
-              )}
+            <div className="mt-2">
+              <p className="text-gray-600">
+                You currently have no available borrowing power. Supply collateral to enable borrowing.
+              </p>
               {borrowInfoMessage}
             </div>
           );
         }
 
-        // Show info message when user can borrow
-        return (
-          <div className="px-4 py-3 bg-gray-50 rounded-md">
-            {borrowInfoMessage}
-          </div>
-        );
+        if (eligibleCollateralTokens.length === 0) {
+          return (
+            <div className="mt-2">
+              <p className="text-gray-600">
+                You have no eligible collateral. Supply assets to enable borrowing.
+              </p>
+              {borrowInfoMessage}
+            </div>
+          );
+        }
+
+        return null;
       })()}
     </div>
   );

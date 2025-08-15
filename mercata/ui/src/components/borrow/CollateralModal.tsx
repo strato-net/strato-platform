@@ -69,9 +69,10 @@ const CollateralModal = ({
 
       const totalBorrowedBigInt = BigInt(loanData.totalAmountOwed);
       const collateralValueBigInt = BigInt(loanData.totalCollateralValueUSD);
-      const amountWei = safeParseUnits(amount || "0", 18);
+      const tokenDecimals = asset?.customDecimals ?? 18;
+      const amountWei = safeParseUnits(amount || "0", tokenDecimals);
       const assetPriceUSD = BigInt(asset?.assetPrice || "0");
-      const amountValueUSD = (amountWei * assetPriceUSD * BigInt(asset?.liquidationThreshold || 0)) / ((10n ** 18n) * 10000n);
+      const amountValueUSD = (amountWei * assetPriceUSD * BigInt(asset?.liquidationThreshold || 0)) / ((BigInt(10) ** BigInt(tokenDecimals)) * 10000n);
 
       let newCollateralValue: bigint;
       if (isSupply) {
@@ -126,7 +127,8 @@ const CollateralModal = ({
   }, [isOpen]);
 
   const handlePercentageClick = (percent?: bigint) => {
-    const amountValue = formatUnits((maxAmount * percent) / 100n, 18);
+    const tokenDecimals = asset?.customDecimals ?? 18;
+    const amountValue = formatUnits((maxAmount * percent) / 100n, tokenDecimals);
     setAmount(amountValue);
     setDisplayAmount(addCommasToInput(amountValue));
   };
@@ -146,11 +148,12 @@ const CollateralModal = ({
   };
 
   const getBalanceValue = () => {
-    if (isSupply) {
-      return formatUnits(asset?.userBalance || 0, 18);
-    } else {
-      return formatUnits(asset?.collateralizedAmount || 0, 18);
-    }
+         const tokenDecimals = asset?.customDecimals ?? 18;
+     if (isSupply) {
+       return formatUnits(asset?.userBalance || 0, tokenDecimals);
+     } else {
+       return formatUnits(asset?.collateralizedAmount || 0, tokenDecimals);
+     }
   };
 
   const getTitle = () => {
@@ -245,7 +248,7 @@ const CollateralModal = ({
               <Input
                 placeholder="0.00"
                 className={`pr-8 ${
-                  safeParseUnits(amount || "0", 18) > maxAmount
+                  safeParseUnits(amount || "0", asset?.customDecimals ?? 18) > maxAmount
                     ? "text-red-600"
                     : ""
                 }`}

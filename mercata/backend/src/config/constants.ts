@@ -3,7 +3,7 @@ import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry } fro
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
   key = "/key",
-  state = "/contracts/tate/:contractAddress/state",
+  state = "/contracts/state/:contractAddress/state",
   identity = "/identity",
   result = "/transactions/results",
 }
@@ -66,7 +66,12 @@ export const constants = (() => {
       "address," +
       "borrowableAsset," +
       "mToken," +
-      "totalBorrowPrincipal::text," +
+      "borrowIndex," +
+      "totalScaledDebt," +
+      "reservesAccrued," +
+      "debtCeilingAsset," +
+      "debtCeilingUSD," +
+      "lastAccrual," +
       `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value),` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value))`,
     "oracle:priceOracle_fkey(" +
