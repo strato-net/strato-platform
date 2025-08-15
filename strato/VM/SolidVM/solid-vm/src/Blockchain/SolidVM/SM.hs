@@ -487,7 +487,7 @@ getVariableOfName name = do
                        "string",
                        "keccak256",
                        "ripemd160",
-                       "modexp",
+                       "modExp",
                        "ecAdd",
                        "ecMul",
                        "ecPairing",

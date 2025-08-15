@@ -2428,7 +2428,7 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
       Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
 callBuiltin "sha256" args = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "ripemd160" args = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
-callBuiltin "modexp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
+callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
 callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
   let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
    in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]

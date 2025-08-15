@@ -9,8 +9,6 @@ module Blockchain.SolidVM.Builtins where
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.VM.SolidException
--- import Data.Curve
--- import Data.Curve.Weierstrass.BN254
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine))
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul)
 import Data.Pairing                 (pairing)
@@ -19,7 +17,6 @@ import qualified Data.Vector as V
 import GHC.Exts (IsList(fromList))
 import qualified SolidVM.Model.Storable as MS
 import SolidVM.Model.Value
--- import GHC.Integer (eqInteger)
 
 -- Pushes a new value to an array and returns the length of the new array
 push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
@@ -83,9 +80,7 @@ ecPairing = maybe False doPairing . toTrios
               toG2    :: ((Integer,Integer), (Integer,Integer)) -> G2'
               toG2 (x2,y2) = A (toFq2 x2) (toFq2 y2)
 
-              -- multiply all pairings together in GT
               acc :: GT'
-              acc = mconcat [ pairing (toG1 g1) (toG2 (x2,y2))
-                            | (g1,x2,y2) <- trios
-                            ]
-          in acc == mempty  -- identity in GT (rename to `one`/`identity` if your lib uses that)
+              acc = mconcat [pairing (toG1 g1) (toG2 (x2,y2)) | (g1,x2,y2) <- trios]
+
+           in acc == mempty
