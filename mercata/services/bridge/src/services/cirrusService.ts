@@ -4,14 +4,16 @@ import { config } from "../config";
 const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
 
 // Get the last processed block number for a specific chain
-export const getLastProcessedBlock = async (chainId: number): Promise<number> => {
+export const getLastProcessedBlock = async (
+  chainId: number,
+): Promise<number> => {
   const data = await cirrus.get(`/${MERCATA_URL}-chains`, {
     params: {
       key: `eq.${chainId}`,
-      address: `eq.${config.bridge.address}`
-    }
+      address: `eq.${config.bridge.address}`,
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
     return parseInt(data[0].value?.lastProcessedBlock) || 0;
   }
@@ -23,14 +25,14 @@ export const getEnabledChains = async (): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-chains`, {
     params: {
       "value->>enabled": "eq.true",
-      address: `eq.${config.bridge.address}`
-    }
+      address: `eq.${config.bridge.address}`,
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
-    const chains = data.map(item => ({
+    const chains = data.map((item) => ({
       ...item.value,
-      chainId: item.key
+      chainId: item.key,
     }));
     return chains;
   }
@@ -42,29 +44,31 @@ export const getEnabledAssets = async (): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       "value->>enabled": "eq.true",
-      address: `eq.${config.bridge.address}`
-    }
+      address: `eq.${config.bridge.address}`,
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
-    return data.map(item => ({
+    return data.map((item) => ({
       ...item.value,
-      stratoToken: item.key
+      stratoToken: item.key,
     }));
   }
   return [];
 };
 
 // Get asset info by STRATO token address
-export const getAssetInfo = async (stratoTokenAddress: string): Promise<any | null> => {
+export const getAssetInfo = async (
+  stratoTokenAddress: string,
+): Promise<any | null> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
-      "key": `eq.${stratoTokenAddress}`,
+      key: `eq.${stratoTokenAddress}`,
       "value->>enabled": "eq.true",
-      address: `eq.${config.bridge.address}`
-    }
+      address: `eq.${config.bridge.address}`,
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
     return data[0].value || null;
   }
@@ -72,20 +76,22 @@ export const getAssetInfo = async (stratoTokenAddress: string): Promise<any | nu
 };
 
 // Get withdrawals by status (reusable function)
-export const getWithdrawalsByStatus = async (status: string): Promise<any[]> => {
+export const getWithdrawalsByStatus = async (
+  status: string,
+): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-withdrawals`, {
     params: {
       "value->>bridgeStatus": `eq.${status}`,
       address: `eq.${config.bridge.address}`,
-      order: "value->>requestedAt.asc"
-    }
+      order: "value->>requestedAt.asc",
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
-    return data.map(item => ({
+    return data.map((item) => ({
       ...item.value,
       id: item.key,
-      withdrawalId: item.key
+      withdrawalId: item.key,
     }));
   }
   return [];
@@ -97,54 +103,60 @@ export const getDepositsByStatus = async (status: string): Promise<any[]> => {
     params: {
       "value->>bridgeStatus": `eq.${status}`,
       address: `eq.${config.bridge.address}`,
-      order: "value->>requestedAt.asc"
-    }
+      order: "value->>requestedAt.asc",
+    },
   });
-  
+
   if (Array.isArray(data) && data.length > 0) {
-    return data.map(item => ({
+    return data.map((item) => ({
       ...item.value,
       srcChainId: item.key,
       srcTxHash: item.key2,
       id: item.key,
-      depositId: item.key
+      depositId: item.key,
     }));
   }
   return [];
 };
 
 // Validate if a token is enabled in the bridge
-export const isTokenEnabled = async (tokenAddress: string): Promise<boolean> => {
+export const isTokenEnabled = async (
+  tokenAddress: string,
+): Promise<boolean> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       "value->>stratoToken": `eq.${tokenAddress}`,
       "value->>enabled": "eq.true",
-      address: `eq.${config.bridge.address}`
-    }
+      address: `eq.${config.bridge.address}`,
+    },
   });
-  
+
   return Array.isArray(data) && data.length > 0;
 };
 
 // Get safeTxHash from WithdrawalPending events for multiple withdrawal IDs
 export const getSafeTxHashFromEvents = async (
-  withdrawalIds: string[]
+  withdrawalIds: string[],
 ): Promise<Record<string, string | null>> => {
   const ids = [...new Set(withdrawalIds)];
-  const result = Object.fromEntries(ids.map((id) => [id, null])) as Record<string, string | null>;
+  const result = Object.fromEntries(ids.map((id) => [id, null])) as Record<
+    string,
+    string | null
+  >;
 
   const data = await cirrus.get(`/${MERCATA_URL}-WithdrawalPending`, {
-    params: { 
+    params: {
       address: `eq.${config.bridge.address}`,
       withdrawalId: `in.(${ids.join(",")})`,
-      select: "withdrawalId,custodyTxHash"
-    }
+      select: "withdrawalId,custodyTxHash",
+    },
   });
 
-  for (const item of (Array.isArray(data) ? data : [])) {
+  for (const item of Array.isArray(data) ? data : []) {
     const withdrawalId = item?.withdrawalId;
     const custodyTxHash = item?.custodyTxHash;
-    if (withdrawalId && custodyTxHash && withdrawalId in result) result[withdrawalId] = custodyTxHash;
+    if (withdrawalId && custodyTxHash && withdrawalId in result)
+      result[withdrawalId] = custodyTxHash;
   }
 
   return result;

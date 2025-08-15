@@ -10,6 +10,7 @@ interface PercentageButtonsProps {
   onChange: (value: string) => void;
   percentages?: number[];
   className?: string;
+  decimals?: number;
 }
 
 const PercentageButtons: React.FC<PercentageButtonsProps> = ({
@@ -17,10 +18,14 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   maxValue,
   onChange,
   percentages = [0.25, 0.5, 0.75, 1],
-  className = ""
+  className = "",
+  decimals = 18,
 }) => {
   const maxValueBigInt = useMemo(() => BigInt(maxValue || "0"), [maxValue]);
-  const valueBigInt = useMemo(() => safeParseUnits(value || "0", 18), [value]);
+  const valueBigInt = useMemo(
+    () => safeParseUnits(value || "0", decimals),
+    [value, decimals],
+  );
 
   const calculatePercentage = (value: bigint, percent: number): bigint => {
     const result = (value * BigInt(Math.round(percent * 10000))) / 10000n;
@@ -34,7 +39,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
     if (valueBigInt === percentValueBigInt) {
       onChange(""); // Clear the value when deselecting
     } else {
-      onChange(formatUnits(percentValueBigInt, 18));
+      onChange(formatUnits(percentValueBigInt, decimals));
     }
   };
 
@@ -46,10 +51,10 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   }, [percentages, maxValueBigInt]);
 
   const isDisabled = maxValueBigInt <= 0n;
-  
+
   return (
     <div className={`flex gap-2 ${className}`}>
-      {percentageValues.map(({percent, percentValue}) => {
+      {percentageValues.map(({ percent, percentValue }) => {
         const isActive = valueBigInt === percentValue;
 
         return (
@@ -60,7 +65,11 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
             onClick={() => handlePercentageClick(percent)}
             className={`flex-1 transition-all duration-200 ${!isDisabled ? "hover:scale-105" : ""}`}
             disabled={isDisabled}
-            title={isDisabled ? "No amount available" : `Set to ${percent * 100}% of available`}
+            title={
+              isDisabled
+                ? "No amount available"
+                : `Set to ${percent * 100}% of available`
+            }
           >
             {Math.round(percent * 100)}%
           </Button>
@@ -70,4 +79,4 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   );
 };
 
-export default PercentageButtons; 
+export default PercentageButtons;

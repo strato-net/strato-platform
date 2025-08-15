@@ -9,10 +9,9 @@ import BridgeOut from './BridgeOut';
 
 const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
-  const [chainId, setChainId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { loadNetworksAndTokens, availableNetworks } = useBridgeContext();
+  const { loadNetworksAndTokens } = useBridgeContext();
 
   // Load networks on component mount
   useEffect(() => {
@@ -29,13 +28,6 @@ const BridgeWidget = () => {
 
     initializeBridge();
   }, [loadNetworksAndTokens]);
-
-  // Set chainId when availableNetworks changes
-  useEffect(() => {
-    if (availableNetworks && availableNetworks.length > 0) {
-      setChainId(availableNetworks[0].chainId);
-    }
-  }, [availableNetworks]);
 
   if (loading) {
     return (
@@ -81,9 +73,9 @@ const BridgeWidget = () => {
         />
         <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
           {activeTab === 'bridgeIn' ? (
-            <BridgeIn networkChainId={chainId} />
+            <BridgeIn />
           ) : (
-            <BridgeOut networkChainId={chainId} />
+            <BridgeOut />
           )}
         </div>
       </div>

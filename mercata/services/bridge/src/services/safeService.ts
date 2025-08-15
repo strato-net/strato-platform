@@ -4,11 +4,12 @@ import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { Interface, getAddress } from "ethers";
 import { config, getChainRpcUrl, ZERO_ADDRESS, ERC20_ABI } from "../config";
 import { getAssetInfo } from "./cirrusService";
-import { 
-  TxType, 
-  SafeTransactionState, 
-  WithdrawalTransaction, 
-  SafeTransactionResult 
+import { convertFromStratoDecimals } from "../utils/decimalUtils";
+import {
+  TxType,
+  SafeTransactionState,
+  WithdrawalTransaction,
+  SafeTransactionResult,
 } from "../types";
 
 // Utility functions
@@ -16,15 +17,18 @@ const with0x = (a: string) => (a?.startsWith("0x") ? a : `0x${a}`);
 const toChecksum = (a: string) => getAddress(with0x(a));
 
 // Get external token address from cirrus service
-async function getExternalTokenAddress(stratoToken: string, chainId: bigint): Promise<string | null> {
+async function getExternalTokenAddress(
+  stratoToken: string,
+  chainId: bigint,
+): Promise<string | null> {
   if (!stratoToken) return null;
-  
+
   const assetInfo = await getAssetInfo(stratoToken);
   if (!assetInfo) return null;
-  
+
   const chainIdStr = chainId.toString();
   if (assetInfo.chainId !== chainIdStr || !assetInfo.enabled) return null;
-  
+
   return with0x(assetInfo.extToken);
 }
 
@@ -43,23 +47,30 @@ function buildSafeTxData(params: {
       operation: OperationType.Call,
     };
   }
-  
+
   const token = params.token!;
   if (token.toLowerCase() === ZERO_ADDRESS) {
-    throw new Error("ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead");
+    throw new Error(
+      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead",
+    );
   }
-  
+
   const iface = new Interface(ERC20_ABI);
   return {
     to: toChecksum(token),
     value: "0",
-    data: iface.encodeFunctionData("transfer", [toChecksum(params.to), params.amount]),
+    data: iface.encodeFunctionData("transfer", [
+      toChecksum(params.to),
+      params.amount,
+    ]),
     operation: OperationType.Call,
   };
 }
 
 // Main functions
-export const createSafeTransactionsForWithdrawals = async (withdrawals: any[]): Promise<SafeTransactionResult[]> => {
+export const createSafeTransactionsForWithdrawals = async (
+  withdrawals: any[],
+): Promise<SafeTransactionResult[]> => {
   const safeTxs: SafeTransactionResult[] = [];
 
   for (const withdrawal of withdrawals) {
@@ -67,17 +78,32 @@ export const createSafeTransactionsForWithdrawals = async (withdrawals: any[]): 
     const stratoToken = withdrawal.token;
     const destAddress = withdrawal.dest || withdrawal.destAddress;
 
-    const externalToken = await getExternalTokenAddress(stratoToken, destChainId);
+    const externalToken = await getExternalTokenAddress(
+      stratoToken,
+      destChainId,
+    );
     const isEth = externalToken && externalToken.toLowerCase() === ZERO_ADDRESS;
     const txType: TxType = isEth ? "eth" : "erc20";
-    const tokenToUse = isEth ? ZERO_ADDRESS : (externalToken || stratoToken);
+    const tokenToUse = isEth ? ZERO_ADDRESS : externalToken || stratoToken;
+
+    // Get asset info for decimal conversion
+    const assetInfo = await getAssetInfo(stratoToken);
+    const extDecimals = assetInfo?.extDecimals
+      ? parseInt(assetInfo.extDecimals)
+      : 18;
+
+    // Convert amount from STRATO decimals (18) to external token decimals
+    const convertedAmount = convertFromStratoDecimals(
+      withdrawal.amount.toString(),
+      extDecimals,
+    );
 
     const generator = safeTransactionGenerator(
-      withdrawal.amount.toString(),
+      convertedAmount,
       destAddress,
       txType,
       tokenToUse,
-      destChainId
+      destChainId,
     );
 
     const hashResult = await generator.next();
@@ -91,45 +117,59 @@ export const createSafeTransactionsForWithdrawals = async (withdrawals: any[]): 
   return safeTxs;
 };
 
-export const checkExecutedSafeTransactions = async (withdrawals: any[]): Promise<WithdrawalTransaction[]> => {
+export const checkExecutedSafeTransactions = async (
+  withdrawals: any[],
+): Promise<WithdrawalTransaction[]> => {
   const results: WithdrawalTransaction[] = [];
-  
+
   for (const withdrawal of withdrawals) {
     const hash = withdrawal.safeTxHash;
     if (!hash) {
       results.push({ hash: `missing_${withdrawal.id}`, success: false });
       continue;
     }
-    
-    const status = await monitorSafeTransactionStatus(hash, BigInt(withdrawal.destChainId));
+
+    const status = await monitorSafeTransactionStatus(
+      hash,
+      BigInt(withdrawal.destChainId),
+    );
     results.push({ hash, success: status === "executed" });
   }
-  
+
   return results;
 };
 
 export const monitorSafeTransactionStatus = async (
   transactionKey: string,
-  chainId: bigint
-): Promise<'executed' | 'rejected' | 'pending'> => {
-  if (!transactionKey) return 'pending';
+  chainId: bigint,
+): Promise<"executed" | "rejected" | "pending"> => {
+  if (!transactionKey) return "pending";
 
-  const safeTxHash = transactionKey.startsWith('0x') ? transactionKey : `0x${transactionKey}`;
+  const safeTxHash = transactionKey.startsWith("0x")
+    ? transactionKey
+    : `0x${transactionKey}`;
   const apiKit = new SafeApiKit({ chainId });
 
   const tx = await apiKit.getTransaction(safeTxHash);
-  if (tx.isExecuted) return 'executed';
+  if (tx.isExecuted) return "executed";
 
   try {
-    const executed = await apiKit.getMultisigTransactions(tx.safe, { nonce: tx.nonce, executed: true } as any);
-    if ((executed as any)?.results?.some((m: any) => m?.nonce === tx.nonce && m?.isExecuted)) {
-      return 'rejected';
+    const executed = await apiKit.getMultisigTransactions(tx.safe, {
+      nonce: tx.nonce,
+      executed: true,
+    } as any);
+    if (
+      (executed as any)?.results?.some(
+        (m: any) => m?.nonce === tx.nonce && m?.isExecuted,
+      )
+    ) {
+      return "rejected";
     }
   } catch {
-    return 'pending';
+    return "pending";
   }
 
-  return 'pending';
+  return "pending";
 };
 
 // Safe transaction generator
@@ -138,7 +178,7 @@ async function* safeTransactionGenerator(
   toAddress: string,
   type: TxType,
   tokenAddress: string,
-  chainId: bigint
+  chainId: bigint,
 ): AsyncGenerator<{
   step: "generate" | "propose";
   hash?: string;
@@ -147,7 +187,7 @@ async function* safeTransactionGenerator(
   const state: SafeTransactionState = {};
 
   const rpcUrl = getChainRpcUrl(chainId);
-  
+
   state.protocolKit = await Safe.init({
     provider: rpcUrl,
     signer: config.safe.safeOwnerPrivateKey || "",
@@ -156,10 +196,12 @@ async function* safeTransactionGenerator(
 
   const signerAddress = config.safe.safeOwnerAddress || "";
 
-  const kind: TxType = (type === "eth" || (tokenAddress && tokenAddress.toLowerCase() === ZERO_ADDRESS)) 
-    ? "eth" 
-    : "erc20";
-    
+  const kind: TxType =
+    type === "eth" ||
+    (tokenAddress && tokenAddress.toLowerCase() === ZERO_ADDRESS)
+      ? "eth"
+      : "erc20";
+
   const safeTransactionData = buildSafeTxData({
     kind,
     to: toAddress,
@@ -173,7 +215,8 @@ async function* safeTransactionGenerator(
     options: { nonce },
   });
 
-  state.safeTxHash = await state.protocolKit.getTransactionHash(safeTransaction);
+  state.safeTxHash =
+    await state.protocolKit.getTransactionHash(safeTransaction);
   yield { step: "generate", hash: state.safeTxHash };
 
   state.apiKit = new SafeApiKit({ chainId });
