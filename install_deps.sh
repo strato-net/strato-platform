@@ -66,28 +66,31 @@ Linux)
 
         Ubuntu|"Linux Mint")
             echo "Installing STRATO Mercata dependencies on Ubuntu or Mint Linux."
-            sudo apt -q update
             
             # Install git
+            sudo apt -q update
             sudo apt install -qy --no-install-recommends git
             
-            # Install Docker
+            # Install packaging-related tools needed for the Docker install
             sudo apt install -qy --no-install-recommends \
                 ca-certificates \
                 curl \
                 gnupg \
                 lsb-release
+
+            # Download Docker GPG key and add to our Apt keyrings
             sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-            
-            # Set Ubuntu codename - for Linux Mint, use the Ubuntu base codename
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor --yes -o /etc/apt/keyrings/docker.gpg
+
+            # Add the appropriate "Additional Sources List" for the stable Docker packages for this distro version
             if [ "$DISTRO_NAME" = "Linux Mint" ]; then
                 UBUNTU_CODENAME=$(cat /etc/upstream-release/lsb-release | grep DISTRIB_CODENAME | cut -d= -f2)
             else
                 UBUNTU_CODENAME=$(lsb_release -cs)
             fi
-            
             echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+            # Install the Docker packages
             sudo apt -q update
             sudo apt install -qy --no-install-recommends \
                 docker-ce \
@@ -95,7 +98,17 @@ Linux)
                 containerd.io \
                 docker-buildx-plugin \
                 docker-compose-plugin
-            
+
+            # Ubuntu does not automatically add the current user to the docker group (Mint Linux does),
+            # so we need to do so manually as a post-install step.
+            #
+            # See https://docs.docker.com/engine/install/linux-postinstall/
+            if [ "$DISTRO_NAME" = "Ubuntu" ]; then
+                sudo groupadd docker 2>/dev/null || true
+                sudo usermod -aG docker $USER
+                newgrp docker
+            fi
+                        
             # Install Haskell GHC and Stack
             sudo apt install -qy --no-install-recommends \
                 build-essential \
