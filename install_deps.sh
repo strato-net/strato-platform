@@ -37,7 +37,16 @@ Darwin)
     # Check for Homebrew install and abort if it is not installed.
     brew --version > /dev/null 2>&1 || { echo >&2 "ERROR - STRATO Mercata requires a Homebrew install on macOS. See https://brew.sh"; exit 1; }
 
-    # And finally install all the external dependencies.
+    # Install git
+    brew install --quiet git
+    
+    # Install Docker Desktop for Mac
+    brew install --quiet --cask docker
+    
+    # Install Haskell Stack
+    brew install --quiet haskell-stack
+
+    # Install STRATO dependencies
     brew install --quiet \
         leveldb \
         libpq \
@@ -54,7 +63,24 @@ Linux)
 
         "Amazon Linux"*)
             echo "Installing STRATO Mercata dependencies on Amazon Linux."
+            
+            # Install git
             sudo dnf update -q -y
+            sudo dnf install -q -y git
+            
+            # Install Docker
+            sudo dnf install -q -y docker
+            
+            # Install Haskell Stack
+            sudo dnf install -q -y \
+                gcc \
+                gcc-c++ \
+                gmp-devel \
+                ncurses-devel \
+                zlib-devel
+            curl -sSL https://get.haskellstack.org/ | sh -s - -f
+            
+            # Install STRATO dependencies
             sudo dnf install -q -y \
                 leveldb-devel \
                 libsecp256k1-devel \
