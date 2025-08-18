@@ -62,7 +62,10 @@ contract record RewardsEngine is Ownable {
     // CONSTANTS
     // ═════════════════════════════════════════════════════════════════════════
 
-    uint256 private constant DEFAULT_MULTIPLIER_FACTOR = 1;
+    /* uint256 private constant DEFAULT_MULTIPLIER_FACTOR = 1;
+       REQUESTED: https://github.com/blockapps/strato-platform/issues/4474
+     */
+    uint256 DEFAULT_MULTIPLIER_FACTOR = 1;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
