@@ -1,6 +1,13 @@
 import { constants } from "../../config/constants";
 
-export const toBig = (v: string | number | bigint) => BigInt(v);
+export const toBig = (v: string | number | bigint | null | undefined) => {
+  try {
+    return v == null || v === "" ? 0n : BigInt(v);
+  } catch {
+    return 0n; // fallback if input is invalid
+  }
+};
+
 const { DECIMALS } = constants;
 
 export const RAY = 10n ** 27n;
