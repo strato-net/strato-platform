@@ -55,7 +55,7 @@ pipeline {
         dir ('strato-worktree') {
           sh "echo ${env.RELEASE_VERSION} > VERSION"
           sh 'rm -rf .docker-work'
-          sh 'REPO=public make all'
+          sh 'REPO=public make docker'
         }
       }
     }

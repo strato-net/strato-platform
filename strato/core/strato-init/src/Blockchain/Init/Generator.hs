@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -41,6 +42,7 @@ import Database.Persist.Postgresql
 import qualified Executable.EthDiscoverySetup as EthDiscovery
 import SelectAccessible ()
 import System.FilePath ((</>))
+import Text.RawString.QQ
 import Turtle (chmod, roo)
 import UnliftIO.Directory
 
@@ -60,6 +62,28 @@ convertGenesisFromOld = do
   oldGenesis <- OLD.getGenesisInfo
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode $ convertFromOld oldGenesis
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
+
+
+createCommandsFile :: IO ()
+createCommandsFile = 
+  writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
+
+strato-p2p --averageTxsPerBlock=40 --connectionTimeout=3600 --debugFail=true --maxConn=1000 --maxReturnedHeaders=500 --networkID=-1 --sqlPeers=true --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
+
+strato-sequencer --blockstanbul=true --blockstanbul_block_period_ms=1000 --blockstanbul_round_period_s=120 --minLogLevel=LevelInfo --seq_max_events_per_iter=500 --seq_max_us_per_iter=50000 --validatorBehavior=true --test_mode_bypass_blockstanbul=false --network=helium +RTS -T -RTS +RTS -N1
+
+vm-runner --blockstanbul=true --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --seqEventsBatchSize=-1 --seqEventsCostHeuristic=20000 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
+
+strato-p2p-indexer
+
+strato-api-indexer
+
+slipstream --database=cirrus --kafkahost=localhost --kafkaport=9092 --minLogLevel=LevelInfo --pghost=localhost --pgport=5432 --pguser=postgres --password=api --stratourl=http://localhost:3000/eth/v1.2 +RTS -T -RTS
+
+strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.blockapps.net:8093 --oauthDiscoveryUrl=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --network=helium +RTS -T -RTS +RTS -N1
+|]
+
+
 
 mkAll :: (MonadLoggerIO m, MonadUnliftIO m, MonadFail m, HasKafka m) =>
          String -> m ()
@@ -129,6 +153,8 @@ mkAll network = do
   $logInfoS "ethconf/bootnodes" . T.pack $ CL.yellow ">>>> Inserting bootnodes"
   $logInfoLS "ethconf/bootnodes" bootnodes
   EthDiscovery.setup bootnodes
+
+  liftIO createCommandsFile
 
   runResourceT . runSetupDBM . runRedisM UEC.lookupRedisBlockDBConfig . runSQLM $ do
     $logInfoS "runWorker" "Adding empty code"

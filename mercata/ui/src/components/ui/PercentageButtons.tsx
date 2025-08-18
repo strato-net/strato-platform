@@ -2,7 +2,7 @@
 import React, { useMemo } from "react";
 import { Button } from "./button";
 import { safeParseUnits } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
+import { formatUnits, parseUnits } from "ethers";
 
 interface PercentageButtonsProps {
   value: string;
@@ -21,15 +21,24 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   className = "",
   decimals = 18,
 }) => {
-  const maxValueBigInt = useMemo(() => BigInt(maxValue || "0"), [maxValue]);
+  const maxValueBigInt = useMemo(() => {
+    const s = String(maxValue || "0").replace(/,/g, "").trim();
+    if (!s) return 0n;
+    // If it looks decimal, parse as decimals units; otherwise treat as wei bigint
+    if (s.includes(".")) {
+      try { return parseUnits(s, decimals); } catch { return 0n; }
+    }
+    try { return BigInt(s); } catch { return 0n; }
+  }, [maxValue]);
+
   const valueBigInt = useMemo(
     () => safeParseUnits(value || "0", decimals),
     [value, decimals],
   );
 
   const calculatePercentage = (value: bigint, percent: number): bigint => {
-    const result = (value * BigInt(Math.round(percent * 10000))) / 10000n;
-    return result;
+    const scaled = BigInt(Math.round(percent * 10000));
+    return (value * scaled) / 10000n;
   };
 
   const handlePercentageClick = (percent: number) => {
