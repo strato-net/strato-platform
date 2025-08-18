@@ -2,6 +2,7 @@ import { logError } from "../utils/logger";
 
 // Constants
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const STRATO_DECIMALS = 18;
 
 export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",

@@ -2,9 +2,9 @@ import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import { Interface, getAddress } from "ethers";
-import { config, getChainRpcUrl, ZERO_ADDRESS, ERC20_ABI } from "../config";
+import { config, getChainRpcUrl, ZERO_ADDRESS, ERC20_ABI, STRATO_DECIMALS } from "../config";
 import { getAssetInfo } from "./cirrusService";
-import { convertFromStratoDecimals } from "../utils/decimalUtils";
+import { convertFromStratoDecimals, convertDecimals, ensureHexPrefix, safeToBigInt } from "../utils/utils";
 import {
   TxType,
   SafeTransactionState,
@@ -14,7 +14,7 @@ import {
 
 // Utility functions
 const with0x = (a: string) => (a?.startsWith("0x") ? a : `0x${a}`);
-const toChecksum = (a: string) => getAddress(with0x(a));
+const toChecksum = (a: string) => getAddress(ensureHexPrefix(a));
 
 // Get external token address from cirrus service
 async function getExternalTokenAddress(
@@ -74,7 +74,7 @@ export const createSafeTransactionsForWithdrawals = async (
   const safeTxs: SafeTransactionResult[] = [];
 
   for (const withdrawal of withdrawals) {
-    const destChainId = BigInt(withdrawal.destChainId);
+    const destChainId = safeToBigInt(withdrawal.destChainId);
     const stratoToken = withdrawal.token;
     const destAddress = withdrawal.dest || withdrawal.destAddress;
 
@@ -90,13 +90,13 @@ export const createSafeTransactionsForWithdrawals = async (
     const assetInfo = await getAssetInfo(stratoToken);
     const extDecimals = assetInfo?.extDecimals
       ? parseInt(assetInfo.extDecimals)
-      : 18;
+      : STRATO_DECIMALS;
 
-    // Convert amount from STRATO decimals (18) to external token decimals
-    const convertedAmount = convertFromStratoDecimals(
-      withdrawal.amount.toString(),
-      extDecimals,
-    );
+    // Convert amount from STRATO decimals to external token decimals
+    // For ETH: keep as decimal string, for ERC20: convert to hex
+    const convertedAmount = isEth 
+      ? convertDecimals(withdrawal.amount.toString(), STRATO_DECIMALS, extDecimals).toString()
+      : convertFromStratoDecimals(withdrawal.amount.toString(), extDecimals);
 
     const generator = safeTransactionGenerator(
       convertedAmount,
@@ -131,7 +131,7 @@ export const checkExecutedSafeTransactions = async (
 
     const status = await monitorSafeTransactionStatus(
       hash,
-      BigInt(withdrawal.destChainId),
+      safeToBigInt(withdrawal.destChainId),
     );
     results.push({ hash, success: status === "executed" });
   }

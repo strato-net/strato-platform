@@ -1,5 +1,6 @@
 import { fetch } from '../utils/api';
 import { getChainRpcUrl } from '../config';
+import { ensureHexPrefix, decimalToHex } from '../utils/utils';
 
 // Get current block number for a chain
 export const getCurrentBlockNumber = async (chainId: number): Promise<number> => {
@@ -24,15 +25,15 @@ export const getChainLogs = async (
   const rpcUrl = getChainRpcUrl(chainId);
   
   // Ensure depositRouter has 0x prefix
-  const formattedAddress = depositRouter.startsWith('0x') ? depositRouter : `0x${depositRouter}`;
+  const formattedAddress = ensureHexPrefix(depositRouter);
   
   const response: any = await fetch.post(rpcUrl, {
     jsonrpc: '2.0',
     id: 1,
     method: 'eth_getLogs',
     params: [{
-      fromBlock: `0x${fromBlock.toString(16)}`,
-      toBlock: `0x${toBlock.toString(16)}`,
+      fromBlock: decimalToHex(fromBlock.toString()),
+      toBlock: decimalToHex(toBlock.toString()),
       topics: [eventSignature],
       address: formattedAddress
     }]

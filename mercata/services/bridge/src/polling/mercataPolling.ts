@@ -12,6 +12,7 @@ import {
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatus } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
+import { safeToBigInt } from "../utils/utils";
 
 export const startWithdrawalRequestPolling = async () => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
@@ -75,7 +76,7 @@ export const startWithdrawalTxPolling = async () => {
           try {
             const status = await monitorSafeTransactionStatus(
               safeTxHash,
-              BigInt(tx.destChainId)
+              safeToBigInt(tx.destChainId)
             );
             if (status === "executed") toFinalize.push(tx);
             else if (status === "rejected") toReject.push(tx);
