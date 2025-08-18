@@ -73,8 +73,7 @@ export const getBridgeStatus = async (
       url = `/${MercataBridge}-deposits`;
       params = {
         select: "depositId:key,depositInfo:value",
-        // "value->>user": `eq.${userAddress}`,    how to get this address?
-        "value->>user": `eq.156947246105159104636409351615097004700443525326`,
+          "value->>user": `eq.${userAddress}`,   // how to get this address?
         address: `eq.${constants.mercataBridge}`
       };
       
@@ -87,7 +86,6 @@ export const getBridgeStatus = async (
   
     
     const { data: results } = await cirrus.get(accessToken, url, { params });
-    console.log("Results:", results);
     return results || [];
   } catch (error) {
     console.error("Error in getBridgeStatus:", error);
