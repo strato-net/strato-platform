@@ -5,6 +5,7 @@ import {
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch
 } from "../services/bridgeService";
+import { NonEmptyArray, Withdrawal } from "../types";
 import { 
   getWithdrawalsByStatus,
   getDepositsByStatus,
@@ -21,7 +22,7 @@ export const startWithdrawalRequestPolling = async () => {
       const initiatedWithdrawals = await getWithdrawalsByStatus("1");
       
       if (initiatedWithdrawals.length > 0) {
-        await confirmWithdrawalBatch(initiatedWithdrawals);
+        await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<Withdrawal>);
       }
     } catch (e: any) {
       logError('MercataPolling', e as Error, { operation: 'startWithdrawalRequestPolling' });
@@ -39,7 +40,7 @@ export const startDepositInitiatedPolling = async () => {
       const depositStatus = await getDepositsByStatus("1");
       
       if (depositStatus.length > 0) {
-        await confirmDepositBatch(depositStatus);
+        await confirmDepositBatch(depositStatus as NonEmptyArray<any>);
       }
     } catch (e: any) {
       logError('MercataPolling', e as Error, { operation: 'startDepositInitiatedPolling' });
@@ -78,7 +79,7 @@ export const startWithdrawalTxPolling = async () => {
               safeTxHash,
               safeToBigInt(tx.destChainId)
             );
-            if (status === "executed") toFinalize.push(tx);
+            if (status === "executed") toFinalize.push({ ...tx, safeTxHash });
             else if (status === "rejected") toReject.push(tx);
           } catch (_) {
             toReject.push(tx);
@@ -86,8 +87,8 @@ export const startWithdrawalTxPolling = async () => {
         })
       );
 
-      if (toFinalize.length) await finaliseWithdrawalBatch(toFinalize);
-      if (toReject.length) await handleRejectedWithdrawalBatch(toReject);
+      if (toFinalize.length) await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Withdrawal>);
+      if (toReject.length) await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Withdrawal>);
     } catch (e: any) {
       logError("MercataPolling", e as Error, { operation: "startWithdrawalTxPolling" });
     }

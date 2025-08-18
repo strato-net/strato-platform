@@ -1,6 +1,6 @@
 import { bloc, strato, extractErrorMessage } from "./api";
 import { config } from "../config";
-import { logInfo, logError } from "./logger";
+import { logInfo } from "./logger";
 import { 
   FunctionInput, 
   BuiltTx, 
@@ -99,21 +99,15 @@ export const execute = async (
   const { method = 'unknown', contractName = 'unknown' } = inputArray[0] || {};
   const context = `${method} on ${contractName}`;
   
-  try {
-    logInfo('StratoHelper', `Executing ${context} (${inputArray.length} tx)`);
-    
-    const result = await postAndWaitForTx(
-      () => strato.post("/transaction/parallel?resolve=true", buildFunctionTx(inputs)),
-      timeout
-    );
-    
-    logInfo('StratoHelper', `${result.status}: ${context} (${result.hash})`);
-    return result;
-    
-  } catch (error) {
-    logError('StratoHelper', error as Error, { method, contractName, count: inputArray.length });
-    throw error;
-  }
+  logInfo('StratoHelper', `Executing ${context} (${inputArray.length} tx)`);
+  
+  const result = await postAndWaitForTx(
+    () => strato.post("/transaction/parallel?resolve=true", buildFunctionTx(inputs)),
+    timeout
+  );
+  
+  logInfo('StratoHelper', `${result.status}: ${context} (${result.hash})`);
+  return result;
 };
 
 // ============================================================================

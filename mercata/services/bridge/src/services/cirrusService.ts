@@ -30,11 +30,10 @@ export const getEnabledChains = async (): Promise<any[]> => {
   });
 
   if (Array.isArray(data) && data.length > 0) {
-    const chains = data.map((item) => ({
+    return data.map((item) => ({
       ...item.value,
       chainId: item.key,
     }));
-    return chains;
   }
   return [];
 };

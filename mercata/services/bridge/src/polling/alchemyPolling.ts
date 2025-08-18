@@ -6,6 +6,7 @@ import {
   getEnabledAssets,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
+import { NonEmptyArray } from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
@@ -88,8 +89,6 @@ const pollChainForDeposits = async (chain: any) => {
     const chainId = chain.chainId;
     const depositRouter = chain.depositRouter;
 
-    if (!depositRouter) return;
-
     const lastProcessedBlock = await getLastProcessedBlock(chainId);
     if (!isChainConfigured(chainId)) return;
 
@@ -123,7 +122,7 @@ const pollChainForDeposits = async (chain: any) => {
     }
 
     if (filteredDeposits.length > 0) {
-      await depositBatch(filteredDeposits);
+      await depositBatch(filteredDeposits as NonEmptyArray<any>);
     }
 
     await updateLastProcessedBlock(chainId, currentBlock);

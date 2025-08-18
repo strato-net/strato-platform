@@ -1,3 +1,5 @@
+import { getAddress } from "ethers";
+
 /**
  * Converts an amount from one decimal place to another
  * @param amount - The amount as BigInt or string (hex/decimal)
@@ -115,4 +117,17 @@ export function safeToBigInt(value: string | number | bigint): bigint {
     return BigInt(cleanValue);
   }
   return 0n;
+}
+
+export function safeChecksum(a: string) {
+  return getAddress(ensureHexPrefix(a));
+}
+
+export function validateAddress(address: string): boolean {
+  try {
+    safeChecksum(address);
+    return true;
+  } catch {
+    return false;
+  }
 }

@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { logError } from './logger';
 import { getBAUserToken } from '../auth';
 import { config } from '../config';
 import { RetryConfig, ClientOptions, ApiClient } from '../types';
@@ -42,8 +41,6 @@ const retry = async <T>(
       lastError = new Error(extractErrorMessage(error));
       
       if (i < maxAttempts) {
-        logError(logPrefix, new Error(`Attempt ${i}/${maxAttempts} failed: ${lastError.message}`));
-        
         // Add exponential backoff for Cloudflare challenges
         if (lastError.message.includes('Cloudflare challenge')) {
           const backoffDelay = Math.min(1000 * Math.pow(2, i - 1), 30000); // Max 30 seconds
@@ -53,7 +50,6 @@ const retry = async <T>(
     }
   }
   
-  logError(logPrefix, new Error(`All ${maxAttempts} attempts failed: ${lastError!.message}`));
   throw lastError!;
 };
 
