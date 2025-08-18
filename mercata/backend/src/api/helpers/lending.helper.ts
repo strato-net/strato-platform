@@ -187,7 +187,7 @@ export const simulateLoan = (
     lastUpdated: actualLoan.lastUpdated,
 
     // Index-based results
-    totalAmountOwed,                        // underlying (18d)
+    totalAmountOwed: (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })(),                        // underlying (18d)
 
     // Health and capacity (USD 18d)
     healthFactor: Number(toBig(healthFactorRaw)) / Number(DECIMALS),
