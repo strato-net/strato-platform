@@ -46,9 +46,14 @@ data EthConf = EthConf
     levelDBConfig :: LevelDBConf,
     quarryConfig :: QuarryConf,
     blockConfig :: BlockConf,
-    discoveryConfig :: DiscoveryConf
+    discoveryConfig :: DiscoveryConf,
+    apiConfig :: ApiConfig
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data ApiConfig = ApiConfig
+  { ipAddress :: String
+  } deriving (Show, Eq, Generic, FromJSON, ToJSON)
 
 data DiscoveryConf = DiscoveryConf
   { discoveryPort :: Int,

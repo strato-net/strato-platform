@@ -1,5 +1,6 @@
 //ERC20
 import "../abstract/ERC20/ERC20.sol";
+import "../abstract/ERC20/utils/ReentrancyGuard.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
 //Generic token
@@ -40,7 +41,7 @@ import "Lending/PriceOracle.sol";
 import "Lending/RateStrategy.sol";
 
 //Bridging
-import "./Bridge/MercataEthBridge.sol";
+import "./Bridge/MercataBridge.sol";
 
 //Fee Collector
 import "Admin/FeeCollector.sol";
@@ -54,7 +55,7 @@ contract record Mercata {
     LendingPool public lendingPool;
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
-    MercataEthBridge public mercataEthBridge;
+    MercataBridge public mercataBridge;
     OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
@@ -91,7 +92,7 @@ contract record Mercata {
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 
         // Create Services
-        mercataEthBridge = new MercataEthBridge(msg.sender, address(tokenFactory));
+        mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
         onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
 
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);

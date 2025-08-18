@@ -305,6 +305,12 @@ export interface LiquidityData {
   totalUSDSTSupplied: string;
   utilizationRate: number;
   maxWithdrawableUSDST: string;
+  borrowIndex?: string;           // RAY (1e27)
+  reservesAccrued?: string;       // underlying (1e18)
+
+  // new (optional)
+  totalAmountOwed?: string;
+  totalAmountOwedPreview?: string;
 }
 
 export interface CollateralRatioItem {
@@ -383,18 +389,16 @@ export interface SetPoolRatesData {
 }
 
 export type NewLoanData = {
-  principalBalance: string;
-  interestOwed: string;
-  lastIntCalculated: string;
-  lastUpdated: string;
+  totalAmountOwed: string;             // current debt (index-based)
+  totalAmountOwedPreview?: string;     // projected debt (optional)
+  exchangeRate?: string;               // 1e18 (optional, if you surface it here)
+  lastUpdated?: string;
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  accruedInterest: string;
-  interestRate: number;
-  totalAmountOwed: string;
   totalCollateralValueUSD: string;
   maxAvailableToBorrowUSD: string;
+  interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;
   id?: string;
   maxRepay?: string;

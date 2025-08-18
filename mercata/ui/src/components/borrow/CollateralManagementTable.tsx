@@ -125,7 +125,7 @@ const CollateralManagementTable = ({
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">{formatBalance(asset?.userBalance || 0n, undefined, 18, 2)}</div>
+                          <div className="font-medium">{formatBalance(asset?.userBalance || 0n, undefined, asset?.customDecimals ?? 18, 2)}</div>
                           <div className="text-xs text-gray-500">
                             ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
                           </div>
@@ -151,7 +151,7 @@ const CollateralManagementTable = ({
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
                           <div className="font-medium">
-                            {formatBalance(asset?.collateralizedAmount || 0n, undefined, 18, 2)}
+                            {formatBalance(asset?.collateralizedAmount || 0n, undefined, asset?.customDecimals ?? 18, 2)}
                           </div>
                           <div className="text-xs text-gray-500">
                             {formatBalance(asset?.collateralizedAmountValue, undefined, 18, 1, 2, true)}

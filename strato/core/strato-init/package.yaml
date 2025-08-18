@@ -47,6 +47,7 @@ library:
   - monad-alter
   - nibblestring
   - persistent-postgresql
+  - raw-strings-qq
   - redis-monad
   - resourcet
   - servant-client
