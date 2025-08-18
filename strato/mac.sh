@@ -1,1 +1,0 @@
-sed -i '' -e 's|^# - /opt/homebrew|- /opt/homebrew|g' -e 's|^- /usr|# - /usr|g' -e 's|^  enable: true #|  enable: false #|g' -e 's|^#- simulator|- simulator|g' -e 's|^# arch: aarch64|arch: aarch64|g' stack.yaml
