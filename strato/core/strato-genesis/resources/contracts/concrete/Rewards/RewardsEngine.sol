@@ -152,7 +152,7 @@ contract record RewardsEngine is Ownable {
             rewardTokenMap[address(lastToken)] = index;
         }
 
-        rewardTokens.pop();
+        rewardTokens.length -= 1;
         delete rewardTokenMap[tokenAddress];
 
         // Remove this token from all existing multipliers
@@ -252,7 +252,7 @@ contract record RewardsEngine is Ownable {
             multiplierMap[lastName] = index;
         }
 
-        multiplierNames.pop();
+        multiplierNames.length -= 1;
         delete multiplierMap[name];
         delete multipliers[name];
 
