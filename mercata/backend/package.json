@@ -22,7 +22,7 @@
     "typescript": "^5.8.3"
   },
   "engines": {
-    "node": "22.x"
+    "node": ">=22.12 <23.0"
   },
   "dependencies": {
     "@hapi/joi": "^17.1.1",
