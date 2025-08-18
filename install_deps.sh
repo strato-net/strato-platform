@@ -32,10 +32,33 @@ case $(uname -s) in
 #------------------------------------------------------------------------------
 
 Darwin)
-    echo "Installing STRATO Mercata dependencies on macOS."
+    # Check macOS version constraints - only allow Sequoia
+    MACOS_VERSION=$(sw_vers -productVersion)
+    MACOS_MAJOR=$(echo $MACOS_VERSION | cut -d. -f1)
+    if [ "$MACOS_MAJOR" != "15" ]; then
+        echo "ERROR - STRATO Mercata only supports macOS Sequoia (15.x)."
+        echo "Your macOS version: $MACOS_VERSION"
+        exit 1
+    fi
     
-    # Check for Homebrew install and abort if it is not installed.
-    brew --version > /dev/null 2>&1 || { echo >&2 "ERROR - STRATO Mercata requires a Homebrew install on macOS. See https://brew.sh"; exit 1; }
+    echo "Installing STRATO Mercata dependencies on macOS Sequoia $MACOS_VERSION."
+    
+    # Install Homebrew if not already installed (non-interactive, safe to run repeatedly)
+    if ! command -v brew > /dev/null 2>&1; then
+        echo "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" < /dev/null
+        
+        # Add Homebrew to PATH for the current session
+        if [[ $(uname -m) == "arm64" ]]; then
+            # Apple Silicon Mac
+            eval "$(/opt/homebrew/bin/brew shellenv)"
+        else
+            # Intel Mac
+            eval "$(/usr/local/bin/brew shellenv)"
+        fi
+    else
+        echo "Homebrew is already installed."
+    fi
 
     # Install git
     brew install --quiet git
@@ -62,7 +85,18 @@ Linux)
         case $DISTRO_NAME in
 
         "Amazon Linux"*)
-            echo "Installing STRATO Mercata dependencies on Amazon Linux."
+            # Check Amazon Linux version constraints - only allow 2023
+            AMAZON_VERSION=$(. /etc/os-release; echo $VERSION_ID)
+            case $AMAZON_VERSION in
+                2023|2023.*)
+                    echo "Installing STRATO Mercata dependencies on Amazon Linux $AMAZON_VERSION."
+                    ;;
+                *)
+                    echo "ERROR - STRATO Mercata only supports Amazon Linux 2023 (initial release or point releases)."
+                    echo "Your Amazon Linux version: $AMAZON_VERSION"
+                    exit 1
+                    ;;
+            esac
             
             # Install git
             sudo dnf update -q -y
@@ -91,7 +125,32 @@ Linux)
             ;;
 
         Ubuntu|"Linux Mint")
-            echo "Installing STRATO Mercata dependencies on Ubuntu or Mint Linux."
+            # Check Ubuntu version constraints - only allow 24.04 LTS "Noble Numbat"
+            if [ "$DISTRO_NAME" = "Ubuntu" ]; then
+                UBUNTU_VERSION=$(lsb_release -rs)
+                UBUNTU_CODENAME=$(lsb_release -cs)
+                case $UBUNTU_VERSION in
+                    24.04|24.04.*)
+                        echo "Installing STRATO Mercata dependencies on Ubuntu $UBUNTU_VERSION LTS \"$UBUNTU_CODENAME\"."
+                        ;;
+                    *)
+                        echo "ERROR - STRATO Mercata only supports Ubuntu 24.04 LTS \"Noble Numbat\" (initial release or point releases)."
+                        echo "Your Ubuntu version: $UBUNTU_VERSION \"$UBUNTU_CODENAME\"."
+                        exit 1
+                        ;;
+                esac
+            else
+                # Check Linux Mint version constraints - only allow 22.1 "Xia"
+                MINT_VERSION=$(lsb_release -rs)
+                MINT_CODENAME=$(lsb_release -cs)
+                if [ "$MINT_VERSION" = "22.1" ] && [ "$MINT_CODENAME" = "xia" ]; then
+                    echo "Installing STRATO Mercata dependencies on Linux Mint $MINT_VERSION \"Xia\"."
+                else
+                    echo "ERROR - STRATO Mercata only supports Linux Mint 22.1 \"Xia\"."
+                    echo "Your Linux Mint version: $MINT_VERSION \"$MINT_CODENAME\""
+                    exit 1
+                fi
+            fi
             
             # Install git
             sudo apt -q update
