@@ -340,7 +340,8 @@ contract record RewardsEngine is Ownable {
     ) internal view returns (uint256) {
         uint256 currentTime = block.timestamp;
         uint256 timeDelta = currentTime - userBalance.modifiedAt;
-	return (amount * delta * multiplierFactor) / seconds_in_year;
+	uint256 seconds_in_year = 60 * 60 * 24 * 365;
+	return (amount * timeDelta * multiplierFactor) / seconds_in_year;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
