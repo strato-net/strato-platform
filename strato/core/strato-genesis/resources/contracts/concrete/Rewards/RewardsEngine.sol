@@ -231,8 +231,8 @@ contract record RewardsEngine is Ownable {
         Multiplier storage multiplier = multipliers[name];
         multiplier.name = name;
 
-        for (uint i = 0; i < tokenAddresses.length; i++) {
-            multiplier.factors[tokenAddresses[i]] = factors[i];
+        for (uint j = 0; j < tokenAddresses.length; j++) {
+            multiplier.factors[tokenAddresses[j]] = factors[j];
         }
 
         emit MultiplierAdded(name);
