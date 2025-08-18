@@ -175,11 +175,13 @@ The name of the smart contract will be `RewardsEngine`
 ### TODO Reward claim
 
   implement today
+  minting capability (for each reward token) to create reward when claimed
 
 ### TODO function modifiers
 
  `update` should be called by owners only
  `claim` only user should be allowed to claim rewards
+
 
 ### Estimate CurrentBalance Reward (IMPLEMENTED)
 
