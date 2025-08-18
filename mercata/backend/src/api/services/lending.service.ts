@@ -302,7 +302,7 @@ export const collateralAndBalance = async (
         collateralizedAmount,
         collateralizedAmountValue,
         isCollateralized: collateral?.amount > 0,
-        canSupply: BigInt(userBalance) > 0n,
+        canSupply: toBig(userBalance) > 0n,
         maxBorrowingPower,
         assetPrice,
         ltv,
@@ -634,8 +634,8 @@ export const executeLiquidation = async (
     const collateralAmt = toBig(
       (userCollaterals.find((c) => c.asset === chosenCollateral) as any)?.amount || "0"
     );
-    const liqBonus = BigInt(
-      (assetConfigMap.get(chosenCollateral)?.liquidationBonus as number) || 10500
+    const liqBonus = toBig(
+      assetConfigMap.get(chosenCollateral)?.liquidationBonus ?? 10500
     );
 
     let ceilCollateralCover = debtLimit;
@@ -860,11 +860,11 @@ export const listLoansForLiquidation = async (
       if (priceDebt > 0n && priceCollBig > 0n) {
         collateralLimit =
           (collateralAmtBig * priceCollBig * 10000n) /
-          (priceDebt * BigInt(liquidationBonus));
+          (priceDebt * toBig(liquidationBonus));
       }
 
       const effectiveMaxRepay = debtLimit < collateralLimit ? debtLimit : collateralLimit;
-      const profitFactor = BigInt(liquidationBonus - 10000);
+      const profitFactor = toBig(liquidationBonus) - 10000n;
       const expectedProfit = (effectiveMaxRepay * profitFactor) / 10000n;
 
       return {
