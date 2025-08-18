@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getBalance, getTokens } from "./tokens.service";
-import { extractContractName } from "../../utils/utils";
+import { extractContractName, safeBigInt } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import {
   simulateLoan,
@@ -407,12 +407,12 @@ export const liquidityAndBalance = async (
     totalMTokenSupply
   );
 
-  const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
+  const totalUSDSTSupplied = (safeBigInt(availableLiquidity) + safeBigInt(systemTotalDebt)).toString();
 
   // Utilization rate: U = debt / (cash + debt − reserves)
-  let denom = BigInt(availableLiquidity) + BigInt(systemTotalDebt);
-  denom = BigInt(reservesAccruedStr || "0") < denom ? (denom - BigInt(reservesAccruedStr || "0")) : BigInt(availableLiquidity);
-  const utilizationRate = denom === 0n ? 0 : Number((BigInt(systemTotalDebt) * 10000n) / denom) / 100;
+  let denom = safeBigInt(availableLiquidity) + safeBigInt(systemTotalDebt);
+  denom = safeBigInt(reservesAccruedStr || "0") < denom ? (denom - safeBigInt(reservesAccruedStr || "0")) : safeBigInt(availableLiquidity);
+  const utilizationRate = denom === 0n ? 0 : Number((safeBigInt(systemTotalDebt) * 10000n) / denom) / 100;
 
   // APY from flat APR; supply APY scaled by utilization
   const apyData = calculateAPYs(interestRateBps, (borrowableAssetConfig?.reserveFactor as number) || 1000);
@@ -429,12 +429,12 @@ export const liquidityAndBalance = async (
   );
 
   // User’s withdrawable underlying (min of user mToken value and pool cash)
-  const userMTokenBalance = BigInt(mTokenBalance);
+  const userMTokenBalance = safeBigInt(mTokenBalance);
   const userUSDSTValue = userMTokenBalance > 0n 
-    ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
+    ? ((userMTokenBalance * safeBigInt(exchangeRate)) / (10n ** 18n))
     : 0n;
 
-  const poolAvailableLiquidity = BigInt(availableLiquidity);
+  const poolAvailableLiquidity = safeBigInt(availableLiquidity);
   const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
