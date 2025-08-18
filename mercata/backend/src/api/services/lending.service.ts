@@ -1,6 +1,6 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
+import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
@@ -220,9 +220,10 @@ export const repay = async (
     },
   ];
 
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
   );
+  return { ...result, amountSent: amount };
 };
 
 export const collateralAndBalance = async (
@@ -397,6 +398,10 @@ export const liquidityAndBalance = async (
   );
   const totalAmountOwedPreview = debtFromScaled(userScaledDebtStr, idxPreview);
 
+  // Clamp dust (<= 1 wei) to zero for UI cleanliness
+  const totalAmountOwedClamped = (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })();
+  const totalAmountOwedPreviewClamped = (() => { try { return (BigInt(totalAmountOwedPreview) <= 1n) ? "0" : totalAmountOwedPreview; } catch { return totalAmountOwedPreview; } })();
+
   // System totals and exchange rate
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
@@ -470,8 +475,8 @@ export const liquidityAndBalance = async (
     borrowIndex: borrowIndexStr.toString(),
     reservesAccrued: reservesAccruedStr.toString(),
     // New index-based fields for UI:
-    totalAmountOwed,
-    totalAmountOwedPreview,
+    totalAmountOwed: totalAmountOwedClamped,
+    totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
     totalBorrowPrincipal,
   };
@@ -540,6 +545,99 @@ export const getLoan = async (
   }
 
   return allLoans;
+};
+
+export const getSafeMaxBorrow = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ safeMaxBorrow: string; rawMax: string; bufferBps: number; utilizationRate: number; timestamp: number }> => {
+  // Reuse liquidity view
+  const info = await liquidityAndBalance(accessToken, userAddress);
+  const rawMaxStr = (info as any)?.maxAvailableToBorrowUSD || "0";
+  const rawMax = BigInt(rawMaxStr);
+  // Dynamic buffer: 0.5% base + utilization% capped at 1.5% total
+  const utilPct = Math.max(0, Math.min(100, Math.floor(Number(info?.utilizationRate || 0))));
+  const bufferBps = 50 + Math.min(100, utilPct); // 50-150 bps
+  const buffered = (rawMax * BigInt(10000 - bufferBps)) / 10000n;
+  const safe = buffered > 0n ? buffered : 0n;
+  return {
+    safeMaxBorrow: safe.toString(),
+    rawMax: rawMax.toString(),
+    bufferBps,
+    utilizationRate: Number(info?.utilizationRate || 0),
+    timestamp: Math.floor(Date.now() / 1000)
+  };
+};
+
+export const getSafeMaxRepay = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ safeMaxRepay: string; totalOwed: string; timestamp: number }> => {
+  // Total owed from previewable loan
+  const loan = await getLoan(accessToken, userAddress);
+  const totalOwed = BigInt(loan?.totalAmountOwed || 0);
+  return {
+    safeMaxRepay: totalOwed.toString(),
+    totalOwed: totalOwed.toString(),
+    timestamp: Math.floor(Date.now() / 1000)
+  };
+};
+
+export const repayAll = async (
+  accessToken: string,
+  userAddress: string
+) => {
+  const registry = await getPool(accessToken, undefined, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,borrowIndex::text,` +
+        `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
+      `),` +
+      `liquidityPool:liquidityPool_fkey(address)`
+  ,
+    "lendingPool.userLoan.key": `eq.${userAddress}`
+  } as any);
+
+  const lendingPoolAddr = registry.lendingPool?.address as string;
+  const liquidityPoolAddr = registry.liquidityPool?.address as string;
+  const borrowableAsset = registry.lendingPool?.borrowableAsset as string;
+  if (!lendingPoolAddr || !liquidityPoolAddr || !borrowableAsset) {
+    throw new Error("Required pool addresses not found");
+  }
+
+  const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  const loanEntry = (registry.lendingPool?.userLoan || []).find((r: any) => r.user === userAddress);
+  const scaledDebt = loanEntry?.LoanInfo?.scaledDebt || "0";
+  const exactDebtWei = BigInt(debtFromScaled(scaledDebt, borrowIndexStr));
+
+  const MAX_UINT256 = ((1n << 256n) - 1n).toString();
+
+  // Single tx: approve MAX + repay MAX; contract caps to current debt
+  const tx: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: borrowableAsset,
+      method: "approve",
+      args: { spender: liquidityPoolAddr, value: MAX_UINT256 },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPoolAddr,
+      method: "repay",
+      args: { amount: MAX_UINT256 },
+    },
+  ];
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+
+  return {
+    status,
+    hash,
+    amountRequested: MAX_UINT256,
+    estimatedDebtAtRead: exactDebtWei.toString(),
+  };
 };
 
 export const executeLiquidation = async (

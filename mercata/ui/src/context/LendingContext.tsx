@@ -35,7 +35,8 @@ type LendingContextType = {
   }) => Promise<void>;
   repayLoan: (args: {
     amount: string;
-  }) => Promise<void>;
+  }) => Promise<{ status: string; hash: string; amountSent?: string }>;
+  repayAll: () => Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }>;
   getLend: () => Promise<LendData>;
   depositLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidity: (args: { amount: string }) => Promise<void>;
@@ -45,6 +46,9 @@ type LendingContextType = {
   loadingCollateral: boolean;
   supplyCollateral: (args: { asset: string; amount: string }) => Promise<void>;
   withdrawCollateral: (args: { asset: string; amount: string }) => Promise<void>;
+
+  getSafeMaxBorrow: () => Promise<{ safeMaxBorrow: string; rawMax: string; bufferBps: number; utilizationRate: number; timestamp: number }>;
+  getSafeMaxRepay: () => Promise<{ safeMaxRepay: string; totalOwed: string; timestamp: number }>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -151,10 +155,16 @@ export const LendingProvider = ({
     loanId: string;
     amount: string;
     asset: string;
-  }) => {
-    await api.patch("/lending/loans", {
+  }): Promise<{ status: string; hash: string; amountSent?: string }> => {
+    const res = await api.patch("/lending/loans", {
       amount
     });
+    return res.data;
+  };
+
+  const repayAll = async (): Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }> => {
+    const res = await api.post("/lending/loans/repay-all");
+    return res.data;
   };
 
   const getLend = async () => {
@@ -176,6 +186,16 @@ export const LendingProvider = ({
 
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
     await api.delete("/lending/collateral", {data: args});
+  };
+
+  const getSafeMaxBorrow = async () => {
+    const res = await api.get("/lending/safe/max-borrow");
+    return res.data;
+  };
+
+  const getSafeMaxRepay = async () => {
+    const res = await api.get("/lending/safe/max-repay");
+    return res.data;
   };
 
   const refreshLendingData = async (): Promise<void> => {
@@ -213,6 +233,7 @@ export const LendingProvider = ({
       refreshLendingData,
       borrowAsset,
       repayLoan,
+      repayAll,
       getLend,
       depositLiquidity,
       withdrawLiquidity,
@@ -221,6 +242,8 @@ export const LendingProvider = ({
       refreshCollateral: fetchCollateralInfo,
       supplyCollateral,
       withdrawCollateral,
+      getSafeMaxBorrow,
+      getSafeMaxRepay,
     }),
     [
       loans,

@@ -120,7 +120,15 @@ const PositionSection = ({ userCollaterals, loanData }: BorrowingSectionProps) =
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">
                 <span className="text-gray-600 text-sm font-medium">Total Amount Owed</span>
                 <span className="font-semibold text-lg">
-                  {formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2)}
+                  {(() => {
+                    try {
+                      const owed = BigInt(loanData?.totalAmountOwed || 0);
+                      const display = owed <= 1n ? 0n : owed;
+                      return formatBalance(display, "USDST", 18, 2, 2);
+                    } catch {
+                      return formatBalance(loanData?.totalAmountOwed || 0n, "USDST", 18, 2, 2);
+                    }
+                  })()}
                 </span>
               </div>
               <div className="flex flex-col space-y-3 p-4 bg-gray-50 rounded-lg">

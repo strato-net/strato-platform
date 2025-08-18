@@ -30,7 +30,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
 
   // Calculate current borrowed amount
   const currentBorrowed = loanData?.totalAmountOwed 
-    ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18))
+    ? parseFloat(formatUnits((() => { try { return (BigInt(loanData.totalAmountOwed) <= 1n ? 0n : BigInt(loanData.totalAmountOwed)); } catch { return 0n; } })(), 18))
     : 0;
 
   // Calculate risk level using the same logic as other components
