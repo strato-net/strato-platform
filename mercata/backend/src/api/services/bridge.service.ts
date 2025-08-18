@@ -73,7 +73,7 @@ export const getBridgeStatus = async (
       url = `/${MercataBridge}-deposits`;
       params = {
         select: "depositId:key,depositInfo:value",
-          "value->>user": `eq.${userAddress}`,   // how to get this address?
+          "value->>user": `eq.${userAddress}`,   // how to get this address 156947246105159104636409351615097004700443525326?
         address: `eq.${constants.mercataBridge}`
       };
       
