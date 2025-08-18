@@ -358,7 +358,8 @@ contract record RewardsEngine is Ownable {
         require(assets.length == amounts.length, "RewardsEngine: Array length mismatch");
         require(user != address(0), "RewardsEngine: Invalid user address");
 
-        CurrentBalance[] memory currentBalances = new CurrentBalance[](assets.length * rewardTokens.length);
+	// length assets.length * rewardTokens.length
+        CurrentBalance[] memory currentBalances = [];
         uint256 resultIndex = 0;
 
         for (uint256 i = 0; i < assets.length; i++) {
@@ -420,7 +421,8 @@ contract record RewardsEngine is Ownable {
     ) external view returns (CurrentBalance[] memory) {
         require(userAddress != address(0), "RewardsEngine: Invalid user address");
 
-        CurrentBalance[] memory estimatedBalances = new CurrentBalance[](actionKeys.length * rewardTokens.length);
+	// length actionKeys.length * rewardTokens.length
+        CurrentBalance[] memory estimatedBalances = [];
         uint256 resultIndex = 0;
 
         for (uint256 i = 0; i < actionKeys.length; i++) {
