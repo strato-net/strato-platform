@@ -13,7 +13,11 @@ import {
   isChainConfigured,
 } from "../services/rpcService";
 import { logError } from "../utils/logger";
-import { convertToStratoDecimals, normalizeAddress, ensureHexPrefix } from "../utils/utils";
+import {
+  convertToStratoDecimals,
+  normalizeAddress,
+  ensureHexPrefix,
+} from "../utils/utils";
 import { STRATO_DECIMALS } from "../config";
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash

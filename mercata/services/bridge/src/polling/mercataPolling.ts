@@ -1,15 +1,15 @@
 import { config } from "../config";
-import { 
+import {
   confirmDepositBatch,
-  confirmWithdrawalBatch, 
+  confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
-  handleRejectedWithdrawalBatch
+  handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
 import { NonEmptyArray, Withdrawal } from "../types";
-import { 
+import {
   getWithdrawalsByStatus,
   getDepositsByStatus,
-  getSafeTxHashFromEvents
+  getSafeTxHashFromEvents,
 } from "../services/cirrusService";
 import { monitorSafeTransactionStatus } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
@@ -20,12 +20,16 @@ export const startWithdrawalRequestPolling = async () => {
   const poll = async () => {
     try {
       const initiatedWithdrawals = await getWithdrawalsByStatus("1");
-      
+
       if (initiatedWithdrawals.length > 0) {
-        await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<Withdrawal>);
+        await confirmWithdrawalBatch(
+          initiatedWithdrawals as NonEmptyArray<Withdrawal>,
+        );
       }
     } catch (e: any) {
-      logError('MercataPolling', e as Error, { operation: 'startWithdrawalRequestPolling' });
+      logError("MercataPolling", e as Error, {
+        operation: "startWithdrawalRequestPolling",
+      });
     }
   };
 
@@ -38,12 +42,14 @@ export const startDepositInitiatedPolling = async () => {
   const poll = async () => {
     try {
       const depositStatus = await getDepositsByStatus("1");
-      
+
       if (depositStatus.length > 0) {
         await confirmDepositBatch(depositStatus as NonEmptyArray<any>);
       }
     } catch (e: any) {
-      logError('MercataPolling', e as Error, { operation: 'startDepositInitiatedPolling' });
+      logError("MercataPolling", e as Error, {
+        operation: "startDepositInitiatedPolling",
+      });
     }
   };
 
@@ -77,20 +83,26 @@ export const startWithdrawalTxPolling = async () => {
           try {
             const status = await monitorSafeTransactionStatus(
               safeTxHash,
-              safeToBigInt(tx.destChainId)
+              safeToBigInt(tx.destChainId),
             );
             if (status === "executed") toFinalize.push({ ...tx, safeTxHash });
             else if (status === "rejected") toReject.push(tx);
           } catch (_) {
             toReject.push(tx);
           }
-        })
+        }),
       );
 
-      if (toFinalize.length) await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Withdrawal>);
-      if (toReject.length) await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Withdrawal>);
+      if (toFinalize.length)
+        await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Withdrawal>);
+      if (toReject.length)
+        await handleRejectedWithdrawalBatch(
+          toReject as NonEmptyArray<Withdrawal>,
+        );
     } catch (e: any) {
-      logError("MercataPolling", e as Error, { operation: "startWithdrawalTxPolling" });
+      logError("MercataPolling", e as Error, {
+        operation: "startWithdrawalTxPolling",
+      });
     }
   };
 
@@ -99,11 +111,11 @@ export const startWithdrawalTxPolling = async () => {
 };
 
 export const initializeMercataPolling = async () => {
-  logInfo('MercataPolling', "Initializing Mercata polling...");
-  
+  logInfo("MercataPolling", "Initializing Mercata polling...");
+
   await startDepositInitiatedPolling();
   await startWithdrawalRequestPolling();
   await startWithdrawalTxPolling();
-  
-  logInfo('MercataPolling', "Mercata polling initialized");
+
+  logInfo("MercataPolling", "Mercata polling initialized");
 };

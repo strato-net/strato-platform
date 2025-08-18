@@ -1,17 +1,11 @@
 import SafeApiKit from "@safe-global/api-kit";
 import { logError } from "../utils/logger";
-import {
-  SafeTransactionResult,
-  NonEmptyArray,
-  Withdrawal,
-} from "../types";
+import { SafeTransactionResult, NonEmptyArray, Withdrawal } from "../types";
 import {
   CallCache,
   validateAndGroupWithdrawals,
   processChainWithdrawals,
 } from "../utils/safeHelper";
-
-
 
 export const createSafeTransactionsForWithdrawals = async (
   withdrawals: NonEmptyArray<Withdrawal>,
@@ -22,7 +16,11 @@ export const createSafeTransactionsForWithdrawals = async (
   const allSafeTxs: SafeTransactionResult[] = [];
 
   for (const [chainId, chainWithdrawals] of withdrawalsByChain) {
-    const chainSafeTxs = await processChainWithdrawals(chainId, chainWithdrawals, callCache);
+    const chainSafeTxs = await processChainWithdrawals(
+      chainId,
+      chainWithdrawals,
+      callCache,
+    );
     allSafeTxs.push(...chainSafeTxs);
   }
 
@@ -38,18 +36,18 @@ export const monitorSafeTransactionStatus = async (
   const safeTxHash = transactionKey.startsWith("0x")
     ? transactionKey
     : `0x${transactionKey}`;
-  
+
   try {
     const apiKit = new SafeApiKit({ chainId });
     const tx = await apiKit.getTransaction(safeTxHash);
-    
+
     if (tx.isExecuted) return "executed";
 
     const executed = await apiKit.getMultisigTransactions(tx.safe, {
       nonce: tx.nonce,
       executed: true,
     } as any);
-    
+
     if (
       (executed as any)?.results?.some(
         (m: any) => m?.nonce === tx.nonce && m?.isExecuted,
@@ -58,10 +56,10 @@ export const monitorSafeTransactionStatus = async (
       return "rejected";
     }
   } catch (e) {
-    logError('SafeService', e as Error, {
-      operation: 'monitorSafeTransactionStatus',
+    logError("SafeService", e as Error, {
+      operation: "monitorSafeTransactionStatus",
       safeTxHash,
-      chainId: chainId.toString()
+      chainId: chainId.toString(),
     });
   } finally {
     return "pending";

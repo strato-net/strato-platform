@@ -65,20 +65,20 @@ export function convertFromStratoDecimals(
  */
 export function normalizeAddress(address: string): string {
   if (!address) return address;
-  
+
   // Remove 0x prefix if present
   const cleanAddress = address.startsWith("0x") ? address.slice(2) : address;
-  
+
   // If it's already 40 characters (20 bytes), it's already normalized
   if (cleanAddress.length === 40) {
     return `0x${cleanAddress.toLowerCase()}`;
   }
-  
+
   // If it's 64 characters (32 bytes), extract the last 40 characters
   if (cleanAddress.length === 64) {
     return `0x${cleanAddress.toLowerCase().slice(-40)}`;
   }
-  
+
   // If it's something else, assume it's already in the right format
   return `0x${cleanAddress.toLowerCase()}`;
 }

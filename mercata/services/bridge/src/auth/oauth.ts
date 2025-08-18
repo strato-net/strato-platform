@@ -60,7 +60,7 @@ class OAuthUtil {
       return oauth;
     } catch (error: any) {
       throw new Error(
-        `Failed to initialize OAuth: ${error?.message || "Unknown error"}`
+        `Failed to initialize OAuth: ${error?.message || "Unknown error"}`,
       );
     }
   }
@@ -70,7 +70,7 @@ class OAuthUtil {
    */
   async getAccessTokenByResourceOwnerCredential(
     username: string,
-    password: string
+    password: string,
   ): Promise<TokenResponse> {
     try {
       const tokenParams = {
@@ -95,15 +95,17 @@ class OAuthUtil {
     } catch (error: any) {
       // Check if it's an axios error with response data
       if (error.response?.data) {
-        const contentType = error.response.headers['content-type'] || '';
-        if (!contentType.includes('application/json')) {
-          throw new Error(`OAuth endpoint returned non-JSON content (${contentType}). Response: ${error.response.data.substring(0, 200)}...`);
+        const contentType = error.response.headers["content-type"] || "";
+        if (!contentType.includes("application/json")) {
+          throw new Error(
+            `OAuth endpoint returned non-JSON content (${contentType}). Response: ${error.response.data.substring(0, 200)}...`,
+          );
         }
         throw new Error(`OAuth error: ${JSON.stringify(error.response.data)}`);
       }
-      
+
       throw new Error(
-        `Failed to get access token: ${error?.message || "Unknown error"}`
+        `Failed to get access token: ${error?.message || "Unknown error"}`,
       );
     }
   }

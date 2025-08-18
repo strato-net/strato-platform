@@ -2,9 +2,21 @@ import { Interface } from "ethers";
 import { MetaTransactionData, OperationType } from "@safe-global/types-kit";
 import SafeApiKit from "@safe-global/api-kit";
 import Safe from "@safe-global/protocol-kit";
-import { config, ZERO_ADDRESS, ERC20_ABI, STRATO_DECIMALS, getChainRpcUrl } from "../config";
+import {
+  config,
+  ZERO_ADDRESS,
+  ERC20_ABI,
+  STRATO_DECIMALS,
+  getChainRpcUrl,
+} from "../config";
 import { getAssetInfo } from "../services/cirrusService";
-import { convertDecimals, ensureHexPrefix, safeChecksum, validateAddress, safeToBigInt } from "./utils";
+import {
+  convertDecimals,
+  ensureHexPrefix,
+  safeChecksum,
+  validateAddress,
+  safeToBigInt,
+} from "./utils";
 import { logError } from "./logger";
 import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType } from "../types";
 
@@ -34,27 +46,35 @@ export class CallCache {
   }
 }
 
-export async function getAssetInfoForChain(stratoToken: string, chainId: number, callCache: CallCache): Promise<AssetInfo | null> {
+export async function getAssetInfoForChain(
+  stratoToken: string,
+  chainId: number,
+  callCache: CallCache,
+): Promise<AssetInfo | null> {
   const cacheKey = `${stratoToken}-${chainId}`;
   let assetInfo = callCache.get(cacheKey);
-  
+
   if (!assetInfo) {
     assetInfo = await getAssetInfo(stratoToken);
-    
-    if (!assetInfo || assetInfo.chainId !== chainId.toString() || !assetInfo.enabled) {
+
+    if (
+      !assetInfo ||
+      assetInfo.chainId !== chainId.toString() ||
+      !assetInfo.enabled
+    ) {
       return null;
     }
-    
+
     assetInfo = {
       extToken: ensureHexPrefix(assetInfo.extToken),
       extDecimals: parseInt(assetInfo.extDecimals) || STRATO_DECIMALS,
       enabled: assetInfo.enabled,
       chainId: assetInfo.chainId,
     };
-    
+
     callCache.set(cacheKey, assetInfo);
   }
-  
+
   return assetInfo;
 }
 
@@ -67,72 +87,98 @@ export function buildTxDescriptor(params: {
 }): { transactions: MetaTransactionData[]; options: { nonce: number } } {
   if (params.kind === "eth") {
     return {
-      transactions: [{
-        to: safeChecksum(params.to),
-        value: params.amount,
-        data: "0x",
-        operation: OperationType.Call,
-      }],
+      transactions: [
+        {
+          to: safeChecksum(params.to),
+          value: params.amount,
+          data: "0x",
+          operation: OperationType.Call,
+        },
+      ],
       options: { nonce: params.nonce },
     };
   }
 
   const token = params.token!;
   if (token.toLowerCase() === ZERO_ADDRESS) {
-    throw new Error("ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead");
+    throw new Error(
+      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead",
+    );
   }
 
   return {
-    transactions: [{
-      to: safeChecksum(token),
-      value: "0",
-      data: erc20Interface.encodeFunctionData("transfer", [
-        safeChecksum(params.to),
-        params.amount,
-      ]),
-      operation: OperationType.Call,
-    }],
+    transactions: [
+      {
+        to: safeChecksum(token),
+        value: "0",
+        data: erc20Interface.encodeFunctionData("transfer", [
+          safeChecksum(params.to),
+          params.amount,
+        ]),
+        operation: OperationType.Call,
+      },
+    ],
     options: { nonce: params.nonce },
   };
 }
 
-export function validateAndGroupWithdrawals(withdrawals: Withdrawal[]): Map<number, Withdrawal[]> {
+export function validateAndGroupWithdrawals(
+  withdrawals: Withdrawal[],
+): Map<number, Withdrawal[]> {
   const grouped = new Map<number, Withdrawal[]>();
-  
+
   for (const withdrawal of withdrawals) {
     const chainId = Number(withdrawal.destChainId);
     const toAddress = withdrawal.dest || withdrawal.destAddress;
     if (!toAddress || !validateAddress(toAddress)) {
-      logError('SafeService', new Error(`Invalid destination address: ${toAddress}`), {
-        operation: 'validateAndGroupWithdrawals',
-        withdrawalId: withdrawal.id || withdrawal.withdrawalId,
-        address: toAddress
-      });
+      logError(
+        "SafeService",
+        new Error(`Invalid destination address: ${toAddress}`),
+        {
+          operation: "validateAndGroupWithdrawals",
+          withdrawalId: withdrawal.id || withdrawal.withdrawalId,
+          address: toAddress,
+        },
+      );
       continue;
     }
-    
+
     if (!grouped.has(chainId)) {
       grouped.set(chainId, []);
     }
     grouped.get(chainId)!.push(withdrawal);
   }
-  
+
   return grouped;
 }
 
-export async function prepareWithdrawals(chainId: number, withdrawals: Withdrawal[], callCache: CallCache): Promise<PreparedWithdrawal[]> {
+export async function prepareWithdrawals(
+  chainId: number,
+  withdrawals: Withdrawal[],
+  callCache: CallCache,
+): Promise<PreparedWithdrawal[]> {
   const preparationPromises = withdrawals.map(async (withdrawal) => {
-    const assetInfo = await getAssetInfoForChain(withdrawal.token, chainId, callCache);
+    const assetInfo = await getAssetInfoForChain(
+      withdrawal.token,
+      chainId,
+      callCache,
+    );
     if (!assetInfo) {
-      throw new Error(`No external mapping found for token ${withdrawal.token} on chain ${chainId}`);
+      throw new Error(
+        `No external mapping found for token ${withdrawal.token} on chain ${chainId}`,
+      );
     }
-    
+
     const isEth = assetInfo.extToken.toLowerCase() === ZERO_ADDRESS;
     const type: TxType = isEth ? "eth" : "erc20";
     const tokenAddress = isEth ? ZERO_ADDRESS : assetInfo.extToken;
-    
-    const amount = convertDecimals(withdrawal.amount.toString(), STRATO_DECIMALS, assetInfo.extDecimals).toString();
-    
+
+    const amount = convertDecimals(
+      withdrawal.amount.toString(),
+      STRATO_DECIMALS,
+      assetInfo.extDecimals,
+    ).toString();
+
     return {
       amount,
       toAddress: withdrawal.dest || withdrawal.destAddress!,
@@ -141,31 +187,33 @@ export async function prepareWithdrawals(chainId: number, withdrawals: Withdrawa
       chainId,
     };
   });
-  
+
   const results = await Promise.allSettled(preparationPromises);
   const preparedWithdrawals: PreparedWithdrawal[] = [];
-  
+
   results.forEach((result, index) => {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       preparedWithdrawals.push(result.value);
     } else {
       // Log the error but don't fail the entire batch
-      logError('SafeService', result.reason as Error, {
-        operation: 'prepareWithdrawals',
+      logError("SafeService", result.reason as Error, {
+        operation: "prepareWithdrawals",
         withdrawalId: withdrawals[index].id || withdrawals[index].withdrawalId,
         token: withdrawals[index].token,
-        chainId
+        chainId,
       });
     }
   });
-  
+
   return preparedWithdrawals;
 }
 
 export function isNonceConflict(err: any): boolean {
-  const msg = String(err?.message ?? '');
+  const msg = String(err?.message ?? "");
   const code = Number(err?.response?.status ?? 0);
-  return NONCE_CONFLICT_CODES.includes(code) || NONCE_CONFLICT_PATTERNS.test(msg);
+  return (
+    NONCE_CONFLICT_CODES.includes(code) || NONCE_CONFLICT_PATTERNS.test(msg)
+  );
 }
 
 export async function proposeWithRetry(
@@ -173,7 +221,7 @@ export async function proposeWithRetry(
   protocolKit: any,
   descriptor: { transactions: any[]; options: { nonce: number } },
   safeAddress: string,
-  relayer: string
+  relayer: string,
 ): Promise<{ safeTxHash: string }> {
   try {
     const safeTransaction = await protocolKit.createTransaction(descriptor);
@@ -197,10 +245,11 @@ export async function proposeWithRetry(
 
     const retryDescriptor = {
       ...descriptor,
-      options: { nonce: retryNonce }
+      options: { nonce: retryNonce },
     };
 
-    const retryTransaction = await protocolKit.createTransaction(retryDescriptor);
+    const retryTransaction =
+      await protocolKit.createTransaction(retryDescriptor);
     const retryHash = await protocolKit.getTransactionHash(retryTransaction);
     const retrySignature = await protocolKit.signHash(retryHash);
 
@@ -224,25 +273,33 @@ export async function initializeSafeForChain(chainId: number) {
     safeAddress: config.safe.address || "",
   });
   const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId) });
-  
+
   return { protocolKit, apiKit };
 }
 
 export async function processChainWithdrawals(
   chainId: number,
   withdrawals: Withdrawal[],
-  callCache: CallCache
+  callCache: CallCache,
 ): Promise<{ safeTxHash: string }[]> {
   const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
-  const preparedWithdrawals = await prepareWithdrawals(chainId, withdrawals, callCache);
-  
-  return await proposeChainTransactions(protocolKit, apiKit, preparedWithdrawals);
+  const preparedWithdrawals = await prepareWithdrawals(
+    chainId,
+    withdrawals,
+    callCache,
+  );
+
+  return await proposeChainTransactions(
+    protocolKit,
+    apiKit,
+    preparedWithdrawals,
+  );
 }
 
 export async function proposeChainTransactions(
   protocolKit: any,
   apiKit: any,
-  preparedWithdrawals: PreparedWithdrawal[]
+  preparedWithdrawals: PreparedWithdrawal[],
 ): Promise<{ safeTxHash: string }[]> {
   const safeTxs: { safeTxHash: string }[] = [];
   const safeAddress = config.safe.address || "";
@@ -258,7 +315,13 @@ export async function proposeChainTransactions(
       nonce,
     });
 
-    const { safeTxHash } = await proposeWithRetry(apiKit, protocolKit, descriptor, safeAddress, relayer);
+    const { safeTxHash } = await proposeWithRetry(
+      apiKit,
+      protocolKit,
+      descriptor,
+      safeAddress,
+      relayer,
+    );
     safeTxs.push({ safeTxHash });
     nonce += 1;
   }

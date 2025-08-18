@@ -1,9 +1,7 @@
 import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import {
-  createSafeTransactionsForWithdrawals,
-} from "./safeService";
+import { createSafeTransactionsForWithdrawals } from "./safeService";
 import { NonEmptyArray, Withdrawal } from "../types";
 
 import { logInfo, logError } from "../utils/logger";
@@ -54,7 +52,9 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<any>) => {
   );
 };
 
-export const confirmWithdrawalBatch = async (withdrawals: NonEmptyArray<Withdrawal>) => {
+export const confirmWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
+) => {
   const safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
 
   if (safeTxs?.length > 0) {
@@ -80,28 +80,30 @@ export const confirmWithdrawalBatch = async (withdrawals: NonEmptyArray<Withdraw
     const emailPromises = withdrawals.map(async (withdrawal) => {
       try {
         await sendEmail(withdrawal.id || withdrawal.withdrawalId!);
-        return 'success';
+        return "success";
       } catch (emailError) {
         logError("BridgeService", emailError as Error, {
           operation: "sendEmail",
           withdrawalId: withdrawal.id || withdrawal.withdrawalId!,
         });
-        return 'failed';
+        return "failed";
       }
     });
 
     // Wait for all emails to complete and log results
     const emailResults = await Promise.all(emailPromises);
-    const successCount = emailResults.filter(r => r === 'success').length;
-    const failureCount = emailResults.filter(r => r === 'failed').length;
+    const successCount = emailResults.filter((r) => r === "success").length;
+    const failureCount = emailResults.filter((r) => r === "failed").length;
     logInfo(
       "BridgeService",
-      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`
+      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
     );
   }
 };
 
-export const finaliseWithdrawalBatch = async (withdrawals: NonEmptyArray<Withdrawal>) => {
+export const finaliseWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
+) => {
   const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
   const custodyTxHashes = withdrawals.map((w) => w.safeTxHash!);
 
@@ -121,7 +123,9 @@ export const finaliseWithdrawalBatch = async (withdrawals: NonEmptyArray<Withdra
   );
 };
 
-export const handleRejectedWithdrawalBatch = async (withdrawals: NonEmptyArray<Withdrawal>) => {
+export const handleRejectedWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
+) => {
   const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
 
   await execute({

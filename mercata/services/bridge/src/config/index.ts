@@ -9,7 +9,8 @@ export const ERC20_ABI = [
 ];
 
 // DepositRouted(address,uint256,address,address,uint256)
-export const DEPOSIT_EVENT_SIGNATURE = '0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207';
+export const DEPOSIT_EVENT_SIGNATURE =
+  "0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207";
 
 const config = {
   auth: {
@@ -28,12 +29,14 @@ const config = {
     safeOwnerPrivateKey: process.env.SAFE_OWNER_PRIVATE_KEY,
   },
   voucher: {
-    contractAddress: process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e",
+    contractAddress:
+      process.env.VOUCHER_CONTRACT_ADDRESS ||
+      "000000000000000000000000000000000000100e",
   },
   polling: {
-    bridgeInInterval: 1 * 60 * 1000,    // 5 minutes (was 100 seconds)
-    bridgeOutInterval: 1 * 60 * 1000,   // 1 minute (was 3 minutes)
-    withdrawalInterval: 1 * 60 * 1000,  // 1 minute (was 10 seconds)
+    bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)
+    bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
+    withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
     ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
   },
   strato: {
@@ -52,9 +55,9 @@ const config = {
   api: {
     nodeUrl: process.env.NODE_URL,
     errorCodes: {
-      ECONNREFUSED: 'Connection refused',
-      ENOTFOUND: 'DNS lookup failed',
-      ETIMEDOUT: 'Request timeout',
+      ECONNREFUSED: "Connection refused",
+      ENOTFOUND: "DNS lookup failed",
+      ETIMEDOUT: "Request timeout",
     },
     defaults: {
       timeout: 60_000,
@@ -68,24 +71,33 @@ export { config };
 export const getChainRpcUrl = (chainId: number | bigint): string => {
   const chainIdStr = chainId.toString();
   const rpcUrl = process.env[`CHAIN_${chainIdStr}_RPC_URL`];
-  
+
   if (!rpcUrl) {
-    throw new Error(`CHAIN_${chainIdStr}_RPC_URL environment variable is not configured`);
+    throw new Error(
+      `CHAIN_${chainIdStr}_RPC_URL environment variable is not configured`,
+    );
   }
-  
+
   return rpcUrl;
 };
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'BA_USERNAME', 'BA_PASSWORD', 'CLIENT_SECRET', 'CLIENT_ID', 'OPENID_DISCOVERY_URL',
-  'BRIDGE_ADDRESS', 'SAFE_ADDRESS', 'SAFE_OWNER_ADDRESS', 'SAFE_OWNER_PRIVATE_KEY'
+  "BA_USERNAME",
+  "BA_PASSWORD",
+  "CLIENT_SECRET",
+  "CLIENT_ID",
+  "OPENID_DISCOVERY_URL",
+  "BRIDGE_ADDRESS",
+  "SAFE_ADDRESS",
+  "SAFE_OWNER_ADDRESS",
+  "SAFE_OWNER_PRIVATE_KEY",
 ];
 
-const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  const error = `Missing required environment variables: ${missingEnvVars.join(', ')}`;
-  logError('Config', error, { missingEnvVars });
+  const error = `Missing required environment variables: ${missingEnvVars.join(", ")}`;
+  logError("Config", error, { missingEnvVars });
   throw new Error(error);
 }
