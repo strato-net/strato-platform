@@ -133,10 +133,10 @@ const DepositTransactionDetails = () => {
       key: "ethTokenSymbol",
       render: (text: string, record: DepositTransaction) => (
         <div className="flex flex-col gap-1">
-          <span>{text || "-"}</span>
+          {/* <span>{text || "-"}</span> */}
           {record.ethTokenAddress && (
             <span className="text-xs text-gray-500">
-              {renderTruncatedAddress(record.ethTokenAddress)}
+              {renderTruncatedAddressWithCopy(record.token)}
             </span>
           )}
         </div>
@@ -145,14 +145,14 @@ const DepositTransactionDetails = () => {
     },
     {
       title: "Token (STRATO)",
-      dataIndex: "tokenSymbol",
-      key: "tokenSymbol",
+      dataIndex: "token",
+      key: "token",
       render: (text: string, record: DepositTransaction) => (
         <div className="flex flex-col gap-1">
-          <span>{text || "-"}</span>
+          {/* <span>{text || "-"}</span> */}
           {record.token && (
             <span className="text-xs text-gray-500">
-              {renderTruncatedAddress(record.token)}
+              {renderTruncatedAddressWithCopy(record.ethTokenAddress)}
             </span>
           )}
         </div>
@@ -188,6 +188,13 @@ const DepositTransactionDetails = () => {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
+              Processing
+            </span>
+          );
+        } else if (status === "3") {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              <Clock className="h-3 w-3 mr-1" />
               Completed
             </span>
           );

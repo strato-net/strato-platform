@@ -48,16 +48,49 @@ export const getBridgeStatus = async (
       throw new Error('User address is required');
     }
 
-    const params = {
-      select: "withdrawalId:key,withdrawalInfo:value",
-      "value->>user": `eq.${userAddress}`,
-      address: `eq.${constants.mercataBridge}`
-    };
+    // Extract status from rawParams
+    const { status } = rawParams;
+   
+    
+    let url: string;
+    let params: Record<string, any>;
 
-    const { data: withdrawals } = await cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, { params });
-
-    return withdrawals || [];
+    if (status === 'WithdrawalInitiated') {
+      console.log("Processing WithdrawalInitiated status");
+      // Same params and URL as before for WithdrawalInitiated
+      url = `/${MercataBridge}-withdrawals`;
+      params = {
+        select: "withdrawalId:key,withdrawalInfo:value",
+        "value->>user": `eq.${userAddress}`,
+        address: `eq.${constants.mercataBridge}`
+      };
+      
+   
+      
+    } else if (status === 'DepositInitiated') {
+      console.log("Processing DepositInitiated status");
+      // Different URL and params for DepositInitiated
+      url = `/${MercataBridge}-deposits`;
+      params = {
+        select: "depositId:key,depositInfo:value",
+        // "value->>user": `eq.${userAddress}`,    how to get this address?
+        "value->>user": `eq.156947246105159104636409351615097004700443525326`,
+        address: `eq.${constants.mercataBridge}`
+      };
+      
+      
+    } else {
+      console.log("Invalid status received:", status);
+      throw new Error('Invalid status. Must be either "WithdrawalInitiated" or "DepositInitiated"');
+    }
+    
+  
+    
+    const { data: results } = await cirrus.get(accessToken, url, { params });
+    console.log("Results:", results);
+    return results || [];
   } catch (error) {
+    console.error("Error in getBridgeStatus:", error);
     throw error;
   }
 };

@@ -73,37 +73,49 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         orderDirection: 'desc',
       });
 
-      const response = await api.get(`/bridge/depositStatus/${status}?${params}`);
+      const response = await api.get(`/bridge/status/${status}?${params}`);
       const responseData = response.data;
 
-      const depositData = responseData?.data?.data.data || [];
+      // Try different response data paths to find the actual data
+      let depositData = responseData?.data?.data?.data  || [];
+      
+      // If the response is directly an array (like your example data), use it directly
+      if (Array.isArray(responseData)) {
+        depositData = responseData;
+      }
+      
       
       const transformedData = Array.isArray(depositData)
-        ? depositData.map((item: RawDepositData) => ({
-            transaction_hash: item.transaction_hash,
-            block_timestamp: item.block_timestamp,
-            from: item.from,
-            to: item.to,
-            tokenSymbol: item.tokenSymbol,
-            ethTokenSymbol: item.ethTokenSymbol,
-            ethTokenAddress: item.ethTokenAddress,
-            amount: item.amount
-              ? (
-                  Number(item.amount) /
-                   ( 10 ** 18)
-                ).toLocaleString("fullwide", {
-                  useGrouping: false,
-                  maximumFractionDigits: 20,
-                })
-              : "-",
-            txHash: item.txHash,
-            token: item.token,
-            key: item.key,
-            depositStatus: item.depositStatus,
-          }))
+        ? depositData.map((item: RawDepositData) => {
+           
+            return {
+              transaction_hash: item.depositId?.toString() || item.transaction_hash || '-',
+              block_timestamp: item.block_timestamp || new Date().toISOString(),
+              from: item.depositInfo?.user || item.from || '-',
+              to: item.to || '-',
+              tokenSymbol: item.tokenSymbol || '-',
+              ethTokenSymbol: item.ethTokenSymbol || '-',
+              ethTokenAddress: item.ethTokenAddress || '-',
+              amount: item.depositInfo?.amount || item.amount
+                ? (
+                    Number(item.depositInfo?.amount || item.amount) /
+                     (10 ** 18)
+                  ).toLocaleString("fullwide", {
+                    useGrouping: false,
+                    maximumFractionDigits: 20,
+                  })
+                : "-",
+              txHash: item.txHash || '-',
+              token: item.depositInfo?.token || item.token || '-',
+              key: item.depositId?.toString() || item.key || '-',
+              depositStatus: item.depositInfo?.bridgeStatus || item.depositStatus || '-',
+            };
+          })
         : [];
+      
 
-      const totalCount = responseData?.data?.data?.totalCount || 0;
+
+      const totalCount = responseData?.data?.data?.totalCount || responseData?.totalCount || depositData?.length || 0;
       
       setDepositTransactions(transformedData);
       
@@ -141,37 +153,30 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
         orderDirection: 'desc',
       });
 
-      const response = await api.get(`/bridge/withdrawalStatus/${status}?${params}`);
+      const response = await api.get(`/bridge/status/${status}?${params}`);
       const responseData = response.data;
 
-      const withdrawalData = responseData?.data?.data.data || [];
+      // Handle new API response structure
+      const withdrawalData = responseData?.data || responseData || [];
       
       const transformedData = Array.isArray(withdrawalData)
         ? withdrawalData.map((item: RawWithdrawData) => ({
-            transaction_hash: item.transaction_hash,
-            block_timestamp: item.block_timestamp,
-            from: item.from,
-            to: item.to,
-            ethTokenSymbol: item.ethTokenSymbol,
-            ethTokenAddress: item.ethTokenAddress,
-            amount: item.amount
-              ? (
-                  Number(item.amount) /
-                  (item.tokenDecimal ? 10 ** item.tokenDecimal : 1)
-                ).toLocaleString("fullwide", {
-                  useGrouping: false,
-                  maximumFractionDigits: 20,
-                })
-              : "-",
-            txHash: item.txHash,
-            token: item.token,
-            key: item.key,
-            withdrawalStatus: item.withdrawalStatus,
-            tokenSymbol: item.tokenSymbol,
+            transaction_hash: item.withdrawalId?.toString() || '-',
+            block_timestamp: item.withdrawalInfo?.requestedAt || '-',
+            from: item.withdrawalInfo?.user || '-', // From shows user address
+            to: item.withdrawalInfo?.dest || '-', // To shows dest address
+            ethTokenSymbol: '-', // Not available in new data
+            ethTokenAddress: '-', // Not available in new data
+            amount: item.withdrawalInfo?.amount || '-', // Show actual amount
+            txHash: '-', // Not available in new data
+            token: item.withdrawalInfo?.token || '-',
+            key: item.withdrawalId?.toString() || '-',
+            withdrawalStatus: item.withdrawalInfo?.bridgeStatus || '-',
+            tokenSymbol: '-', // Not available in new data
           }))
         : [];
 
-      const totalCount = responseData?.data?.data?.totalCount || 0;
+      const totalCount = responseData?.totalCount || withdrawalData?.length || 0;
       
       setWithdrawTransactions(transformedData);
       
@@ -191,6 +196,31 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
 
   const formatDate = useCallback((dateString: string): string => {
     try {
+      // Handle Unix timestamp (seconds since epoch)
+      if (/^\d{10,}$/.test(dateString)) {
+        const timestamp = parseInt(dateString) * 1000; // Convert seconds to milliseconds
+        const date = new Date(timestamp);
+        const relativeTime = formatDistanceToNow(date, { addSuffix: true });
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+        if (date < sevenDaysAgo) {
+          const indianDate = new Date(date.getTime() + 5.5 * 60 * 60 * 1000);
+          return indianDate.toLocaleString("en-IN", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: false,
+          });
+        }
+
+        return relativeTime;
+      }
+
+      // Handle existing ISO string format
       const isoString = dateString.replace(" UTC", "Z");
       const date = new Date(isoString);
       const relativeTime = formatDistanceToNow(date, { addSuffix: true });

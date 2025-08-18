@@ -107,7 +107,7 @@ const WithdrawTransactionDetails = () => {
       key: 'ethTokenSymbol',
       render: (text: string, record: WithdrawTransaction) => (
         <div className="flex flex-col gap-1">
-          <span>{text || '-'}</span>
+          {/* <span>{text || '-'}</span> */}
           {record.ethTokenAddress && (
             <span className="text-xs text-gray-500">
               {renderTruncatedAddressWithCopy(record.ethTokenAddress)}
@@ -123,7 +123,7 @@ const WithdrawTransactionDetails = () => {
       key: 'tokenSymbol',
       render: (text: string, record: WithdrawTransaction) => (
         <div className="flex flex-col gap-1">
-          <span>{text || '-'}</span>
+          {/* <span>{text || '-'}</span> */}
           {record.token && (
             <span className="text-xs text-gray-500">
               {renderTruncatedAddressWithCopy(record.token)}
