@@ -1,0 +1,17 @@
+{
+  "name": "mercata-scripts",
+  "version": "1.0.0",
+  "description": "Testing and utility scripts for Mercata lending protocol",
+  "scripts": {
+    "lending": "./get_tokens.sh && node newLendingTests.test.js",
+    "old-liquidation": "./get_tokens.sh && node liquidationFlow.test.js",
+    "old-lending-invariant": "./get_tokens.sh && node lendingInvariant.test.js"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1"
+  }
+}
