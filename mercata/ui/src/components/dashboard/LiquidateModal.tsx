@@ -8,6 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
+import { parseUnits } from 'ethers';
 
 interface LiquidateModalProps {
   open: boolean;
@@ -27,10 +28,14 @@ const weiToEth = (v?: string | number | bigint | null): number => {
   }
 };
 
-const ethToWei = (eth: number): string => {
-  if (!isFinite(eth) || eth <= 0) return "0";
-  // Use floor to convert without rounding up (no safety buffer)
-  return BigInt(Math.floor(eth * 1e18)).toString();
+const toWeiFromStr = (val: string): string => {
+  const clean = (val || '').replace(/,/g, '').trim();
+  if (!clean) return '0';
+  try {
+    return parseUnits(clean, 18).toString();
+  } catch {
+    return '0';
+  }
 };
 
 const addCommasToInput = (value: string) => {
@@ -121,12 +126,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const handleConfirm = async () => {
     // If 100 % selected, use backend-supplied exact wei string to avoid JS rounding
-    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : ethToWei(repayEth);
+    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : toWeiFromStr(repayStr);
     if (!repayWei || repayWei === "0") {
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
-    
     await executeLiquidation(loan.id, collateral.asset, repayWei);
     toast({ title: "Liquidation submitted", variant: "success" });
     onSuccess();

@@ -36,11 +36,15 @@ endif
 
 $(info )
 
-all: build_all docker-compose eks
+all: mercata
+
+docker: build_all docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-build_all: strato apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe docker-compose
+
+build_all: strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
 build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
 
@@ -115,27 +119,28 @@ build_formatter:
 	@echo building code formatter...
 	docker build --tag=strato-formatter:${STACK_RESOLVER} -f Dockerfile.buildbase .
 
-build_common: build_buildbase
+build_common:
 	@echo building haskell libraries and creating directories
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build ${ARCH_FLAG} \
-		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
+	cd strato && stack install \
+		--test --no-run-tests \
 
-build_common_with_tests: build_buildbase
-	@echo building haskell libraries and creating directories
+build_common_docker: build_buildbase
+	@echo building haskell libraries and creating directories in docker
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
-	cd strato && stack build ${ARCH_FLAG} \
+	cd strato && stack build \
+		--docker \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_profiled: build_buildbase
-	@echo building haskell libraries and creating directories
+	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
@@ -145,7 +150,7 @@ build_common_profiled: build_buildbase
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
 build_common_fast: build_buildbase
-	@echo building haskell libraries and creating directories
+	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
@@ -174,7 +179,7 @@ hoogle_serve:
 
 hoogle: hoogle_generate hoogle_serve
 
-highway: build_common 
+highway: build_common_docker
 	@echo Now building highway...
 	cp strato/highway/doit.sh ${HIGHWAYDIR}
 	docker build --target highway --tag ${REPO_URL}highway:${VERSION} --file Dockerfile.multi ${FAKEROOT}
@@ -186,6 +191,12 @@ highway-nginx:
 
 strato: build_common
 	@echo Now building core-strato...
+	cp -fr strato/extraFiles/* ${STRATODIR}
+	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
+	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
+
+strato_docker: build_common_docker
+	@echo Now building core-strato for docker...
 	cp -fr strato/extraFiles/* ${STRATODIR}
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
@@ -202,7 +213,7 @@ profile: build_common_profiled
 	docker build --target strato --tag ${REPO_URL}strato:${VERSION} --file Dockerfile.multi ${FAKEROOT}
 	docker tag ${REPO_URL}strato:${VERSION} ${REPO_AWS_ECR_URL}strato:${VERSION}
 
-vault-wrapper: build_common
+vault-wrapper: build_common_docker
 	@echo Now building vault-wrapper...
 	cp strato/vault/doit.sh ${VAULTDIR}
 	docker build --target vault-wrapper --tag ${REPO_URL}vault-wrapper:${VERSION} --file Dockerfile.multi ${FAKEROOT}
@@ -226,6 +237,7 @@ docker-compose:
 	@echo Now generating docker-compose yml files...
 	@echo Creating the image-push-ready docker-compose.push.yml...
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.yml
+	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.allDocker.tpl.yml > docker-compose.allDocker.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.tpl.yml > docker-compose.push.ecr.yml
 	sed -e 's|<REPO_URL>|'"${REPO_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.yml
 	sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' docker-compose.vault.tpl.yml > docker-compose.vault.push.ecr.yml
@@ -242,6 +254,7 @@ docker-compose:
 
 	@echo Creating the final docker-compose.yml...
 	awk '/build: ./{getline} 1' docker-compose.push.yml > docker-compose.yml
+	awk '/build: ./{getline} 1' docker-compose.allDocker.push.yml > docker-compose.allDocker.yml
 	awk '/build: ./{getline} 1' docker-compose.push.ecr.yml > docker-compose.ecr.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.yml > docker-compose.vault.yml
 	awk '/build: ./{getline} 1' docker-compose.vault.push.ecr.yml > docker-compose.vault.ecr.yml

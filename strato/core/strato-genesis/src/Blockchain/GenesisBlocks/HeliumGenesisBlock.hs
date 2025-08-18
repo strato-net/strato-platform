@@ -376,7 +376,6 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
   , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
   , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
-  , (".totalBorrowPrincipal", BInteger sigma)
   , (".RAY", BInteger 1_000_000_000_000_000_000_000_000_000)
   , (".SECONDS_PER_YEAR", BInteger 31536000)
   , (".borrowIndex", BInteger 1_000_000_000_000_000_000_000_000_000)
@@ -456,7 +455,7 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAcc
   ]
 
 mercataBridge :: AccountInfo
-mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataEthBridge") $ ownedByBlockApps mercataAddress ++
+mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataBridge") $ ownedByBlockApps mercataAddress ++
   [ (".relayer", BAccount $ unspecifiedChain blockappsAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
