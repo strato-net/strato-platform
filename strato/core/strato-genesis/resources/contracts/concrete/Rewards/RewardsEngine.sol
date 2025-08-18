@@ -296,13 +296,13 @@ contract record RewardsEngine is Ownable {
         // Check that the (actionType, asset) tuple is unique
         require(actions[actionType][asset].actionType != "", "RewardsEngine: Action already exists");
 
-        actions[actionType][asset] = Action({
-            actionType: actionType,
-            asset: asset,
-            multiplierName: multiplierName,
-            owner: owner,
-            createdAt: block.timestamp
-        });
+        actions[actionType][asset] = Action(
+            actionType,
+            asset,
+            multiplierName,
+            owner,
+            block.timestamp
+        );
 
         // Note: balances[actionType][asset][rewardToken][user] mappings are automatically
         // available in Solidity. UserBalance structs will be created on-demand when users interact.
@@ -394,12 +394,12 @@ contract record RewardsEngine is Ownable {
                 userBalance.modifiedAt = currentTime;
                 userBalance.lastSeenAmount = amount;
 
-                currentBalances[resultIndex] = CurrentBalance({
-                    rewardToken: rewardToken,
-                    actionType: actionType,
-                    asset: asset,
-                    currentBalance: userBalance.balance
-                });
+                currentBalances[resultIndex] = CurrentBalance(
+                    rewardToken,
+                    actionType,
+                    asset,
+                    userBalance.balance
+                );
                 resultIndex++;
             }
 
@@ -448,12 +448,12 @@ contract record RewardsEngine is Ownable {
                     estimatedBalance += accruedReward;
                 }
 
-                estimatedBalances[resultIndex] = CurrentBalance({
-                    rewardToken: rewardToken,
-                    actionType: actionType,
-                    asset: asset,
-                    currentBalance: estimatedBalance
-                });
+                estimatedBalances[resultIndex] = CurrentBalance(
+                    rewardToken,
+                    actionType,
+                    asset,
+                    estimatedBalance
+                );
                 resultIndex++;
             }
         }
