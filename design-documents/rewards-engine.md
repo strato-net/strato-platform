@@ -52,6 +52,7 @@ The name of the smart contract will be `RewardsEngine`
   - Remove multiplier
   - Add multipliers (bath operation)
   - Remove multipliers (bath operation)
+  - Edit multipliers factors (TODO)
 
   Both those actions intertwine with "Reward tokens management" and "Action
   management". When adding a multiplier we need to check that it provides a
@@ -172,15 +173,38 @@ The name of the smart contract will be `RewardsEngine`
    - `asset`: the asset address
    - `currentBalance`: the updated balance amount
 
-### TODO Reward claim
+### Reward claim (IMPLEMENTED)
 
-  implement today
-  minting capability (for each reward token) to create reward when claimed
+  The reward claim feature is a mixture of what 'update' and 'estimateRewards' are doing.
+
+  The function 'claim' takes the following arguments:
+
+  - `actionType`: type of an `Action` that is triggering the update (string)
+  - `assets`: an array of asset addresses
+  - `user`: an `address` of a user
+
+  It first updates balances with accrued rewards simply because time has passed. 
+  It assumes that the amounts have not changed, only time has passed, and then 
+  calculates accrued rewards using the stored `lastSeenAmount` (similar to what 
+  'estimateRewards' does, but actually updates the balances).
+
+  Once all balances are updated, for each balance it mints rewards for the user 
+  and nullifies the balances (sets them to '0').
+
+  The function returns an array of 'CurrentBalance', holding information about 
+  how much rewards were minted per each action per each reward token.
+
+  Key implementation details:
+  - Only the user themselves can claim their own rewards (enforced via `msg.sender` check)
+  - Uses `Token(rewardToken).mint(user, claimedAmount)` to mint reward tokens
+  - Only processes and returns results for balances > 0 to avoid unnecessary operations
+  - Updates `modifiedAt` timestamp when nullifying balances
+
 
 ### TODO function modifiers
 
- `update` should be called by owners only
- `claim` only user should be allowed to claim rewards
+ `update` should be called by owners only `claim` only user should be allowed to
+ claim rewards
 
 ### TODO Delegate pattern
 

@@ -508,4 +508,69 @@ contract record RewardsEngine is Ownable {
         return estimatedBalances;
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // CLAIM REWARDS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function claim(
+        string calldata actionType,
+        address[] calldata assets,
+        address user
+    ) external returns (CurrentBalance[] memory) {
+        require(actionType != "", "RewardsEngine: Empty action type");
+        require(user != address(0), "RewardsEngine: Invalid user address");
+        require(user == msg.sender, "RewardsEngine: Only user can claim their own rewards");
+
+        CurrentBalance[] memory claimedBalances = [];
+        uint256 resultIndex = 0;
+
+        for (uint256 i = 0; i < assets.length; i++) {
+            address asset = assets[i];
+
+            // Check that action exists
+            Action storage action = actions[actionType][asset];
+            require(action.actionType != "", "RewardsEngine: Action not found");
+
+            // Get the multiplier for this action
+            Multiplier storage multiplier = multipliers[action.multiplierName];
+
+            // Update and claim rewards for each reward token
+            for (uint256 j = 0; j < rewardTokens.length; j++) {
+                address rewardToken = address(rewardTokens[j]);
+
+                UserBalance storage userBalance = balances[actionType][asset][rewardToken][user];
+
+                uint256 currentTime = block.timestamp;
+                uint256 multiplierFactor = multiplier.factors[rewardToken];
+                uint256 claimedAmount = userBalance.balance;
+
+                // Add accrued rewards using lastSeenAmount
+                if (userBalance.createdAt > 0) {
+                    uint256 accruedReward = calculateAccruedReward(userBalance, userBalance.lastSeenAmount, multiplierFactor);
+                    claimedAmount += accruedReward;
+                }
+
+                // Only mint and record if there's something to claim
+                if (claimedAmount > 0) {
+                    // Mint reward tokens to the user
+                    Token(rewardToken).mint(user, claimedAmount);
+
+                    // Nullify the balance
+                    userBalance.balance = 0;
+                    userBalance.modifiedAt = currentTime;
+
+                    claimedBalances.push(CurrentBalance(
+                        rewardToken,
+                        actionType,
+                        asset,
+                        claimedAmount
+                    ));
+                    resultIndex++;
+                }
+            }
+        }
+
+        return claimedBalances;
+    }
+
 }
