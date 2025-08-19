@@ -11,10 +11,43 @@ Install the latest docker from https://www.docker.com/
 - Docker Compose V2
 
 ### Stack
-Stack v2.11.1 is required to build strato-platform with docker env enabled
+Stack v2.11.1+ is required to build strato-platform with docker env enabled
 
-Most unix systems (incl. ubuntu and mac):
+**⚠️ IMPORTANT: Architecture Compatibility**
+
+The build system automatically validates that your Stack binary matches your system architecture. This prevents build failures due to architecture mismatches.
+
+**Installation (Recommended):**
+```bash
+# Install via ghcup (recommended)
+curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
+ghcup install stack 3.7.1
 ```
+
+**If you get an architecture mismatch error:**
+
+**For macOS (Apple Silicon):**
+```bash
+ghcup rm stack $(stack --version | cut -d' ' -f2)
+ghcup install stack $(stack --version | cut -d' ' -f2) --platform aarch64-apple-darwin
+```
+
+**For macOS (Intel):**
+```bash
+ghcup rm stack $(stack --version | cut -d' ' -f2)
+ghcup install stack $(stack --version | cut -d' ' -f2) --platform x86_64-apple-darwin
+```
+
+**For Linux:**
+```bash
+ghcup rm stack $(stack --version | cut -d' ' -f2)
+ghcup install stack $(stack --version | cut -d' ' -f2) --platform x86_64-unknown-linux
+# or for ARM64 Linux:
+ghcup install stack $(stack --version | cut -d' ' -f2) --platform aarch64-unknown-linux
+```
+
+**Legacy installation (not recommended):**
+```bash
 curl -sSL https://get.haskellstack.org/ | sh
 ```
 

@@ -1,3 +1,51 @@
+# Architecture detection and validation
+# This prevents the common issue where Stack is installed for the wrong architecture
+# (e.g., x86_64 Stack on ARM64 Mac), which causes cryptic build failures.
+# The validation runs before any build targets and provides clear error messages.
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+# Detect OS and architecture
+ifeq ($(UNAME_S),Darwin)
+  OS := macos
+  ifeq ($(UNAME_M),arm64)
+    ARCH := aarch64
+    PLATFORM := aarch64-apple-darwin
+  else ifeq ($(UNAME_M),x86_64)
+    ARCH := x86_64
+    PLATFORM := x86_64-apple-darwin
+  else
+    $(error Unsupported Mac architecture: $(UNAME_M))
+  endif
+else ifeq ($(UNAME_S),Linux)
+  OS := linux
+  ifeq ($(UNAME_M),x86_64)
+    ARCH := x86_64
+    PLATFORM := x86_64-unknown-linux
+  else ifeq ($(UNAME_M),aarch64)
+    ARCH := aarch64
+    PLATFORM := aarch64-unknown-linux
+  else
+    $(error Unsupported Linux architecture: $(UNAME_M))
+  endif
+else
+  $(error Unsupported operating system: $(UNAME_S))
+endif
+
+# Validate Stack architecture
+STACK_ARCH := $(shell stack --version 2>/dev/null | grep -o 'x86_64\|aarch64' || echo "unknown")
+ifeq ($(STACK_ARCH),unknown)
+  $(error Stack not found or version output not recognized. Please install Stack via ghcup.)
+endif
+
+# Check for architecture mismatch
+ifneq ($(ARCH),$(STACK_ARCH))
+  $(error ARCHITECTURE MISMATCH DETECTED! Your system architecture is: $(ARCH) ($(UNAME_M)) but your Stack binary is: $(STACK_ARCH). This will cause build failures. For macOS (Apple Silicon): ghcup rm stack $(shell stack --version | cut -d' ' -f2) && ghcup install stack $(shell stack --version | cut -d' ' -f2) --platform aarch64-apple-darwin. For macOS (Intel): ghcup rm stack $(shell stack --version | cut -d' ' -f2) && ghcup install stack $(shell stack --version | cut -d' ' -f2) --platform x86_64-apple-darwin. For Linux: ghcup rm stack $(shell stack --version | cut -d' ' -f2) && ghcup install stack $(shell stack --version | cut -d' ' -f2) --platform $(PLATFORM))
+endif
+
+$(info Detected platform: $(OS) $(ARCH) ($(PLATFORM)))
+$(info Stack architecture: $(STACK_ARCH) - ✓ Compatible)
+
 REPO_URL ?= 
 ifeq ($(REPO),private)
   REPO_URL=registry-aws.blockapps.net:5000/blockapps/
