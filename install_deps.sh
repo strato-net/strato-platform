@@ -368,7 +368,6 @@ Linux)
 esac
 
 # Lock the specific package versions for Ubuntu or Mint Linux
-echo "Checking package versions for Ubuntu and Mint:"
 check_package_version "ubuntu-or-mint" "build-essential" "12.10ubuntu1"
 check_package_version "ubuntu-or-mint" "ca-certificates" "20240203"
 check_package_version "ubuntu-or-mint" "containerd.io" "1.7.27-1"
