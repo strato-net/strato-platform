@@ -185,7 +185,7 @@ const Borrow = () => {
         const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead), 18) : 'all';
         toast({
           title: "Success",
-          description: `Successfully Repaid ${sent} USDST`,
+          description: `Successfully repaid ${sent} USDST`,
           variant: "success",
         });
       } else {
@@ -198,7 +198,7 @@ const Borrow = () => {
         const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent), 18) : amount;
         toast({
           title: "Success",
-          description: `Successfully Repaid ${sent} USDST`,
+          description: `Successfully repaid ${sent} USDST`,
           variant: "success",
         });
       }
