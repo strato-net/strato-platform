@@ -297,7 +297,7 @@ contract record RewardsEngine is Ownable {
         require(multiplierMap[multiplierName] > 0, "RewardsEngine: Multiplier not found");
 
         // Check that the (actionType, asset) tuple is unique
-        require(actions[actionType][asset].actionType != "", "RewardsEngine: Action already exists");
+        require(actions[actionType][asset].actionType == "", "RewardsEngine: Action already exists");
 
         actions[actionType][asset] = Action(
             actionType,
