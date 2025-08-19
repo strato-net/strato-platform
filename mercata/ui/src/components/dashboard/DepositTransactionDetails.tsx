@@ -3,10 +3,12 @@ import { Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { message, Table } from "antd";
 import { CopyOutlined, LinkOutlined, FrownOutlined } from "@ant-design/icons";
 import { useTransactionContext } from "@/context/TransactionContext";
+import { SUPPORTED_CHAINS } from "@/lib/bridge/constants";
 
 interface DepositTransaction {
   transaction_hash: string;
   block_timestamp: string;
+  chainId?: number;
   from: string;
   to: string;
   amount: string;
@@ -27,6 +29,27 @@ const DepositTransactionDetails = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState("DepositInitiated");
   const [transactions, setTransactions] = useState<DepositTransaction[]>([]);
+  const [chainId, setChainId] = useState<number>(0);
+  const [chainName, setChainName] = useState<string>("");
+
+  // Function to get chain name from chainId
+  const getChainName = (chainId: number): string => {
+    const chainEntries = Object.entries(SUPPORTED_CHAINS);
+    const chainEntry = chainEntries.find(([_, id]) => id === chainId);
+    return chainEntry ? chainEntry[0] : "Unknown Chain";
+  };
+
+  // Update chainId and chainName when transactions change
+  useEffect(() => {
+    if (transactions.length > 0 && transactions[0].chainId) {
+      const firstChainId = transactions[0].chainId;
+      setChainId(firstChainId);
+      setChainName(getChainName(firstChainId));
+    } else {
+      setChainId(0);
+      setChainName("");
+    }
+  }, [transactions]);
 
   const {
     loading: isLoading,
@@ -114,7 +137,7 @@ const DepositTransactionDetails = () => {
 
   const columns = [
     {
-      title: "From (ETH)",
+      title: `From (${chainName || ""})`,
       dataIndex: "from",
       key: "from",
       render: (text: string) => renderTruncatedAddressWithCopy(text),
@@ -128,7 +151,7 @@ const DepositTransactionDetails = () => {
       width: 100,
     },
     {
-      title: "Token (ETH)",
+      title: `Token (${chainName || "ETH"})`,
       dataIndex: "ethTokenSymbol",
       key: "ethTokenSymbol",
       render: (text: string, record: DepositTransaction) => (
@@ -193,8 +216,7 @@ const DepositTransactionDetails = () => {
           );
         } else if (status === "3") {
           return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-              <Clock className="h-3 w-3 mr-1" />
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               Completed
             </span>
           );

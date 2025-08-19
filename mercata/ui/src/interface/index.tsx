@@ -244,6 +244,7 @@ export interface RawWithdrawData {
 }
 
 export interface RawDepositData {
+  chainId: any;
   transaction_hash: string;
   block_timestamp: string;
   from: string;

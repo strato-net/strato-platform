@@ -117,11 +117,48 @@ const BridgeIn: React.FC = () => {
     !!expectedChainId &&
     (nativeLoading || tokenLoading);
 
+  // State for minimum deposit amount
+  const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ 
+    amount: "", 
+    loading: false 
+  });
+
+  // Function to fetch minimum deposit amount using existing service
+  const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
+    if (!tokenAddress || !selectedNetworkConfig) return;
+    
+    setMinDepositInfo(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const validation = await bridgeContractService.validateRouterContract({
+        depositRouterAddress: selectedNetworkConfig.depositRouter,
+        amount: "0", // We just need the config, not validation
+        decimals: decimals.toString(),
+        chainId: selectedNetworkConfig.chainId,
+        tokenAddress,
+      });
+
+      // Use the minAmount that's already fetched by the service
+      const formattedMinAmount = validation.minAmount ? 
+        (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
+      
+      setMinDepositInfo({ amount: formattedMinAmount, loading: false });
+    } catch (error) {
+      console.error("Error fetching min deposit amount:", error);
+      setMinDepositInfo({ amount: "0", loading: false });
+    }
+  };
+
   useEffect(() => {
     setAmount("");
     setErrors((e) => ({ ...e, amount: "" }));
     setApprovalState("idle");
-  }, [selectedToken]);
+    
+    // Fetch minimum deposit amount for selected token
+    if (selectedToken && selectedNetworkConfig) {
+      fetchMinDepositAmount(selectedToken.extToken, parseInt(selectedToken.extDecimals || "18"));
+    }
+  }, [selectedToken, selectedNetworkConfig]);
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
@@ -567,6 +604,20 @@ const BridgeIn: React.FC = () => {
           onChange={handleAmountChange}
           disabled={!isConnected || isBalanceLoading}
         />
+        
+        {/* Display minimum deposit amount */}
+        {selectedToken && selectedNetworkConfig && (
+          <div className="flex items-center gap-2 mt-1">
+            {minDepositInfo.loading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            ) : (
+              <span className="text-xs text-gray-500">
+                Minimum deposit: {minDepositInfo.amount} {selectedToken.extSymbol}
+              </span>
+            )}
+          </div>
+        )}
+        
         {errors.amount && (
           <p className="text-sm text-red-500">{errors.amount}</p>
         )}

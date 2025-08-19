@@ -3,12 +3,14 @@ import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
 import { message, Table } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
 import { useTransactionContext } from '@/context/TransactionContext';
+import { SUPPORTED_CHAINS } from '@/lib/bridge/constants';
 
 interface WithdrawTransaction {
   transaction_hash: string;
   block_timestamp: string;
   from: string;
   to: string;
+  destChainId?: number;
   amount: string;
   txHash?: string;
   token?: string;
@@ -26,6 +28,27 @@ const WithdrawTransactionDetails = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState('WithdrawalInitiated');
   const [transactions, setTransactions] = useState<WithdrawTransaction[]>([]);
+  const [chainId, setChainId] = useState<number>(0);
+  const [chainName, setChainName] = useState<string>("");
+
+  // Function to get chain name from chainId
+  const getChainName = (chainId: number): string => {
+    const chainEntries = Object.entries(SUPPORTED_CHAINS);
+    const chainEntry = chainEntries.find(([_, id]) => id === chainId);
+    return chainEntry ? chainEntry[0] : "Unknown Chain";
+  };
+
+  // Update chainId and chainName when transactions change
+  useEffect(() => {
+    if (transactions.length > 0 && transactions[0].destChainId) {
+      const firstChainId = transactions[0].destChainId;
+      setChainId(firstChainId);
+      setChainName(getChainName(firstChainId));
+    } else {
+      setChainId(0);
+      setChainName("");
+    }
+  }, [transactions]);
 
   const {
     loading: isLoading,
@@ -95,14 +118,14 @@ const WithdrawTransactionDetails = () => {
       width: 100,
     },
     {
-      title: 'To (ETH)',
+      title: `To (${chainName || ""})`,
       dataIndex: 'to',
       key: 'to',
       render: (text: string) => renderTruncatedAddressWithCopy(text),
       width: 100,
     },
     {
-      title: 'Token (ETH)',
+      title: `Token (${chainName || ""})`,
       dataIndex: 'ethTokenSymbol',
       key: 'ethTokenSymbol',
       render: (text: string, record: WithdrawTransaction) => (
@@ -170,6 +193,13 @@ const WithdrawTransactionDetails = () => {
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
               Completed
+            </span>
+          );
+        }
+        else if (status === "4") {
+          return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              Aborted
             </span>
           );
         }

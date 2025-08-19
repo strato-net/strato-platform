@@ -2,10 +2,12 @@ import { createContext, useContext, useState, useCallback, ReactNode } from 'rea
 import { formatDistanceToNow } from 'date-fns';
 import { RawDepositData, RawWithdrawData } from '@/interface/index';
 import { api } from '@/lib/axios';
+import { formatWeiAmount } from '@/utils/numberUtils';
 
 interface Transaction {
   transaction_hash: string;
   block_timestamp: string;
+  chainId?: number;
   from: string;
   to: string;
   amount: string;
@@ -91,21 +93,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             return {
               transaction_hash: item.depositId?.toString() || item.transaction_hash || '-',
               block_timestamp: item.block_timestamp || new Date().toISOString(),
-              from: item.depositInfo?.user || item.from || '-',
-              to: item.to || '-',
+              chainId: typeof item.chainId === 'number' ? item.chainId : 0,
+              from: '-',
+              to:  item.depositInfo?.user || item.from || '-',
               tokenSymbol: item.tokenSymbol || '-',
               ethTokenSymbol: item.ethTokenSymbol || '-',
               ethTokenAddress: item.ethTokenAddress || '-',
               amount: item.depositInfo?.amount || item.amount
-                ? (
-                    Number(item.depositInfo?.amount || item.amount) /
-                     (10 ** 18)
-                  ).toLocaleString("fullwide", {
-                    useGrouping: false,
-                    maximumFractionDigits: 20,
-                  })
+                ? formatWeiAmount(item.depositInfo?.amount || item.amount, 18)
                 : "-",
-              txHash: item.txHash || '-',
+              txHash: item.transaction_hash || '-',
               token: item.depositInfo?.token || item.token || '-',
               key: item.depositId?.toString() || item.key || '-',
               depositStatus: item.depositInfo?.bridgeStatus || item.depositStatus || '-',
@@ -160,15 +157,16 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
       const withdrawalData = responseData?.data || responseData || [];
       
       const transformedData = Array.isArray(withdrawalData)
-        ? withdrawalData.map((item: RawWithdrawData) => ({
+                  ? withdrawalData.map((item: RawWithdrawData) => ({
             transaction_hash: item.withdrawalId?.toString() || '-',
             block_timestamp: item.withdrawalInfo?.requestedAt || '-',
+            destChainId: typeof item.withdrawalInfo?.destChainId === 'string' ? parseInt(item.withdrawalInfo.destChainId) : 0,
             from: item.withdrawalInfo?.user || '-', // From shows user address
-            to: item.withdrawalInfo?.dest || '-', // To shows dest address
+            to: '-', // To shows dest address
             ethTokenSymbol: '-', // Not available in new data
             ethTokenAddress: '-', // Not available in new data
-            amount: item.withdrawalInfo?.amount || '-', // Show actual amount
-            txHash: '-', // Not available in new data
+            amount: item.withdrawalInfo?.amount ? formatWeiAmount(item.withdrawalInfo.amount, 18) : '-', // Show amount in 18 decimals
+            txHash: item.transaction_hash || '-', // Not available in new data
             token: item.withdrawalInfo?.token || '-',
             key: item.withdrawalId?.toString() || '-',
             withdrawalStatus: item.withdrawalInfo?.bridgeStatus || '-',
