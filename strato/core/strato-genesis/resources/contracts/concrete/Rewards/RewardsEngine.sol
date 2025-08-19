@@ -434,10 +434,35 @@ contract record RewardsEngine is Ownable {
     // ESTIMATE REWARDS FUNCTIONALITY
     // ═════════════════════════════════════════════════════════════════════════
 
+    // This is a workaround for the estimateRewards not being rendered properly
+    function estimateReward(
+        address userAddress,
+        string calldata actionType,
+        address asset,
+        address rewardToken
+    ) external view returns (uint256) {
+        require(rewardTokenMap[rewardToken] > 0, "RewardsEngine: Reward token not registered");
+
+        ActionKey[] memory actionKeysArray = [];
+        actionKeysArray.push(ActionKey(actionType, asset));
+
+        CurrentBalance[] memory results = estimateRewards(userAddress, actionKeysArray);
+
+        for (uint256 i = 0; i < results.length; i++) {
+            if (results[i].rewardToken == rewardToken) {
+                return results[i].currentBalance;
+            }
+        }
+	return 0;
+    }
+
+    // When called via HTTP, this function will return 400 because of the
+    // https://github.com/blockapps/strato-platform/issues/4485. This function
+    // works, we are just waiting for the #4485 to be fixed
     function estimateRewards(
         address userAddress,
         ActionKey[] calldata actionKeys
-    ) external view returns (CurrentBalance[] memory) {
+    ) public view returns (CurrentBalance[] memory) {
         require(userAddress != address(0), "RewardsEngine: Invalid user address");
 
 	// length actionKeys.length * rewardTokens.length
