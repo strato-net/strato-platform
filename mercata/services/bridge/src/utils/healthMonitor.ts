@@ -16,33 +16,25 @@ class HealthMonitor {
   }
 
   getStatus() {
-    const exists = existsSync(ERROR_FILE);
-
     let details: any = null;
-    if (exists) {
+    
+    if (existsSync(ERROR_FILE)) {
       try {
         const lines = readFileSync(ERROR_FILE, "utf8").trim().split("\n");
-        if (lines.length) {
-          const last = JSON.parse(lines[lines.length - 1]);
-          details = {
-            lastError: last.msg,
-            timestamp: last.ts,
-            context: last.context,
-            errorCount: lines.length,
-          };
-        }
-      } catch {
+        const last = JSON.parse(lines[lines.length - 1]);
         details = {
-          lastError: "Failed to read error file",
-          errorCount: 0,
+          lastError: last.msg,
+          timestamp: last.ts,
+          context: last.context,
+          errorCount: lines.length,
         };
-      }
+      } catch {}
     }
 
     return {
       status: this.isHealthy() ? "healthy" : "unhealthy",
       lastError: this.lastError,
-      errorFileExists: exists,
+      errorFileExists: !this.isHealthy(),
       errorDetails: details,
     };
   }

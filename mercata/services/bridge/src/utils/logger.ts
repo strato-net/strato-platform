@@ -3,9 +3,7 @@ import path from "path";
 import { ERROR_FILE_NAME } from "../config";
 import { healthMonitor } from "./healthMonitor";
 
-const errorFile = createWriteStream(path.join(process.cwd(), ERROR_FILE_NAME), {
-  flags: "a",
-});
+const ERROR_FILE_PATH = path.join(process.cwd(), ERROR_FILE_NAME);
 
 const SENSITIVE = [
   /api[_-]?key=[^&\s]+/gi,
@@ -29,17 +27,18 @@ const redact = (v: unknown): unknown => {
 };
 
 const write = (data: object, isError: boolean) => {
-  const line = JSON.stringify(data) + "\n";
-  (isError ? process.stderr : process.stdout).write(line);
-
   const d = data as any;
+  const dt = new Date(d.ts);
+  const ts = `${(dt.getMonth()+1).toString().padStart(2,'0')}/${dt.getDate().toString().padStart(2,'0')} ${dt.toTimeString().slice(0,8)}`;
+  
   console.log(
-    `\x1b[3${isError ? 1 : 6}m[${d.level?.toUpperCase()}]\x1b[0m ${d.context}: ${d.msg}`,
-    d.data || "",
+    `\x1b[90m${ts}\x1b[0m \x1b[3${isError ? 1 : 6}m[${d.level?.toUpperCase()}]\x1b[0m ${d.context}: ${d.msg}`,
+    d.data || ""
   );
-
+  
   if (isError) {
-    errorFile.write(line) || errorFile.once("drain", () => {});
+    const errorFile = createWriteStream(ERROR_FILE_PATH, { flags: "a" });
+    errorFile.write(JSON.stringify(data) + "\n") || errorFile.once("drain", () => {});
   }
 };
 
