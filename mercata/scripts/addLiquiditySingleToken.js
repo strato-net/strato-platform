@@ -27,7 +27,6 @@ require("dotenv").config();
   const AMOUNT = process.env.AMOUNT || "0";
   if (AMOUNT === "0") throw new Error("AMOUNT env var required");
 
-  const MIN_LP = process.env.MIN_LP || "0";
   const DEADLINE =
     process.env.DEADLINE ||
     String(Math.floor(Date.now() / 1000) + 3600);
@@ -47,6 +46,30 @@ require("dotenv").config();
     return data;
   };
 
+  // Helper for direct contract calls using transaction endpoint
+  const callContract = async (contractName, address, method, args = []) => {
+    let callArgs = {};
+    if (method === "balanceOf" && args.length > 0) {
+      // balanceOf expects the address as accountAddress parameter
+      callArgs = { accountAddress: args[0] };
+    } else if (args.length > 0) {
+      callArgs = { args: args };
+    }
+    const tx = buildCall(contractName, address, method, callArgs);
+    const url = `${BASE}/transaction/parallel?resolve=true`;
+    const body = { txs: [tx] };
+    // console.log(`Calling: ${url}`);
+    // console.log(`Body:`, JSON.stringify(body, null, 2));
+    const { data } = await axios.post(url, body, { headers });
+    // console.log(`Response:`, data);
+    if (data[0].status !== "Success") {
+      throw new Error(`Contract call failed: ${JSON.stringify(data[0])}`);
+    }
+    const result = data[0].data.contents[0];
+    // console.log(`Extracted result:`, result);
+    return result;
+  };
+
   // fetch state helper using Cirrus
   const fetchState = async () => {
     // Get pool info from Cirrus
@@ -63,24 +86,17 @@ require("dotenv").config();
     const poolData = poolRows[0];
     const lpToken = poolData.lpToken.toLowerCase();
     
-    // Get LP token total supply from Token table
-    const lpTokenRows = await cirrusGet("/BlockApps-Mercata-Token", {
-      address: `eq.${lpToken}`,
-      select: "_totalSupply",
-      limit: 1,
-    });
+    // Get LP token total supply directly from contract
+    const totalLp = await callContract("Token", lpToken, "totalSupply");
     
-    const totalLp = lpTokenRows.length > 0 ? lpTokenRows[0]._totalSupply : "0";
-    
-    // Get caller's LP balance from Token balances mapping table
-    const callerLpRows = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
-      root: `eq.${lpToken}`,
-      key: `eq.${CALLER}`,
-      select: "value",
-      limit: 1,
-    });
-    
-    const callerLp = callerLpRows.length > 0 ? callerLpRows[0].value : "0";
+    // Get caller's LP balance directly from LP token contract
+    let callerLp;
+    try {
+      callerLp = await callContract("Token", lpToken, "balanceOf", [CALLER]);
+    } catch (err) {
+      console.warn("Could not get caller LP balance:", err.message);
+      callerLp = "0";
+    }
 
     return {
       tokenA: poolData.tokenA.toLowerCase(),
@@ -97,8 +113,7 @@ require("dotenv").config();
   console.log(`Pool:      ${POOL}`);
   console.log(`Token In:  ${TOKEN}`);
   console.log(`Amount In: ${AMOUNT}`);
-  console.log(`Min LP:    ${MIN_LP}`);
-  console.log(`Deadline:  ${DEADLINE}`);
+  // console.log(`Deadline:  ${DEADLINE}`);
   console.log(`Caller:    ${CALLER}`);
 
   const before = await fetchState();
