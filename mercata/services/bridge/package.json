@@ -9,6 +9,9 @@
     "build": "tsc",
     "test": "jest"
   },
+  "engines": {
+    "node": ">=22.12 <23.0"
+  },
   "dependencies": {
     "@safe-global/api-kit": "^3.0.1",
     "@safe-global/protocol-kit": "^6.0.4",
