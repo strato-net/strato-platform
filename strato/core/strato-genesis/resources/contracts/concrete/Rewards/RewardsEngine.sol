@@ -354,12 +354,25 @@ contract record RewardsEngine is Ownable {
     // UPDATE REWARDS FUNCTIONALITY
     // ═════════════════════════════════════════════════════════════════════════
 
+    // This is a workaround to an issue requested in
+    // https://github.com/blockapps/strato-platform/issues/4485. For now the
+    // update function will not return balances, but once #4485 is fixed, it
+    // will.
     function update(
         string calldata actionType,
         address[] calldata assets,
         uint256[] calldata amounts,
         address user
-    ) external returns (CurrentBalance[] memory) {
+    ) external {
+	_update(actionType, assets, amounts, user);
+    }
+
+    function _update(
+        string calldata actionType,
+        address[] calldata assets,
+        uint256[] calldata amounts,
+        address user
+    ) internal returns (CurrentBalance[] memory) {
         require(actionType != "", "RewardsEngine: Empty action type");
         require(assets.length == amounts.length, "RewardsEngine: Array length mismatch");
         require(user != address(0), "RewardsEngine: Invalid user address");
