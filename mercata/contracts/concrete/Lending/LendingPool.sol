@@ -220,8 +220,8 @@ contract record LendingPool is Ownable {
         _accrue(); // ensure borrow index & reserves are up-to-date before health check
 
         // health check to ensure the user remains solvent after withdrawal
-        uint currentBorrow = _getTotalBorrowValue(msg.sender); // in USD
-        uint newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // in USD
+        uint currentBorrow = getUserDebt(msg.sender); // underlying units (e.g., USDST 18d)
+        uint newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // underlying units
         require(currentBorrow <= newMaxBorrow, "Withdrawal would exceed existing loan");
         
         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amount);

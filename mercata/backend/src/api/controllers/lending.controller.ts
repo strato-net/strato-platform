@@ -15,6 +15,9 @@ import {
   getLoan,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
+  getSafeMaxBorrow,
+  getSafeMaxRepay,
+  repayAll,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -204,6 +207,36 @@ class LendingController {
       const result = await executeLiquidationService(accessToken, id, req.body || {});
       res.status(RestStatus.OK).json(result);
       return next();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSafeMaxBorrow(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, address } = req;
+      const result = await getSafeMaxBorrow(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getSafeMaxRepay(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, address } = req;
+      const result = await getSafeMaxRepay(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async repayAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, address } = req;
+      const result = await repayAll(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
