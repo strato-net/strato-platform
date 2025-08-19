@@ -206,7 +206,32 @@ The name of the smart contract will be `RewardsEngine`
  `update` should be called by owners only `claim` only user should be allowed to
  claim rewards
 
-### TODO Delegate pattern
+### Delegate Pattern (IMPLEMENTED)
+
+The RewardsEngine supports a delegate pattern for customizable reward calculation. This allows external contracts to override the default reward calculation logic while maintaining backward compatibility.
+
+**Implementation details:**
+- `rewardDelegate`: Storage variable holding the address of the delegate contract
+- `setRewardDelegate(address _rewardDelegate)`: Owner-only function to set the delegate
+- Modified `calculateAccruedReward` function that:
+  - Checks if a delegate is set (`rewardDelegate != address(0)`)
+  - If delegate exists: Uses `delegatecall` to delegate's `calculateAccruedReward` function
+  - If no delegate: Falls back to the original time-based calculation
+
+**Delegate function signature:**
+The delegate contract must implement:
+```solidity
+function calculateAccruedReward(
+    uint256 modifiedAt,     // timestamp when balance was last modified
+    uint256 amount,         // current amount
+    uint256 multiplierFactor // multiplier factor for the reward
+) external view returns (uint256)
+```
+
+**Benefits:**
+- Allows upgrading reward calculation logic without deploying new contracts
+- Supports different reward strategies (e.g., non-linear rewards, bonus periods)
+- Maintains original implementation as fallback for reliability
 
 ### Estimate CurrentBalance Reward (IMPLEMENTED)
 

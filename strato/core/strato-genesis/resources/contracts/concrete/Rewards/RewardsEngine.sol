@@ -86,6 +86,9 @@ contract record RewardsEngine is Ownable {
     // User balances: actionType -> asset -> rewardToken -> userAddress -> UserBalance
     mapping(string => mapping(address => mapping(address => mapping(address => UserBalance)))) public record balances;
 
+    // Reward calculation delegate
+    address public rewardDelegate;
+
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
@@ -99,6 +102,14 @@ contract record RewardsEngine is Ownable {
             _addRewardToken(args.initialRewardTokens[i]);
         }
         _ownershipGranted = false;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // DELEGATE MANAGEMENT
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function setRewardDelegate(address _rewardDelegate) external onlyOwner {
+        rewardDelegate = _rewardDelegate;
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -344,10 +355,18 @@ contract record RewardsEngine is Ownable {
         uint256 amount,
         uint256 multiplierFactor
     ) internal view returns (uint256) {
-        uint256 currentTime = block.timestamp;
-        uint256 timeDelta = currentTime - userBalance.modifiedAt;
-	uint256 seconds_in_year = 60 * 60 * 24 * 365;
-	return (amount * timeDelta * multiplierFactor) / seconds_in_year;
+        if (rewardDelegate != address(0)) {
+            return rewardDelegate.delegatecall("calculateAccruedReward",
+                userBalance.modifiedAt,
+                amount,
+                multiplierFactor
+            );
+        } else {
+            uint256 currentTime = block.timestamp;
+            uint256 timeDelta = currentTime - userBalance.modifiedAt;
+            uint256 seconds_in_year = 60 * 60 * 24 * 365;
+            return (amount * timeDelta * multiplierFactor) / seconds_in_year;
+        }
     }
 
     // ═════════════════════════════════════════════════════════════════════════
