@@ -140,7 +140,7 @@ Linux)
             
             # Build secp256k1 (not available in Amazon Linux 2023 repositories)
             sudo dnf install -y autoconf libtool make
-            git clone https://github.com/bitcoin-core/secp256k1.git  # TODO: peg to a specific refspec to match a version
+            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
             cd secp256k1
             ./autogen.sh
             ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
