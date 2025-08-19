@@ -1,3 +1,6 @@
+// ---------------- Utility Types ----------------
+export type NonEmptyArray<T> = [T, ...T[]];
+
 // ---------------- Transaction Types ----------------
 export type TxPayloadArgs = Record<string, any>;
 
@@ -60,18 +63,32 @@ export interface ApiClient {
 // ---------------- Safe Service Types ----------------
 export type TxType = "eth" | "erc20";
 
-export interface SafeTransactionState {
-  safeTxHash?: string;
-  protocolKit?: any; // Safe type
-  apiKit?: any; // SafeApiKit type
-}
-
-export interface WithdrawalTransaction {
-  hash: string;
-  success: boolean;
-}
-
 export interface SafeTransactionResult {
   safeTxHash: string;
-  success: boolean;
+}
+
+export interface AssetInfo {
+  extToken: string;
+  extDecimals: number;
+  enabled: boolean;
+  chainId: string;
+}
+
+export interface PreparedWithdrawal {
+  amount: string;
+  toAddress: string;
+  type: TxType;
+  tokenAddress: string;
+  chainId: number;
+}
+
+export interface Withdrawal {
+  destChainId: string | number;
+  token: string;
+  dest?: string;
+  destAddress?: string;
+  amount: string | bigint;
+  id?: string;
+  withdrawalId?: string;
+  safeTxHash?: string;
 }

@@ -6,13 +6,19 @@ import {
   getEnabledAssets,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
+import { NonEmptyArray } from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
   isChainConfigured,
 } from "../services/rpcService";
 import { logError } from "../utils/logger";
-import { convertToStratoDecimals } from "../utils/decimalUtils";
+import {
+  convertToStratoDecimals,
+  normalizeAddress,
+  ensureHexPrefix,
+} from "../utils/utils";
+import { STRATO_DECIMALS } from "../config";
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
@@ -28,12 +34,10 @@ const getStratoTokenMapping = async (
 
   for (const asset of enabledAssets) {
     if (asset.chainId === chainId.toString() && asset.extToken) {
-      const extTokenWith0x = asset.extToken.startsWith("0x")
-        ? asset.extToken
-        : `0x${asset.extToken}`;
+      const extTokenWith0x = ensureHexPrefix(asset.extToken);
       mapping.set(extTokenWith0x.toLowerCase(), {
         stratoToken: asset.stratoToken,
-        extDecimals: parseInt(asset.extDecimals) || 18,
+        extDecimals: parseInt(asset.extDecimals) || STRATO_DECIMALS,
       });
     }
   }
@@ -59,18 +63,16 @@ const updateLastProcessedBlock = async (
 const parseDepositEvents = async (logs: any[], chainId: number) => {
   const tokenMapping = await getStratoTokenMapping(chainId);
   return logs.map((log) => {
-    const externalToken = log.topics[1];
-    const stratoAddress = log.topics[3];
-    const amount = log.data.substring(0, 66);
+    const externalToken = normalizeAddress(log.topics[1]);
+    const stratoAddress = normalizeAddress(log.topics[3]);
+    const amount = "0x" + log.data.substring(2, 66);
 
-    // Convert 32-byte padded address to 20-byte standard address
-    const normalizedToken = "0x" + externalToken.toLowerCase().slice(-40);
-    const tokenInfo = tokenMapping.get(normalizedToken);
+    const tokenInfo = tokenMapping.get(externalToken);
     if (!tokenInfo) {
       return null;
     }
 
-    // Convert amount from external decimals to STRATO decimals (18)
+    // Convert amount from external decimals to STRATO decimals
     const convertedAmount = convertToStratoDecimals(
       amount,
       tokenInfo.extDecimals,
@@ -90,8 +92,6 @@ const pollChainForDeposits = async (chain: any) => {
   try {
     const chainId = chain.chainId;
     const depositRouter = chain.depositRouter;
-
-    if (!depositRouter) return;
 
     const lastProcessedBlock = await getLastProcessedBlock(chainId);
     if (!isChainConfigured(chainId)) return;
@@ -126,7 +126,7 @@ const pollChainForDeposits = async (chain: any) => {
     }
 
     if (filteredDeposits.length > 0) {
-      await depositBatch(filteredDeposits);
+      await depositBatch(filteredDeposits as NonEmptyArray<any>);
     }
 
     await updateLastProcessedBlock(chainId, currentBlock);

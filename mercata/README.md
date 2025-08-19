@@ -19,7 +19,7 @@ The app consists of multiple parts:
 ## DEV MODE
 
 ### Prerequisites
-- Node.js v22 (with nvm and npm) — see https://nodejs.org/en/download
+- Node.js v22.12+ (not tested with 23+) (with nvm and npm) — see https://nodejs.org/en/download
 
 ### Run Backend:
 ```

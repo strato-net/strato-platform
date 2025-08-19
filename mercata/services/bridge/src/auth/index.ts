@@ -5,13 +5,13 @@ import { logError } from "../utils/logger";
 // Validation function to check config at runtime
 const validateConfig = () => {
   if (!config.auth?.clientId) {
-    throw new Error('CLIENT_ID is not configured');
+    throw new Error("CLIENT_ID is not configured");
   }
   if (!config.auth?.clientSecret) {
-    throw new Error('CLIENT_SECRET is not configured');
+    throw new Error("CLIENT_SECRET is not configured");
   }
   if (!config.auth?.openIdDiscoveryUrl) {
-    throw new Error('OPENID_DISCOVERY_URL is not configured');
+    throw new Error("OPENID_DISCOVERY_URL is not configured");
   }
 };
 
@@ -22,7 +22,7 @@ const getOAuthConfig = () => {
     clientSecret: config.auth.clientSecret!,
     openIdDiscoveryUrl: config.auth.openIdDiscoveryUrl!,
     scope: "openid email profile",
-    tokenField: "access_token"
+    tokenField: "access_token",
   };
 };
 
@@ -53,15 +53,14 @@ export const initOpenIdConfig = async () => {
     oauthInstance = await OAuthUtil.init(getOAuthConfig());
     oauthInitialized = true;
   } catch (error) {
-    logError('Auth', error as Error, { operation: 'initOpenIdConfig' });
+    logError("Auth", error as Error, { operation: "initOpenIdConfig" });
     throw error;
   }
 };
 
-
 export const getBAUserToken = async (): Promise<string> => {
   if (!config.auth.baUsername) {
-    throw new Error('BA_USERNAME is not configured');
+    throw new Error("BA_USERNAME is not configured");
   }
 
   const cacheKey = config.auth.baUsername;
@@ -79,27 +78,32 @@ export const getBAUserToken = async (): Promise<string> => {
 
   try {
     if (!oauthInstance) {
-      throw new Error('OAuth client not initialized. Call initOpenIdConfig() first');
+      throw new Error(
+        "OAuth client not initialized. Call initOpenIdConfig() first",
+      );
     }
 
     if (!config.auth.baPassword) {
-      throw new Error('BA_PASSWORD is not configured');
+      throw new Error("BA_PASSWORD is not configured");
     }
 
     // Fetch a new token using Resource Owner Password Credentials
-    const tokenObj = await oauthInstance.getAccessTokenByResourceOwnerCredential(
-      config.auth.baUsername,
-      config.auth.baPassword
-    );
+    const tokenObj =
+      await oauthInstance.getAccessTokenByResourceOwnerCredential(
+        config.auth.baUsername,
+        config.auth.baPassword,
+      );
 
     // Type assertion for token object
     const token = tokenObj.token[getOAuthConfig().tokenField] as string;
     const expiresAt = Math.floor((tokenObj.token.expires_at as number) / 1000);
-    
+
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
     return token;
   } catch (error: any) {
-    throw new Error(`Failed to fetch user OAuth token: ${error?.message || 'Unknown error'}`);
+    throw new Error(
+      `Failed to fetch user OAuth token: ${error?.message || "Unknown error"}`,
+    );
   }
 };

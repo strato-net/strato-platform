@@ -90,10 +90,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
   fi
 
-  if [ "$blockstanbul" != true ]; then
-    sed -i '/#TEMPLATE_MARK_BLOCKSTANBUL/d' /tmp/nginx.conf
-  fi
-
   if [ "$SERVE_LOGS" != true ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi

@@ -18,13 +18,20 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Global error handler
-app.use((error: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  logError('BridgeService', error, { operation: 'request' });
-  
-  if (!res.headersSent) {
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+app.use(
+  (
+    error: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ) => {
+    logError("BridgeService", error, { operation: "request" });
+
+    if (!res.headersSent) {
+      res.status(500).json({ error: "Internal server error" });
+    }
+  },
+);
 
 app.get("/health", (_, res) => {
   const status = healthMonitor.getStatus();
@@ -33,26 +40,31 @@ app.get("/health", (_, res) => {
 
 app.listen(port, async () => {
   try {
-    logInfo('BridgeService', 'Starting bridge service...');
-    
+    logInfo("BridgeService", "Starting bridge service...");
+
     // Validate configuration before starting
     const configValid = await validateBridgeConfig();
     if (!configValid) {
-      const error = new Error('Configuration validation failed - service cannot start');
-      logError('BridgeService', error);
+      const error = new Error(
+        "Configuration validation failed - service cannot start",
+      );
+      logError("BridgeService", error);
       process.exit(1);
     }
-    
+
     // Initialize OAuth
     await initOpenIdConfig();
-    
+
     // Start polling services
     startMultiChainDepositPolling();
     await initializeMercataPolling();
-    
-    logInfo('BridgeService', `Bridge service started successfully on port ${port}`);
+
+    logInfo(
+      "BridgeService",
+      `Bridge service started successfully on port ${port}`,
+    );
   } catch (error) {
-    logError('BridgeService', error as Error, { operation: 'startup' });
+    logError("BridgeService", error as Error, { operation: "startup" });
     process.exit(1);
   }
 });

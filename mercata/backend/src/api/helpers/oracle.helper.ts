@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import { getPools } from "../services/swapping.service";
 import { getPool as getLendingRegistry } from "../services/lending.service";
 import { calculateLPTokenPrice } from "./swapping.helper";
-import { calculateExchangeRate } from "./lending.helper";
+import { exchangeRateFromComponents } from "./lending.helper";
 
 const { Token } = constants;
 
@@ -45,9 +45,9 @@ export const createCompletePriceMap = async (
   // Add mToken price
   try {
     const lendingData = await getLendingRegistry(accessToken, undefined, {
-      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,totalBorrowPrincipal::text),liquidityPool:liquidityPool_fkey(address)"
+      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,borrowIndex,totalScaledDebt,reservesAccrued),liquidityPool:liquidityPool_fkey(address)"
     });
-    const { borrowableAsset, mToken, totalBorrowPrincipal } = lendingData.lendingPool || {};
+    const { borrowableAsset, mToken } = lendingData.lendingPool || {};
     
     if (borrowableAsset && mToken && lendingData.liquidityPool?.address) {
       const borrowableAssetPrice = priceMap.get(borrowableAsset) || "0";
@@ -68,9 +68,17 @@ export const createCompletePriceMap = async (
         
         const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
         const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === lendingData.liquidityPool.address)?.balance || "0";
-        
-        const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(totalBorrowPrincipal || "0")).toString();
-        const exchangeRate = calculateExchangeRate(totalMTokenSupply, totalUSDSTSupplied);
+        const borrowIndexStr     = lendingData.lendingPool?.borrowIndex     || "0";
+        const totalScaledDebtStr = lendingData.lendingPool?.totalScaledDebt || "0";
+        const reservesAccruedStr = lendingData.lendingPool?.reservesAccrued || "0";
+        const systemTotalDebt = ((BigInt(totalScaledDebtStr) * BigInt(borrowIndexStr)) / (10n ** 27n)).toString();
+
+        const exchangeRate = exchangeRateFromComponents(
+          availableLiquidity,
+          systemTotalDebt,
+          reservesAccruedStr,
+          totalMTokenSupply
+        );
         
         // mToken price = borrowable asset price * exchange rate
         const mTokenPrice = (BigInt(borrowableAssetPrice.toString()) * BigInt(exchangeRate)) / BigInt(10 ** 18);
