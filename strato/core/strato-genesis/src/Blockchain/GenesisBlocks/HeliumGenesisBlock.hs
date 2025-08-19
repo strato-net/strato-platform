@@ -31,7 +31,7 @@ import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
 import           Data.List                                       (find)
 import qualified Data.Map.Strict                                 as M
-import           Data.Maybe                                      (mapMaybe)
+import           Data.Maybe                                      (fromMaybe, mapMaybe)
 import qualified Data.Sequence                                   as S
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
@@ -286,13 +286,15 @@ assetToAccountInfos asset@GA.Asset{..} =
   let accountBalances' = assetBalances asset
       allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
+      name' = if root == silvstRoot then "SILVST" else name
+      description' = fromMaybe description $ M.lookup name' descriptions 
    in case allBalances of
         [] -> Nothing
         _ -> Just . SolidVMContractWithStorage root 0 (CodeAtAccount mercataAddress "Token") $
           ownedByBlockApps root ++
-          [ ("._name", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 name)
+          [ ("._name", BString $ encodeUtf8 name')
           , ("._symbol", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 $ takeCaps name)
-          , (".description", BString $ encodeUtf8 description)
+          , (".description", BString $ encodeUtf8 description')
           , (".customDecimals", BInteger 18)
           , ("._totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
           , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
@@ -880,3 +882,16 @@ admins = [
   "James Hormuzdiar"
   ]
 
+descriptions :: M.Map Text Text
+descriptions = M.fromList
+  [ ("PAXGST", "PAXGST is a digital asset on STRATO Mercata pegged 1:1 to PAX Gold (PAXG) on Ethereum, enabling holders to bridge their PAXG into Mercata, and access DeFi and staking opportunities."),
+    ("WBTCST", "WBTCST mirrors Wrapped Bitcoin (WBTC) on Ethereum at a 1:1 ratio, allowing users to bridge WBTC to STRATO Mercata for use in staking and decentralized finance applications."),
+    ("USDST", "USDST is a decentralized, collateral-backed stablecoin pegged to the US dollar and serves as the primary currency of the STRATO Mercata ecosystem, supporting instant marketplace purchases for stakeable assets."),
+    ("SILVST", "SILVST provides fractional ownership of investment-grade silver backed by audited and insured physical silver; this combines traditional stability with digital efficiency. Each token represents one troy ounce of 99.9% pure silver, and can be redeemed for physical silver (fees apply)."),
+    ("USDTST", "USDTST is a STRATO Mercata asset pegged 1:1 with Tether (USDT) on Ethereum, enabling seamless bridging and participation in Mercata’s DeFi and staking ecosystem."),
+    ("MUSDST", "MUSDST is a STRATO Mercata native stablecoin (details TBD/temporary placeholder), designed to facilitate payments, DeFi activity, and ecosystem utility."),
+    ("USDCST", "USDCST is pegged 1:1 to USD Coin (USDC) on Ethereum, allowing users to bridge USDC to STRATO Mercata and leverage its DeFi and staking functionality."),
+    ("USDTEMP", "USDTEMP is a temporary STRATO Mercata token placeholder (details TBD) intended for bridging or testing functions within the ecosystem."),
+    ("ETHST", "ETHST brings staked Ethereum into STRATO Mercata, giving users a flexible way to earn rewards while benefiting from integrated DeFi features."),
+    ("GOLDST", "GOLDST provides fractional ownership of investment-grade gold backed by audited and insured physical gold; this combines traditional stability with digital efficiency. Each token represents one troy ounce of 99.5% pure gold (minimum), and can be redeemed for physical gold (fees apply).")
+  ]
