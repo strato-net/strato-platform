@@ -12,6 +12,10 @@ export const ERC20_ABI = [
 export const DEPOSIT_EVENT_SIGNATURE =
   "0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207";
 
+// Transfer(address,address,uint256)
+export const TRANSFER_EVENT_SIGNATURE =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
 // Error file configuration
 export const ERROR_FILE_NAME = "bridge-error.flag";
 

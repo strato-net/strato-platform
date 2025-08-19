@@ -45,6 +45,36 @@ export const getChainLogs = async (
   return response?.result || [];
 };
 
+// Get transaction receipt
+export const getTransactionReceipt = async (
+  chainId: number,
+  txHash: string,
+): Promise<any> => {
+  const rpcUrl = getChainRpcUrl(chainId);
+  const response: any = await fetch.post(rpcUrl, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "eth_getTransactionReceipt",
+    params: [ensureHexPrefix(txHash)],
+  });
+  return response?.result;
+};
+
+// Get transaction by hash
+export const getTransactionByHash = async (
+  chainId: number,
+  txHash: string,
+): Promise<any> => {
+  const rpcUrl = getChainRpcUrl(chainId);
+  const response: any = await fetch.post(rpcUrl, {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "eth_getTransactionByHash",
+    params: [ensureHexPrefix(txHash)],
+  });
+  return response?.result;
+};
+
 // Check if chain RPC is configured
 export const isChainConfigured = (chainId: number): boolean => {
   try {
