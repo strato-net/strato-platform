@@ -25,6 +25,111 @@ unsupported_platform() {
     exit 1
 }
 
+# Function to get package version for the current distro
+# Usage: get_package_version "package_name"
+get_package_version() {
+    local package_name="$1"
+    local version=""
+    
+    case $(uname -s) in
+        Darwin)
+            # macOS - use Homebrew
+            if command -v brew > /dev/null 2>&1; then
+                version=$(brew list --versions "$package_name" 2>/dev/null | awk '{print $2}' | head -1)
+            fi
+            ;;
+        Linux)
+            if [ -f "/etc/os-release" ]; then
+                DISTRO_NAME=$(. /etc/os-release; echo $NAME)
+                case $DISTRO_NAME in
+                    "Amazon Linux"*)
+                        # Amazon Linux - use dnf/rpm
+                        version=$(rpm -q --queryformat '%{VERSION}-%{RELEASE}' "$package_name" 2>/dev/null | head -1)
+                        if [ "$?" -ne 0 ]; then
+                            version=""
+                        fi
+                        ;;
+                    Ubuntu|"Linux Mint")
+                        # Ubuntu/Mint - use dpkg
+                        version=$(dpkg-query -W -f='${Version}' "$package_name" 2>/dev/null)
+                        if [ "$?" -ne 0 ]; then
+                            version=""
+                        fi
+                        ;;
+                esac
+            fi
+            ;;
+    esac
+    
+    echo "$version"
+}
+
+# Function to display package name and version
+# Usage: show_package_version "package_name"
+show_package_version() {
+    local package_name="$1"
+    local version=$(get_package_version "$package_name")
+    
+    if [ -n "$version" ]; then
+        echo "$package_name=$version"
+    else
+        echo "$package_name=not_installed"
+    fi
+}
+
+# Function to check package version against expected version for specific distro
+# Usage: check_package_version "distro_name" "package_name" "expected_version"
+check_package_version() {
+    local distro_name="$1"
+    local package_name="$2"
+    local expected_version="$3"
+    local current_distro=""
+    
+    # Determine current distro
+    case $(uname -s) in
+        Darwin)
+            current_distro="macos"
+            ;;
+        Linux)
+            if [ -f "/etc/os-release" ]; then
+                DISTRO_NAME=$(. /etc/os-release; echo $NAME)
+                case $DISTRO_NAME in
+                    "Amazon Linux"*)
+                        current_distro="amazon"
+                        ;;
+                    Ubuntu)
+                        current_distro="ubuntu"
+                        ;;
+                    "Linux Mint")
+                        current_distro="mint"
+                        ;;
+                esac
+            fi
+            ;;
+    esac
+    
+    # Only run check if distro matches
+    if [ "$distro_name" != "$current_distro" ]; then
+        return 0
+    fi
+    
+    local actual_version=$(get_package_version "$package_name")
+    
+    if [ -z "$actual_version" ]; then
+        echo "ERROR - Package $package_name is not installed"
+        exit 1
+    fi
+    
+    if [ "$actual_version" != "$expected_version" ]; then
+        echo "ERROR - Version mismatch for $package_name:"
+        echo "  Expected: $expected_version"
+        echo "  Actual:   $actual_version"
+        exit 1
+    fi
+    
+    echo "✓ $package_name version $actual_version matches expected version"
+}
+
 case $(uname -s) in
 
 #------------------------------------------------------------------------------
@@ -221,14 +326,13 @@ Linux)
             if [ "$DISTRO_NAME" = "Ubuntu" ]; then
                 sudo groupadd docker 2>/dev/null || true
                 sudo usermod -aG docker $USER
-                newgrp docker
+                echo "Note: You may need to log out and back in for Docker group membership to take effect."
             fi
                         
             # Install Haskell GHC and Stack
             sudo apt install -qy --no-install-recommends \
                 build-essential \
                 curl \
-                libtinfo-dev \
                 libgmp-dev \
                 zlib1g-dev
             curl -sSL https://get.haskellstack.org/ | sh -s - -f
@@ -258,3 +362,26 @@ Linux)
     ;;
 
 esac
+
+# Check package versions for Ubuntu
+echo
+echo "Checking package versions for Ubuntu:"
+check_package_version "ubuntu" "build-essential" "12.10ubuntu1"
+check_package_version "ubuntu" "ca-certificates" "20240203"
+check_package_version "ubuntu" "containerd.io" "1.7.27-1"
+check_package_version "ubuntu" "curl" "8.5.0-2ubuntu10.6"
+check_package_version "ubuntu" "docker-buildx-plugin" "0.26.1-1~ubuntu.24.04~noble"
+check_package_version "ubuntu" "docker-ce" "5:28.3.3-1~ubuntu.24.04~noble"
+check_package_version "ubuntu" "docker-ce-cli" "5:28.3.3-1~ubuntu.24.04~noble"
+check_package_version "ubuntu" "docker-compose-plugin" "2.39.1-1~ubuntu.24.04~noble"
+check_package_version "ubuntu" "git" "1:2.43.0-1ubuntu7.3"
+check_package_version "ubuntu" "gnupg" "2.4.4-2ubuntu17.3"
+check_package_version "ubuntu" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
+check_package_version "ubuntu" "libleveldb-dev" "1.23-5build1"
+check_package_version "ubuntu" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
+check_package_version "ubuntu" "libpq-dev" "16.9-0ubuntu0.24.04.1"
+check_package_version "ubuntu" "libsecp256k1-dev" "0.2.0-2"
+check_package_version "ubuntu" "libsodium-dev" "1.0.18-1build3"
+check_package_version "ubuntu" "lsb-release" "12.0-2"
+check_package_version "ubuntu" "postgresql-client" "16+257build1.1"
+check_package_version "ubuntu" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
