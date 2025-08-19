@@ -1,141 +1,23 @@
 import { Request, Response, NextFunction } from "express";
-import { BridgeService } from "../services/bridge.service";
-import { validateBridgeIn, validateBridgeOut } from "../validators/bridge.validators";
+import { 
+  bridgeOut, 
+  getBridgeableTokens,
+  getNetworkConfigs, 
+  getBridgeStatus 
+} from "../services/bridge.service";
+import { validateBridgeOut } from "../validators/bridge.validators";
 
-// Extend Express Request type to include user
-interface AuthenticatedRequest extends Request {
-  user?: {
-    token: string;
-  };
-}
-
-export class BridgeController {
-  private bridgeService: BridgeService;
-
-  constructor() {
-    this.bridgeService = new BridgeService();
-  }
-
-  public bridgeIn = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken, body } = req;
-      validateBridgeIn(body);
-
-      // Process bridge transaction
-      const result = await this.bridgeService.bridgeIn({
-        ...body,
-        accessToken,
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
-
-  public bridgeOut = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken, body } = req;
-      validateBridgeOut(body);
-
-      // Process bridge transaction
-      const result = await this.bridgeService.bridgeOut({
-        ...body,
-        accessToken,
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
-
-  public getBalance = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken } = req;
-      const { tokenAddress } = req.params;
-
-      const result = await this.bridgeService.getBalance({
-        accessToken,
-        tokenAddress,
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
-
-  public getBridgeInTokens = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken } = req;
-      const { type } = req.params;
-
-      const result = await this.bridgeService.getBridgeInTokens({
-        accessToken,
-        type
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
-
-  public getBridgeOutTokens = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { accessToken } = req;
-      const result = await this.bridgeService.getBridgeOutTokens({
-        accessToken,
-      });
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  }
-
-  public getBridgeConfig = async (
+class BridgeController {
+  static async bridgeOut(
     req: Request,
     res: Response,
     next: NextFunction
-  ) => {
+  ): Promise<void> {
     try {
-      const result = await this.bridgeService.getBridgeConfig();
+      const { accessToken, body } = req;
+      validateBridgeOut(body);
+      
+      const result = await bridgeOut(accessToken, body);
 
       res.json({
         success: true,
@@ -144,63 +26,66 @@ export class BridgeController {
     } catch (error: any) {
       next(error);
     }
-  };
+  }
 
-  public userDepositStatus = async (
-    req: AuthenticatedRequest,
+  static async getBridgeableTokens(
+    req: Request,
     res: Response,
     next: NextFunction
-  ) => {
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId } = req.params;
+      
+      if (!chainId) {
+        res.status(400).json({ error: "chainId parameter is required" });
+        return;
+      }
+      
+      const result = await getBridgeableTokens(accessToken, chainId);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getNetworkConfigs(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await getNetworkConfigs(accessToken);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getBridgeStatus(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
     try {
       const { accessToken } = req;
       const { status } = req.params;
-      const { limit, orderBy, orderDirection, pageNo } = req.query;
 
-      const result = await this.bridgeService.getUserDepositStatus({
+      const result = await getBridgeStatus(
         accessToken,
-        status,
-        limit: limit ? parseInt(limit as string) : undefined,
-        orderBy: orderBy as string,
-        orderDirection: orderDirection as string,
-        pageNo: pageNo as string
-      });
+        req.address,
+        {
+          status,
+          ...req.query
+        }
+      );
 
-      res.json({
-        success: true,
-        data: result,
-      });
+      res.json(result);
     } catch (error: any) {
       next(error);
     }
-  };
-
-
-  public userWithdrawalStatus = async (
-    req: AuthenticatedRequest,
-    res: Response,
-    next: NextFunction
-    
-  ) => {
-    try {
-      const { accessToken } = req;
-      const { status } = req.params;
-      const { limit, orderBy, orderDirection, pageNo } = req.query;
-
-      const result = await this.bridgeService.getUserWithdrawalStatus({
-        accessToken,
-        status,
-        limit: limit ? parseInt(limit as string) : undefined,
-        orderBy: orderBy as string,
-        orderDirection: orderDirection as string,
-        pageNo: pageNo as string
-      });
-
-      res.json({
-        success: true,
-        data: result,
-      });
-    } catch (error: any) {
-      next(error);
-    }
-  };
+  }
 }
+
+export default BridgeController;

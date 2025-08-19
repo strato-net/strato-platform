@@ -44,8 +44,8 @@ export const API_ERROR_TITLES: Record<string, string> = {
   
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
-  "/bridge/bridgeInTokens": "Bridge In Tokens Error",
-  "/bridge/bridgeOutTokens": "Bridge Out Tokens Error",
+  "/bridge/bridgeableTokens": "Bridge Tokens Error",
+  "/bridge/networkConfigs": "Bridge Network Config Error",
   "/bridge/bridgeIn": "Bridge In Error",
   "/bridge/bridgeOut": "Bridge Out Error",
   "/bridge/balance": "Bridge Balance Error",
