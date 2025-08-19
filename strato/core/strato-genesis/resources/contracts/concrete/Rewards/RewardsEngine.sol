@@ -22,10 +22,6 @@ contract record RewardsEngine is Ownable {
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
 
-    struct RewardsEngineArgs {
-        address[] initialRewardTokens;
-    }
-
     struct Multiplier {
         string name;
         mapping(address => uint256) factors; // rewardToken -> factor
@@ -93,16 +89,7 @@ contract record RewardsEngine is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(
-        RewardsEngineArgs memory args,
-        address initialOwner
-    ) Ownable(initialOwner) {
-        _ownershipGranted = true;
-        for (uint i = 0; i < args.initialRewardTokens.length; i++) {
-            _addRewardToken(args.initialRewardTokens[i]);
-        }
-        _ownershipGranted = false;
-    }
+    constructor(address initialOwner) Ownable(initialOwner) {}
 
     // ═════════════════════════════════════════════════════════════════════════
     // DELEGATE MANAGEMENT
