@@ -28,7 +28,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     healthImpact: 0,
     isHealthy: true,
   });
-  const { getSafeMaxRepay } = useLendingContext();
+
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -153,15 +153,13 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           <div>
             <button
               type="button"
-              onClick={async () => {
+              onClick={() => {
                 try {
-                  const { safeMaxRepay } = await getSafeMaxRepay();
-                  const maxFormatted = formatUnits(BigInt(safeMaxRepay || '0'), 18);
+                  const owed = BigInt(loans?.totalAmountOwed || 0);
+                  const maxFormatted = formatUnits(owed, 18);
                   setRepayAmount(maxFormatted);
                   setRepayDisplayAmount(addCommasToInput(maxFormatted));
-                } catch {
-                  // noop
-                }
+                } catch {}
               }}
               disabled={(() => {
                 const owed = BigInt(loans?.totalAmountOwed || 0);
@@ -282,7 +280,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
         {repayLoading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
         ) : (
-          `Repay ${repayAmount ? `${formatCurrency(repayAmount)} USDST` : "0.00 USDST"}`
+          "Repay"
         )}
       </Button>
     </div>

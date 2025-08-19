@@ -119,6 +119,23 @@ export const withdrawLiquidity = async (
   );
 };
 
+export const withdrawLiquidityAll = async (
+  accessToken: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawLiquidityAll",
+      args: {},
+    }))
+  );
+};
+
 export const supplyCollateral = async (
   accessToken: string,
   asset: string,
@@ -185,6 +202,23 @@ export const borrow = async (
       contractAddress: lendingPool,
       method: "borrow",
       args: { amount },
+    }))
+  );
+};
+
+export const borrowMax = async (
+  accessToken: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "borrowMax",
+      args: {},
     }))
   );
 };
@@ -547,42 +581,6 @@ export const getLoan = async (
   return allLoans;
 };
 
-export const getSafeMaxBorrow = async (
-  accessToken: string,
-  userAddress: string
-): Promise<{ safeMaxBorrow: string; rawMax: string; bufferBps: number; utilizationRate: number; timestamp: number }> => {
-  // Reuse liquidity view
-  const info = await liquidityAndBalance(accessToken, userAddress);
-  const rawMaxStr = (info as any)?.maxAvailableToBorrowUSD || "0";
-  const rawMax = BigInt(rawMaxStr);
-  // Dynamic buffer: 0.5% base + utilization% capped at 1.5% total
-  const utilPct = Math.max(0, Math.min(100, Math.floor(Number(info?.utilizationRate || 0))));
-  const bufferBps = 50 + Math.min(100, utilPct); // 50-150 bps
-  const buffered = (rawMax * BigInt(10000 - bufferBps)) / 10000n;
-  const safe = buffered > 0n ? buffered : 0n;
-  return {
-    safeMaxBorrow: safe.toString(),
-    rawMax: rawMax.toString(),
-    bufferBps,
-    utilizationRate: Number(info?.utilizationRate || 0),
-    timestamp: Math.floor(Date.now() / 1000)
-  };
-};
-
-export const getSafeMaxRepay = async (
-  accessToken: string,
-  userAddress: string
-): Promise<{ safeMaxRepay: string; totalOwed: string; timestamp: number }> => {
-  // Total owed from previewable loan
-  const loan = await getLoan(accessToken, userAddress);
-  const totalOwed = BigInt(loan?.totalAmountOwed || 0);
-  return {
-    safeMaxRepay: totalOwed.toString(),
-    totalOwed: totalOwed.toString(),
-    timestamp: Math.floor(Date.now() / 1000)
-  };
-};
-
 export const repayAll = async (
   accessToken: string,
   userAddress: string
@@ -612,7 +610,7 @@ export const repayAll = async (
 
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
 
-  // Single tx: approve MAX + repay MAX; contract caps to current debt
+  // Single tx: approve MAX + on-chain repayAll
   const tx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
@@ -623,8 +621,8 @@ export const repayAll = async (
     {
       contractName: extractContractName(LendingPool),
       contractAddress: lendingPoolAddr,
-      method: "repay",
-      args: { amount: MAX_UINT256 },
+      method: "repayAll",
+      args: {},
     },
   ];
 
@@ -1074,4 +1072,22 @@ export const listLiquidatableLoans = async (accessToken: string): Promise<Liquid
 
 export const listNearUnhealthyLoans = async (accessToken: string, margin: number): Promise<LiquidationEntry[]> => {
   return listLoansForLiquidation(accessToken, margin);
+};
+
+export const withdrawCollateralMax = async (
+  accessToken: string,
+  asset: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawCollateralMax",
+      args: { asset },
+    }))
+  );
 };

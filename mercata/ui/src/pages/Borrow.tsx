@@ -44,7 +44,8 @@ const Borrow = () => {
     supplyCollateral,
     withdrawCollateral,
     repayLoan: repayLoanFn,
-    repayAll
+    repayAll,
+    withdrawCollateralMax
   } = useLendingContext();
 
   // Use the new smart polling hook for balance updates
@@ -131,10 +132,14 @@ const Borrow = () => {
   const executeWithdraw = async (asset: CollateralData, amount: string) => {
     try {
       setModalLoading(true);
-      await withdrawCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
-      });
+      if (amount === 'ALL') {
+        await withdrawCollateralMax({ asset: asset.address });
+      } else {
+        await withdrawCollateral({
+          asset: asset.address,
+          amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
+        });
+      }
       toast({
         title: "Withdraw Initiated",
         description: `You withdrew ${amount} ${asset._symbol}`,
@@ -185,7 +190,7 @@ const Borrow = () => {
         const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead), 18) : 'all';
         toast({
           title: "Success",
-          description: `Successfully Repaid ${sent} USDST`,
+          description: `Successfully repaid ${sent} USDST`,
           variant: "success",
         });
       } else {
@@ -198,7 +203,7 @@ const Borrow = () => {
         const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent), 18) : amount;
         toast({
           title: "Success",
-          description: `Successfully Repaid ${sent} USDST`,
+          description: `Successfully repaid ${sent} USDST`,
           variant: "success",
         });
       }

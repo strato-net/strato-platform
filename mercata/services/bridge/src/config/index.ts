@@ -1,37 +1,34 @@
-import dotenv from 'dotenv';
-import logger from '../utils/logger';
-import fetch from "node-fetch";
-import jwksRsa from "jwks-rsa";
-// import jwkToPem from "jwk-to-pem";
+import { logError } from "../utils/logger";
 
-dotenv.config();
+// Constants
+export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+export const STRATO_DECIMALS = 18;
 
-export interface BridgeConfig {
-  readonly address: string | undefined;
-  readonly ethereumRpcUrl: string | undefined;
-  readonly mintAndTransfer: "mintETHST";
-  readonly tokenAddress: string | undefined;
-}
+export const ERC20_ABI = [
+  "function transfer(address to, uint256 amount) public returns (bool)",
+];
 
-export const config = {
+// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint256 depositId)
+export const DEPOSIT_EVENT_SIGNATURE =
+  "0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207";
+
+// Transfer(address,address,uint256)
+export const TRANSFER_EVENT_SIGNATURE =
+  "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+
+// Error file configuration
+export const ERROR_FILE_NAME = "bridge-error.flag";
+
+const config = {
   auth: {
     baUsername: process.env.BA_USERNAME,
     baPassword: process.env.BA_PASSWORD,
     clientSecret: process.env.CLIENT_SECRET,
     clientId: process.env.CLIENT_ID,
-    openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL ,
-  },
-  alchemy: {
-    apiKey: process.env.ALCHEMY_API_KEY,
-    network: process.env.ALCHEMY_NETWORK || 'ETH_MAINNET',
+    openIdDiscoveryUrl: process.env.OPENID_DISCOVERY_URL,
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
-    mintAndTransfer: "mintETHST",
-    tokenAddress: process.env.BRIDGE_TOKEN_ADDRESS,
-  },
-  ethereum: {
-    rpcUrl: process.env.ETHEREUM_RPC_URL,
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
@@ -39,236 +36,75 @@ export const config = {
     safeOwnerPrivateKey: process.env.SAFE_OWNER_PRIVATE_KEY,
   },
   voucher: {
-    contractAddress: process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e",
+    contractAddress:
+      process.env.VOUCHER_CONTRACT_ADDRESS ||
+      "000000000000000000000000000000000000100e",
   },
   polling: {
-    bridgeInInterval: 100 * 1000, // 100 seconds for bridge-in (dev/testing)
-    bridgeOutInterval: 3 * 60 * 1000, // 3 minutes for bridge-out
+    bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)
+    bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
+    withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
+    ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
   },
-} as const;
+  strato: {
+    gas: {
+      limit: 32_100_000_000,
+      price: 1,
+    },
+    polling: {
+      defaultTimeout: 60_000,
+      defaultInterval: 5_000,
+    },
+    tx: {
+      type: "FUNCTION" as const,
+    },
+  },
+  api: {
+    nodeUrl: process.env.NODE_URL,
+    errorCodes: {
+      ECONNREFUSED: "Connection refused",
+      ENOTFOUND: "DNS lookup failed",
+      ETIMEDOUT: "Request timeout",
+    },
+    defaults: {
+      timeout: 60_000,
+      maxAttempts: 2,
+    },
+  },
+};
+
+export { config };
+
+export const getChainRpcUrl = (chainId: number | bigint): string => {
+  const chainIdStr = chainId.toString();
+  const rpcUrl = process.env[`CHAIN_${chainIdStr}_RPC_URL`];
+
+  if (!rpcUrl) {
+    throw new Error(
+      `CHAIN_${chainIdStr}_RPC_URL environment variable is not configured`,
+    );
+  }
+
+  return rpcUrl;
+};
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'BA_USERNAME',
-  'BA_PASSWORD',
-  'CLIENT_SECRET',
-  'CLIENT_ID',
-  'OPENID_DISCOVERY_URL',
-  'ALCHEMY_API_KEY',
-  'BRIDGE_ADDRESS',
+  "BA_USERNAME",
+  "BA_PASSWORD",
+  "CLIENT_SECRET",
+  "CLIENT_ID",
+  "OPENID_DISCOVERY_URL",
+  "BRIDGE_ADDRESS",
+  "SAFE_ADDRESS",
+  "SAFE_OWNER_ADDRESS",
+  "SAFE_OWNER_PRIVATE_KEY",
 ];
 
-const missingEnvVars = requiredEnvVars.filter(
-  (envVar) => !process.env[envVar]
-);
+const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  const error = `Missing required environment variables: ${missingEnvVars.join(
-    ', '
-  )}`;
-  logger.error(error);
+  const error = `Missing required environment variables: ${missingEnvVars.join(", ")}`;
+  logError("Config", error, { missingEnvVars });
   throw new Error(error);
 }
-
-export const TESTNET_ETH_TOKENS = [
-  {
-    name: "Sepolia Ether",
-    symbol: "SepoliaETH",
-    tokenAddress: "0x0000000000000000000000000000000000000000", // Native token address
-    decimals: 18,
-    chainId: 11155111,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
-  },
-  {
-    name: "USD Coin",
-    symbol: "USDC",
-    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-    chainId: 11155111,
-    decimals: 6,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  }
-];
-
-export const MAINNET_ETH_TOKENS = [
-  {
-    name: "Ethereum",
-    symbol: "ETH",
-    tokenAddress: "0x0000000000000000000000000000000000000000", // Native token address
-    decimals: 18,
-    chainId: 1,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
-  },
-  {
-    name: "USD Coin",
-    symbol: "USDC",
-    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-    decimals: 6,
-    chainId: 1,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  }
-];
-
-export const TESTNET_STRATO_TOKENS = [
-  {
-    name: "STRATO Ether",
-    symbol: "ETHST",
-    tokenAddress: "0x93fb7295859b2d70199e0a4883b7c320cf874e6c" ,
-    decimals: 18,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
-  },
-  {
-    name: "STRATO USDC",
-    symbol: "USDCST",
-    tokenAddress: "0x3d351a4a339f6eef7371b0b1b025b3a434ad0399",
-    decimals: 6,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  }
-];
-
-export const MAINNET_STRATO_TOKENS = [
-  {
-    name: "STRATO Ether",
-    symbol: "STRATO_ETH",
-    tokenAddress: "0x0000000000000000000000000000000000000000", // Native token address
-    decimals: 18,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png"
-  },
-  {
-    name: "STRATO USD Coin",
-    symbol: "USDCST",
-    tokenAddress: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-    decimals: 6,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/USDC/logo.png"
-  }
-];
-
-export const TESTNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x93fb7295859b2d70199e0a4883b7c320cf874e6c', // ETH        
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x3d351a4a339f6eef7371b0b1b025b3a434ad0399' // USDC
-}
-  
-export const MAINNET_ETH_STRATO_TOKEN_MAPPING = {
-  '0x0000000000000000000000000000000000000000': '0x0000000000000000000000000000000000000000',
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238': '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238'
-} 
-
-export const TESTNET_ERC20_TOKEN_CONTRACTS = [
-  '0x3d351a4a339f6eef7371b0b1b025b3a434ad0399', // USDCST
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // USDC (Ethereum address)
-];
-
-export const MAINNET_ERC20_TOKEN_CONTRACTS = [
-  '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238',
-];
-
-export const getExchangeTokenInfoBridgeIn = (
-  tokenAddress: string,
-  showTestnet: boolean
-) => {
-  const map = Object.fromEntries(
-    Object.entries(
-      showTestnet ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING
-    ).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()])
-  );
-  const stratoTokenAddress = map[tokenAddress.toLowerCase()];
-  const tokens = showTestnet ? TESTNET_STRATO_TOKENS : MAINNET_STRATO_TOKENS;
-  const token = tokens.find(t => t.tokenAddress.toLowerCase() === stratoTokenAddress);
-  return {
-    exchangeTokenName: token?.name || '',
-    exchangeTokenSymbol: token?.symbol || ''
-  };
-};
-
-
-export const getExchangeTokenInfoBridgeOut = (
-  tokenAddress: string,
-  showTestnet: boolean
-) => {
-  const map = Object.fromEntries(
-    Object.entries(
-      showTestnet ? TESTNET_ETH_STRATO_TOKEN_MAPPING : MAINNET_ETH_STRATO_TOKEN_MAPPING
-    ).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()])
-  );
-
-  const reverseMap = Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k]));
-  const ethTokenAddress = reverseMap[tokenAddress.toLowerCase()];
-  const tokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;
-
-  const token = tokens.find(t => t.tokenAddress.toLowerCase() === ethTokenAddress);
-  return {
-    exchangeTokenName: token?.name || '',
-    exchangeTokenSymbol: token?.symbol || '',
-    exchangeTokenAddress: token?.tokenAddress || ''
-  };
-};
-
-
-
-let issuer: string;
-let jwksClient: jwksRsa.JwksClient;
-let keyCache: Map<string, string> = new Map(); // Cache for all JWKS keys
-let isInitialized = false;
-
-export const initializeOAuth = async () => {
-  if (isInitialized) {
-    return;
-  }
-
-  if (!config.auth.openIdDiscoveryUrl) {
-    throw new Error("OpenID discovery URL not configured");
-  }
-
-  try {
-    const response = await fetch(config.auth.openIdDiscoveryUrl);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch OpenID configuration: ${response.status} ${response.statusText}`);
-    }
-    
-    const discovery = await response.json();
-
-    if (!discovery.jwks_uri || !discovery.issuer) {
-      throw new Error("Invalid OpenID configuration - missing jwks_uri or issuer");
-    }
-
-    issuer = discovery.issuer;
-
-    // Pre-fetch and cache all JWKS keys
-    const jwksResponse = await fetch(discovery.jwks_uri);
-    if (!jwksResponse.ok) {
-      throw new Error(`Failed to fetch JWKS: ${jwksResponse.status} ${jwksResponse.statusText}`);
-    }
-    
-    const jwks = await jwksResponse.json();
-    if (!jwks.keys || !Array.isArray(jwks.keys)) {
-      throw new Error("Invalid JWKS response - missing keys array");
-    }
-
-    // Cache all keys by their key ID
-    for (const key of jwks.keys) {
-      if (key.kid && key.n && key.e) {
-        // Convert JWK to PEM format
-        const jwkToPem = require('jwk-to-pem');
-        try {
-          const pem = jwkToPem(key);
-          keyCache.set(key.kid, pem);
-        } catch (error) {
-          console.warn(`⚠️ Failed to convert key ${key.kid} to PEM:`, error);
-        }
-      }
-    }
-
-    isInitialized = true;
-  } catch (error) {
-    console.error("❌ Failed to initialize OAuth config:", error);
-    throw error;
-  }
-};
-
-export const getOAuthConfig = () => {
-  if (!isInitialized) {
-    throw new Error("OAuth not initialized. Call initializeOAuth() first");
-  }
-
-  return { issuer, keyCache };
-};
