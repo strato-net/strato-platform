@@ -54,6 +54,26 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   );
 };
 
+export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
+  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "reviewDepositBatch",
+    args: {
+      srcChainIds: srcChainIds,
+      srcTxHashes: srcTxHashes,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Successfully set ${deposits.length} deposits to pending review`,
+  );
+};
+
 export const confirmWithdrawalBatch = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ) => {

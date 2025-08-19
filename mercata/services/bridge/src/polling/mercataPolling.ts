@@ -1,6 +1,7 @@
 import { config } from "../config";
 import {
   confirmDepositBatch,
+  reviewDepositBatch,
   confirmWithdrawalBatch,
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
@@ -66,7 +67,9 @@ export const startDepositInitiatedPolling = (): void => {
         .filter(r => r.verified)
         .map(r => r.deposit);
 
-      const failedCount = results.length - verifiedDeposits.length;
+      const failedDeposits = results
+        .filter(r => !r.verified)
+        .map(r => r.deposit);
 
       if (verifiedDeposits.length > 0) {
         await confirmDepositBatch(
@@ -74,10 +77,10 @@ export const startDepositInitiatedPolling = (): void => {
         );
       }
 
-      if (failedCount > 0) {
-        logError("MercataPolling", `Failed to verify ${failedCount} deposits`, {
-          failedCount,
-        });
+      if (failedDeposits.length > 0) {
+        await reviewDepositBatch(
+          failedDeposits as NonEmptyArray<Deposit>
+        );
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {

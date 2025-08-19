@@ -35,7 +35,8 @@ contract record MercataBridge is Ownable {
         NONE,         // default (mapping unset)
         INITIATED,    // deposit  : relayer observed external tx
                       // withdrawal: user escrowed tokens
-        PENDING_APPROVAL, // withdrawal only – Custody tx proposed
+        PENDING_REVIEW, // deposit: verification failed, needs review
+                      // withdrawal: custody tx proposed, waiting for review
         COMPLETED,    // flow fully executed
         ABORTED       // owner/user reclaimed escrow
     }
@@ -58,7 +59,7 @@ contract record MercataBridge is Ownable {
         address dest;        // External recipient address
         uint256 amount;      // Escrowed amount
         uint64 requestedAt; // Timestamp – drives abort timeout
-        BridgeStatus   bridgeStatus;      // NONE / INITIATED / PENDING_APPROVAL / ...
+        BridgeStatus   bridgeStatus;      // NONE / INITIATED / PENDING_REVIEW / ...
     }
 
     struct TokenLimit {
@@ -123,6 +124,7 @@ contract record MercataBridge is Ownable {
         address from
     );
     event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);   // wrapped tokens minted
+    event DepositPendingReview(uint256 indexed srcChainId, string srcTxHash);   // verification failed, needs review
 
     /*  WITHDRAWAL FLOW  */
     event WithdrawalRequested(  // user locked tokens in bridge
@@ -362,7 +364,7 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * Step-2  (relayer) – after off-chain finality, mint wrapped tokens.
+     * Step-2.1 (relayer) – Verification passed, mint wrapped tokens.
      */
     function confirmDeposit(uint256 srcChainId, string calldata srcTxHash)
         external
@@ -400,6 +402,44 @@ contract record MercataBridge is Ownable {
             d.bridgeStatus = BridgeStatus.COMPLETED;
 
             emit DepositCompleted(srcChainIds[i], h);
+        }
+    }
+
+    /**
+     * Step-2.2 (relayer) – Verification failed, set deposit for manual review
+     */
+    function reviewDeposit(uint256 srcChainId, string calldata srcTxHash)
+        external
+        onlyRelayer
+        whenDepositsOpen
+    {
+        DepositInfo storage d = deposits[srcChainId][srcTxHash];
+        require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+
+        d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+        emit DepositPendingReview(srcChainId, srcTxHash);
+    }
+
+    // ──────────────────────── BATCH: reviewDeposit ────────────────────────
+    function reviewDepositBatch(
+        uint256[] calldata srcChainIds,
+        string[] calldata srcTxHashes
+    )
+        external
+        onlyRelayer
+        whenDepositsOpen
+    {
+        uint256 n = srcChainIds.length;
+        require(n == srcTxHashes.length, "MB: len");
+
+        for (uint256 i = 0; i < n; i++) {
+            string memory h = srcTxHashes[i];
+
+            DepositInfo storage d = deposits[srcChainIds[i]][h];
+            require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+
+            d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+            emit DepositPendingReview(srcChainIds[i], h);
         }
     }
 
@@ -486,7 +526,7 @@ contract record MercataBridge is Ownable {
             WithdrawalInfo storage w = withdrawals[ids[i]];
             require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
-            w.bridgeStatus = BridgeStatus.PENDING_APPROVAL;
+            w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
             emit WithdrawalPending(ids[i], h);
         }
     }
@@ -500,7 +540,7 @@ contract record MercataBridge is Ownable {
         whenWithdrawalsOpen
     {
         WithdrawalInfo storage w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,"MB: bad state");
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW,"MB: bad state");
 
         Token(w.token).burn(address(this), w.amount);
 
