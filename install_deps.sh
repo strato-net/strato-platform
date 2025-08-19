@@ -116,12 +116,41 @@ Linux)
             
             # Install STRATO dependencies
             sudo dnf install -q -y \
-                leveldb-devel \
-                libsecp256k1-devel \
                 libsodium-devel \
-                postgresql-client \
+                postgresql15 \
                 postgresql-devel \
                 xz-devel
+            
+            # Build leveldb 1.22 (not available in Amazon Linux 2023 repositories)
+            git clone --branch 1.22 --recurse-submodules https://github.com/google/leveldb.git
+            cd leveldb
+            mkdir build && cd build
+            cmake -DCMAKE_BUILD_TYPE=Release \
+                  -DBUILD_SHARED_LIBS=ON \
+                  -DCMAKE_CXX_STANDARD=17 \
+                  -DCMAKE_CXX_STANDARD_REQUIRED=ON \
+                  -DLEVELDB_BUILD_TESTS=OFF \
+                  -DLEVELDB_BUILD_BENCHMARKS=OFF \
+                  ..
+            cmake --build . -j$(nproc)
+            sudo cmake --build . --target install
+            cd ..
+            rm -rf leveldb 
+            
+            # Build secp256k1 (not available in Amazon Linux 2023 repositories)
+            sudo dnf install -y autoconf libtool make
+            git clone https://github.com/bitcoin-core/secp256k1.git  # TODO: peg to a specific refspec to match a version
+            cd secp256k1
+            ./autogen.sh
+            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+            make
+            sudo make install
+            cd ..
+            rm -rf secp256k1
+
+            # Update library cache
+            sudo ldconfig
+            
             ;;
 
         Ubuntu|"Linux Mint")
