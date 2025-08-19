@@ -31,7 +31,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     healthImpact: 0,
     isHealthy: true,
   });
-  const { getSafeMaxBorrow } = useLendingContext();
+  const { borrowMax } = useLendingContext();
 
   // Calculate risk level for borrow form
   useEffect(() => {
@@ -135,11 +135,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
               type="button"
               onClick={async () => {
                 try {
-                  const { safeMaxBorrow } = await getSafeMaxBorrow();
-                  const formatted = formatUnits(BigInt(safeMaxBorrow || '0'), 18);
-                  setBorrowAmount(formatted);
-                  setBorrowDisplayAmount(addCommasToInput(formatted));
-                  handlePollingUpdate(formatted);
+                  await borrowMax();
+                  // After borrowMax, clear input and rely on refresh from parent
+                  setBorrowAmount("");
+                  setBorrowDisplayAmount("");
+                  handlePollingUpdate("");
                 } catch {
                   // noop
                 }
