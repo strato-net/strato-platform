@@ -109,7 +109,11 @@ check_package_version() {
     esac
     
     # Only run check if distro matches
-    if [ "$distro_name" != "$current_distro" ]; then
+    if [ "$distro_name" = "ubuntu-or-mint" ]; then
+        if [ "$current_distro" != "ubuntu" ] && [ "$current_distro" != "mint" ]; then
+            return 0
+        fi
+    elif [ "$distro_name" != "$current_distro" ]; then
         return 0
     fi
     
@@ -363,25 +367,24 @@ Linux)
 
 esac
 
-# Check package versions for Ubuntu
-echo
-echo "Checking package versions for Ubuntu:"
-check_package_version "ubuntu" "build-essential" "12.10ubuntu1"
-check_package_version "ubuntu" "ca-certificates" "20240203"
-check_package_version "ubuntu" "containerd.io" "1.7.27-1"
-check_package_version "ubuntu" "curl" "8.5.0-2ubuntu10.6"
-check_package_version "ubuntu" "docker-buildx-plugin" "0.26.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu" "docker-ce" "5:28.3.3-1~ubuntu.24.04~noble"
-check_package_version "ubuntu" "docker-ce-cli" "5:28.3.3-1~ubuntu.24.04~noble"
-check_package_version "ubuntu" "docker-compose-plugin" "2.39.1-1~ubuntu.24.04~noble"
-check_package_version "ubuntu" "git" "1:2.43.0-1ubuntu7.3"
-check_package_version "ubuntu" "gnupg" "2.4.4-2ubuntu17.3"
-check_package_version "ubuntu" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
-check_package_version "ubuntu" "libleveldb-dev" "1.23-5build1"
-check_package_version "ubuntu" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
-check_package_version "ubuntu" "libpq-dev" "16.9-0ubuntu0.24.04.1"
-check_package_version "ubuntu" "libsecp256k1-dev" "0.2.0-2"
-check_package_version "ubuntu" "libsodium-dev" "1.0.18-1build3"
-check_package_version "ubuntu" "lsb-release" "12.0-2"
-check_package_version "ubuntu" "postgresql-client" "16+257build1.1"
-check_package_version "ubuntu" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
+# Lock the specific package versions for Ubuntu or Mint Linux
+echo "Checking package versions for Ubuntu and Mint:"
+check_package_version "ubuntu-or-mint" "build-essential" "12.10ubuntu1"
+check_package_version "ubuntu-or-mint" "ca-certificates" "20240203"
+check_package_version "ubuntu-or-mint" "containerd.io" "1.7.27-1"
+check_package_version "ubuntu-or-mint" "curl" "8.5.0-2ubuntu10.6"
+check_package_version "ubuntu-or-mint" "docker-buildx-plugin" "0.26.1-1~ubuntu.24.04~noble"
+check_package_version "ubuntu-or-mint" "docker-ce" "5:28.3.3-1~ubuntu.24.04~noble"
+check_package_version "ubuntu-or-mint" "docker-ce-cli" "5:28.3.3-1~ubuntu.24.04~noble"
+check_package_version "ubuntu-or-mint" "docker-compose-plugin" "2.39.1-1~ubuntu.24.04~noble"
+check_package_version "ubuntu-or-mint" "git" "1:2.43.0-1ubuntu7.3"
+check_package_version "ubuntu-or-mint" "gnupg" "2.4.4-2ubuntu17.3"
+check_package_version "ubuntu-or-mint" "libgmp-dev" "2:6.3.0+dfsg-2ubuntu6.1"
+check_package_version "ubuntu-or-mint" "libleveldb-dev" "1.23-5build1"
+check_package_version "ubuntu-or-mint" "liblzma-dev" "5.6.1+really5.4.5-1ubuntu0.2"
+check_package_version "ubuntu-or-mint" "libpq-dev" "16.9-0ubuntu0.24.04.1"
+check_package_version "ubuntu-or-mint" "libsecp256k1-dev" "0.2.0-2"
+check_package_version "ubuntu-or-mint" "libsodium-dev" "1.0.18-1build3"
+check_package_version "ubuntu-or-mint" "lsb-release" "12.0-2"
+check_package_version "ubuntu-or-mint" "postgresql-client" "16+257build1.1"
+check_package_version "ubuntu-or-mint" "zlib1g-dev" "1:1.3.dfsg-3.1ubuntu2.1"
