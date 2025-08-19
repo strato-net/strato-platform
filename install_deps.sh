@@ -122,6 +122,7 @@ Linux)
                 xz-devel
             
             # Build leveldb 1.22 (not available in Amazon Linux 2023 repositories)
+            sudo dnf install -q -y cmake
             git clone --branch 1.22 --recurse-submodules https://github.com/google/leveldb.git
             cd leveldb
             mkdir build && cd build
