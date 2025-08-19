@@ -12,6 +12,9 @@ export const ERC20_ABI = [
 export const DEPOSIT_EVENT_SIGNATURE =
   "0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207";
 
+// Error file configuration
+export const ERROR_FILE_NAME = "bridge-error.flag";
+
 const config = {
   auth: {
     baUsername: process.env.BA_USERNAME,
