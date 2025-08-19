@@ -41,6 +41,7 @@ executables:
     - servant-swagger
     - servant-swagger-ui
     - solid-vm-model
+    - strato-conf
     - sql-monad
     - strato-model
     - swagger2

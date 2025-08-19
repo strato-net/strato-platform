@@ -1,3 +1,6 @@
+/** Zero address constant for filtering */
+export const ZERO_ADDRESS = "0000000000000000000000000000000000000000";
+
 /** Validate that a string is a well-formed URL */
 const isValidUrl = (value: string): boolean => {
   try {

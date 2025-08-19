@@ -1,4 +1,5 @@
-import { fetchOpenIdTokenEndpoint } from "../utils/authHelper";
+import { fetchOpenIdConfig } from "../utils/authHelper";
+import { JSONWebKeySet } from "jose";
 
 // Load local .env files when not in production
 if (process.env.NODE_ENV !== "production") {
@@ -19,12 +20,16 @@ if (!process.env.NODE_URL) {
   throw new Error("NODE_URL is not defined");
 }
 
+// TODO: potentially add the TTL for cached values, to update values after a period of time
 export let openIdTokenEndpoint: string | undefined;
+export let openIdJwks: JSONWebKeySet | undefined;
 /**
  * Init function to be called from the App.js to make sure the app is served after the token endpoint is asynchronously fetched from OpenID Discovery URL 
  */
 export async function initOpenIdConfig() {
-  openIdTokenEndpoint = await fetchOpenIdTokenEndpoint(process.env.OAUTH_DISCOVERY_URL);
+  const { tokenEndpoint, jwks } = await fetchOpenIdConfig(process.env.OAUTH_DISCOVERY_URL);
+  openIdTokenEndpoint = tokenEndpoint;
+  openIdJwks = jwks;
 }
 export const clientId = process.env.OAUTH_CLIENT_ID;
 export const clientSecret = process.env.OAUTH_CLIENT_SECRET;

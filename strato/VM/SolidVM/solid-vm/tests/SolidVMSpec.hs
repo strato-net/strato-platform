@@ -827,7 +827,6 @@ spec = do
                        ]
 
     it "should be able to insert into a mapping" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingSet.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 3) . length
@@ -837,10 +836,9 @@ spec = do
           [Field "us", MapIndex (INum 999999)],
           [Field "us", MapIndex (INum 10)]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 4, BInteger 21, BDefault]
+        `shouldReturn` [BDefault, BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
@@ -851,7 +849,7 @@ spec = do
           [Field "y"],
           [Field "z"]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BDefault]
+        `shouldReturn` [BDefault, BInteger 343, BInteger 343, BDefault]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol"
@@ -2700,13 +2698,12 @@ contract qq {
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
-    liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
     runBS
       [r|
 contract qq {
   mapping(string => uint) assoc;
 }|]
-    getFields ["assoc"] `shouldReturn` [BMappingSentinel]
+    getFields ["assoc"] `shouldReturn` [BDefault]
 
   it "can compare contracts to int literals" . runTest $ do
     runBS
@@ -2939,7 +2936,7 @@ contract qq {
   it "can accept bytes32 arguments" . runTest $ do
     runCall
       "set"
-      ["\"deadbeef00000000000000000000000000000000000000000000000000000000\""]
+      ["\"\xde\xad\xbe\xef\""]
       [r|
 contract qq {
   bytes32 bs;
@@ -2950,7 +2947,7 @@ contract qq {
       `shouldReturn` Just "()"
     getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
 
-  it "should not compute remote arguments" $
+  it "should not compute remote arguments" $ do
     runTest
       ( do
           runCall
@@ -5921,7 +5918,7 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+      `shouldReturn` Just "(\"2a4aec41b4652949f203748247b8b6f20f70f24b5a2a94c77eaa5167635186cd\")"
 
   it "cant use  a commented pragma" . runTest $ do
     runCall'
@@ -8124,8 +8121,8 @@ contract qq {
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]
@@ -8144,7 +8141,7 @@ contract qq {
   account a;
 
   constructor() {
-    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
   }
 }|]
       )
@@ -8886,8 +8883,8 @@ contract qq {
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]

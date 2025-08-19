@@ -24,6 +24,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens
+import Control.Monad (unless)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.List
@@ -214,7 +215,8 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
                         ) _qaSearch
                     ]
 
-            E.where_ (foldl1 (E.&&.) criteria)
+            unless (null criteria) $
+              E.where_ (foldl1 (E.&&.) criteria)
 
             E.offset . fromIntegral $ fromMaybe 0 _qaOffset
             E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) _qaLimit

@@ -67,6 +67,7 @@ connectMe (UDPPort port') = do
           -- But I will leave this line here with this comment in the hopes that when we do decide the day has come,
           -- all we need to do is uncomment the line below (will make platform prefer ipv6 over ipv4, so be prepared
           -- for some confusion :D)
+          , addrFamily = AF_INET
           -- , addrFamily = AF_INET6  -- AF_INET6 + Datagram allows both ipv4 and ipv6 to be handled by same socket
           }))
         Nothing

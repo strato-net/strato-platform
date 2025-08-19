@@ -74,6 +74,7 @@ export interface CheckoutSessionParams {
   tokenAddress: string;
   buyerAddress: string;
   baseUrl: string;
+  marginBps: number;
 }
 
 export type TxInput = DeployInput | FunctionInput;

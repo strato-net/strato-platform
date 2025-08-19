@@ -4,10 +4,153 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { baseUrl } from "../../config/config";
+import { ZERO_ADDRESS } from "../helpers/onramp.helper";
 import axios from "axios";
 
 const contractAddress = constants.onRamp!;
 const { OnRamp, onRampSelectFields, Token } = constants;
+
+export const addPaymentProvider = async (
+  accessToken: string,
+  providerData: {
+    providerAddress: string;
+    name: string;
+    endpoint: string;
+  }
+) => {
+  const { providerAddress, name, endpoint } = providerData;
+  
+  const args = {
+    provider: providerAddress.toLowerCase(),
+    name,
+    endpoint,
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "addPaymentProvider",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: `Payment provider ${name} added successfully`,
+  };
+};
+
+export const cancelListing = async (
+  accessToken: string,
+  token: string
+) => {
+  const args = {
+    token: token.toLowerCase(),
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "cancelListing",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Listing cancelled successfully",
+  };
+};
+
+export const updateListing = async (
+  accessToken: string,
+  body: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }
+) => {
+  const { token, amount, marginBps, providerAddresses } = body;
+  
+  const args = {
+    token: token.toLowerCase(),
+    amount,
+    marginBps,
+    providerAddresses: providerAddresses.map(addr => addr.toLowerCase()),
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "updateListing",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Listing updated successfully",
+  };
+};
+
+export const removePaymentProvider = async (
+  accessToken: string,
+  providerAddress: string
+) => {
+  // First, check if the provider is being used in any listings
+  const onRampData = await get(accessToken);
+  const listings = onRampData?.listings || [];
+
+  // Check if this provider is being used in any active listing
+  const isProviderInUse = listings.some((listing: any) => {
+    const listingInfo = listing.ListingInfo;
+    if (!listingInfo || !listingInfo.providers) return false;
+    
+    return listingInfo.providers.some((provider: any) => {
+      const address = provider.providerAddress || provider.key || provider;
+      const providerAddr = address.toLowerCase().replace(/^0x/, '');
+      return providerAddr === providerAddress.toLowerCase();
+    });
+  });
+  
+  if (isProviderInUse) {
+    throw new Error("Cannot remove payment provider: It is currently being used in active listings");
+  }
+  
+  const args = {
+    provider: providerAddress.toLowerCase(),
+  };
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(OnRamp),
+    contractAddress,
+    method: "removePaymentProvider",
+    args
+  });
+
+  const result = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return {
+    success: true,
+    transactionHash: result.hash,
+    message: "Payment provider removed successfully",
+  };
+};
 
 // Get all tokens with optional filtering
 export const get = async (accessToken: string) => {
@@ -37,9 +180,13 @@ export const get = async (accessToken: string) => {
         .map((p: any) => [p.token, p])
     );
 
-    // Build payment provider map
+    // Build payment provider map, filtering out zero addresses
+    const filteredProviders = (paymentProviders || []).filter((p: any) => 
+      p.key !== ZERO_ADDRESS && p.value?.providerAddress !== ZERO_ADDRESS
+    );
+    
     const providerMap = Object.fromEntries(
-      (paymentProviders || []).map((p: any) => [
+      filteredProviders.map((p: any) => [
         p.key,
         p.value
       ])
@@ -66,8 +213,12 @@ export const get = async (accessToken: string) => {
       console.log("Error fetching token info:", err);
     }
 
-    // Enhance listings
-    const enhancedListings = listings.map((listing: any) => {
+    // Filter out listings with ZERO_ADDRESS and enhance remaining listings
+    const filteredListings = (listings || []).filter((listing: any) => 
+      listing.key !== ZERO_ADDRESS && listing.value?.token !== ZERO_ADDRESS
+    );
+    
+    const enhancedListings = filteredListings.map((listing: any) => {
       const { key: id, value: info } = listing;
 
       if (!info) {
@@ -100,6 +251,7 @@ export const get = async (accessToken: string) => {
     return {
       ...onRamp,
       listings: enhancedListings,
+      paymentProviders: filteredProviders, // Return filtered providers instead of raw ones
       approvedTokens: Object.entries(tokenInfoMap).map(([token, info]) => ({
         token,
         _name: info._name,

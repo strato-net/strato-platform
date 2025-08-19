@@ -188,16 +188,35 @@ export interface BuyPayload {
   paymentProviderAddress: string;
 }
 
+export interface SellPayload {
+  token: string;
+  amount: string;
+  marginBps: string;
+  providerAddresses: string[];
+}
+
 export interface OnRampContextType {
   token: OnRampToken | null;
   loading: boolean;
   error: string | null;
+  onRampData: OnrampApiResponse | null;
+  providers: PaymentProvider[];
+  listings: Listing[];
   
   get: () => Promise<OnrampApiResponse>;
   buy: (payload: BuyPayload, userAddress: string) => Promise<{ url: string }>;
-  sell: (body) => Promise<void>;
-  lock: (body) => Promise<{ url: string }>;
+  sell: (payload: SellPayload) => Promise<any>;
+  lock: (body: any) => Promise<{ url: string }>;
   unlockTokens: (listingId: string) => Promise<void>;
+  addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
+  removePaymentProvider: (providerAddress: string) => Promise<any>;
+  cancelListing: (token: string) => Promise<any>;
+  updateListing: (payload: {
+    token: string;
+    amount: string;
+    marginBps: string;
+    providerAddresses: string[];
+  }) => Promise<any>;
 }
 
 export interface RawWithdrawData {
@@ -286,6 +305,12 @@ export interface LiquidityData {
   totalUSDSTSupplied: string;
   utilizationRate: number;
   maxWithdrawableUSDST: string;
+  borrowIndex?: string;           // RAY (1e27)
+  reservesAccrued?: string;       // underlying (1e18)
+
+  // new (optional)
+  totalAmountOwed?: string;
+  totalAmountOwedPreview?: string;
 }
 
 export interface CollateralRatioItem {
@@ -364,18 +389,16 @@ export interface SetPoolRatesData {
 }
 
 export type NewLoanData = {
-  principalBalance: string;
-  interestOwed: string;
-  lastIntCalculated: string;
-  lastUpdated: string;
+  totalAmountOwed: string;             // current debt (index-based)
+  totalAmountOwedPreview?: string;     // projected debt (optional)
+  exchangeRate?: string;               // 1e18 (optional, if you surface it here)
+  lastUpdated?: string;
   healthFactor: number;
   healthFactorRaw: string;
   totalBorrowingPowerUSD: string;
-  accruedInterest: string;
-  interestRate: number;
-  totalAmountOwed: string;
   totalCollateralValueUSD: string;
   maxAvailableToBorrowUSD: string;
+  interestRate: number;                // bps
   isAboveLiquidationThreshold: boolean;
   id?: string;
   maxRepay?: string;
@@ -399,6 +422,12 @@ export interface PaymentProvider {
   key: string;
   value: PaymentProviderValue;
 }
+
+export interface AddPaymentProviderData {
+  providerAddress: string;
+  name: string;
+  endpoint: string;
+}
 export interface ApprovedToken {
   token: string;
   _name: string;
@@ -414,7 +443,7 @@ export interface ListingInfo {
   providers: PaymentProviderValue[];
   _name: string;
   _symbol: string;
-  tokenOracleValue: string | null;
+  tokenOracleValue: { price: string } | null;
 }
 
 export interface Listing {

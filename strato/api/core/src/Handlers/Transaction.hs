@@ -41,7 +41,7 @@ import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
 import qualified Control.Exception as E
-import Control.Monad (when)
+import Control.Monad (unless, when)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
@@ -181,17 +181,17 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
                            in foldr (E.||.) (E.val False) queries
                         ) qtSearch
                     ]
-
-            E.where_ ((foldl1 (E.&&.) criteria)) -- map (getTransFilter rawTx) $ getParameters ))
-            -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
-            E.where_ (foldl1 (E.||.) (map (foldl1 (E.&&.)) [criteria]))
+            unless (null criteria) $ do
+              E.where_ (foldl1 (E.&&.) criteria)
+              -- FIXME: if more than `limit` transactions per block, we will need to have a tuple as index
+              E.where_ (foldl1 (E.||.) [foldl1 (E.&&.) criteria])
 
             -- E.offset $ (limit * offset)
             E.offset . fromIntegral $ fromMaybe 0 qtOffset
             E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) qtLimit
-            E.orderBy $
-              [ (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionBlockNumber),
-                (sortToOrderBy qtSortby) $ (rawTx E.^. RawTransactionNonce)
+            E.orderBy
+              [ sortToOrderBy qtSortby $ rawTx E.^. RawTransactionBlockNumber,
+                sortToOrderBy qtSortby $ rawTx E.^. RawTransactionNonce
               ]
 
             return rawTx

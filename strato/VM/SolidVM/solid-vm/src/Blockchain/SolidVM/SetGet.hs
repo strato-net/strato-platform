@@ -58,22 +58,7 @@ fromBasic = \case
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
-  MS.BMappingSentinel -> SMappingSentinel
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
-
-basicTypeToType :: BasicType -> SVMType.Type
-basicTypeToType = \case
-  TInteger -> SVMType.Int Nothing Nothing
-  TString -> SVMType.String Nothing
-  TDecimal -> SVMType.Decimal
-  TBool -> SVMType.Bool
-  TAccount -> SVMType.Address False
-  TContract n -> SVMType.Contract n
-  TEnumVal n -> SVMType.Enum Nothing n Nothing
-  TStruct n _ -> SVMType.Struct Nothing n
-  TArray t ml -> SVMType.Array (basicTypeToType t) ml
-  TMapping k v -> SVMType.Mapping Nothing (basicTypeToType k) (basicTypeToType v)
-  Todo msg -> todo "basicTypeToType/todo" msg
 
 findDefault :: BasicType -> Value
 findDefault = \case
@@ -85,8 +70,8 @@ findDefault = \case
   TContract n -> SContract n $ unspecifiedChain 0x0
   TEnumVal n -> SEnumVal n "" 0x0
   TStruct n fs -> SStruct n . M.fromList $ (BC.unpack *** Constant . findDefault) <$> fs
-  a@(TArray t ml) -> SArray (basicTypeToType a) $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
-  m@TMapping{} -> SMap (basicTypeToType m) M.empty
+  TArray t ml -> SArray $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
+  TMapping -> SMap M.empty
   Todo msg -> todo "findDefault/todo" msg
 
 toBasic :: Value -> Maybe MS.BasicValue
@@ -98,7 +83,6 @@ toBasic = \case
   SAccount a _ -> Just $ MS.BAccount a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
-  SMappingSentinel -> Just $ MS.BMappingSentinel
   SUserDefined _ _ x -> toBasic x
   _ -> Nothing
 
@@ -126,7 +110,7 @@ setVal (SReference dst) (SReference src) = do
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
     setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
-setVal (SReference dst) (SArray _ fs) = do
+setVal (SReference dst) (SArray fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
@@ -178,7 +162,7 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
       case typeHint of
         TStruct{} -> return $ SReference addressedPath
         TArray{} -> return $ SReference addressedPath
-        TMapping{} -> return $ SReference addressedPath
+        TMapping -> return $ SReference addressedPath
         _ -> return $ findDefault typeHint
     MS.BString bs -> do
       t <- getXabiValueType addressedPath
@@ -195,7 +179,7 @@ getVar (Constant (SStruct s ma)) = do
       )
       ma
   return $ SStruct s resolved
-getVar (Constant (SArray typ vc)) = do
+getVar (Constant (SArray vc)) = do
   resolved <-
     V.mapM
       ( \var -> do
@@ -203,7 +187,7 @@ getVar (Constant (SArray typ vc)) = do
           return $ Constant v
       )
       vc
-  return $ SArray typ resolved
+  return $ SArray resolved
 getVar (Constant (STuple vct)) = do
   resolved <-
     V.mapM
@@ -213,7 +197,7 @@ getVar (Constant (STuple vct)) = do
       )
       vct
   return $ STuple resolved
-getVar (Constant (SMap ty mp)) = do
+getVar (Constant (SMap mp)) = do
   resolved <-
     mapM
       ( \var -> do
@@ -221,7 +205,7 @@ getVar (Constant (SMap ty mp)) = do
           return $ Constant v
       )
       mp
-  return $ SMap ty resolved
+  return $ SMap resolved
 getVar (Constant (SPush v (Just var))) = do
   resolved <- getVar var
   return $ SPush v (Just $ Constant resolved)
@@ -235,13 +219,13 @@ forceLoadVar (SReference a) = do
     TStruct n ts -> do
       vs <- traverse (\(t,_) -> (BC.unpack t,) . Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.Field t))) ts
       return . SStruct n $ M.fromList vs
-    t@(TArray _ ml) -> do
+    TArray _ ml -> do
       arrLen <- case ml of
         Just l -> pure $ fromIntegral l
         Nothing -> fmap fromIntegral . getInt . Constant . SReference . apSnoc a $ MS.Field "length"
       vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.ArrayIndex i))) [0..arrLen-1]
-      pure . SArray (basicTypeToType t) $ V.fromList vs
-    TMapping{} -> typeError "forceLoadVar/mapping" (SReference a)
+      pure . SArray $ V.fromList vs
+    TMapping -> typeError "forceLoadVar/mapping" (SReference a)
     _ -> pure $ findDefault typeHint
 forceLoadVar v = pure v
 
@@ -250,6 +234,7 @@ getInt p = do
   v <- getVar p
   case v of
     SInteger s -> return s
+    SNULL -> return 0
     _ -> typeError "getInt" (p, v)
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
@@ -258,6 +243,7 @@ getRealNum p = do
   case v of
     SInteger s -> return $ Left s
     SDecimal s -> return $ Right s
+    SNULL -> return $ Left 0
     _ -> typeError "getRealNum" (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
@@ -265,6 +251,7 @@ getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
+    SNULL -> return False
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
@@ -312,7 +299,7 @@ showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "(" ++ intercalate ", " strings ++ ")"
-showSM (SArray _ v) = do
+showSM (SArray v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
   return $ "[" ++ intercalate ", " strings ++ "]"
@@ -326,7 +313,7 @@ showSM (SStruct name m) = do
     labelToString name ++ "{"
       ++ intercalate ", " (map (\(n, v) -> labelToString n ++ ": " ++ v) valStrings)
       ++ "}"
-showSM (SMap _ m) = do
+showSM (SMap m) = do
   valStrings <-
     forM (M.toList m) $ \(key, var) -> do
       val <- getVar var
@@ -364,7 +351,7 @@ jsonSM = go False
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
       return $ "[" ++ intercalate ", " strings ++ "]"
-    go _ (SArray _ v) = do
+    go _ (SArray v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)
       return $ "[" ++ intercalate ", " strings ++ "]"
@@ -378,7 +365,7 @@ jsonSM = go False
         labelToString name ++ "{"
           ++ intercalate ", " (map (\(n, v) -> show (labelToString n) ++ ": " ++ v) valStrings)
           ++ "}"
-    go _ (SMap _ m) = do
+    go _ (SMap m) = do
       valStrings <-
         forM (M.toList m) $ \(key, var) -> do
           val <- getVar var

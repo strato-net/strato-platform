@@ -4,7 +4,7 @@ import { useUser } from "@/context/UserContext";
 import { useTokenContext } from "@/context/TokenContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Coins, AlertTriangle, HelpCircle, Minus } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   formatWeiAmount,
   formatCurrency,
@@ -55,6 +55,7 @@ const UsdstBalanceBox: React.FC = () => {
   const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } =
     useUserTokens();
   const { getToken } = useTokenContext();
+  const location = useLocation();
   const [isMinimized, setIsMinimized] = useState(false);
   const [usdstToken, setUsdstToken] = useState<Token | null>(null);
 
@@ -90,8 +91,8 @@ const UsdstBalanceBox: React.FC = () => {
   const isLowBalance = balanceValue <= 0.2 && balanceValue > 0.03;
   const isCriticalBalance = balanceValue <= 0.03;
 
-  // Don't render if user is not logged in
-  if (!userAddress) {
+  // Don't render if user is not logged in or if on homepage
+  if (!userAddress || location.pathname === "/") {
     return null;
   }
 

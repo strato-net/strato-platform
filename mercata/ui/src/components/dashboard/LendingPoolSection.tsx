@@ -402,7 +402,7 @@ const LendingPoolSection = () => {
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Utilization Rate</span>
-                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}</span>
+                  <span className="font-medium text-sm sm:text-base">{liquidityInfo?.utilizationRate || '0'}%</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
                   <span className="text-gray-500 text-sm sm:text-base">Available Liquidity</span>
@@ -427,6 +427,34 @@ const LendingPoolSection = () => {
                       </span>
                     ) : liquidityInfo?.totalCollateralValue ? (
                         formatBalance(liquidityInfo.totalCollateralValue || 0n, undefined, 18, 2, 2, true)
+                    ) : (
+                      "$0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Borrow Index</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">Loading...</span>
+                    ) : liquidityInfo?.borrowIndex ? (
+                      (() => {
+                        const s = formatUnits(liquidityInfo.borrowIndex || 0, 27);
+                        const [w, f = ""] = s.split(".");
+                        return f ? `${w}.${f.slice(0, 5)}` : w;
+                      })()
+                    ) : (
+                      "0"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
+                  <span className="text-gray-500 text-sm sm:text-base">Reserves Accrued</span>
+                  <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">Loading...</span>
+                    ) : liquidityInfo?.reservesAccrued ? (
+                      formatBalance(liquidityInfo.reservesAccrued || 0n, undefined, 18, 2, 2, true)
                     ) : (
                       "$0.00"
                     )}

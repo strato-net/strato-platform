@@ -8,6 +8,10 @@ const router = Router();
 // Get lending pool information
 router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
 
+// New: Safe max endpoints
+router.get("/safe/max-borrow", authHandler.authorizeRequest(), LendingController.getSafeMaxBorrow);
+router.get("/safe/max-repay", authHandler.authorizeRequest(), LendingController.getSafeMaxRepay);
+
 // ----- User Balances & Positions -----
 // Get user's collateral and balance information
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
@@ -38,6 +42,9 @@ router.post("/loans", authHandler.authorizeRequest(), LendingController.borrow);
 
 // Repay loan
 router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
+
+// Repay all
+router.post("/loans/repay-all", authHandler.authorizeRequest(), LendingController.repayAll);
 
 // ----- Liquidation Data (Listing) -----
 // Get currently liquidatable loans

@@ -3,6 +3,8 @@ FROM node:22-alpine AS base
 # Install dependencies only when needed
 FROM base AS deps
 WORKDIR /app
+# Add Python and build tools for native modules (node-gyp) only during dependency installation (required for arm64 builds)
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 

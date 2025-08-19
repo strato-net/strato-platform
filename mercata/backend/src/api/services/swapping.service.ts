@@ -124,11 +124,12 @@ export const addLiquidity = async (
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, tokenBAmount, maxTokenAAmount } = params;
-    
+    const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -158,6 +159,7 @@ export const addLiquidity = async (
         args: {
           tokenBAmount,
           maxTokenAAmount,
+          deadline
         },
       }
     ]);
@@ -177,11 +179,12 @@ export const removeLiquidity = async (
   removeLiquidityParams: {
     poolAddress: string;
     lpTokenAmount: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, lpTokenAmount } = removeLiquidityParams;
-    
+    const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
     });
@@ -214,6 +217,7 @@ export const removeLiquidity = async (
         lpTokenAmount,
         minTokenBAmount,
         minTokenAAmount,
+        deadline
       },
     });
 
@@ -237,11 +241,12 @@ export const swap = async (
     isAToB: boolean;
     amountIn: string;
     minAmountOut: string;
+    deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, isAToB, amountIn, minAmountOut } = swapParams;
-    
+    const { poolAddress, isAToB, amountIn, minAmountOut, deadline } = swapParams;
+
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
       select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
@@ -268,6 +273,7 @@ export const swap = async (
           isAToB,
           amountIn,
           minAmountOut,
+          deadline,
         },
       }
     ]);

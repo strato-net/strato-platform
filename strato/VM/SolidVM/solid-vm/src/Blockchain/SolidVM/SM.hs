@@ -467,10 +467,10 @@ getVariableOfName name = do
   let maybeLocalValue = fmap snd $ M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
-      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
+      maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
 
       maybeFreeFunction :: Maybe Variable
-      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
+      maybeFreeFunction = fmap (t "free function" . Constant . SFunction name . Just) $ M.lookup name $ codeCollection currentCallInfo ^. CC.flFuncs
 
       maybeBuiltinFunction :: Maybe Variable
       maybeBuiltinFunction =
@@ -512,7 +512,7 @@ getVariableOfName name = do
                        "verifySignature"
                      ]
           )
-          $ t "builtin function" $ Constant $ SBuiltinFunction name Nothing
+          $ t "builtin function" $ Constant $ SFunction name Nothing
 
       maybeBuiltinVariable :: Maybe Variable
       maybeBuiltinVariable =
@@ -746,10 +746,10 @@ getCurrentFunctionName = do
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
 
-getLocal :: MonadSM m => SolidString -> m (Maybe Variable)
+getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
-  return $ fmap snd $ M.lookup name $ localVariables currentCallInfo
+  return . M.lookup name $ localVariables currentCallInfo
 
 setLocal :: MonadSM m => SolidString -> Variable -> m ()
 setLocal name val = do
@@ -820,10 +820,7 @@ hintFromType = \case
   SVMType.Array t ml -> do
     t' <- hintFromType t
     pure $ TArray t' ml
-  SVMType.Mapping _ k v -> do
-    k' <- hintFromType k
-    v' <- hintFromType v
-    pure $ TMapping k' v'
+  SVMType.Mapping{} -> pure TMapping
   tt'' -> todo "hintFromType" tt''
 
 getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type

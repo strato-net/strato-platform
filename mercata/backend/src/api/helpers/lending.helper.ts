@@ -3,10 +3,53 @@ import { constants } from "../../config/constants";
 export const toBig = (v: string | number | bigint) => BigInt(v);
 const { DECIMALS } = constants;
 
+export const RAY = 10n ** 27n;
+const YEAR = 31536000n;
+
+export const debtFromScaled = (scaledDebt: string, borrowIndex: string): string => {
+  const sd = BigInt(scaledDebt || "0");
+  const idx = BigInt(borrowIndex || "0");
+  return ((sd * idx) / RAY).toString();
+};
+
+export const totalDebtFromScaled = (totalScaledDebt: string, borrowIndex: string): string => {
+  const tsd = BigInt(totalScaledDebt || "0");
+  const idx = BigInt(borrowIndex || "0");
+  return ((tsd * idx) / RAY).toString();
+};
+
+export const previewBorrowIndexFromFlatApr = (
+  borrowIndex: string,      // RAY as string
+  aprBps: string | number,  // basis points
+  lastAccrual: string,      // seconds (string)
+  nowTsSec: number          // seconds (number)
+): string => {
+  const idx = BigInt(borrowIndex || "0");
+  const dt = BigInt(nowTsSec) - BigInt(lastAccrual || "0");
+  if (dt <= 0n) return idx.toString();
+  const factorRAY = (BigInt(aprBps) * RAY * dt) / (10000n * YEAR);
+  return ((idx * (RAY + factorRAY)) / RAY).toString();
+};
+
+export const exchangeRateFromComponents = (
+  cash: string,            // ERC20(borrowable).balanceOf(LiquidityPool)
+  totalDebt: string,       // system debt in underlying
+  reservesAccrued: string, // protocol reserves
+  mTokenSupply: string
+): string => {
+  const cashN = BigInt(cash || "0");
+  const debtN = BigInt(totalDebt || "0");
+  const resN  = BigInt(reservesAccrued || "0");
+  const supN  = BigInt(mTokenSupply || "0");
+  if (supN === 0n) return (10n ** 18n).toString();
+  let underlying = cashN + debtN;
+  underlying = resN < underlying ? (underlying - resN) : cashN; // floor at cash
+  if (underlying === 0n) return (10n ** 18n).toString();
+  return ((underlying * (10n ** 18n)) / supN).toString();
+};
+
 export interface LoanInfo {
-  principalBalance: string;
-  interestOwed: string;
-  lastIntCalculated: string;
+  scaledDebt: string;
   lastUpdated: string;
 }
 
@@ -22,47 +65,6 @@ export interface CollateralInfo {
   amount: string;
 }
 
-/**
- * Simulates the smart contract's _accrueInterest function
- * @param loan The user's loan data
- * @param interestRate Annual interest rate in basis points
- * @param currentTime Current timestamp in seconds
- * @returns accruedInterest and newTotalOwed
- */
-export const calculateAccruedInterest = (
-  loan: LoanInfo,
-  interestRate: number,
-  currentTime: number
-): { accruedInterest: string; newTotalOwed: string } => {
-  if (toBig(loan.principalBalance) === 0n) {
-    return { accruedInterest: "0", newTotalOwed: "0" };
-  }
-
-  // Calculate time elapsed since last interest calculation
-  const timeElapsed = Math.max(0, currentTime - Number(loan.lastIntCalculated));
-  const hoursElapsed = BigInt(Math.floor(timeElapsed / 3600)); // Convert to hours
-
-  // Calculate NEW interest since last calculation: (principal * rate * hours) / (8760 * 10000)
-  // 8760 hours per year, 10000 for basis points
-  const newInterest = (
-    (toBig(loan.principalBalance) * BigInt(interestRate) * hoursElapsed) /
-    BigInt(8760 * 10000)
-  );
-
-  // Calculate TOTAL accrued interest (existing interestOwed + new interest)
-  const totalAccruedInterest = toBig(loan.interestOwed) + newInterest;
-
-  // Calculate new total owed
-  const newTotalOwed = (
-    toBig(loan.principalBalance) + 
-    totalAccruedInterest
-  ).toString();
-
-  return { 
-    accruedInterest: totalAccruedInterest.toString(), 
-    newTotalOwed 
-  };
-};
 
 /**
  * Simulates the smart contract's _getTotalCollateralValueForHealth function
@@ -116,88 +118,87 @@ export const calculateHealthFactor = (
 };
 
 /**
- * Comprehensive loan simulation that calculates all loan metrics
- * @param loan The user's loan data
- * @param collaterals User's collateral assets and amounts
- * @param assetConfigs Map of asset configurations
- * @param currentTime Current timestamp in seconds
- * @returns Complete loan simulation with all calculated values
+ * Simulate a user's loan using index-based debt and collateral values.
+ *
+ * @param loan          User's loan snapshot (scaledDebt, lastUpdated)
+ * @param collaterals   User's collateral assets and amounts
+ * @param assetConfigs  Map of asset -> { price (1e18 USD), liquidationThreshold (bps), ltv (bps), interestRate (bps) }
+ * @param borrowIndex   Global borrow index (RAY, 1e27) as string
  */
 export const simulateLoan = (
   loan: LoanInfo | null,
   collaterals: CollateralInfo[],
   assetConfigs: Map<string, AssetConfig>,
-  currentTime: number
+  borrowIndex: string
 ) => {
-  // Get borrowable asset config (assuming single borrowable asset)
+  // 1) Borrowable asset config (single borrowable asset model)
   const borrowableAssetConfig = Array.from(assetConfigs.values())[0];
   if (!borrowableAssetConfig) {
     throw new Error("No borrowable asset configuration found");
   }
 
-  // If no loan exists, create a default empty loan
-  const defaultLoan: LoanInfo = {
-    principalBalance: "0",
-    interestOwed: "0",
-    lastIntCalculated: currentTime.toString(),
-    lastUpdated: currentTime.toString(),
+  // 2) Default loan if none exists
+  const actualLoan: LoanInfo = loan || {
+    scaledDebt: "0",
+    lastUpdated: "0",
   };
 
-  const actualLoan = loan || defaultLoan;
+  // 3) Current debt (underlying units) using the borrow index
+  const totalAmountOwed = debtFromScaled(actualLoan.scaledDebt, borrowIndex); // underlying (18d)
 
-  // Calculate interest and total owed
-  const { accruedInterest, newTotalOwed } = calculateAccruedInterest(
-    actualLoan,
-    borrowableAssetConfig.interestRate,
-    currentTime
-  );
+  // 4) Convert debt to USD (18 decimals)
+  const priceUSD = toBig(borrowableAssetConfig.price); // 1e18
+  const totalBorrowValueUSD = (toBig(totalAmountOwed) * priceUSD) / DECIMALS;
 
-  // Calculate total collateral value for health
-  const totalCollateralValue = calculateTotalCollateralValueForHealth(
+  // 5) Total collateral value for health (USD, 18 decimals)
+  const totalCollateralValueUSD = calculateTotalCollateralValueForHealth(
     collaterals,
     assetConfigs
   );
 
-  // Calculate max borrowing power using existing calculateCollateralMetrics logic
+  // 6) Max borrowing power (sum across collaterals by LTV)
   let maxBorrowingPowerUSD = 0n;
   for (const collateral of collaterals) {
-    const config = assetConfigs.get(collateral.asset);
-    if (!config) continue;
+    const cfg = assetConfigs.get(collateral.asset);
+    if (!cfg) continue;
 
     const metrics = calculateCollateralMetrics(
-      "0", // userBalance not needed for this calculation
+      "0", // user token balance not needed here
       collateral.amount,
-      config.price,
-      config.ltv || 0
+      cfg.price,                  // USD 1e18
+      cfg.ltv || 0                // bps
     );
-    
     maxBorrowingPowerUSD += toBig(metrics.maxBorrowingPower);
   }
 
-  const maxAvailableToBorrowUSD = maxBorrowingPowerUSD - toBig(newTotalOwed);
+  const maxAvailableToBorrowUSD = maxBorrowingPowerUSD > totalBorrowValueUSD
+    ? (maxBorrowingPowerUSD - totalBorrowValueUSD)
+    : 0n;
 
-  // Calculate health factor using newTotalOwed directly
-  const healthFactor = calculateHealthFactor(totalCollateralValue, newTotalOwed);
+  // 7) Health factor uses USD values (18 decimals)
+  const healthFactorRaw = calculateHealthFactor(
+    totalCollateralValueUSD,
+    totalBorrowValueUSD.toString()
+  );
 
   return {
-    // Original loan data from contract
-    principalBalance: actualLoan.principalBalance,
-    interestOwed: actualLoan.interestOwed,
-    lastIntCalculated: actualLoan.lastIntCalculated,
+    // Core loan state
+    scaledDebt: actualLoan.scaledDebt,
     lastUpdated: actualLoan.lastUpdated,
-    
-    // Calculated values
-    healthFactor: healthFactorToPercentage(healthFactor),
-    healthFactorRaw: healthFactor,
+
+    // Index-based results
+    totalAmountOwed: (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })(),                        // underlying (18d)
+
+    // Health and capacity (USD 18d)
+    healthFactor: Number(toBig(healthFactorRaw)) / Number(DECIMALS),
+    healthFactorRaw,
     totalBorrowingPowerUSD: maxBorrowingPowerUSD.toString(),
-    accruedInterest,
-    interestRate: borrowableAssetConfig.interestRate / 100,
-    totalAmountOwed: newTotalOwed,
-    totalCollateralValueUSD: totalCollateralValue,
+    totalCollateralValueUSD: totalCollateralValueUSD,
     maxAvailableToBorrowUSD: maxAvailableToBorrowUSD.toString(),
 
-    // Health status flags
-    isAboveLiquidationThreshold: Number(healthFactor) >= Number(DECIMALS),
+    // Display APR (bps → percent) if needed by callers
+    interestRate: borrowableAssetConfig.interestRate,
+    isAboveLiquidationThreshold: Number(toBig(healthFactorRaw)) >= Number(DECIMALS),
   };
 };
 
@@ -263,18 +264,22 @@ export const calculateCollateralMetrics = (
  * @returns Exchange rate scaled by 1e18
  */
 export const calculateExchangeRate = (
-  totalMTokenSupply: string,
-  totalUSDSTSupplied: string
+  cash: string,            // ERC20(borrowable).balanceOf(LiquidityPool)
+  totalDebt: string,       // system debt in underlying
+  reservesAccrued: string, // protocol reserves in underlying
+  mTokenSupply: string     // total mToken supply
 ): string => {
-  const mTokenSupply = toBig(totalMTokenSupply);
-  const underlying = toBig(totalUSDSTSupplied);
-  
-  if (mTokenSupply === 0n || underlying === 0n) {
-    return DECIMALS.toString(); // Default 1:1 ratio
-  }
-  
-  // Exchange rate = totalUSDSTSupplied / totalMTokenSupply (scaled by 1e18)
-  return ((underlying * DECIMALS) / mTokenSupply).toString();
+  const cashN = BigInt(cash || "0");
+  const debtN = BigInt(totalDebt || "0");
+  const resN  = BigInt(reservesAccrued || "0");
+  const supN  = BigInt(mTokenSupply || "0");
+  if (supN === 0n) return (10n ** 18n).toString();
+
+  let underlying = cashN + debtN;
+  underlying = resN < underlying ? (underlying - resN) : cashN; // floor at cash
+  if (underlying === 0n) return (10n ** 18n).toString();
+
+  return ((underlying * (10n ** 18n)) / supN).toString();
 };
 
 /**
@@ -294,55 +299,23 @@ export const calculateTotalUSDSTSupplied = (
 };
 
 /**
- * Calculate total borrowed amount across all loans
- * @param loans Array of loan entries
- * @param interestRate Interest rate in basis points
- * @param currentTime Current timestamp
- * @returns Total borrowed amount including accrued interest
- */
-export const calculateTotalBorrowed = (
-  loans: any[],
-  interestRate: number,
-  currentTime: number
-): string => {
-  let totalBorrowed = 0n;
-  
-  for (const loanEntry of loans) {
-    const loan = loanEntry.LoanInfo;
-    if (loan && loan.principalBalance && toBig(loan.principalBalance) > 0n) {
-      const { newTotalOwed } = calculateAccruedInterest(
-        {
-          principalBalance: loan.principalBalance,
-          interestOwed: loan.interestOwed || "0",
-          lastIntCalculated: loan.lastIntCalculated || currentTime.toString(),
-          lastUpdated: loan.lastUpdated || currentTime.toString(),
-        },
-        interestRate,
-        currentTime
-      );
-      totalBorrowed += toBig(newTotalOwed);
-    }
-  }
-  
-  return totalBorrowed.toString();
-};
-
-/**
  * Calculate utilization rate of the pool
  * @param totalBorrowed Total borrowed amount
  * @param totalSupplied Total supplied amount
  * @returns Utilization rate as percentage
  */
 export const calculateUtilizationRate = (
-  totalBorrowed: string,
-  totalSupplied: string
+  cash: string,
+  totalDebt: string,
+  reservesAccrued: string
 ): number => {
-  const borrowed = toBig(totalBorrowed);
-  const supplied = toBig(totalSupplied);
-  
-  if (supplied === 0n) return 0;
-  
-  return Number((borrowed * 10000n) / supplied) / 100;
+  const cashN = BigInt(cash || "0");
+  const debtN = BigInt(totalDebt || "0");
+  const resN  = BigInt(reservesAccrued || "0");
+  let denom = cashN + debtN;
+  denom = resN < denom ? (denom - resN) : cashN;
+  if (denom === 0n) return 0;
+  return Number((debtN * 10000n) / denom) / 100; // percent with 2 decimals
 };
 
 /**

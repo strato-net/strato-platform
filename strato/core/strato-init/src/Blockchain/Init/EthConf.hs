@@ -83,6 +83,13 @@ defaultRedisBlockDBConfig =
       redisMaxIdleTime = 30
     }
 
+defaultApiConfig :: ApiConfig
+defaultApiConfig =
+  ApiConfig
+  {
+    ipAddress = flags_apiIPAddress
+  }
+
 defaultConfig :: EthConf
 defaultConfig =
   EthConf
@@ -93,7 +100,8 @@ defaultConfig =
       kafkaConfig = defaultKafkaConfig,
       blockConfig = defaultBlockConfig,
       quarryConfig = defaultQuarryConfig,
-      discoveryConfig = defaultDiscoveryConfig
+      discoveryConfig = defaultDiscoveryConfig,
+      apiConfig = defaultApiConfig
     }
 
 getNodeKey :: IO (VC.PublicKey, Address)

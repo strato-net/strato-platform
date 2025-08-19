@@ -30,7 +30,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
 
   // Calculate current borrowed amount
   const currentBorrowed = loanData?.totalAmountOwed 
-    ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18))
+    ? parseFloat(formatUnits((() => { try { return (BigInt(loanData.totalAmountOwed) <= 1n ? 0n : BigInt(loanData.totalAmountOwed)); } catch { return 0n; } })(), 18))
     : 0;
 
   // Calculate risk level using the same logic as other components
@@ -87,7 +87,7 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
                 </span>
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Current Borrowed</span>
+                <span className="text-gray-600 text-sm sm:text-base">Total Amount Owed</span>
                 <span className="font-semibold text-sm sm:text-base">
                   {currentBorrowed.toLocaleString("en-US", {
                     minimumFractionDigits: 2,
@@ -97,17 +97,9 @@ const BorrowingSection = ({ loanData }: BorrowingSectionProps) => {
               </div>
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-gray-600 text-sm sm:text-base">Interest Rate</span>
-                <span className="font-semibold text-sm sm:text-base">{loanData?.interestRate || 0}%</span>
+                <span className="font-semibold text-sm sm:text-base">{((Number(loanData?.interestRate) || 0) / 100).toFixed(2)}%</span>
               </div>
-              <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
-                <span className="text-gray-600 text-sm sm:text-base">Interest Owed</span>
-                <span className="font-semibold text-sm sm:text-base">
-                  {parseFloat(formatUnits(loanData?.accruedInterest || 0, 18)).toLocaleString("en-US", {
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })} USDST
-                </span>
-              </div>
+
               <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-0">
                 <span className="text-gray-600 text-sm sm:text-base">Health Factor</span>
                 <span className="font-semibold text-sm sm:text-base" style={{ color: getTextColor((loanData?.healthFactor || 0)) }}>
