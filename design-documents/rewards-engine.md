@@ -1,4 +1,4 @@
-# New smart contract allowing users to earn CATA rewords
+# New smart contract allowing users to earn CATA rewards
 
 ## Summary
 
@@ -183,15 +183,15 @@ The name of the smart contract will be `RewardsEngine`
   - `assets`: an array of asset addresses
   - `user`: an `address` of a user
 
-  It first updates balances with accrued rewards simply because time has passed. 
-  It assumes that the amounts have not changed, only time has passed, and then 
-  calculates accrued rewards using the stored `lastSeenAmount` (similar to what 
+  It first updates balances with accrued rewards simply because time has passed.
+  It assumes that the amounts have not changed, only time has passed, and then
+  calculates accrued rewards using the stored `lastSeenAmount` (similar to what
   'estimateRewards' does, but actually updates the balances).
 
-  Once all balances are updated, for each balance it mints rewards for the user 
+  Once all balances are updated, for each balance it mints rewards for the user
   and nullifies the balances (sets them to '0').
 
-  The function returns an array of 'CurrentBalance', holding information about 
+  The function returns an array of 'CurrentBalance', holding information about
   how much rewards were minted per each action per each reward token.
 
   Key implementation details:
