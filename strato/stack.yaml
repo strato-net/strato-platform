@@ -69,8 +69,8 @@ packages:
 - libs/type-lits
 
 #removing for now, too hard to keep this up to date when making large changes elsewhere
-#- simulator/strato-lite
-#- simulator/smd-ui-hs
+- simulator/strato-lite
+- simulator/smd-ui-hs
 
 - tools/blockapps-tools
 - tools/convoke
