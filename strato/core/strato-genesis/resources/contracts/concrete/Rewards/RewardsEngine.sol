@@ -155,6 +155,7 @@ contract record RewardsEngine is Ownable {
             rewardTokenMap[address(lastToken)] = index;
         }
 
+	rewardTokens[lastIndex] = Token(address(0));
         rewardTokens.length -= 1;
         delete rewardTokenMap[tokenAddress];
 
@@ -255,6 +256,8 @@ contract record RewardsEngine is Ownable {
             multiplierMap[lastName] = index;
         }
 
+
+	multiplierNames[lastIndex] = "";
         multiplierNames.length -= 1;
         delete multiplierMap[name];
         delete multipliers[name];
