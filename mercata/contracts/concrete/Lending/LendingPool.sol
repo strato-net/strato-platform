@@ -307,6 +307,158 @@ contract record LendingPool is Ownable {
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
     }
 
+    /**
+     * @notice Borrow the maximum amount allowed by current collateral (minus 1 wei safety)
+     * @return amountBorrowed The amount actually borrowed
+     */
+    function borrowMax() external onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
+        // Bring index & reserves current, then enforce system caps on the final amount
+        _accrue();
+
+        uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
+        uint currentOwed = getUserDebt(msg.sender);
+        require(maxBorrowAmount > currentOwed, "No borrowing power");
+
+        uint available = maxBorrowAmount - currentOwed;
+        // 1 wei safety to keep HF strictly > 1 after rounding
+        amountBorrowed = available > 1 ? (available - 1) : 0;
+        require(amountBorrowed > 0, "No borrowing power");
+
+        _checkDebtLimits(amountBorrowed);
+
+        // Update index-based loan storage
+        LoanInfo storage loan = userLoan[msg.sender];
+        uint scaledAdd = (amountBorrowed * RAY) / borrowIndex;
+        loan.scaledDebt += scaledAdd;
+        loan.lastUpdated = block.timestamp;
+        totalScaledDebt += scaledAdd;
+
+        // Move funds
+        LiquidityPool(_liquidityPool()).borrow(amountBorrowed, msg.sender);
+
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit Borrowed(msg.sender, borrowableAsset, amountBorrowed);
+        return amountBorrowed;
+    }
+
+    /**
+     * @notice Repay the caller's entire outstanding debt
+     * @return amountRepaid The amount actually repaid
+     */
+    function repayAll() external onlyTokenFactory(borrowableAsset) returns (uint amountRepaid) {
+        LoanInfo storage loan = userLoan[msg.sender];
+        require(loan.scaledDebt > 0, "No active loan");
+
+        _accrue();
+
+        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
+        require(owed > 0, "Nothing to repay");
+
+        // Move exact owed into the pool
+        LiquidityPool(_liquidityPool()).repay(owed, msg.sender);
+        amountRepaid = owed;
+
+        // Reduce scaled debt fully
+        uint scaledDelta = (amountRepaid * RAY) / borrowIndex;
+        if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt;
+        loan.scaledDebt -= scaledDelta;
+        totalScaledDebt -= scaledDelta;
+
+        if (loan.scaledDebt == 0) {
+            delete userLoan[msg.sender];
+        } else {
+            loan.lastUpdated = block.timestamp;
+        }
+
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit Repaid(msg.sender, borrowableAsset, amountRepaid);
+        return amountRepaid;
+    }
+
+    /**
+     * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
+     * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
+     */
+    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
+        _accrue();
+        require(mToken != address(0), "mToken not set");
+        uint userShares = IERC20(mToken).balanceOf(msg.sender);
+        require(userShares > 0, "No mTokens to withdraw");
+
+        // Underlying amount based on current exchange rate
+        uint exchangeRate = getExchangeRate();
+        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
+        underlyingAmount = (userShares * exchangeRate) / 1e18;
+
+        // Ensure pool has liquidity
+        address asset = borrowableAsset;
+        uint poolCash = IERC20(asset).balanceOf(address(_liquidityPool()));
+        require(poolCash >= underlyingAmount, "Insufficient liquidity");
+
+        LiquidityPool(_liquidityPool()).withdraw(userShares, msg.sender, underlyingAmount);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+    }
+
+    /**
+     * @notice Withdraw the maximum collateral for an asset while remaining healthy (minus 1 wei safety)
+     * @param asset The collateral asset to withdraw
+     * @return amountWithdrawn The amount actually withdrawn
+     */
+        function withdrawCollateralMax(address asset) external onlyTokenFactory(asset) returns (uint amountWithdrawn) {
+         // Current user collateral for asset
+         uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
+         require(totalCollateral > 0, "No collateral");
+ 
+         _accrue();
+ 
+         // Current borrow capacity and debt
+         uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
+         uint currentOwed = getUserDebt(msg.sender);
+ 
+         // If no outstanding debt, allow full withdrawal with no dust
+         if (currentOwed == 0) {
+             CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, totalCollateral);
+             emit WithdrawnCollateral(msg.sender, asset, totalCollateral);
+             return totalCollateral;
+         }
+         require(maxBorrowAmount > currentOwed, "No room");
+ 
+         // Prices and LTV
+         uint priceAsset = PriceOracle(_priceOracle()).getAssetPrice(asset); // 1e18
+         uint priceBorrow = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18
+         uint ltv = assetConfigs[asset].ltv; // bps
+         require(priceAsset > 0 && priceBorrow > 0 && ltv > 0, "Config");
+ 
+         // roomBorrow = maxBorrowAmount - currentOwed (in borrowable units)
+         uint roomBorrow = maxBorrowAmount - currentOwed;
+ 
+         // From calculateMaxBorrowingPower math, the reduction in borrow capacity for withdrawing `amount` is:
+         // deltaBorrow = amount * priceAsset * ltv / (priceBorrow * 10000)
+         // Solve for amount: amount = roomBorrow * priceBorrow * 10000 / (priceAsset * ltv)
+         uint numerator = roomBorrow * priceBorrow * 10000;
+         uint denom = priceAsset * ltv;
+         if (denom == 0) {
+             return 0;
+         }
+         uint maxByHealth = numerator / denom;
+ 
+         // Cap by user's available collateral
+         amountWithdrawn = maxByHealth < totalCollateral ? maxByHealth : totalCollateral;
+         // 1 wei safety when there is outstanding debt
+         if (amountWithdrawn > 1) {
+             amountWithdrawn = amountWithdrawn - 1;
+         }
+         require(amountWithdrawn > 0, "No withdrawable amount");
+ 
+         // Final health check using existing path for consistency
+         uint newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amountWithdrawn);
+         require(currentOwed <= newMaxBorrow, "Withdrawal would exceed existing loan");
+ 
+         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amountWithdrawn);
+         emit WithdrawnCollateral(msg.sender, asset, amountWithdrawn);
+         return amountWithdrawn;
+     }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDATION OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════════

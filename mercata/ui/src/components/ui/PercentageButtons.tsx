@@ -22,7 +22,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   const maxValueBigInt = useMemo(() => {
     const s = String(maxValue || "0").replace(/,/g, "").trim();
     if (!s) return 0n;
-    // If it looks decimal, parse as 18d units; otherwise treat as wei bigint
+    // If decimal string, parse to 18d units; otherwise treat as wei bigint
     if (s.includes(".")) {
       try { return parseUnits(s, 18); } catch { return 0n; }
     }
