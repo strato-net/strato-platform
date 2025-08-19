@@ -399,12 +399,12 @@ contract record RewardsEngine is Ownable {
                 userBalance.modifiedAt = currentTime;
                 userBalance.lastSeenAmount = amount;
 
-                currentBalances[resultIndex] = CurrentBalance(
+                currentBalances.push(CurrentBalance(
                     rewardToken,
                     actionType,
                     asset,
                     userBalance.balance
-                );
+		));
                 resultIndex++;
             }
 
@@ -454,12 +454,12 @@ contract record RewardsEngine is Ownable {
                     estimatedBalance += accruedReward;
                 }
 
-                estimatedBalances[resultIndex] = CurrentBalance(
+                estimatedBalances.push(CurrentBalance(
                     rewardToken,
                     actionType,
                     asset,
                     estimatedBalance
-                );
+		));
                 resultIndex++;
             }
         }
