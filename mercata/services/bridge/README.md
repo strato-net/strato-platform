@@ -1,33 +1,34 @@
 # Mercata Bridge Service
-The Mercata Bridge Service is responsible for seamlessly bridging assets between the Ethereum Sepolia network and the STRATO Mercata testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using Alchemy WebSocket connections.
+
+The Mercata Bridge Service is responsible for seamlessly bridging assets between multiple blockchain networks and the STRATO Mercata testnet. It manages deposits and withdrawals using a Safe multisig wallet and monitors blockchain activity in real-time using dynamic RPC connections.
 
 ## Features
-* Detects deposit/withdrawal events on both Ethereum and STRATO
-* Proposes transactions to Safe multisig for security and approval
-* Executes actions after Safe approval
-* Syncs transaction states across chains to ensure consistency
-* Fetches balances and transaction history for display in frontend interfaces
-* Real-time monitoring of Ethereum and STRATO bridge contracts
-* Event-based handling of deposit and withdraw actions
-* Proposing transactions to Safe multisig for pending/confirm updates
-* Fetching balances of bridged tokens
-* Retrieving transaction histories
-* Automatic reconnection for resilient WebSocket communication
-* Secure and contextual logging using Winston
+
+* **Dynamic Chain Support**: Automatically detects and configures RPC endpoints for all enabled chains from the bridge contract
+* **Safe Multisig Integration**: Proposes and executes transactions through Gnosis Safe for secure asset management
+* **Real-time Monitoring**: Polls blockchain events and transaction statuses across all supported chains
+* **Bridge Out Flow**: Complete STRATO → Ethereum asset transfer with Safe approval workflow
+* **Bridge In Flow**: Ethereum → STRATO deposit processing and confirmation
+* **Dynamic Asset Management**: Fetches enabled assets and chain information from on-chain bridge contract
+* **Email Notifications**: Sends transaction alerts to configured email addresses
+* **Comprehensive Logging**: Secure and contextual logging using Winston
+* **OAuth Integration**: Secure authentication with STRATO using OpenID Connect
 
 ## Prerequisites
 
 - Node.js 18 or higher
-- Access to Ethereum and STRATO RPC endpoints
-- Safe multisig wallet address
-- Relayer private key
-- Safe Transaction Service URL
+- Access to Alchemy API for Ethereum networks
+- Gnosis Safe multisig wallet
+- Safe owner private key
+- STRATO OAuth credentials
 
 ## Installation
 
 1. Clone the repository
-
-2. cd services/bridge
+2. Navigate to the bridge service:
+```bash
+cd services/bridge
+```
 
 3. Install dependencies:
 ```bash
@@ -41,25 +42,43 @@ cp .env.example .env
 
 ## Configuration
 
-Update the following environment variables in `.env`:
-Key	                           Description
+### Required Environment Variables
 
-- ALCHEMY_API_KEY                 	WebSocket API key for Ethereum
-- ALCHEMY_NETWORK                 	Ethereum network name (e.g. ETH_SEPOLIA)
-- ETHEREUM_RPC_URL              	RPC endpoint for Ethereum
-- NODE_URL	RPC                     endpoint for STRATO
-- SAFE_ADDRESS	                  Address of the Safe multisig wallet
-- SAFE_OWNER_PRIVATE_KEY        	Private key of Safe proposer
-- SAFE_OWNER_ADDRESS	            Address of Safe owner submitting the proposal
-- BRIDGE_ADDRESS	                  STRATO bridge contract address
-- BRIDGE_TOKEN_ADDRESS           	Token address on STRATO
-- CLIENT_ID, CLIENT_SECRET      	OAuth credentials for STRATO login
-- OPENID_DISCOVERY_URL	            STRATO OpenID metadata URL
-- TRANSACTION_APPROVER_EMAILS   Comma-separated list of emails for transaction alerts
-- SENDGRID_API_KEY	               SendGrid API key for sending emails
+#### Authentication
+- `BA_USERNAME` - BlockApps username
+- `BA_PASSWORD` - BlockApps password
+- `CLIENT_SECRET` - OAuth client secret
+- `CLIENT_ID` - OAuth client ID
+- `OPENID_DISCOVERY_URL` - OpenID discovery endpoint
 
+#### Blockchain
+- `ALCHEMY_API_KEY` - Alchemy API key (used for all chains)
+- `BRIDGE_ADDRESS` - MercataBridge contract address
 
+#### Chain RPC URLs (Dynamically Validated)
+The service automatically validates that RPC URLs are configured for all enabled chains from the bridge contract:
 
+- `CHAIN_11155111_RPC_URL` - Sepolia RPC URL (e.g., `https://eth-sepolia.g.alchemy.com/v2`)
+- `CHAIN_1_RPC_URL` - Ethereum mainnet RPC URL (if using mainnet)
+- `CHAIN_${chainId}_RPC_URL` - RPC URL for any additional enabled chains
+
+#### Safe Wallet
+- `SAFE_ADDRESS` - Gnosis Safe wallet address
+- `SAFE_OWNER_ADDRESS` - Safe owner address
+- `SAFE_OWNER_PRIVATE_KEY` - Safe owner private key
+
+#### Optional
+- `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
+- `TRANSACTION_APPROVER_EMAILS` - Comma-separated list of emails for transaction alerts
+- `SENDGRID_API_KEY` - SendGrid API key for sending emails
+
+### Dynamic Configuration
+
+The service automatically:
+- Fetches enabled chains and assets from the bridge contract via Cirrus
+- Validates that all required RPC URLs are configured at startup
+- Uses the Alchemy API key for all chain connections
+- Filters all operations by the specific bridge contract address
 
 ## Usage
 
@@ -82,50 +101,71 @@ npm start
 
 ## Architecture
 
-1. Event Monitoring Layer
-- Uses Alchemy WebSockets to subscribe to Deposit events on Ethereum
-- Uses STRATO WebSockets to detect Withdraw events
-- Automatically reconnects if socket drops
+### Service Layer
 
-2. Bridge Logic Deposits (ETH → STRATO):
-- Detects DepositInitiated on Ethereum
-- Checks if already processed
-- If not, triggers recordDeposit on STRATO
-- Withdrawals (STRATO → ETH):
-- Detects WithdrawInitiated on STRATO
-- Proposes a transaction to Safe for marking withdrawal
-- Waits for approvals and executes via Safe SDK
+1. **Bridge Service** (`bridgeService.ts`)
+   - Core bridge contract interactions
+   - Handles deposit and withdrawal confirmations
+   - Manages batch operations for efficiency
 
-3. Safe Integration Uses Safe SDK to:
-- Create transactions (markWithdrawalPending, confirmWithdrawal)
-- Submit them for multisig approval
-- Execute after approval
+2. **Safe Service** (`safeService.ts`)
+   - Centralized Safe multisig wallet operations
+   - Transaction generation and proposal
+   - Status monitoring and execution
 
-4. Data Fetching Fetches:
-- Token balances on STRATO
-- Transaction history for audit/debugging
+3. **Cirrus Service** (`cirrusService.ts`)
+   - Dynamic chain and asset information fetching
+   - Withdrawal status queries
+   - Bridge contract data retrieval
 
-### Event Flow
+4. **Polling Services**
+   - **Mercata Polling**: Monitors STRATO bridge events
+   - **Alchemy Polling**: Monitors Ethereum bridge events
+   - Real-time transaction status tracking
 
-Deposit Flow:
-* Alchemy detects a deposit on Ethereum
-* Service checks if it’s already processed on STRATO
-* If not processed → sends a recordDeposit() transaction on STRATO
+### Bridge Out Flow (STRATO → Ethereum)
 
-Withdrawal Flow:
-* STRATO detects a withdrawal
-* Creates a transaction to mark it as pending on Ethereum via Safe
-* Submits for Safe approval
-* After enough signatures → executes the transaction
+1. **Withdrawal Initiation**
+   - Service polls for withdrawals with status "1" (INITIATED)
+   - Groups withdrawals by destination chain and token
+   - Creates Safe transactions for each unique combination
+
+2. **Safe Transaction Processing**
+   - Generates Safe transaction with total amount and destination address
+   - Proposes transaction to Safe multisig for approval
+   - Monitors transaction status (executed/rejected/pending)
+
+3. **Finalization**
+   - **Executed**: Calls `finaliseWithdrawalBatch` on bridge contract
+   - **Rejected**: Calls `abortWithdrawalBatch` on bridge contract
+   - Sends email notifications for completed transactions
+
+### Bridge In Flow (Ethereum → STRATO)
+
+1. **Deposit Detection**
+   - Alchemy polling monitors Ethereum deposit events
+   - Checks if deposit is already processed
+   - Records deposit on STRATO if new
+
+2. **Processing**
+   - Updates last processed block for chain
+   - Handles batch processing for efficiency
+
+### Key Components
+
+- **Dynamic RPC Management**: Uses `getChainRpcUrl(chainId)` for all chain interactions
+- **Safe Integration**: Leverages `@safe-global/protocol-kit` and `@safe-global/api-kit`
+- **OAuth Authentication**: Secure STRATO access with JWT validation
+- **Error Handling**: Comprehensive error handling with detailed logging
 
 ## Error Handling
 
-The service includes comprehensive error handling and logging:
+The service includes comprehensive error handling:
 
-- WebSocket connection errors
-- Transaction failures
-- Safe proposal errors
-- Network errors
+- **Network Errors**: Automatic retry mechanisms for RPC calls
+- **Safe Transaction Failures**: Proper error handling for proposal and execution
+- **Cirrus API Errors**: Graceful degradation when Cirrus is unavailable
+- **Configuration Errors**: Startup validation ensures all required config is present
 
 All errors are logged with appropriate context for debugging.
 
@@ -133,21 +173,19 @@ All errors are logged with appropriate context for debugging.
 
 The service logs important events and errors using Winston logger:
 
-- WebSocket connection status
-- Transaction proposals and executions
-- Event detections
-- Error conditions
-
-Logs are written to both console and files:
-- `error.log`: Error-level logs
-- `combined.log`: All logs
+- **Startup**: Chain validation, OAuth initialization
+- **Polling**: Event detection and processing
+- **Safe Operations**: Transaction proposals and executions
+- **Bridge Operations**: Deposit and withdrawal processing
+- **Errors**: Detailed error logging with context
 
 ## Security Considerations
 
-- Private keys are stored in environment variables
-- Safe multisig ensures transaction approval
-- WebSocket connections are secured
-- Error handling prevents service crashes
+- **Private Keys**: Stored securely in environment variables
+- **Safe Multisig**: All bridge operations require Safe approval
+- **OAuth**: Secure authentication with STRATO
+- **Contract Validation**: All operations filter by specific bridge contract address
+- **Error Handling**: Prevents service crashes and data corruption
 
 ## Contributing
 

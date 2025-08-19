@@ -40,3 +40,4 @@ export const lendingRegistry = process.env.LENDING_REGISTRY || "0000000000000000
 export const onRamp = process.env.ONRAMP || "0000000000000000000000000000000000001009";
 export const tokenFactory = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 export const adminRegistry = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
+export const mercataBridge = process.env.MERCATA_BRIDGE || "000000000000000000000000000000000000100d"; // TODO: update with correct address
