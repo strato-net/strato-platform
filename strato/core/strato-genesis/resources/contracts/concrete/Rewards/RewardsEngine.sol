@@ -398,7 +398,6 @@ contract record RewardsEngine is Ownable {
 
 	// length assets.length * rewardTokens.length
         CurrentBalance[] memory currentBalances = [];
-        uint256 resultIndex = 0;
 
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
@@ -440,7 +439,6 @@ contract record RewardsEngine is Ownable {
                     asset,
                     userBalance.balance
 		));
-                resultIndex++;
             }
 
             emit RewardsUpdated(user, actionType, asset);
@@ -486,7 +484,6 @@ contract record RewardsEngine is Ownable {
 
 	// length actionKeys.length * rewardTokens.length
         CurrentBalance[] memory estimatedBalances = [];
-        uint256 resultIndex = 0;
 
         for (uint256 i = 0; i < actionKeys.length; i++) {
             string calldata actionType = actionKeys[i].actionType;
@@ -520,7 +517,6 @@ contract record RewardsEngine is Ownable {
                     asset,
                     estimatedBalance
 		));
-                resultIndex++;
             }
         }
 
@@ -541,7 +537,6 @@ contract record RewardsEngine is Ownable {
         require(user == msg.sender, "RewardsEngine: Only user can claim their own rewards");
 
         CurrentBalance[] memory claimedBalances = [];
-        uint256 resultIndex = 0;
 
         for (uint256 i = 0; i < assets.length; i++) {
             address asset = assets[i];
@@ -584,7 +579,6 @@ contract record RewardsEngine is Ownable {
                         asset,
                         claimedAmount
                     ));
-                    resultIndex++;
                 }
             }
         }
