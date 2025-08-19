@@ -504,7 +504,7 @@ contract record MercataBridge is Ownable {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.INITIATED,"MB: bad state");
 
-        w.bridgeStatus = BridgeStatus.PENDING_APPROVAL;
+        w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         emit WithdrawalPending(id, custodyTxHash);
     }
 
@@ -564,7 +564,7 @@ contract record MercataBridge is Ownable {
             string memory h = custodyTxHashes[i];
 
             WithdrawalInfo storage w = withdrawals[ids[i]];
-            require(w.bridgeStatus == BridgeStatus.PENDING_APPROVAL, "MB: bad state");
+            require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
             Token(w.token).burn(address(this), w.amount);
             w.bridgeStatus = BridgeStatus.COMPLETED;
@@ -581,7 +581,7 @@ contract record MercataBridge is Ownable {
     function abortWithdrawal(uint256 id) external {
         WithdrawalInfo storage w = withdrawals[id];
         require(
-            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,
+            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
             "MB: not abortable"
         );
 
@@ -613,7 +613,7 @@ contract record MercataBridge is Ownable {
 
             // must be in an abortable state
             require(
-                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,
+                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
                 "MB: not abortable"
             );
 

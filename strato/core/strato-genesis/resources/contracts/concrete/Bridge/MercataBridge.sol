@@ -36,7 +36,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         NONE,         // default (mapping unset)
         INITIATED,    // deposit  : relayer observed external tx
                       // withdrawal: user escrowed tokens
-        PENDING_APPROVAL, // withdrawal only – Custody tx proposed
+        PENDING_REVIEW, // withdrawal only – Custody tx proposed
         COMPLETED,    // flow fully executed
         ABORTED       // owner/user reclaimed escrow
     }
@@ -58,7 +58,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         address dest;        // External recipient address
         uint256 amount;      // Escrowed amount
         uint64 requestedAt; // Timestamp – drives abort timeout
-        BridgeStatus   bridgeStatus;      // NONE / INITIATED / PENDING_APPROVAL / ...
+        BridgeStatus   bridgeStatus;      // NONE / INITIATED / PENDING_REVIEW / ...
     }
 
     struct TokenLimit {
@@ -464,7 +464,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.INITIATED,"MB: bad state");
 
-        w.bridgeStatus = BridgeStatus.PENDING_APPROVAL;
+        w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         emit WithdrawalPending(id, custodyTxHash);
     }
 
@@ -487,7 +487,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
             WithdrawalInfo storage w = withdrawals[ids[i]];
             require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
-            w.bridgeStatus = BridgeStatus.PENDING_APPROVAL;
+            w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
             emit WithdrawalPending(ids[i], h);
         }
     }
@@ -502,7 +502,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         nonReentrant
     {
         WithdrawalInfo storage w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,"MB: bad state");
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW,"MB: bad state");
 
         Token(w.token).burn(address(this), w.amount);
 
@@ -527,7 +527,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
             string memory h = custodyTxHashes[i];
 
             WithdrawalInfo storage w = withdrawals[ids[i]];
-            require(w.bridgeStatus == BridgeStatus.PENDING_APPROVAL, "MB: bad state");
+            require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
             Token(w.token).burn(address(this), w.amount);
             w.bridgeStatus = BridgeStatus.COMPLETED;
@@ -544,7 +544,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     function abortWithdrawal(uint256 id) external nonReentrant {
         WithdrawalInfo storage w = withdrawals[id];
         require(
-            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,
+            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
             "MB: not abortable"
         );
 
@@ -576,7 +576,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
 
             // must be in an abortable state
             require(
-                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_APPROVAL,
+                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
                 "MB: not abortable"
             );
 
