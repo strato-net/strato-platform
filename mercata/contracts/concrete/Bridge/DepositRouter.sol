@@ -1,0 +1,230 @@
+pragma solidity ^0.8.26;
+
+import "../../node_modules/@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../../node_modules/@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+
+contract DepositRouter is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
+    // ============ Custom Errors ============
+    error TokenNotAllowed();
+    error UseDepositETH();
+    error BelowMinimum();
+    error InvalidAddress();
+    error ETHTransferFailed();
+    error ArrayLengthMismatch();
+    error SameAddressProposed();
+
+    //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
+    IPermit2 public constant PERMIT2 =
+        IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+
+    address private gnosisSafe;
+    uint256 public depositId;
+
+    mapping(address => bool) public allowedTokens;
+    mapping(address => uint256) public minDepositAmount;
+
+    event DepositRouted(
+        address indexed token,
+        uint256 amount,
+        address indexed sender,
+        address indexed stratoAddress,
+        uint256 depositId
+    );
+
+    event TokenAllowlistUpdated(address indexed token, bool allowed);
+    event MinDepositAmountSet(address indexed token, uint256 minAmount);
+    event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        address gnosisSafe_,
+        address owner_
+    ) public initializer {
+        __Ownable_init(owner_);
+        __ReentrancyGuard_init();
+        __Pausable_init();
+        __UUPSUpgradeable_init();
+
+        if (gnosisSafe_ == address(0)) revert InvalidAddress();
+        gnosisSafe = gnosisSafe_;
+    }
+
+    function deposit(
+        address token,
+        uint256 amount,
+        address stratoAddress,
+        uint256 nonce,
+        uint256 deadline,
+        bytes calldata signature
+    ) external whenNotPaused nonReentrant {
+        if (!allowedTokens[token]) revert TokenNotAllowed();
+        if (token == address(0)) revert UseDepositETH();
+        if (amount < minDepositAmount[token]) revert BelowMinimum();
+
+        depositId++;
+
+        IPermit2.PermitTransferFrom memory permit = IPermit2
+            .PermitTransferFrom({
+                permitted: IPermit2.TokenPermissions({
+                    token: token,
+                    amount: amount
+                }),
+                nonce: nonce,
+                deadline: deadline
+            });
+
+        IPermit2.SignatureTransferDetails memory transferDetails = IPermit2
+            .SignatureTransferDetails({
+                to: gnosisSafe,
+                requestedAmount: amount
+            });
+
+        PERMIT2.permitTransferFrom(
+            permit,
+            transferDetails,
+            msg.sender,
+            signature
+        );
+
+        emit DepositRouted(token, amount, msg.sender, stratoAddress, depositId);
+    }
+
+    // using address(0) for ETH
+    function depositETH(
+        address stratoAddress
+    ) external payable whenNotPaused nonReentrant {
+        if (!allowedTokens[address(0)]) revert TokenNotAllowed();
+        if (msg.value < minDepositAmount[address(0)]) revert BelowMinimum();
+
+        depositId++;
+
+        (bool success, ) = gnosisSafe.call{value: msg.value}("");
+        if (!success) revert ETHTransferFailed();
+
+        emit DepositRouted(
+            address(0),
+            msg.value,
+            msg.sender,
+            stratoAddress,
+            depositId
+        );
+    }
+
+    function setTokenAllowed(address token, bool allowed) external onlyOwner {
+        allowedTokens[token] = allowed;
+        emit TokenAllowlistUpdated(token, allowed);
+    }
+
+    function setMinDepositAmount(
+        address token,
+        uint256 minAmount
+    ) external onlyOwner {
+        minDepositAmount[token] = minAmount;
+        emit MinDepositAmountSet(token, minAmount);
+    }
+
+    function batchUpdateTokens(
+        address[] calldata tokens,
+        bool[] calldata allowed,
+        uint256[] calldata minAmounts
+    ) external onlyOwner {
+        if (
+            tokens.length != allowed.length ||
+            tokens.length != minAmounts.length
+        ) {
+            revert ArrayLengthMismatch();
+        }
+
+        for (uint256 i = 0; i < tokens.length; i++) {
+            allowedTokens[tokens[i]] = allowed[i];
+            minDepositAmount[tokens[i]] = minAmounts[i];
+            emit TokenAllowlistUpdated(tokens[i], allowed[i]);
+            emit MinDepositAmountSet(tokens[i], minAmounts[i]);
+        }
+    }
+
+    function setGnosisSafe(address newSafe) external onlyOwner {
+        if (newSafe == address(0)) revert InvalidAddress();
+        if (newSafe == gnosisSafe) revert SameAddressProposed();
+
+        address oldSafe = gnosisSafe;
+        gnosisSafe = newSafe;
+
+        emit GnosisSafeUpdated(oldSafe, newSafe);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    function canDeposit(
+        address token,
+        uint256 amount
+    ) external view returns (bool) {
+        return
+            !paused() &&
+            allowedTokens[token] &&
+            amount >= minDepositAmount[token];
+    }
+
+    function getTokenConfig(
+        address token
+    ) external view returns (bool allowed, uint256 minAmount) {
+        return (allowedTokens[token], minDepositAmount[token]);
+    }
+
+    function getGnosisSafe() public view returns (address) {
+        return gnosisSafe;
+    }
+
+    function version() external pure virtual returns (string memory) {
+        return "1.0.0";
+    }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
+}
+
+// see https://github.com/dragonfly-xyz/useful-solidity-patterns/blob/main/patterns/permit2/Permit2Vault.sol
+interface IPermit2 {
+    struct TokenPermissions {
+        address token;
+        uint256 amount;
+    }
+
+    struct PermitTransferFrom {
+        TokenPermissions permitted;
+        uint256 nonce;
+        uint256 deadline;
+    }
+
+    struct SignatureTransferDetails {
+        address to;
+        uint256 requestedAmount;
+    }
+
+    function permitTransferFrom(
+        PermitTransferFrom memory permit,
+        SignatureTransferDetails calldata transferDetails,
+        address owner,
+        bytes calldata signature
+    ) external;
+}
