@@ -2631,7 +2631,7 @@ certificateMap maybeCert _ =
        in M.union fieldsToUpdate $ emptyFields
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
-runTheConstructors from to hsh cc contractName' argVals = do
+runTheConstructors from to hsh cc contractName' argVals' = do
   let !contract' =
         fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
           cc ^. CC.contracts . at contractName'
@@ -2647,6 +2647,12 @@ runTheConstructors from to hsh cc contractName' argVals = do
       putStrLn $
         box
           ["running constructor: " ++ labelToString contractName' ++ "(" ++ intercalate ", " (map (labelToString . snd) argTypeNames) ++ ")"]
+
+  argVals <- case contract' ^. CC.constructor of
+    Nothing -> pure argVals'
+    Just theConstructor -> validateFunctionArguments theConstructor argVals' >>= \case
+      Just vals -> pure vals
+      Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
   zipped <-
