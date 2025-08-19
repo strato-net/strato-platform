@@ -348,28 +348,34 @@ contract record LendingPool is Ownable {
     function repayAll() external onlyTokenFactory(borrowableAsset) returns (uint amountRepaid) {
         LoanInfo storage loan = userLoan[msg.sender];
         require(loan.scaledDebt > 0, "No active loan");
-
+ 
         _accrue();
-
+ 
         uint owed = (loan.scaledDebt * borrowIndex) / RAY;
         require(owed > 0, "Nothing to repay");
-
+ 
         // Move exact owed into the pool
         LiquidityPool(_liquidityPool()).repay(owed, msg.sender);
         amountRepaid = owed;
-
-        // Reduce scaled debt fully
+ 
+        // Reduce scaled debt fully (eliminate dust)
         uint scaledDelta = (amountRepaid * RAY) / borrowIndex;
-        if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt;
-        loan.scaledDebt -= scaledDelta;
+        if (scaledDelta > loan.scaledDebt) {
+            scaledDelta = loan.scaledDebt;
+        } else if (scaledDelta < loan.scaledDebt) {
+            // Force full zero by consuming any residual due to truncation
+            uint remaining = loan.scaledDebt - scaledDelta;
+            scaledDelta += remaining;
+        }
+        loan.scaledDebt -= scaledDelta; // zero
         totalScaledDebt -= scaledDelta;
-
+ 
         if (loan.scaledDebt == 0) {
             delete userLoan[msg.sender];
         } else {
             loan.lastUpdated = block.timestamp;
         }
-
+ 
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Repaid(msg.sender, borrowableAsset, amountRepaid);
         return amountRepaid;
