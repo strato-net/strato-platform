@@ -87,6 +87,29 @@ export function validateConfigureAssetArgs(args: any) {
   }
 }
 
+export function validateSweepReservesArgs(args: any) {
+  const schema = Joi.object({
+    amount: numericStringField("amount"),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Sweep Reserves Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetDebtCeilingsArgs(args: any) {
+  const schema = Joi.object({
+    assetUnits: numericStringField("assetUnits"),
+    usdValue: numericStringField("usdValue"),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Debt Ceilings Argument Validation Error: " + error.message);
+  }
+}
+
 export function validateLiquidationArgs(args: any) {
   const schema = Joi.object({
     id: Joi.string()
