@@ -1,13 +1,9 @@
 import { config, ZERO_ADDRESS, TRANSFER_EVENT_SIGNATURE } from "../config";
 import { getTransactionReceipt, getTransactionByHash } from "./rpcService";
 import { normalizeAddress, safeToBigInt } from "../utils/utils";
+import { Deposit } from "../types";
 
-export const verifyDepositTransferEvents = async (deposit: {
-  srcChainId: number | string;
-  srcTxHash: string;
-  token: string;
-  amount: string;
-}) => {
+export const verifyDepositTransferEvents = async (deposit: Deposit) => {
   const chainId = typeof deposit.srcChainId === "number" 
     ? deposit.srcChainId 
     : Number(deposit.srcChainId);

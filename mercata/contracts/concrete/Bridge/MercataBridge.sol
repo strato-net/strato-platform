@@ -46,6 +46,7 @@ contract record MercataBridge is Ownable {
     struct DepositInfo {
         address token;        // STRATO token to mint
         address user;         // STRATO recipient
+        address from;         // External chain sender
         uint256 amount;       // amount to mint
         BridgeStatus bridgeStatus; // NONE / INITIATED / COMPLETED / ABORTED
     }
@@ -118,7 +119,8 @@ contract record MercataBridge is Ownable {
         string  srcTxHash,
         address token,
         uint256 amount,
-        address indexed user
+        address indexed user,
+        address from
     );
     event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);   // wrapped tokens minted
 
@@ -280,7 +282,8 @@ contract record MercataBridge is Ownable {
         string  srcTxHash,
         address token,
         uint256 amount,
-        address user
+        address user,
+        address from
     )
         external
         onlyRelayer
@@ -299,12 +302,13 @@ contract record MercataBridge is Ownable {
         deposits[srcChainId][srcTxHash] = DepositInfo(
             token,
             user,
+            from,
             amount,
             BridgeStatus.INITIATED
         );
 
         emit DepositInitiated(
-            srcChainId, srcTxHash, token, amount, user
+            srcChainId, srcTxHash, token, amount, user, from
         );
     }
     
@@ -314,7 +318,8 @@ contract record MercataBridge is Ownable {
         string[]  calldata srcTxHashes,
         address[] calldata tokens,
         uint256[] calldata amounts,
-        address[] calldata users
+        address[] calldata users,
+        address[] calldata froms
     )
         external
         onlyRelayer
@@ -325,7 +330,8 @@ contract record MercataBridge is Ownable {
             n == srcTxHashes.length &&
             n == tokens.length     &&
             n == amounts.length    &&
-            n == users.length,
+            n == users.length      &&
+            n == froms.length,
             "MB: len"
         );
 
@@ -346,11 +352,12 @@ contract record MercataBridge is Ownable {
             deposits[srcChainId][h] = DepositInfo(
                 tokens[i],
                 users[i],
+                froms[i],
                 amounts[i],
                 BridgeStatus.INITIATED
             );
 
-            emit DepositInitiated(srcChainId, h, tokens[i], amounts[i], users[i]);
+            emit DepositInitiated(srcChainId, h, tokens[i], amounts[i], users[i], froms[i]);
         }
     }
 

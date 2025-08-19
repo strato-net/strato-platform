@@ -5,7 +5,7 @@ import {
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
-import { NonEmptyArray, Withdrawal } from "../types";
+import { NonEmptyArray, Withdrawal, Deposit } from "../types";
 import {
   getWithdrawalsByStatus,
   getDepositsByStatus,
@@ -70,7 +70,7 @@ export const startDepositInitiatedPolling = (): void => {
 
       if (verifiedDeposits.length > 0) {
         await confirmDepositBatch(
-          verifiedDeposits as unknown as NonEmptyArray<(typeof verifiedDeposits)[number]>
+          verifiedDeposits as NonEmptyArray<Deposit>
         );
       }
 
