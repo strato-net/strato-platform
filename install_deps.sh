@@ -230,22 +230,18 @@ Linux)
                 postgresql-devel \
                 xz-devel
             
-            # Build leveldb 1.22 (not available in Amazon Linux 2023 repositories)
-            sudo dnf install -q -y cmake
-            git clone --branch 1.22 --recurse-submodules https://github.com/google/leveldb.git
+            # Build leveldb (not available in Amazon Linux 2023 repositories)
+            sudo dnf install -q -y snappy-devel
+            git clone --branch v1.20 --recurse-submodules https://github.com/google/leveldb.git
             cd leveldb
-            mkdir build && cd build
-            cmake -DCMAKE_BUILD_TYPE=Release \
-                  -DBUILD_SHARED_LIBS=ON \
-                  -DCMAKE_CXX_STANDARD=17 \
-                  -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-                  -DLEVELDB_BUILD_TESTS=OFF \
-                  -DLEVELDB_BUILD_BENCHMARKS=OFF \
-                  ..
-            cmake --build . -j$(nproc)
-            sudo cmake --build . --target install
+            make
+            sudo mkdir -p /usr/local/include/leveldb
+            sudo cp -r include/leveldb/* /usr/local/include/leveldb/
+            if [ -f out-shared/libleveldb.so ]; then
+                sudo cp out-shared/libleveldb.so* /usr/local/lib/
+            fi
             cd ..
-            rm -rf leveldb 
+            rm -rf leveldb
             
             # Build secp256k1 (not available in Amazon Linux 2023 repositories)
             sudo dnf install -y autoconf libtool make
@@ -255,6 +251,10 @@ Linux)
             ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
             make
             sudo make install
+            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
+            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
+            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
+            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
             cd ..
             rm -rf secp256k1
 
