@@ -182,6 +182,7 @@ The name of the smart contract will be `RewardsEngine`
  `update` should be called by owners only
  `claim` only user should be allowed to claim rewards
 
+### TODO Delegate pattern
 
 ### Estimate CurrentBalance Reward (IMPLEMENTED)
 
