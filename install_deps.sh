@@ -244,9 +244,9 @@ Linux)
             make
             sudo mkdir -p /usr/local/include/leveldb
             sudo cp -r include/leveldb/* /usr/local/include/leveldb/
-            if [ -f out-shared/libleveldb.so ]; then
-                sudo cp out-shared/libleveldb.so* /usr/local/lib/
-            fi
+            sudo cp out-shared/libleveldb.* /usr/local/lib/
+            sudo cp out-static/libleveldb.a /usr/local/lib/
+            sudo cp /usr/local/lib/libleveldb.so.1 /lib64
             cd ..
             rm -rf leveldb
             
@@ -262,6 +262,7 @@ Linux)
             # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
             # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
             sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
+            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
             cd ..
             rm -rf secp256k1
 
