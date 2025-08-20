@@ -105,6 +105,18 @@ const CollateralModal = ({
   }, [amount, asset, loanData, isSupply]);
 
   const handleAction = () => {
+    const tokenDecimals = asset?.customDecimals ?? 18;
+    try {
+      if (!isSupply) {
+        const amtWei = safeParseUnits(amount || "0", tokenDecimals);
+        if (amtWei >= maxAmount && maxAmount > 0n) {
+          onAction('ALL');
+          setAmount("");
+          setDisplayAmount("");
+          return;
+        }
+      }
+    } catch {}
     onAction(amount);
     setAmount("");
     setDisplayAmount("");

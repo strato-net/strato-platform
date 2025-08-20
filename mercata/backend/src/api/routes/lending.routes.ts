@@ -7,6 +7,10 @@ const router = Router();
 // ----- Pool Information -----
 // Get lending pool information
 router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
+ 
+// New: Helper actions
+router.post("/loans/borrow-max", authHandler.authorizeRequest(), LendingController.borrowMax);
+router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingController.withdrawCollateralMax);
 
 // ----- User Balances & Positions -----
 // Get user's collateral and balance information
@@ -24,6 +28,8 @@ router.post("/pools/liquidity", authHandler.authorizeRequest(), LendingControlle
 
 // Withdraw liquidity from the lending pool
 router.delete("/pools/liquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
+// Withdraw all liquidity (no dust)
+router.post("/pools/withdraw-all", authHandler.authorizeRequest(), LendingController.withdrawLiquidityAll);
 
 // ----- Collateral Management -----
 // Supply collateral
@@ -38,6 +44,9 @@ router.post("/loans", authHandler.authorizeRequest(), LendingController.borrow);
 
 // Repay loan
 router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
+
+// Repay all
+router.post("/loans/repay-all", authHandler.authorizeRequest(), LendingController.repayAll);
 
 // ----- Liquidation Data (Listing) -----
 // Get currently liquidatable loans

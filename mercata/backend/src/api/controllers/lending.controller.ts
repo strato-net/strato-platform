@@ -15,6 +15,9 @@ import {
   getLoan,
   listLiquidatableLoans,
   listNearUnhealthyLoans,
+  repayAll,
+  borrowMax,
+  withdrawCollateralMax,
 } from "../services/lending.service";
 import {
   validateDepositLiquidityArgs,
@@ -77,6 +80,22 @@ class LendingController {
     }
   }
 
+  static async withdrawLiquidityAll(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { withdrawLiquidityAll } = await import("../services/lending.service");
+      const result = await withdrawLiquidityAll(accessToken);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
   static async borrow(
     req: Request,
     res: Response,
@@ -87,6 +106,21 @@ class LendingController {
       validateBorrowArgs(body);
 
       const result = await borrow(accessToken, body.amount);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async borrowMax(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const result = await borrowMax(accessToken);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -140,6 +174,22 @@ class LendingController {
       validateWithdrawCollateralArgs(body);
 
       const result = await withdrawCollateral(accessToken, body.asset, body.amount);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async withdrawCollateralMax(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateWithdrawCollateralArgs(body);
+      const result = await withdrawCollateralMax(accessToken, body.asset);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -204,6 +254,16 @@ class LendingController {
       const result = await executeLiquidationService(accessToken, id, req.body || {});
       res.status(RestStatus.OK).json(result);
       return next();
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async repayAll(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { accessToken, address } = req;
+      const result = await repayAll(accessToken, address as string);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

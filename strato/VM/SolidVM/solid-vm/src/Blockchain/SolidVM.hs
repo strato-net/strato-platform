@@ -1441,7 +1441,9 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
         else case constName `M.lookup` CC._constants cont of
           Nothing -> case constName `M.lookup` (cc ^. CC.flConstants) of
             Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
-            Nothing -> unknownConstant "constant member access" (contractName', constName)
+            Nothing -> case constName `M.lookup` CC._structs cont of
+              Just _ -> pure . Constant $ SStructDef constName
+              Nothing -> unknownConstant "constant member access" (contractName', constName)
           Just (CC.ConstantDecl _ _ constExp _) -> expToVar constExp Nothing
     (SBuiltinVariable "block", "proposer") -> do
       env' <- getEnv
@@ -1500,6 +1502,9 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) _ = do
           if (fromIntegral i) >= length theVector
             then indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
             else return $ theVector V.! fromIntegral i
+        (SVariadic theList, SInteger i) -> case theList !? fromInteger i of
+          Just v -> pure $ Constant v
+          Nothing -> indexOutOfBounds ("index out of range: " ++ (show i)) $ unparseExpression x
         (SMap theMap, _) -> case theMap M.!? theIndex of
           Just v -> return v
           Nothing -> traverse getVar (fmap fst . uncons $ M.elems theMap) >>= \case
@@ -1628,11 +1633,13 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) (CC.OrderedAr
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) (CC.NamedArgs {})) _ =
   typeError "cannot create new bytes with named arguments" x
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t})) (CC.OrderedArgs args)) _ = do
-  ctract <- getCurrentContract
   case args of
     [a] -> do
       len <- getInt =<< expToVar a Nothing
-      return . Constant . SArray . V.replicate (fromIntegral len) . Constant $ defaultValue ctract t
+      ctract <- getCurrentContract
+      cc <- snd <$> getCurrentCodeCollection
+      v <- createDefaultValue cc ctract t
+      Constant . SArray . V.fromList <$> traverse (const $ createVar v) [1..len]
     _ -> arityMismatch "new array" 1 (length args)
 expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {})) CC.NamedArgs {}) _ =
   typeError "cannot create new array with named arguments" x
@@ -1696,11 +1703,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
       return saltValue
 -- case to catch a using statement function like _x.add(3)
 
-expToVar' theFullExp@(CC.FunctionCall _ e args) _ = do
-  mUsingCase <- specialUsingChecker theFullExp
-  case mUsingCase of
-    Just aResult -> return aResult
-    Nothing -> do
+expToVar' (CC.FunctionCall _ e args) _ = do
       argVals <- argsToVals args
       case e of -- FunctionCall Special Case when calling a function via Member Access
         (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall argVals Nothing --Because of the hardcoded Util functions
@@ -2423,6 +2426,35 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
       Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
 callBuiltin "sha256" args = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "ripemd160" args = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
+callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
+  let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
+   in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+callBuiltin "ecMul" [SInteger x1, SInteger y1, SInteger s] =
+  let (x, y) = Builtins.ecMul (x1, y1) s
+   in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
+callBuiltin "ecPairing" [SVariadic xys] =
+  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
+      go []   = Right []
+      go xys' = Left xys'
+   in case go xys of
+        Right points -> pure . SBool $ Builtins.ecPairing points
+        Left xys' -> typeError "invalid args passed to ecPairing" xys'
+callBuiltin "ecPairing" [SArray xys] = do
+  let go (x : y : xys') = ((x,y):) <$> go xys'
+      go []   = Right []
+      go xys' = Left xys'
+  intArray <- traverse getInt $ V.toList xys
+  case go intArray of
+    Right points -> pure . SBool $ Builtins.ecPairing points
+    Left xys' -> typeError "invalid args passed to ecPairing" xys'
+callBuiltin "ecPairing" xys =
+  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
+      go []   = Right []
+      go xys' = Left xys'
+   in case go xys of
+        Right points -> pure . SBool $ Builtins.ecPairing points
+        Left xys' -> typeError "invalid args passed to ecPairing" xys'
 callBuiltin ("payable") [SAccount a _] = return $ SAccount a True
 callBuiltin "require" (SBool cond : msg) = do
   case msg of
@@ -2765,8 +2797,9 @@ runTheCall ::
   Bool ->
   m (Maybe Value)
 runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
-  let !returns = [(n, (t, defaultValue contract' t)) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
+  let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
+  !returns <- traverse (\(n, t) -> ((n,) . (t,)) <$> createDefaultValue cc contract' t) returnNamesAndTypes
 
   theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract' ^. CC.modifiers) of
@@ -3460,59 +3493,6 @@ solidVMExceptionHandler catchBlockMap ex =
         Just (_, block) -> do
           res <- runStatementBlock block
           return res
-
-specialUsingChecker :: MonadSM m => CC.Expression -> m (Maybe Variable)
-specialUsingChecker (CC.FunctionCall _ (CC.MemberAccess _ (CC.Variable firstPos firstArgVar) usingFuncName) (CC.OrderedArgs xs)) = do
-  -- firstArgVar == "_x" and usingFuncName == "add" and xs == [NumberLiteral (line 11, column 19) - (line 11, column 20): ()  1 Nothing]
-  ctrct <- getCurrentContract
-
-  let usingDeclsInContract = ctrct ^. CC.usings -- Map SolidString [UsingF]
-  (_, cc) <- getCurrentCodeCollection
-  let usingDecls = concat $ M.elems usingDeclsInContract
-  -- iterate through the list of using declartions and find ones that have the someString as a function name
-  -- get the usingContract name
-  let usingContractNames = map (\y -> y ^. CC.usingContract) usingDecls
-  -- search through the contracts in the code collection for the contract with the name usingContractName
-  let contracts = cc ^. CC.contracts
-  let usingContracts = map (\y -> M.lookup y contracts) usingContractNames
-  let usingContracts' = catMaybes usingContracts
-  -- look throught the functions of each contract and find the one with the name usingFuncName
-  let usingFunctions = map (\y -> (^. CC.functions) y) usingContracts'
-  let theFunction = map (\y -> M.lookup usingFuncName y) usingFunctions
-  let theFunction' = catMaybes theFunction
-  let theFunction'' = case theFunction' of
-        [] -> Nothing
-        (x : _) -> Just x -- big unknown if there are two functions with the same name
-  case theFunction'' of
-    Nothing -> return Nothing
-    (Just tf) -> do
-      -- add theFunction' to the current contract's functions
-      addFunctionToCurrentContractInCurrentCallInfo usingFuncName tf
-
-      -- now we need to get the value of the firstArgVar and prepend it to the xs list
-      let x' = (CC.Variable (firstPos) firstArgVar)
-      let dummyAnnotation :: SourceAnnotation ()
-          dummyAnnotation =
-            SourceAnnotation
-              { _sourceAnnotationStart =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationEnd =
-                  SourcePosition
-                    { _sourcePositionName = "",
-                      _sourcePositionLine = 0,
-                      _sourcePositionColumn = 0
-                    },
-                _sourceAnnotationAnnotation = ()
-              }
-
-      theResult <- expToVar (CC.FunctionCall dummyAnnotation (CC.Variable dummyAnnotation usingFuncName) (CC.OrderedArgs (x' : xs))) Nothing
-      removeFunctionFromCurrentContractInCurrentCallInfo usingFuncName
-      return $ Just theResult
-specialUsingChecker _ = return $ Nothing
 
 -- checks if an argument list is valid for a given function signature
 validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe ValList)

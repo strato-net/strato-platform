@@ -1,217 +1,154 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
-import { api } from '@/lib/axios';
-
-interface Token {
-  name: string;
-  symbol: string;
-  tokenAddress: string;
-  decimals: number;
-  icon: string;
-  chainId: number;
-  exchangeTokenSymbol?: string;
-  exchangeTokenName?: string;
-}
-
-interface BridgeInParams {
-  amount: string;
-  fromAddress: string;
-  tokenAddress: string;
-  ethHash: string;
-}
-
-interface BridgeOutParams {
-  amount: string;
-  toAddress: string;
-  tokenAddress: string;
-}
-
-interface BalanceResponse {
-  balance: string;
-}
-
-interface BridgeResponse {
-  success: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data?: any;
-}
-
-interface BridgeConfig {
-  showTestnet: boolean;
-  safeAddress: string;
-}
-
-type BridgeContextType = {
-  // State
-  bridgeInTokens: Token[];
-  bridgeOutTokens: Token[];
-  loading: boolean;
-  error: string | null;
-  config: BridgeConfig | null;
-  
-  // Bridge In Functions
-  fetchBridgeInTokens: () => Promise<Token[]>;
-  bridgeIn: (params: BridgeInParams) => Promise<BridgeResponse>;
-  
-  // Bridge Out Functions
-  fetchBridgeOutTokens: () => Promise<Token[]>;
-  bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
-  getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
-  
-  // Bridge Config Functions
-  fetchBridgeConfig: () => Promise<BridgeConfig>;
-  
-  // Utility Functions
-  formatBalance: (value: bigint | string, decimals: number) => string;
-};
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  ReactNode,
+} from "react";
+import { api } from "@/lib/axios";
+import {
+  Token,
+  BridgeOutParams,
+  BalanceResponse,
+  BridgeResponse,
+  NetworkConfigFromAPI,
+  NetworkSummary,
+  BridgeContextType,
+} from "@/lib/bridge/types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
 export const BridgeProvider = ({ children }: { children: ReactNode }) => {
-  const [bridgeInTokens, setBridgeInTokens] = useState<Token[]>([]);
-  const [bridgeOutTokens, setBridgeOutTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [config, setConfig] = useState<BridgeConfig | null>(null);
+  const [availableNetworks, setAvailableNetworks] = useState<NetworkSummary[]>(
+    [],
+  );
+  const [bridgeableTokens, setBridgeableTokens] = useState<Token[]>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
+  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [networksLoaded, setNetworksLoaded] = useState(false);
 
-  const formatBalance = useCallback((value: bigint | string, decimals: number): string => {
-    if (typeof value === 'bigint') {
-      const formattedBalance = Number(value) / Math.pow(10, decimals);
-      return formattedBalance.toFixed(decimals);
-    } else {
-      const numericValue = parseFloat(value);
-      if (isNaN(numericValue)) return "0";
-      return numericValue.toFixed(decimals);
-    }
-  }, []);
+  const fetchTokensForChain = useCallback(
+    async (chainId: string) => {
+      try {
+        const { data } = await api.get<Token[]>(
+          `/bridge/bridgeableTokens/${chainId}`,
+        );
+        const tokens = Array.isArray(data) ? data : [];
+        setBridgeableTokens(tokens);
 
-  const fetchBridgeConfig = useCallback(async (): Promise<BridgeConfig> => {
-    setLoading(true);
-    
-    try {
-      const response = await api.get(`/bridge/config`);
-      let bridgeConfig = response.data.data.data;
-      if (!bridgeConfig) {
-        bridgeConfig = response.data;
+        // Set initial token if none is selected
+        if (tokens.length > 0 && !selectedToken) {
+          setSelectedToken(tokens[0]);
+        }
+      } catch (e) {
+        setBridgeableTokens([]);
+        setError("Failed to load tokens for selected network");
       }
-      setConfig(bridgeConfig);
-      return bridgeConfig;
-    } catch (err) {
-      throw err ;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [selectedToken],
+  );
 
-  const fetchBridgeInTokens = useCallback(async (): Promise<Token[]> => {
+  const loadNetworksAndTokens = useCallback(async () => {
+    if (loading || networksLoaded) return;
     setLoading(true);
-    
+
     try {
-      const response = await api.get(`/bridge/bridgeInTokens`);
-      // Get tokens from the correct path
-      let tokens = response.data.data.data.bridgeInTokens;
-      // Ensure tokens is always an array
-      if (!Array.isArray(tokens)) {
-        tokens = [];
+      const { data } = await api.get<NetworkConfigFromAPI[]>(
+        `/bridge/networkConfigs`,
+      );
+
+      const networks: NetworkSummary[] = (data || [])
+        .filter((cfg) => cfg?.chainInfo?.enabled)
+        .map((cfg) => ({
+          chainId: cfg.chainId,
+          chainName: cfg.chainInfo.chainName,
+          enabled: cfg.chainInfo.enabled,
+          depositRouter: cfg.chainInfo.depositRouter,
+        }));
+
+      setAvailableNetworks(networks);
+      setNetworksLoaded(true);
+
+      if (!selectedNetwork && networks.length > 0) {
+        const defaultName = networks[0].chainName;
+        setSelectedNetwork(defaultName);
+        await fetchTokensForChain(networks[0].chainId);
       }
-      
-      setBridgeInTokens(tokens);
-      return tokens;
-    } catch (err) {
-      setBridgeInTokens([]);
-      return [];
+    } catch (e) {
+      setError("Failed to load networks");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [fetchTokensForChain, loading, networksLoaded, selectedNetwork]);
 
-  const bridgeIn = useCallback(async (params: BridgeInParams): Promise<BridgeResponse> => {
-    setLoading(true);
-    
-    try {
-      const response = await api.post(`/bridge/bridgeIn`, params);
+  const handleSetSelectedNetwork = useCallback(
+    async (networkName: string) => {
+      setSelectedNetwork(networkName);
+      setBridgeableTokens([]);
 
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (err) {
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      const cfg = availableNetworks.find((n) => n.chainName === networkName);
+      if (!cfg) return;
 
-  const fetchBridgeOutTokens = useCallback(async (): Promise<Token[]> => {
-    setLoading(true);
-    
-    try {
-      const response = await api.get(`/bridge/bridgeOutTokens`);
-      // Get tokens from the correct path
-      let tokens = response.data.data.data.bridgeOutTokens;
-      
-      // Ensure tokens is always an array
-      if (!Array.isArray(tokens)) {
-        tokens = [];
+      await fetchTokensForChain(cfg.chainId);
+    },
+    [availableNetworks, fetchTokensForChain],
+  );
+
+  const bridgeOut = useCallback(
+    async (params: BridgeOutParams): Promise<BridgeResponse> => {
+      setLoading(true);
+      try {
+        const { data } = await api.post(`/bridge/bridgeOut`, params);
+        return { success: true, data };
+      } catch (e) {
+        setError("Bridge out failed");
+        throw e;
+      } finally {
+        setLoading(false);
       }
-      
-      setBridgeOutTokens(tokens);
-      return tokens;
-    } catch (err) {
-      setBridgeOutTokens([]);
-      return [];
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    },
+    [],
+  );
 
-  const bridgeOut = useCallback(async (params: BridgeOutParams): Promise<BridgeResponse> => {
-    setLoading(true);
-    
-    try {
-      const response = await api.post(`/bridge/bridgeOut`, params);
-
-      return {
-        success: true,
-        data: response.data
-      };
-    } catch (err) {
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const getBalance = useCallback(async (tokenAddress: string): Promise<BalanceResponse> => {
-    setLoading(true);
-    
-    try {
-      const formattedTokenAddress = tokenAddress.startsWith("0x")
-        ? tokenAddress
-        : `0x${tokenAddress}`;
-      const response = await api.get(`/bridge/balance/${formattedTokenAddress}`);
-      return { balance: response.data.data.balance };
-    } catch (err) {
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const getBalance = useCallback(
+    async (tokenAddress: string): Promise<BalanceResponse> => {
+      setLoading(true);
+      try {
+        const addr = tokenAddress.startsWith("0x")
+          ? tokenAddress.slice(2)
+          : tokenAddress;
+        const { data } = await api.get(`/tokens/balance?address=eq.${addr}`);
+        const balance =
+          Array.isArray(data) && data[0]?.balance
+            ? String(data[0].balance)
+            : "0";
+        return { balance };
+      } catch (e) {
+        setError("Failed to fetch balance");
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
 
   return (
     <BridgeContext.Provider
       value={{
-        bridgeInTokens,
-        bridgeOutTokens,
         loading,
         error,
-        config,
-        fetchBridgeInTokens,
-        bridgeIn,
-        fetchBridgeOutTokens,
+        availableNetworks,
+        bridgeableTokens,
+        selectedNetwork,
+        selectedToken,
         bridgeOut,
         getBalance,
-        fetchBridgeConfig,
-        formatBalance,
+        setSelectedNetwork: handleSetSelectedNetwork,
+        setSelectedToken,
+        loadNetworksAndTokens,
       }}
     >
       {children}
@@ -221,6 +158,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
 export const useBridgeContext = (): BridgeContextType => {
   const context = useContext(BridgeContext);
-  if (!context) throw new Error('useBridgeContext must be used within a BridgeProvider');
+  if (!context)
+    throw new Error("useBridgeContext must be used within a BridgeProvider");
   return context;
-}; 
+};
