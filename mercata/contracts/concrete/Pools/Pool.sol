@@ -81,7 +81,10 @@ contract record Pool is Ownable {
 
     /// @notice Pool-specific LP share percentage in basis points (0 = use factory default)
     uint256 public lpSharePercent;
-    
+
+    /// @notice Address of the rewards engine contract
+    address public rewardsEngine;
+
     // ============ MODIFIERS ============
 
     /// @notice Prevents reentrant calls to functions
@@ -135,7 +138,8 @@ contract record Pool is Ownable {
     constructor(
         address tokenAAddr,
         address tokenBAddr,
-        address lpTokenAddr
+        address lpTokenAddr,
+        address _rewardsEngine
     ) Ownable(msg.sender) {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
@@ -144,6 +148,7 @@ contract record Pool is Ownable {
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         lpToken = Token(lpTokenAddr);
+        rewardsEngine = _rewardsEngine;
     }
 
     // ============ UTILITY FUNCTIONS ============
@@ -343,5 +348,12 @@ contract record Pool is Ownable {
 
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
+    }
+
+    /// @notice Set the rewards engine address (owner only)
+    /// @param _rewardsEngine The new rewards engine contract address
+    /// @dev This function can only be called by the owner of the pool which is the PoolFactory contract
+    function setRewardsEngine(address _rewardsEngine) external onlyOwner {
+        rewardsEngine = _rewardsEngine;
     }
 }
