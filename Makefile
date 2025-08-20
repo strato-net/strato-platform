@@ -122,7 +122,7 @@ build_common:
 	mkdir -p ${VAULTDIR}
 	mkdir -p ${IDENTITYDIR}
 	cd strato && stack install \
-		--test --no-run-tests \
+		--test --no-run-tests
 
 build_common_docker: build_buildbase
 	@echo building haskell libraries and creating directories in docker
