@@ -13,7 +13,7 @@ contract record PoolConfigurator is Ownable {
    
     LendingRegistry public immutable registry;
 
-    event AssetConfigured(address indexed asset, uint256 ltv, uint256 liquidationThreshold, uint256 liquidationBonus, uint256 interestRate);
+    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate);
 
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry");
@@ -44,18 +44,23 @@ contract record PoolConfigurator is Ownable {
         address priceOracle,
         address tokenFactory,
         address[] calldata assets,
-        uint256[] calldata ltvs,
-        uint256[] calldata liquidationThresholds,
-        uint256[] calldata liquidationBonuses,
-        uint256[] calldata interestRates,
-        uint256[] calldata reserveFactors
+        uint[] calldata ltvs,
+        uint[] calldata liquidationThresholds,
+        uint[] calldata liquidationBonuses,
+        uint[] calldata interestRates,
+        uint[] calldata reserveFactors,
+        uint debtCeilingAssetUnits,
+        uint debtCeilingUSD
     ) external onlyOwner {
         // Set all registry components
         registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
         
         // Set token factory
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.setTokenFactory(tokenFactory);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setTokenFactory(tokenFactory);
+
+        // Set initial debt ceilings
+        pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
         
         // Configure all assets if provided
         if (assets.length > 0) {
@@ -66,8 +71,8 @@ contract record PoolConfigurator is Ownable {
             require(interestRates.length == assets.length, "Interest rates length mismatch");
             require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
             
-            for (uint256 i = 0; i < assets.length; i++) {
-                lendingPool.configureAsset(
+            for (uint i = 0; i < assets.length; i++) {
+                pool.configureAsset(
                     assets[i], 
                     ltvs[i], 
                     liquidationThresholds[i], 
@@ -91,11 +96,11 @@ contract record PoolConfigurator is Ownable {
      */
     function configureAssets(
         address[] calldata assets,
-        uint256[] calldata ltvs,
-        uint256[] calldata liquidationThresholds,
-        uint256[] calldata liquidationBonuses,
-        uint256[] calldata interestRates,
-        uint256[] calldata reserveFactors
+        uint[] calldata ltvs,
+        uint[] calldata liquidationThresholds,
+        uint[] calldata liquidationBonuses,
+        uint[] calldata interestRates,
+        uint[] calldata reserveFactors
     ) external onlyOwner {
         // Validate array lengths match
         require(assets.length > 0, "No assets provided");
@@ -105,9 +110,9 @@ contract record PoolConfigurator is Ownable {
         require(interestRates.length == assets.length, "Interest rates length mismatch");
         require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
         
-        for (uint256 i = 0; i < assets.length; i++) {
-            LendingPool lendingPool = LendingPool(registry.getLendingPool());
-            lendingPool.configureAsset(
+        for (uint i = 0; i < assets.length; i++) {
+            LendingPool pool = LendingPool(registry.getLendingPool());
+            pool.configureAsset(
                 assets[i], 
                 ltvs[i], 
                 liquidationThresholds[i], 
@@ -130,14 +135,14 @@ contract record PoolConfigurator is Ownable {
      */
     function configureAsset(
         address asset,
-        uint256 ltv,
-        uint256 liquidationThreshold,
-        uint256 liquidationBonus,
-        uint256 interestRate,
-        uint256 reserveFactor
+        uint ltv,
+        uint liquidationThreshold,
+        uint liquidationBonus,
+        uint interestRate,
+        uint reserveFactor
     ) external onlyOwner {
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.configureAsset(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.configureAsset(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor);
         emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate);
     }
 
@@ -146,9 +151,9 @@ contract record PoolConfigurator is Ownable {
      * @param asset The asset address
      * @return ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor
      */
-    function getAssetConfig(address asset) external view returns (uint256, uint256, uint256, uint256, uint256) {
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        return lendingPool.getAssetConfig(asset);
+    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint) {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        return pool.getAssetConfig(asset);
     }
 
     /**
@@ -156,8 +161,8 @@ contract record PoolConfigurator is Ownable {
      * @param _tokenFactory The token factory address
      */
     function setTokenFactory(address _tokenFactory) external onlyOwner {
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.setTokenFactory(_tokenFactory);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setTokenFactory(_tokenFactory);
     }
 
     /**
@@ -165,22 +170,36 @@ contract record PoolConfigurator is Ownable {
      * @param _feeCollector The fee collector address
      */
     function setFeeCollector(address _feeCollector) external onlyOwner {
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.setFeeCollector(_feeCollector);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setFeeCollector(_feeCollector);
     }
 
      // Setter function for borrowable asset
     function setBorrowableAsset(address asset) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.setBorrowableAsset(asset);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setBorrowableAsset(asset);
     }
 
     // Setter function for mToken
     function setMToken(address mToken) external onlyOwner {
         require(mToken != address(0), "Invalid mToken address");
-        LendingPool lendingPool = LendingPool(registry.getLendingPool());
-        lendingPool.setMToken(mToken);
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setMToken(mToken);
     }
-    
+
+    /// @notice Governance setter to update debt ceilings later
+    function setDebtCeilings(uint assetUnits, uint usdValue) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setDebtCeilings(assetUnits, usdValue);
+    }
+
+    /**
+     * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
+     * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
+     */
+    function sweepReserves(uint amount) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.sweepReserves(amount);
+    }
 } 
