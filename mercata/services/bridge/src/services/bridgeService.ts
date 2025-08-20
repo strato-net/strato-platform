@@ -2,16 +2,17 @@ import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
 import { createSafeTransactionsForWithdrawals } from "./safeService";
-import { NonEmptyArray, Withdrawal } from "../types";
+import { NonEmptyArray, Withdrawal, Deposit } from "../types";
 
 import { logInfo, logError } from "../utils/logger";
 
-export const depositBatch = async (deposits: NonEmptyArray<any>) => {
+export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
   const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
   const tokens = deposits.map((deposit) => deposit.token);
   const amounts = deposits.map((deposit) => deposit.amount);
   const users = deposits.map((deposit) => deposit.user);
+  const froms = deposits.map((deposit) => deposit.from);
 
   await execute({
     contractName: "MercataBridge",
@@ -23,6 +24,7 @@ export const depositBatch = async (deposits: NonEmptyArray<any>) => {
       tokens: tokens,
       amounts: amounts,
       users: users,
+      froms: froms,
     },
   });
 
@@ -32,7 +34,7 @@ export const depositBatch = async (deposits: NonEmptyArray<any>) => {
   );
 };
 
-export const confirmDepositBatch = async (deposits: NonEmptyArray<any>) => {
+export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
   const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
 
@@ -49,6 +51,26 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<any>) => {
   logInfo(
     "BridgeService",
     `Successfully confirmed ${deposits.length} deposits`,
+  );
+};
+
+export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
+  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "reviewDepositBatch",
+    args: {
+      srcChainIds: srcChainIds,
+      srcTxHashes: srcTxHashes,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Successfully set ${deposits.length} deposits to pending review`,
   );
 };
 

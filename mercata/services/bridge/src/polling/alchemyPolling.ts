@@ -6,7 +6,7 @@ import {
   getEnabledAssets,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
-import { NonEmptyArray } from "../types";
+import { NonEmptyArray, Deposit } from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
@@ -64,6 +64,7 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
   const tokenMapping = await getStratoTokenMapping(chainId);
   return logs.map((log) => {
     const externalToken = normalizeAddress(log.topics[1]);
+    const sender = normalizeAddress(log.topics[2]);
     const stratoAddress = normalizeAddress(log.topics[3]);
     const amount = "0x" + log.data.substring(2, 66);
 
@@ -84,6 +85,7 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
       token: tokenInfo.stratoToken,
       amount: convertedAmount,
       user: stratoAddress,
+      from: sender,
     };
   });
 };
@@ -126,7 +128,7 @@ const pollChainForDeposits = async (chain: any) => {
     }
 
     if (filteredDeposits.length > 0) {
-      await depositBatch(filteredDeposits as NonEmptyArray<any>);
+      await depositBatch(filteredDeposits as NonEmptyArray<Deposit>);
     }
 
     await updateLastProcessedBlock(chainId, currentBlock);

@@ -82,6 +82,15 @@ export interface PreparedWithdrawal {
   chainId: number;
 }
 
+export interface Deposit {
+  srcChainId: string | number;
+  srcTxHash: string;
+  token: string;
+  amount: string;
+  user: string;
+  from: string;
+}
+
 export interface Withdrawal {
   destChainId: string | number;
   token: string;

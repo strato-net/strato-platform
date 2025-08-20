@@ -9,6 +9,7 @@ import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
+import { useLendingContext } from "@/context/LendingContext";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
@@ -30,6 +31,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     healthImpact: 0,
     isHealthy: true,
   });
+  const { borrowMax } = useLendingContext();
 
   // Calculate risk level for borrow form
   useEffect(() => {
@@ -108,7 +110,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <div className="flex justify-between">
           <span className="text-sm text-gray-500">Total Amount Owed</span>
           <span className="font-medium">
-            USDST {loans?.totalAmountOwed ? formatUnits(loans.totalAmountOwed, 18) : "0.00"}
+            {(() => {
+              const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
+              const display = owed <= 1n ? 0n : owed;
+              return `USDST ${formatUnits(display, 18)}`;
+            })()}
           </span>
         </div>
         <div className="flex justify-between">
@@ -127,15 +133,20 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           <div>
             <button
               type="button"
-              onClick={() => {
-                const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
-                setBorrowAmount(availableToBorrowFormatted);
-                setBorrowDisplayAmount(addCommasToInput(availableToBorrowFormatted));
-                handlePollingUpdate(availableToBorrowFormatted);
+              onClick={async () => {
+                try {
+                  await borrowMax();
+                  // After borrowMax, clear input and rely on refresh from parent
+                  setBorrowAmount("");
+                  setBorrowDisplayAmount("");
+                  handlePollingUpdate("");
+                } catch {
+                  // noop
+                }
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
               className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-              title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to maximum available amount"}
+              title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to safe maximum available amount"}
             >
               Max :
             </button>
