@@ -76,7 +76,6 @@ import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Traversable (for)
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
 import SolidVM.Model.Storable
 import qualified SolidVM.Model.CodeCollection as CC
@@ -241,10 +240,10 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
-  diffsAndEvents <- populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr
-  for_ diffsAndEvents $ \(sd, vmes) -> do
-    commitSqlDiffs sd
-    void $ produceVMEvents vmes
+  let pub sd vmes = do
+        commitSqlDiffs sd
+        void $ produceVMEvents vmes
+  populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub
 
 populateStorageDBs' ::
   ( MonadIO m,
@@ -260,8 +259,9 @@ populateStorageDBs' ::
   Block ->
   Maybe Word256 ->
   MP.StateRoot ->
-  m [(StateDiff.StateDiff, [VMEvent])]
-populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
+  (StateDiff.StateDiff -> [VMEvent] -> m ()) ->
+  m ()
+populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub = do
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
@@ -269,7 +269,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
   let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
       events = genesisInfoEvents genesisInfo
 
-  diffAndEvents <- for addresses $ \address -> do
+  for_ addresses $ \address -> do
     -- Fetch full address state from the state database
     fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
@@ -296,10 +296,9 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr = do
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
     vmEvents <- squashMap (toAction addressEvents) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
-    pure (mkStateDiff fullAccountDiffs, vmEvents)
+    pub (mkStateDiff fullAccountDiffs) vmEvents
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  pure diffAndEvents
 
   where
 

@@ -893,10 +893,10 @@ corePeerSetup = do
           metadatas = M.fromList $ hashAndMd <$> srcInfo
           findMetadata = flip M.lookup metadatas
       slip <- asks _corePeerSlipstreamSource
-      sdsAndVMEs <- withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader)
-      for_ sdsAndVMEs $ \(sd, vmes) -> do
-        Mod.output sd
-        atomically $ writeTQueue slip vmes
+      let pub sd vmes = do
+            Mod.output sd
+            atomically $ writeTQueue slip vmes
+      withCurrentBlockHash genHash $ populateStorageDBs' findMetadata genesisInfo gb Nothing (stateRoot genHeader) pub
 
 -- | A simple wrapper around a "TQueue". As data is pushed into the queue, the
 --   source will read it and pass it down the conduit pipeline.
