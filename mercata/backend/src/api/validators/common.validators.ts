@@ -63,4 +63,30 @@ export const numericStringField = (label: string, { allowZero = false } = {}) =>
       "number.positive": `"${label}" must be greater than 0`,
       "any.required": `"${label}" is required`,
     });
+
+export function validateRawParams(args: any): Record<string, string | undefined> {
+  if (!args || typeof args !== "object") {
+    return {};
+  }
+
+  // Convert to proper format and filter out undefined values
+  const validatedParams = Object.fromEntries(
+    Object.entries(args).filter(([_, v]) => v !== undefined)
+  ) as Record<string, string | undefined>;
+
+  // Validate that all values are strings
+  const schema = Joi.object().pattern(
+    Joi.string(),
+    Joi.string().allow("")
+  );
+
+  const { error } = schema.validate(validatedParams);
+  if (error) {
+    const err = new Error("Query Parameter Validation Error: " + error.message);
+    (err as any).statusCode = StatusCodes.BAD_REQUEST;
+    throw err;
+  }
+
+  return validatedParams;
+}
   

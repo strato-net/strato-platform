@@ -3,6 +3,12 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
+import { 
+  buildQueryParams, 
+  enrichTransactionData, 
+  executeParallelQueries, 
+  QUERY_CONFIGS 
+} from "../helpers/bridge.helper";
 
 const { MercataBridge, Token } = constants;
 
@@ -38,101 +44,36 @@ export const bridgeOut = async (
   return { status, hash, message: "Withdrawal request submitted successfully" };
 };
 
-export const getBridgeStatus = async (
+export const getBridgeTransactions = async (
   accessToken: string,
-  userAddress: string,
+  type: 'withdrawal' | 'deposit',
+  userAddress?: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
-  try {
-    if (!userAddress) {
-      throw new Error('User address is required');
-    }
-
-    // Extract status from rawParams
-    const { status } = rawParams;
-   
-    // Get bridge assets to match with transactions
-    const bridgeAssets = await getBridgeAssets(accessToken);
-    
-    let url: string;
-    let params: Record<string, any>;
-
-    if (status === 'WithdrawalInitiated') {
-      // Same params and URL as before for WithdrawalInitiated
-      url = `/${MercataBridge}-withdrawals`;
-      params = {
-        order: 'block_timestamp.desc',
-        select: "withdrawalId:key,withdrawalInfo:value,block_timestamp,transaction_hash",
-        "value->>user": `eq.${userAddress}`,
-        address: `eq.${constants.mercataBridge}`
-      };
-      
-   
-      
-    } else if (status === 'DepositInitiated') {
-     
-      // Different URL and params for DepositInitiated
-      url = `/${MercataBridge}-deposits`;
-      params = {  
-         order: 'block_timestamp.desc',
-     select: "chainId:key,depositInfo:value,block_timestamp,transaction_hash",
-          "value->>user": `eq.${userAddress}`,   // how to get this address 156947246105159104636409351615097004700443525326?
-        address: `eq.${constants.mercataBridge}`
-      };
-      
-    } else {
-      throw new Error('Invalid status. Must be either "WithdrawalInitiated" or "DepositInitiated"');
-    }
-    
-    const { data: results } = await cirrus.get(accessToken, url, { params });
-    
-    if (!results || !results.length) return [];
-
-    // Enrich results with bridge asset data
-    const enrichedResults = results.map((result: any) => {
-      let matchingAsset;
-      
-      if (status === 'WithdrawalInitiated') {
-        // Match destChainId AND token from withdrawalInfo with bridge assets
-        matchingAsset = bridgeAssets.find((asset: any) => 
-          asset.value.chainId === result.withdrawalInfo?.destChainId &&
-          asset.key === result.withdrawalInfo?.token
-        );
-      } else if (status === 'DepositInitiated') {
-        // Match chainId AND token from depositInfo with bridge assets
-        matchingAsset = bridgeAssets.find((asset: any) => 
-          asset.value.chainId === String(result.chainId) &&
-          asset.value.extToken === result.depositInfo?.token
-        );
-      }
-
-      if (matchingAsset) {
-        return {
-          ...result,
-          stratoToken: matchingAsset.stratoToken,
-          stratoTokenName: matchingAsset.stratoTokenName,
-          stratoTokenSymbol: matchingAsset.stratoTokenSymbol,
-          extName: matchingAsset.value.extName,
-          extToken: matchingAsset.value.extToken
-        };
-      } else {
-        // Return result with default values if no match found
-        return {
-          ...result,
-          stratoToken: "-",
-          stratoTokenName: "-",
-          stratoTokenSymbol: "-",
-          extName: "-",
-          extToken: "-"
-        };
-      }
-    });
-    return enrichedResults;
+  const bridgeAssets = await getBridgeAssets(accessToken);
+  const config = QUERY_CONFIGS[type];
   
-  } catch (error) {
-    console.error("Error in getBridgeStatus:", error);
-    throw error;
+  const dataParams = {
+    select: config.selectFields,
+    ...buildQueryParams(rawParams, userAddress)
+  };
+
+  const countParams = {
+    select: config.countField,
+    ...buildQueryParams(rawParams, userAddress, ['limit', 'offset', 'order', 'select'])
+  };
+
+  const { results, totalCount } = await executeParallelQueries(
+    accessToken, config, dataParams, countParams
+  );
+
+  if (!results.length) {
+    return { data: [], totalCount };
   }
+
+  const enrichedData = enrichTransactionData(results, bridgeAssets, config.enrichmentType);
+  
+  return { data: enrichedData, totalCount };
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId: string) => {

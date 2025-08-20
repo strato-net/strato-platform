@@ -1,71 +1,43 @@
 import { useEffect, useState } from 'react';
 import { Clock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { message, Table } from 'antd';
+import { Table, Select, Space, Card } from 'antd';
 import { CopyOutlined, FrownOutlined } from '@ant-design/icons';
-import { useTransactionContext } from '@/context/TransactionContext';
-import { SUPPORTED_CHAINS } from '@/lib/bridge/constants';
-
-interface WithdrawTransaction {
-  transaction_hash: string;
-  block_timestamp: string;
-  from: string;
-  to: string;
-  destChainId?: number;
-  amount: string;
-  txHash?: string;
-  token?: string;
-  key?: string;
-  withdrawalStatus?: string;
-  tokenSymbol?: string;
-  ethTokenSymbol?: string;
-  ethTokenAddress?: string;
-}
-
-const ITEMS_PER_PAGE = 10;
+import { useBridgeContext } from '@/context/BridgeContext';
+import { formatTxHash, formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleCopyToClipboard } from '@/lib/bridge/utils';
+import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
+import { WithdrawTransaction } from '@/lib/bridge/types';
+import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 
 const WithdrawTransactionDetails = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  const [withdrawalStatus, setWithdrawalStatus] = useState('WithdrawalInitiated');
+  const [withdrawalStatus, setWithdrawalStatus] = useState<number | null>(null);
+  const [selectedChainId, setSelectedChainId] = useState<number | null>(null);
   const [transactions, setTransactions] = useState<WithdrawTransaction[]>([]);
-  const [chainId, setChainId] = useState<number>(0);
-  const [chainName, setChainName] = useState<string>("");
-
-  // Function to get chain name from chainId
-  const getChainName = (chainId: number): string => {
-    const chainEntries = Object.entries(SUPPORTED_CHAINS);
-    const chainEntry = chainEntries.find(([_, id]) => id === chainId);
-    return chainEntry ? chainEntry[0] : "Unknown Chain";
-  };
-
-  // Update chainId and chainName when transactions change
-  useEffect(() => {
-    if (transactions.length > 0 && transactions[0].destChainId) {
-      const firstChainId = transactions[0].destChainId;
-      setChainId(firstChainId);
-      setChainName(getChainName(firstChainId));
-    } else {
-      setChainId(0);
-      setChainName("");
-    }
-  }, [transactions]);
 
   const {
     loading: isLoading,
     fetchWithdrawTransactions,
-    formatDate,
-    copyToClipboard,
-    renderTruncatedAddress
-  } = useTransactionContext();
+  } = useBridgeContext();
 
   useEffect(() => {
     const loadTransactions = async () => {
       try {
-        const result = await fetchWithdrawTransactions({
-          status: withdrawalStatus,
-          page: currentPage,
-          limit: ITEMS_PER_PAGE
-        });
+        const params: Record<string, string> = {
+          limit: ITEMS_PER_PAGE.toString(),
+          offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
+          order: 'block_timestamp.desc',
+        };
+        
+        if (withdrawalStatus !== null) {
+          params.status = `eq.${withdrawalStatus}`;
+        }
+        
+        if (selectedChainId !== null) {
+          params.destChainId = `eq.${selectedChainId}`;
+        }
+        
+        const result = await fetchWithdrawTransactions(params);
         setTransactions(result.data);
         setTotalCount(result.totalCount);
       } catch (error) {
@@ -76,64 +48,42 @@ const WithdrawTransactionDetails = () => {
     };
 
     loadTransactions();
-  }, [currentPage, withdrawalStatus, fetchWithdrawTransactions]);
-
-  const handleCopyToClipboard = async (text: string) => {
-    try {
-      await copyToClipboard(text);
-      message.success('Copied to clipboard');
-    } catch (error) {
-      message.error('Failed to copy');
-    }
-  };
-
-  const renderTruncatedAddressWithCopy = (address: string) => {
-    if (!address) return '-';
-    return (
-      <div className="group relative flex items-center gap-2">
-        <span className="cursor-pointer">
-          {renderTruncatedAddress(address)}
-        </span>
-        <CopyOutlined 
-          className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors" 
-          onClick={() => handleCopyToClipboard(address)}
-        />
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
-          {address}
-        </div>
-      </div>
-    );
-  };
-
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalCount);
+  }, [currentPage, withdrawalStatus, selectedChainId, fetchWithdrawTransactions]);
 
   const columns = [
     {
       title: 'From (STRATO)',
       dataIndex: 'from',
       key: 'from',
-      render: (text: string) => renderTruncatedAddressWithCopy(text),
+      render: (text: string) => renderTruncatedAddressWithCopy(text, handleCopyToClipboard),
       width: 100,
     },
     {
-      title: `To (${chainName || ""})`,
+      title: "To",
       dataIndex: 'to',
       key: 'to',
-      render: (text: string) => renderTruncatedAddressWithCopy(text),
-      width: 100,
+      render: (text: string, record: WithdrawTransaction) => (
+        <div>
+          <div className="text-xs text-gray-500 mb-1">
+            {record.destChainId ? getChainName(record.destChainId) : "Unknown Chain"}
+          </div>
+          {renderTruncatedAddressWithCopy(text, handleCopyToClipboard)}
+        </div>
+      ),
+      width: 120,
     },
     {
-      title: `Token (${chainName || ""})`,
+      title: "Token (External)",
       dataIndex: 'ethTokenSymbol',
       key: 'ethTokenSymbol',
       render: (text: string, record: WithdrawTransaction) => (
         <div className="flex flex-col gap-1">
-          {/* <span>{text || '-'}</span> */}
+          <div className="text-xs text-gray-500 mb-1">
+            {record.destChainId ? getChainName(record.destChainId) : "Unknown Chain"}
+          </div>
           {record.ethTokenAddress && (
             <span className="text-xs text-gray-500">
-              {renderTruncatedAddressWithCopy(record.ethTokenAddress)}
+              {renderTruncatedAddressWithCopy(record.ethTokenAddress, handleCopyToClipboard)}
             </span>
           )}
         </div>
@@ -149,7 +99,7 @@ const WithdrawTransactionDetails = () => {
           {/* <span>{text || '-'}</span> */}
           {record.token && (
             <span className="text-xs text-gray-500">
-              {renderTruncatedAddressWithCopy(record.token)}
+              {renderTruncatedAddressWithCopy(record.token, handleCopyToClipboard)}
             </span>
           )}
         </div>
@@ -166,7 +116,20 @@ const WithdrawTransactionDetails = () => {
       title: 'Tx Hash',
       dataIndex: 'txHash',
       key: 'txHash',
-      render: (text: string) => renderTruncatedAddressWithCopy(text),
+      render: (text: string) => text ? (
+        <div className="group relative flex items-center gap-2">
+          <span className="cursor-pointer">
+            {formatTxHash(text)}
+          </span>
+          <CopyOutlined
+            className="text-gray-400 hover:text-blue-500 cursor-pointer transition-colors"
+            onClick={() => handleCopyToClipboard(text)}
+          />
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10">
+            {text}
+          </div>
+        </div>
+      ) : "-",
       width: 100,
     },
     {
@@ -174,28 +137,28 @@ const WithdrawTransactionDetails = () => {
       dataIndex: 'withdrawalStatus',
       key: 'withdrawalStatus',
       render: (status: string) => {
-        if (status === "1") {
+        const statusNum = parseInt(status);
+        if (statusNum === 1) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
               <Clock className="h-3 w-3 mr-1" />
               Initiated
             </span>
           );
-        } else if (status === "2") {
+        } else if (statusNum === 2) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
               <CheckCircle2 className="h-3 w-3 mr-1" />
-              Approval Pending
+              Pending Review
             </span>
           );
-        } else if (status === "3") {
+        } else if (statusNum === 3) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
               Completed
             </span>
           );
-        }
-        else if (status === "4") {
+        } else if (statusNum === 4) {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
               Aborted
@@ -222,6 +185,33 @@ const WithdrawTransactionDetails = () => {
 
   return (
     <div className="space-y-4">
+      <Card className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
+        <Space size="large">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status Filter
+            </label>
+            <Select
+              value={withdrawalStatus}
+              onChange={setWithdrawalStatus}
+              style={{ width: 150 }}
+              options={BRIDGE_STATUS_OPTIONS}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Chain Filter
+            </label>
+            <Select
+              value={selectedChainId}
+              onChange={setSelectedChainId}
+              style={{ width: 150 }}
+              options={CHAIN_OPTIONS}
+            />
+          </div>
+        </Space>
+      </Card>
+      
       <div className="bg-white/80 rounded-xl shadow-sm border border-gray-200">
         <Table
           columns={columns}
