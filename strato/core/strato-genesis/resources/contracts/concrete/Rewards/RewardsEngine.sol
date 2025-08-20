@@ -201,6 +201,35 @@ contract record RewardsEngine is Ownable {
         }
     }
 
+    function editMultiplierFactor(
+        string calldata multiplierName,
+        address rewardToken,
+        uint256 newFactor
+    ) external onlyOwner {
+        require(multiplierName != "", "RewardsEngine: Empty multiplier name");
+        require(multiplierMap[multiplierName] > 0, "RewardsEngine: Multiplier not found");
+        require(rewardTokenMap[rewardToken] > 0, "RewardsEngine: Reward token not registered");
+        require(newFactor > 0, "RewardsEngine: Factor must be greater than 0");
+
+        multipliers[multiplierName].factors[rewardToken] = newFactor;
+    }
+
+    function editMultiplierFactors(
+        string calldata multiplierName,
+        address[] calldata rewardTokens,
+        uint256[] calldata newFactors
+    ) external onlyOwner {
+        require(multiplierName != "", "RewardsEngine: Empty multiplier name");
+        require(multiplierMap[multiplierName] > 0, "RewardsEngine: Multiplier not found");
+        require(rewardTokens.length == newFactors.length, "RewardsEngine: Array length mismatch");
+
+        for (uint i = 0; i < rewardTokens.length; i++) {
+            require(rewardTokenMap[rewardTokens[i]] > 0, "RewardsEngine: Reward token not registered");
+            require(newFactors[i] > 0, "RewardsEngine: Factor must be greater than 0");
+            multipliers[multiplierName].factors[rewardTokens[i]] = newFactors[i];
+        }
+    }
+
     function _addMultiplier(
         string calldata name,
         address[] calldata tokenAddresses,

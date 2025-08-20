@@ -54,7 +54,8 @@ The name of the smart contract will be `RewardsEngine`
   - Remove multiplier
   - Add multipliers (bath operation)
   - Remove multipliers (bath operation)
-  - Edit multipliers factors (TODO)
+  - Edit multipliers factors for a particular reward token
+
 
   Both those actions intertwine with "Reward tokens management" and "Action
   management". When adding a multiplier we need to check that it provides a
