@@ -18,7 +18,7 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
     // EVENTS
     // ═══════════════════════════════════════════════════════════════════════════════
- 
+
     event Deposited(address indexed user, address indexed asset, uint256 amount);
     event Withdrawn(address indexed user, address indexed asset, uint256 amount);
     event Borrowed(address indexed user, address indexed asset, uint256 amount);
@@ -43,7 +43,7 @@ contract record LendingPool is Ownable {
 
     struct AssetConfig {
         uint256 ltv;                    // Loan-to-Value ratio (max initial borrow) in basis points
-        uint256 liquidationThreshold;   // Liquidation threshold in basis points  
+        uint256 liquidationThreshold;   // Liquidation threshold in basis points
         uint256 liquidationBonus;       // Liquidation bonus in basis points
         uint256 interestRate;          // Interest rate in basis points
         uint256 reserveFactor;         // Reserve factor in basis points (percentage to protocol treasury)
@@ -58,7 +58,7 @@ contract record LendingPool is Ownable {
 
     // Asset Configuration
     mapping(address => AssetConfig) public record assetConfigs;
-    
+
     // Array of all configured assets (for iteration)
     address[] public record configuredAssets;
 
@@ -71,7 +71,7 @@ contract record LendingPool is Ownable {
     // debt.  Increases on borrow, decreases on principal repayment / liquidation.
     // ───────────────────────────────────────────────────────────────────────────
     uint256 public totalBorrowPrincipal;
-    
+
     // External Contracts
     LendingRegistry public registry;
     TokenFactory public tokenFactory;
@@ -104,7 +104,7 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
     // REGISTRY ACCESS HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
-    
+
     function _liquidityPool() internal view returns (LiquidityPool) {
         return registry.liquidityPool();
     }
@@ -132,12 +132,12 @@ contract record LendingPool is Ownable {
     function depositLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
-        
+
         // Check that borrowable asset has lending parameters configured
         AssetConfig memory config = assetConfigs[borrowableAsset];
         require(config.interestRate > 0, "Interest rate not configured");
-        require(config.reserveFactor > 0, "Reserve factor not configured"); 
-        
+        require(config.reserveFactor > 0, "Reserve factor not configured");
+
         // Calculate current exchange rate and corresponding mToken amount to mint
         uint256 exchangeRate = getExchangeRate();
         uint256 mTokenAmount = (amount * 1e18) / exchangeRate;
@@ -145,7 +145,7 @@ contract record LendingPool is Ownable {
 
         // Transfer underlying and mint mTokens via LiquidityPool
         LiquidityPool(_liquidityPool()).deposit(amount, mTokenAmount, msg.sender);
-        
+
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Deposited(msg.sender, borrowableAsset, amount);
     }
@@ -157,16 +157,16 @@ contract record LendingPool is Ownable {
     function withdrawLiquidity(uint256 amount) external onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
-        
+
         // Calculate mTokens to burn based on current exchange rate
         uint256 exchangeRate = getExchangeRate();
         uint256 mTokensToBurn = (amount * 1e18) / exchangeRate;
-        
+
         require(IERC20(mToken).balanceOf(msg.sender) >= mTokensToBurn, "Insufficient mToken balance");
-        
+
         // LiquidityPool burns calculated mTokens and transfers requested underlying amount
         LiquidityPool(_liquidityPool()).withdraw(mTokensToBurn, msg.sender, amount);
-        
+
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Withdrawn(msg.sender, borrowableAsset, amount);
     }
@@ -183,17 +183,17 @@ contract record LendingPool is Ownable {
      */
     function supplyCollateral(address asset, uint256 amount) external onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
-        
+
         // Check that asset is configured as eligible collateral
         AssetConfig memory config = assetConfigs[asset];
         require(config.ltv > 0, "Asset not configured as collateral");
         require(config.liquidationThreshold > 0, "Asset missing liquidation threshold");
         require(config.liquidationBonus >= 10000, "Asset missing liquidation bonus");
-        
+
         // The CollateralVault will handle the token transfer from msg.sender
         // User must have approved CollateralVault to spend their tokens
         CollateralVault(_collateralVault()).addCollateral(msg.sender, asset, amount);
-        
+
         emit SuppliedCollateral(msg.sender, asset, amount);
     }
 
@@ -213,7 +213,7 @@ contract record LendingPool is Ownable {
         uint256 currentBorrow = _getTotalBorrowValue(msg.sender); // in USD
         uint256 newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amount); // in USD
         require(currentBorrow <= newMaxBorrow, "Withdrawal would exceed existing loan");
-        
+
         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amount);
 
         emit WithdrawnCollateral(msg.sender, asset, amount);
@@ -230,12 +230,12 @@ contract record LendingPool is Ownable {
      */
     function borrow(uint256 amount) external onlyTokenFactory(borrowableAsset){
         require(amount > 0, "Invalid amount");
-    
+
         uint256 maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
 
         LoanInfo storage loan = userLoan[msg.sender];
         uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
-        
+
         // Get up-to-date debt (without mutating state)
         (uint256 accruedInterest, uint256 currentOwed) = _accrueInterest(loan, interestRate);
 
@@ -264,7 +264,7 @@ contract record LendingPool is Ownable {
 
         uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
 
-        // Get up-to-date debt 
+        // Get up-to-date debt
         (uint256 accruedInterest, uint256 totalOwed) = _accrueInterest(loan, interestRate);
         require(totalOwed > 0, "Nothing to repay");
 
@@ -278,7 +278,7 @@ contract record LendingPool is Ownable {
         // Calculate principal and interest portions of the repayment
         uint256 principalPortion;
         uint256 interestPortion;
-        
+
         if (repayAmount >= totalOwed) {
             // Full repayment
             principalPortion = loan.principalBalance;
@@ -322,7 +322,7 @@ contract record LendingPool is Ownable {
         }
 
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
-    }   
+    }
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDATION OPERATIONS
@@ -456,10 +456,10 @@ contract record LendingPool is Ownable {
     function getHealthFactor(address user) public view returns (uint256) {
         uint256 totalCollateralValue = _getTotalCollateralValueForHealth(user);
         uint256 totalBorrowValue = _getTotalBorrowValue(user);
-        
+
         if (totalBorrowValue == 0) return 2**256 - 1; // No debt = infinite health
         if (totalCollateralValue == 0) return 0; // No collateral = 0 health
-        
+
         // Aave style: health factor = (collateral * liquidation_threshold) / debt
         return (totalCollateralValue * 1e18) / totalBorrowValue;
     }
@@ -485,18 +485,18 @@ contract record LendingPool is Ownable {
         uint256 interestRate,
         uint256 reserveFactor
     ) external onlyPoolConfigurator {
-        require(asset != address(0) && tokenFactory.isTokenActive(asset), "Invalid or inactive asset"); 
+        require(asset != address(0) && tokenFactory.isTokenActive(asset), "Invalid or inactive asset");
         require(ltv <= liquidationThreshold, "LTV must be <= liquidation threshold");
         require(liquidationThreshold <= 9500, "Liquidation threshold too high"); // Max 95%
         require(liquidationBonus >= 10000 && liquidationBonus <= 12500, "Invalid liquidation bonus"); // 100-125%
         require(interestRate <= 10000, "Interest rate too high"); // Max 100%
         require(reserveFactor <= 5000, "Reserve factor too high"); // Max 50%
-        
+
         // If this is a new asset, add it to configuredAssets array
         if (assetConfigs[asset].ltv == 0 && assetConfigs[asset].liquidationThreshold == 0) {
             configuredAssets.push(asset);
         }
-        
+
         assetConfigs[asset] = AssetConfig(
             ltv,
             liquidationThreshold,
@@ -504,7 +504,7 @@ contract record LendingPool is Ownable {
             interestRate,
             reserveFactor
         );
-        
+
         emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor);
     }
 
@@ -523,19 +523,19 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
 
     /**
-     * @notice Get exchange rate for the borrowable asset 
+     * @notice Get exchange rate for the borrowable asset
      * @dev In this model, mTokens are always minted 1:1 with deposits
      * @dev The exchange rate shows how much underlying each mToken is worth
      * @return Exchange rate in 18 decimals (1e18 = 1:1 ratio, >1e18 = appreciation)
      */
     function getExchangeRate() public view returns (uint256) {
         if (mToken == address(0)) return 1e18;
-        
+
         uint256 totalSupply_ = IERC20(mToken).totalSupply();
         if (totalSupply_ == 0) {
             return 1e18; // Initial 1:1 ratio
         }
-        
+
         uint256 cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
 
         // Include outstanding principal so the rate never dips below 1 when cash is lent out
@@ -548,7 +548,7 @@ contract record LendingPool is Ownable {
         // Exchange rate = (cash + outstanding principal) / total mToken supply
         return (underlying * 1e18) / totalSupply_;
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTEREST DISTRIBUTION
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -559,24 +559,24 @@ contract record LendingPool is Ownable {
      */
     function distributeInterest(uint256 totalInterest) internal onlyTokenFactory(borrowableAsset){
         if (totalInterest == 0) return;
-        
+
         uint256 assetReserveFactor = assetConfigs[borrowableAsset].reserveFactor;
         if (assetReserveFactor == 0) assetReserveFactor = 1000; // Default 10%
-        
+
         // Calculate reserve cut (to protocol treasury)
         uint256 reserveCut = (totalInterest * assetReserveFactor) / 10000;
         uint256 supplierCut = totalInterest - reserveCut;
-        
+
         // The full repayment (including interest) is already in the LiquidityPool
         // We need to transfer the reserve cut out to the fee collector
         // The remaining amount stays in the pool and increases the exchange rate
-        
+
         if (reserveCut > 0 && address(feeCollector) != address(0)) {
             // Transfer reserve cut directly from LiquidityPool to fee collector
             LiquidityPool liquidityPool = _liquidityPool();
             liquidityPool.transferReserve(reserveCut, address(feeCollector));
         }
-        
+
         emit InterestDistributed(borrowableAsset, totalInterest, reserveCut, supplierCut);
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
@@ -616,7 +616,7 @@ contract record LendingPool is Ownable {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -638,7 +638,7 @@ contract record LendingPool is Ownable {
 
         newTotalOwed = loan.principalBalance + loan.interestOwed + accruedInterest;
         return (accruedInterest, newTotalOwed);
-    } 
+    }
 
     // @dev Calculate liquidation-weighted collateral value for a user (iterates configuredAssets)
     function _getTotalCollateralValueForHealth(address user) internal view returns (uint256) {
@@ -668,7 +668,7 @@ contract record LendingPool is Ownable {
 
         uint256 interestRate = assetConfigs[borrowableAsset].interestRate;
 
-        // Simulate interest accrual 
+        // Simulate interest accrual
         (, uint256 totalOwed) = _accrueInterest(loan, interestRate);
         if (totalOwed == 0) return 0;
 
@@ -688,16 +688,16 @@ contract record LendingPool is Ownable {
      */
     function calculateMaxBorrowingPower(address user, address excludeAsset, uint256 excludeAmount) public view returns (uint256) {
         uint256 totalCollateralValue = 0;
-        
+
         // Check all configured assets - only count if it's configured as collateral (ltv > 0)
         for (uint256 i = 0; i < configuredAssets.length; i++) {
             address asset = configuredAssets[i];
             uint256 ltv = assetConfigs[asset].ltv;
-            
+
             // Only process assets that are configured as collateral
             if (ltv > 0) {
                 uint256 collateralAmount = CollateralVault(_collateralVault()).userCollaterals(user, asset);
-                
+
                 // If this is the asset being excluded (for withdrawal simulation), reduce the amount
                 if (asset == excludeAsset) {
                     if (collateralAmount >= excludeAmount) {
@@ -706,10 +706,10 @@ contract record LendingPool is Ownable {
                         collateralAmount = 0;
                     }
                 }
-                
+
                 if (collateralAmount > 0) {
                     uint256 price = PriceOracle(_priceOracle()).getAssetPrice(asset);
-                    
+
                     if (price > 0) {
                         // Calculate borrowable value using LTV (max borrowing power)
                         uint256 assetBorrowableValue = (collateralAmount * price * ltv) / (1e18 * 10000);
@@ -718,13 +718,13 @@ contract record LendingPool is Ownable {
                 }
             }
         }
-        
+
         // Convert total borrowable value back to borrowableAsset units
         uint256 borrowableAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
         if (borrowableAssetPrice == 0) {
             return 0;
         }
-        
+
         return (totalCollateralValue * 1e18) / borrowableAssetPrice;
     }
-} 
+}
