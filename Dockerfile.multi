@@ -24,14 +24,15 @@ RUN apt -y update && apt install -y \
   && apt clean \
   && ln -s /lib/x86_64-linux-gnu/libleveldb.so.1.23.0 /lib/x86_64-linux-gnu/libleveldb.so.1 \
   && locale-gen en_US.UTF-8 \
-  && git clone --branch v0.2.0 https://github.com/bitcoin-core/secp256k1.git \
+  && git clone https://github.com/blockapps/secp256k1 \
   && cd secp256k1/ \
   && ./autogen.sh \
-  && ./configure --enable-module-ecdh --enable-module-recovery --enable-benchmark=no --enable-tests=no --prefix=/usr/ \
+  && ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh \
   && make \
   && make install \
   && cd .. \
-  && rm -rf secp256k1
+  && rm -rf secp256k1 \
+  && ldconfig
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
@@ -44,7 +45,7 @@ COPY \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/strato-barometer \
-  ./usr/local/bin/modifyDate \ 
+  ./usr/local/bin/modifyDate \
   ./usr/local/bin/process-monitor-exe \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
