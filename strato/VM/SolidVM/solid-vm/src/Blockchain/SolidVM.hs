@@ -71,7 +71,7 @@ import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Extra (findM, fromMaybeM, unlessM)
+import Control.Monad.Extra (fromMaybeM)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
@@ -1800,32 +1800,30 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
               res <- do
+                let go (x:xs) = validateFunctionArguments x argVals >>= \case
+                                  Just argVals' -> pure $ Just (x, argVals')
+                                  Nothing -> go xs
+                    go [] = pure Nothing
                 if (CC._funcIsFree func)
                   then do
-                    matchingOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload func
-                    doesFunctionMatch <- validateFunctionArguments func argVals
-                    if (doesFunctionMatch)
-                      then runTheCall address contract' funcName hsh cc func argVals ro True
-                      else case matchingOverload of
+                    validateFunctionArguments func argVals >>= \case
+                      Just argVals' -> runTheCall address contract' funcName hsh cc func argVals' ro True
+                      Nothing -> go (CC._funcOverload func) >>= \case
                         Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
-                        Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                        Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
                   else do
-                    matchingOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload func
-                    doesFunctionMatch <- validateFunctionArguments func argVals
-                    if (doesFunctionMatch)
-                      then runTheCall address contract' funcName hsh cc func argVals ro False
-                      else case matchingOverload of
+                    validateFunctionArguments func argVals >>= \case
+                      Just argVals' -> runTheCall address contract' funcName hsh cc func argVals' ro False
+                      Nothing -> go (CC._funcOverload func) >>= \case
                         Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                           Just ff -> do
-                            matchingFreeOverload <- findM (flip validateFunctionArguments argVals) $ CC._funcOverload ff
-                            doesFreeFunctionMatch <- validateFunctionArguments ff argVals
-                            if (doesFreeFunctionMatch)
-                              then runTheCall address contract' funcName hsh cc ff argVals ro True
-                              else case matchingFreeOverload of
+                            validateFunctionArguments ff argVals >>= \case
+                              Just argVals' -> runTheCall address contract' funcName hsh cc ff argVals' ro True
+                              Nothing -> go (CC._funcOverload ff) >>= \case
                                 Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                                Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro True
+                                Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
                           Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                        Just mo -> runTheCall address contract' funcName hsh cc mo argVals ro False
+                        Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro False
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
@@ -2665,7 +2663,7 @@ certificateMap maybeCert _ =
        in M.union fieldsToUpdate $ emptyFields
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
-runTheConstructors from to hsh cc contractName' argVals = do
+runTheConstructors from to hsh cc contractName' argVals' = do
   let !contract' =
         fromMaybe (missingType "contract inherits from nonexistent parent" contractName') $
           cc ^. CC.contracts . at contractName'
@@ -2681,6 +2679,12 @@ runTheConstructors from to hsh cc contractName' argVals = do
       putStrLn $
         box
           ["running constructor: " ++ labelToString contractName' ++ "(" ++ intercalate ", " (map (labelToString . snd) argTypeNames) ++ ")"]
+
+  argVals <- case contract' ^. CC.constructor of
+    Nothing -> pure argVals'
+    Just theConstructor -> validateFunctionArguments theConstructor argVals' >>= \case
+      Just vals -> pure vals
+      Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
   zipped <-
@@ -2792,7 +2796,7 @@ runTheCall ::
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
+runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
   !returns <- traverse (\(n, t) -> ((n,) . (t,)) <$> createDefaultValue cc contract' t) returnNamesAndTypes
@@ -2804,11 +2808,12 @@ runTheCall address' contract' funcName hsh cc theFunction argVals ro ff = do
       Nothing -> if name `elem` contract' ^. CC.parents then return Nothing else missingField "modifier not found" name
   let !theModifiers = catMaybes theModifiers'
 
-  unlessM (validateFunctionArguments theFunction argVals) $
-   typeError
-     "the argument values do not match up with the function signature" 
-     (let valList' = case argVals of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
-      in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+  argVals <- validateFunctionArguments theFunction argVals' >>= \case
+    Just av -> pure av
+    Nothing -> typeError
+      "the argument values do not match up with the function signature" 
+      (let valList' = case argVals' of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
+       in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
   let !args = case argVals of
         OrderedVals vs ->
@@ -3490,61 +3495,60 @@ solidVMExceptionHandler catchBlockMap ex =
           return res
 
 -- checks if an argument list is valid for a given function signature
-validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m Bool
+validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe ValList)
 validateFunctionArguments func argVals = do
   testMatch func
   where
     argValsLength = case argVals of
       OrderedVals xs -> length xs
       NamedVals xs -> length xs
-    testMatch :: MonadSM m => CC.Func -> m Bool
+    testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
     testMatch tf = do
       let argMapping = mapArgs tf
-      doArgsMatch <- mapM testTypes $ snd <$> argMapping
-      pure $
-        (testValidVariadic tf) ||
-        ((length argMapping) == (length $ CC._funcArgs tf)) && 
-        ((length argMapping) == argValsLength) && 
-        (all (== True) doArgsMatch)
+      sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
+        Just vals' -> pure . Just $ OrderedVals vals'
+        Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
       case unsnoc (map snd (CC._funcArgs tf)) of
         Just ([], x) | CC.indexedTypeType x == SVMType.Variadic -> True  
         Just (xs, x) | CC.indexedTypeType x == SVMType.Variadic -> argValsLength >= length xs
         _ -> False
-    testTypes :: MonadSM m => (SVMType.Type, Value) -> m Bool
-    testTypes (t, v) =
+    marshalValue :: MonadSM m => (SVMType.Type, Value) -> m (Maybe Value)
+    marshalValue (t, v) =
       -- These cases might not be all inclusive of all valid combinations.
       case (v, t) of
-        (SInteger _, SVMType.Int _ _) -> pure True
-        (SInteger _, SVMType.String _) -> pure True
-        (SInteger _, SVMType.Address _) -> pure True
-        (SInteger _, SVMType.Account _) -> pure True
-        (SInteger _, SVMType.UnknownLabel _ _) -> pure True
-        (SInteger _, SVMType.Decimal) -> pure True
-        (SDecimal _, SVMType.Decimal) -> pure True
-        (SString _, SVMType.String _) -> pure True
-        (SString _, SVMType.Bytes _ _) -> pure True
-        (SString _, SVMType.Address _) -> pure True
-        (SString _, SVMType.Account _) -> pure True
-        (SBool _, SVMType.Bool) -> pure True
-        (SAccount _ _, SVMType.Address _) -> pure True
-        (SAccount _ _, SVMType.Account _) -> pure True
-        (SEnumVal _ _ _, SVMType.UnknownLabel _ _) -> pure True
-        (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
-        (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-        (SArray vs, SVMType.Array _ _) | V.null vs -> pure True
-        (SArray xs, SVMType.Array y _) -> and <$> traverse (testTypes . (y,) <=< getVar) xs
-        (_, SVMType.Variadic) -> pure True
-        (SReference addressedPath, _) -> do
+        (SInteger i, SVMType.Int _ _) -> pure . Just $ SInteger i
+        (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
+        (SInteger i, SVMType.Address b) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) b
+        (SInteger i, SVMType.Account b) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) b
+        (SInteger i, SVMType.UnknownLabel _ _) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) False
+        (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
+        (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
+        (SString s, SVMType.String _) -> pure . Just $ SString s
+        (SString s, SVMType.Bytes _ _) -> pure . Just $ SString s
+        (SString s, SVMType.Address b) -> pure $ flip SAccount b . unspecifiedChain <$> stringAddress s
+        (SString s, SVMType.Account b) -> pure $ flip SAccount b . unspecifiedChain <$> stringAddress s
+        (SBool b, SVMType.Bool) -> pure . Just $ SBool b
+        (SAccount a _, SVMType.Address b) -> pure . Just $ SAccount a b
+        (SAccount a _, SVMType.Account b) -> pure . Just $ SAccount a b
+        (SEnumVal r x y, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
+        (SStruct r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
+        (SContract r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SContract r x) $ r == u
+        (SArray vs, SVMType.Array y ml) ->
+          if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
+            then fmap SArray . sequence <$> traverse (fmap (fmap Constant) . marshalValue . (y,) <=< getVar) vs
+            else pure Nothing
+        (x, SVMType.Variadic) -> pure $ Just x
+        (r@(SReference addressedPath), _) -> do
           refType <- getXabiValueType addressedPath
           if (refType == t)
-            then pure $ True
+            then pure $ Just r
             else case (refType, t) of
-              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure $ x == y
-              (SVMType.Array x _, SVMType.Array y _) -> pure $ x == y
-              _ -> pure $ False
-        _ -> pure $ False
+              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure . bool Nothing (Just r) $ x == y
+              (SVMType.Array x _, SVMType.Array y _) -> pure . bool Nothing (Just r) $ x == y
+              _ -> pure Nothing
+        _ -> pure Nothing
     mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
     mapArgs theFunc = case argVals of
       OrderedVals vs ->
