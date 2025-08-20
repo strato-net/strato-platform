@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { formatUnits } from "ethers";
 import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
@@ -42,7 +43,9 @@ const Borrow = () => {
     refreshCollateral,
     supplyCollateral,
     withdrawCollateral,
-    repayLoan: repayLoanFn
+    repayLoan: repayLoanFn,
+    repayAll,
+    withdrawCollateralMax
   } = useLendingContext();
 
   // Use the new smart polling hook for balance updates
@@ -129,10 +132,14 @@ const Borrow = () => {
   const executeWithdraw = async (asset: CollateralData, amount: string) => {
     try {
       setModalLoading(true);
-      await withdrawCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
-      });
+      if (amount === 'ALL') {
+        await withdrawCollateralMax({ asset: asset.address });
+      } else {
+        await withdrawCollateral({
+          asset: asset.address,
+          amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
+        });
+      }
       toast({
         title: "Withdraw Initiated",
         description: `You withdrew ${amount} ${asset._symbol}`,
@@ -178,25 +185,29 @@ const Borrow = () => {
   const executeEmbeddedRepay = async (amount: string) => {
     try {
       setRepayLoading(true);
-      const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
-      let amountInWei = safeParseUnits(amount || "0", 18);
-      
-      if (amountInWei > totalOwedWei) {
-        amountInWei = totalOwedWei;
+      if (amount === 'ALL') {
+        const res = await repayAll();
+        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead), 18) : 'all';
+        toast({
+          title: "Success",
+          description: `Successfully repaid ${sent} USDST`,
+          variant: "success",
+        });
+      } else {
+        const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
+        let amountInWei = safeParseUnits(amount || "0", 18);
+        if (amountInWei > totalOwedWei) {
+          amountInWei = totalOwedWei;
+        }
+        const res = await repayLoanFn({ amount: amountInWei.toString() } as any);
+        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent), 18) : amount;
+        toast({
+          title: "Success",
+          description: `Successfully repaid ${sent} USDST`,
+          variant: "success",
+        });
       }
-
-      await repayLoanFn({
-        amount: amountInWei.toString(),
-      });
-      
-      toast({
-        title: "Success",
-        description: `Successfully Repaid ${amount} USDST`,
-        variant: "success",
-      });
-      
       setRepayLoading(false);
-      
       await Promise.all([
         refreshLoans(),
         refreshCollateral(),

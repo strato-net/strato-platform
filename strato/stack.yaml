@@ -114,6 +114,7 @@ extra-deps:
 - jsaddle-wkwebview-0.9.9.0@sha256:07e0e12b960225fcef4e8cf158e9e1de8f07e962b9bbfa8a2eabf03ce60693ed,1974
 - lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
 - monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
+- pairing-1.1.0@sha256:3082ceef0e970114202675b565bf015e01186b01c9a722b0bdfc75475fecb9ce,5270
 - patch-0.0.8.4@sha256:00904a2f2e6b9bef71b12a5200bc047d6e108af3ad74954eed1795e419949bed,3368
 - reflex-0.9.3.3@sha256:a9ea57dc29765968a8dc3e1c50dbe247a9dfbede1af54aa97c9fe86df3eed186,12222
 - reflex-dom-0.6.3.4@sha256:d8065389600029e1ef6d34f3e9374e89e281f3db6273ce3aef9850313a08f525,6291
@@ -125,6 +126,10 @@ extra-deps:
 - wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
 - git: https://github.com/dustinnorwood/streaming-commons
   commit: cc6bca3d93a7bd427c5c7c982af508d7d27df184
+- git: https://github.com/dustinnorwood/galois-field
+  commit: 68bf36dbd5b9c8ef1906458b22daead3bf8284e6
+- git: https://github.com/sdiehl/elliptic-curve
+  commit: 445e196a550e36e0f25bd4d9d6a38676b4cf2be8
 
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889

@@ -25,16 +25,19 @@ library:
   - debugger
   - Decimal
   - deepseq
+  - elliptic-curve
   - ethereum-rlp
   - exceptions
   - extra
   - format
+  - galois-field
   - labeled-error
   - lens
   - merkle-patricia-db
   - monad-alter
   - nibblestring
   - ordered-containers
+  - pairing
   - parsec
   - solid-vm-compiler
   - solid-vm-model

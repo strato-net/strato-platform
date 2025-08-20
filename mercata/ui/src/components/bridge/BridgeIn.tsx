@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,516 +15,534 @@ import {
   useAccount,
   useChainId,
   useBalance,
-  useSendTransaction,
   useWriteContract,
+  useSwitchChain,
+  useSignTypedData,
 } from "wagmi";
-import { parseEther, createPublicClient, http } from "viem";
-import { mainnet, sepolia } from "viem/chains";
-import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
+import { createPublicClient, http } from "viem";
+import {
+  NATIVE_TOKEN_ADDRESS,
+  resolveViemChain,
+  DEPOSIT_ROUTER_ABI,
+  ERC20_ABI,
+  PERMIT2_ADDRESS,
+} from "@/lib/bridge/constants";
+import { bridgeContractService } from "@/lib/bridge/contractService";
+import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
 import { useBridgeContext } from "@/context/BridgeContext";
-import BridgeWalletStatus from './BridgeWalletStatus';
+import { useUser } from "@/context/UserContext";
+import BridgeWalletStatus from "./BridgeWalletStatus";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { safeParseUnits } from "@/utils/numberUtils";
-import { getNetworkErrorMessage, getTokenSelectionErrorMessage } from "@/utils/networkUtils";
-import { parseUnits } from "ethers";
+import { Token, BridgeContext } from "@/lib/bridge/types";
+import {
+  normalizeError,
+  formatTxHash,
+  getExplorerUrl,
+} from "@/lib/bridge/utils";
 
-interface Token {
-  name: string;
-  symbol: string;
-  tokenAddress: string;
-  decimals: number;
-  icon: string;
-  chainId: number;
-  exchangeTokenSymbol?: string;
-  exchangeTokenName?: string;
-}
+// Constants
+const DECIMAL_PATTERN = /^\d*\.?\d*$/;
+const BRIDGE_FEE = "0.1%";
+const ESTIMATED_TIME = "2-5 minutes";
 
-interface BridgeInProps {
-  showTestnet: boolean;
-}
-
-const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
+const BridgeIn: React.FC = () => {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { sendTransactionAsync } = useSendTransaction();
   const { writeContractAsync } = useWriteContract();
+  const { switchChain } = useSwitchChain();
+  const { signTypedDataAsync } = useSignTypedData();
   const { toast } = useToast();
-
+  const { userAddress } = useUser();
   const {
-    bridgeInTokens,
-    loading: contextLoading,
-    fetchBridgeInTokens,
-    bridgeIn: bridgeInAPI,
-    formatBalance,
+    availableNetworks,
+    bridgeableTokens,
+    selectedNetwork,
+    setSelectedNetwork,
+    selectedToken,
+    setSelectedToken,
   } = useBridgeContext();
-
-  const { config } = useBridgeContext();
-  const safeAddress = config?.safeAddress;
-
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [amount, setAmount] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
-  const [amountError, setAmountError] = useState<string>("");
-  const [balanceError, setBalanceError] = useState<string>("");
-  const [networkError, setNetworkError] = useState<string>("");
-  const [fromChain, setFromChain] = useState<string>(
-    showTestnet ? "Sepolia" : "Ethereum"
+  const [approvalState, setApprovalState] = useState<
+    "idle" | "approving" | "approved"
+  >("idle");
+  const [errors, setErrors] = useState({ amount: "", network: "" });
+  const inFlightRef = useRef(false);
+
+  const selectedNetworkConfig = availableNetworks.find(
+    (n) => n.chainName === selectedNetwork,
   );
-  const [toChain, setToChain] = useState<string>("STRATO");
+  const activeChainId = selectedNetworkConfig?.chainId;
+  const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
+  const isCorrectNetwork =
+    isConnected && chainId && expectedChainId && chainId === expectedChainId;
+  const isNativeToken = selectedToken?.extToken === NATIVE_TOKEN_ADDRESS;
 
-  // Expected network validation - use chainId from selected token
-  // This needs to be computed every time chainId or selectedToken changes
-  const isCorrectNetwork = isConnected && chainId && selectedToken?.chainId && chainId === selectedToken.chainId;
-  
-
-  // Fetch network tokens
-  useEffect(() => {
-    const loadBridgeInTokens = async () => {
-      try {
-        const tokens = await fetchBridgeInTokens();
-        if (!selectedToken && tokens.length > 0) {
-          setSelectedToken(tokens[0]);
-        }
-      } catch (error: any) {
-        console.error("Error fetching bridge in tokens:", error);
-        toast({
-          title: "Token Fetch Error",
-          description: "Failed to load available tokens. Please refresh the page and try again.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    loadBridgeInTokens();
-  }, [fetchBridgeInTokens, toast]);
-
-  // Clear balance error when token changes or connection status changes
-  useEffect(() => {
-    setBalanceError("");
-  }, [selectedToken, isConnected, address]);
-
-  // Network validation - following existing error handling pattern
-  useEffect(() => {
-    if (isConnected && chainId && selectedToken?.chainId) {
-      if (chainId !== selectedToken.chainId) {
-        setNetworkError(getNetworkErrorMessage({
-          networkName: selectedToken.name,
-          tokenSymbol: selectedToken.symbol,
-          direction: "in"
-        }));
-      } else {
-        setNetworkError("");
-      }
-    } else if (isConnected && !selectedToken) {
-      setNetworkError(getTokenSelectionErrorMessage("in"));
-    } else {
-      setNetworkError("");
-    }
-  }, [chainId, isConnected, selectedToken]);
-
-  // Force re-validation when chainId changes - additional safety check
- 
-  // Balance fetching hooks
-  const { data: nativeBalance, refetch: refetchNativeBalance, isError: isNativeBalanceError, isLoading: isNativeBalanceLoading } = useBalance({
+  const {
+    data: nativeBalance,
+    refetch: refetchNative,
+    isError: nativeError,
+    isLoading: nativeLoading,
+  } = useBalance({
     address,
-    chainId: selectedToken?.chainId,
+    chainId: expectedChainId || undefined,
     query: {
-      enabled:
-        isConnected &&
-        !!address &&
-        !!selectedToken?.chainId &&
-        selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH"),
-      refetchInterval: false,
+      enabled: isConnected && !!address && !!expectedChainId && isNativeToken,
     },
   });
 
-  const { data: tokenBalanceData, refetch: refetchTokenBalance, isError: isTokenBalanceError, isLoading: isTokenBalanceLoading } = useBalance({
+  const {
+    data: tokenBalanceData,
+    refetch: refetchToken,
+    isError: tokenError,
+    isLoading: tokenLoading,
+  } = useBalance({
     address,
-    token: selectedToken?.tokenAddress as `0x${string}` | undefined,
-    chainId: selectedToken?.chainId,
+    token: selectedToken?.extToken as `0x${string}`,
+    chainId: expectedChainId || undefined,
     query: {
       enabled:
         isConnected &&
         !!address &&
-        !!selectedToken?.chainId &&
+        !!expectedChainId &&
         !!selectedToken &&
-        selectedToken.symbol !== (showTestnet ? "SepoliaETH" : "ETH"),
-      refetchInterval: false,
+        !isNativeToken,
     },
   });
 
-  // Balance update effect
+  const isBalanceLoading =
+    isConnected &&
+    !!address &&
+    !!expectedChainId &&
+    (nativeLoading || tokenLoading);
+
   useEffect(() => {
-    let mounted = true;
-    let isInitialFetch = true;
-    let loadingTimeout: NodeJS.Timeout;
+    setAmount("");
+    setErrors((e) => ({ ...e, amount: "" }));
+    setApprovalState("idle");
+  }, [selectedToken]);
 
-    const updateBalance = async () => {
-      try {
-        if (isInitialFetch) {
-          setIsBalanceLoading(true);
-          setTokenBalance("0");
-          setBalanceError("");
-          
-          // Set a timeout to stop loading if it takes too long
-          loadingTimeout = setTimeout(() => {
-            if (mounted && isBalanceLoading) {
-              setIsBalanceLoading(false);
-            }
-          }, 10000); // 10 second timeout
+  useEffect(() => {
+    const handleNetworkSwitch = async () => {
+      if (
+        isConnected &&
+        selectedNetwork &&
+        expectedChainId &&
+        chainId !== expectedChainId
+      ) {
+        setErrors((e) => ({
+          ...e,
+          network: `Switching to ${selectedNetwork} network...`,
+        }));
+        try {
+          await switchChain({ chainId: expectedChainId });
+        } catch {
+          setErrors((e) => ({
+            ...e,
+            network: `Please manually switch to ${selectedNetwork} network`,
+          }));
         }
-
-        // Check if we should be loading based on wagmi hook states
-        const shouldBeLoading = isConnected && address && selectedToken && (
-          (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
-          (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
-        );
-
-        if (mounted && shouldBeLoading) {
-          setIsBalanceLoading(true);
-        }
-
-        if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
-          if (nativeBalance) {
-            const formattedBalance = formatBalance(
-              nativeBalance.value,
-              nativeBalance.decimals
-            );
-            if (mounted) {
-              setTokenBalance(formattedBalance);
-              setBalanceError("");
-              clearTimeout(loadingTimeout); // Clear timeout on successful fetch
-            }
-          } else if (isInitialFetch && isConnected && address && isNativeBalanceError) {
-            // Only show error if the hook is actually in error state
-            const errorMessage = "Failed to fetch ETH balance. Please check your wallet connection.";
-            if (mounted) {
-              setBalanceError(errorMessage);
-              toast({
-                title: "Balance Fetch Error",
-                description: errorMessage,
-                variant: "destructive",
-              });
-              clearTimeout(loadingTimeout); // Clear timeout on error
-            }
-          } else if (isInitialFetch && !isConnected) {
-            // Don't show error if user is not connected
-            if (mounted) {
-              setTokenBalance("0");
-              setBalanceError("");
-              clearTimeout(loadingTimeout); // Clear timeout
-            }
-          }
-        } else if (selectedToken?.tokenAddress) {
-          if (tokenBalanceData) {
-            const formattedBalance = formatBalance(
-              tokenBalanceData.value,
-              tokenBalanceData.decimals
-            );
-            if (mounted) {
-              setTokenBalance(formattedBalance);
-              setBalanceError("");
-              clearTimeout(loadingTimeout); // Clear timeout on successful fetch
-            }
-          } else if (isInitialFetch && isConnected && address && isTokenBalanceError) {
-            // Only show error if the hook is actually in error state
-            const errorMessage = `Failed to fetch ${selectedToken.symbol} balance. Please check your wallet connection.`;
-            if (mounted) {
-              setBalanceError(errorMessage);
-              toast({
-                title: "Balance Fetch Error",
-                description: errorMessage,
-                variant: "destructive",
-              });
-              clearTimeout(loadingTimeout); // Clear timeout on error
-            }
-          } else if (isInitialFetch && !isConnected) {
-            // Don't show error if user is not connected
-            if (mounted) {
-              setTokenBalance("0");
-              setBalanceError("");
-              clearTimeout(loadingTimeout); // Clear timeout
-            }
-          }
-        }
-      } catch (error: any) {
-        console.error("Error fetching balance:", error);
-        if (mounted) {
-          setTokenBalance("0");
-          const errorMessage = error?.message || "Failed to fetch balance. Please try again.";
-          setBalanceError(errorMessage);
-          toast({
-            title: "Balance Fetch Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-        }
-      } finally {
-        if (mounted) {
-          // Only stop loading if the hooks are not loading
-          const shouldBeLoading = isConnected && address && selectedToken && (
-            (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH") && isNativeBalanceLoading) ||
-            (selectedToken?.symbol !== (showTestnet ? "SepoliaETH" : "ETH") && isTokenBalanceLoading)
-          );
-          
-          if (!shouldBeLoading) {
-            setIsBalanceLoading(false);
-          }
-          isInitialFetch = false;
-        }
+      } else {
+        setErrors((e) => ({
+          ...e,
+          network:
+            isConnected && !selectedNetwork ? "Please select a network" : "",
+        }));
       }
     };
+    handleNetworkSwitch();
+  }, [chainId, isConnected, selectedNetwork, expectedChainId, switchChain]);
 
-    if (isInitialFetch) {
-      updateBalance();
-    } else {
-      const timeout = setTimeout(updateBalance, 1000);
-      return () => clearTimeout(timeout);
+  useEffect(() => {
+    const balance = isNativeToken ? nativeBalance : tokenBalanceData;
+
+    if (balance) {
+      setTokenBalance(
+        formatBalance(balance.value, undefined, balance.decimals),
+      );
     }
-
-    return () => {
-      mounted = false;
-      clearTimeout(loadingTimeout); // Clear timeout on component unmount
-    };
-  }, [
-    isConnected,
-    address,
-    selectedToken,
-    nativeBalance,
-    tokenBalanceData,
-    chainId,
-    toast,
-    isNativeBalanceError,
-    isTokenBalanceError,
-    isNativeBalanceLoading,
-    isTokenBalanceLoading,
-  ]);
+  }, [isNativeToken, nativeBalance, tokenBalanceData]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
-      setAmountError("");
+      setErrors((e) => ({ ...e, amount: "" }));
       return true;
     }
 
-    const numericAmount = parseFloat(value);
-    const numericBalance = parseFloat(tokenBalance);
-
-    if (isNaN(numericAmount)) {
-      setAmountError("Please enter a valid number");
+    const num = parseFloat(value);
+    if (isNaN(num) || num <= 0) {
+      setErrors((e) => ({
+        ...e,
+        amount:
+          num <= 0
+            ? "Amount must be greater than 0"
+            : "Please enter a valid number",
+      }));
       return false;
     }
 
-    if (numericAmount <= 0) {
-      setAmountError("Amount must be greater than 0");
+    const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
+    const bal = balanceMatch
+      ? parseFloat(balanceMatch[1].replace(/,/g, ""))
+      : 0;
+
+    if (num > bal) {
+      setErrors((e) => ({
+        ...e,
+        amount: `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.extSymbol}`,
+      }));
       return false;
     }
 
-    if (numericAmount > numericBalance) {
-      setAmountError(
-        `Insufficient balance. Maximum amount: ${tokenBalance} ${selectedToken?.symbol}`
-      );
-      return false;
-    }
-
-    setAmountError("");
+    setErrors((e) => ({ ...e, amount: "" }));
     return true;
   };
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
+    if (DECIMAL_PATTERN.test(value)) {
       setAmount(value);
       validateAmount(value);
     }
   };
 
-  const handlePercentageClick = (percentageAmount: string) => {
-    setAmount(percentageAmount);
-    validateAmount(percentageAmount);
+  // Structured bridge flow functions
+  const preflight = (): BridgeContext => {
+    if (
+      !selectedToken ||
+      !amount ||
+      !isConnected ||
+      !isCorrectNetwork ||
+      !address ||
+      !userAddress
+    ) {
+      throw new Error(
+        !userAddress ? "User address not available" : "Invalid configuration",
+      );
+    }
+
+    if (!selectedNetworkConfig) {
+      throw new Error("Selected network configuration not found");
+    }
+
+    const depositAmount = safeParseUnits(
+      amount,
+      parseInt(selectedToken.extDecimals || "18"),
+    );
+    const isNative = selectedToken.extToken === NATIVE_TOKEN_ADDRESS;
+
+    return {
+      selectedToken,
+      selectedNetwork,
+      amount,
+      userAddress,
+      address,
+      activeChainId,
+      depositRouter: selectedNetworkConfig.depositRouter,
+      depositAmount,
+      isNative,
+    };
   };
 
-  const handleBridgeIn = async () => {
-    const tokenAddress = selectedToken?.tokenAddress;
-    const tokenChainId = selectedToken?.chainId;
-
-    // Network validation - following existing error handling pattern
-    if (!isCorrectNetwork) {
-      toast({
-        title: "Wrong Network",
-        description: getNetworkErrorMessage({
-          networkName: selectedToken?.name || "network",
-          tokenSymbol: selectedToken?.symbol || "tokens",
-          direction: "in"
-        }),
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!tokenChainId) {
-      toast({
-        title: "Error",
-        description: "Invalid network configuration",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    toast({
-      title: "Preparing transaction...",
-      description: "Please wait while we prepare your transaction",
+  const validateOnChain = async (ctx: BridgeContext) => {
+    const validation = await bridgeContractService.validateRouterContract({
+      depositRouterAddress: ctx.depositRouter,
+      amount: ctx.amount,
+      decimals: ctx.selectedToken.extDecimals,
+      chainId: ctx.activeChainId,
+      tokenAddress: ctx.selectedToken.extToken,
     });
 
-    try {
-      let hash: `0x${string}` | undefined;
+    if (!validation.isValid) {
+      throw new Error(validation.error || "Validation failed");
+    }
+  };
 
-      // MetaMask transaction - handle wallet errors with toasts
-      try {
-        if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
-          const txHash = await sendTransactionAsync({
-            to: safeAddress as `0x${string}`,
-            value: parseEther(amount),
-          });
-          hash = txHash as `0x${string}`;
-        } else {
-          const txHash = await writeContractAsync({
-            address: tokenAddress as `0x${string}`,
-            abi: [
-              {
-                name: "transfer",
-                type: "function",
-                stateMutability: "nonpayable",
-                inputs: [
-                  { name: "recipient", type: "address" },
-                  { name: "amount", type: "uint256" },
-                ],
-                outputs: [{ name: "", type: "bool" }],
-              },
-            ],
-            functionName: "transfer",
-            args: [safeAddress as `0x${string}`, parseUnits(amount, 6)],
-            chain: showTestnet ? sepolia : mainnet,
-            account: address as `0x${string}`,
-          });
-          hash = txHash as `0x${string}`;
-        }
-      } catch (walletError: any) {
-        console.error("MetaMask wallet error:", walletError);
-        
-        toast({
-          title: "Wallet Error",
-          description: walletError?.message || "Transaction failed",
-          variant: "destructive",
-        });
-        return;
-      }
+  const ensureAllowanceOrPermit = async (ctx: BridgeContext) => {
+    const approval = await bridgeContractService.checkPermit2Approval({
+      token: ctx.selectedToken.extToken,
+      owner: ctx.address,
+      amount: ctx.depositAmount,
+      chainId: ctx.activeChainId,
+    });
 
-      const client = createPublicClient({
-        chain: showTestnet ? sepolia : mainnet,
-        transport: http(),
+    if (!approval.isApproved) {
+      setApprovalState("approving");
+      toast({
+        title: "Approval Required",
+        description: "Approving Permit2 to spend your tokens...",
       });
 
-      const receipt = await client.waitForTransactionReceipt({ hash });
-
-      // Only call bridgeInAPI after transaction is mined
-      if (receipt.status === "success") {
-        await bridgeInAPI({
-          amount,
-          fromAddress: address as string,
-          tokenAddress: tokenAddress || "",
-          ethHash: hash,
+      try {
+        const approveTx = await writeContractAsync({
+          address: ctx.selectedToken.extToken as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: "approve",
+          args: [
+            PERMIT2_ADDRESS as `0x${string}`,
+            BigInt(2) ** BigInt(256) - BigInt(1),
+          ],
+          chain: await resolveViemChain(ctx.activeChainId),
+          account: ctx.address as `0x${string}`,
         });
-      }
 
-      if (receipt.status === "success") {
-        if (tokenAddress === NATIVE_TOKEN_ADDRESS) {
-          const balance = await client.getBalance({
-            address: address as `0x${string}`,
-          });
-          const formattedBalance = formatBalance(balance, 18);
-          setTokenBalance(formattedBalance);
-        } else {
-          const balance = await client.readContract({
-            address: tokenAddress as `0x${string}`,
-            abi: [
-              {
-                name: "balanceOf",
-                type: "function",
-                stateMutability: "view",
-                inputs: [{ name: "account", type: "address" }],
-                outputs: [{ name: "", type: "uint256" }],
-              },
-            ],
-            functionName: "balanceOf",
-            args: [address as `0x${string}`],
-          });
-          const formattedBalance = formatBalance(balance, 6);
-          setTokenBalance(formattedBalance);
-        }
+        await bridgeContractService.waitForTransaction(
+          approveTx,
+          ctx.activeChainId,
+        );
 
+        setApprovalState("approved");
+        const approvalExplorerUrl = getExplorerUrl(
+          ctx.activeChainId,
+          approveTx,
+        );
         toast({
-          title: "Transaction Successful",
-          description: `Successfully transferred ${amount} ${selectedToken?.symbol}`,
+          title: "Approval Successful",
+          description: (
+            <div>
+              <p>Now processing your bridge transaction...</p>
+              <a
+                href={approvalExplorerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 underline text-sm"
+              >
+                View Approval on Explorer →
+              </a>
+            </div>
+          ),
         });
+      } catch (error) {
+        setApprovalState("idle");
+        throw error;
       }
-    } catch (error) {
-      console.error("Bridge transaction failed:", error);
-      // API errors are handled globally by fetch wrapper
+    }
+  };
+
+  const buildPermit = async (ctx: BridgeContext) => {
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 minutes
+    const nonce = bridgeContractService.getPermit2Nonce();
+    const permitMessage = bridgeContractService.createPermit2Message({
+      token: ctx.selectedToken.extToken,
+      amount: ctx.depositAmount,
+      spender: ctx.depositRouter,
+      nonce,
+      deadline,
+    });
+
+    const signature = await signTypedDataAsync({
+      domain: bridgeContractService.getPermit2Domain(ctx.activeChainId),
+      types: bridgeContractService.getPermit2Types(),
+      primaryType: "PermitTransferFrom",
+      message: permitMessage,
+      account: ctx.address as `0x${string}`,
+    });
+
+    return { signature, nonce, deadline };
+  };
+
+  const simulateAndSend = async (
+    ctx: BridgeContext,
+    permitData?: { signature: string; nonce: bigint; deadline: bigint },
+  ): Promise<`0x${string}`> => {
+    const chain = await resolveViemChain(ctx.activeChainId);
+    const client = createPublicClient({ chain, transport: http() });
+
+    if (ctx.isNative) {
+      // Simulate ETH deposit
+      await client.simulateContract({
+        address: ctx.depositRouter as `0x${string}`,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "depositETH",
+        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        value: ctx.depositAmount,
+        account: ctx.address as `0x${string}`,
+      });
+
+      // Send ETH deposit
+      const txHash = await writeContractAsync({
+        address: ctx.depositRouter as `0x${string}`,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "depositETH",
+        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        value: ctx.depositAmount,
+        chain,
+        account: ctx.address as `0x${string}`,
+      });
+      return txHash as `0x${string}`;
+    } else {
+      if (!permitData) {
+        throw new Error("Permit data is required for ERC20 deposits");
+      }
+
+      // Simulate ERC20 deposit
+      await client.simulateContract({
+        address: ctx.depositRouter as `0x${string}`,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "deposit",
+        args: [
+          bridgeContractService.formatAddress(ctx.selectedToken.extToken),
+          ctx.depositAmount,
+          bridgeContractService.formatAddress(ctx.userAddress),
+          permitData!.nonce,
+          permitData!.deadline,
+          permitData!.signature as `0x${string}`,
+        ],
+        account: ctx.address as `0x${string}`,
+      });
+
+      // Send ERC20 deposit
+      const txHash = await writeContractAsync({
+        address: ctx.depositRouter as `0x${string}`,
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "deposit",
+        args: [
+          bridgeContractService.formatAddress(ctx.selectedToken.extToken),
+          ctx.depositAmount,
+          bridgeContractService.formatAddress(ctx.userAddress),
+          permitData!.nonce,
+          permitData!.deadline,
+          permitData!.signature as `0x${string}`,
+        ],
+        chain,
+        account: ctx.address as `0x${string}`,
+      });
+      return txHash as `0x${string}`;
+    }
+  };
+
+  const waitAndFinalize = async (ctx: BridgeContext, txHash: `0x${string}`) => {
+    const success = await bridgeContractService.waitForTransaction(
+      txHash,
+      ctx.activeChainId,
+    );
+    if (!success) {
+      throw new Error("Transaction reverted");
+    }
+  };
+
+  const handleBridge = async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+    setIsLoading(true);
+    toast({ title: "Preparing transaction...", description: "Please wait" });
+
+    try {
+      // Validate
+      const ctx = preflight();
+      await validateOnChain(ctx);
+
+      let permitData:
+        | { signature: string; nonce: bigint; deadline: bigint }
+        | undefined;
+      if (!ctx.isNative) {
+        await ensureAllowanceOrPermit(ctx);
+        permitData = await buildPermit(ctx);
+      }
+
+      const txHash = await simulateAndSend(ctx, permitData);
+
+      const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
+      toast({
+        title: "Transaction Sent",
+        description: (
+          <div>
+            <p>Transaction submitted: {formatTxHash(txHash)}</p>
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 underline text-sm"
+            >
+              View on Explorer →
+            </a>
+          </div>
+        ),
+      });
+
+      await waitAndFinalize(ctx, txHash);
+
+      toast({
+        title: "Bridge Initiated",
+        description:
+          "Your deposit has been submitted successfully. The relayer will process it shortly.",
+      });
+
+      // Trigger wagmi balance refetch
+      if (ctx.isNative) {
+        refetchNative();
+      } else {
+        refetchToken();
+      }
+    } catch (error: any) {
+      const bridgeError = normalizeError(error);
+      toast({
+        title: "Transaction Failed",
+        description: bridgeError.userMessage,
+        variant: "destructive",
+      });
     } finally {
+      inFlightRef.current = false;
       setIsLoading(false);
+      setApprovalState("idle");
     }
   };
 
   return (
     <div className="space-y-6">
       <BridgeWalletStatus />
+
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
-          <Label htmlFor="from">From Network</Label>
-          <Input
-            id="from-chain"
-            value={fromChain}
-            disabled
-            className="bg-gray-50"
-          />
+          <Label>From Network</Label>
+          <Select
+            value={selectedNetwork || ""}
+            onValueChange={(v) => {
+              setSelectedNetwork(v);
+              setSelectedToken(null);
+            }}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select network" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableNetworks.map((n) => (
+                <SelectItem key={n.chainId} value={n.chainName}>
+                  {n.chainName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-
         <div className="flex-1 space-y-1.5">
-          <Label htmlFor="to">To Network</Label>
-          <Input
-            id="to-chain"
-            value={toChain}
-            disabled
-            className="bg-gray-50"
-          />
+          <Label>To Network</Label>
+          <Input value="STRATO" disabled className="bg-gray-50" />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="asset">Select Asset</Label>
+        <Label>Select Asset</Label>
         <Select
-          value={selectedToken?.symbol || ""}
-          onValueChange={(value) => {
-            const token = bridgeInTokens?.find((t) => t.symbol === value);
-            if (token) {
-              setSelectedToken(token);
-            }
-          }}
+          value={selectedToken?.extSymbol || ""}
+          onValueChange={(v) =>
+            setSelectedToken(
+              bridgeableTokens.find((t) => t.extSymbol === v) || null,
+            )
+          }
+          disabled={bridgeableTokens.length === 0}
         >
-          <SelectTrigger id="from-token">
+          <SelectTrigger>
             <SelectValue>
               {selectedToken
-                ? `${selectedToken.name} (${selectedToken.symbol})`
+                ? `${selectedToken.extName} (${selectedToken.extSymbol})`
                 : "Select asset"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {bridgeInTokens.map((token) => (
-              <SelectItem key={token.symbol} value={token.symbol}>
-                {token.name} ({token.symbol})
+            {bridgeableTokens.map((t) => (
+              <SelectItem key={t.extSymbol} value={t.extSymbol}>
+                {t.extName} ({t.extSymbol})
               </SelectItem>
             ))}
           </SelectContent>
@@ -532,106 +550,133 @@ const BridgeIn: React.FC<BridgeInProps> = ({ showTestnet }) => {
       </div>
 
       <div className="space-y-1.5">
-        <Label htmlFor="amount">Amount</Label>
+        <Label>Amount</Label>
         <Input
-          id="amount"
           type="text"
           inputMode="decimal"
           pattern="[0-9]*\.?[0-9]*"
-          placeholder="0.00"
-          className={`w-full ${
-            amountError ? "border-red-500 focus:ring-red-400" : ""
-          }`}
+          placeholder={
+            isConnected
+              ? isBalanceLoading
+                ? "Loading..."
+                : "0.00"
+              : "Connect wallet"
+          }
+          className={errors.amount ? "border-red-500" : ""}
           value={amount}
           onChange={handleAmountChange}
+          disabled={!isConnected || isBalanceLoading}
         />
-        {amountError && (
-          <p className="text-sm text-red-500">{amountError}</p>
+        {errors.amount && (
+          <p className="text-sm text-red-500">{errors.amount}</p>
         )}
-        <PercentageButtons
-          value={amount}
-          maxValue={safeParseUnits(tokenBalance,18).toString()}
-          onChange={handlePercentageClick}
-          className="mt-2"
-        />
-        <div className="flex items-center gap-2 mt-1">
-          {isBalanceLoading ? (
-            <div className="flex items-center gap-2">
+        {isConnected && !isBalanceLoading && tokenBalance !== "0" && (
+          <PercentageButtons
+            value={amount}
+            maxValue={safeParseUnits(
+              tokenBalance,
+              parseInt(selectedToken?.extDecimals || "18"),
+            ).toString()}
+            onChange={(v) => {
+              setAmount(v);
+              validateAmount(v);
+            }}
+            className="mt-2"
+            decimals={parseInt(selectedToken?.extDecimals || "18")}
+          />
+        )}
+
+        {isConnected &&
+          (isBalanceLoading ? (
+            <div className="flex items-center gap-2 mt-1">
               <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-              <p className="text-sm text-gray-500">Fetching balance...</p>
+              <span className="text-sm text-gray-500">Fetching balance...</span>
             </div>
-          ) : balanceError ? (
-            <div className="space-y-2">
-              <div className="text-sm text-red-500">
-                {balanceError}
-              </div>
-              <button
-                onClick={() => {
-                  setBalanceError("");
-                  // Trigger balance refetch
-                  if (selectedToken?.symbol === (showTestnet ? "SepoliaETH" : "ETH")) {
-                    refetchNativeBalance();
-                  } else {
-                    refetchTokenBalance();
-                  }
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Retry
-              </button>
+          ) : tokenBalance ? (
+            <div className="space-y-2 mt-1">
+              <p className="text-sm text-gray-500">
+                Balance: {tokenBalance} {selectedToken?.extSymbol}
+              </p>
+              {selectedToken?.stratoTokenSymbol && amount && (
+                <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
+                  You will receive ≈ {amount} {selectedToken.stratoTokenName} (
+                  {selectedToken.stratoTokenSymbol}) on STRATO
+                  <br />
+                  <span className="text-xs text-gray-500">
+                    Bridge fee: {BRIDGE_FEE}
+                  </span>
+                </p>
+              )}
             </div>
-          ) : (
-            tokenBalance && (
-              <div className="space-y-2">
-                <div className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.symbol}
-                </div>
-                {selectedToken?.exchangeTokenSymbol && (
-                  <div className="text-sm">
-                    <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                      You will receive {amount ? `${amount} ` : ""}{" "}
-                      {selectedToken?.exchangeTokenName} (
-                      {selectedToken?.exchangeTokenSymbol}) on STRATO network
-                    </p>
-                  </div>
-                )}
-              </div>
-            )
-          )}
-        </div>
+          ) : null)}
       </div>
 
       <div className="bg-gray-50 p-4 rounded-md space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Bridge Fee:</span>
-          <span>0.1%</span>
+          <span>{BRIDGE_FEE}</span>
         </div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Estimated Time:</span>
-          <span>2-5 minutes</span>
+          <span>{ESTIMATED_TIME}</span>
         </div>
       </div>
 
-      <div className="text-sm text-gray-500">
-        <p>• Bridge assets between Ethereum and STRATO networks</p>
-        <p>• Small bridge fee applies</p>
-        <p>• Transaction time varies by network congestion</p>
-        {/* <p>• STRATO to Ethereum transfers require approval</p> */}
+      <div className="text-sm text-gray-500 space-y-1">
+        {[
+          "Bridge assets between Ethereum and STRATO networks",
+          "Small bridge fee applies",
+          "Transaction time varies by network congestion",
+          "Wallet will automatically switch to the selected network",
+        ].map((text, i) => (
+          <p key={i}>• {text}</p>
+        ))}
       </div>
 
-      <div className="flex justify-end gap-4">
-                           <Button
-           onClick={handleBridgeIn}
-           disabled={Boolean(
-             isLoading || !amount || !selectedToken || !isConnected || !isCorrectNetwork
-           )}
-           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
-         >
-          {isLoading ? "Processing..." : "Bridge Assets"}
+      <div className="flex justify-end">
+        <Button
+          onClick={handleBridge}
+          disabled={
+            isLoading ||
+            !amount ||
+            !selectedToken ||
+            !isConnected ||
+            !isCorrectNetwork
+          }
+          className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
+        >
+          {isLoading && approvalState === "approving" && "Approving..."}
+          {isLoading && approvalState === "approved" && "Bridging..."}
+          {isLoading && approvalState === "idle" && "Processing..."}
+          {!isLoading && !isConnected && "Connect Wallet"}
+          {!isLoading && isConnected && !selectedNetwork && "Select Network"}
+          {!isLoading &&
+            isConnected &&
+            selectedNetwork &&
+            !selectedToken &&
+            "Select Asset"}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            !amount &&
+            "Enter Amount"}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            amount &&
+            !isCorrectNetwork &&
+            `Switch to ${selectedNetwork}`}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            amount &&
+            isCorrectNetwork &&
+            "Bridge Assets"}
         </Button>
       </div>
-      {networkError && (
-        <p className="text-sm text-red-500">{networkError}</p>
+
+      {errors.network && (
+        <p className="text-sm text-red-500">{errors.network}</p>
       )}
     </div>
   );

@@ -226,21 +226,27 @@ filterFuncs cc x name f visibilities = case f ^. funcVisibility of
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
   cc@CodeCollection {..} <- asks codeCollection
+  ctract <- asks contract
   pure $ case M.lookup cName _contracts of
     Nothing -> bottom $ ("Unknown contract: " <> labelToText cName) <$ x
     Just c -> case M.lookup fName (_functions c) of
       Nothing -> case M.lookup fName (_constants c) of
         Nothing -> case M.lookup fName (_storageDefs c) of
-          Nothing ->
-            bottom $
-              ( T.concat
-                  [ "Unknown contract function: ",
-                    labelToText cName,
-                    ".",
-                    labelToText fName
-                  ]
-              )
-                <$ x
+          Nothing -> case M.lookup fName (_structs c) of
+            Nothing ->
+              bottom $
+                ( T.concat
+                    [ "Unknown contract function: ",
+                      labelToText cName,
+                      ".",
+                      labelToText fName
+                    ]
+                )
+                  <$ x
+            Just fields ->
+              let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
+                  fRets = Static (SVMType.Struct Nothing fName) x
+               in Function fArgs fRets x [] [] False
           Just VariableDecl {..} ->
             if _varIsPublic
               then do
@@ -257,7 +263,10 @@ lookupContractFunction x cName fName = do
                   )
                     <$ x
         Just ConstantDecl {..} -> Static _constType x
-      Just f -> filterFuncs cc x fName f [Internal, Private]
+      Just f -> filterFuncs cc x fName f $
+        case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
+          [] -> [Internal, Private]
+          _ -> []
       
   where 
     nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
@@ -358,7 +367,7 @@ apply (Sum types@(t :| _)) args argList =
       isFunction (Top _ _) = True
       isFunction _ = False
    in pickType' (context' t) <$> traverse (\x -> apply x args argList) (filter isFunction $ NE.toList types)
-apply x _ _ = pure . bottom $ "trying to apply function to a non-function type" <$ context' x
+apply x y z = pure . bottom $ (T.pack $ "trying to apply function to a non-function type: " ++ show x ++ ", " ++ show y ++ ", " ++ show z) <$ context' x
 
 bottom :: a -> TypeF' a
 bottom a = Bottom $ a :| []
@@ -596,6 +605,11 @@ toFunctionType (SVMType.Mapping _ k v) x = case toFunctionType v x of
 toFunctionType SVMType.Variadic x = Function (Product [] x) (topType' x) x [] [] False
 toFunctionType t x = Function (Product [] x) (Static t x) x [] [] False
 
+theLastPartOf :: SolidString -> Text
+theLastPartOf = unsafeHead . reverse . T.splitOn "." . labelToText
+  where unsafeHead [] = error "Data.Text.splitOn returned an empty list. This should not be possible"
+        unsafeHead (x:_) = x
+
 typecheckStatic :: Type -> Type -> Either Text Type
 typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
   case (s1, s2) of
@@ -621,32 +635,32 @@ typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Accoun
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Account a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Account a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
-typecheckStatic (SVMType.UnknownLabel a _) (SVMType.UnknownLabel b _) =
-  if a == b || a == "" || b == ""
-    then Right (SVMType.UnknownLabel (string' [a, b]) Nothing)
+typecheckStatic (SVMType.UnknownLabel a' _) (SVMType.UnknownLabel b' _) = case (theLastPartOf a', theLastPartOf b') of
+  (a, b) -> if a == b || a == "" || b == ""
+    then Right (SVMType.UnknownLabel (string' [a', b']) Nothing)
     else
       Left $
         "Type mismatch: labels "
-          <> labelToText a
+          <> a
           <> " and "
-          <> labelToText b
+          <> b
           <> " do not match."
 typecheckStatic (SVMType.UnknownLabel a _) b@SVMType.Struct {} =
   typecheckStatic (SVMType.Struct Nothing a) b
 typecheckStatic a@SVMType.Struct {} (SVMType.UnknownLabel b _) =
   typecheckStatic a (SVMType.Struct Nothing b)
-typecheckStatic (SVMType.Struct b1 t1) (SVMType.Struct b2 t2) =
+typecheckStatic (SVMType.Struct b1 t1') (SVMType.Struct b2 t2') =
   case (b1, b2) of
     (Just a, Just b) | a /= b -> Left "Mismatched byte sizes between struct types"
-    _ ->
-      if t1 == t2 || t1 == "" || t2 == ""
-        then Right $ SVMType.Struct (b1 <|> b2) (string' [t1, t2])
+    _ -> case (theLastPartOf t1', theLastPartOf t2') of
+      (t1,t2) -> if t1 == t2 || t1 == "" || t2 == ""
+        then Right $ SVMType.Struct (b1 <|> b2) (string' [t1', t2'])
         else
           Left $
             "Type mismatch between struct values: "
-              <> labelToText t1
+              <> t1
               <> " and "
-              <> labelToText t2
+              <> t2
               <> " do not match."
 typecheckStatic (SVMType.UnknownLabel a _) b@SVMType.Enum {} =
   typecheckStatic (SVMType.Enum Nothing a Nothing) b
@@ -1284,7 +1298,7 @@ statementsHelper args ss = do
                         _ -> do
                           t' <- typecheck' ignoreTops a b
                           case t' of
-                            Bottom _ -> pure . bottom $ "not all paths return a value." <$ x
+                            Bottom _ -> pure . bottom $ ("not all paths return a value: " <> T.pack (show rs)) <$ x
                             _ -> pure t'
                   )
                   (pure $ topType' x)
@@ -1299,7 +1313,7 @@ statementsHelper' x stmts = do
   modify $ \case
     _ :| [] -> error "statementsHelper': Stack underflow"
     (r, _) :| ((s, l) : rest) -> case (r, s) of
-      (Nothing, Nothing) -> (Just (Sum (Product [] x :| [])), l) :| rest
+      (Nothing, Nothing) -> (Nothing, l) :| rest
       (Nothing, Just (Sum ss)) -> (Just (Sum (NE.cons (Product [] x) ss)), l) :| rest
       (Just (Bottom es), Just (Bottom ess)) -> (Just (Bottom (es <> ess)), l) :| rest
       (Just (Bottom es), Nothing) -> (Just (Bottom es), l) :| rest
@@ -1387,6 +1401,22 @@ sha256Args x = topType' x
 ripemd160Args :: SourceAnnotation Text -> Type'
 ripemd160Args x = topType' x
 
+modexpArgs :: SourceAnnotation Text -> Type'
+modexpArgs x = Product [intType' x, intType' x, intType' x] x
+
+ecAddArgs :: SourceAnnotation Text -> Type'
+ecAddArgs x = Product [intType' x, intType' x, intType' x, intType' x] x
+
+ecMulArgs :: SourceAnnotation Text -> Type'
+ecMulArgs x = Product [intType' x, intType' x, intType' x] x
+
+ecPairingArgs :: SourceAnnotation Text -> Type'
+ecPairingArgs x = Sum
+                $ (Static (SVMType.Array (SVMType.Int Nothing Nothing) Nothing) x)
+               :| [ Static SVMType.Variadic x
+                  , MultiVariate (intType' x) x
+                  ]
+
 --This function should have multivariate type that represents any amount of string types
 stringConcatArgs :: SourceAnnotation Text -> Type'
 stringConcatArgs x = MultiVariate (stringType' x) x
@@ -1473,6 +1503,10 @@ getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [
 getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [] [] False
+getVarType' "ecAdd" ctx = pure $ Function (ecAddArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
+getVarType' "ecMul" ctx = pure $ Function (ecMulArgs ctx) (Product [intType' ctx, intType' ctx] ctx) ctx [] [] False
+getVarType' "ecPairing" ctx = pure $ Function (ecPairingArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "selfdestruct" ctx = pure $ Function (selfdestructArgs ctx) (boolType' ctx) ctx [] [] False
 getVarType' "require" ctx = pure $ Function (requireArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "assert" ctx = pure $ Function (assertArgs ctx) (Product [] ctx) ctx [] [] False
@@ -1953,8 +1987,14 @@ tcExpr (PlusPlus x a) =
   intType' x ~> tcExpr a
 tcExpr (MinusMinus x a) = do
   intType' x ~> tcExpr a
-tcExpr (NewExpression x b@SVMType.Bytes {}) = pure $ Static b x
-tcExpr (NewExpression x a@SVMType.Array {}) = pure $ Static a x
+tcExpr (NewExpression x b@SVMType.Bytes {}) = do
+  let fArgs = Product [Static (SVMType.Int Nothing Nothing) x] x
+      fRets = Static b x
+  pure . Sum $ fRets :| [Function fArgs fRets x [] [] False]
+tcExpr (NewExpression x a@SVMType.Array {}) = do
+  let fArgs = Product [Static (SVMType.Int Nothing Nothing) x] x
+      fRets = Static a x
+  pure . Sum $ fRets :| [Function fArgs fRets x [] [] False]
 tcExpr (NewExpression x (SVMType.UnknownLabel l _)) = getConstructorType' x l
 tcExpr (NewExpression x (SVMType.Contract l)) = getConstructorType' x l
 tcExpr (NewExpression x t) = pure . bottom $ ("Cannot use keyword 'new' in conjuction with type " <> showType t) <$ x

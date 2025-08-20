@@ -68,6 +68,7 @@ import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Statement
+import SolidVM.Model.SolidString (labelToText)
 import SolidVM.Solidity.Parse.ParserTypes (initialParserState)
 import SolidVM.Solidity.Parse.Statement
 import Text.Format
@@ -339,11 +340,16 @@ expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
 expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
 expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
+expressionToValue (ObjectLiteral _ fields) = do
+  let convertField (key, expr) = do
+        value <- expressionToValue expr
+        pure (labelToText key, value)
+  convertedFields <- traverse convertField (Map.toList fields)
+  pure $ ValueStruct $ Map.fromList convertedFields
 expressionToValue _ = Nothing
 
--- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
+-- TODO: implement expressionToValue for tuples and mappings
 --expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
---expressionToValue (ObjectLiteral _ n) = Just $ SMV.SStruct _ n --SStruct _ theMap
 
 constructArgValuesAndSource ::
   (MonadIO m, MonadLogger m) =>

@@ -1,4 +1,5 @@
 import "../concrete/BaseCodeCollection.sol";
+import "main.groth16.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -142,5 +143,15 @@ contract Describe_Mercata {
         mapping (string => string) strs;
         require(3 + nums["hello"] == 3, "Mapping should return 0, instead got " + string(nums["hello"]));
         require(strs["hello"] + "yo" + strs["goodbye"] == "yo", "Mapping should return empty string, instead got " + strs["hello"]);
+    }
+
+    function it_can_verify_a_groth16_proof() {
+        Verifier v = new Verifier();
+        uint[2] a = [1,2];
+        uint[2][2] b = [[3,4],[5,6]];
+        uint[2] c = [7,8];
+        uint[2] input = [9,10];
+        bool success = v.verifyProof(a, b, c, input);
+        require(success, "Groth16 proof failed!");
     }
 }

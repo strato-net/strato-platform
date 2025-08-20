@@ -1,4 +1,4 @@
-import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry } from "./config";
+import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry, mercataBridge } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -24,6 +24,7 @@ export const constants = (() => {
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
+  const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
   const Event = "event";
   
   const tokenSelectFields = [
@@ -110,6 +111,7 @@ export const constants = (() => {
     "price::text",
     "timestamp::text"
   ];
+
   return {
     poolFactory,
     lendingRegistry,
@@ -130,6 +132,8 @@ export const constants = (() => {
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
+    MercataBridge,
+    mercataBridge,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,

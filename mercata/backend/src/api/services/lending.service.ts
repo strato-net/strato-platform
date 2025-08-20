@@ -1,6 +1,6 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
-import { postAndWaitForTx } from "../../utils/txHelper";
+import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
@@ -119,6 +119,23 @@ export const withdrawLiquidity = async (
   );
 };
 
+export const withdrawLiquidityAll = async (
+  accessToken: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawLiquidityAll",
+      args: {},
+    }))
+  );
+};
+
 export const supplyCollateral = async (
   accessToken: string,
   asset: string,
@@ -189,6 +206,23 @@ export const borrow = async (
   );
 };
 
+export const borrowMax = async (
+  accessToken: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "borrowMax",
+      args: {},
+    }))
+  );
+};
+
 export const repay = async (
   accessToken: string,
   amount: string,
@@ -220,9 +254,10 @@ export const repay = async (
     },
   ];
 
-  return await postAndWaitForTx(accessToken, () =>
+  const result = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
   );
+  return { ...result, amountSent: amount };
 };
 
 export const collateralAndBalance = async (
@@ -397,6 +432,10 @@ export const liquidityAndBalance = async (
   );
   const totalAmountOwedPreview = debtFromScaled(userScaledDebtStr, idxPreview);
 
+  // Clamp dust (<= 1 wei) to zero for UI cleanliness
+  const totalAmountOwedClamped = (() => { try { return (BigInt(totalAmountOwed) <= 1n) ? "0" : totalAmountOwed; } catch { return totalAmountOwed; } })();
+  const totalAmountOwedPreviewClamped = (() => { try { return (BigInt(totalAmountOwedPreview) <= 1n) ? "0" : totalAmountOwedPreview; } catch { return totalAmountOwedPreview; } })();
+
   // System totals and exchange rate
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
@@ -470,8 +509,8 @@ export const liquidityAndBalance = async (
     borrowIndex: borrowIndexStr.toString(),
     reservesAccrued: reservesAccruedStr.toString(),
     // New index-based fields for UI:
-    totalAmountOwed,
-    totalAmountOwedPreview,
+    totalAmountOwed: totalAmountOwedClamped,
+    totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
     totalBorrowPrincipal,
   };
@@ -540,6 +579,63 @@ export const getLoan = async (
   }
 
   return allLoans;
+};
+
+export const repayAll = async (
+  accessToken: string,
+  userAddress: string
+) => {
+  const registry = await getPool(accessToken, undefined, {
+    select:
+      `lendingPool:lendingPool_fkey(` +
+        `address,borrowableAsset,borrowIndex::text,` +
+        `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
+      `),` +
+      `liquidityPool:liquidityPool_fkey(address)`
+  ,
+    "lendingPool.userLoan.key": `eq.${userAddress}`
+  } as any);
+
+  const lendingPoolAddr = registry.lendingPool?.address as string;
+  const liquidityPoolAddr = registry.liquidityPool?.address as string;
+  const borrowableAsset = registry.lendingPool?.borrowableAsset as string;
+  if (!lendingPoolAddr || !liquidityPoolAddr || !borrowableAsset) {
+    throw new Error("Required pool addresses not found");
+  }
+
+  const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  const loanEntry = (registry.lendingPool?.userLoan || []).find((r: any) => r.user === userAddress);
+  const scaledDebt = loanEntry?.LoanInfo?.scaledDebt || "0";
+  const exactDebtWei = BigInt(debtFromScaled(scaledDebt, borrowIndexStr));
+
+  const MAX_UINT256 = ((1n << 256n) - 1n).toString();
+
+  // Single tx: approve MAX + on-chain repayAll
+  const tx: FunctionInput[] = [
+    {
+      contractName: extractContractName(Token),
+      contractAddress: borrowableAsset,
+      method: "approve",
+      args: { spender: liquidityPoolAddr, value: MAX_UINT256 },
+    },
+    {
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPoolAddr,
+      method: "repayAll",
+      args: {},
+    },
+  ];
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+
+  return {
+    status,
+    hash,
+    amountRequested: MAX_UINT256,
+    estimatedDebtAtRead: exactDebtWei.toString(),
+  };
 };
 
 export const executeLiquidation = async (
@@ -901,4 +997,22 @@ export const listLiquidatableLoans = async (accessToken: string): Promise<Liquid
 
 export const listNearUnhealthyLoans = async (accessToken: string, margin: number): Promise<LiquidationEntry[]> => {
   return listLoansForLiquidation(accessToken, margin);
+};
+
+export const withdrawCollateralMax = async (
+  accessToken: string,
+  asset: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+      contractName: extractContractName(LendingPool),
+      contractAddress: lendingPool,
+      method: "withdrawCollateralMax",
+      args: { asset },
+    }))
+  );
 };
