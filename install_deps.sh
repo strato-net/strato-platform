@@ -183,7 +183,7 @@ Darwin)
         leveldb \
         libpq \
         libsodium \
-        pkg-config \
+        pkgconf \
         secp256k1 \
         xz
     ;;
