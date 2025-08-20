@@ -10,26 +10,26 @@ import "../../abstract/ERC20/access/Ownable.sol";
  * @title Pool
  * @notice A decentralized exchange (DEX) liquidity pool for trading between two ERC20 tokens
  * @dev This contract implements an automated market maker (AMM) with constant product formula
- * 
+ *
  * Key Features:
  * - Automated market making using x * y = k formula
  * - Liquidity provision and removal with LP token rewards
  * - Swap functionality with configurable fees
  * - Fee distribution between protocol and liquidity providers
  * - Reentrancy protection for security
- * 
+ *
  * Fee Structure:
  * - Total swap fee is split between protocol and LP providers
  * - Protocol fee goes to fee collector
  * - LP fee is distributed to liquidity providers based on their share
- * 
+ *
  * @author Mercata Protocol
  * @version 1.0.0
  */
 contract record Pool is Ownable {
-    
+
     // ============ EVENTS ============
-    
+
     /// @notice Emitted when a swap occurs
     /// @param sender The address that initiated the swap
     /// @param tokenIn The address of the input token
@@ -37,13 +37,13 @@ contract record Pool is Ownable {
     /// @param amountIn The amount of input tokens
     /// @param amountOut The amount of output tokens received
     event Swap(address sender, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut);
-    
+
     /// @notice Emitted when liquidity is added to the pool
     /// @param provider The address that provided liquidity
     /// @param tokenBAmount The amount of tokenB added
     /// @param tokenAAmount The amount of tokenA added
     event AddLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
-    
+
     /// @notice Emitted when liquidity is removed from the pool
     /// @param provider The address that removed liquidity
     /// @param tokenBAmount The amount of tokenB received
@@ -51,39 +51,39 @@ contract record Pool is Ownable {
     event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
 
     // ============ STATE VARIABLES ============
-    
+
     /// @notice The first token in the trading pair
     Token public tokenA;
-    
+
     /// @notice The second token in the trading pair
     Token public tokenB;
-    
+
     /// @notice The liquidity provider token representing ownership in the pool
     Token public lpToken;
 
     /// @notice Reentrancy guard to prevent recursive calls
-    bool private locked;   
-    
+    bool private locked;
+
     /// @notice Current exchange rate from tokenA to tokenB
     decimal public aToBRatio;
-    
+
     /// @notice Current exchange rate from tokenB to tokenA
     decimal public bToARatio;
 
     /// @notice Current balance of tokenA in the pool
     uint public tokenABalance;
-    
+
     /// @notice Current balance of tokenB in the pool
     uint public tokenBBalance;
 
     /// @notice Pool-specific swap fee rate in basis points (0 = use factory default)
     uint256 public swapFeeRate;
-    
+
     /// @notice Pool-specific LP share percentage in basis points (0 = use factory default)
     uint256 public lpSharePercent;
     
     // ============ MODIFIERS ============
-    
+
     /// @notice Prevents reentrant calls to functions
     /// @dev Uses a simple boolean lock to prevent recursive calls
     modifier nonReentrant() {
@@ -94,7 +94,7 @@ contract record Pool is Ownable {
     }
 
     // ============ INTERNAL FUNCTIONS ============
-    
+
     /// @notice Get the fee collector address from the factory
     /// @return The address of the fee collector contract
     function _feeCollector() internal view returns (address) {
@@ -126,28 +126,28 @@ contract record Pool is Ownable {
     }
 
     // ============ CONSTRUCTOR ============
-    
+
     /// @notice Initialize a new liquidity pool
     /// @param tokenAAddr The address of the first token in the pair
     /// @param tokenBAddr The address of the second token in the pair
     /// @param lpTokenAddr The address of the LP token contract
     /// @dev The pool owner is set to the factory that creates it
     constructor(
-        address tokenAAddr, 
+        address tokenAAddr,
         address tokenBAddr,
         address lpTokenAddr
     ) Ownable(msg.sender) {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(lpTokenAddr != address(0), "Zero lpToken address");
-        
+
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
         lpToken = Token(lpTokenAddr);
     }
 
     // ============ UTILITY FUNCTIONS ============
-    
+
     /// @notice Update the pool's state variables (balances and ratios)
     /// @dev Called after operations that change token balances
     function _updateStateVars() internal {
@@ -178,7 +178,7 @@ contract record Pool is Ownable {
     }
 
     // ============ CORE FUNCTIONS ============
-    
+
     /// @notice Add liquidity to the pool and receive LP tokens
     /// @param tokenBAmount The amount of tokenB to add (used as the base for calculations)
     /// @param maxTokenAAmount The maximum amount of tokenA the user is willing to add
@@ -192,7 +192,7 @@ contract record Pool is Ownable {
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
-        
+
         if (totalLiquidity > 0) {
             uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
             uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
@@ -235,7 +235,7 @@ contract record Pool is Ownable {
     /// @dev The user must approve LP tokens for burning before calling this function
     /// @dev Slippage protection is provided by minTokenBAmount and minTokenAAmount parameters
     function removeLiquidity(
-        uint256 lpTokenAmount, 
+        uint256 lpTokenAmount,
         uint256 minTokenBAmount,
         uint256 minTokenAAmount
     ) external returns (uint256, uint256) {
@@ -246,7 +246,7 @@ contract record Pool is Ownable {
         uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
         uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
         uint256 tokenAAmount = lpTokenAmount * tokenAReserve / totalLiquidity;
-        
+
         require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
         require(ERC20(tokenB).transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
@@ -262,7 +262,7 @@ contract record Pool is Ownable {
     }
 
     // ============ SWAP FUNCTIONS ============
-    
+
     /// @notice Calculate the output amount for a given input amount using the constant product formula
     /// @param inputAmount The amount of input tokens
     /// @param inputReserve The current reserve of input tokens
@@ -309,7 +309,7 @@ contract record Pool is Ownable {
 
         // Transfer full amount to pool
         require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
-        
+
         // Send protocol fee to fee collector
         require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
 
@@ -324,7 +324,7 @@ contract record Pool is Ownable {
     }
 
     // ============ ADMIN FUNCTIONS ============
-    
+
     /// @notice Set fee parameters for this pool (owner only)
     /// @param newSwapFeeRate New swap fee rate in basis points (e.g., 30 = 0.3%)
     /// @param newLpSharePercent New LP share percentage in basis points (e.g., 7000 = 70%)
@@ -340,7 +340,7 @@ contract record Pool is Ownable {
         require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
         require(newLpSharePercent > 0, "LP share must be greater than 0");
-        
+
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
     }
