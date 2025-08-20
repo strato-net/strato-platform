@@ -458,6 +458,9 @@ mercataBridge :: AccountInfo
 mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataBridge") $ ownedByBlockApps mercataAddress ++
   [ (".relayer", BAccount $ unspecifiedChain blockappsAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+  , (".depositsPaused", BBool False)
+  , (".withdrawalCounter", BInteger 0)
+  , (".withdrawalsPaused", BBool False)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
   ]
 
