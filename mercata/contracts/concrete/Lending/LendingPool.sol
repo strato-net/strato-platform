@@ -145,6 +145,9 @@ contract record LendingPool is Ownable {
         uint256 mTokenAmount = (amount * 1e18) / exchangeRate;
         require(mTokenAmount > 0, "Deposit too small");
 
+        // Call RewardsEngine update before deposit with current user balance
+        _updateRewardsEngine();
+
         // Transfer underlying and mint mTokens via LiquidityPool
         LiquidityPool(_liquidityPool()).deposit(amount, mTokenAmount, msg.sender);
 
@@ -165,6 +168,9 @@ contract record LendingPool is Ownable {
         uint256 mTokensToBurn = (amount * 1e18) / exchangeRate;
 
         require(IERC20(mToken).balanceOf(msg.sender) >= mTokensToBurn, "Insufficient mToken balance");
+
+        // Call RewardsEngine update before withdraw with current user balance
+        _updateRewardsEngine();
 
         // LiquidityPool burns calculated mTokens and transfers requested underlying amount
         LiquidityPool(_liquidityPool()).withdraw(mTokensToBurn, msg.sender, amount);
@@ -626,6 +632,18 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
     // ═══════════════════════════════════════════════════════════════════════════════
+
+    function _updateRewardsEngine() internal {
+        if (rewardsEngine != address(0)) {
+            uint256 currentBalance = IERC20(mToken).balanceOf(msg.sender);
+            address[] memory assets = [];
+            assets.push(borrowableAsset);
+            uint256[] memory amounts = [];
+            amounts.push(currentBalance);
+
+            RewardsEngine(rewardsEngine).update("LendingPool", assets, amounts, msg.sender);
+        }
+    }
     /**
     * @notice Calculates interest accrued since last update using RateStrategy
     * @param loan The user's loan data
