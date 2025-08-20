@@ -9,13 +9,13 @@ import "./LendingRegistry.sol";
  */
  
 contract record CollateralVault is Ownable {
-    event CollateralAdded(address indexed user, address indexed asset, uint256 amount);
-    event CollateralRemoved(address indexed user, address indexed asset, uint256 amount);
+    event CollateralAdded(address indexed user, address indexed asset, uint amount);
+    event CollateralRemoved(address indexed user, address indexed asset, uint amount);
 
     LendingRegistry public registry;
     
     // user => asset => amount
-    mapping(address => mapping(address => uint256)) public record userCollaterals;
+    mapping(address => mapping(address => uint)) public record userCollaterals;
 
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
@@ -33,7 +33,7 @@ contract record CollateralVault is Ownable {
      * @param asset The collateral asset address
      * @param amount The amount to add
      */
-    function addCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
+    function addCollateral(address borrower, address asset, uint amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
         require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
         userCollaterals[borrower][asset] += amount;
@@ -46,7 +46,7 @@ contract record CollateralVault is Ownable {
      * @param asset The collateral asset address
      * @param amount The amount to remove
      */
-    function removeCollateral(address borrower, address asset, uint256 amount) public onlyLendingPool {
+    function removeCollateral(address borrower, address asset, uint amount) public onlyLendingPool {
         require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral");
         userCollaterals[borrower][asset] -= amount; 
         require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
@@ -60,7 +60,7 @@ contract record CollateralVault is Ownable {
      * @param asset The collateral asset address
      * @param amount Amount of collateral to seize
      */
-    function seizeCollateral(address borrower, address to, address asset, uint256 amount) public onlyLendingPool {
+    function seizeCollateral(address borrower, address to, address asset, uint amount) public onlyLendingPool {
         require(amount > 0, "Invalid amount");
         require(userCollaterals[borrower][asset] >= amount, "Insufficient collateral to seize");
 
@@ -76,7 +76,7 @@ contract record CollateralVault is Ownable {
      * @param asset The asset address
      * @return The collateral amount
      */
-    function getCollateral(address user, address asset) public view returns (uint256) {
+    function getCollateral(address user, address asset) public view returns (uint) {
         return userCollaterals[user][asset];
     }
 
