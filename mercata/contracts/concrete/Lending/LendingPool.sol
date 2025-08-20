@@ -77,18 +77,20 @@ contract record LendingPool is Ownable {
     TokenFactory public tokenFactory;
     address public poolConfigurator;
     FeeCollector public feeCollector;
+    address public rewardsEngine;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory, address _feeCollector) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory, address _feeCollector, address _rewardsEngine) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         poolConfigurator = _poolConfigurator;
         tokenFactory = TokenFactory(_tokenFactory);
         feeCollector = FeeCollector(_feeCollector);
+        rewardsEngine = _rewardsEngine;
     }
 
     modifier onlyPoolConfigurator() {
@@ -591,6 +593,10 @@ contract record LendingPool is Ownable {
 
     function setFeeCollector(address _feeCollector) external onlyPoolConfigurator {
         feeCollector = FeeCollector(_feeCollector);
+    }
+
+    function setRewardsEngine(address _rewardsEngine) external onlyPoolConfigurator {
+        rewardsEngine = _rewardsEngine;
     }
     /**
      * @notice Set the single borrowable asset
