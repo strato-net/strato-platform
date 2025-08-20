@@ -32,6 +32,8 @@ The name of the smart contract will be `RewardsEngine`
   - Remove reward tokens (batch operation that calls 'Remove reward token' in a
     loop)
 
+  When we remove a reward token, we must update multipliers.
+
 ### Multipliers management (PARTIALLY IMPLEMENTED)
 
   Because we have different `Reward tokens`, one `Action` can requires applying
@@ -60,7 +62,6 @@ The name of the smart contract will be `RewardsEngine`
   multiplier, we need to check that it is not referenced by other existing
   `Action` and fail otherwise.
 
-  <!-- TODO: Add validation to prevent removing multipliers that are referenced by existing Actions (requires Action Management to be implemented first) -->
 
 ### Action Management (IMPLEMENTED)
 
@@ -200,11 +201,6 @@ The name of the smart contract will be `RewardsEngine`
   - Only processes and returns results for balances > 0 to avoid unnecessary operations
   - Updates `modifiedAt` timestamp when nullifying balances
 
-
-### TODO function modifiers
-
- `update` should be called by owners only `claim` only user should be allowed to
- claim rewards
 
 ### Delegate Pattern (IMPLEMENTED)
 
