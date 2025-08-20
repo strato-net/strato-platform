@@ -2658,7 +2658,10 @@ runTheConstructors from to hsh cc contractName' argVals' = do
   zipped <-
     case argVals of
       OrderedVals vals -> do
-        let go [(SVMType.Variadic, n)] vs' = do
+        let go [(SVMType.Variadic, n)] [SVariadic vs'] = do
+              let var = Constant $ SVariadic vs'
+              pure [(n, (SVMType.Variadic, var))]
+            go [(SVMType.Variadic, n)] vs' = do
               let var = Constant $ SVariadic vs'
               pure [(n, (SVMType.Variadic, var))]
             go [] _ = pure []
@@ -2788,6 +2791,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
           let argMeta =
                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
                   CC._funcArgs theFunction
+              go [(n, SVMType.Variadic)] [SVariadic vs'] = [(n, (SVMType.Variadic, SVariadic vs'))]
               go [(n, SVMType.Variadic)] vs' = [(n, (SVMType.Variadic, SVariadic vs'))]
               go [] _ = []
               go _ [] = []
@@ -3472,10 +3476,11 @@ validateFunctionArguments func argVals = do
       NamedVals xs -> length xs
     testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
     testMatch tf = do
-      let argMapping = mapArgs tf
-      sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
-        Just vals' -> pure . Just $ OrderedVals vals'
-        Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
+      case mapArgs tf of
+        Nothing -> pure Nothing
+        Just argMapping -> sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
+          Just vals' -> pure . Just $ OrderedVals vals'
+          Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
       case unsnoc (map snd (CC._funcArgs tf)) of
@@ -3507,7 +3512,7 @@ validateFunctionArguments func argVals = do
           if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
             then fmap SArray . sequence <$> traverse (fmap (fmap Constant) . marshalValue . (y,) <=< getVar) vs
             else pure Nothing
-        (x, SVMType.Variadic) -> pure $ Just x
+        (SVariadic x, SVMType.Variadic) -> pure . Just $ SVariadic x
         (r@(SReference addressedPath), _) -> do
           refType <- getXabiValueType addressedPath
           if (refType == t)
@@ -3517,13 +3522,19 @@ validateFunctionArguments func argVals = do
               (SVMType.Array x _, SVMType.Array y _) -> pure . bool Nothing (Just r) $ x == y
               _ -> pure Nothing
         _ -> pure Nothing
-    mapArgs :: CC.FuncF a -> [(String, (SVMType.Type, Value))]
+    mapArgs :: CC.FuncF a -> Maybe [(String, (SVMType.Type, Value))]
     mapArgs theFunc = case argVals of
       OrderedVals vs ->
-        let argMeta =
+        let go [(n, SVMType.Variadic)] [SVariadic args] = Just [(n, (SVMType.Variadic, SVariadic args))]
+            go [(n, SVMType.Variadic)] args = Just [(n, (SVMType.Variadic, SVariadic args))]
+            go nts [SVariadic args] = go nts args
+            go ((n,t):nts) (v:args) = ((n, (t, v)):) <$> go nts args
+            go [] [] = Just []
+            go _ _ = Nothing
+            argMeta =
               map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
-          in zipWith (\(n, t) v -> (n, (t, v))) argMeta vs
+         in go argMeta vs
       NamedVals ns ->
         let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
             typeAndVal =
@@ -3537,4 +3548,4 @@ validateFunctionArguments func argVals = do
               map snd . sortWith fst
                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                 $ M.toList typeAndVal
-          in sortedArgs
+          in Just sortedArgs
