@@ -59,9 +59,10 @@ The name of the smart contract will be `RewardsEngine`
 
   Both those actions intertwine with "Reward tokens management" and "Action
   management". When adding a multiplier we need to check that it provides a
-  factor for every Reward token we have, and fail otherwise. When we remove a
-  multiplier, we need to check that it is not referenced by other existing
-  `Action` and fail otherwise.
+  factor for every Reward token we have, and fail otherwise.
+
+  When we remove a multiplier, we need to check that it is not referenced by
+  other existing `Action` and fail otherwise (TODO).
 
 
 ### Action Management (IMPLEMENTED)
@@ -285,3 +286,22 @@ contract.
   1. 1-based indexing: xMap stores array.length (not array.length - 1)
   2. Why 1-based: So that xMap[_token] == 0 means "not registered"
   3. Usage: To access the token, use xs[xMap[x] - 1]
+
+## Issues
+
+### Remove multiplier
+
+  The `multiplierNames` are updated, but not the `multipliers`.
+
+  We also do not check if multiplier is used by any `Action`. We should probably
+  do it, but this requires tracking actions.
+
+### Rewards token removal
+
+  When we remove a reward token, we update multipliers, but we don't update the
+  balances.
+  This requires additional tracking of actions, maybe not worth it?
+
+### Remove action
+
+  When we remove action, we don't clean up balances
