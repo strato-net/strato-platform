@@ -1195,7 +1195,7 @@ def registerStratoUserKey(OAuthDiscoveryUrl, clientId, clientSecret, username=''
   
   def oauth_token_endpoint = sh(returnStdout: true, script: "curl --fail -s ${OAuthDiscoveryUrl} | jq -r .token_endpoint ").trim()
   sh "echo ${oauth_token_endpoint} > _oauth_token_endpoint_tmp"
-  def client_b64string = sh(returnStdout: true, script: "python -c \"import base64; print(base64.b64encode('${clientId}:${clientSecret}'))\"").trim()
+  def client_b64string = sh(returnStdout: true, script: "echo -n '${clientId}:${clientSecret}' | base64 -w0").trim()
   def data_url_encoded = "--data-urlencode 'grant_type=client_credentials'"
   if (!username.isEmpty() && !password.isEmpty()) {
     data_url_encoded = "--data-urlencode 'grant_type=password' --data-urlencode 'username=${username}' --data-urlencode 'password=${password}'"
