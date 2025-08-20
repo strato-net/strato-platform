@@ -44,7 +44,7 @@ contract record Pool is Ownable {
     /// @param tokenAAmount The amount of tokenA added
     event AddLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
     
-    /// @notice Emitted when liquidity is removed from the pool
+        /// @notice Emitted when liquidity is removed from the pool
     /// @param provider The address that removed liquidity
     /// @param tokenBAmount The amount of tokenB received
     /// @param tokenAAmount The amount of tokenA received
@@ -87,6 +87,9 @@ contract record Pool is Ownable {
     
     /// @notice Pool-specific LP share percentage in basis points (0 = use factory default)
     uint256 public lpSharePercent;
+    
+    /// @notice Whether to charge swap fees on internal zap swaps (default: true)
+    bool public zapSwapFeesEnabled = true;
     
     // ============ MODIFIERS ============
     
@@ -370,5 +373,129 @@ contract record Pool is Ownable {
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
+    }
+
+    /// @notice Toggle swap fees for internal zap swaps (owner only)
+    /// @param enabled Whether to charge fees on internal zap swaps
+    /// @dev When disabled, zap swaps are fee-free, improving capital efficiency for liquidity providers
+    /// @dev When enabled, zap swaps follow the same fee structure as regular swaps
+    function setZapSwapFeesEnabled(bool enabled) external onlyOwner {
+        zapSwapFeesEnabled = enabled;
+    }
+
+    // ============ ZAP-IN (SINGLE TOKEN LIQUIDITY) ============
+    /// @notice Calculate integer square root of a uint256 (Babylonian method)
+    function _sqrt(uint256 y) internal pure returns (uint256 z) {
+        if (y > 3) {
+            z = y;
+            uint256 x = y / 2 + 1;
+            while (x < z) {
+                z = x;
+                x = (y / x + x) / 2;
+            }
+        } else if (y != 0) {
+            z = 1;
+        }
+    }
+
+    /// @notice Compute optimal swap amount for single-sided liquidity (generic fee)
+    /// @dev Derived from Uniswap-V2 zap formula, generalized for fee in basis points.
+    function _getOptimalSwapAmount(
+        uint256 reserveIn,
+        uint256 userIn,
+        uint256 feeBps
+    ) internal pure returns (uint256) {
+        require(feeBps < 10000, "Fee too high");
+        uint256 a = 10000 - feeBps; // effective multipler (e.g., 9970 for 0.3%)
+        uint256 b = 10000;
+        // term = sqrt( reserveIn * ( userIn * 4 * a * b + reserveIn * (a + b) ** 2 ) )
+        uint256 term1 = userIn * 4 * a * b;
+        uint256 term2 = reserveIn * (a + b) * (a + b);
+        uint256 term = _sqrt(reserveIn * (term1 + term2));
+        uint256 numerator = term - reserveIn * (a + b);
+        return numerator / (2 * a);
+    }
+
+    function _internalSwapForZap(
+        bool isAToB,
+        uint256 amountIn
+    ) internal returns (uint256 amountOut) {
+        
+
+        uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
+        uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
+
+        uint256 netInput;
+        if (zapSwapFeesEnabled) {
+            uint256 fee = (amountIn * _swapFeeRate()) / 10000;
+            uint256 lpFee = (fee * _lpSharePercent()) / 10000;
+            uint256 protocolFee = fee - lpFee;
+            netInput = amountIn - fee;
+
+            // protocol fee sent to collector
+            Token inputToken = isAToB ? tokenA : tokenB;
+            require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Fee transfer failed");
+        } else {
+            netInput = amountIn; // no fees charged
+        }
+
+        amountOut = getInputPrice(netInput, inputReserve, outputReserve);
+
+        // Note: For internal zap swaps, tokens don't actually move since they're all in the same pool
+        // The swap calculation determines how to split the deposited tokens optimally
+        // Actual balance updates happen when _updateStateVars() is called at the end
+    }
+
+    function _mintLiquidityAfterZap(
+        uint256 tokenBContribution,
+        uint256 tokenAContribution
+    ) internal returns (uint256 liquidityMinted) {
+        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        uint256 tokenBReserve = tokenBBalance;
+        liquidityMinted = tokenBContribution * totalLiquidity / tokenBReserve;
+        
+        lpToken.mint(msg.sender, liquidityMinted);
+        emit AddLiquidity(msg.sender, tokenBContribution, tokenAContribution);
+        _updateStateVars();
+    }
+
+    /// @notice Add liquidity with a single token (zap-in)
+    /// @param isAToB True if depositing tokenA only, false if depositing tokenB only
+    /// @param amountIn Amount of the single token supplied by the user
+    /// @param deadline Expiry timestamp
+    /// @return liquidityMinted Amount of LP tokens minted to the user
+    function addLiquiditySingleToken(
+        bool isAToB,
+        uint256 amountIn,
+        uint256 deadline
+    ) external returns (uint256 liquidityMinted) {
+        require(amountIn > 0, "Invalid inputs");
+        require(block.timestamp <= deadline, "EXPIRED");
+        require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
+        skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+
+        // Transfer full amount from user to pool
+        Token depositToken = isAToB ? tokenA : tokenB;
+        uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
+        require(ERC20(depositToken).transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
+        
+        // Sync balances after transfer to account for the new tokens
+        _updateStateVars();
+        uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
+        uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
+
+        uint256 amountOut = _internalSwapForZap(isAToB, swapAmt);
+
+        uint256 tokenAContribution;
+        uint256 tokenBContribution;
+        if (isAToB) {
+            tokenAContribution = amountIn - swapAmt;
+            tokenBContribution = amountOut;
+        } else {
+            tokenBContribution = amountIn - swapAmt;
+            tokenAContribution = amountOut;
+        }
+
+        liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
     }
 }
