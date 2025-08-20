@@ -97,8 +97,8 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
               from: '-',
               to:  item.depositInfo?.user || item.from || '-',
               tokenSymbol: item.tokenSymbol || '-',
-              ethTokenSymbol: item.ethTokenSymbol || '-',
-              ethTokenAddress: item.ethTokenAddress || '-',
+              stratoTokenSymbol: item.stratoTokenSymbol || '-',
+              stratoTokenAddress: item.stratoToken || '-',
               amount: item.depositInfo?.amount || item.amount
                 ? formatWeiAmount(item.depositInfo?.amount || item.amount, 18)
                 : "-",
@@ -164,7 +164,7 @@ export const TransactionProvider = ({ children }: { children: ReactNode }) => {
             from: item.withdrawalInfo?.user || '-', // From shows user address
             to: '-', // To shows dest address
             ethTokenSymbol: '-', // Not available in new data
-            ethTokenAddress: '-', // Not available in new data
+            ethTokenAddress: item.extToken || '-', // Not available in new data
             amount: item.withdrawalInfo?.amount ? formatWeiAmount(item.withdrawalInfo.amount, 18) : '-', // Show amount in 18 decimals
             txHash: item.transaction_hash || '-', // Not available in new data
             token: item.withdrawalInfo?.token || '-',

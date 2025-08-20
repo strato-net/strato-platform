@@ -220,6 +220,7 @@ export interface OnRampContextType {
 }
 
 export interface RawWithdrawData {
+  extToken: string;
   withdrawalId: number;
   withdrawalInfo: {
     dest: string;
@@ -244,6 +245,9 @@ export interface RawWithdrawData {
 }
 
 export interface RawDepositData {
+  stratoTokenSymbol: string;
+  stratoToken: string;
+  extToken: string;
   chainId: any;
   transaction_hash: string;
   block_timestamp: string;

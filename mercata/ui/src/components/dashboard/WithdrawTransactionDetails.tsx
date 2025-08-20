@@ -191,7 +191,6 @@ const WithdrawTransactionDetails = () => {
         } else if (status === "3") {
           return (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              <CheckCircle2 className="h-3 w-3 mr-1" />
               Completed
             </span>
           );

@@ -51,12 +51,13 @@ export const getBridgeStatus = async (
     // Extract status from rawParams
     const { status } = rawParams;
    
+    // Get bridge assets to match with transactions
+    const bridgeAssets = await getBridgeAssets(accessToken);
     
     let url: string;
     let params: Record<string, any>;
 
     if (status === 'WithdrawalInitiated') {
-      console.log("Processing WithdrawalInitiated status");
       // Same params and URL as before for WithdrawalInitiated
       url = `/${MercataBridge}-withdrawals`;
       params = {
@@ -69,7 +70,7 @@ export const getBridgeStatus = async (
    
       
     } else if (status === 'DepositInitiated') {
-      console.log("Processing DepositInitiated status");
+     
       // Different URL and params for DepositInitiated
       url = `/${MercataBridge}-deposits`;
       params = {  
@@ -79,16 +80,55 @@ export const getBridgeStatus = async (
         address: `eq.${constants.mercataBridge}`
       };
       
-      
     } else {
-      console.log("Invalid status received:", status);
       throw new Error('Invalid status. Must be either "WithdrawalInitiated" or "DepositInitiated"');
     }
     
-  
-    
     const { data: results } = await cirrus.get(accessToken, url, { params });
-    return results || [];
+    
+    if (!results || !results.length) return [];
+
+    // Enrich results with bridge asset data
+    const enrichedResults = results.map((result: any) => {
+      let matchingAsset;
+      
+      if (status === 'WithdrawalInitiated') {
+        // Match destChainId AND token from withdrawalInfo with bridge assets
+        matchingAsset = bridgeAssets.find((asset: any) => 
+          asset.value.chainId === result.withdrawalInfo?.destChainId &&
+          asset.key === result.withdrawalInfo?.token
+        );
+      } else if (status === 'DepositInitiated') {
+        // Match chainId AND token from depositInfo with bridge assets
+        matchingAsset = bridgeAssets.find((asset: any) => 
+          asset.value.chainId === String(result.chainId) &&
+          asset.value.extToken === result.depositInfo?.token
+        );
+      }
+
+      if (matchingAsset) {
+        return {
+          ...result,
+          stratoToken: matchingAsset.stratoToken,
+          stratoTokenName: matchingAsset.stratoTokenName,
+          stratoTokenSymbol: matchingAsset.stratoTokenSymbol,
+          extName: matchingAsset.value.extName,
+          extToken: matchingAsset.value.extToken
+        };
+      } else {
+        // Return result with default values if no match found
+        return {
+          ...result,
+          stratoToken: "-",
+          stratoTokenName: "-",
+          stratoTokenSymbol: "-",
+          extName: "-",
+          extToken: "-"
+        };
+      }
+    });
+    return enrichedResults;
+  
   } catch (error) {
     console.error("Error in getBridgeStatus:", error);
     throw error;
@@ -131,5 +171,42 @@ export const getNetworkConfigs = async (accessToken: string) => {
     });
   } catch (e) {
     throw e;
+  }
+};
+
+export const getBridgeAssets = async (accessToken: string) => {
+  try {
+    const { data: bridgeData } = await cirrus.get(accessToken, `/BlockApps-Mercata-MercataBridge`, {
+      params: {
+        select: "assets:BlockApps-Mercata-MercataBridge-assets(*)",
+        address: `eq.${constants.mercataBridge}`
+      }
+    });
+
+    const assets = bridgeData?.[0]?.assets || [];
+    if (!assets.length) return [];
+
+    const tokenAddresses = assets.map((asset: any) => asset.key);
+    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
+      params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
+    });
+
+    const tokenMap = new Map(tokenData.map((t: any) => [t.address, { name: t._name, symbol: t._symbol }]));
+
+    return assets.map((asset: any) => {
+      const tokenInfo = tokenMap.get(asset.key) as { name?: string; symbol?: string } | undefined;
+      return {
+        key: asset.key,
+        root: asset.root,
+        value: asset.value,
+        address: asset.address,
+        stratoToken: asset.key,
+        stratoTokenName: tokenInfo?.name || "",
+        stratoTokenSymbol: tokenInfo?.symbol || ""
+      };
+    });
+  } catch (error) {
+    console.error("Error in getBridgeAssets:", error);
+    throw error;
   }
 };
