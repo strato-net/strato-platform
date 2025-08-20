@@ -44,12 +44,13 @@ export const validateAddressField = (label: string) =>
 export const numericStringField = (label: string, { allowZero = false } = {}) =>
   Joi.string()
     .trim()
-    .pattern(/^\d+$/)
+    .pattern(/^\d+(\.\d+)?$/)
     .required()
     .custom((value, helpers) => {
       try {
-        const big = BigInt(value);
-        if (!allowZero && big <= 0n) return helpers.error("number.positive");
+        const num = parseFloat(value);
+        if (isNaN(num)) return helpers.error("string.pattern.base");
+        if (!allowZero && num <= 0) return helpers.error("number.positive");
         return value; // Keep the original string
       } catch {
         return helpers.error("string.pattern.base");
@@ -58,7 +59,8 @@ export const numericStringField = (label: string, { allowZero = false } = {}) =>
     .messages({
       "string.empty": `"${label}" is required`,
       "string.base": `"${label}" must be a string`,
-      "string.pattern.base": `"${label}" must be a numeric string (integers only)`,
+      "string.pattern.base": `"${label}" must be a valid numeric string (supports decimals)`,
       "number.positive": `"${label}" must be greater than 0`,
       "any.required": `"${label}" is required`,
     });
+  

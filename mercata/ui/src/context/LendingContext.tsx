@@ -33,6 +33,7 @@ type LendingContextType = {
   borrowAsset: (args: {
     amount: string;
   }) => Promise<void>;
+  borrowMax: () => Promise<void>;
   repayLoan: (args: {
     amount: string;
   }) => Promise<{ status: string; hash: string; amountSent?: string }>;
@@ -40,15 +41,14 @@ type LendingContextType = {
   getLend: () => Promise<LendData>;
   depositLiquidity: (args: { amount: string }) => Promise<void>;
   withdrawLiquidity: (args: { amount: string }) => Promise<void>;
+  withdrawLiquidityAll: () => Promise<void>;
 
   collateralInfo: CollateralData[];
   refreshCollateral: (signal?: AbortSignal) => void;
   loadingCollateral: boolean;
   supplyCollateral: (args: { asset: string; amount: string }) => Promise<void>;
   withdrawCollateral: (args: { asset: string; amount: string }) => Promise<void>;
-
-  getSafeMaxBorrow: () => Promise<{ safeMaxBorrow: string; rawMax: string; bufferBps: number; utilizationRate: number; timestamp: number }>;
-  getSafeMaxRepay: () => Promise<{ safeMaxRepay: string; totalOwed: string; timestamp: number }>;
+  withdrawCollateralMax: (args: { asset: string }) => Promise<void>;
 };
 
 const LendingContext = createContext<LendingContextType | undefined>(undefined);
@@ -149,6 +149,10 @@ export const LendingProvider = ({
     });
   };
 
+  const borrowMax = async () => {
+    await api.post("/lending/loans/borrow-max");
+  };
+
   const repayLoan = async ({
     amount,
   }: {
@@ -179,6 +183,9 @@ export const LendingProvider = ({
   const withdrawLiquidity = async (args: { amount: string }) => {
     await api.delete("/lending/pools/liquidity", {data: args});
   };
+  const withdrawLiquidityAll = async () => {
+    await api.post("/lending/pools/withdraw-all");
+  };
 
   const supplyCollateral = async (args: { asset: string, amount: string }) => {
     await api.post("/lending/collateral", args);
@@ -187,15 +194,8 @@ export const LendingProvider = ({
   const withdrawCollateral = async (args: { asset: string, amount: string }) => {
     await api.delete("/lending/collateral", {data: args});
   };
-
-  const getSafeMaxBorrow = async () => {
-    const res = await api.get("/lending/safe/max-borrow");
-    return res.data;
-  };
-
-  const getSafeMaxRepay = async () => {
-    const res = await api.get("/lending/safe/max-repay");
-    return res.data;
+  const withdrawCollateralMax = async (args: { asset: string }) => {
+    await api.post("/lending/collateral/withdraw-max", args);
   };
 
   const refreshLendingData = async (): Promise<void> => {
@@ -232,18 +232,19 @@ export const LendingProvider = ({
       loading,
       refreshLendingData,
       borrowAsset,
+      borrowMax,
       repayLoan,
       repayAll,
       getLend,
       depositLiquidity,
       withdrawLiquidity,
+      withdrawLiquidityAll,
       collateralInfo,
       loadingCollateral,
       refreshCollateral: fetchCollateralInfo,
       supplyCollateral,
       withdrawCollateral,
-      getSafeMaxBorrow,
-      getSafeMaxRepay,
+      withdrawCollateralMax,
     }),
     [
       loans,
