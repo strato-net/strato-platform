@@ -1,26 +1,13 @@
-// System-Wide Tests
-// Borrow that would exceed debt ceiling
-
-// Supply and withdraw collateral
-// Test with various collateral, corresponding LTV and liquidation threshold
-
-// Supply and withdraw liquidity to the Lending Pool
-
-// Liquidate unhealthy loans
-// Ensure that healthy loans are not liquidated
-// Ensure that health factor matches other interpretations of the LTV constraint
-
-// Borrow and Repay
-// Insufficient collateral --> Reject 
-
 // Test suite for new LendingPool mechanics
-// Usage: npm run newLendingTests.test.js
+// Usage: npm run lending
 
 const axios = require("axios");
 require("dotenv").config();
 
 (async () => {
-  console.log("=== Lending invariant test ===");
+  console.log("=== Aug 2025 Lending Pool Tests ===");
+  // The Lending pool was updated mid-august to an overall index-based approach,
+  // so these updated tests target that contract version.
 
   /* ----------------- env ----------------- */
   const nodeEnv = process.env.STRATO_NODE_URL || process.env.NODE_URL;
@@ -593,3 +580,48 @@ require("dotenv").config();
     process.exit(1);
   }
 })();
+
+// # Notes on tests to be run:
+// ## System-Wide Tests
+// Borrow that would exceed debt ceiling
+// 1) Get current system amount owed
+// 2) Set Asset-unit borrow limit just below that (not that close, since it will increase second-by-second anyway; unit-perfect tests later), dollar borrow limit 0
+// 3) Attempt to borrow such that we would exceed debt ceiling (again, not that close). Ensure that transaction reverts
+// 4) Set Dollar borrow limit just below that (not that close, since it will increase second-by-second anyway; unit-perfect tests later), asset-unitborrow limit 0.
+//    - This won't be that helpful a test unless we set up a non-$1 underlying asset; mark that for future
+// 5) Attempt to borrow such that we would exceed debt ceiling (again, not that close). Ensure that transaction reverts
+// Bonus: Put both debt ceilings in place. Ensure that the lesser of the two limits is enforced
+
+// ## Supply and withdraw collateral
+// Test with various collateral, corresponding LTV and liquidation threshold
+
+// ## Supply and withdraw liquidity to the Lending Pool
+// Note: withdrawAll() doesn't correspond to anything currently in the UI, but we can still test it here if we want to implement its service in the mercata backend api.
+
+// ## Liquidate unhealthy loans
+// Ensure that healthy loans are not liquidated
+// Ensure that health factor matches other interpretations of the LTV constraint
+
+// ## Borrow and Repay
+// Insufficient collateral --> Reject
+
+// ## UI Testing Flows
+// ### 100% buttons
+// 1) Supply 100% of collateral
+//    - Ensure transaction does not revert (red error box in bottom right)
+// 2) Borrow 100% of lending pool underlying asset
+//    - Ensure transaction does not revert (red error box in bottom right)
+// 3) Repay 100% of debt
+//    - Ensure dust does not remain
+// 4) Withdraw 100% of collateral
+//    - Ensure dust does not remain
+// ### 50% Liquidation
+// 1) TODO steps
+// ### 100% Liquidation
+// 1) TODO steps
+// ### Accounting
+// Ensure that the numbers add up after flows; in particular, ensure that no 
+// 1) TODO steps
+// ### Dust in UI
+// Regardless of whether dust in fact remains, ensure that the UI does not show it to extreme decimals.
+// 1) TODO steps
