@@ -14,6 +14,7 @@ module SolidVM.Model.CodeCollection (
   flFuncs,
   contracts,
   getParents,
+  getParentsAndUsings,
   getTopLevelAbstracts,
   getTopLevelAbstractsForContract,
   flConstants,
@@ -148,6 +149,22 @@ getParents cc c =
    in fmap concat . for (c ^. parents) $ \p -> do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParents cc p'
+
+getParentsAndUsings :: CodeCollection -> Contract -> SolidEither [Contract]
+getParentsAndUsings cc c = do
+  let toErr x p =
+        maybe
+          ( Left
+              ( InternalError "contract using does not exist" (labelToString p),
+                x
+              )
+          )
+          Right
+  ps <- getParents cc c
+  us <- fmap concat . for (M.elems $ c ^. usings) . traverse $ \(Using p _ _) -> do
+        p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
+        (p' :) <$> getParentsAndUsings cc p'
+  pure . concat $ ps : us
 
 getTopLevelAbstracts :: CodeCollection -> Map SolidString Contract
 getTopLevelAbstracts cc = M.unions . map (getTopLevelAbstractsForContract cc) . M.elems $ _contracts cc

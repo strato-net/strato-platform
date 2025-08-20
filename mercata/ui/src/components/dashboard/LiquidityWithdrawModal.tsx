@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useSwapContext } from '@/context/SwapContext';
+import { useLendingContext } from '@/context/LendingContext';
 import { usdstAddress, WITHDRAW_FEE } from "@/lib/constants";
 import { LiquidityPool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
@@ -40,6 +41,7 @@ const LiquidityWithdrawModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   const { removeLiquidity, fetchTokenBalances } = useSwapContext();
+  const { withdrawLiquidityAll } = useLendingContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -206,7 +208,7 @@ const LiquidityWithdrawModal = ({
                   variant="ghost"
                   size="sm"
                   className="text-xs text-blue-500"
-                  onClick={() => setWithdrawPercent('100')}
+                  onClick={async () => { try { await withdrawLiquidityAll(); onWithdrawSuccess(); onClose(); } catch {} }}
                 >
                   Max
                 </Button>

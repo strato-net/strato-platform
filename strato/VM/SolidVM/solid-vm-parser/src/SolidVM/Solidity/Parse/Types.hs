@@ -35,7 +35,9 @@ simpleType =
     <|> intSuffixed "uint" (SVMType.Int (Just False))
     <|> intSuffixed "int" (SVMType.Int (Just True))
     <|> simple "variadic" SVMType.Variadic
-    <|> choice [saltParser, unknownLabelParser, unknownLabelMemberParser]
+    <|> saltParser
+    <|> unknownLabelMemberParser
+    <|> unknownLabelParser
   where
     saltParser = try $ do
       name <- identifier

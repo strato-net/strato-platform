@@ -1,110 +1,250 @@
-export const NATIVE_TOKEN_ADDRESS =
-  "0x0000000000000000000000000000000000000000";
+import type { Chain } from 'viem';
+import { defineChain } from 'viem/utils';
+import { ChainHints } from './types';
 
-export const BRIDGE_TOKEN_ADDRESS = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
-export const BRIDGE_TOKEN_ADDRESS_ETH = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS;
-export const BRIDGE_TOKEN_ADDRESS_USDC = import.meta.env.VITE_BRIDGE_TOKEN_ADDRESS_USDC;
+// Core Constants
+export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
+export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const;
 
-export const BRIDGE_ABI = [
+// Contract ABIs
+export const ERC20_ABI = [
+  {
+    inputs: [{ name: 'owner', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
+    inputs: [{ name: 'owner', type: 'address' }],
+    name: 'nonces',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
   {
     inputs: [
-      {
-        internalType: "address",
-        name: "token",
-        type: "address",
-      },
-      {
-        internalType: "uint256",
-        name: "amount",
-        type: "uint256",
-      },
-      {
-        internalType: "address",
-        name: "recipient",
-        type: "address",
-      },
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' }
     ],
-    name: "bridge",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    name: 'approve',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
+  {
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' }
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function'
+  }
 ] as const;
 
-export const TESTNET_TOKENS = [
+export const DEPOSIT_ROUTER_ABI = [
+  // Functions
   {
-    symbol: "SepoliaETH",
-    name: "Sepolia Ether",
-  },
-  {
-    symbol: "USDC",
-    name: "USD Coin",
-  },
-];
-
-export const MAINNET_TOKENS = [
-  {
-    symbol: "ETH",
-    name: "Ethereum",
+    inputs: [{ name: 'stratoAddress', type: 'address' }],
+    name: 'depositETH',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function'
   },
   {
-    symbol: "USDC",
-    name: "USD Coin",
-  },
-];
-
-export const TOKEN_ADDRESSES: { [key: string]: { [key: string]: string } } = {
-  Ethereum: {
-    ETH: NATIVE_TOKEN_ADDRESS, // TODO: change to the correct address
-    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  },
-  Sepolia: {
-    SepoliaETH: NATIVE_TOKEN_ADDRESS,
-    USDC: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-  },
-};
-
-export const NETWORK_CONFIGS = {
-  Sepolia: {
-    name: "Sepolia",
-    chain: "sepolia",
-    chainId: 11155111,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png",
-    rpc: ["https://rpc.sepolia.org"],
-    nativeCurrency: {
-      name: "Sepolia Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    shortName: "sep",
-    infoURL: "https://sepolia.etherscan.io",
-    explorers: [
-      {
-        name: "Etherscan",
-        url: "https://sepolia.etherscan.io",
-        standard: "EIP3091",
-      },
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'stratoAddress', type: 'address' },
+      { name: 'nonce', type: 'uint256' },
+      { name: 'deadline', type: 'uint256' },
+      { name: 'signature', type: 'bytes' }
     ],
+    name: 'deposit',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function'
   },
-  Ethereum: {
-    name: "Ethereum",
-    chain: "ethereum",
-    chainId: 1,
-    icon: "https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/ethereum/assets/ETH/logo.png",
-    rpc: ["https://eth.llamarpc.com"],
-    nativeCurrency: {
-      name: "Ether",
-      symbol: "ETH",
-      decimals: 18,
-    },
-    shortName: "eth",
-    infoURL: "https://etherscan.io",
-    explorers: [
-      {
-        name: "Etherscan",
-        url: "https://etherscan.io",
-        standard: "EIP3091",
-      },
+  {
+    inputs: [{ name: 'token', type: 'address' }],
+    name: 'getTokenConfig',
+    outputs: [
+      { name: 'allowed', type: 'bool' },
+      { name: 'minAmount', type: 'uint256' }
     ],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  // Errors
+  {
+    inputs: [],
+    name: 'TokenNotAllowed',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'UseDepositETH',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'BelowMinimum',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'InvalidAddress',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'ETHTransferFailed',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'ArrayLengthMismatch',
+    type: 'error'
+  },
+  {
+    inputs: [],
+    name: 'SameAddressProposed',
+    type: 'error'
   }
-};
+] as const;
+
+// Chain Management
+export const SUPPORTED_CHAINS = {
+  MAINNET: 1,
+  SEPOLIA: 11155111,
+  POLYGON: 137,
+  POLYGON_AMOY: 80002,
+  OPTIMISM: 10,
+  BASE: 8453,
+  ARBITRUM: 42161,
+  ARBITRUM_NOVA: 42170,
+  BSC: 56,
+  AVALANCHE: 43114
+} as const;
+
+const chainCache = new Map<number, Chain>();
+
+export async function resolveViemChain(
+  chainId: number | string, 
+  hints: ChainHints = {}
+): Promise<Chain> {
+  // Normalize chain ID to number
+  const id = typeof chainId === 'string' ? Number(chainId) : chainId;
+  if (Number.isNaN(id)) {
+    throw new Error(`Invalid chainId: ${chainId}`);
+  }
+
+  // Check cache first
+  const cached = chainCache.get(id);
+  if (cached) return cached;
+
+  // Try to load built-in chain
+  const builtInChain = await loadBuiltInChain(id);
+  if (builtInChain) {
+    return cacheChain(id, builtInChain);
+  }
+
+  // Create custom chain from hints
+  return cacheChain(id, createCustomChain(id, hints));
+}
+
+async function loadBuiltInChain(id: number): Promise<Chain | null> {
+  try {
+    const chains = await import('viem/chains');
+    
+    switch (id) {
+      case SUPPORTED_CHAINS.MAINNET:       return chains.mainnet;
+      case SUPPORTED_CHAINS.SEPOLIA:       return chains.sepolia;
+      case SUPPORTED_CHAINS.POLYGON:       return chains.polygon;
+      case SUPPORTED_CHAINS.POLYGON_AMOY:  return chains.polygonAmoy;
+      case SUPPORTED_CHAINS.OPTIMISM:      return chains.optimism;
+      case SUPPORTED_CHAINS.BASE:          return chains.base;
+      case SUPPORTED_CHAINS.ARBITRUM:      return chains.arbitrum;
+      case SUPPORTED_CHAINS.ARBITRUM_NOVA: return chains.arbitrumNova;
+      case SUPPORTED_CHAINS.BSC:           return chains.bsc;
+      case SUPPORTED_CHAINS.AVALANCHE:     return chains.avalanche;
+      default:                             return null;
+    }
+  } catch {
+    return null;
+  }
+}
+
+function createCustomChain(id: number, hints: ChainHints): Chain {
+  const {
+    name = `Chain ${id}`,
+    rpcUrl,
+    blockExplorerUrl,
+    nativeName = 'Ether',
+    nativeSymbol = 'ETH',
+    decimals = 18,
+  } = hints;
+
+  return defineChain({
+    id,
+    name,
+    nativeCurrency: { 
+      name: nativeName, 
+      symbol: nativeSymbol, 
+      decimals 
+    },
+    rpcUrls: rpcUrl 
+      ? { 
+          default: { http: [rpcUrl] }, 
+          public: { http: [rpcUrl] } 
+        } 
+      : { 
+          default: { http: [] }, 
+          public: { http: [] } 
+        },
+    blockExplorers: blockExplorerUrl 
+      ? { 
+          default: { 
+            name: 'explorer', 
+            url: blockExplorerUrl 
+          } 
+        } 
+      : undefined,
+  });
+}
+
+function cacheChain(id: number, chain: Chain): Chain {
+  chainCache.set(id, chain);
+  return chain;
+}
+
+export async function primeChainsFromApi(
+  configs: Array<{
+    chainId: string | number;
+    chainName?: string;
+    rpcUrl?: string;
+    explorer?: string;
+  }>
+): Promise<void> {
+  await Promise.all(
+    configs.map(cfg =>
+      resolveViemChain(cfg.chainId, {
+        name: cfg.chainName,
+        rpcUrl: cfg.rpcUrl,
+        blockExplorerUrl: cfg.explorer,
+      })
+    )
+  );
+}
+
+export function clearChainCache(): void {
+  chainCache.clear();
+}
+
+export function getCachedChains(): Map<number, Chain> {
+  return new Map(chainCache);
+}
+
+export type { Chain } from 'viem';
