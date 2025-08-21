@@ -131,3 +131,34 @@ export function validateAddress(address: string): boolean {
     return false;
   }
 }
+
+/**
+ * Parses a hex string to BigInt (handles 32-byte padded hex)
+ * @param data - Hex string to parse
+ * @returns BigInt representation
+ */
+export function parseUint256(data: string): bigint {
+  const hex = (data.startsWith("0x") ? data.slice(2) : data)
+    .padStart(64, "0")
+    .slice(0, 64);
+  return BigInt("0x" + hex);
+}
+
+/**
+ * Decodes a topic to a normalized Ethereum address
+ * @param topic - Topic string (32-byte hex)
+ * @returns Normalized 20-byte Ethereum address
+ */
+export function decodeTopicAddr(topic: string): string {
+  return normalizeAddress("0x" + topic.slice(-40));
+}
+
+/**
+ * Checks if a transaction receipt indicates success
+ * @param receipt - Transaction receipt object
+ * @returns true if transaction was successful
+ */
+export function isOkStatus(receipt: any): boolean {
+  return receipt.status === 1 || receipt.status === true || 
+    (typeof receipt.status === "string" && receipt.status.toLowerCase() === "0x1");
+}

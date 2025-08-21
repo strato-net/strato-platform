@@ -6,6 +6,9 @@ import { ChainHints } from './types';
 export const NATIVE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' as const;
 export const PERMIT2_ADDRESS = '0x000000000022D473030F116dDEE9F6B43aC78BA3' as const;
 
+// UI Constants
+export const ITEMS_PER_PAGE = 10;
+
 // Contract ABIs
 export const ERC20_ABI = [
   {

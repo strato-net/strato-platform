@@ -14,6 +14,7 @@ import {
   NetworkConfigFromAPI,
   NetworkSummary,
   BridgeContextType,
+  BridgeTransactionResponse,
 } from "@/lib/bridge/types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
@@ -135,6 +136,66 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  const fetchDepositTransactions = useCallback(
+    async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
+      setLoading(true);
+      
+      try {
+        const params = new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+          )
+        );
+
+        const response = await api.get(`/bridge/transactions/deposit?${params}`);
+        const responseData = response.data;
+
+        return {
+          data: responseData?.data || responseData || [],
+          totalCount: responseData?.totalCount || responseData?.length || 0
+        };
+      } catch (err) {
+        return {
+          data: [],
+          totalCount: 0
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  const fetchWithdrawTransactions = useCallback(
+    async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
+      setLoading(true);
+      
+      try {
+        const params = new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+          )
+        );
+
+        const response = await api.get(`/bridge/transactions/withdrawal?${params}`);
+        const responseData = response.data;
+
+        return {
+          data: responseData?.data || responseData || [],
+          totalCount: responseData?.totalCount || responseData?.length || 0
+        };
+      } catch (err) {
+        return {
+          data: [],
+          totalCount: 0
+        };
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
   return (
     <BridgeContext.Provider
       value={{
@@ -149,6 +210,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
         loadNetworksAndTokens,
+        fetchDepositTransactions,
+        fetchWithdrawTransactions,
       }}
     >
       {children}

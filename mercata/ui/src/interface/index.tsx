@@ -220,22 +220,35 @@ export interface OnRampContextType {
 }
 
 export interface RawWithdrawData {
-  transaction_hash: string;
-  block_timestamp: string;
-  from: string;
-  to: string;
+  extToken: string;
+  withdrawalId: number;
+  withdrawalInfo: {
+    dest: string;
+    user: string;
+    token: string;
+    amount: string;
+    destChainId: string;
+    requestedAt: string;
+    bridgeStatus: string;
+  };
+  // Legacy fields for backward compatibility (will be mapped from withdrawalInfo)
+  transaction_hash?: string;
+  block_timestamp?: string;
+  from?: string;
+  to?: string;
   ethTokenSymbol?: string;
   ethTokenAddress?: string;
-  amount?: string;
   tokenDecimal?: number;
   txHash?: string;
-  token?: string;
-  key?: string;
   withdrawalStatus?: string;
   tokenSymbol?: string;
 }
 
 export interface RawDepositData {
+  stratoTokenSymbol: string;
+  stratoToken: string;
+  extToken: string;
+  chainId: any;
   transaction_hash: string;
   block_timestamp: string;
   from: string;
@@ -249,6 +262,14 @@ export interface RawDepositData {
   token?: string;
   key?: string;
   depositStatus?: string;
+  // New fields for updated API response
+  depositId?: number;
+  depositInfo?: {
+    user: string;
+    token: string;
+    amount: string;
+    bridgeStatus: string;
+  };
 }
 
 export interface CollateralData {
