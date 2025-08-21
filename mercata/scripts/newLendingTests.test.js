@@ -4,7 +4,223 @@
 const axios = require("axios");
 require("dotenv").config();
 
-(async () => {
+async function newLendingTests() {
+
+  /* ----------------- helpers ----------------- */
+const headers = (tok) => ({ Authorization: `Bearer ${tok}`, "Content-Type": "application/json" });
+const E18 = 10n ** 18n;
+const fmt = (weiBigInt) => {
+  const whole = weiBigInt / E18;
+  const frac = (weiBigInt % E18).toString().padStart(18, "0").replace(/0+$/, "");
+  return frac ? `${whole}.${frac}` : `${whole}`;
+};
+const buildCall = (name, addr, method, args = {}) => ({
+  payload: { contractName: name, contractAddress: addr, method, args },
+  type: "FUNCTION",
+});
+const sendTx = async (token, calls, opts = {}) => {
+  const quiet = opts.quiet === true;
+  const body = { txs: Array.isArray(calls) ? calls : [calls], txParams: { gasPrice: 1, gasLimit: 32100000000 } };
+  try {
+    const { data } = await axios.post(txEndpoint, body, { headers: headers(token) });
+    if (data[0]?.status !== "Success") {
+      if (!quiet) {
+        console.error("Strato returned non-success status", JSON.stringify(data, null, 2));
+      }
+      throw new Error(data[0]?.status || "Tx failed");
+    }
+  } catch (err) {
+    if (!quiet && err.response) {
+      console.error("HTTP", err.response.status, err.response.statusText);
+      if (typeof err.response.data === "string") {
+        console.error(err.response.data);
+      } else {
+        console.error(JSON.stringify(err.response.data, null, 2));
+      }
+    }
+    throw err;
+  }
+};
+
+// Fetch total liquidity for USDST held by LiquidityPool
+const getPoolLiquidity = async () => {
+  try {
+    const rows = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
+      key: `eq.${cfg.LIQUIDITY_POOL.toLowerCase()}`,
+      address: `eq.${cfg.USDST.toLowerCase()}`,
+      select: "balance:value::text",
+    });
+    return BigInt(rows[0]?.balance || "0");
+  } catch {
+    return 0n;
+  }
+};
+
+// Read collateral directly from contract (authoritative)
+async function getCollateralOnChain(user=USER_ADDRESS, assetAddr=cfg.COLLATERAL_ST) {
+  try {
+    const returnValue = await viewCall("CollateralVault", cfg.COLLATERAL_VAULT, "getCollateral", { user, asset: assetAddr });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getCollateralOnChain:", err.response?.data || err.message || err);
+    throw err;
+  }
+}
+
+
+/*
+  Query Cirrus mapping view for the user's collateral.
+  If assetAddr provided ⇒ we add a filter so we only sum that asset.
+*/
+const getUserCollateralCirrus = async (assetAddr) => {
+  try {
+    const params = {
+      address: `eq.${cfg.COLLATERAL_VAULT.toLowerCase()}`,
+      key: `eq.${USER_ADDRESS}`,
+      select: "key2,value,value_fkey",
+    };
+    if (assetAddr) params.key2 = `eq.${assetAddr.toLowerCase()}`;
+
+    const rows = await cirrusGet("/BlockApps-Mercata-CollateralVault-userCollaterals", params);
+
+    if (!Array.isArray(rows) || rows.length === 0) return 0n;
+
+    return rows.reduce((total, r) => {
+      const amtStr = r?.value_fkey ?? r?.value;
+      return total + (amtStr ? BigInt(amtStr) : 0n);
+    }, 0n);
+  } catch (err) {
+    console.error("⚠️  Failed to fetch user collateral from Cirrus:", err.message || err);
+    return 0n;
+  }
+};
+
+const getMaxBorrowPower = async () => {
+  try {
+    const returnValue = await viewCall("LendingPool", cfg.LENDING_POOL, "calculateMaxBorrowingPower", {
+      user: USER_ADDRESS,
+      excludeAsset: "0000000000000000000000000000000000000000",
+      excludeAmount: "0",
+    });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getMaxBorrowPower:", err.response?.data || err.message || err);
+    throw err;
+  }
+};
+
+const getHealthFactor = async () => {
+  try {
+    const returnValue = await viewCall("LendingPool", cfg.LENDING_POOL, "getHealthFactor", { user: USER_ADDRESS });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getHealthFactor:", err.response?.data || err.message || err);
+    throw err;
+  }
+};
+
+const getUserDebt = async () => {
+  console.error("USING INVALID OLD getUserDebt()!!")
+  try {
+    const rows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
+      address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
+      key: `eq.${USER_ADDRESS}`,
+      select: "*",
+    });
+    if (!Array.isArray(rows) || rows.length === 0) return 0n;
+    const row = rows[0] || {};
+    let pStr = row.principalBalance ?? row.principalbalance ?? row.principal_balance;
+    let iStr = row.interestOwed ?? row.interestowed ?? row.interest_owed;
+    if (pStr === undefined || iStr === undefined) {
+      // Data may be nested under 'value' object or JSON string
+      const valObj = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      if (valObj) {
+        pStr = pStr ?? valObj.principalBalance ?? valObj.principalbalance;
+        iStr = iStr ?? valObj.interestOwed     ?? valObj.interestowed;
+      }
+    }
+    if (!pStr) pStr = "0";
+    if (!iStr) iStr = "0";
+    return BigInt(pStr) + BigInt(iStr);
+  } catch (err) {
+    console.error("      ↳ ERROR getUserDebt (Cirrus):", err.response?.data || err.message || err);
+    return 0n; // fallback – don't fail test due to indexing lag
+  }
+};
+
+const getUserDebtOnChain = async (userToken, userAddr) => {
+  try {
+    const returnValue = await viewCall("LendingPool", cfg.LENDING_POOL, "getUserDebtPreview", { user: userAddr });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getUserDebtOnChain:", err.response?.data || err.message || err);
+    throw err;
+  }
+};
+
+const getAssetConfig = async (assetAddr) => {
+  try {
+    const returnValue = await viewCall("LendingPool", cfg.LENDING_POOL, "getAssetConfig", { asset: assetAddr });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getAssetConfig:", err.response?.data || err.message || err);
+    throw err;
+  }
+};
+
+/**
+ * Sends an actual transaction to the transaction endpoint to make a view call on chain.
+ * The transaction is sent from the admin account.
+ * @param {*} contractName 
+ * @param {*} contractAddress 
+ * @param {*} method 
+ * @param {*} args 
+ * @returns The return value of the view call
+ */
+async function viewCall(contractName, contractAddress, method, args = {}) {
+  const body = {
+    txs: [{
+      payload: { contractName, contractAddress, method, args },
+      type: "FUNCTION",
+    }],
+    txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
+  };
+  const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
+  if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
+  return data[0].data.contents;
+}
+
+async function getPrice(assetAddr) {
+  try {
+    const returnValue = await viewCall("PriceOracle", cfg.PRICE_ORACLE, "getAssetPrice", { asset: assetAddr });
+    return BigInt(returnValue[0]);
+  } catch (err) {
+    console.error("      ↳ ERROR getPrice:", err.response?.data || err.message || err);
+    throw err;
+  }
+}
+
+async function withdrawCollateral(user_token, amount, quiet=false) {
+  await sendTx(user_token, buildCall("LendingPool", cfg.LENDING_POOL, "withdrawCollateral", { asset: cfg.COLLATERAL_ST, amount: amount.toString() }), { quiet: quiet });
+}
+
+async function withdrawAllCollateral(user_token, quiet=false) {
+  const amount_onchain = await getCollateralOnChain(cfg.COLLATERAL_ST);
+  const amount_cirrus = await getUserCollateralCirrus(cfg.COLLATERAL_ST);
+  if (amount_onchain !== amount_cirrus) {
+      throw new Error(`Collateral discrepancy: On-chain=${amount_onchain.toString()} Cirrus=${amount_cirrus.toString()}`);
+  }
+  await withdrawCollateral(user_token, amount_onchain - 1n /*quick fix for failure to full repay; requires sufficiently valuable collateral. TODO remove subtraction*/, quiet);
+}
+
+async function repayFullLoan(userToken, userAddr,quiet=false) {
+  const debt = await getUserDebtOnChain(userToken, userAddr);
+  console.log("   Repaying", debt.toString(), "of debt");
+  await sendTx(userToken, buildCall("LendingPool", cfg.LENDING_POOL, "repay", { amount: debt.toString() }), { quiet: quiet });
+}
+//place
+
+
   console.log("=== Aug 2025 Lending Pool Tests ===");
   // The Lending pool was updated mid-august to an overall index-based approach,
   // so these updated tests target that contract version.
@@ -58,293 +274,6 @@ require("dotenv").config();
       process.exit(1);
     }
   });
-
-  /* ----------------- helpers ----------------- */
-  const headers = (tok) => ({ Authorization: `Bearer ${tok}`, "Content-Type": "application/json" });
-  const E18 = 10n ** 18n;
-  const fmt = (weiBigInt) => {
-    const whole = weiBigInt / E18;
-    const frac = (weiBigInt % E18).toString().padStart(18, "0").replace(/0+$/, "");
-    return frac ? `${whole}.${frac}` : `${whole}`;
-  };
-  const buildCall = (name, addr, method, args = {}) => ({
-    payload: { contractName: name, contractAddress: addr, method, args },
-    type: "FUNCTION",
-  });
-  const sendTx = async (token, calls, opts = {}) => {
-    const quiet = opts.quiet === true;
-    const body = { txs: Array.isArray(calls) ? calls : [calls], txParams: { gasPrice: 1, gasLimit: 32100000000 } };
-    try {
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(token) });
-      if (data[0]?.status !== "Success") {
-        if (!quiet) {
-          console.error("Strato returned non-success status", JSON.stringify(data, null, 2));
-        }
-        throw new Error(data[0]?.status || "Tx failed");
-      }
-    } catch (err) {
-      if (!quiet && err.response) {
-        console.error("HTTP", err.response.status, err.response.statusText);
-        if (typeof err.response.data === "string") {
-          console.error(err.response.data);
-        } else {
-          console.error(JSON.stringify(err.response.data, null, 2));
-        }
-      }
-      throw err;
-    }
-  };
-
-  // Cirrus read helper (read-only)
-  const CIRRUS_BASE = ROOT.includes("/strato") ? ROOT.split("/strato")[0] : ROOT;
-  const cirrusGet = async (path, params) => {
-    const { data } = await axios.get(`${CIRRUS_BASE}/cirrus/search${path}`, { headers: headers(ADMIN_TOKEN), params });
-    return data;
-  };
-
-  // Fetch total liquidity for USDST held by LiquidityPool
-  const getPoolLiquidity = async () => {
-    try {
-      const rows = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
-        key: `eq.${cfg.LIQUIDITY_POOL.toLowerCase()}`,
-        address: `eq.${cfg.USDST.toLowerCase()}`,
-        select: "balance:value::text",
-      });
-      return BigInt(rows[0]?.balance || "0");
-    } catch {
-      return 0n;
-    }
-  };
-
-  // Read collateral directly from contract (authoritative)
-  const getCollateralOnChain = async (assetAddr) => {
-    const body = {
-      txs: [
-        {
-          payload: {
-            contractName: "CollateralVault",
-            contractAddress: cfg.COLLATERAL_VAULT,
-            method: "getCollateral",
-            args: { user: USER_ADDRESS, asset: assetAddr },
-          },
-          type: "FUNCTION",
-        },
-      ],
-      txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-    };
-    try {
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0] || 0);
-    } catch (err) {
-      console.error("      ↳ ERROR getCollateralOnChain:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  const getUserCollateralCirrus = async (assetAddr) => {
-    /*
-      Query Cirrus mapping view for the user's collateral.
-      If assetAddr provided ⇒ we add a filter so we only sum that asset.
-    */
-    try {
-      const params = {
-        address: `eq.${cfg.COLLATERAL_VAULT.toLowerCase()}`,
-        key: `eq.${USER_ADDRESS}`,
-        select: "key2,value,value_fkey",
-      };
-      if (assetAddr) params.key2 = `eq.${assetAddr.toLowerCase()}`;
-
-      const rows = await cirrusGet("/BlockApps-Mercata-CollateralVault-userCollaterals", params);
-
-      if (!Array.isArray(rows) || rows.length === 0) return 0n;
-
-      return rows.reduce((total, r) => {
-        const amtStr = r?.value_fkey ?? r?.value;
-        return total + (amtStr ? BigInt(amtStr) : 0n);
-      }, 0n);
-    } catch (err) {
-      console.error("⚠️  Failed to fetch user collateral from Cirrus:", err.message || err);
-      return 0n;
-    }
-  };
-
-  const getMaxBorrowPower = async () => {
-    try {
-      const body = {
-        txs: [
-          {
-            payload: {
-              contractName: "LendingPool",
-              contractAddress: cfg.LENDING_POOL,
-              method: "calculateMaxBorrowingPower",
-              args: {
-                user: USER_ADDRESS,
-                excludeAsset: "0000000000000000000000000000000000000000",
-                excludeAmount: "0",
-              },
-            },
-            type: "FUNCTION",
-          },
-        ],
-        txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-      };
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0] || 0);
-    } catch (err) {
-      console.error("      ↳ ERROR getMaxBorrowPower:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  const getHealthFactor = async () => {
-    try {
-      const body = {
-        txs: [
-          {
-            payload: {
-              contractName: "LendingPool",
-              contractAddress: cfg.LENDING_POOL,
-              method: "getHealthFactor",
-              args: { user: USER_ADDRESS },
-            },
-            type: "FUNCTION",
-          },
-        ],
-        txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-      };
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0] || 0);
-    } catch (err) {
-      console.error("      ↳ ERROR getHealthFactor:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  const getUserDebt = async () => {
-    console.error("USING INVALID OLD getUserDebt()!!")
-    try {
-      const rows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
-        address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
-        key: `eq.${USER_ADDRESS}`,
-        select: "*",
-      });
-      if (!Array.isArray(rows) || rows.length === 0) return 0n;
-      const row = rows[0] || {};
-      let pStr = row.principalBalance ?? row.principalbalance ?? row.principal_balance;
-      let iStr = row.interestOwed ?? row.interestowed ?? row.interest_owed;
-      if (pStr === undefined || iStr === undefined) {
-        // Data may be nested under 'value' object or JSON string
-        const valObj = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
-        if (valObj) {
-          pStr = pStr ?? valObj.principalBalance ?? valObj.principalbalance;
-          iStr = iStr ?? valObj.interestOwed     ?? valObj.interestowed;
-        }
-      }
-      if (!pStr) pStr = "0";
-      if (!iStr) iStr = "0";
-      return BigInt(pStr) + BigInt(iStr);
-    } catch (err) {
-      console.error("      ↳ ERROR getUserDebt (Cirrus):", err.response?.data || err.message || err);
-      return 0n; // fallback – don't fail test due to indexing lag
-    }
-  };
-
-  const getUserDebtOnChain = async (userToken, userAddr) => {
-    try {
-      const body = {
-        txs: [
-          {
-            payload: {
-              contractName: "LendingPool",
-              contractAddress: cfg.LENDING_POOL,
-              method: "getUserDebtPreview",
-              args: { user: userAddr },
-            },
-            type: "FUNCTION",
-          },
-        ],
-        txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-      };
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(userToken) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0]);
-    } catch (err) {
-      console.error("      ↳ ERROR getUserDebtOnChain:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  const getAssetConfig = async (assetAddr) => {
-    try {
-      const body = {
-        txs: [
-          {
-            payload: {
-              contractName: "LendingPool",
-              contractAddress: cfg.LENDING_POOL,
-              method: "getAssetConfig",
-              args: { asset: assetAddr },
-            },
-            type: "FUNCTION",
-          },
-        ],
-        txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-      };
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0]);
-    } catch (err) {
-      console.error("      ↳ ERROR getAssetConfig:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  const getPrice = async (assetAddr) => {
-    try {
-      const body = {
-        txs: [
-          {
-            payload: {
-              contractName: "PriceOracle",
-              contractAddress: cfg.PRICE_ORACLE,
-              method: "getAssetPrice",
-              args: { asset: assetAddr },
-            },
-            type: "FUNCTION",
-          },
-        ],
-        txParams: { gasLimit: cfg.BABY_GAS_LIMIT, gasPrice: 1 },
-      };
-      const { data } = await axios.post(txEndpoint, body, { headers: headers(ADMIN_TOKEN) });
-      if (data[0]?.status !== "Success") throw new Error(JSON.stringify(data));
-      return BigInt(data[0].data.contents[0] || 0);
-    } catch (err) {
-      console.error("      ↳ ERROR getPrice:", err.response?.data || err.message || err);
-      throw err;
-    }
-  };
-
-  async function withdrawCollateral(user_token, amount, quiet=false) {
-    await sendTx(user_token, buildCall("LendingPool", cfg.LENDING_POOL, "withdrawCollateral", { asset: cfg.COLLATERAL_ST, amount: amount.toString() }), { quiet: quiet });
-  }
-
-  async function withdrawAllCollateral(user_token, quiet=false) {
-    const amount_onchain = await getCollateralOnChain(cfg.COLLATERAL_ST);
-    const amount_cirrus = await getUserCollateralCirrus(cfg.COLLATERAL_ST);
-    if (amount_onchain !== amount_cirrus) {
-        throw new Error(`Collateral discrepancy: On-chain=${amount_onchain.toString()} Cirrus=${amount_cirrus.toString()}`);
-    }
-    await withdrawCollateral(user_token, amount_onchain - 1n /*quick fix for failure to full repay; requires sufficiently valuable collateral. TODO remove subtraction*/, quiet);
-  }
-
-  async function repayFullLoan(userToken, userAddr,quiet=false) {
-    const debt = await getUserDebtOnChain(userToken, userAddr);
-    console.log("   Repaying", debt.toString(), "of debt");
-    await sendTx(userToken, buildCall("LendingPool", cfg.LENDING_POOL, "repay", { amount: debt.toString() }), { quiet: quiet });
-  }
 
   /* ----------------- test cases ----------------- */
   try {
@@ -579,7 +508,18 @@ require("dotenv").config();
     console.error("FAILED:", err.message || err);
     process.exit(1);
   }
-})();
+
+  // Cirrus read helper (read-only)
+const CIRRUS_BASE = ROOT.includes("/strato") ? ROOT.split("/strato")[0] : ROOT;
+const cirrusGet = async (path, params) => {
+  const { data } = await axios.get(`${CIRRUS_BASE}/cirrus/search${path}`, { headers: headers(ADMIN_TOKEN), params });
+  return data;
+};
+}
+
+
+
+newLendingTests();
 
 // # Notes on tests to be run:
 // ## System-Wide Tests
