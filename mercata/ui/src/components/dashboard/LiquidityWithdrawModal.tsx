@@ -101,7 +101,7 @@ const LiquidityWithdrawModal = ({
       onWithdrawSuccess();
       toast({
         title: "Success",
-        description: `${calculatedAmount.toString()} ${selectedPool._name} withdrawn successfully.`,
+        description: `Withdrew ${calculatedAmount.toString()} ${selectedPool._name}.`,
         variant: "success",
       });
     } catch (error) {
