@@ -3,7 +3,8 @@ import {
   bridgeOut, 
   getBridgeableTokens,
   getNetworkConfigs, 
-  getBridgeStatus 
+  getBridgeStatus,
+  getTokenLimit
 } from "../services/bridge.service";
 import { validateBridgeOut } from "../validators/bridge.validators";
 
@@ -81,6 +82,27 @@ class BridgeController {
         }
       );
 
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getTokenLimit(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { tokenAddress } = req.params;
+      
+      if (!tokenAddress) {
+        res.status(400).json({ error: "tokenAddress parameter is required" });
+        return;
+      }
+      
+      const result = await getTokenLimit(accessToken, tokenAddress);
       res.json(result);
     } catch (error: any) {
       next(error);

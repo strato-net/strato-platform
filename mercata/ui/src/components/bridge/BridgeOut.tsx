@@ -41,6 +41,7 @@ const BridgeOut: React.FC = () => {
   const {
     bridgeOut: bridgeOutAPI,
     getBalance,
+    getTokenLimit,
     bridgeableTokens,
     availableNetworks,
     selectedNetwork,
@@ -55,6 +56,11 @@ const BridgeOut: React.FC = () => {
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tokenLimitInfo, setTokenLimitInfo] = useState<{ maxPerTx: string; isUnlimited: boolean; loading: boolean }>({
+    maxPerTx: "0",
+    isUnlimited: false,
+    loading: false
+  });
 
   // Set initial network selection
   useEffect(() => {
@@ -83,6 +89,24 @@ const BridgeOut: React.FC = () => {
       mounted = false;
     };
   }, [selectedToken, getBalance]);
+
+  // New useEffect to fetch token limits when token is selected
+  useEffect(() => {
+    if (!selectedToken?.stratoTokenAddress) return;
+    
+    setTokenLimitInfo(prev => ({ ...prev, loading: true }));
+    
+    getTokenLimit(selectedToken.stratoTokenAddress)
+      .then(tokenLimit => setTokenLimitInfo({
+        maxPerTx: tokenLimit.maxPerTx || "0",
+        isUnlimited: tokenLimit.isUnlimited,
+        loading: false
+      }))
+      .catch(error => {
+        console.error("Error fetching token limit:", error);
+        setTokenLimitInfo(prev => ({ ...prev, loading: false }));
+      });
+  }, [selectedToken, getTokenLimit]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -264,6 +288,23 @@ const BridgeOut: React.FC = () => {
           disabled={!isConnected}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+        
+        {/* Display maximum transfer limit */}
+        {selectedToken && (
+          <div className="flex items-center gap-2 mt-1">
+            {tokenLimitInfo.loading ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+            ) : (
+              <span className="text-xs text-gray-500">
+                {tokenLimitInfo.isUnlimited 
+                  ? "Maximum transfer: Unlimited" 
+                  : `Maximum transfer: ${tokenLimitInfo.maxPerTx} ${selectedToken.extSymbol}`
+                }
+              </span>
+            )}
+          </div>
+        )}
+        
         {isConnected && (
           <PercentageButtons
             value={amount}

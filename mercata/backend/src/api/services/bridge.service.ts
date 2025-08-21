@@ -210,3 +210,40 @@ export const getBridgeAssets = async (accessToken: string) => {
     throw error;
   }
 };
+
+export const getTokenLimit = async (accessToken: string, tokenAddress: string) => {
+  try {
+
+    
+    const { data: tokenLimitData } = await cirrus.get(accessToken, `/${MercataBridge}-tokenLimits`, {
+      params: {
+        select: "token:key,tokenLimit:value",
+        "key": `eq.${tokenAddress}`,
+        address: `eq.${constants.mercataBridge}`
+      }
+    });
+
+    if (!tokenLimitData || !tokenLimitData.length) {
+      console.log("No token limit found for token:", tokenAddress);
+      return {
+        token: tokenAddress,
+        maxPerTx: 0,
+        isUnlimited: true
+      };
+    }
+
+    const tokenLimit = tokenLimitData[0];
+    const maxPerTx = tokenLimit.tokenLimit?.maxPerTx || 0;
+    const isUnlimited = maxPerTx === 0;
+
+
+    return {
+      token: tokenAddress,
+      maxPerTx,
+      isUnlimited
+    };
+  } catch (error) {
+    console.error("Error in getTokenLimit:", error);
+    throw error;
+  }
+};
