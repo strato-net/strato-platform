@@ -874,11 +874,11 @@ export const setDebtCeilings = async (
   const usdValue = body.usdValue.toString();
 
   // Validate both parameters are valid number strings
-  if (!/^\d+\.?\d*$/.test(assetUnits)) {
+  if (!/^\d+$/.test(assetUnits)) {
     throw new Error("Asset units must be a valid number");
   }
-  if (!/^\d+\.?\d*$/.test(usdValue)) {
-    throw new Error("USD value must be a valid number");
+  if (!/^\d+$/.test(usdValue)) {
+    throw new Error("USD value must be a valid number"); // convert to BigInt before making the API call.
   }
 
   const registry = await getPool(accessToken, undefined, { select: "_owner" });
