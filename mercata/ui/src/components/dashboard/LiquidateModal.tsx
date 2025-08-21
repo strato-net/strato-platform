@@ -118,8 +118,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const handlePercentageChange = (value: string) => {
     try {
-      setRepayStr(value);
-      setDisplayAmount(addCommasToInput(value));
+      // value is a wei string from PercentageButtons; convert to decimal (18d)
+      const dec = (Number(BigInt(value)) / 1e18).toString();
+      setRepayStr(dec);
+      setDisplayAmount(addCommasToInput(dec));
     } catch {
       setRepayStr("0");
       setDisplayAmount("0");
