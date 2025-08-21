@@ -30,6 +30,7 @@ RUN apt -y update && apt install -y \
   && ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh \
   && make \
   && make install \
+  && ln -s /usr/local/lib/libsecp256k1.so.0.0.0 /lib/x86_64-linux-gnu/libsecp256k1.so.1 \
   && cd .. \
   && rm -rf secp256k1 \
   && ldconfig
