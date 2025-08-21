@@ -28,6 +28,7 @@ import {
   validateRepayArgs,
   validateSupplyCollateralArgs,
   validateWithdrawCollateralArgs,
+  validateWithdrawCollateralMaxArgs,
   validateConfigureAssetArgs,
   validateLiquidationArgs,
   validateSweepReservesArgs,
