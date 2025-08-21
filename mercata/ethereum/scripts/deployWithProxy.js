@@ -184,7 +184,7 @@ async function main() {
 
   
   console.log("To Verify on Etherscan:");
-  console.log(`   npx hardhat verify --network ${networkName} ${implementationAddress}`);
+  console.log(`   npm run verify:${networkName} -- ${implementationAddress}`);
   
   console.log("Check the deployment info in:");
   console.log(`   deployments/${config.contractName}_${networkName}_latest.json`);

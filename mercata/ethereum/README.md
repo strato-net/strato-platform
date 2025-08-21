@@ -104,17 +104,32 @@ npm run deployWithProxy:sepolia
 
 **Common Issues:**
 
-| Error                 | Solution                                         |
-| --------------------- | ------------------------------------------------ |
-| "Contract not found"  | Run `npm run compile` and check contract name    |
-| "Invalid INIT_PARAMS" | Verify JSON array format: `'["addr1", "addr2"]'` |
-| "Insufficient funds"  | Add ETH to your deployer wallet                  |
-| "Network error"       | Check RPC URL and internet connection            |
+### "Contract not found"
+
+**Solution:** Run `npm run compile` and check contract name
+
+### "Invalid INIT_PARAMS"
+
+**Solution:** Verify JSON array format: `'["addr1", "addr2"]'`
+
+### "Network error"
+
+**Solution:** Check RPC URL and internet connection
+
+### "Unable to update lock within the stale threshold"
+
+**Solution:** Remove stale lock files:
+
+```bash
+rm -rf .openzeppelin/chain-*.lock
+```
 
 **Debug Tips:**
 
+### 💡 Pre-deployment Checklist
+
 - Always run `npm run compile` before deployment
 - Contract names are case-sensitive
-- Use single quotes around INIT_PARAMS JSON
-- Check your .env file for correct values
+- Use single quotes around INIT_PARAMS JSON: `'["param1", "param2"]'`
+- Check your `.env` file for correct values
 - Ensure sufficient ETH balance for gas fees
