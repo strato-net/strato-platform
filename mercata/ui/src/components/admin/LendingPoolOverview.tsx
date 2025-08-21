@@ -218,7 +218,7 @@ const LendingPoolOverview = () => {
                       <Input placeholder="0" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Amount of reserves to sweep to fee collector (0 = all available reserves)
+                      Amount of reserves to sweep to fee collector
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

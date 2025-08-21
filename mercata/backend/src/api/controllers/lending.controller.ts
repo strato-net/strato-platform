@@ -192,7 +192,6 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      validateWithdrawCollateralArgs(body);
       const result = await withdrawCollateralMax(accessToken, body.asset);
       res.status(RestStatus.OK).json(result);
       return next();

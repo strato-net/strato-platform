@@ -100,8 +100,8 @@ export function validateSweepReservesArgs(args: any) {
 
 export function validateSetDebtCeilingsArgs(args: any) {
   const schema = Joi.object({
-    assetUnits: numericStringField("assetUnits"),
-    usdValue: numericStringField("usdValue"),
+    assetUnits: numericStringField("assetUnits", {allowZero: true}),
+    usdValue: numericStringField("usdValue", {allowZero: true}),
   });
   
   const { error } = schema.validate(args);
