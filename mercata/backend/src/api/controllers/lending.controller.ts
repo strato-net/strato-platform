@@ -26,6 +26,7 @@ import {
   validateRepayArgs,
   validateSupplyCollateralArgs,
   validateWithdrawCollateralArgs,
+  validateWithdrawCollateralMaxArgs,
   validateConfigureAssetArgs,
   validateLiquidationArgs,
 } from "../validators/lending.validator";
@@ -188,7 +189,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      validateWithdrawCollateralArgs(body);
+      validateWithdrawCollateralMaxArgs(body);
       const result = await withdrawCollateralMax(accessToken, body.asset);
       res.status(RestStatus.OK).json(result);
       return next();

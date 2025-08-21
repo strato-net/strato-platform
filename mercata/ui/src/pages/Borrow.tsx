@@ -142,7 +142,7 @@ const Borrow = () => {
       }
       toast({
         title: "Withdraw Initiated",
-        description: `You withdrew ${amount} ${asset._symbol}`,
+        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
         variant: "success",
       });
       setModalLoading(false);
