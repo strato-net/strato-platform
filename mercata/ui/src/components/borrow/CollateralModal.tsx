@@ -58,6 +58,10 @@ const CollateralModal = ({
   const maxAmount = isSupply 
     ? BigInt(asset?.userBalance || 0)
     : getMaxSafeWithdrawAmount(asset, loanData);
+  
+  // NEW: reflect on-chain 1 wei safety when there is outstanding debt
+  const hasDebt = BigInt(loanData?.totalAmountOwed || "0") > 0n;
+  const maxDisplayAmount = (!isSupply && hasDebt && maxAmount > 0n) ? (maxAmount - 1n) : maxAmount;
 
   // Calculate risk level when amount changes
   useEffect(() => {
@@ -109,7 +113,8 @@ const CollateralModal = ({
     try {
       if (!isSupply) {
         const amtWei = safeParseUnits(amount || "0", tokenDecimals);
-        if (amtWei >= maxAmount && maxAmount > 0n) {
+        // If user selected at least the max, invoke on-chain max-withdraw to avoid drift issues
+        if (amtWei >= maxDisplayAmount && maxDisplayAmount > 0n) {
           onAction('ALL');
           setAmount("");
           setDisplayAmount("");
@@ -140,6 +145,13 @@ const CollateralModal = ({
 
   const handlePercentageClick = (percent?: bigint) => {
     const tokenDecimals = asset?.customDecimals ?? 18;
+    // Use adjusted max for 100% when withdrawing with debt, to avoid dust surprises
+    if (!isSupply && hasDebt && percent === 100n && maxDisplayAmount > 0n) {
+      const amountValue = formatUnits(maxDisplayAmount, tokenDecimals);
+      setAmount(amountValue);
+      setDisplayAmount(addCommasToInput(amountValue));
+      return;
+    }
     const amountValue = formatUnits((maxAmount * percent) / 100n, tokenDecimals);
     setAmount(amountValue);
     setDisplayAmount(addCommasToInput(amountValue));
@@ -155,7 +167,7 @@ const CollateralModal = ({
     if (isSupply) {
       return "Available to supply";
     } else {
-      return "Available to withdraw";
+      return "Collateral supplied";
     }
   };
 
@@ -232,6 +244,12 @@ const CollateralModal = ({
               <span className="text-sm text-gray-500">{getBalanceText()}</span>
               <span className="font-medium">{getBalanceValue()}</span>
             </div>
+            {!isSupply && (
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-500">Max withdrawable now</span>
+                <span className="font-medium">{formatUnits(maxDisplayAmount, asset?.customDecimals ?? 18)}</span>
+              </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -318,7 +336,7 @@ const CollateralModal = ({
                 onClick={() => handlePercentageClick(100n)}
                 className="flex-1"
               >
-                100%
+                {!isSupply && (BigInt(loanData?.totalAmountOwed || "0") > 0n) ? "Max" : "100%"}
               </Button>
             </div>
           </div>

@@ -70,6 +70,18 @@ export function validateWithdrawCollateralArgs(args: any) {
   }
 }
 
+// NEW: dedicated validator for withdraw-collateral-max (asset only)
+export function validateWithdrawCollateralMaxArgs(args: any) {
+  const schema = Joi.object({
+    asset: validateAddressField("asset"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Withdraw Collateral Max Argument Validation Error: " + error.message);
+  }
+}
+
 
 export function validateConfigureAssetArgs(args: any) {
   const schema = Joi.object({
