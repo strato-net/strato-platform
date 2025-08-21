@@ -250,23 +250,27 @@ Linux)
             cd ..
             rm -rf leveldb
             
-            # Build secp256k1 (not available in Amazon Linux 2023 repositories)
+            # For secp256k1, we are currently dependent on our own custom version,
+            # which we have to build from source.  We would really like to move to
+            # vanilla 0.7.0, but it would require a further hard fork and we're
+            # rushing for code freeze, so need a stable network more than to
+            # resolve this version issue.
+            #
+            # We were having to build this package manually on Amazon Linux
+            # even before this custom version situation, because the package
+            # is not present in the Amazon Linux 2023 repositories at all, so
+            # when we switch to a vanilla version, this local build will still
+            # be needed.
             sudo dnf install -y autoconf libtool make
-            git clone --branch v0.7.0 https://github.com/bitcoin-core/secp256k1.git
+            git clone https://github.com/blockapps/secp256k1
             cd secp256k1
+            git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
             ./autogen.sh
             ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
             make
             sudo make install
-            # Need to copy to /usr/share/pkgconfig for pkg-config to find it.
-            # To check where the library was installed: `sudo find /usr -name "libsecp256k1.pc" 2>/dev/null`
-            # To check the pkgconfig paths: `pkg-config --variable pc_path pkg-config`
-            sudo cp /usr/local/lib/pkgconfig/libsecp256k1.pc /usr/share/pkgconfig/
-            sudo cp /usr/local/lib/libsecp256k1.so.6 /lib64
             cd ..
             rm -rf secp256k1
-
-            # Update library cache
             sudo ldconfig
             
             ;;
@@ -354,9 +358,26 @@ Linux)
                 libleveldb-dev \
                 liblzma-dev \
                 libpq-dev \
-                libsecp256k1-dev \
                 libsodium-dev \
                 postgresql-client
+
+            # For secp256k1, we are currently dependent on our own custom version,
+            # which we have to build from source.  We would really like to move to
+            # vanilla 0.7.0, but it would require a further hard fork and we're
+            # rushing for code freeze, so need a stable network more than to
+            # resolve this version issue.
+            sudo apt install -y autoconf libtool make
+            git clone https://github.com/blockapps/secp256k1
+            cd secp256k1
+            git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
+            ./autogen.sh
+            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+            make
+            sudo make install
+            cd ..
+            rm -rf secp256k1
+            sudo ldconfig
+
             ;;
 
         *)
