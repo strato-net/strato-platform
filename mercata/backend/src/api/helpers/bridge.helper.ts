@@ -16,15 +16,15 @@ interface EnrichmentConfig {
 
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
-    tableName: `${constants.mercataBridge}-withdrawals`,
+    tableName: `${constants.MercataBridge}-withdrawals`,
     selectFields: "withdrawalId:key,withdrawalInfo:value,block_timestamp,transaction_hash",
-    countField: "withdrawalId.count()",
+    countField: "count()",
     enrichmentType: 'withdrawal'
   },
   deposit: {
-    tableName: `${constants.mercataBridge}-deposits`,
+    tableName: `${constants.MercataBridge}-deposits`,
     selectFields: "chainId:key,depositInfo:value,block_timestamp,transaction_hash",
-    countField: "chainId.count()",
+    countField: "count()",
     enrichmentType: 'deposit'
   }
 };
