@@ -89,6 +89,11 @@ export interface Deposit {
   amount: string;
   user: string;
   from: string;
+  extToken: string;
+  extDecimals: number;
+  chainId: string;
+  enabled: boolean;
+  depositRouter: string;
 }
 
 export interface Withdrawal {

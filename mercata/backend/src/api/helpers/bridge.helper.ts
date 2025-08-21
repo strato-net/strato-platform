@@ -92,6 +92,7 @@ export function enrichTransactionData(
       stratoTokenName: stratoTokenName || "-",
       stratoTokenSymbol: stratoTokenSymbol || "-",
       extName: value?.extName || "-",
+      extSymbol: value?.extSymbol || "-",
       extToken: value?.extToken || "-"
     };
   });

@@ -45,34 +45,64 @@ export const getChainLogs = async (
   return response?.result || [];
 };
 
-// Get transaction receipt
-export const getTransactionReceipt = async (
+// Batch get transaction receipts
+export const getTransactionReceiptsBatch = async (
   chainId: number,
-  txHash: string,
-): Promise<any> => {
+  txHashes: string[],
+): Promise<Map<string, any>> => {
   const rpcUrl = getChainRpcUrl(chainId);
-  const response: any = await fetch.post(rpcUrl, {
+  
+  // Create batch request
+  const batchRequest = txHashes.map((txHash, index) => ({
     jsonrpc: "2.0",
-    id: 1,
+    id: index + 1,
     method: "eth_getTransactionReceipt",
     params: [ensureHexPrefix(txHash)],
-  });
-  return response?.result;
+  }));
+
+  const response: any[] = await fetch.post(rpcUrl, batchRequest);
+  
+  // Map responses back to tx hashes
+  const result = new Map<string, any>();
+  if (Array.isArray(response)) {
+    response.forEach((item, index) => {
+      if (item?.result) {
+        result.set(txHashes[index], item.result);
+      }
+    });
+  }
+  
+  return result;
 };
 
-// Get transaction by hash
-export const getTransactionByHash = async (
+// Batch get internal transactions
+export const getInternalTransactionsBatch = async (
   chainId: number,
-  txHash: string,
-): Promise<any> => {
+  txHashes: string[],
+): Promise<Map<string, any[]>> => {
   const rpcUrl = getChainRpcUrl(chainId);
-  const response: any = await fetch.post(rpcUrl, {
+  
+  // Create batch request
+  const batchRequest = txHashes.map((txHash, index) => ({
     jsonrpc: "2.0",
-    id: 1,
-    method: "eth_getTransactionByHash",
+    id: index + 1,
+    method: "trace_transaction",
     params: [ensureHexPrefix(txHash)],
-  });
-  return response?.result;
+  }));
+
+  const response: any[] = await fetch.post(rpcUrl, batchRequest);
+  
+  // Map responses back to tx hashes
+  const result = new Map<string, any[]>();
+  if (Array.isArray(response)) {
+    response.forEach((item, index) => {
+      if (item?.result) {
+        result.set(txHashes[index], item.result || []);
+      }
+    });
+  }
+  
+  return result;
 };
 
 // Check if chain RPC is configured
