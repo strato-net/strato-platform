@@ -605,6 +605,13 @@ require("dotenv").config();
 // ## Borrow and Repay
 // Insufficient collateral --> Reject
 
+// ## Sweep Fees
+// 1) First, ensure that some interest has accrued.
+// 2) Sweep max fees by entering a huge number (amount > fees means sweep all)
+//    - Ensure that the amount of fees actually swept is the appropriate fraction of interest accrued
+// 3) Sweep a specific number of fees (after letting it accrue a bit more)
+//    - Ensure that the amount of fees swept is as expected, there are no issues with decimals
+
 // ## UI Testing Flows
 // ### 100% buttons
 // 1) Supply 100% of collateral
@@ -619,6 +626,15 @@ require("dotenv").config();
 // 1) TODO steps
 // ### 100% Liquidation
 // 1) TODO steps
+// ### Debt Ceiling
+// Same as programmatic debt ceiling tests, but with the newly implemented admin panel UI.
+// Also ensure that decimals are handled correctly.
+// ###  Sweep Fees
+// 1) First, ensure that some interest has accrued.
+// 2) Sweep max fees using the newly implemented Lending tab of the admin panel by entering a huge number (amount > fees means sweep all)
+//    - Ensure that the amount of fees actually swept is the appropriate fraction of interest accrued
+// 3) Sweep a specific number of fees (after letting it accrue a bit more)
+//    - Ensure that the amount of fees swept is as expected, there are no issues with decimals
 // ### Accounting
 // Ensure that the numbers add up after flows; in particular, ensure that no 
 // 1) TODO steps
