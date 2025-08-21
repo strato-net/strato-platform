@@ -206,14 +206,16 @@ require("dotenv").config();
     }
 
     console.log("Seeding liquidity:", DEP_USD / 1e18, "USDST vs", amounts[sym] / 1e18, sym);
+
     const txs = [
       // approve USDST & tokenB
       buildCall("Token", USDST, "approve", { spender: poolAddr, value: DEP_USD }),
       buildCall("Token", tokenB, "approve", { spender: poolAddr, value: amounts[sym] }),
-      // addLiquidity (tokenBAmount, maxTokenAAmount)
+      // addLiquidity (tokenBAmount, maxTokenAAmount, deadline)
       buildCall("Pool", poolAddr, "addLiquidity", {
         tokenBAmount: amounts[sym],
         maxTokenAAmount: DEP_USD,
+        deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
       }),
     ];
 

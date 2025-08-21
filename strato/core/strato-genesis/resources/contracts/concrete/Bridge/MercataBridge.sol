@@ -20,13 +20,12 @@
     ───────────────────────────────────────────────────────────────────────── */
 
 import "../../abstract/ERC20/access/Ownable.sol";
-import "../../abstract/ERC20/utils/ReentrancyGuard.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
 /* ───────────────────────────────────────────────────────────────────────── */
-contract record MercataBridge is Ownable, ReentrancyGuard {
+contract record MercataBridge is Ownable {
 /* --------------------------------------------------------------------- */
 /*                            ─  ENUMS  ─                               */
 /* --------------------------------------------------------------------- */
@@ -36,7 +35,8 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         NONE,         // default (mapping unset)
         INITIATED,    // deposit  : relayer observed external tx
                       // withdrawal: user escrowed tokens
-        PENDING_REVIEW, // withdrawal only – Custody tx proposed
+        PENDING_REVIEW, // deposit: verification failed, needs review
+                      // withdrawal: custody tx proposed, waiting for review
         COMPLETED,    // flow fully executed
         ABORTED       // owner/user reclaimed escrow
     }
@@ -47,6 +47,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     struct DepositInfo {
         address token;        // STRATO token to mint
         address user;         // STRATO recipient
+        address from;         // External chain sender
         uint256 amount;       // amount to mint
         BridgeStatus bridgeStatus; // NONE / INITIATED / COMPLETED / ABORTED
     }
@@ -119,9 +120,11 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         string  srcTxHash,
         address token,
         uint256 amount,
-        address indexed user
+        address indexed user,
+        address from
     );
     event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);   // wrapped tokens minted
+    event DepositPendingReview(uint256 indexed srcChainId, string srcTxHash);   // verification failed, needs review
 
     /*  WITHDRAWAL FLOW  */
     event WithdrawalRequested(  // user locked tokens in bridge
@@ -281,12 +284,12 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         string  srcTxHash,
         address token,
         uint256 amount,
-        address user
+        address user,
+        address from
     )
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         require(tokenFactory.isTokenActive(token), "MB: inactive token");
         AssetInfo memory a = assets[token];
@@ -301,12 +304,13 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         deposits[srcChainId][srcTxHash] = DepositInfo(
             token,
             user,
+            from,
             amount,
             BridgeStatus.INITIATED
         );
 
         emit DepositInitiated(
-            srcChainId, srcTxHash, token, amount, user
+            srcChainId, srcTxHash, token, amount, user, from
         );
     }
     
@@ -316,19 +320,20 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         string[]  calldata srcTxHashes,
         address[] calldata tokens,
         uint256[] calldata amounts,
-        address[] calldata users
+        address[] calldata users,
+        address[] calldata froms
     )
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         uint256 n = srcChainIds.length;
         require(
             n == srcTxHashes.length &&
             n == tokens.length     &&
             n == amounts.length    &&
-            n == users.length,
+            n == users.length      &&
+            n == froms.length,
             "MB: len"
         );
 
@@ -349,22 +354,22 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
             deposits[srcChainId][h] = DepositInfo(
                 tokens[i],
                 users[i],
+                froms[i],
                 amounts[i],
                 BridgeStatus.INITIATED
             );
 
-            emit DepositInitiated(srcChainId, h, tokens[i], amounts[i], users[i]);
+            emit DepositInitiated(srcChainId, h, tokens[i], amounts[i], users[i], froms[i]);
         }
     }
 
     /**
-     * Step-2  (relayer) – after off-chain finality, mint wrapped tokens.
+     * Step-2.1 (relayer) – Verification passed, mint wrapped tokens.
      */
     function confirmDeposit(uint256 srcChainId, string calldata srcTxHash)
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         DepositInfo storage d = deposits[srcChainId][srcTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
@@ -383,7 +388,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenDepositsOpen
-        nonReentrant
     {
         uint256 n = srcChainIds.length;
         require(n == srcTxHashes.length, "MB: len");
@@ -398,6 +402,44 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
             d.bridgeStatus = BridgeStatus.COMPLETED;
 
             emit DepositCompleted(srcChainIds[i], h);
+        }
+    }
+
+    /**
+     * Step-2.2 (relayer) – Verification failed, set deposit for manual review
+     */
+    function reviewDeposit(uint256 srcChainId, string calldata srcTxHash)
+        external
+        onlyRelayer
+        whenDepositsOpen
+    {
+        DepositInfo storage d = deposits[srcChainId][srcTxHash];
+        require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+
+        d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+        emit DepositPendingReview(srcChainId, srcTxHash);
+    }
+
+    // ──────────────────────── BATCH: reviewDeposit ────────────────────────
+    function reviewDepositBatch(
+        uint256[] calldata srcChainIds,
+        string[] calldata srcTxHashes
+    )
+        external
+        onlyRelayer
+        whenDepositsOpen
+    {
+        uint256 n = srcChainIds.length;
+        require(n == srcTxHashes.length, "MB: len");
+
+        for (uint256 i = 0; i < n; i++) {
+            string memory h = srcTxHashes[i];
+
+            DepositInfo storage d = deposits[srcChainIds[i]][h];
+            require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+
+            d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
+            emit DepositPendingReview(srcChainIds[i], h);
         }
     }
 
@@ -418,7 +460,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
     )
         external
         whenWithdrawalsOpen
-        nonReentrant
         returns (uint256 id)
     {
         require(tokenFactory.isTokenActive(token),"MB: inactive");
@@ -459,7 +500,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.INITIATED,"MB: bad state");
@@ -476,7 +516,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         uint256 n = ids.length;
         require(n == custodyTxHashes.length, "MB: len");
@@ -499,7 +538,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         WithdrawalInfo storage w = withdrawals[id];
         require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW,"MB: bad state");
@@ -518,7 +556,6 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         external
         onlyRelayer
         whenWithdrawalsOpen
-        nonReentrant
     {
         uint256 n = ids.length;
         require(n == custodyTxHashes.length, "MB: len");
@@ -541,7 +578,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
      * escrowed tokens.  Covers the scenario where Custody tx is never signed
      * or relayer disappears.
      */
-    function abortWithdrawal(uint256 id) external nonReentrant {
+    function abortWithdrawal(uint256 id) external {
         WithdrawalInfo storage w = withdrawals[id];
         require(
             w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
@@ -564,7 +601,7 @@ contract record MercataBridge is Ownable, ReentrancyGuard {
         emit WithdrawalAborted(id);
     }
 
-    function abortWithdrawalBatch(uint256[] calldata ids) external nonReentrant {
+    function abortWithdrawalBatch(uint256[] calldata ids) external {
         uint256 n = ids.length;
         require(n > 0, "MB: empty");
 
