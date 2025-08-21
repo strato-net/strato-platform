@@ -40,7 +40,7 @@ const LendingPoolOverview = () => {
     try {
       await api.post('/lend/admin/set-debt-ceilings', {
         assetUnits: data.assetUnits,
-        usdValue: data.usdValue,
+        usdValue: BigInt(Math.floor(parseFloat(data.usdValue) * 1e18)).toString(),
       });
       
       toast({
@@ -107,7 +107,7 @@ const LendingPoolOverview = () => {
                   rules={{ 
                     required: 'Asset units ceiling is required',
                     pattern: {
-                      value: /^\d+\.?\d*$/,
+                      value: /^\d+$/,
                       message: 'Must be a valid number'
                     }
                   }}
@@ -115,7 +115,7 @@ const LendingPoolOverview = () => {
                     <FormItem>
                       <FormLabel>Asset Units Ceiling</FormLabel>
                       <FormControl>
-                        <Input placeholder="1000000" {...field} />
+                        <Input placeholder={(1_000_000n * 10n ** 18n).toString()} {...field} />
                       </FormControl>
                       <FormDescription>
                         Maximum borrowable amount in asset units (0 = no limit)
@@ -139,7 +139,7 @@ const LendingPoolOverview = () => {
                     <FormItem>
                       <FormLabel>USD Value Ceiling</FormLabel>
                       <FormControl>
-                        <Input placeholder="10000000" {...field} />
+                        <Input placeholder="1000000.00" {...field} />
                       </FormControl>
                       <FormDescription>
                         Maximum borrowable amount in USD value (0 = no limit)
@@ -207,7 +207,7 @@ const LendingPoolOverview = () => {
                 rules={{ 
                   required: 'Amount is required',
                   pattern: {
-                    value: /^\d+\.?\d*$/,
+                    value: /^\d+$/,
                     message: 'Must be a valid number'
                   }
                 }}
@@ -215,10 +215,10 @@ const LendingPoolOverview = () => {
                   <FormItem>
                     <FormLabel>Amount to Sweep</FormLabel>
                     <FormControl>
-                      <Input placeholder="0" {...field} />
+                      <Input placeholder={(1n * 10n ** 18n).toString()} {...field} />
                     </FormControl>
                     <FormDescription>
-                      Amount of reserves to sweep to fee collector
+                      Amount of reserves (in asset units) to sweep to fee collector
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
