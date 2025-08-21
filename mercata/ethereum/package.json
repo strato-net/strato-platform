@@ -1,0 +1,35 @@
+{
+  "name": "mercata-ethereum",
+  "version": "1.0.0",
+  "description": "Ethereum deployment for Mercata contracts with UUPS proxy support",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "verify": "hardhat verify --network",
+    
+    "deploy:proxy": "echo 'Usage: CONTRACT_NAME=MyContract INIT_PARAMS=\\\"[\\\\\"param1\\\\\", \\\\\"param2\\\\\"]\\\", npx hardhat run scripts/deployWithProxy.js --network <network>'",
+    "deploy:standard": "hardhat run scripts/deploy.js --network",
+    
+    "deploy:sepolia": "hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deploy:mainnet": "hardhat run scripts/deployWithProxy.js --network mainnet",
+    
+    "deploy:sepolia:deposit-router": "CONTRACT_NAME=DepositRouter INIT_PARAMS='[\"0x8713850E9fF0fd0200ce87C32E3cdB24eD021631\", \"0x8713850E9fF0fd0200ce87C32E3cdB24eD021631\"]' npx hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deploy:mainnet:deposit-router": "CONTRACT_NAME=DepositRouter INIT_PARAMS='[\"0x8713850E9fF0fd0200ce87C32E3cdB24eD021631\", \"0x8713850E9fF0fd0200ce87C32E3cdB24eD021631\"]' npx hardhat run scripts/deployWithProxy.js --network mainnet",
+    
+    "deploy:sepolia:token": "CONTRACT_NAME=MyToken INIT_PARAMS='[\"MyToken\", \"MTK\", 1000000]' npx hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deploy:mainnet:token": "CONTRACT_NAME=MyToken INIT_PARAMS='[\"MyToken\", \"MTK\", 1000000]' npx hardhat run scripts/deployWithProxy.js --network mainnet",
+    
+    "deploy:sepolia:auto-verify": "AUTO_VERIFY=true hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deploy:mainnet:auto-verify": "AUTO_VERIFY=true hardhat run scripts/deployWithProxy.js --network mainnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "dotenv": "^17.2.1"
+  }
+} 
