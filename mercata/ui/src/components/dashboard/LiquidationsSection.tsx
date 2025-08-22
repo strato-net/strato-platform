@@ -36,13 +36,8 @@ const LiquidationsSection: React.FC = () => {
     collateral: CollateralData;
   } | null>(null);
 
-  // Filter out user's own loans from liquidatable positions
-  const filteredLiquidatable = useMemo(() => {
-    if (!userAddress) return liquidatable;
-    return liquidatable.filter(
-      loan => loan.user.toLowerCase() !== userAddress.toLowerCase()
-    );
-  }, [liquidatable, userAddress]);
+  // You cannot liquidate your own loans
+  const isOwnLoan = (loan: LiquidationEntry) => loan.user.toLowerCase() === userAddress?.toLowerCase();
 
   // Refresh liquidation data when component mounts (tab is opened)
   useEffect(() => {
@@ -69,13 +64,13 @@ const LiquidationsSection: React.FC = () => {
           <div className="flex justify-center items-center h-12">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
           </div>
-        ) : filteredLiquidatable.length === 0 ? (
+        ) : liquidatable.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             No liquidatable positions available
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
-            {filteredLiquidatable.map((ln: LiquidationEntry) => (
+            {liquidatable.map((ln: LiquidationEntry) => (
               <div key={ln.id} className="border rounded-lg overflow-hidden">
                 {/* Main row */}
                 <div 
@@ -96,6 +91,12 @@ const LiquidationsSection: React.FC = () => {
                         {(ln.healthFactor * 100).toFixed(2)}%
                       </div>
                     </div>
+                    {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
+                    {isOwnLoan(ln) && (
+                      <div className="text-sm text-red-500">
+                        <span className="font-medium">(You)</span>
+                      </div>
+                    )}
                     <div className="text-sm text-gray-600">
                       Borrowed: <span className="font-medium">{weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
                     </div>
@@ -117,6 +118,13 @@ const LiquidationsSection: React.FC = () => {
                           <CopyButton address={ln.user} />
                         </div>
                       </div>
+
+                      {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
+                      {isOwnLoan(ln) && (
+                        <div className="text-sm text-red-500">
+                          <span className="font-medium">(You)</span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Borrowed amount */}
@@ -165,6 +173,7 @@ const LiquidationsSection: React.FC = () => {
                                   e.stopPropagation();
                                   openModal(ln, c);
                                 }}
+                                disabled={isOwnLoan(ln)}
                               >
                                 Liquidate
                               </Button>
@@ -236,6 +245,7 @@ const LiquidationsSection: React.FC = () => {
                                       e.stopPropagation();
                                       openModal(ln, c);
                                     }}
+                                    disabled={isOwnLoan(ln)}
                                   >
                                     Liquidate
                                   </Button>
