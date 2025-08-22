@@ -4,8 +4,11 @@ import {
   useState,
   useCallback,
   ReactNode,
+  useEffect,
+  useRef,
 } from "react";
 import { api } from "@/lib/axios";
+import { formatBalance } from "@/utils/numberUtils";
 import {
   Token,
   BridgeOutParams,
@@ -113,9 +116,9 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  const getBalance = useCallback(
+  // Internal balance fetching function used by useBalance hook
+  const fetchBalance = useCallback(
     async (tokenAddress: string): Promise<BalanceResponse> => {
-      setLoading(true);
       try {
         const addr = tokenAddress.startsWith("0x")
           ? tokenAddress.slice(2)
@@ -129,12 +132,71 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       } catch (e) {
         setError("Failed to fetch balance");
         throw e;
-      } finally {
-        setLoading(false);
       }
     },
     [],
   );
+
+  // Custom useBalance hook similar to wagmi's useBalance
+  const useBalance = useCallback((tokenAddress: string | null) => {
+    const [data, setData] = useState<{ balance: string; formatted: string } | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isError, setIsError] = useState(false);
+    const [error, setError] = useState<Error | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const mountedRef = useRef(true);
+
+    const refetch = useCallback(async () => {
+      if (!tokenAddress || !mountedRef.current) return;
+
+      // Cancel previous request
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+
+      abortControllerRef.current = new AbortController();
+      setIsLoading(true);
+      setIsError(false);
+      setError(null);
+
+      try {
+        const { balance } = await fetchBalance(tokenAddress);
+        if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
+          const formatted = formatBalance(balance);
+          setData({ balance, formatted });
+        }
+      } catch (err) {
+        if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
+          setIsError(true);
+          setError(err instanceof Error ? err : new Error('Failed to fetch balance'));
+        }
+      } finally {
+        if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }, [tokenAddress, fetchBalance]);
+
+    useEffect(() => {
+      mountedRef.current = true;
+      refetch();
+      
+      return () => {
+        mountedRef.current = false;
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+      };
+    }, [refetch]);
+
+    return {
+      data,
+      isLoading,
+      isError,
+      error,
+      refetch
+    };
+  }, [fetchBalance]);
 
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
@@ -206,7 +268,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         selectedNetwork,
         selectedToken,
         bridgeOut,
-        getBalance,
+        useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
         loadNetworksAndTokens,

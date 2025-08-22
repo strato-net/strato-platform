@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,21 +18,8 @@ import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   roundToDecimals,
   safeParseUnits,
-  formatBalance,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-
-interface Token {
-  stratoTokenAddress: string;
-  stratoTokenName: string;
-  stratoTokenSymbol: string;
-  chainId: string;
-  enabled: boolean;
-  extName: string;
-  extToken: string;
-  extSymbol: string;
-  extDecimals: string;
-}
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -40,7 +27,7 @@ const BridgeOut: React.FC = () => {
 
   const {
     bridgeOut: bridgeOutAPI,
-    getBalance,
+    useBalance,
     bridgeableTokens,
     availableNetworks,
     selectedNetwork,
@@ -50,15 +37,18 @@ const BridgeOut: React.FC = () => {
   } = useBridgeContext();
 
   const [amount, setAmount] = useState("");
-  const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   
-  // Add refs to prevent duplicate API calls
-  const lastFetchedAddress = useRef<string | null>(null);
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Use the custom useBalance hook
+  const {
+    data: balanceData,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance
+  } = useBalance(selectedToken?.stratoTokenAddress || null);
+  
+  const tokenBalance = balanceData?.formatted || "0";
 
   // Set initial network selection
   useEffect(() => {
@@ -66,51 +56,6 @@ const BridgeOut: React.FC = () => {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
   }, [availableNetworks, selectedNetwork]);
-
-  // Reset last fetched address when token changes significantly
-  useEffect(() => {
-    if (selectedToken?.stratoTokenAddress !== lastFetchedAddress.current) {
-      lastFetchedAddress.current = null;
-    }
-  }, [selectedToken?.stratoTokenAddress]);
-
-  useEffect(() => {
-    // Clear any existing timeout
-    if (fetchTimeoutRef.current) {
-      clearTimeout(fetchTimeoutRef.current);
-    }
-
-    // Don't fetch if no token or if we already fetched this address
-    if (!selectedToken?.stratoTokenAddress) return;
-    
-    const currentAddress = selectedToken.stratoTokenAddress;
-    if (lastFetchedAddress.current === currentAddress) return;
-
-    // Debounce the API call to prevent rapid successive calls
-    fetchTimeoutRef.current = setTimeout(async () => {
-      let mounted = true;
-      setIsBalanceLoading(true);
-      
-      try {
-        const { balance } = await getBalance(currentAddress);
-        const formatted = formatBalance(balance);
-        if (mounted) {
-          setTokenBalance(formatted);
-          lastFetchedAddress.current = currentAddress;
-        }
-      } catch {
-        if (mounted) setTokenBalance("0");
-      } finally {
-        if (mounted) setIsBalanceLoading(false);
-      }
-    }, 300); // 300ms debounce
-
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-    };
-  }, [selectedToken?.stratoTokenAddress]); // Only depend on the address, not the entire token object
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -173,26 +118,6 @@ const BridgeOut: React.FC = () => {
 
   const handleModalCancel = () => setIsModalOpen(false);
 
-  // Manual refresh function for balance
-  const refreshBalance = async () => {
-    if (!selectedToken?.stratoTokenAddress) return;
-    
-    // Reset the last fetched address to force a refresh
-    lastFetchedAddress.current = null;
-    
-    setIsBalanceLoading(true);
-    try {
-      const { balance } = await getBalance(selectedToken.stratoTokenAddress);
-      const formatted = formatBalance(balance);
-      setTokenBalance(formatted);
-      lastFetchedAddress.current = selectedToken.stratoTokenAddress;
-    } catch {
-      setTokenBalance("0");
-    } finally {
-      setIsBalanceLoading(false);
-    }
-  };
-
   const handleBridgeOut = async () => {
     if (!selectedToken || !address || !selectedNetwork) return;
     setIsModalOpen(false);
@@ -221,7 +146,7 @@ const BridgeOut: React.FC = () => {
           title: "Transaction Proposed Successfully",
           description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
-        await refreshBalance();
+        await refetchBalance();
         setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
@@ -272,11 +197,10 @@ const BridgeOut: React.FC = () => {
         <Label htmlFor="asset">Select Asset</Label>
         <Select
           value={selectedToken?.extSymbol || ""}
-          onValueChange={(v) =>
-            setSelectedToken(
-              bridgeableTokens.find((t) => t.extSymbol === v) || null,
-            )
-          }
+          onValueChange={(v) => {
+            const newToken = bridgeableTokens.find((t) => t.extSymbol === v) || null;
+            setSelectedToken(newToken);
+          }}
           disabled={bridgeableTokens.length === 0}
         >
           <SelectTrigger id="from-token">
