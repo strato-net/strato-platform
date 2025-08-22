@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
 import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useUser } from "@/context/UserContext";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -28,11 +29,20 @@ const weiToEther = (v?: string) => {
 
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
+  const { userAddress } = useUser();
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
     collateral: CollateralData;
   } | null>(null);
+
+  // Filter out user's own loans from liquidatable positions
+  const filteredLiquidatable = useMemo(() => {
+    if (!userAddress) return liquidatable;
+    return liquidatable.filter(
+      loan => loan.user.toLowerCase() !== userAddress.toLowerCase()
+    );
+  }, [liquidatable, userAddress]);
 
   // Refresh liquidation data when component mounts (tab is opened)
   useEffect(() => {
@@ -59,13 +69,13 @@ const LiquidationsSection: React.FC = () => {
           <div className="flex justify-center items-center h-12">
             <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
           </div>
-        ) : liquidatable.length === 0 ? (
+        ) : filteredLiquidatable.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             No liquidatable positions available
           </div>
         ) : (
           <div className="space-y-3 md:space-y-4">
-            {liquidatable.map((ln: LiquidationEntry) => (
+            {filteredLiquidatable.map((ln: LiquidationEntry) => (
               <div key={ln.id} className="border rounded-lg overflow-hidden">
                 {/* Main row */}
                 <div 
