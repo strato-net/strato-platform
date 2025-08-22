@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,6 +55,10 @@ const BridgeOut: React.FC = () => {
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  // Add refs to prevent duplicate API calls
+  const lastFetchedAddress = useRef<string | null>(null);
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Set initial network selection
   useEffect(() => {
@@ -63,26 +67,50 @@ const BridgeOut: React.FC = () => {
     }
   }, [availableNetworks, selectedNetwork]);
 
+  // Reset last fetched address when token changes significantly
   useEffect(() => {
-    let mounted = true;
-    const fetch = async () => {
-      if (!selectedToken?.stratoTokenAddress) return;
+    if (selectedToken?.stratoTokenAddress !== lastFetchedAddress.current) {
+      lastFetchedAddress.current = null;
+    }
+  }, [selectedToken?.stratoTokenAddress]);
+
+  useEffect(() => {
+    // Clear any existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Don't fetch if no token or if we already fetched this address
+    if (!selectedToken?.stratoTokenAddress) return;
+    
+    const currentAddress = selectedToken.stratoTokenAddress;
+    if (lastFetchedAddress.current === currentAddress) return;
+
+    // Debounce the API call to prevent rapid successive calls
+    fetchTimeoutRef.current = setTimeout(async () => {
+      let mounted = true;
       setIsBalanceLoading(true);
+      
       try {
-        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
+        const { balance } = await getBalance(currentAddress);
         const formatted = formatBalance(balance);
-        if (mounted) setTokenBalance(formatted);
+        if (mounted) {
+          setTokenBalance(formatted);
+          lastFetchedAddress.current = currentAddress;
+        }
       } catch {
         if (mounted) setTokenBalance("0");
       } finally {
         if (mounted) setIsBalanceLoading(false);
       }
-    };
-    fetch();
+    }, 300); // 300ms debounce
+
     return () => {
-      mounted = false;
+      if (fetchTimeoutRef.current) {
+        clearTimeout(fetchTimeoutRef.current);
+      }
     };
-  }, [selectedToken]);
+  }, [selectedToken?.stratoTokenAddress]); // Only depend on the address, not the entire token object
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
@@ -145,6 +173,26 @@ const BridgeOut: React.FC = () => {
 
   const handleModalCancel = () => setIsModalOpen(false);
 
+  // Manual refresh function for balance
+  const refreshBalance = async () => {
+    if (!selectedToken?.stratoTokenAddress) return;
+    
+    // Reset the last fetched address to force a refresh
+    lastFetchedAddress.current = null;
+    
+    setIsBalanceLoading(true);
+    try {
+      const { balance } = await getBalance(selectedToken.stratoTokenAddress);
+      const formatted = formatBalance(balance);
+      setTokenBalance(formatted);
+      lastFetchedAddress.current = selectedToken.stratoTokenAddress;
+    } catch {
+      setTokenBalance("0");
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  };
+
   const handleBridgeOut = async () => {
     if (!selectedToken || !address || !selectedNetwork) return;
     setIsModalOpen(false);
@@ -173,9 +221,7 @@ const BridgeOut: React.FC = () => {
           title: "Transaction Proposed Successfully",
           description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
-        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
-        const formatted = formatBalance(balance);
-        setTokenBalance(formatted);
+        await refreshBalance();
         setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
