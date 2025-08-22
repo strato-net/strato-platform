@@ -242,7 +242,10 @@ const LiquidityDepositModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Deposit Liquidity</DialogTitle>
+                      <DialogTitle>
+              Deposit Liquidity
+              {lockMode !== 0 && <span className="text-blue-500"> (One-Sided)</span>}
+            </DialogTitle>
           <DialogDescription>
             Add liquidity to the {selectedPool?._name} pool.
           </DialogDescription>
@@ -250,7 +253,7 @@ const LiquidityDepositModal = ({
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
             {/* First Token */}
-            <div className="rounded-lg border p-2">
+            <div className={`rounded-lg border p-2 ${lockMode === 1 ? 'border-blue-500' : ''}`}>
               <span className="text-sm text-gray-500">Amount</span>
               <div className="flex items-center gap-2">
                 <Input
@@ -354,12 +357,19 @@ const LiquidityDepositModal = ({
                 onClick={toggleLockMode}
                 className="p-2 rounded-full hover:bg-gray-200 focus:outline-none"
               >
-                <span className={`text-2xl ${lockMode === 0 ? 'text-gray-400' : 'text-blue-500'}`}>🧲</span>
+                <svg 
+                  className={`w-6 h-6 ${lockMode === 0 ? 'text-gray-400' : 'text-blue-500'}`}
+                  fill="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M17 8h1a1 1 0 0 1 1 1v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V9a1 1 0 0 1 1-1h1V6a5 5 0 0 1 10 0v2zM7 10v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-7H7zm2-2h6V6a3 3 0 0 0-6 0v2z"/>
+                  <circle cx="12" cy="14" r="1"/>
+                </svg>
               </button>
             </div>
 
             {/* Second Token */}
-            <div className="rounded-lg border p-3">
+            <div className={`rounded-lg border p-3 ${lockMode === 2 ? 'border-blue-500' : ''}`}>
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-gray-500">Amount</span>
               </div>
