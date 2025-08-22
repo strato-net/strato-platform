@@ -827,6 +827,81 @@ export const configureAsset = async (
   return { status, hash };
 };
 
+export const sweepReserves = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.amount) {
+    throw new Error("Missing required parameter: amount");
+  }
+
+  const amount = body.amount.toString();
+
+  // Validate amount is a valid number string
+  if (!/^\d+$/.test(amount)) {
+    throw new Error("Amount must be a valid positive integer");
+  }
+
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
+  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: poolConfiguratorAddress,
+    method: "sweepReserves",
+    args: {
+      amount,
+    },
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
+export const setDebtCeilings = async (
+  accessToken: string,
+  body: Record<string, string | number>
+) => {
+  if (!body.assetUnits || !body.usdValue) {
+    throw new Error("Missing required parameters: assetUnits and usdValue");
+  }
+
+  const assetUnits = body.assetUnits.toString();
+  const usdValue = body.usdValue.toString();
+
+  // Validate both parameters are valid number strings
+  if (!/^\d+$/.test(assetUnits)) {
+    throw new Error("Asset units must be a valid number");
+  }
+  if (!/^\d+$/.test(usdValue)) {
+    throw new Error("USD value must be a valid number"); // convert to BigInt before making the API call.
+  }
+
+  const registry = await getPool(accessToken, undefined, { select: "_owner" });
+  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
+  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
+
+  const tx = buildFunctionTx({
+    contractName: extractContractName(constants.PoolConfigurator),
+    contractAddress: poolConfiguratorAddress,
+    method: "setDebtCeilings",
+    args: {
+      assetUnits,
+      usdValue,
+    },
+  });
+
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+
+  return { status, hash };
+};
+
 // ---------------- Liquidation Listing Helpers ----------------
 
 export interface LiquidationCollateralInfo {
