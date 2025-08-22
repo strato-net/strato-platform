@@ -3,7 +3,7 @@
 # STRATO Platform Force Wipe Script
 # 
 # This script performs a complete cleanup of the STRATO platform by:
-# 1. Deleting the specified deployment directory (to force database recreation)
+# 1. Deleting the specified deployment directory
 # 2. Killing and removing all Docker containers
 # 3. Removing all Docker volumes (persistent data)
 # 4. Terminating all STRATO processes
@@ -70,8 +70,7 @@ if [[ ! "$current_dir" =~ strato ]]; then
 fi
 
 # Final user confirmation before destructive operations
-echo "About to delete directory: $1"
-echo "This will force recreation of cirrus and eth databases on next startup."
+echo "About to delete deployment directory: $1"
 echo "Are you sure? This cannot be undone. (y/N)"
 read -r confirmation
 if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
