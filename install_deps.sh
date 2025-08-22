@@ -77,6 +77,28 @@ show_package_version() {
     fi
 }
 
+# Function to build secp256k1 from BlockApps custom source
+# Note: Platform-specific build tools (autoconf, libtool, make) must be installed before calling this function
+build_secp256k1() {
+    echo "Building secp256k1 from BlockApps custom source..."
+    
+    # For secp256k1, we are currently dependent on our own custom version,
+    # which we have to build from source.  We would really like to move to
+    # vanilla 0.7.0, but it would require a further hard fork and we're
+    # rushing for code freeze, so need a stable network more than to
+    # resolve this version issue.
+    git clone https://github.com/blockapps/secp256k1
+    cd secp256k1
+    git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
+    ./autogen.sh
+    ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
+    make
+    sudo make install
+    cd ..
+    rm -rf secp256k1
+    sudo ldconfig
+}
+
 # Function to check package version against expected version for specific distro
 # Usage: check_package_version "distro_name" "package_name" "expected_version"
 check_package_version() {
@@ -250,28 +272,14 @@ Linux)
             cd ..
             rm -rf leveldb
             
-            # For secp256k1, we are currently dependent on our own custom version,
-            # which we have to build from source.  We would really like to move to
-            # vanilla 0.7.0, but it would require a further hard fork and we're
-            # rushing for code freeze, so need a stable network more than to
-            # resolve this version issue.
-            #
+            # Build secp256k1 from BlockApps custom source
             # We were having to build this package manually on Amazon Linux
             # even before this custom version situation, because the package
             # is not present in the Amazon Linux 2023 repositories at all, so
             # when we switch to a vanilla version, this local build will still
             # be needed.
             sudo dnf install -y autoconf libtool make
-            git clone https://github.com/blockapps/secp256k1
-            cd secp256k1
-            git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
-            ./autogen.sh
-            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
-            make
-            sudo make install
-            cd ..
-            rm -rf secp256k1
-            sudo ldconfig
+            build_secp256k1
             
             ;;
 
@@ -361,22 +369,9 @@ Linux)
                 libsodium-dev \
                 postgresql-client
 
-            # For secp256k1, we are currently dependent on our own custom version,
-            # which we have to build from source.  We would really like to move to
-            # vanilla 0.7.0, but it would require a further hard fork and we're
-            # rushing for code freeze, so need a stable network more than to
-            # resolve this version issue.
+            # Build secp256k1 from BlockApps custom source
             sudo apt install -y autoconf libtool make
-            git clone https://github.com/blockapps/secp256k1
-            cd secp256k1
-            git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
-            ./autogen.sh
-            ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh
-            make
-            sudo make install
-            cd ..
-            rm -rf secp256k1
-            sudo ldconfig
+            build_secp256k1
 
             ;;
 
