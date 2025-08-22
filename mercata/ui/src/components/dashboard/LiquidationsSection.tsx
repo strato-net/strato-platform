@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
 import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
@@ -33,6 +33,11 @@ const LiquidationsSection: React.FC = () => {
     loan: LiquidationEntry;
     collateral: CollateralData;
   } | null>(null);
+
+  // Refresh liquidation data when component mounts (tab is opened)
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);
