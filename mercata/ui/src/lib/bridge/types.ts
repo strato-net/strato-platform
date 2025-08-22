@@ -86,7 +86,13 @@ export type BridgeContextType = {
   selectedNetwork: string | null;
   selectedToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
-  getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
+  useBalance: (tokenAddress: string | null) => {
+    data: { balance: string; formatted: string } | null;
+    isLoading: boolean;
+    isError: boolean;
+    error: Error | null;
+    refetch: () => Promise<void>;
+  };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: Token | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
