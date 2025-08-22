@@ -1,87 +1,266 @@
 #!/usr/bin/env bash
 
-set -e
+# STRATO Platform Startup Script
+#
+# This script starts the STRATO blockchain platform by:
+# 1. Validating deployment directory parameter
+# 2. Setting up OAuth credentials (interactive or from saved file)
+# 3. Configuring platform-specific networking
+# 4. Starting Docker containers
+# 5. Starting vault proxy server
+# 6. Running first-time setup (database creation) if needed
+# 7. Starting the main STRATO processes via convoke
+#
+# Usage: ./start <deployment_directory>
+# Example: ./start mynode
+#
+# The deployment directory will be created if it doesn't exist and will contain:
+# - .ethereumH/ (blockchain configuration and data)
+# - logs/ (application logs)
+#
+# Prerequisites:
+# - Docker and Docker Compose installed
+# - PostgreSQL accessible at localhost
+# - Required STRATO binaries in PATH (strato-setup, convoke, blockapps-vault-proxy-server)
 
-if [ "$1" = "" ]
-then
-	echo "error!  You must supply a directory"
-	exit
+set -e  # Exit immediately if any command fails
+
+# Validate deployment directory parameter
+if [ "$1" = "" ]; then
+	echo -e "ERROR: You must supply a deployment directory name"
+	echo -e "Usage: ./start <deployment_directory>"
+	echo -e "Example: ./start mynode"
+	exit 1
 fi
 
-if [ -e ~/.secrets/oauth_credentials ]
-then
+# Validate we're in the STRATO platform directory
+if [[ ! -d "strato" ]] || [[ ! -d "strato/core" ]] || [[ ! -d "strato/api" ]]; then
+	echo -e "ERROR: This script must be run from the strato-platform root directory"
+	echo -e "Expected STRATO directories not found: strato/core, strato/api"
+	exit 1
+fi
+
+# Safety check for deployment directory name
+case "$1" in
+	# Block absolute paths
+	/*)
+		echo -e "ERROR: Absolute paths are not allowed for deployment directory"
+		echo -e "Please use a relative path like 'mynode' instead of '$1'"
+		exit 1
+		;;
+	# Block path traversal
+	*..*)
+		echo -e "ERROR: Path traversal (..) is not allowed in deployment directory name"
+		echo -e "Path: '$1'"
+		exit 1
+		;;
+	# Block system directories
+	"bin" | "boot" | "dev" | "etc" | "home" | "lib" | "lib64" | "opt" | "proc" | "root" | "sbin" | "sys" | "tmp" | "usr" | "var")
+		echo -e "ERROR: Cannot use system directory name '$1' for deployment"
+		exit 1
+		;;
+esac
+
+echo "Starting STRATO platform with deployment directory: $1"
+
+# Array to track background process PIDs for cleanup
+declare -a BACKGROUND_PIDS=()
+
+# Comprehensive cleanup function for graceful shutdown
+function cleanup {
+    echo ""
+    echo "Shutting down STRATO platform..."
+    
+    # Kill background processes gracefully with TERM signal
+    for pid in "${BACKGROUND_PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "  Stopping process $pid gracefully..."
+            kill -TERM "$pid" 2>/dev/null || true
+        fi
+    done
+    
+    # Wait for graceful shutdown
+    echo "  Waiting for processes to shut down gracefully..."
+    sleep 3
+    
+    # Force kill any remaining processes
+    for pid in "${BACKGROUND_PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "  Force killing process $pid..."
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+    
+    # Kill any remaining STRATO processes by name
+    echo "  Cleaning up any remaining STRATO processes..."
+    pkill -f "blockapps-vault-proxy-server" 2>/dev/null || true
+    pkill -f "convoke" 2>/dev/null || true
+    pkill -f "strato-api" 2>/dev/null || true
+    pkill -f "strato-p2p" 2>/dev/null || true
+    pkill -f "strato-sequencer" 2>/dev/null || true
+    
+    # Stop Docker containers with proper cleanup
+    echo "  Stopping Docker containers..."
+    docker compose -p strato down -t 5 --remove-orphans 2>/dev/null || true
+    
+    echo "✓ STRATO platform shutdown complete"
+    exit 0
+}
+
+# Handle multiple signals for robust shutdown
+trap 'cleanup' INT TERM EXIT
+
+# OAuth Configuration Setup
+echo "Configuring OAuth credentials..."
+
+if [ -e ~/.secrets/oauth_credentials ]; then
+    echo "  Loading OAuth credentials from ~/.secrets/oauth_credentials"
     source ~/.secrets/oauth_credentials
 else
+    echo "  OAuth credentials not found, setting up interactively..."
     export DEFAULT_OAUTH_DISCOVERY_URL="https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration"
+    
     read -e -p "Enter the OAUTH_DISCOVERY_URL [${DEFAULT_OAUTH_DISCOVERY_URL}]: " OAUTH_DISCOVERY_URL
-
     OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-$DEFAULT_OAUTH_DISCOVERY_URL}
-
+    
     read -e -p "Enter the OAUTH_CLIENT_ID: " OAUTH_CLIENT_ID
     read -s -e -p "Enter the OAUTH_CLIENT_SECRET: " OAUTH_CLIENT_SECRET
-    read -e -p "Save OAUTH credentials in "~/.secrets/"? (y/N)" SHOULD_SAVE
-    if [ "$SHOULD_SAVE" = "y" ]
-    then
-	mkdir -p ~/.secrets
-	echo -e "OAUTH_DISCOVERY_URL=$OAUTH_DISCOVERY_URL\nOAUTH_CLIENT_ID=$OAUTH_CLIENT_ID\nOAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET" > ~/.secrets/oauth_credentials
+    echo  # Add newline after hidden input
+    
+    read -e -p "Save OAUTH credentials to ~/.secrets/oauth_credentials? (y/N): " SHOULD_SAVE
+    if [ "$SHOULD_SAVE" = "y" ]; then
+        mkdir -p ~/.secrets
+        chmod 700 ~/.secrets  # Secure permissions
+        chmod 600 ~/.secrets/oauth_credentials  # Secure permissions
+        echo -e "OAUTH_DISCOVERY_URL=$OAUTH_DISCOVERY_URL\nOAUTH_CLIENT_ID=$OAUTH_CLIENT_ID\nOAUTH_CLIENT_SECRET=$OAUTH_CLIENT_SECRET" > ~/.secrets/oauth_credentials
+        echo "  ✓ OAuth credentials saved securely"
     fi
 fi
 
+# Export OAuth environment variables
 export OAUTH_DISCOVERY_URL
 export OAUTH_CLIENT_ID
 export OAUTH_CLIENT_SECRET
 
+# Platform Configuration
+echo "Configuring platform settings..."
 export network=helium
 export VAULT_URL=https://vault.blockapps.net:8093
 
-####################################
-
-function cleanup {
-    docker compose -p strato down # -v -t 0 --remove-orphans
-    killall blockapps-vault-proxy-server
-}
-
-trap 'cleanup' INT
-
-# "host.docker.internal" is set up in Windows/Mac (to point to the host's localhost),
-# but for some reason wasn't set up to work in Linux
+# Network Configuration
+# Docker's host.docker.internal works on Windows/Mac but not Linux
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
-  STRATO_HOSTNAME=172.17.0.1
-  STRATO_IP=$STRATO_HOSTNAME
+    STRATO_HOSTNAME=172.17.0.1  # Docker bridge network gateway
+    STRATO_IP=$STRATO_HOSTNAME
+    echo "  Detected Linux: Using Docker bridge IP $STRATO_IP"
 else
-  STRATO_HOSTNAME=host.docker.internal
-  STRATO_IP=127.0.0.1
+    STRATO_HOSTNAME=host.docker.internal
+    STRATO_IP=127.0.0.1
+    echo "  Detected non-Linux: Using host.docker.internal"
 fi
 
 export STRATO_HOSTNAME
-
-export HTTP_PORT=8080 #You can change this to 80 for Linux, Mac seems to forbid it
+export HTTP_PORT=8080  # Can be changed to 80 on Linux if needed
 export NODE_HOST="localhost:8080"
 export blocHost=$STRATO_HOSTNAME:3000
 
-mkdir -p $1
-
-docker compose -p strato up -d
-
-sleep 10
-
-cd $1
-
-mkdir -p logs
-
-echo "######## starting blockapps-vault-proxy-server"
-
-blockapps-vault-proxy-server --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" --VAULT_URL=$VAULT_URL > logs/blockapps-vault-proxy-server 2>&1 &
-
-if [ ! -e .ethereumH/ethconf.yaml ]
-then
-    echo "######## running first time setup"
-    PGPASSWORD=api createdb -h localhost -U postgres cirrus
-
-    echo "Running setup"
-    strato-setup -p api -K localhost --network=helium --apiIPAddress=$STRATO_IP > logs/strato-setup 2>&1
-    echo "Setup complete"
+# Create deployment directory
+echo "Setting up deployment directory: $1"
+if [[ ! -d "$1" ]]; then
+    mkdir -p "$1"
+    echo "  ✓ Created deployment directory: $1"
+else
+    echo "  ✓ Using existing deployment directory: $1"
 fi
 
-echo "######## convoking"
-convoke
+# Start Docker containers
+echo "Starting Docker containers..."
+if ! docker compose -p strato up -d; then
+    echo "ERROR: Failed to start Docker containers"
+    echo "Please check Docker is running and docker-compose.yml is valid"
+    exit 1
+fi
+echo "  ✓ Docker containers started"
+
+# Wait for containers to be ready
+echo "Waiting for containers to initialize..."
+sleep 10
+
+# Change to deployment directory
+cd "$1"
+echo "  Working in deployment directory: $(pwd)"
+
+# Create logs directory
+mkdir -p logs
+echo "  ✓ Logs directory ready: $(pwd)/logs"
+
+# Start vault proxy server
+echo "Starting blockapps-vault-proxy-server..."
+if ! command -v blockapps-vault-proxy-server &> /dev/null; then
+    echo "ERROR: blockapps-vault-proxy-server not found in PATH"
+    exit 1
+fi
+
+blockapps-vault-proxy-server \
+    --OAUTH_DISCOVERY_URL="$OAUTH_DISCOVERY_URL" \
+    --OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+    --OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" \
+    --VAULT_URL="$VAULT_URL" \
+    > logs/blockapps-vault-proxy-server 2>&1 &
+
+VAULT_PID=$!
+BACKGROUND_PIDS+=($VAULT_PID)
+echo "  ✓ Started blockapps-vault-proxy-server with PID $VAULT_PID"
+
+# First-time setup (database initialization)
+if [ ! -e .ethereumH/ethconf.yaml ]; then
+    echo "Running first-time setup (database initialization)..."
+    
+    # Create cirrus database
+    echo "  Creating cirrus database..."
+    if ! PGPASSWORD=api createdb -h localhost -U postgres cirrus 2>/dev/null; then
+        echo "  Warning: cirrus database may already exist or PostgreSQL not ready"
+    fi
+    
+    # Run STRATO setup
+    echo "  Running strato-setup..."
+    if ! command -v strato-setup &> /dev/null; then
+        echo "ERROR: strato-setup not found in PATH"
+        exit 1
+    fi
+    
+    if strato-setup -p api -K localhost --network=helium --apiIPAddress="$STRATO_IP" > logs/strato-setup 2>&1; then
+        echo "  ✓ First-time setup completed successfully"
+    else
+        echo "ERROR: strato-setup failed. Check logs/strato-setup for details"
+        exit 1
+    fi
+else
+    echo "Existing deployment detected (.ethereumH/ethconf.yaml found)"
+    echo "  Skipping first-time setup"
+fi
+
+# Start main STRATO processes via convoke
+echo "Starting main STRATO processes (convoke)..."
+if ! command -v convoke &> /dev/null; then
+    echo "ERROR: convoke not found in PATH"
+    exit 1
+fi
+
+convoke &
+CONVOKE_PID=$!
+BACKGROUND_PIDS+=($CONVOKE_PID)
+echo "  ✓ Started convoke with PID $CONVOKE_PID"
+
+echo ""
+echo "✓ STRATO platform startup complete!"
+echo "  - Deployment directory: $1"
+echo "  - Vault proxy server PID: $VAULT_PID"
+echo "  - Main processes PID: $CONVOKE_PID"
+echo "  - Logs available in: $(pwd)/logs/"
+echo "  - HTTP endpoint: http://localhost:$HTTP_PORT"
+echo ""
+echo "Press Ctrl+C to shutdown gracefully"
+
+# Wait for convoke to finish or for a signal
+wait $CONVOKE_PID
