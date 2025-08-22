@@ -328,9 +328,8 @@ const BridgeOut: React.FC = () => {
                           <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
                           <span className="text-xs text-gray-500">
-                            {tokenLimitInfo.isUnlimited 
-                              ? "Max: Unlimited" 
-                              : `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.extSymbol}`
+                            { !(tokenLimitInfo.isUnlimited) &&
+                             `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.extSymbol}`
                             }
                           </span>
                         )}
