@@ -45,14 +45,21 @@ export const createRejectionTransaction = async (
   const rejectionTransaction = await protocolKit.createRejectionTransaction(nonce);
   const rejectionHash = await protocolKit.getTransactionHash(rejectionTransaction);
   const signature = await protocolKit.signHash(rejectionHash);
-
-  await apiKit.proposeTransaction({
+  
+  const proposalData = {
     safeAddress,
     safeTransactionData: rejectionTransaction.data,
     safeTxHash: rejectionHash,
     senderAddress: relayer,
     senderSignature: signature.data,
-  });
+  };
+  
+  // Retry once on failure
+  try {
+    await apiKit.proposeTransaction(proposalData);
+  } catch {
+    await apiKit.proposeTransaction(proposalData);
+  }
   
   logInfo(
     "SafeService",
