@@ -2370,6 +2370,7 @@ callBuiltin "uint" args = return $ intBuiltin args
 callBuiltin "int" args = return $ intBuiltin args
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
+callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" args = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)

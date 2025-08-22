@@ -1395,6 +1395,9 @@ byteArgs x = intType' x
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = topType' x
 
+logArgs :: SourceAnnotation Text -> Type'
+logArgs x = topType' x
+
 sha256Args :: SourceAnnotation Text -> Type'
 sha256Args x = topType' x
 
@@ -1501,6 +1504,7 @@ getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] []
 getVarType' "push" ctx = pure $ Function (topType' ctx) (Product [] ctx) ctx [] [] False
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
 getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "log" ctx = pure $ Function (logArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [] [] False

@@ -510,6 +510,7 @@ getVariableOfName name = do
                        "byte",
                        "bytes",
                        "string",
+                       "log",
                        "keccak256",
                        "ripemd160",
                        "modExp",
