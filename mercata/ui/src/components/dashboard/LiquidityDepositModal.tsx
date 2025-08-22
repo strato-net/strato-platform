@@ -242,10 +242,7 @@ const LiquidityDepositModal = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
         <DialogHeader>
-                      <DialogTitle>
-              Deposit Liquidity
-              {lockMode !== 0 && <span className="text-blue-500"> (One-Sided)</span>}
-            </DialogTitle>
+                      <DialogTitle>Deposit Liquidity</DialogTitle>
           <DialogDescription>
             Add liquidity to the {selectedPool?._name} pool.
           </DialogDescription>
@@ -350,7 +347,7 @@ const LiquidityDepositModal = ({
             </div>
 
             {/* Magnet Toggle */}
-            <div className="flex justify-center py-2">
+            <div className="flex justify-center items-center py-2 gap-2">
               <button
                 type="button"
                 aria-label="toggle single-sided mode"
@@ -366,6 +363,9 @@ const LiquidityDepositModal = ({
                   <circle cx="12" cy="14" r="1"/>
                 </svg>
               </button>
+              {lockMode !== 0 && (
+                <span className="text-blue-500 text-sm font-medium">Single Asset Deposit</span>
+              )}
             </div>
 
             {/* Second Token */}
