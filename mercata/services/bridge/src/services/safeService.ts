@@ -1,19 +1,21 @@
 import SafeApiKit from "@safe-global/api-kit";
-import { logError } from "../utils/logger";
+import { logError, logInfo } from "../utils/logger";
 import { SafeTransactionResult, NonEmptyArray, Withdrawal } from "../types";
 import {
   CallCache,
   validateAndGroupWithdrawals,
   processChainWithdrawals,
+  initializeSafeForChain,
 } from "../utils/safeHelper";
+import { config } from "../config";
 
 export const createSafeTransactionsForWithdrawals = async (
   withdrawals: NonEmptyArray<Withdrawal>,
-): Promise<SafeTransactionResult[]> => {
+): Promise<{ safeTxHash: string; nonce: number }[]> => {
   const withdrawalsByChain = validateAndGroupWithdrawals(withdrawals);
   const callCache = new CallCache();
 
-  const allSafeTxs: SafeTransactionResult[] = [];
+  const allSafeTxs: { safeTxHash: string; nonce: number }[] = [];
 
   for (const [chainId, chainWithdrawals] of withdrawalsByChain) {
     const chainSafeTxs = await processChainWithdrawals(
@@ -24,7 +26,38 @@ export const createSafeTransactionsForWithdrawals = async (
     allSafeTxs.push(...chainSafeTxs);
   }
 
+  logInfo(
+    "SafeService",
+    `Created ${allSafeTxs.length} Safe transactions for ${withdrawals.length} withdrawals`,
+  );
+
   return allSafeTxs;
+};
+
+export const createRejectionTransaction = async (
+  chainId: number,
+  nonce: number,
+): Promise<void> => {
+  const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
+  const safeAddress = config.safe.address || "";
+  const relayer = config.safe.safeOwnerAddress || "";
+  
+  const rejectionTransaction = await protocolKit.createRejectionTransaction(nonce);
+  const rejectionHash = await protocolKit.getTransactionHash(rejectionTransaction);
+  const signature = await protocolKit.signHash(rejectionHash);
+
+  await apiKit.proposeTransaction({
+    safeAddress,
+    safeTransactionData: rejectionTransaction.data,
+    safeTxHash: rejectionHash,
+    senderAddress: relayer,
+    senderSignature: signature.data,
+  });
+  
+  logInfo(
+    "SafeService",
+    `Created rejection transaction for Safe ${safeAddress} with nonce ${nonce}`,
+  );
 };
 
 export const monitorSafeTransactionStatus = async (
