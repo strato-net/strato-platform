@@ -1,29 +1,138 @@
 #!/usr/bin/env bash
 
-if [ "$1" == "" ]
-then
-	echo "You need to specify the node to wipe: ./wipe <node directory>"
-	exit;
+# STRATO Platform Force Wipe Script
+# 
+# This script performs a complete cleanup of the STRATO platform by:
+# 1. Deleting the specified deployment directory
+# 2. Killing and removing all Docker containers
+# 3. Removing all Docker volumes (persistent data)
+# 4. Terminating all STRATO processes
+#
+# Usage: ./forceWipe <deployment_directory>
+# Example: ./forceWipe mynode
+#
+# WARNING: This is a destructive operation that cannot be undone!
+# 
+# Related: https://github.com/blockapps/strato-platform/issues/4528
+
+set -e  # Exit immediately if any command fails
+
+# Validate that deployment directory parameter is provided
+if [ "$1" = "" ]; then
+	echo -e "Syntax error: ./forceWipe needs a parameter to define the deployment directory\nA common example would be ./forceWipe mynode."
+	exit 1
 fi
 
-if [ ! -e "$1" -o ! -e "$1/.ethereumH" -o ! -e "$1/.ethereumH/ethconf.yaml" -o ! -e "$1/genesis.json" ]
-then
-	echo "There is no node at $1"
-	exit;
+# Comprehensive safety checks to prevent system damage
+echo "Performing safety checks..."
+
+case "$1" in
+	# Block critical system directories
+	"/" | "/bin" | "/boot" | "/dev" | "/etc" | "/home" | "/lib" | "/lib64" | "/opt" | "/proc" | "/root" | "/sbin" | "/sys" | "/tmp" | "/usr" | "/var")
+		echo -e "ERROR: Cannot delete system directory '$1'\nThis would damage your operating system."
+		exit 1
+		;;
+	# Block absolute paths for safety
+	/*)
+		echo -e "ERROR: Absolute paths are not allowed for safety reasons.\nPlease use a relative path like 'mynode' instead of '$1'"
+		exit 1
+		;;
+	# Block path traversal attempts
+	*..*)
+		echo -e "ERROR: Path traversal (..) is not allowed for safety reasons.\nPath: '$1'"
+		exit 1
+		;;
+	# Block empty paths (redundant but explicit)
+	"")
+		echo -e "ERROR: Empty path detected"
+		exit 1
+		;;
+esac
+
+# Verify we're in the correct directory (strato-platform root)
+# Check for STRATO-specific directory structure
+if [[ ! -d "strato" ]] || [[ ! -d "strato/core" ]] || [[ ! -d "strato/api" ]]; then
+	echo -e "ERROR: This script must be run from the strato-platform root directory"
+	echo -e "Expected STRATO directories not found: strato/core, strato/api"
+	exit 1
 fi
 
-echo 
+# Additional check: verify parent directory name contains 'strato'
+current_dir=$(basename "$(pwd)")
+if [[ ! "$current_dir" =~ strato ]]; then
+	echo -e "WARNING: Current directory name '$current_dir' doesn't contain 'strato'"
+	echo -e "Are you sure you're in the strato-platform directory? (y/N)"
+	read -r dir_confirmation
+	if [[ "$dir_confirmation" != "y" && "$dir_confirmation" != "Y" ]]; then
+		echo "Operation cancelled for safety."
+		exit 0
+	fi
+fi
 
+# Final user confirmation before destructive operations
+echo "About to delete deployment directory: $1"
+echo "Are you sure? This cannot be undone. (y/N)"
+read -r confirmation
+if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
+	echo "Operation cancelled."
+	exit 0
+fi
 
-read -p "Warning!  This script is about to delete everything in the \"$1\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).  Click "Y" to proceed. [y/N]: " choice
-
-if [[ "$choice" == "Y" || "$choice" == "y" ]]; then
-    echo "You chose Yes. Continuing..."
+# Delete the deployment directory
+echo "Deleting deployment directory: $1"
+if [[ -d "$1" ]]; then
+	rm -rf "$1"
+	echo "✓ Deleted directory: $1"
 else
-    echo "Exiting script without wiping the node."
-    exit 1
+	echo "ℹ Directory '$1' does not exist, skipping deletion"
 fi
 
-docker compose -p strato down -v -t 0 --remove-orphans
+# Kill and remove all STRATO Docker containers
+echo "Killing and removing all Docker containers:"
+containers="strato-nginx-1 strato-mercata-ui-1 strato-smd-1 strato-mercata-backend-1 strato-kafka-1 strato-apex-1 strato-postgrest-1 strato-postgres-1 strato-prometheus-1 strato-docs-1 strato-zookeeper-1 strato-redis-1"
 
-rm -rf $1
+for container in $containers; do
+	if docker ps -a --format "table {{.Names}}" | grep -q "^${container}$"; then
+		echo "  Killing container: $container"
+		docker kill "$container" 2>/dev/null || echo "    Warning: Could not kill $container (may already be stopped)"
+		echo "  Removing container: $container"
+		docker rm "$container" 2>/dev/null || echo "    Warning: Could not remove $container"
+	else
+		echo "  Container $container not found, skipping"
+	fi
+done
+
+# Remove all STRATO Docker volumes (persistent data)
+echo "Removing all Docker volumes:"
+volumes="strato_kafkadata strato_pgdata strato_prometheusdata strato_redisdata strato_zookeeperdata"
+
+for volume in $volumes; do
+	if docker volume ls --format "table {{.Name}}" | grep -q "^${volume}$"; then
+		echo "  Removing volume: $volume"
+		docker volume rm "$volume" 2>/dev/null || echo "    Warning: Could not remove volume $volume"
+	else
+		echo "  Volume $volume not found, skipping"
+	fi
+done
+
+# Terminate all STRATO processes
+echo "Killing all STRATO processes:"
+processes="strato-api strato-p2p strato-sequencer blockapps-vault-proxy-server"
+
+for process in $processes; do
+	if pgrep -f "$process" > /dev/null; then
+		echo "  Killing process: $process"
+		pkill -f "$process" 2>/dev/null || echo "    Warning: Could not kill $process"
+	else
+		echo "  Process $process not running, skipping"
+	fi
+done
+
+echo ""
+echo "✓ Force wipe completed successfully!"
+echo "  - Deployment directory '$1' has been deleted"
+echo "  - All Docker containers have been stopped and removed"
+echo "  - All Docker volumes have been removed"
+echo "  - All STRATO processes have been terminated"
+echo ""
+echo "You can now run './start $1' to create a fresh deployment."
