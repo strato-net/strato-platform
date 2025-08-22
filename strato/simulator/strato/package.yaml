@@ -72,8 +72,6 @@ dependencies:
 library:
   source-dirs: 
     - src
-  other-modules:
-    - Paths_smd_ui_hs
   dependencies:
     - aeson
     - bytestring
