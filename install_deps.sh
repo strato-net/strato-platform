@@ -78,15 +78,16 @@ show_package_version() {
 }
 
 # Function to build secp256k1 from BlockApps custom source
-# Note: Platform-specific build tools (autoconf, libtool, make) must be installed before calling this function
+#
+# For secp256k1, we are currently dependent on our own custom version,
+# which we have to build from source.  We would really like to move to
+# vanilla 0.7.0, but it would require a further hard fork and we're
+# rushing for code freeze, so need a stable network more than to
+# resolve this version issue.
+#
+# Note: Platform-specific build tools (autoconf, libtool, make) must
+# be installed before calling this function.
 build_secp256k1() {
-    echo "Building secp256k1 from BlockApps custom source..."
-    
-    # For secp256k1, we are currently dependent on our own custom version,
-    # which we have to build from source.  We would really like to move to
-    # vanilla 0.7.0, but it would require a further hard fork and we're
-    # rushing for code freeze, so need a stable network more than to
-    # resolve this version issue.
     git clone https://github.com/blockapps/secp256k1
     cd secp256k1
     git checkout c6b6090ef6feca10e5f82b557112523275fa76c7
