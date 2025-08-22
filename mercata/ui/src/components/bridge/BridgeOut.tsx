@@ -82,7 +82,7 @@ const BridgeOut: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [selectedToken, getBalance]);
+  }, [selectedToken]);
 
   const validateAmount = (value: string): boolean => {
     if (!value) {
