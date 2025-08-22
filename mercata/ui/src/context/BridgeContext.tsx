@@ -136,6 +136,19 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  const getTokenLimit = useCallback(
+    async (tokenAddress: string) => {
+      try {
+        const { data } = await api.get(`/bridge/tokenLimit/${tokenAddress}`);
+        return data;
+      } catch (e) {
+        setError("Failed to fetch token limit");
+        throw e;
+      }
+    },
+    [],
+  );
+
   const fetchDepositTransactions = useCallback(
     async (rawParams: Record<string, string | undefined> = {}): Promise<BridgeTransactionResponse> => {
       setLoading(true);
@@ -207,6 +220,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         selectedToken,
         bridgeOut,
         getBalance,
+        getTokenLimit,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
         loadNetworksAndTokens,

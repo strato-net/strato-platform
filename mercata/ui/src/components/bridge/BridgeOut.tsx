@@ -34,6 +34,12 @@ interface Token {
   extDecimals: string;
 }
 
+interface TokenLimitInfo {
+  maxPerTx: string;
+  isUnlimited: boolean;
+  loading: boolean;
+}
+
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
@@ -41,6 +47,7 @@ const BridgeOut: React.FC = () => {
   const {
     bridgeOut: bridgeOutAPI,
     getBalance,
+    getTokenLimit,
     bridgeableTokens,
     availableNetworks,
     selectedNetwork,
@@ -55,6 +62,11 @@ const BridgeOut: React.FC = () => {
   const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [tokenLimitInfo, setTokenLimitInfo] = useState<TokenLimitInfo>({
+    maxPerTx: "0",
+    isUnlimited: false,
+    loading: false,
+  });
 
   // Set initial network selection
   useEffect(() => {
@@ -84,6 +96,24 @@ const BridgeOut: React.FC = () => {
     };
   }, [selectedToken, getBalance]);
 
+  // Fetch token limits when token is selected
+  useEffect(() => {
+    if (!selectedToken?.stratoTokenAddress) return;
+    
+    let mounted = true;
+    setTokenLimitInfo(prev => ({ ...prev, loading: true }));
+    
+    getTokenLimit(selectedToken.stratoTokenAddress)
+      .then(tokenLimit => mounted && setTokenLimitInfo({
+        maxPerTx: tokenLimit.maxPerTx || "0",
+        isUnlimited: tokenLimit.isUnlimited || false,
+        loading: false,
+      }));
+
+    return () => { mounted = false; };
+  }, [selectedToken, getTokenLimit]);
+
+  // Validate amount against balance and token limits
   const validateAmount = (value: string): boolean => {
     if (!value) {
       setAmountError("");
@@ -288,8 +318,24 @@ const BridgeOut: React.FC = () => {
             ) : (
               tokenBalance && (
                 <div className="space-y-2">
-                  <div className="text-sm text-gray-500">
-                    Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm text-gray-500">
+                      Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
+                    </p>
+                    {selectedToken && (
+                      <div className="flex items-center gap-1">
+                        {tokenLimitInfo.loading ? (
+                          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                        ) : (
+                          <span className="text-xs text-gray-500">
+                            {tokenLimitInfo.isUnlimited 
+                              ? "Max: Unlimited" 
+                              : `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.extSymbol}`
+                            }
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   {selectedToken?.extSymbol && (
                     <div className="text-sm">
@@ -325,6 +371,7 @@ const BridgeOut: React.FC = () => {
         <p>• Bridge assets between STRATO and external networks</p>
         <p>• Small bridge fee applies</p>
         <p>• Transaction time varies by network congestion</p>
+        <p>• Maximum transfer limits apply per token</p>
       </div>
 
       <div className="flex justify-end gap-4">
@@ -336,7 +383,8 @@ const BridgeOut: React.FC = () => {
               !selectedToken ||
               !isConnected ||
               amountError ||
-              !selectedNetwork,
+              !selectedNetwork ||
+              tokenLimitInfo.loading,
           )}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
@@ -382,6 +430,11 @@ const BridgeOut: React.FC = () => {
                     : amount}{" "}
                   {selectedToken?.extName} ({selectedToken?.extSymbol}) on{" "}
                   {selectedNetwork || "selected"} network
+                </p>
+              )}
+              {!tokenLimitInfo.isUnlimited && tokenLimitInfo.maxPerTx !== "0" && (
+                <p className="text-orange-600 text-sm">
+                  Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.extSymbol}
                 </p>
               )}
             </div>
