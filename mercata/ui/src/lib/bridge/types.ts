@@ -29,6 +29,10 @@ export interface BridgeOutParams {
 
 export interface BalanceResponse {
   balance: string;
+  tokenLimit?: {
+    maxPerTx: string;
+    isUnlimited: boolean;
+  };
 }
 
 export interface BridgeResponse {
@@ -87,7 +91,6 @@ export type BridgeContextType = {
   selectedToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
-  getTokenLimit: (tokenAddress: string) => Promise<any>;
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: Token | null) => void;
   loadNetworksAndTokens: () => Promise<void>;

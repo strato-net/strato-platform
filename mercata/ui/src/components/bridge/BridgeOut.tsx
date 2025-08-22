@@ -47,7 +47,6 @@ const BridgeOut: React.FC = () => {
   const {
     bridgeOut: bridgeOutAPI,
     getBalance,
-    getTokenLimit,
     bridgeableTokens,
     availableNetworks,
     selectedNetwork,
@@ -80,14 +79,32 @@ const BridgeOut: React.FC = () => {
     const fetch = async () => {
       if (!selectedToken?.stratoTokenAddress) return;
       setIsBalanceLoading(true);
+      setTokenLimitInfo(prev => ({ ...prev, loading: true }));
       try {
-        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
+        const balanceResponse = await getBalance(selectedToken.stratoTokenAddress);
+        const { balance, tokenLimit } = balanceResponse;
         const formatted = formatBalance(balance);
-        if (mounted) setTokenBalance(formatted);
+        if (mounted) {
+          setTokenBalance(formatted);
+          setTokenLimitInfo({
+            maxPerTx: tokenLimit?.maxPerTx || "0",
+            isUnlimited: tokenLimit?.isUnlimited || false,
+            loading: false,
+          });
+        }
       } catch {
-        if (mounted) setTokenBalance("0");
+        if (mounted) {
+          setTokenBalance("0");
+          setTokenLimitInfo({
+            maxPerTx: "0",
+            isUnlimited: false,
+            loading: false,
+          });
+        }
       } finally {
-        if (mounted) setIsBalanceLoading(false);
+        if (mounted) {
+          setIsBalanceLoading(false);
+        }
       }
     };
     fetch();
@@ -95,23 +112,6 @@ const BridgeOut: React.FC = () => {
       mounted = false;
     };
   }, [selectedToken, getBalance]);
-
-  // Fetch token limits when token is selected
-  useEffect(() => {
-    if (!selectedToken?.stratoTokenAddress) return;
-    
-    let mounted = true;
-    setTokenLimitInfo(prev => ({ ...prev, loading: true }));
-    
-    getTokenLimit(selectedToken.stratoTokenAddress)
-      .then(tokenLimit => mounted && setTokenLimitInfo({
-        maxPerTx: tokenLimit.maxPerTx || "0",
-        isUnlimited: tokenLimit.isUnlimited || false,
-        loading: false,
-      }));
-
-    return () => { mounted = false; };
-  }, [selectedToken, getTokenLimit]);
 
   // Validate amount against balance and token limits
   const validateAmount = (value: string): boolean => {
@@ -329,7 +329,7 @@ const BridgeOut: React.FC = () => {
                         ) : (
                           <span className="text-xs text-gray-500">
                             { !(tokenLimitInfo.isUnlimited) &&
-                             `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.extSymbol}`
+                             `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.stratoTokenSymbol}`
                             }
                           </span>
                         )}
@@ -431,7 +431,7 @@ const BridgeOut: React.FC = () => {
                   {selectedNetwork || "selected"} network
                 </p>
               )}
-              {!tokenLimitInfo.isUnlimited && tokenLimitInfo.maxPerTx !== "0" && (
+              {!tokenLimitInfo.isUnlimited &&  (
                 <p className="text-orange-600 text-sm">
                   Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.extSymbol}
                 </p>

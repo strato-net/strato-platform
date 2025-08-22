@@ -10,7 +10,7 @@ router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridg
 // ----- Bridge Configuration -----
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
-router.get("/tokenLimit/:tokenAddress", authHandler.authorizeRequest(false), BridgeController.getTokenLimit);
+
 
 // ----- Bridge Transactions -----
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
