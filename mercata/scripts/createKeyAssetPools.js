@@ -50,10 +50,10 @@ require("dotenv").config();
   };
 
   const amounts = {
-    ETHST : process.env.AMT_ETHST  || "3858150000000000000",   // 3.85815 ETH
-    WBTCST: process.env.AMT_WBTCST || "91590000000000000",     // 0.09159 BTC
-    GOLDST: process.env.AMT_GOLDST || "2988870000000000000",   // 2.98887 GOLD
-    SILVST: process.env.AMT_SILVST || "269235000000000000000", // 269.235 SILV
+    ETHST : process.env.AMT_ETHST  || "2229987534369683200",    // ~2.23 ETH
+    WBTCST: process.env.AMT_WBTCST || "87076156806743168",      // ~0.0871 BTC
+    GOLDST: process.env.AMT_GOLDST || "3003733640915658240",    // ~3.00 GOLD
+    SILVST: process.env.AMT_SILVST || "263088660878716141568",  // ~263.09 SILV
   };
 
   const DEP_USD = process.env.DEPOSIT_USDST || "10000000000000000000000"; // 10 000 * 1e18 = 1e22
