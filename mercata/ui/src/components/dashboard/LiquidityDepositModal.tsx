@@ -49,6 +49,7 @@ const LiquidityDepositModal = ({
 }: LiquidityDepositModalProps) => {
   const [token1Amount, setToken1Amount] = useState('');
   const [token2Amount, setToken2Amount] = useState('');
+  const [lockMode, setLockMode] = useState<0 | 1 | 2>(0); // 0 = none, 1 = lock bottom, 2 = lock top
   const [depositLoading, setDepositLoading] = useState(false);
   const [tokenABalance, setTokenABalance] = useState('');
   const [tokenBBalance, setTokenBBalance] = useState('');
@@ -65,6 +66,20 @@ const LiquidityDepositModal = ({
       token: 'token1'
     },
   });
+
+  // Cycle lock mode handler
+  const toggleLockMode = () => {
+    setLockMode((prev) => ((prev + 1) % 3) as 0 | 1 | 2);
+  };
+
+  // Sync amounts when lock mode changes
+  useEffect(() => {
+    if (lockMode === 1) {
+      setToken2Amount('0');
+    } else if (lockMode === 2) {
+      setToken1Amount('0');
+    }
+  }, [lockMode]);
 
   useEffect(() => {
     if (selectedPool && isOpen) {
@@ -89,6 +104,10 @@ const LiquidityDepositModal = ({
       fetchBalances();
     }
   }, [selectedPool, isOpen, fetchTokenBalances, userAddress, toast]);
+
+  useEffect(() => {
+    console.log('[Deposit Modal] tokenA amount:', token1Amount, 'tokenB amount:', token2Amount);
+  }, [token1Amount, token2Amount]);
 
   const handleClose = () => {
     setToken1Amount('');
@@ -183,6 +202,7 @@ const LiquidityDepositModal = ({
       if (token === 'token1') {
         setToken1Amount(value);
         if (
+          lockMode !== 1 && // only update token2 when it is NOT locked
           value &&
           selectedPool?.aToBRatio &&
           BigInt(safeParseUnits(selectedPool.aToBRatio, 18)) > BigInt(0)
@@ -195,6 +215,7 @@ const LiquidityDepositModal = ({
       } else {
         setToken2Amount(value);
         if (
+          lockMode !== 2 &&
           value &&
           selectedPool?.bToARatio &&
           BigInt(safeParseUnits(selectedPool.bToARatio, 18)) > BigInt(0)
@@ -234,10 +255,11 @@ const LiquidityDepositModal = ({
               <div className="flex items-center gap-2">
                 <Input
                   disabled={balanceLoading}
+                  readOnly={lockMode === 2}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                    safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
-                  }`}
+                    safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""}
+                     ${lockMode === 2 ? 'text-gray-400' : ''}`}
                   value={token1Amount}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -324,6 +346,18 @@ const LiquidityDepositModal = ({
               })()}
             </div>
 
+            {/* Magnet Toggle */}
+            <div className="flex justify-center py-2">
+              <button
+                type="button"
+                aria-label="toggle single-sided mode"
+                onClick={toggleLockMode}
+                className="p-2 rounded-full hover:bg-gray-200 focus:outline-none"
+              >
+                <span className={`text-2xl ${lockMode === 0 ? 'text-gray-400' : 'text-blue-500'}`}>🧲</span>
+              </button>
+            </div>
+
             {/* Second Token */}
             <div className="rounded-lg border p-3">
               <div className="flex justify-between mb-2">
@@ -332,12 +366,14 @@ const LiquidityDepositModal = ({
               <div className="flex items-center gap-2">
                 <Input
                   disabled={balanceLoading}
+                  readOnly={lockMode === 1}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
-                  }`}
+                  } ${lockMode === 1 ? 'text-gray-400' : ''}`}
                   value={token2Amount}
                   onChange={(e) => {
+                    if (lockMode === 1) return;
                     const value = e.target.value;
                     if (value === '' || /^\d*\.?\d*$/.test(value)) {
                       if (value === '.') {

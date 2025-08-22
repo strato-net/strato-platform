@@ -174,6 +174,56 @@ export const addLiquidity = async (
   }
 };
 
+export const addLiquiditySingleToken = async (
+  accessToken: string,
+  params: {
+    poolAddress: string;
+    isAToB: boolean;
+    amountIn: string;
+    deadline: number;
+  }
+) => {
+  try {
+    const { poolAddress, isAToB, amountIn, deadline } = params;
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + poolAddress,
+      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+    });
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
+    const tokenAddress = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: tokenAddress || "",
+        method: "approve",
+        args: { spender: poolAddress || "", value: amountIn || "" },
+      },
+      {
+        contractName: extractContractName(Pool),
+        contractAddress: poolAddress || "",
+        method: "addLiquiditySingleToken",
+        args: {
+          isAToB,
+          amountIn,
+          deadline,
+        },
+      },
+    ]);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
 export const removeLiquidity = async (
   accessToken: string,
   removeLiquidityParams: {

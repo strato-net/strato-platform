@@ -50,13 +50,33 @@ export function validateCreatePoolsArgs(args: any) {
 
 export function validateAddLiquidityArgs(args: any) {
   const schema = Joi.object({
-    tokenBAmount: numericStringField("TokenBAmount"),
-    maxTokenAAmount: numericStringField("MaxTokenAAmount"),
-  });
+    tokenBAmount: numericStringField("TokenBAmount", { allowZero: true }),
+    maxTokenAAmount: numericStringField("MaxTokenAAmount", { allowZero: true }),
+  }).custom((value, helpers) => {
+    const tokenBZero = value.tokenBAmount === "0" || value.tokenBAmount === 0;
+    const tokenAZero = value.maxTokenAAmount === "0" || value.maxTokenAAmount === 0;
+
+    if (tokenBZero && tokenAZero) {
+      return helpers.error("object.missing");
+    }
+    return value;
+  }, "At least one amount must be greater than zero");
 
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Add Liquidity Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateAddSingleLiquidityArgs(args: any) {
+  const schema = Joi.object({
+    isAToB: Joi.boolean().required(),
+    amountIn: numericStringField("AmountIn"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Add Single Liquidity Argument Validation Error: " + error.message);
   }
 }
 

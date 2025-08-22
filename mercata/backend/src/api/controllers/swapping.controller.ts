@@ -10,6 +10,7 @@ import {
   calculateSwapReverse,
   getSwapHistory,
   setPoolRates,
+  addLiquiditySingleToken,
 } from "../services/swapping.service";
 import { getBalance } from "../services/tokens.service";
 import {
@@ -24,6 +25,7 @@ import {
   validateCalculateSwapArgs,
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
+  validateAddSingleLiquidityArgs,
 } from "../validators/swapping.validator";
 
 class SwappingController {
@@ -91,14 +93,31 @@ class SwappingController {
     validateAddLiquidityArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const liquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
 
-    const result = await addLiquidity(accessToken, liquidityParams);
-    res.status(200).json(result);
+    const isSingle = [body.tokenBAmount, body.maxTokenAAmount].some(
+      (v) => v === "0" || v === 0
+    );
+
+    if (isSingle) {
+      const isAToB = body.tokenBAmount === "0" || body.tokenBAmount === 0;
+      const amountIn = isAToB ? body.maxTokenAAmount : body.tokenBAmount;
+
+      const result = await addLiquiditySingleToken(accessToken, {
+        poolAddress: params.poolAddress,
+        isAToB,
+        amountIn,
+        deadline,
+      } as any);
+      res.status(200).json(result);
+    } else {
+      const result = await addLiquidity(accessToken, {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline,
+      });
+      res.status(200).json(result);
+    }
+
     return next();
   }
 
@@ -291,6 +310,22 @@ class SwappingController {
     } catch (error) {
       next(error);
     }
+  }
+
+  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction) {
+    const { accessToken, body, params } = req;
+    validateAddSingleLiquidityArgs(body);
+
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+    const liquidityParams = {
+      ...body,
+      poolAddress: params.poolAddress,
+      deadline
+    };
+
+    const result = await addLiquiditySingleToken(accessToken, liquidityParams as any);
+    res.status(200).json(result);
+    return next();
   }
 }
 
