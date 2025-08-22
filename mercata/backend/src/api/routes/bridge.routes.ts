@@ -12,7 +12,7 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 router.get("/tokenLimit/:tokenAddress", authHandler.authorizeRequest(false), BridgeController.getTokenLimit);
 
-// ----- Bridge Status -----
-router.get("/status/:status", authHandler.authorizeRequest(), BridgeController.getBridgeStatus);
+// ----- Bridge Transactions -----
+router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
 
 export default router;

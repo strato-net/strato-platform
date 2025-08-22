@@ -605,19 +605,6 @@ const BridgeIn: React.FC = () => {
           disabled={!isConnected || isBalanceLoading}
         />
         
-        {/* Display minimum deposit amount */}
-        {selectedToken && selectedNetworkConfig && (
-          <div className="flex items-center gap-2 mt-1">
-            {minDepositInfo.loading ? (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-            ) : (
-              <span className="text-xs text-gray-500">
-                Minimum deposit: {minDepositInfo.amount} {selectedToken.extSymbol}
-              </span>
-            )}
-          </div>
-        )}
-        
         {errors.amount && (
           <p className="text-sm text-red-500">{errors.amount}</p>
         )}
@@ -645,9 +632,22 @@ const BridgeIn: React.FC = () => {
             </div>
           ) : tokenBalance ? (
             <div className="space-y-2 mt-1">
-              <p className="text-sm text-gray-500">
-                Balance: {tokenBalance} {selectedToken?.extSymbol}
-              </p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-500">
+                  Balance: {tokenBalance} {selectedToken?.extSymbol}
+                </p>
+                {selectedToken && selectedNetworkConfig && (
+                  <div className="flex items-center gap-1">
+                    {minDepositInfo.loading ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        Min: {minDepositInfo.amount} {selectedToken.extSymbol}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               {selectedToken?.stratoTokenSymbol && amount && (
                 <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
                   You will receive ≈ {amount} {selectedToken.stratoTokenName} (

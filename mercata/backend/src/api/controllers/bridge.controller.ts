@@ -2,11 +2,12 @@ import { Request, Response, NextFunction } from "express";
 import { 
   bridgeOut, 
   getBridgeableTokens,
-  getNetworkConfigs, 
-  getBridgeStatus,
+  getNetworkConfigs,
+  getBridgeTransactions,
   getTokenLimit
 } from "../services/bridge.service";
-import { validateBridgeOut } from "../validators/bridge.validators";
+import { validateBridgeOut, validateTransactionType } from "../validators/bridge.validators";
+import { validateRawParams } from "../validators/common.validators";
 
 class BridgeController {
   static async bridgeOut(
@@ -64,24 +65,18 @@ class BridgeController {
     }
   }
 
-  static async getBridgeStatus(
+  static async getTransactions(
     req: Request,
     res: Response,
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const { status } = req.params;
-
-      const result = await getBridgeStatus(
-        accessToken,
-        req.address,
-        {
-          status,
-          ...req.query
-        }
-      );
-
+      const { accessToken, address } = req;
+      const { type } = req.params;
+      const queryParams = validateRawParams(req.query);
+      
+      const validatedType = validateTransactionType(type);
+      const result = await getBridgeTransactions(accessToken, validatedType, address, queryParams);
       res.json(result);
     } catch (error: any) {
       next(error);

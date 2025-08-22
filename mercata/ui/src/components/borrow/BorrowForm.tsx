@@ -77,7 +77,19 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     handlePollingUpdate(percentageAmount);
   };
 
-  const handleBorrow = () => {
+  const handleBorrow = async () => {
+    const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
+    const wei = safeParseUnits(borrowAmount || "0", 18);
+
+    // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
+    if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
+      onBorrow('ALL');
+      setBorrowAmount("");
+      setBorrowDisplayAmount("");
+      handlePollingUpdate("");
+      return;
+    }
+
     onBorrow(borrowAmount);
     setBorrowAmount("");
     setBorrowDisplayAmount("");

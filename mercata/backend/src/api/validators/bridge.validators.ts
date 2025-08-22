@@ -44,3 +44,15 @@ export function validateBridgeOut(args: any) {
     throw new Error("BridgeOut Argument Validation Error: " + error.message);
   }
 }
+
+export function validateTransactionType(type: string): 'withdrawal' | 'deposit' {
+  if (!type || typeof type !== 'string') {
+    throw new Error("Transaction type is required and must be a string");
+  }
+
+  if (!['withdrawal', 'deposit'].includes(type)) {
+    throw new Error("Invalid transaction type. Must be 'withdrawal' or 'deposit'");
+  }
+
+  return type as 'withdrawal' | 'deposit';
+}
