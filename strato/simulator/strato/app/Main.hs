@@ -19,5 +19,5 @@ main = do
       putStrLn "Starting native window interface..."
       runStrato Native.run
     else do
-      putStrLn "Starting browser-based interface..."
+      putStrLn $ "Starting browser-based interface on port " ++ show flags_frontend_port ++ "..."
       runStrato $ Browser.run flags_frontend_port
