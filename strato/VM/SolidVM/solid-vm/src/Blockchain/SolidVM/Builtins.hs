@@ -50,7 +50,7 @@ modExp b e m =
 
 point :: (Integer, Integer) -> Point Weierstrass Affine BN254 Fq Fr
 point (x, y) =
-  if x == 0 || y == 0
+  if x == 0 && y == 0
     then O
     else A (fromInteger x :: Fq) (fromInteger y :: Fq)
 
