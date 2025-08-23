@@ -2402,28 +2402,22 @@ callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
 callBuiltin "ecMul" [SInteger x1, SInteger y1, SInteger s] =
   let (x, y) = Builtins.ecMul (x1, y1) s
    in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecPairing" [SVariadic xys] =
-  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
+callBuiltin "ecPairing" [SVariadic xs] =
+  let go (SInteger x : xs') = (x:) <$> go xs'
       go []   = Right []
-      go xys' = Left xys'
-   in case go xys of
+      go xs' = Left xs'
+   in case go xs of
         Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xys' -> typeError "invalid args passed to ecPairing" xys'
-callBuiltin "ecPairing" [SArray xys] = do
-  let go (x : y : xys') = ((x,y):) <$> go xys'
+        Left xs' -> typeError "invalid args passed to ecPairing" xs'
+callBuiltin "ecPairing" [SArray xs] =
+  SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
+callBuiltin "ecPairing" xs =
+  let go (SInteger x : xs') = (x:) <$> go xs'
       go []   = Right []
-      go xys' = Left xys'
-  intArray <- traverse getInt $ V.toList xys
-  case go intArray of
-    Right points -> pure . SBool $ Builtins.ecPairing points
-    Left xys' -> typeError "invalid args passed to ecPairing" xys'
-callBuiltin "ecPairing" xys =
-  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
-      go []   = Right []
-      go xys' = Left xys'
-   in case go xys of
+      go xs' = Left xs'
+   in case go xs of
         Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xys' -> typeError "invalid args passed to ecPairing" xys'
+        Left xs' -> typeError "invalid args passed to ecPairing" xs'
 callBuiltin ("payable") [SAccount a _] = return $ SAccount a True
 callBuiltin "require" (SBool cond : msg) = do
   case msg of

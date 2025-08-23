@@ -49,8 +49,8 @@ contract Pairing {
             input.push(p1[i].X);
             input.push(p1[i].Y);
             input.push(p2[i].X[0]);
-            input.push(p2[i].Y[0]);
             input.push(p2[i].X[1]);
+            input.push(p2[i].Y[0]);
             input.push(p2[i].Y[1]);
         }
         log("pairing input:",input);
@@ -141,10 +141,10 @@ contract Verifier is Pairing {
              8495653923123431417604973247489272438418190587263600148770280649306958101930]
         );
         vk.delta2 = Pairing.G2Point(
-            [16021317307815603482474275448696407982295372130429793310528863745564466234780,
-             5970046761261105769942933811353444502135313243430340289078054918151108483382],
-            [2483527448770544337921880795631679328186826975317490896314204141659059394536,
-             9247009759127019657901847904966364845766097813536346865340591759097213046766]
+            [12101754203754945271389443532153679833063226400685063301069666849221402992500,
+             14379262679244528034124170835668772583305430352268740321381555841508286014061],
+            [17070125538435644168504004496302943318520261011373627964574760168631649080455,
+             8953145113906301673169150492864629212925115921887262482624722630578005717320]
         );
         vk.IC = new Pairing.G1Point[](3);
         
@@ -175,7 +175,9 @@ contract Verifier is Pairing {
         Pairing.G1Point vk_x = Pairing.G1Point(0, 0);
         for (uint i = 0; i < input.length; i++) {
             require(input[i] < snark_scalar_field,"verifier-gte-snark-scalar-field");
-            vk_x = Pairing.addition(vk_x, Pairing.scalar_mul(vk.IC[i + 1], input[i]));
+            Pairing.G1Point vk_mul = Pairing.scalar_mul(vk.IC[i + 1], input[i]);
+            vk_x = Pairing.addition(vk_x, vk_mul);
+            log("vk_mul " + string(i) + ":",vk_mul);
             log("vk_x " + string(i) + ":",vk_x);
         }
         vk_x = Pairing.addition(vk_x, vk.IC[0]);
@@ -197,7 +199,7 @@ contract Verifier is Pairing {
         ) public view returns (bool r) {
         Proof memory proof;
         proof.A = Pairing.G1Point(a[0], a[1]);
-        proof.B = Pairing.G2Point([b[0][0], b[0][1]], [b[1][0], b[1][1]]);
+        proof.B = Pairing.G2Point([b[0][1], b[0][0]], [b[1][1], b[1][0]]);
         proof.C = Pairing.G1Point(c[0], c[1]);
         uint[] memory inputValues = new uint[](input.length);
         for(uint i = 0; i < input.length; i++){
