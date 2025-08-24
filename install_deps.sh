@@ -216,7 +216,7 @@ Darwin)
     
     # Add to shell profile if not already present
     if ! grep -q "libpq/bin" "$SHELL_PROFILE"; then
-        echo "export PATH=\"$LIBPQ_PATH:\$PATH\"" >> "$SHELL_PROFILE"
+        sudo echo "export PATH=\"$LIBPQ_PATH:\$PATH\"" >> "$SHELL_PROFILE"
         echo "Added libpq to PATH in $SHELL_PROFILE"
     else
         echo "libpq PATH already configured in $SHELL_PROFILE"
