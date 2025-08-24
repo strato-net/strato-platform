@@ -185,6 +185,26 @@ Darwin)
         
         brew install --quiet docker docker-compose colima
         
+        # Ensure Docker CLI is available in PATH
+        if [[ $(uname -m) == "arm64" ]]; then
+            # Apple Silicon Mac
+            export PATH="/opt/homebrew/bin:$PATH"
+        else
+            # Intel Mac
+            export PATH="/usr/local/bin:$PATH"
+        fi
+        
+        # Verify Docker CLI is installed before starting Colima
+        if ! command -v docker >/dev/null 2>&1; then
+            echo "⚠ Docker CLI not found in PATH. Refreshing shell environment..."
+            # Reload Homebrew environment
+            if [[ $(uname -m) == "arm64" ]]; then
+                eval "$(/opt/homebrew/bin/brew shellenv)"
+            else
+                eval "$(/usr/local/bin/brew shellenv)"
+            fi
+        fi
+        
         # Start Colima (Docker runtime for headless systems)
         echo "Starting Colima Docker runtime..."
         colima start --cpu 2 --memory 4 --disk 60
