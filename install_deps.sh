@@ -185,6 +185,9 @@ Darwin)
         
         brew install --quiet docker docker-compose colima
         
+        # Ensure Docker is linked (in case it was installed but not linked)
+        brew link --overwrite docker 2>/dev/null || true
+        
         # Ensure Docker CLI is available in PATH
         if [[ $(uname -m) == "arm64" ]]; then
             # Apple Silicon Mac
@@ -202,6 +205,12 @@ Darwin)
                 eval "$(/opt/homebrew/bin/brew shellenv)"
             else
                 eval "$(/usr/local/bin/brew shellenv)"
+            fi
+            
+            # Try linking Docker again if still not found
+            if ! command -v docker >/dev/null 2>&1; then
+                echo "Attempting to link Docker..."
+                brew link --overwrite docker
             fi
         fi
         
