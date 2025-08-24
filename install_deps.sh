@@ -186,6 +186,56 @@ Darwin)
         pkgconf \
         secp256k1 \
         xz
+
+    # Add libpq to PATH so pg_config can be found
+    # This is needed for Haskell packages that depend on PostgreSQL
+    if [[ $(uname -m) == "arm64" ]]; then
+        # Apple Silicon Mac
+        LIBPQ_PATH="/opt/homebrew/opt/libpq/bin"
+    else
+        # Intel Mac
+        LIBPQ_PATH="/usr/local/opt/libpq/bin"
+    fi
+    
+    # Detect shell and set appropriate profile
+    SHELL_PROFILE=""
+    if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ] || [ "$SHELL" = "/usr/bin/zsh" ]; then
+        SHELL_PROFILE="$HOME/.zshrc"
+    elif [ -n "$BASH_VERSION" ] || [ "$SHELL" = "/bin/bash" ] || [ "$SHELL" = "/usr/bin/bash" ]; then
+        SHELL_PROFILE="$HOME/.bash_profile"
+    else
+        # Default to zsh on macOS (default since Catalina)
+        SHELL_PROFILE="$HOME/.zshrc"
+    fi
+    
+    # Create shell profile if it doesn't exist
+    if [ ! -f "$SHELL_PROFILE" ]; then
+        touch "$SHELL_PROFILE"
+        echo "Created $SHELL_PROFILE"
+    fi
+    
+    # Add to shell profile if not already present
+    if ! grep -q "libpq/bin" "$SHELL_PROFILE"; then
+        sudo echo "export PATH=\"$LIBPQ_PATH:\$PATH\"" >> "$SHELL_PROFILE"
+        echo "Added libpq to PATH in $SHELL_PROFILE"
+    else
+        echo "libpq PATH already configured in $SHELL_PROFILE"
+    fi
+    
+    # Source the profile to make pg_config available immediately
+    if [ -f "$SHELL_PROFILE" ]; then
+        # Export the PATH for the current session
+        export PATH="$LIBPQ_PATH:$PATH"
+        echo "libpq PATH activated for current session"
+        
+        # Verify pg_config is now available
+        if command -v pg_config > /dev/null 2>&1; then
+            echo "✓ pg_config is now available: $(which pg_config)"
+            echo "✓ pg_config version: $(pg_config --version)"
+        else
+            echo "⚠ pg_config still not found. You may need to restart your terminal."
+        fi
+    fi
     ;;
 
 Linux)
