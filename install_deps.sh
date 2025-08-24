@@ -172,8 +172,53 @@ Darwin)
     # Install git
     brew install --quiet git
     
-    # Install Docker Desktop for Mac
-    brew install --quiet --cask docker
+    # Install Docker - detect if GUI is available or if this is headless
+    if [ -n "$SSH_CONNECTION" ] || [ -n "$SSH_CLIENT" ] || [ -z "$DISPLAY" ] || ! command -v osascript >/dev/null 2>&1; then
+        # Headless environment - use Colima
+        echo "Detected headless environment. Installing Docker Engine with Colima..."
+        
+        # Check if Docker Desktop is already installed and warn
+        if [ -d "/Applications/Docker.app" ]; then
+            echo "⚠ Warning: Docker Desktop is installed but this appears to be a headless environment."
+            echo "⚠ Colima and Docker Desktop can conflict. Consider uninstalling Docker Desktop if you encounter issues."
+        fi
+        
+        brew install --quiet docker docker-compose colima
+        
+        # Start Colima (Docker runtime for headless systems)
+        echo "Starting Colima Docker runtime..."
+        colima start --cpu 2 --memory 4 --disk 60
+        
+        # Wait for Docker daemon to be ready
+        echo "Waiting for Docker daemon to start..."
+        timeout=60
+        while [ $timeout -gt 0 ] && ! docker info >/dev/null 2>&1; do
+            echo "Still waiting for Docker... ($timeout seconds remaining)"
+            sleep 5
+            timeout=$((timeout-5))
+        done
+        
+        if docker info >/dev/null 2>&1; then
+            echo "✓ Docker is now running via Colima"
+            echo "Docker version: $(docker --version)"
+            echo "Docker Compose version: $(docker-compose --version)"
+        else
+            echo "⚠ Docker failed to start. You may need to run 'colima start' manually."
+        fi
+    else
+        # GUI environment - use Docker Desktop
+        echo "Detected GUI environment. Installing Docker Desktop..."
+        
+        # Check if Colima is running and warn
+        if command -v colima >/dev/null 2>&1 && colima status >/dev/null 2>&1; then
+            echo "⚠ Warning: Colima is currently running. Docker Desktop and Colima can conflict."
+            echo "⚠ Consider stopping Colima with 'colima stop' before using Docker Desktop."
+        fi
+        
+        brew install --quiet --cask docker
+        echo "✓ Docker Desktop installed. Please start it manually from Applications or Launchpad."
+        echo "Note: Docker Desktop requires manual startup and may need permissions approval."
+    fi
     
     # Install Haskell Stack
     brew install --quiet haskell-stack
