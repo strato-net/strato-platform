@@ -1,7 +1,6 @@
 import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import {
-  getLastProcessedBlock,
   getEnabledChains,
   getEnabledAssets,
 } from "../services/cirrusService";
@@ -91,14 +90,15 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
 };
 
 const pollChainForDeposits = async (chain: any) => {
-  try {
-    const chainId = chain.chainId;
-    const depositRouter = chain.depositRouter;
+  const chainId = chain.chainId;
+  const depositRouter = chain.depositRouter;
+  const lastProcessedBlock = parseInt(chain.lastProcessedBlock) || 0;
+  let currentBlock: number | null = null;
 
-    const lastProcessedBlock = await getLastProcessedBlock(chainId);
+  try {
     if (!isChainConfigured(chainId)) return;
 
-    const currentBlock = await getCurrentBlockNumber(chainId);
+    currentBlock = await getCurrentBlockNumber(chainId);
     if (currentBlock <= lastProcessedBlock) {
       return;
     }
@@ -112,7 +112,6 @@ const pollChainForDeposits = async (chain: any) => {
     );
 
     if (logs.length === 0) {
-      await updateLastProcessedBlock(chainId, currentBlock);
       return;
     }
 
@@ -123,20 +122,26 @@ const pollChainForDeposits = async (chain: any) => {
     );
     const failedParses = validDeposits.length - filteredDeposits.length;
 
-    if (failedParses > 0) {
-      return;
-    }
-
+    // Process valid deposits first
     if (filteredDeposits.length > 0) {
       await depositBatch(filteredDeposits as NonEmptyArray<Deposit>);
     }
 
-    await updateLastProcessedBlock(chainId, currentBlock);
-  } catch (error) {
-    logError("AlchemyPolling", error as Error, {
-      operation: "pollChainForDeposits",
-      chain,
-    });
+    // If there were parse failures, throw error after processing valid ones
+    if (failedParses > 0) {
+      throw new Error(`Failed to parse ${failedParses} out of ${validDeposits.length} deposits for chain ${chainId}`);
+    }
+  } finally {
+    // Always update lastProcessedBlock if we got a currentBlock
+    if (currentBlock !== null && currentBlock > lastProcessedBlock) {
+      try {
+        await updateLastProcessedBlock(chainId, currentBlock);
+      } catch (updateError) {
+        // Enhance error with context before re-throwing
+        const enhancedError = new Error(`updateLastProcessedBlock failed for chain ${chainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
+        throw enhancedError;
+      }
+    }
   }
 };
 
@@ -148,7 +153,17 @@ export const startMultiChainDepositPolling = () => {
       const enabledChains = await getEnabledChains();
       if (enabledChains.length === 0) return;
 
-      await Promise.all(enabledChains.map(pollChainForDeposits));
+      const results = await Promise.allSettled(enabledChains.map(pollChainForDeposits));
+      
+      // Log any errors from individual chain processing
+      results.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          logError("AlchemyPolling", result.reason, {
+            operation: "pollChainForDeposits",
+            chain: enabledChains[index],
+          });
+        }
+      });
     } catch (e: any) {
       logError("AlchemyPolling", e as Error, {
         operation: "startMultiChainDepositPolling",

@@ -1,5 +1,6 @@
 import { decodeErrorResult } from "viem";
-import { DEPOSIT_ROUTER_ABI } from "./constants";
+import { message } from "antd";
+import { DEPOSIT_ROUTER_ABI, SUPPORTED_CHAINS } from "./constants";
 import { BridgeError } from "./types";
 
 /**
@@ -118,6 +119,18 @@ export function formatTxHash(hash: string): string {
 }
 
 /**
+ * Formats a date string for display
+ */
+export function formatDate(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleString();
+  } catch (error) {
+    return dateString;
+  }
+}
+
+/**
  * Creates an explorer URL for a transaction
  */
 export function getExplorerUrl(chainId: string, txHash: string): string {
@@ -144,3 +157,46 @@ export function getExplorerUrl(chainId: string, txHash: string): string {
       return `https://etherscan.io/tx/${txHash}`;
   }
 }
+
+/**
+ * Gets chain name from chain ID
+ */
+export function getChainName(chainId: number): string {
+  const chainEntries = Object.entries(SUPPORTED_CHAINS);
+  const chainEntry = chainEntries.find(([_, id]) => id === chainId);
+  return chainEntry ? chainEntry[0] : "Unknown Chain";
+}
+
+/**
+ * Bridge status options for filter dropdowns
+ */
+export const BRIDGE_STATUS_OPTIONS = [
+  { value: null, label: "All Statuses" },
+  { value: 1, label: "Initiated" },
+  { value: 2, label: "Pending Review" },
+  { value: 3, label: "Completed" },
+  { value: 4, label: "Aborted" },
+];
+
+/**
+ * Chain options for filter dropdowns
+ */
+export const CHAIN_OPTIONS = [
+  { value: null, label: "All Chains" },
+  ...Object.entries(SUPPORTED_CHAINS).map(([name, id]) => ({
+    value: id,
+    label: name,
+  })),
+];
+
+/**
+ * Handles copying text to clipboard with user feedback
+ */
+export const handleCopyToClipboard = async (text: string): Promise<void> => {
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success("Copied to clipboard");
+  } catch (error) {
+    message.error("Failed to copy");
+  }
+};

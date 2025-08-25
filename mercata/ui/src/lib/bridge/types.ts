@@ -54,6 +54,30 @@ export type NetworkSummary = {
   depositRouter: string;
 };
 
+// Bridge Transaction Types
+export interface BridgeTransaction {
+  transaction_hash: string;
+  block_timestamp: string;
+  chainId?: number;
+  from: string;
+  to: string;
+  amount: string;
+  txHash?: string;
+  token?: string;
+  key?: string;
+  depositStatus?: string;
+  withdrawalStatus?: string;
+  tokenSymbol?: string;
+  ethTokenName?: string;
+  ethTokenSymbol?: string;
+  ethTokenAddress?: string;
+}
+
+export interface BridgeTransactionResponse {
+  data: BridgeTransaction[];
+  totalCount: number;
+}
+
 export type BridgeContextType = {
   loading: boolean;
   error: string | null;
@@ -62,10 +86,19 @@ export type BridgeContextType = {
   selectedNetwork: string | null;
   selectedToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
-  getBalance: (tokenAddress: string) => Promise<BalanceResponse>;
+  useBalance: (tokenAddress: string | null) => {
+    data: { balance: string; formatted: string } | null;
+    isLoading: boolean;
+    isError: boolean;
+    error: Error | null;
+    refetch: () => Promise<void>;
+  };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: Token | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
+  // Bridge transaction functions
+  fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
+  fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
 };
 
 export interface ContractValidationResult {
@@ -74,6 +107,40 @@ export interface ContractValidationResult {
   isAllowed?: boolean;
   minAmount?: string;
   depositAmount?: string;
+}
+
+// Transaction Detail Interfaces
+export interface DepositTransaction {
+  transaction_hash: string;
+  block_timestamp: string;
+  chainId?: number;
+  from: string;
+  to: string;
+  amount: string;
+  txHash?: string;
+  token?: string;
+  key?: string;
+  depositStatus?: string;
+  tokenSymbol?: string;
+  ethTokenName?: string;
+  ethTokenSymbol?: string;
+  ethTokenAddress?: string;
+}
+
+export interface WithdrawTransaction {
+  transaction_hash: string;
+  block_timestamp: string;
+  from: string;
+  to: string;
+  destChainId?: number;
+  amount: string;
+  txHash?: string;
+  token?: string;
+  key?: string;
+  withdrawalStatus?: string;
+  tokenSymbol?: string;
+  ethTokenSymbol?: string;
+  ethTokenAddress?: string;
 }
 
 export interface TokenParams {
