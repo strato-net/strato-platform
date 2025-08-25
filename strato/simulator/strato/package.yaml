@@ -108,8 +108,15 @@ executables:
       - -with-rtsopts=-N8
     dependencies:
       - strato
-      - jsaddle-wkwebview
-      - jsaddle-dom
+      - jsaddle
+    when:
+      - condition: os(linux)
+        then:
+          dependencies:
+            - jsaddle-webkit2gtk
+        else:
+          dependencies:
+            - jsaddle-wkwebview
 
 tests:
   strato-test:
