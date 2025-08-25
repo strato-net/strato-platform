@@ -451,7 +451,7 @@ const SwapWidget = () => {
   }, [userAddress, fetchUsdstBalance]);
 
   useEffect(()=>{
-    if(swappableTokens.length > 0 && !fromAsset) {
+    if(swappableTokens.length > 0) {
       initialTokenSetup()
     }
   },[])
@@ -538,13 +538,13 @@ const SwapWidget = () => {
   }, [fromAsset?.address, toAsset?.address, fetchPrice]);
 
   // Start/stop polling based on amount changes
-  useEffect(() => {
-    if (fromAmount && parseFloat(fromAmount) > 0) {
-      startPolling();
-    } else {
-      stopPolling();
-    }
-  }, [fromAmount, startPolling, stopPolling]);
+useEffect(() => {
+  if (fromAmount && parseFloat(fromAmount) > 0) {
+    startPolling();
+  } else {
+    stopPolling();
+  }
+}, [fromAmount, startPolling, stopPolling]);
 
 
 
