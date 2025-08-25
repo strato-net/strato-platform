@@ -32,6 +32,10 @@ contract DepositRouter is
     mapping(address => bool) public allowedTokens;
     mapping(address => uint256) public minDepositAmount;
 
+    // Approved stablecoins like USDC/USDT cause USDST mint instead of wrapping
+    enum Flow { WRAP, MINT_USDST }
+    mapping(address => Flow) public flowOfEthAsset;
+
     event DepositRouted(
         address indexed token,
         uint256 amount,
@@ -41,8 +45,9 @@ contract DepositRouter is
     );
 
     event TokenAllowlistUpdated(address indexed token, bool allowed);
-    event MinDepositAmountSet(address indexed token, uint256 minAmount);
+    event MinDepositAmountUpdated(address indexed token, uint256 minAmount);
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
+    event FlowUpdated(address indexed token, Flow flow);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -123,7 +128,10 @@ contract DepositRouter is
         );
     }
 
-    function setTokenAllowed(address token, bool allowed) external onlyOwner {
+    function setTokenAllowed(
+        address token,
+        bool allowed
+    ) external onlyOwner {
         allowedTokens[token] = allowed;
         emit TokenAllowlistUpdated(token, allowed);
     }
@@ -133,7 +141,14 @@ contract DepositRouter is
         uint256 minAmount
     ) external onlyOwner {
         minDepositAmount[token] = minAmount;
-        emit MinDepositAmountSet(token, minAmount);
+        emit MinDepositAmountUpdated(token, minAmount);
+    }
+
+    function setFlow(
+        address token, Flow flow
+    ) external onlyOwner {
+        flowOfEthAsset[token] = flow;
+        emit FlowUpdated(token, flow);
     }
 
     function batchUpdateTokens(
@@ -152,7 +167,7 @@ contract DepositRouter is
             allowedTokens[tokens[i]] = allowed[i];
             minDepositAmount[tokens[i]] = minAmounts[i];
             emit TokenAllowlistUpdated(tokens[i], allowed[i]);
-            emit MinDepositAmountSet(tokens[i], minAmounts[i]);
+            emit MinDepositAmountUpdated(tokens[i], minAmounts[i]);
         }
     }
 

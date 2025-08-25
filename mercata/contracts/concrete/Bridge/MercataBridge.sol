@@ -36,7 +36,7 @@ contract record MercataBridge is Ownable {
         INITIATED,    // deposit  : relayer observed external tx
                       // withdrawal: user escrowed tokens
         PENDING_REVIEW, // deposit: verification failed, needs review
-                      // withdrawal: custody tx proposed, waiting for review
+                        // withdrawal: custody tx proposed, waiting for review
         COMPLETED,    // flow fully executed
         ABORTED       // owner/user reclaimed escrow
     }
@@ -58,7 +58,7 @@ contract record MercataBridge is Ownable {
         address user;        // STRATO sender
         address dest;        // External recipient address
         uint256 amount;      // Escrowed amount
-        uint64 requestedAt; // Timestamp – drives abort timeout
+        uint64 requestedAt;  // Timestamp – drives abort timeout
         BridgeStatus   bridgeStatus;      // NONE / INITIATED / PENDING_REVIEW / ...
     }
 
@@ -597,7 +597,7 @@ contract record MercataBridge is Ownable {
         }
 
         w.bridgeStatus = BridgeStatus.ABORTED;
-        IERC20(w.token).transfer(w.user, w.amount);
+        IERC20(w.token).transfer(w.user, w.amount); //@adrian shouldn't there be a delay between marking aborted and transferring the tokens?
         emit WithdrawalAborted(id);
     }
 
