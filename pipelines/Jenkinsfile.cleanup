@@ -1,4 +1,4 @@
-def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true) {
+def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = false) {
 
   script {
     def diskspaceAvailableBefore = sh(
@@ -182,7 +182,7 @@ pipeline {
           agent { label "testsync1" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4)
               echo "Diskspace freed on testsync1: $diskspaceFreed kilobytes"
             }
           }
@@ -201,7 +201,7 @@ pipeline {
           agent { label "testsync2" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4)
               echo "Diskspace freed on testsync2: $diskspaceFreed kilobytes"
             }
           }
@@ -220,7 +220,7 @@ pipeline {
           agent { label "testsync3" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4)
               echo "Diskspace freed on testsync3: $diskspaceFreed kilobytes"
             }
           }
