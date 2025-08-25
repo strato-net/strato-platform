@@ -41,6 +41,13 @@ contract record MercataBridge is Ownable {
         ABORTED       // owner/user reclaimed escrow
     }
 
+    // Approved stablecoins like USDC/USDT cause USDST mint instead of wrapping
+    enum Flow {
+        NONE,       // default (mapping unset)
+        WRAP,       // normal path for tokens
+        MINT_USDST  // approved stablecoins
+    }
+
 /* --------------------------------------------------------------------- */
 /*                          ─  DATA STRUCTS ─                           */
 /* --------------------------------------------------------------------- */
@@ -111,6 +118,9 @@ contract record MercataBridge is Ownable {
     /* Users may abort a stuck withdrawal after 48 h                     */
     uint64 public WITHDRAWAL_ABORT_DELAY = 172800;
 
+    // The bridging flow for each token, such as wrapping or minting USDST
+    mapping(address => Flow) public flowOfEthAsset;
+
 /* --------------------------------------------------------------------- */
 /*                               EVENTS                                  */
 /* --------------------------------------------------------------------- */
@@ -123,8 +133,8 @@ contract record MercataBridge is Ownable {
         address indexed user,
         address from
     );
-    event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);   // wrapped tokens minted
-    event DepositPendingReview(uint256 indexed srcChainId, string srcTxHash);   // verification failed, needs review
+    event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);     // wrapped tokens minted
+    event DepositPendingReview(uint256 indexed srcChainId, string srcTxHash); // verification failed, needs review
 
     /*  WITHDRAWAL FLOW  */
     event WithdrawalRequested(  // user locked tokens in bridge
@@ -136,18 +146,19 @@ contract record MercataBridge is Ownable {
         address dest
     );
     event WithdrawalPending(uint256 indexed withdrawalId, string custodyTxHash);
-    event WithdrawalCompleted  (uint256 indexed withdrawalId, string custodyTxHash);
-    event WithdrawalAborted    (uint256 indexed withdrawalId);
+    event WithdrawalCompleted(uint256 indexed withdrawalId, string custodyTxHash);
+    event WithdrawalAborted(uint256 indexed withdrawalId);
 
     /*  ADMIN  */
     event TokenLimitUpdated(address indexed token, uint256 maxPerTx);
-    event RelayerUpdated   (address indexed oldRelayer, address indexed newRelayer);
+    event RelayerUpdated(address indexed oldRelayer, address indexed newRelayer);
     event TokenFactoryUpdated(address indexed oldFactory, address indexed newFactory);
-    event PauseToggled     (bool depositsPaused, bool withdrawalsPaused);
+    event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
     event ChainUpdated(uint256 indexed chainId, address custody, address router, uint256 lastProcessedBlock, bool enabled, string chainName);
     event AssetUpdated(address indexed stratoToken, uint256 chainId, address extToken, uint256 extDecimals, bool enabled, string extName, string extSymbol);
     event AssetMetadataUpdated(address indexed stratoToken, string extName, string extSymbol);   
     event LastProcessedBlockUpdated(uint256 indexed chainId, uint256 lastProcessedBlock);
+    event FlowUpdated(address indexed token, Flow flow);
 
 /* --------------------------------------------------------------------- */
 /*                           ─  MODIFIERS  ─                             */
@@ -266,6 +277,14 @@ contract record MercataBridge is Ownable {
         assets[stratoToken].extName   = extName;
         assets[stratoToken].extSymbol = extSymbol;
         emit AssetMetadataUpdated(stratoToken, extName, extSymbol);
+    }
+
+    function setFlow(
+        address token,
+        Flow flow
+    ) external onlyOwner {
+        flowOfEthAsset[token] = flow;
+        emit FlowUpdated(token, flow);
     }
 
 /* ===================================================================== */

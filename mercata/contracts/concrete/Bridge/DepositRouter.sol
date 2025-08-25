@@ -32,10 +32,6 @@ contract DepositRouter is
     mapping(address => bool) public allowedTokens;
     mapping(address => uint256) public minDepositAmount;
 
-    // Approved stablecoins like USDC/USDT cause USDST mint instead of wrapping
-    enum Flow { WRAP, MINT_USDST }
-    mapping(address => Flow) public flowOfEthAsset;
-
     event DepositRouted(
         address indexed token,
         uint256 amount,
@@ -47,7 +43,6 @@ contract DepositRouter is
     event TokenAllowlistUpdated(address indexed token, bool allowed);
     event MinDepositAmountUpdated(address indexed token, uint256 minAmount);
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
-    event FlowUpdated(address indexed token, Flow flow);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -142,13 +137,6 @@ contract DepositRouter is
     ) external onlyOwner {
         minDepositAmount[token] = minAmount;
         emit MinDepositAmountUpdated(token, minAmount);
-    }
-
-    function setFlow(
-        address token, Flow flow
-    ) external onlyOwner {
-        flowOfEthAsset[token] = flow;
-        emit FlowUpdated(token, flow);
     }
 
     function batchUpdateTokens(
