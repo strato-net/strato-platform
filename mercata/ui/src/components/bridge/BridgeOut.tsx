@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,27 +18,8 @@ import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   roundToDecimals,
   safeParseUnits,
-  formatBalance,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-
-interface Token {
-  stratoTokenAddress: string;
-  stratoTokenName: string;
-  stratoTokenSymbol: string;
-  chainId: string;
-  enabled: boolean;
-  extName: string;
-  extToken: string;
-  extSymbol: string;
-  extDecimals: string;
-}
-
-interface TokenLimitInfo {
-  maxPerTx: string;
-  isUnlimited: boolean;
-  loading: boolean;
-}
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -46,7 +27,7 @@ const BridgeOut: React.FC = () => {
 
   const {
     bridgeOut: bridgeOutAPI,
-    getBalance,
+    useBalance,
     bridgeableTokens,
     availableNetworks,
     selectedNetwork,
@@ -56,16 +37,27 @@ const BridgeOut: React.FC = () => {
   } = useBridgeContext();
 
   const [amount, setAmount] = useState("");
-  const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [tokenLimitInfo, setTokenLimitInfo] = useState<TokenLimitInfo>({
+
+  // Use the useBalance hook from context
+  const {
+    data: balanceData,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance,
+  } = useBalance(selectedToken?.stratoTokenAddress || null);
+
+  const tokenBalance = balanceData?.formatted || "0";
+  const tokenLimitInfo = balanceData?.tokenLimit ? {
+    maxPerTx: balanceData.tokenLimit.maxPerTx,
+    isUnlimited: balanceData.tokenLimit.isUnlimited,
+    loading: false,
+  } : {
     maxPerTx: "0",
     isUnlimited: false,
     loading: false,
-  });
+  };
 
   // Set initial network selection
   useEffect(() => {
@@ -73,45 +65,6 @@ const BridgeOut: React.FC = () => {
       setSelectedNetwork(availableNetworks[0].chainName);
     }
   }, [availableNetworks, selectedNetwork]);
-
-  useEffect(() => {
-    let mounted = true;
-    const fetch = async () => {
-      if (!selectedToken?.stratoTokenAddress) return;
-      setIsBalanceLoading(true);
-      setTokenLimitInfo(prev => ({ ...prev, loading: true }));
-      try {
-        const balanceResponse = await getBalance(selectedToken.stratoTokenAddress);
-        const { balance, tokenLimit } = balanceResponse;
-        const formatted = formatBalance(balance);
-        if (mounted) {
-          setTokenBalance(formatted);
-          setTokenLimitInfo({
-            maxPerTx: tokenLimit?.maxPerTx || "0",
-            isUnlimited: tokenLimit?.isUnlimited || false,
-            loading: false,
-          });
-        }
-      } catch {
-        if (mounted) {
-          setTokenBalance("0");
-          setTokenLimitInfo({
-            maxPerTx: "0",
-            isUnlimited: false,
-            loading: false,
-          });
-        }
-      } finally {
-        if (mounted) {
-          setIsBalanceLoading(false);
-        }
-      }
-    };
-    fetch();
-    return () => {
-      mounted = false;
-    };
-  }, [selectedToken, getBalance]);
 
   // Validate amount against balance and token limits
   const validateAmount = (value: string): boolean => {
@@ -203,9 +156,7 @@ const BridgeOut: React.FC = () => {
           title: "Transaction Proposed Successfully",
           description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
-        const { balance } = await getBalance(selectedToken.stratoTokenAddress);
-        const formatted = formatBalance(balance);
-        setTokenBalance(formatted);
+        await refetchBalance();
         setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
@@ -256,11 +207,10 @@ const BridgeOut: React.FC = () => {
         <Label htmlFor="asset">Select Asset</Label>
         <Select
           value={selectedToken?.extSymbol || ""}
-          onValueChange={(v) =>
-            setSelectedToken(
-              bridgeableTokens.find((t) => t.extSymbol === v) || null,
-            )
-          }
+          onValueChange={(v) => {
+            const newToken = bridgeableTokens.find((t) => t.extSymbol === v) || null;
+            setSelectedToken(newToken);
+          }}
           disabled={bridgeableTokens.length === 0}
         >
           <SelectTrigger id="from-token">
@@ -308,7 +258,7 @@ const BridgeOut: React.FC = () => {
             places
           </p>
         )}
-        {isConnected && (
+        
           <div className="flex items-center gap-2 mt-1">
             {isBalanceLoading ? (
               <div className="flex items-center gap-2">
@@ -324,7 +274,7 @@ const BridgeOut: React.FC = () => {
                     </p>
                     {selectedToken && (
                       <div className="flex items-center gap-1">
-                        {tokenLimitInfo.loading ? (
+                        {isBalanceLoading ? (
                           <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
                           <span className="text-xs text-gray-500">
@@ -352,7 +302,7 @@ const BridgeOut: React.FC = () => {
               )
             )}
           </div>
-        )}
+        
       </div>
 
       <div className="bg-gray-50 p-4 rounded-md space-y-2">
@@ -383,7 +333,7 @@ const BridgeOut: React.FC = () => {
               !isConnected ||
               amountError ||
               !selectedNetwork ||
-              tokenLimitInfo.loading,
+              isBalanceLoading,
           )}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
