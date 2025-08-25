@@ -25,7 +25,6 @@ module Blockchain.SolidVM.SetGet
   )
 where
 
-import Blockchain.Data.RLP
 import Blockchain.DB.SolidStorageDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
@@ -59,7 +58,6 @@ fromBasic = \case
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
-  MS.BVariadic bss -> SVariadic $ rlpDecode . rlpDeserialize <$> bss
   MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
 
 findDefault :: BasicType -> Value
@@ -86,7 +84,6 @@ toBasic = \case
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
-  SVariadic vs -> Just . MS.BVariadic $ rlpSerialize . rlpEncode <$> vs
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()
