@@ -42,7 +42,6 @@ dependencies:
   - http-client
   - jsaddle
   - jsaddle-warp
-  - jsaddle-wkwebview
   - jsaddle-dom
   - lens
   - memory
@@ -80,7 +79,6 @@ library:
     - lens
     - jsaddle
     - jsaddle-warp
-    - jsaddle-wkwebview
     - jsaddle-dom
     - reflex
     - reflex-dom
