@@ -1607,7 +1607,7 @@ solidityTypeToSQLType _ _ _ SVMType.Struct{} = Just SqlJsonb
 solidityTypeToSQLType _ _ _ SVMType.Enum{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Contract{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Error{} = Just SqlText
-solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
+solidityTypeToSQLType _ _ _ SVMType.Variadic = Just SqlJsonb
 
 
 ------------------

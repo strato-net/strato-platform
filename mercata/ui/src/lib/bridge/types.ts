@@ -29,6 +29,10 @@ export interface BridgeOutParams {
 
 export interface BalanceResponse {
   balance: string;
+  tokenLimit?: {
+    maxPerTx: string;
+    isUnlimited: boolean;
+  };
 }
 
 export interface BridgeResponse {
@@ -87,7 +91,14 @@ export type BridgeContextType = {
   selectedToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
-    data: { balance: string; formatted: string } | null;
+    data: { 
+      balance: string; 
+      formatted: string;
+      tokenLimit?: {
+        maxPerTx: string;
+        isUnlimited: boolean;
+      };
+    } | null;
     isLoading: boolean;
     isError: boolean;
     error: Error | null;
