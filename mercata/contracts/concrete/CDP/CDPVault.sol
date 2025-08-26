@@ -1,19 +1,15 @@
-contract CDPVault is Ownable {
-    using SafeMath for uint256;
+import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 
-    //todo: add ReentrancyGuard
-
+contract record CDPVault is Ownable {
     address public cdpEngine;
 
-    // owner => asset => balance
-    mapping(address => mapping(address => uint256)) public balances;
+    // borrower => asset => balance
+    mapping(address => mapping(address => uint)) public record userCollaterals;
 
-    event CollateralMoved(
-        address indexed from,
-        address indexed to,
-        address indexed asset,
-        uint256 amount
-    );
+    event CollateralDeposited(address indexed user, address indexed asset, uint amount);
+    event CollateralWithdrawn(address indexed user, address indexed asset, uint amount);
+    event CollateralSeized(address indexed borrower, address indexed liquidator, address indexed asset, uint amount);
     event CDPEngineUpdated(
         address indexed oldEngine,
         address indexed newEngine
@@ -24,39 +20,38 @@ contract CDPVault is Ownable {
         _;
     }
 
-    constructor(address _cdpEngine) {
+    constructor(address _cdpEngine, address initialOwner) Ownable(initialOwner) {
         require(_cdpEngine != address(0), "CDPVault: Invalid engine");
         cdpEngine = _cdpEngine;
     }
 
     function deposit(
-        address owner,
+        address borrower,
         address asset,
         uint256 amount
-    ) external onlyEngine {
-        require(owner != address(0), "CDPVault: Invalid owner");
+    ) public onlyEngine {
+        require(borrower != address(0), "CDPVault: Invalid borrower");
         require(asset != address(0), "CDPVault: Invalid asset");
+        require(amount > 0, "Invalid amount");
 
-        IERC20(asset).transferFrom(owner, address(this), amount);
-        balances[owner][asset] = balances[owner][asset].add(amount);
-
-        emit CollateralMoved(owner, address(this), asset, amount);
+        require(IERC20(asset).transferFrom(borrower, address(this), amount), "Transfer failed");
+        userCollaterals[borrower][asset] += amount;
+        emit CollateralDeposited(borrower, asset, amount);
     }
 
     function withdraw(
-        address owner,
+        address borrower,
         address asset,
         uint256 amount
-    ) external onlyEngine {
+    ) public onlyEngine {
         require(
-            balances[owner][asset] >= amount,
+            userCollaterals[borrower][asset] >= amount,
             "CDPVault: Insufficient balance"
         );
 
-        balances[owner][asset] = balances[owner][asset].sub(amount);
-        IERC20(asset).transfer(owner, amount);
-
-        emit CollateralMoved(address(this), owner, asset, amount);
+        userCollaterals[borrower][asset] -= amount;
+        require(IERC20(asset).transfer(borrower, amount), "Transfer failed");
+        emit CollateralWithdrawn(borrower, asset, amount);
     }
 
     function seize(
@@ -64,26 +59,23 @@ contract CDPVault is Ownable {
         address asset,
         address liquidator,
         uint256 amount
-    ) external onlyEngine {
+    ) public onlyEngine {
+        require(amount > 0, "Invalid amount");
         require(
-            balances[borrower][asset] >= amount,
+            userCollaterals[borrower][asset] >= amount,
             "CDPVault: insufficient balance"
         );
 
-        balances[borrower][asset] -= amount;
-        IERC20(asset).safeTransfer(liquidator, amount);
+        userCollaterals[borrower][asset] -= amount;
+        require(IERC20(asset).transfer(liquidator, amount), "Transfer failed");
 
-        emit CollateralMoved(borrower, liquidator, asset, amount);
+        emit CollateralSeized(borrower, liquidator, asset, amount);
     }
 
-    function emergencyRecover(
-        address token,
-        address to,
-        uint256 amount
-    ) external onlyOwner {
-        require(to != address(0), "CDPVault: invalid recipient");
-        IERC20(token).safeTransfer(to, amount);
+    function getCollateral(address user, address asset) public view returns (uint) {
+        return userCollaterals[user][asset];
     }
+
 
     function setCDPEngine(address newEngine) external onlyOwner {
         require(newEngine != address(0), "CDPVault: invalid engine");
