@@ -460,7 +460,7 @@ const SwapWidget = () => {
   }, [userAddress, fetchUsdstBalance]);
 
   useEffect(()=>{
-    if(swappableTokens.length > 0 && !fromAsset) {
+    if(swappableTokens.length > 0) {
       initialTokenSetup()
     }
   },[])
@@ -553,10 +553,7 @@ const SwapWidget = () => {
     } else {
       stopPolling();
     }
-}, [fromAsset?.address, toAsset?.address, startPolling, stopPolling]);
-
-
-
+  }, [fromAsset?.address, toAsset?.address, startPolling, stopPolling]);
 
   // Cleanup on unmount
   useEffect(() => {
