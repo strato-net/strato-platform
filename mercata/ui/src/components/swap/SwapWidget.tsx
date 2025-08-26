@@ -26,7 +26,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDebounce } from "@/hooks/useDebounce";
-import { usePoolPolling, useExchangeRate, useSwapCalculation, useSwapStateCleanup } from "@/hooks/useSmartPolling";
+import { usePoolPolling, useExchangeRate, useSwapStateCleanup } from "@/hooks/useSmartPolling";
 
 // Constants
 const DEFAULT_SLIPPAGE = 4; // 4%
@@ -417,16 +417,25 @@ const SwapWidget = () => {
 
   // Individual focused hooks for different responsibilities
   useExchangeRate({ poolData, fromAsset, setExchangeRate });
-  useSwapCalculation({ 
-    poolData, 
-    fromAsset, 
-    fromAmount, 
-    editingField, 
-    calculateSwap, 
-    setToAmount, 
-    lastCalculatedFromRef 
-  });
-  useSwapStateCleanup({ poolData, setToAsset, setToAmount, setExchangeRate });
+  // Use smart polling hooks for state management
+  useSwapStateCleanup({ poolData, setToAsset, setExchangeRate });
+
+  // Clear amounts when assets change to prevent stale validation messages
+  useEffect(() => {
+    // Clear amounts and validation states immediately when assets change
+    setFromAmount("");
+    setToAmount("");
+    setEditingField(null);
+    setWrongAmount(false);
+    setInsufficientPoolBalance(false);
+    lastCalculatedFromRef.current = "";
+
+    // Also cancel any ongoing calculations
+    if (swapInputAbortRef.current) {
+      swapInputAbortRef.current.abort();
+      swapInputAbortRef.current = null;
+    }
+  }, [fromAsset?.address, toAsset?.address]);
 
   // Fee warning logic
   const feeAmount = useMemo(() => safeParseUnits(SWAP_FEE, DECIMALS), [SWAP_FEE]);
@@ -619,7 +628,8 @@ const SwapWidget = () => {
       } else {
         setFromAmount("");
       }
-      setInsufficientPoolBalance(true);
+      // Only show pool balance error if user has entered an amount
+      if (inputAmount && Number(inputAmount) > 0) {setInsufficientPoolBalance(true);}
       return;
     }
 
@@ -633,7 +643,7 @@ const SwapWidget = () => {
         }
         return;
       }
-      
+
       const parsedValue = safeParseUnits(inputAmount, DECIMALS);
 
       if (isFromInput) {
@@ -643,7 +653,7 @@ const SwapWidget = () => {
 
         // Check pool balance
         const poolBalanceBigInt = BigInt(inputPoolBalance);
-        setInsufficientPoolBalance(parsedValue > poolBalanceBigInt && parsedValue <= inputBalance);
+        setInsufficientPoolBalance(parsedValue > 0n && parsedValue > poolBalanceBigInt && parsedValue <= inputBalance);
 
         const isAToB = pool.tokenA?.address === inputAsset.address ? true : false;
         lastCalculatedFromRef.current = inputAmount;
@@ -683,7 +693,7 @@ const SwapWidget = () => {
 
           // Check pool balance
           const poolBalanceBigInt = BigInt(inputPoolBalance);
-          setInsufficientPoolBalance(calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
+          setInsufficientPoolBalance(calculatedInput > 0n && calculatedInput > poolBalanceBigInt && calculatedInput <= fromBalance);
         }
       }
     } catch (err) {
@@ -912,7 +922,7 @@ const handleMaxClick = useCallback((isFrom: boolean) => {
         balance={fromAsset?.balance || 0}
         isLoading={fromBalanceLoading}
         wrongAmount={wrongAmount}
-        insufficientPoolBalance={insufficientPoolBalance}
+        insufficientPoolBalance={insufficientPoolBalance && (fromAmount !== "" || toAmount !== "")}
         onSelect={(asset) => getTokenBalanceFromContext(asset, true)}
         tokens={swappableTokens}
         isOpen={fromPopoverOpen}

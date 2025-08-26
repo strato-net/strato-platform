@@ -602,6 +602,5 @@ export interface SwapCalculationConfig {
 export interface SwapStateCleanupConfig {
   poolData: any;
   setToAsset: (asset: any) => void;
-  setToAmount: (amount: string) => void;
   setExchangeRate: (rate: string) => void;
 }

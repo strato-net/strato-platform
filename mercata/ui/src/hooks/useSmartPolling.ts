@@ -125,13 +125,13 @@ export const useSwapCalculation = ({ poolData, fromAsset, fromAmount, editingFie
   }, [poolData, fromAsset?.address, fromAmount, editingField, calculateSwap, setToAmount, lastCalculatedFromRef]);
 
 // Hook for managing swap state cleanup
-export const useSwapStateCleanup = ({ poolData, setToAsset, setToAmount, setExchangeRate }: SwapStateCleanupConfig) =>
+export const useSwapStateCleanup = ({ poolData, setToAsset, setExchangeRate }: SwapStateCleanupConfig) =>
   useEffect(() => {
     // Only clear UI state, don't manage pool state (context handles that)
+    // Don't clear amounts here - let SwapWidget handle that explicitly
     if (poolData === null) {
       setToAsset(undefined);
-      setToAmount("");
       setExchangeRate("0");
       // Don't call setPool(null) here - let context manage pool state
     }
-  }, [poolData, setToAsset, setToAmount, setExchangeRate]);
+  }, [poolData, setToAsset, setExchangeRate]);
