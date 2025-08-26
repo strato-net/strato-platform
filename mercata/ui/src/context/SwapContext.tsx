@@ -77,6 +77,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
   const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [lastHistoryPoolAddress, setLastHistoryPoolAddress] = useState<string | null>(null);
 
   // Handle asset transitions
   useEffect(() => {
@@ -87,6 +88,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       setSwapHistory([]);
       setSwapHistoryCount(0);
       setSwapHistoryLoading(false);
+      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
     } else {
       // If no assets selected, not transitioning
       setIsTransitioning(false);
@@ -94,15 +96,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       setSwapHistory([]);
       setSwapHistoryCount(0);
       setSwapHistoryLoading(false);
+      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
     }
   }, [fromAsset?.address, toAsset?.address]);
 
   // Clear transitioning state when we have pool and history fetch is complete
   useEffect(() => {
-    if (isTransitioning && pool?.address && fromAsset?.address && toAsset?.address && !swapHistoryLoading) {
+    if (isTransitioning && pool?.address && fromAsset?.address && toAsset?.address && !swapHistoryLoading && lastHistoryPoolAddress === pool.address) {
       setIsTransitioning(false);
     }
-  }, [isTransitioning, pool?.address, fromAsset?.address, toAsset?.address, swapHistoryLoading]);
+  }, [isTransitioning, pool?.address, fromAsset?.address, toAsset?.address, swapHistoryLoading, lastHistoryPoolAddress, swapHistory.length]);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -295,15 +298,18 @@ const refreshSwapHistory = useCallback(
   async (params?: Record<string, string>) => {
     if (!pool?.address) return;
     setSwapHistoryLoading(true);
+    const currentPoolAddress = pool.address; // Capture current pool address
     try {
-      const { data, totalCount } = await fetchSwapHistory(pool.address, params);
+      const { data, totalCount } = await fetchSwapHistory(currentPoolAddress, params);
       setSwapHistory(data);               // ✅ Set new history
       setSwapHistoryCount(totalCount);   // ✅ Set new count
+      setLastHistoryPoolAddress(currentPoolAddress); // ✅ Track which pool this history belongs to
       // Don't clear isTransitioning here - let the effect handle it
     } catch (err) {
       console.error("Failed to refresh swap history", err);
       setSwapHistory([]);                // Optional fallback
       setSwapHistoryCount(0);            // Optional fallback
+      setLastHistoryPoolAddress(currentPoolAddress); // ✅ Still track the pool even on error
     } finally {
       setSwapHistoryLoading(false);
     }
