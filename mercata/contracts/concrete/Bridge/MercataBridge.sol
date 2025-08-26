@@ -108,6 +108,9 @@ contract record MercataBridge is Ownable {
     /* Users may abort a stuck withdrawal after 48 h                     */
     uint64 public WITHDRAWAL_ABORT_DELAY = 172800;
 
+    /* USDST token address for cross-chain minting/redeeming */
+    address public USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+
 /* --------------------------------------------------------------------- */
 /*                               EVENTS                                  */
 /* --------------------------------------------------------------------- */
