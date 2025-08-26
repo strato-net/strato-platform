@@ -8,8 +8,10 @@ import "./MercataBridge.sol";
 contract record USDSTMintGateway is Ownable {
 
     /* Events */
-    event DepositCompleted(bytes32 indexed depositKey, address indexed to, uint netToUser18, uint mintFee18);
+    event DepositCompleted(bytes32 indexed depositKey, address indexed to, uint netToUser18, uint mintFee18); // TODO which to index?
     event RedeemRequested(uint indexed id, address indexed user, address indexed ethAsset, uint amount18, address destEthAddress);
+    event StablecoinApproved(address indexed ethAsset);
+    event StablecoinDisabled(address indexed ethAsset);
     
     /* Errors */
     error AmountExceedsLimit();
@@ -96,6 +98,14 @@ contract record USDSTMintGateway is Ownable {
     function setRedeemFeeBps(uint _redeemFeeBps) external onlyOwner {
         if (_redeemFeeBps > 10_000) revert RedeemFeeTooHigh();
         redeemFeeBps = _redeemFeeBps;
+    }
+    function approveStablecoin(address ethAsset) external onlyOwner {
+        approvedStablecoins[ethAsset] = true;
+        emit StablecoinApproved(ethAsset);
+    }
+    function disableStablecoin(address ethAsset) external onlyOwner {
+        approvedStablecoins[ethAsset] = false;
+        emit StablecoinDisabled(ethAsset);
     }
 
     /* Public Functions */
