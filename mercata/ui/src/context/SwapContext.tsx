@@ -56,6 +56,8 @@ type SwapContextType = {
   refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
   swapHistory: SwapHistoryEntry[];
   swapHistoryCount: number;
+  swapHistoryLoading: boolean;
+  isTransitioning: boolean;
   setPoolRates: (data: SetPoolRatesData) => Promise<void>;
 };
 
@@ -73,6 +75,34 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [pool, setPool] = useState<LiquidityPool | null>(null);
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
+  const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Handle asset transitions
+  useEffect(() => {
+    // When assets change, mark as transitioning and clear ALL old data
+    if (fromAsset?.address && toAsset?.address) {
+      setIsTransitioning(true);
+      setPool(null);                     // ✅ Clear pool immediately to prevent stale data
+      setSwapHistory([]);
+      setSwapHistoryCount(0);
+      setSwapHistoryLoading(false);
+    } else {
+      // If no assets selected, not transitioning
+      setIsTransitioning(false);
+      setPool(null);
+      setSwapHistory([]);
+      setSwapHistoryCount(0);
+      setSwapHistoryLoading(false);
+    }
+  }, [fromAsset?.address, toAsset?.address]);
+
+  // Clear transitioning state when we have pool and history fetch is complete
+  useEffect(() => {
+    if (isTransitioning && pool?.address && fromAsset?.address && toAsset?.address && !swapHistoryLoading) {
+      setIsTransitioning(false);
+    }
+  }, [isTransitioning, pool?.address, fromAsset?.address, toAsset?.address, swapHistoryLoading]);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -209,7 +239,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const fetchTokenBalances = useCallback(async (pool: LiquidityPool, userAddress: string, usdstAddress: string) => {
+  const fetchTokenBalances = useCallback(async (pool: LiquidityPool, _userAddress: string, usdstAddress: string) => {
     const [balanceA, balanceB, balanceUsdst] = await Promise.all([
       api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
       api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
@@ -264,14 +294,18 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 const refreshSwapHistory = useCallback(
   async (params?: Record<string, string>) => {
     if (!pool?.address) return;
+    setSwapHistoryLoading(true);
     try {
       const { data, totalCount } = await fetchSwapHistory(pool.address, params);
       setSwapHistory(data);               // ✅ Set new history
       setSwapHistoryCount(totalCount);   // ✅ Set new count
+      // Don't clear isTransitioning here - let the effect handle it
     } catch (err) {
       console.error("Failed to refresh swap history", err);
       setSwapHistory([]);                // Optional fallback
       setSwapHistoryCount(0);            // Optional fallback
+    } finally {
+      setSwapHistoryLoading(false);
     }
   },
   [pool?.address, fetchSwapHistory]
@@ -329,6 +363,8 @@ const refreshSwapHistory = useCallback(
         refreshSwapHistory,
         swapHistory,
         swapHistoryCount,
+        swapHistoryLoading,
+        isTransitioning,
         setPoolRates
       }}
     >
