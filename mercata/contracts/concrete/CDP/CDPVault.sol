@@ -5,7 +5,7 @@ contract record CDPVault is Ownable {
     address public cdpEngine;
 
     // borrower => asset => balance
-    mapping(address => mapping(address => uint)) public record userCollaterals;
+    mapping(address => mapping(address => uint)) public userCollaterals;
 
     event CollateralDeposited(address indexed user, address indexed asset, uint amount);
     event CollateralWithdrawn(address indexed user, address indexed asset, uint amount);
