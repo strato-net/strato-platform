@@ -88,7 +88,9 @@ export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, setPool
     fetchFn: async () => {
       if (!fromAsset?.address || !toAsset?.address) return null;
       const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
-      setPool(poolData);
+      if (poolData) {
+        setPool(poolData); // Only set pool if we got valid data
+      }
       return poolData;
     },
     shouldPoll: () => !!(fromAsset?.address && toAsset?.address),
@@ -123,12 +125,10 @@ export const useSwapCalculation = ({ poolData, fromAsset, fromAmount, editingFie
   }, [poolData, fromAsset?.address, fromAmount, editingField, calculateSwap, setToAmount, lastCalculatedFromRef]);
 
 // Hook for managing swap state cleanup
-export const useSwapStateCleanup = ({ poolData, setPool, setToAsset, setToAmount, setExchangeRate }: SwapStateCleanupConfig) =>
+export const useSwapStateCleanup = ({ poolData, setToAsset, setExchangeRate }: SwapStateCleanupConfig) =>
   useEffect(() => {
-    if (!poolData) {
-      setPool(null);
+    if (poolData === null) {
       setToAsset(undefined);
-      setToAmount("");
       setExchangeRate("0");
     }
-  }, [poolData, setPool, setToAsset, setToAmount, setExchangeRate]); 
+  }, [poolData, setToAsset, setExchangeRate]);
