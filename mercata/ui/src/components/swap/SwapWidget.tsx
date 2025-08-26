@@ -426,7 +426,7 @@ const SwapWidget = () => {
     setToAmount, 
     lastCalculatedFromRef 
   });
-  useSwapStateCleanup({ poolData, setPool, setToAsset, setToAmount, setExchangeRate });
+  useSwapStateCleanup({ poolData, setToAsset, setToAmount, setExchangeRate });
 
   // Fee warning logic
   const feeAmount = useMemo(() => safeParseUnits(SWAP_FEE, DECIMALS), [SWAP_FEE]);
@@ -539,12 +539,12 @@ const SwapWidget = () => {
 
   // Start/stop polling based on amount changes
   useEffect(() => {
-    if (fromAmount && parseFloat(fromAmount) > 0) {
+    if (fromAsset?.address && toAsset?.address) {
       startPolling();
     } else {
       stopPolling();
     }
-  }, [fromAmount, startPolling, stopPolling]);
+}, [fromAsset?.address, toAsset?.address, startPolling, stopPolling]);
 
 
 
@@ -869,14 +869,14 @@ const SwapWidget = () => {
   };
 
 useEffect(() => {
-  if (debouncedFromAmount && fromAsset && toAsset && pool) {
+  if (debouncedFromAmount !== ""  && fromAsset && toAsset && pool && Number(debouncedFromAmount) > 0) {
     calculateSwapAmount(debouncedFromAmount, true);
   }
 }, [fromAsset, toAsset, debouncedFromAmount, pool]);
 
 // Debounced effect for toAmount (if you want to support reverse calculation)
 useEffect(() => {
-  if (debouncedToAmount && fromAsset && toAsset && pool) {
+  if (debouncedToAmount !== ""  && fromAsset && toAsset && pool && Number(debouncedToAmount) > 0) {
     calculateSwapAmount(debouncedToAmount, false);
   }
 }, [fromAsset, toAsset, debouncedToAmount, pool]);
