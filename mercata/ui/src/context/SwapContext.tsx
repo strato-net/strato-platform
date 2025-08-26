@@ -79,18 +79,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [lastHistoryPoolAddress, setLastHistoryPoolAddress] = useState<string | null>(null);
 
-  // Add refs to track current requests and prevent stale updates
+  // refs to track current requests and prevent stale updates
   const currentAssetPairRef = useRef<string>('');
   const historyAbortControllerRef = useRef<AbortController | null>(null);
 
   // Handle asset transitions
   useEffect(() => {
-    // When assets change, mark as transitioning and clear ALL old data
     if (fromAsset?.address && toAsset?.address) {
       const newAssetPair = `${fromAsset.address}-${toAsset.address}`;
       currentAssetPairRef.current = newAssetPair;
 
-      // Cancel any ongoing history requests
       if (historyAbortControllerRef.current) {
         historyAbortControllerRef.current.abort();
         historyAbortControllerRef.current = null;

@@ -27,10 +27,6 @@ const SwapHistory: React.FC = () => {
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const totalPages = Math.ceil(swapHistoryCount / itemsPerPage);
 
-  // Show loading when:
-  // 1. Assets are transitioning (assets changed but pool/history not ready)
-  // 2. Swap history is actively loading
-  // 3. We have assets but no pool yet (waiting for pool to be fetched)
   const shouldShowLoading = isTransitioning || swapHistoryLoading || (!!fromAsset?.address && !!toAsset?.address && !pool?.address);
 
    // Reset page when pool changes
@@ -44,7 +40,7 @@ const SwapHistory: React.FC = () => {
       // Fetch if we have all required data (pool and assets)
       if (pool?.address && fromAsset?.address && toAsset?.address) {
         setSwapHistoryError(null);
-
+        
         try {
           await refreshSwapHistory({
             limit: itemsPerPage.toString(),
@@ -94,54 +90,54 @@ const SwapHistory: React.FC = () => {
                 </TableRow>
               ) : swapHistory.length > 0 ? (
                   swapHistory.map((swap) => (
-            <TableRow key={swap.id}>
-              <TableCell className="text-sm">
-                {swap.timestamp.toLocaleDateString([], {
-                  year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
-                })}
-              </TableCell>
-              <TableCell className="font-medium text-sm">
-                {swap.tokenIn}
-              </TableCell>
-              <TableCell className="text-sm">
-                {formatWeiAmount(swap.amountIn)}
-              </TableCell>
-              <TableCell className="font-medium text-sm">
-                {swap.tokenOut}
-              </TableCell>
-              <TableCell className="text-sm">
-                {formatWeiAmount(swap.amountOut)}
-              </TableCell>
-              <TableCell className="text-sm">
-                ${swap.impliedPrice}
-              </TableCell>
-              <TableCell className="font-mono text-xs">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => copyToClipboard(swap.sender)}
-                        className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
-                      >
-                        <span>
-                          {copiedHash === swap.sender ? 'Copied!' : formatHash(swap.sender)}
-                        </span>
-                        <Copy className="h-3 w-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Click to copy full address</p>
-                      <p className="font-mono text-xs break-all">{swap.sender}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </TableCell>
-            </TableRow>
+                    <TableRow key={swap.id}>
+                      <TableCell className="text-sm">
+                        {swap.timestamp.toLocaleDateString([], {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          hour12: false
+                        })}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {swap.tokenIn}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatWeiAmount(swap.amountIn)}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {swap.tokenOut}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatWeiAmount(swap.amountOut)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        ${swap.impliedPrice}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => copyToClipboard(swap.sender)}
+                                className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+                              >
+                                <span>
+                                  {copiedHash === swap.sender ? 'Copied!' : formatHash(swap.sender)}
+                                </span>
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Click to copy full address</p>
+                              <p className="font-mono text-xs break-all">{swap.sender}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                    </TableRow>
             ))
               ) : (
                 <TableRow>
@@ -154,39 +150,39 @@ const SwapHistory: React.FC = () => {
         </Table>
 
           {/* Pagination Controls */}
-      <div className="flex items-center justify-between px-6 py-4 border-t">
-        <div className="text-sm text-gray-500">
-          {totalPages > 1 ? (
-            `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, swapHistoryCount)} of ${swapHistoryCount} swaps`
-          ) : (
-            `Showing ${swapHistory.length} swap${swapHistory.length !== 1 ? 's' : ''}`
-          )}
-        </div>
-        {totalPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-              disabled={currentPage === 0 || shouldShowLoading}
-            >
-              Previous
-            </Button>
-            <span className="text-sm text-gray-600">
-              Page {currentPage + 1} of {totalPages}
-              {shouldShowLoading && <span className="ml-2 text-blue-500">Loading...</span>}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
-              disabled={currentPage === totalPages - 1 || shouldShowLoading}
-            >
-              Next
-            </Button>
+          <div className="flex items-center justify-between px-6 py-4 border-t">
+            <div className="text-sm text-gray-500">
+              {totalPages > 1 ? (
+                `Showing ${currentPage * itemsPerPage + 1} to ${Math.min((currentPage + 1) * itemsPerPage, swapHistoryCount)} of ${swapHistoryCount} swaps`
+              ) : (
+                `Showing ${swapHistory.length} swap${swapHistory.length !== 1 ? 's' : ''}`
+              )}
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                  disabled={currentPage === 0 || shouldShowLoading}
+                >
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-600">
+                  Page {currentPage + 1} of {totalPages}
+                  {shouldShowLoading && <span className="ml-2 text-blue-500">Loading...</span>}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+                  disabled={currentPage === totalPages - 1 || shouldShowLoading}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
-        )}
-      </div>
     </div>
   ) : (
     <div className="bg-gray-50 rounded-lg p-6 text-center">
