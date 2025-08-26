@@ -18,7 +18,6 @@ contract DepositRouter is
     using SafeERC20 for IERC20;
 
     // ============ Custom Errors ============
-    error TokenNotAllowed();
     error UseDepositETH();
     error BelowMinimum();
     error ZeroAmount();
@@ -28,10 +27,16 @@ contract DepositRouter is
     error ArrayLengthMismatch();
     error SameAddressProposed();
     error SweepEthFailed();
-    error FlowNotAllowed();
+    error NotPermitted();
+    error InvalidPermissions();
+
+    // ============ Constants ============
+    uint8 constant PERMISSION_WRAP = 1;   // 0b01
+    uint8 constant PERMISSION_MINT = 2;   // 0b10
+    uint8 constant PERMISSION_MASK = PERMISSION_WRAP | PERMISSION_MINT;
 
     // ============ State Variables ============
-    //https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
+    // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
     IPermit2 public constant PERMIT2 = IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
 
     address public gnosisSafe;
@@ -42,8 +47,7 @@ contract DepositRouter is
     // ============ Structs ============
     struct TokenConfig {
         uint96 min;
-        bool allowed;
-        bool canMint;   // true => token may mint, wrap is always allowed
+        uint8 permissions; // bitmask: WRAP/MINT, 0 = disabled
     }
 
     // ============ Events ============
@@ -55,7 +59,7 @@ contract DepositRouter is
         uint96 depositId,
         bool mint   // true = Mint, false = Wrap
     );
-    event TokenConfigUpdated(address indexed token, bool allowed, uint256 minAmount, bool canMint);
+    event TokenConfigUpdated(address indexed token, uint256 minAmount, uint8 permissions);
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -87,9 +91,8 @@ contract DepositRouter is
         if (deadline < block.timestamp) revert PermitExpired();
 
         TokenConfig storage c = tokenConfig[token];
-        if (!c.allowed) revert TokenNotAllowed();
         if (amount < c.min) revert BelowMinimum();
-        if (mint && !c.canMint) revert FlowNotAllowed();
+        if ((c.permissions & (mint ? PERMISSION_MINT : PERMISSION_WRAP)) == 0) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked { ++depositId; }
@@ -110,9 +113,9 @@ contract DepositRouter is
     function depositETH(address stratoAddress) external payable whenNotPaused nonReentrant {
         if (msg.value == 0) revert ZeroAmount();
 
-        TokenConfig storage config = tokenConfig[address(0)];
-        if (!config.allowed) revert TokenNotAllowed();
-        if (msg.value < config.min) revert BelowMinimum();
+        TokenConfig storage c = tokenConfig[address(0)];
+        if (msg.value < c.min) revert BelowMinimum();
+        if ((c.permissions & PERMISSION_WRAP) == 0) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -125,49 +128,41 @@ contract DepositRouter is
         emit DepositRouted(address(0), msg.value, msg.sender, stratoAddress, depositId, false);
     }
 
-    function setTokenAllowed(address token, bool allowed) external onlyOwner {
-        TokenConfig storage cfg = tokenConfig[token];
-        if (cfg.allowed == allowed) return;
-        cfg.allowed = allowed;
-        emit TokenConfigUpdated(token, allowed, cfg.min, cfg.canMint);
-    }
-
     function setMinDepositAmount(address token, uint96 minAmount) external onlyOwner {
-        TokenConfig storage cfg = tokenConfig[token];
-        if (cfg.min == minAmount) return;
-        cfg.min = minAmount;
-        emit TokenConfigUpdated(token, cfg.allowed, minAmount, cfg.canMint);
+        TokenConfig storage c = tokenConfig[token];
+        if (c.min == minAmount) return;
+        c.min = minAmount;
+        emit TokenConfigUpdated(token, minAmount, c.permissions);
     }
 
-    function setTokenCanMint(address token, bool canMint_) external onlyOwner {
-        if (token == address(0)) revert InvalidAddress(); // ETH ignores mint flag
-        TokenConfig storage cfg = tokenConfig[token];
-        if (cfg.canMint == canMint_) return;
-        cfg.canMint = canMint_;
-        emit TokenConfigUpdated(token, cfg.allowed, cfg.min, canMint_);
+    function setTokenPermissions(address token, uint8 permissions) external onlyOwner {
+        if ((permissions & ~PERMISSION_MASK) != 0) revert InvalidPermissions();
+        if (token == address(0) && (permissions & PERMISSION_MINT) != 0) revert InvalidAddress();
+        TokenConfig storage c = tokenConfig[token];
+        if (c.permissions == permissions) return;
+        c.permissions = permissions;
+        emit TokenConfigUpdated(token, c.min, permissions);
     }
 
     function batchUpdateTokens(
         address[] calldata tokens,
-        bool[] calldata allowed,
         uint96[] calldata minAmounts,
-        bool[] calldata canMint
+        uint8[] calldata permissions
     ) external onlyOwner {
         uint256 len = tokens.length;
-        if (len != allowed.length || len != minAmounts.length || len != canMint.length) revert ArrayLengthMismatch();
+        if (len != minAmounts.length || len != permissions.length) revert ArrayLengthMismatch();
 
         for (uint256 i; i < len; ) {
             address t = tokens[i];
-            bool a = allowed[i];
             uint96 m = minAmounts[i];
-            bool cm = (t != address(0)) && canMint[i]; // ETH => false
+            uint8 p = (t == address(0)) ? (permissions[i] & ~PERMISSION_MINT) : permissions[i]; // ETH => no mint
+            if ((p & ~PERMISSION_MASK) != 0) revert InvalidPermissions();
 
-            TokenConfig storage cfg = tokenConfig[t];
-            cfg.allowed = a;
-            cfg.min = m;
-            cfg.canMint = cm;
+            TokenConfig storage c = tokenConfig[t];
+            c.min = m;
+            c.permissions = p;
 
-            emit TokenConfigUpdated(t, a, m, cm);
+            emit TokenConfigUpdated(t, m, p);
             unchecked { ++i; }
         }
     }
@@ -190,12 +185,14 @@ contract DepositRouter is
 
     function canDeposit(address token, uint256 amount, bool mint) external view returns (bool) {
         if (amount == 0 || paused()) return false;
+        if (token == address(0) && mint) return false; // ETH cannot mint
 
         TokenConfig storage c = tokenConfig[token];
-        if (!(c.allowed && amount >= c.min)) return false;
+        if (amount < c.min) return false;
 
-        if (token == address(0)) return !mint;   // ETH cannot mint
-        return mint ? c.canMint : true;          // ERC20: Mint gated, Wrap always ok
+        uint8 need = mint ? PERMISSION_MINT : PERMISSION_WRAP;
+        uint8 perms = c.permissions;
+        return (perms & need) != 0;
     }
 
     function version() external pure virtual returns (string memory) {
