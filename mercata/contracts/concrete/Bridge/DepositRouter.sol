@@ -136,8 +136,7 @@ contract DepositRouter is
     }
 
     function setTokenPermissions(address token, uint8 permissions) external onlyOwner {
-        if ((permissions & ~PERMISSION_MASK) != 0) revert InvalidPermissions();
-        if (token == address(0) && (permissions & PERMISSION_MINT) != 0) revert InvalidAddress();
+        if ((permissions & ~PERMISSION_MASK) != 0 || (token == address(0) && (permissions & PERMISSION_MINT) != 0)) revert InvalidPermissions();
         TokenConfig storage c = tokenConfig[token];
         if (c.permissions == permissions) return;
         c.permissions = permissions;
@@ -155,8 +154,9 @@ contract DepositRouter is
         for (uint256 i; i < len; ) {
             address t = tokens[i];
             uint96 m = minAmounts[i];
-            uint8 p = (t == address(0)) ? (permissions[i] & ~PERMISSION_MINT) : permissions[i]; // ETH => no mint
-            if ((p & ~PERMISSION_MASK) != 0) revert InvalidPermissions();
+            uint8 p = permissions[i];
+            
+            if ((p & ~PERMISSION_MASK) != 0 || (t == address(0) && (p & PERMISSION_MINT) != 0)) revert InvalidPermissions();
 
             TokenConfig storage c = tokenConfig[t];
             c.min = m;
