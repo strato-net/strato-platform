@@ -1,6 +1,8 @@
 contract CDPVault {
     using SafeMath for uint256;
 
+    //todo: add ReentrancyGuard
+
     address public cdpEngine;
 
     // owner => asset => balance
@@ -34,7 +36,7 @@ contract CDPVault {
         IERC20(asset).transferFrom(owner, address(this), amount);
         balances[owner][asset] = balances[owner][asset].add(amount);
 
-        emit CollateralMoved(address(this), owner, asset, amount);
+        emit CollateralMoved(owner, address(this), asset, amount);
     }
 
     function withdraw(
@@ -50,7 +52,7 @@ contract CDPVault {
         balances[owner][asset] = balances[owner][asset].sub(amount);
         IERC20(asset).transfer(owner, amount);
 
-        emit CollateralMoved(owner, address(this), asset, amount);
+        emit CollateralMoved(address(this), owner, asset, amount);
     }
 
     function seize(
