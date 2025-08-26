@@ -321,7 +321,7 @@
 	"dependencies": {
 		"await-notify": "1.0.1",
 		"axios": "^1.4.0",
-		"blockapps-rest": "../blockapps-rest",
+		"blockapps-rest": "^8.4.0",
 		"js-yaml": "^4.0.0",
 		"qs": "^6.11.2",
 		"vscode-debugadapter": "^1.43.0",

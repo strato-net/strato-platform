@@ -4,6 +4,7 @@ import getConfig from './load.config';
 import getOptions from './load.options';
 import { getApplicationUser } from './auth';
 import { LOADIPHLPAPI } from 'dns';
+import { execSync } from "child_process";
 
 let validationCounter: number = 0;
 
@@ -111,7 +112,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
   // another contract's constructor
   const baseCons = Array();
   for(let contractName in contractAST._contracts) {
-    if(contractAST._contracts[contractName]._constructor && Object.keys(contractAST._contracts[contractName]._constructor.funcConstructorCalls).length === 0 && contractAST._contracts[contractName]._parents.length === 0) {
+    if(contractAST._contracts[contractName]._constructor && Object.keys(contractAST._contracts[contractName]._constructor._funcConstructorCalls).length === 0 && contractAST._contracts[contractName]._parents.length === 0) {
       baseCons.push(contractName);
     }
   }
@@ -125,14 +126,14 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
       contractConstructorLines.push({
         'contractName': `${contractName}`,
         'start': {
-          'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
-          'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
-          'name': contractAST._contracts[contractName]._constructor.funcContext.start.source
+          'column': contractAST._contracts[contractName]._constructor._funcContext.start.column,
+          'line': contractAST._contracts[contractName]._constructor._funcContext.start.line,
+          'name': contractAST._contracts[contractName]._constructor._funcContext.start.source
         },
         'end': {
-          'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
-          'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
-          'name': contractAST._contracts[contractName]._constructor.funcContext.end.source
+          'column': contractAST._contracts[contractName]._constructor._funcContext.end.column,
+          'line': contractAST._contracts[contractName]._constructor._funcContext.end.line,
+          'name': contractAST._contracts[contractName]._constructor._funcContext.end.source
         }
       });
     }
@@ -188,7 +189,7 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
           // The parent of this contract is a child that inherits a base constructor.
           // Check the constructor of this contract to see if it constructs the same base constructor.
           if (contractAST._contracts[contractName]._constructor) {
-            for(let key in contractAST._contracts[contractName]._constructor.funcConstructorCalls){
+            for(let key in contractAST._contracts[contractName]._constructor._funcConstructorCalls){
               if(key == parentChild[parentChildIndex].parent){
                 foundReusedBaseCont = true;
                 let parentConstructorLineNumber;
@@ -241,14 +242,14 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
                     '_severity': 'Warning'
                   },
                   'start': {
-                    'line': contractAST._contracts[contractName]._constructor.funcContext.start.line,
-                    'column': contractAST._contracts[contractName]._constructor.funcContext.start.column,
-                    'name': contractAST._contracts[contractName]._constructor.funcContext.start.name
+                    'line': contractAST._contracts[contractName]._constructor._funcContext.start.line,
+                    'column': contractAST._contracts[contractName]._constructor._funcContext.start.column,
+                    'name': contractAST._contracts[contractName]._constructor._funcContext.start.name
                   },
                   'end': {
-                    'line': contractAST._contracts[contractName]._constructor.funcContext.end.line,
-                    'column': contractAST._contracts[contractName]._constructor.funcContext.end.column,
-                    'name': contractAST._contracts[contractName]._constructor.funcContext.end.name
+                    'line': contractAST._contracts[contractName]._constructor._funcContext.end.line,
+                    'column': contractAST._contracts[contractName]._constructor._funcContext.end.column,
+                    'name': contractAST._contracts[contractName]._constructor._funcContext.end.name
                   }
                 });
 
@@ -273,8 +274,8 @@ async function findReusedBaseCons(doc: vscode.TextDocument, contractAST: any): P
           if(parentChild[parentChildIndex].parent === parentChild[i].parent){
             foundReusedBaseCont = true;
             // Push annotation for the contract itself
-            const firstStart = contractAST._contracts[parentChild[parentChildIndex].child]._constructor ? contractAST._contracts[parentChild[parentChildIndex].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[parentChildIndex].child]._contractContext.start.line
-            const secondStart = contractAST._contracts[parentChild[i].child]._constructor ? contractAST._contracts[parentChild[i].child]._constructor.funcContext.start.line : contractAST._contracts[parentChild[i].child]._contractContext.start.line
+            const firstStart = contractAST._contracts[parentChild[parentChildIndex].child]._constructor ? contractAST._contracts[parentChild[parentChildIndex].child]._constructor._funcContext.start.line : contractAST._contracts[parentChild[parentChildIndex].child]._contractContext.start.line
+            const secondStart = contractAST._contracts[parentChild[i].child]._constructor ? contractAST._contracts[parentChild[i].child]._constructor._funcContext.start.line : contractAST._contracts[parentChild[i].child]._contractContext.start.line
             reusedBaseCons.push({
               'annotation': {
                 '_context': `Base constructor arguments given twice for contract '${contractName}' in line ${contractAST._contracts[contractName]._contractContext.start.line}. \nFirst constructor call is in the contract '${parentChild[parentChildIndex].child}' in line ${firstStart}. \nSecond constructor call in the contract '${parentChild[i].child}' in line ${secondStart}.`,
@@ -306,22 +307,15 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
   if (validationCounter === counter) {
     try {
       const diagnostics: vscode.Diagnostic[] = []; 
-      const user = await getApplicationUser();
-      const options = getOptions() || {}
-      let srcMap = {[doc.uri.path]: doc.getText()};
       const folders = vscode.workspace.workspaceFolders || [];
-      if (folders.length > 0) {
-        const serverPath: string = vscode.workspace.getConfiguration().get('strato-vscode.serverPath') || '';
-        const currentFolder = folders[0]
-		    const folder = currentFolder.uri.path;
-        // eslint-disable-next-line import/no-mutable-exports
-        const dirPath = `${folder}/${serverPath}`
-        srcMap = await importer.combine(doc.uri.path, true, dirPath);
-        srcMap[importer.getShortName(doc.uri.path)] = doc.getText();
-      }
-
-      const contractAST = await rest.debugPostParse(user, srcMap, options);
-      const annotations = await rest.debugPostAnalyze(user, srcMap, options);
+      const currentFolder = folders[0]
+		  const folder = currentFolder.uri.path;
+      const fileName = doc.uri.path;
+      const fileStr = doc.getText().replace(/\"/g, "\\\"");
+      console.log(`${fileName}`)
+      // const contractAST = await execShell(`solid-vm-cli parse --${fileName} "${fileStr.replace("\"", "\\\"")}"`);
+      const contractAST = JSON.parse(execSync(`solid-vm-cli compile json source "${fileName}" "${fileStr}"`).toString());
+      const annotations = JSON.parse(execSync(`solid-vm-cli analyze json source "${fileName}" "${fileStr}"`).toString());
 
       // Run dead code detector
       const deadCodeArr = await findDeadCode(doc, contractAST);
@@ -336,8 +330,8 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
         annotations.push(reusedBaseCons[i]);
       }      
 
-      for (let ann in annotations) {
-        const mDiag = createDiagnostic(doc, annotations[ann]);
+      for (let i = 0; i < annotations.length; i++) {
+        const mDiag = createDiagnostic(doc, annotations[i]);
         if (mDiag) {
           diagnostics.push(mDiag);
         }
@@ -347,10 +341,10 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 
 		  const shouldFuzz = vscode.workspace.getConfiguration().get('strato-vscode.autoFuzz') || false;
       if (shouldFuzz) {
-        const fuzzAnns = await rest.debugPostFuzz(user, srcMap, options);
+        const fuzzAnns = JSON.parse(execSync(`solid-vm-cli fuzz json source ${fileName} "${fileStr}"`).toString());
 
-        for (let ann in fuzzAnns) {
-          const mDiag = createFuzzDiagnostic(doc, fuzzAnns[ann]);
+        for (let i = 0; i < fuzzAnns.length; i++) {
+          const mDiag = createFuzzDiagnostic(doc, fuzzAnns[i]);
           if (mDiag) {
             diagnostics.push(mDiag);
           }

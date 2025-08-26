@@ -71,7 +71,7 @@ import Text.Parsec.Error
 
 data CompilationError
   = PEx ParseError
-  | IEx T.Text
+  | IEx (SourceAnnotation T.Text)
   | TCEx [SourceAnnotation T.Text]
   | SVMEx (Positioned ((,) SolidException))
   deriving (Show)
@@ -109,7 +109,7 @@ withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Ei
 withAnnotations f = fmap (first unwind) . f
   where
     unwind (PEx pe) = [parseErrorToAnnotation pe]
-    unwind (IEx t) = [t <$ emptySourceAnnotation]
+    unwind (IEx t) = [t]
     unwind (SVMEx (e, x)) = [T.pack (show e) <$ x]
     unwind (TCEx errs) = errs
 
@@ -130,7 +130,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
   let getNamedSUnits :: T.Text -> T.Text -> Either CompilationError (Positioned UnresolvedFileUnitsF)
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
-        foldrM (\u ufu -> maybe (pure ufu) (first IEx . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
+        foldrM (\u ufu -> maybe (pure ufu) (first (IEx . (<$ (def :: SourceAnnotation ()))) . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
       userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
@@ -155,7 +155,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
-  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
+  theCC <- withExceptT (\(x,t) -> IEx $ t <$ x) $ resolveImports (codeCollectionFromHashNoCache False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
   pure $ force theCC
 
 --- Don't typecheck in Slipstream!!!

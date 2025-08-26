@@ -40,6 +40,8 @@ executables:
     main: Main.hs
     other-modules: []
     dependencies:
+      - aeson
+      - bytestring
       - containers
       - exceptions
       - hflags
