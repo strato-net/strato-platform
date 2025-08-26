@@ -2,11 +2,13 @@
 pragma solidity 0.8.20;
 
 import "./CDPVault.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 
-contract CDPEngine {
+contract record CDPEngine is Ownable {
     // External contracts
 
-    CDPVault public immutable cdpVault;
+    CDPVault public cdpVault;
 
     // Per-collateral asset Risk Parameters
     struct CollateralConfig {
@@ -35,13 +37,13 @@ contract CDPEngine {
     }
 
     // State variables
-    mapping(address => CollateralConfig) public collateralConfigs;
-    mapping(address => CollateralGlobalState) public collateralGlobalStates;
-    mapping(address => mapping(address => Vault)) public vaults; // user => asset => vault
+    mapping(address => CollateralConfig) public record collateralConfigs;
+    mapping(address => CollateralGlobalState) public record collateralGlobalStates;
+    mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
 
     bool public globalPaused;
-    address[] public supportedAssets;
-    mapping(address => bool) public isSupportedAsset;
+    address[] public record supportedAssets;
+    mapping(address => bool) public record isSupportedAsset;
 
     // Events
     event CollateralConfigured(
@@ -109,4 +111,20 @@ contract CDPEngine {
         require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
         _;
     }
+
+    function deposit(
+        address asset,
+        uint256 amount
+    ) external whenNotPaused(asset) onlySupportedAsset(asset) {
+        require(amount > 0, "CDPEngine: Invalid amount");
+
+        cdpVault.deposit(msg.sender, asset, amount);
+
+        // Update vault state
+        vaults[msg.sender][asset].collateral += amount;
+
+        emit Deposited(msg.sender, asset, amount);
+    }
+
+     
 }
