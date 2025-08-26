@@ -7,17 +7,16 @@ export const getMaxSafeWithdrawAmount = (
   const ltvBP = BigInt(asset?.ltv ?? "0");
   const priceAssetUSD = BigInt(asset?.assetPrice ?? "0");
   const userCollatAmt = BigInt(asset?.collateralizedAmount ?? "0");
-  const totalBorrowingPowerUSD = BigInt(loanData?.totalBorrowingPowerUSD ?? "0");
-  const totalAmountOwed = BigInt(loanData?.totalAmountOwed ?? "0");
   const tokenDecimals = BigInt(10) ** BigInt(asset?.customDecimals ?? 18);
 
   if (ltvBP === 0n || priceAssetUSD === 0n) return 0n;
 
-  const availableBorrowingPower = totalBorrowingPowerUSD - totalAmountOwed;
-  if (availableBorrowingPower <= 0n) return 0n;
+  // Use backend-provided USD capacity to avoid unit mismatches (USD 1e18)
+  const availableBorrowingPowerUSD = BigInt(loanData?.maxAvailableToBorrowUSD ?? "0");
+  if (availableBorrowingPowerUSD <= 0n) return 0n;
 
   // amount(tokens) = availableUSD * 10^decimals * 10000 / (priceUSD * ltvBP)
-  const withdrawAmtToken = (availableBorrowingPower * tokenDecimals * 10000n) / (priceAssetUSD * ltvBP);
+  const withdrawAmtToken = (availableBorrowingPowerUSD * tokenDecimals * 10000n) / (priceAssetUSD * ltvBP);
   return withdrawAmtToken < userCollatAmt ? withdrawAmtToken : userCollatAmt;
 };
 
@@ -45,13 +44,17 @@ export const calculateCollateralHealthImpact = (
     };
   }
 
-  // Current values from backend
-  const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
+  // Current values from backend (USD 1e18)
   const currentHealthFactorRaw = BigInt(loanData?.healthFactorRaw || 0n);
-  const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
+  const currentCollateralValueUSD = BigInt(loanData?.totalCollateralValueUSD || 0);
+
+  // Derive current borrow value in USD from HF: HF = collateral / debt => debt = collateral / HF
+  const currentTotalBorrowValueUSD = currentHealthFactorRaw === 0n
+    ? 0n
+    : (currentCollateralValueUSD * 10n ** 18n) / currentHealthFactorRaw;
 
   // If there's no outstanding loan, collateral operations are always healthy
-  if (currentTotalBorrowValue === 0n) {
+  if (currentTotalBorrowValueUSD === 0n) {
     return {
       currentHealthFactor: Infinity,
       newHealthFactor: Infinity,
@@ -73,14 +76,13 @@ export const calculateCollateralHealthImpact = (
 
   // Add or subtract from current collateral value based on operation
   const newCollateralValue = isSupply
-    ? currentCollateralValue + amountValueWithThreshold
-    : currentCollateralValue - amountValueWithThreshold;
+    ? currentCollateralValueUSD + amountValueWithThreshold
+    : currentCollateralValueUSD - amountValueWithThreshold;
 
   // Calculate new health factor (raw, scaled to 1e18)
-  const newHealthFactorRaw =
-    currentTotalBorrowValue === 0n
-      ? 0n
-      : (newCollateralValue * 10n ** 18n) / currentTotalBorrowValue;
+  const newHealthFactorRaw = newCollateralValue <= 0n
+    ? 0n
+    : (newCollateralValue * 10n ** 18n) / currentTotalBorrowValueUSD;
 
   // Calculate health impact and isHealthy using raw values
   const healthImpact = Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
@@ -127,19 +129,23 @@ export const calculateBorrowOperationHealthImpact = (
     };
   }
 
-  // Current values from backend
-  const currentTotalBorrowValue = BigInt(loanData?.totalAmountOwed || 0);
+  // Current values from backend (USD 1e18)
+  const currentTotalBorrowValueUSD = (() => {
+    const hfRaw = BigInt(loanData?.healthFactorRaw || 0n);
+    const collUSD = BigInt(loanData?.totalCollateralValueUSD || 0);
+    if (hfRaw === 0n) return 0n;
+    return (collUSD * 10n ** 18n) / hfRaw;
+  })();
   const currentHealthFactorRaw = BigInt(loanData?.healthFactorRaw || 0n);
-  const currentCollateralValue = BigInt(loanData?.totalCollateralValueUSD || 0);
+  const currentCollateralValueUSD = BigInt(loanData?.totalCollateralValueUSD || 0);
 
   // If there's no outstanding loan, borrow operations have special handling
-  if (currentTotalBorrowValue === 0n) {
+  if (currentTotalBorrowValueUSD === 0n) {
     if (isBorrow) {
       // For borrow, calculate new health factor for first borrow
-      const newHealthFactorRaw =
-        amountWei === 0n
-          ? 0n
-          : (currentCollateralValue * 10n ** 18n) / amountWei;
+      const newHealthFactorRaw = amountWei === 0n
+        ? 0n
+        : (currentCollateralValueUSD * 10n ** 18n) / amountWei;
 
       const healthImpact = Number(newHealthFactorRaw) / 1e18;
       const isHealthy = newHealthFactorRaw >= 10n ** 18n;
@@ -161,22 +167,21 @@ export const calculateBorrowOperationHealthImpact = (
     }
   }
 
-  // Calculate new borrow value after operation
-  const newBorrowValue = isBorrow
-    ? currentTotalBorrowValue + amountWei
-    : currentTotalBorrowValue - amountWei;
+  // Calculate new borrow value after operation (assumes amountWei in USD 1e18 scale)
+  const newBorrowValueUSD = isBorrow
+    ? currentTotalBorrowValueUSD + amountWei
+    : currentTotalBorrowValueUSD - amountWei;
 
   // Calculate new health factor (raw, scaled to 1e18)
-  const newHealthFactorRaw =
-    newBorrowValue === 0n
-      ? 0n
-      : (currentCollateralValue * 10n ** 18n) / newBorrowValue;
+  const newHealthFactorRaw = newBorrowValueUSD === 0n
+    ? 0n
+    : (currentCollateralValueUSD * 10n ** 18n) / newBorrowValueUSD;
 
   // Calculate health impact and isHealthy using raw values
-  const healthImpact = newBorrowValue === 0n 
-    ? Number(10n ** 20n - currentHealthFactorRaw) / 1e18  // Large positive number when fully repaid
+  const healthImpact = newBorrowValueUSD === 0n
+    ? Number(10n ** 20n - currentHealthFactorRaw) / 1e18
     : Number(newHealthFactorRaw - currentHealthFactorRaw) / 1e18;
-  const isHealthy = newBorrowValue === 0n || newHealthFactorRaw >= 10n ** 18n;
+  const isHealthy = newBorrowValueUSD === 0n || newHealthFactorRaw >= 10n ** 18n;
 
   return {
     currentHealthFactor: Number(currentHealthFactorRaw) / 1e18,

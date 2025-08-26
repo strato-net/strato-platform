@@ -3,6 +3,12 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix } from "../../utils/utils";
+import { 
+  buildQueryParams, 
+  enrichTransactionData, 
+  executeParallelQueries, 
+  QUERY_CONFIGS 
+} from "../helpers/bridge.helper";
 
 const { MercataBridge, Token } = constants;
 
@@ -38,28 +44,36 @@ export const bridgeOut = async (
   return { status, hash, message: "Withdrawal request submitted successfully" };
 };
 
-export const getBridgeStatus = async (
+export const getBridgeTransactions = async (
   accessToken: string,
-  userAddress: string,
+  type: 'withdrawal' | 'deposit',
+  userAddress?: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
-  try {
-    if (!userAddress) {
-      throw new Error('User address is required');
-    }
+  const bridgeAssets = await getBridgeAssets(accessToken);
+  const config = QUERY_CONFIGS[type];
+  
+  const dataParams = {
+    select: config.selectFields,
+    ...buildQueryParams(rawParams, userAddress)
+  };
 
-    const params = {
-      select: "withdrawalId:key,withdrawalInfo:value",
-      "value->>user": `eq.${userAddress}`,
-      address: `eq.${constants.mercataBridge}`
-    };
+  const countParams = {
+    select: config.countField,
+    ...buildQueryParams(rawParams, userAddress, ['limit', 'offset', 'order', 'select'])
+  };
 
-    const { data: withdrawals } = await cirrus.get(accessToken, `/${MercataBridge}-withdrawals`, { params });
+  const { results, totalCount } = await executeParallelQueries(
+    accessToken, config, dataParams, countParams
+  );
 
-    return withdrawals || [];
-  } catch (error) {
-    throw error;
+  if (!results.length) {
+    return { data: [], totalCount };
   }
+
+  const enrichedData = enrichTransactionData(results, bridgeAssets, config.enrichmentType);
+  
+  return { data: enrichedData, totalCount };
 };
 
 export const getBridgeableTokens = async (accessToken: string, chainId: string) => {
@@ -98,5 +112,42 @@ export const getNetworkConfigs = async (accessToken: string) => {
     });
   } catch (e) {
     throw e;
+  }
+};
+
+export const getBridgeAssets = async (accessToken: string) => {
+  try {
+    const { data: bridgeData } = await cirrus.get(accessToken, `/BlockApps-Mercata-MercataBridge`, {
+      params: {
+        select: "assets:BlockApps-Mercata-MercataBridge-assets(*)",
+        address: `eq.${constants.mercataBridge}`
+      }
+    });
+
+    const assets = bridgeData?.[0]?.assets || [];
+    if (!assets.length) return [];
+
+    const tokenAddresses = assets.map((asset: any) => asset.key);
+    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
+      params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
+    });
+
+    const tokenMap = new Map(tokenData.map((t: any) => [t.address, { name: t._name, symbol: t._symbol }]));
+
+    return assets.map((asset: any) => {
+      const tokenInfo = tokenMap.get(asset.key) as { name?: string; symbol?: string } | undefined;
+      return {
+        key: asset.key,
+        root: asset.root,
+        value: asset.value,
+        address: asset.address,
+        stratoToken: asset.key,
+        stratoTokenName: tokenInfo?.name || "",
+        stratoTokenSymbol: tokenInfo?.symbol || ""
+      };
+    });
+  } catch (error) {
+    console.error("Error in getBridgeAssets:", error);
+    throw error;
   }
 };

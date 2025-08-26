@@ -70,6 +70,18 @@ export function validateWithdrawCollateralArgs(args: any) {
   }
 }
 
+// NEW: dedicated validator for withdraw-collateral-max (asset only)
+export function validateWithdrawCollateralMaxArgs(args: any) {
+  const schema = Joi.object({
+    asset: validateAddressField("asset"),
+  });
+
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Withdraw Collateral Max Argument Validation Error: " + error.message);
+  }
+}
+
 
 export function validateConfigureAssetArgs(args: any) {
   const schema = Joi.object({
@@ -84,6 +96,29 @@ export function validateConfigureAssetArgs(args: any) {
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Configure Asset Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSweepReservesArgs(args: any) {
+  const schema = Joi.object({
+    amount: numericStringField("amount"),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Sweep Reserves Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateSetDebtCeilingsArgs(args: any) {
+  const schema = Joi.object({
+    assetUnits: numericStringField("assetUnits", {allowZero: true}),
+    usdValue: numericStringField("usdValue", {allowZero: true}),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Set Debt Ceilings Argument Validation Error: " + error.message);
   }
 }
 

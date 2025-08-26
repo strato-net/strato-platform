@@ -31,7 +31,7 @@ services:
       - TOKEN_FACTORY=${TOKEN_FACTORY}
       - ONRAMP=${ONRAMP}
       - ADMIN_REGISTRY=${ADMIN_REGISTRY}
-      - BRIDGE_API_BASE_URL=${BRIDGE_API_BASE_URL}
+      - MERCATA_BRIDGE=${MERCATA_BRIDGE}
       - WAGMI_PROJECT_ID=${WAGMI_PROJECT_ID}
     restart: unless-stopped
     logging:
