@@ -62,7 +62,8 @@ contract record MercataBridge is Ownable {
         address stratoSender;      // STRATO sender
         BridgeStatus bridgeStatus; // NONE / INITIATED / PENDING_REVIEW / ...
         bool mintUSDST;           // true = burn USDST, false = unwrap token
-        uint256 timestamp;        // timestamp of the withdrawal request
+        uint256 timestamp;        // timestamp of the withdrawal
+        uint256 requestedAt;      // timestamp of the withdrawal request (for abort accuracy)
     }
 
 /* --------------------------------------------------------------------- */
@@ -513,6 +514,7 @@ contract record MercataBridge is Ownable {
             msg.sender,
             BridgeStatus.INITIATED,
             mintUSDST,
+            block.timestamp,
             block.timestamp
         );
 
@@ -630,7 +632,7 @@ contract record MercataBridge is Ownable {
         if (msg.sender == w.stratoSender) {
             /* user path – enforce timeout */
             require(
-                block.timestamp >= w.timestamp + WITHDRAWAL_ABORT_DELAY,
+                block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY,
                 "MB: wait 48h"
             );
         } else {
@@ -666,7 +668,7 @@ contract record MercataBridge is Ownable {
                 require(msg.sender == w.stratoSender, "MB: only owner/user");
 
                 // keep time math in uint256 to match block.timestamp
-                uint256 deadline = w.timestamp + WITHDRAWAL_ABORT_DELAY;
+                uint256 deadline = w.requestedAt + WITHDRAWAL_ABORT_DELAY;
                 require(block.timestamp >= deadline, "MB: wait 48h");
             }
 
