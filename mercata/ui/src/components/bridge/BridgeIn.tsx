@@ -662,7 +662,7 @@ const BridgeIn: React.FC = () => {
           ) : null)}
       </div>
 
-      <div className="bg-gray-50 p-4 rounded-md space-y-2">
+      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Bridge Fee:</span>
           <span>{BRIDGE_FEE}</span>
@@ -671,7 +671,7 @@ const BridgeIn: React.FC = () => {
           <span className="text-gray-500">Estimated Time:</span>
           <span>{ESTIMATED_TIME}</span>
         </div>
-      </div>
+      </div> */}
 
       <div className="text-sm text-gray-500 space-y-1">
         {[
