@@ -11,7 +11,6 @@ import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useSwapContext } from '@/context/SwapContext';
-import { useLendingContext } from '@/context/LendingContext';
 import { usdstAddress, WITHDRAW_FEE } from "@/lib/constants";
 import { LiquidityPool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
@@ -39,9 +38,9 @@ const LiquidityWithdrawModal = ({
   const [withdrawLoading, setWithdrawLoading] = useState(false);
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [maxButtonLoading, setMaxButtonLoading] = useState(false);
 
   const { removeLiquidity, fetchTokenBalances } = useSwapContext();
-  const { withdrawLiquidityAll } = useLendingContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -76,6 +75,31 @@ const LiquidityWithdrawModal = ({
   const handleClose = () => {
     setWithdrawPercent('');
     onClose();
+  };
+
+  const handleMaxWithdraw = async () => {
+    if (!selectedPool || operationInProgressRef.current) return;
+    const userLpTokenBalance = selectedPool.lpToken.balances?.[0]?.balance || "0";
+    if (BigInt(userLpTokenBalance) === 0n || BigInt(usdstBalance || "0") < safeParseUnits(WITHDRAW_FEE, 18)) return;
+
+    try {
+      operationInProgressRef.current = true;
+      setMaxButtonLoading(true);
+      
+      await removeLiquidity({
+        poolAddress: selectedPool.address,
+        lpTokenAmount: userLpTokenBalance,
+      });
+      
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      handleClose();
+      onWithdrawSuccess();
+    } catch (error: any) {
+      // Error handling can be added here if needed
+    } finally {
+      setMaxButtonLoading(false);
+      operationInProgressRef.current = false;
+    }
   };
 
   const handleWithdrawSubmit = async () => {
@@ -208,9 +232,10 @@ const LiquidityWithdrawModal = ({
                   variant="ghost"
                   size="sm"
                   className="text-xs text-blue-500"
-                  onClick={async () => { try { await withdrawLiquidityAll(); onWithdrawSuccess(); onClose(); } catch {} }}
+                  onClick={handleMaxWithdraw}
+                  disabled={maxButtonLoading || !selectedPool || BigInt(selectedPool.lpToken.balances?.[0]?.balance || "0") === 0n}
                 >
-                  Max
+                  {maxButtonLoading ? "Processing..." : "Max"}
                 </Button>
               </div>
               {withdrawPercent && parseFloat(withdrawPercent) > 100 && (
