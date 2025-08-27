@@ -175,6 +175,65 @@ contract record CDPEngine is Ownable {
     }
 
     /**
+     * @notice Repay USDST debt for a specific asset
+     * @param asset The collateral asset 
+     * @param amountUSD The amount of USDST to repay
+     * @dev User must first approve(CDPEngine, amountUSD) before calling this
+     */
+    function repay(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
+        _accrue(asset);
+        require(amountUSD > 0, "CDPEngine: zero amount");
+        
+        CollateralGlobalState storage assetState = collateralGlobalStates[asset];
+        Vault storage userVault = vaults[msg.sender][asset];
+        
+        uint256 owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        require(owed > 0, "CDPEngine: no debt");
+        uint256 repay = amountUSD > owed ? owed : amountUSD;
+        uint256 scaledDelta = (repay * RAY) / assetState.rateAccumulator;
+        
+        // Clamp scaledDelta to not exceed current scaledDebt (handle rounding)
+        if (scaledDelta > userVault.scaledDebt) {
+            scaledDelta = userVault.scaledDebt;
+        }
+        
+        require(usdst.burn(msg.sender, repay), "CDPEngine: burn failed");
+
+        userVault.scaledDebt -= scaledDelta;
+        assetState.totalScaledDebt -= scaledDelta;
+        assetState.mintedUSD -= repay;
+        
+        emit USDSTBurned(msg.sender, asset, repay);
+        emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    /**
+     * @notice Repay all debt for a specific asset (dust-free)
+     * @param asset The collateral asset
+     * @dev Consumes rounding residual to set scaledDebt=0 exactly
+     */
+    function repayAll(address asset) external whenNotPaused(asset) onlySupportedAsset(asset) {
+        _accrue(asset);
+        
+        CollateralGlobalState storage assetState = collateralGlobalStates[asset];
+        Vault storage userVault = vaults[msg.sender][asset];
+        
+        require(userVault.scaledDebt > 0, "CDPEngine: no debt");
+        uint256 owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint256 scaledDebtToRemove = userVault.scaledDebt;
+        
+        require(usdst.burn(msg.sender, owed), "CDPEngine: burn failed");
+
+        // Fully clear scaledDebt regardless of rounding
+        userVault.scaledDebt = 0;
+        assetState.totalScaledDebt -= scaledDebtToRemove;
+        assetState.mintedUSD -= owed;
+        
+        emit USDSTBurned(msg.sender, asset, owed);
+        emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    /**
      * @notice Accrue interest for a specific asset
      * @param asset The asset to accrue interest for
      */
