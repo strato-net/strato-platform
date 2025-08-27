@@ -2,6 +2,12 @@
 pragma solidity 0.8.20;
 
 import "./CDPVault.sol";
+import "../Tokens/Token.sol";
+import "./PriceOracle.sol";
+import "../Admin/FeeCollector.sol";
+
+import "../../abstract/ERC20/access/Ownable.sol";
+import "../../abstract/ERC20/IERC20.sol";
 
 contract CDPEngine {
     // External contracts
@@ -34,16 +40,14 @@ contract CDPEngine {
         uint256 scaledDebt;
     }
 
-    // State variables
-    mapping(address => CollateralConfig) public collateralConfigs;
-    mapping(address => CollateralGlobalState) public collateralGlobalStates;
-    mapping(address => mapping(address => Vault)) public vaults; // user => asset => vault
+    mapping(address => CollateralConfig) public record collateralConfigs;
+    mapping(address => CollateralGlobalState) public record collateralGlobalStates;
+    mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
 
     bool public globalPaused;
-    address[] public supportedAssets;
-    mapping(address => bool) public isSupportedAsset;
-
-    address public usdst;
+    uint256 public RAY = 1e27;
+    address[] public record supportedAssets;
+    mapping(address => bool) public record isSupportedAsset;
 
     // Events
     event CollateralConfigured(
