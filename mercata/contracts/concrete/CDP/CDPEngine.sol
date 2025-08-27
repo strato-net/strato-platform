@@ -9,10 +9,13 @@ import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
-contract CDPEngine {
+contract record CDPEngine is Ownable {
     // External contracts
 
     CDPVault public immutable cdpVault;
+    Token public immutable usdst;
+    PriceOracle public priceOracle;
+    FeeCollector public feeCollector;
 
     // Per-collateral asset Risk Parameters
     struct CollateralConfig {
@@ -121,6 +124,23 @@ contract CDPEngine {
     modifier onlySupportedAsset(address asset) {
         require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
         _;
+    }
+
+    constructor(
+        address _cdpVault,
+        address _usdst,
+        address _priceOracle,
+        address _feeCollector,
+        address initialOwner
+    ) Ownable(initialOwner) {
+        require(_cdpVault != address(0), "CDPEngine: invalid vault");
+        require(_usdst != address(0), "CDPEngine: invalid USDST");
+        require(_priceOracle != address(0), "CDPEngine: invalid oracle");
+        
+        cdpVault = CDPVault(_cdpVault);
+        usdst = Token(_usdst);
+        priceOracle = PriceOracle(_priceOracle);
+        feeCollector = FeeCollector(_feeCollector);
     }
 
     function mint(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
