@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
-
 import "./CDPVault.sol";
 import "../Tokens/Token.sol";
 import "./PriceOracle.sol";
@@ -11,7 +8,6 @@ import "../../abstract/ERC20/IERC20.sol";
 
 contract record CDPEngine is Ownable {
     // External contracts
-
     CDPVault public immutable cdpVault;
     Token public immutable usdst;
     PriceOracle public priceOracle;
@@ -326,5 +322,100 @@ contract record CDPEngine is Ownable {
                 }
             }
         }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // ADMINISTRATIVE FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Configure risk parameters for a collateral asset
+     * @param asset The collateral asset address
+     * @param liquidationRatio Minimum collateralization ratio (WAD)
+     * @param liquidationPenaltyBps Penalty for liquidation in basis points
+     * @param closeFactorBps Maximum liquidation amount in basis points
+     * @param stabilityFeeRate Per-second stability fee rate (RAY)
+     * @param debtFloor Minimum debt amount to avoid dust
+     * @param debtCeiling Maximum debt amount for this asset
+     * @param unitScale Scale factor for non-18 decimal tokens
+     */
+    function setCollateralAssetParams(
+        address asset,
+        uint256 liquidationRatio,
+        uint256 liquidationPenaltyBps,
+        uint256 closeFactorBps,
+        uint256 stabilityFeeRate,
+        uint256 debtFloor,
+        uint256 debtCeiling,
+        uint256 unitScale
+    ) external onlyOwner {
+        require(asset != address(0), "CDPEngine: invalid asset");
+        require(liquidationRatio > 1e18, "CDPEngine: liquidation ratio too low");
+        require(liquidationPenaltyBps <= 10000, "CDPEngine: penalty too high");
+        require(closeFactorBps <= 10000, "CDPEngine: close factor too high");
+        require(unitScale > 0, "CDPEngine: invalid unit scale");
+
+        CollateralConfig storage config = collateralConfigs[asset];
+        config.liquidationRatio = liquidationRatio;
+        config.liquidationPenaltyBps = liquidationPenaltyBps;
+        config.closeFactorBps = closeFactorBps;
+        config.stabilityFeeRate = stabilityFeeRate;
+        config.debtFloor = debtFloor;
+        config.debtCeiling = debtCeiling;
+        config.unitScale = unitScale;
+
+        if (!isSupportedAsset[asset]) {
+            isSupportedAsset[asset] = true;
+            supportedAssets.push(asset);
+        }
+
+        emit CollateralConfigured(
+            asset,
+            liquidationRatio,
+            liquidationPenaltyBps,
+            closeFactorBps,
+            stabilityFeeRate,
+            debtFloor,
+            debtCeiling,
+            unitScale
+        );
+    }
+
+    /**
+     * @notice Set pause state for a specific asset
+     * @param asset The asset to pause/unpause
+     * @param isPaused Whether the asset should be paused
+     */
+    function setPaused(address asset, bool isPaused) external onlyOwner {
+        require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
+        collateralConfigs[asset].isPaused = isPaused;
+        emit Paused(asset, isPaused);
+    }
+
+    /**
+     * @notice Set global pause state
+     * @param isPaused Whether the system should be globally paused
+     */
+    function setPausedGlobal(bool isPaused) external onlyOwner {
+        globalPaused = isPaused;
+        emit PausedGlobal(isPaused);
+    }
+
+    /**
+     * @notice Update PriceOracle reference
+     * @param _priceOracle New price oracle address
+     */
+    function setPriceOracle(address _priceOracle) external onlyOwner {
+        require(_priceOracle != address(0), "CDPEngine: invalid oracle");
+        priceOracle = PriceOracle(_priceOracle);
+    }
+
+    /**
+     * @notice Update FeeCollector reference
+     * @param _feeCollector New fee collector address
+     */
+    function setFeeCollector(address _feeCollector) external onlyOwner {
+        require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
+        feeCollector = FeeCollector(_feeCollector);
     }
 }
