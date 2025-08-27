@@ -59,7 +59,6 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
-import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
@@ -2486,23 +2485,10 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
-      -- metadata = Env.metadata theEnv
-      isRunningTests = Env.runningTests theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals) True
   case erNewContractAddress execResults of
-    Just nca -> do
-      when (not isRunningTests) $ 
-      
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (const () <$> cc)
-                                     (SolidVMCode contractName' hsh) 
-                                     (T.pack ctrName)
-                                     (T.pack contractName')
-                                     M.empty
-                                     []
-                                   ]
-      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
@@ -2519,23 +2505,10 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  theEnv <- getEnv
-  let -- metadata = Env.metadata theEnv
-      isRunningTests = Env.runningTests theEnv
   (ctr, originAddress, ctrName) <- getCreator creator
   execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals True
   case erNewContractAddress execResults of
-    Just nca -> do
-      when (not isRunningTests) $ 
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                      (const () <$> cc)
-                                      (SolidVMCode contractName' hsh) 
-                                      (T.pack ctrName) 
-                                      (T.pack contractName')
-                                      M.empty
-                                      []
-                                   ]
-      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 

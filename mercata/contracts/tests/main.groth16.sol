@@ -53,9 +53,7 @@ contract Pairing {
             input.push(p2[i].Y[0]);
             input.push(p2[i].Y[1]);
         }
-        log("pairing input:",input);
         bool b = ecPairing(input);
-        log("pairing success:",b);
         return b;
     }
 
@@ -101,8 +99,6 @@ contract Pairing {
         p2[1] = b2;
         p2[2] = c2;
         p2[3] = d2;
-        log("p1:",p1);
-        log("p2:",p2);
         return pairing(p1, p2);
     }
 }
@@ -167,9 +163,6 @@ contract Verifier is Pairing {
     function verify(uint[] memory input, Proof memory proof) internal view returns (uint) {
         uint256 snark_scalar_field = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
         VerifyingKey memory vk = verifyingKey();
-        log("input:",input);
-        log("proof:",proof);
-        log("vk:",vk);
         require(input.length + 1 == vk.IC.length,"verifier-bad-input");
         // Compute the linear combination vk_x
         Pairing.G1Point vk_x = Pairing.G1Point(0, 0);
@@ -177,11 +170,8 @@ contract Verifier is Pairing {
             require(input[i] < snark_scalar_field,"verifier-gte-snark-scalar-field");
             Pairing.G1Point vk_mul = Pairing.scalar_mul(vk.IC[i + 1], input[i]);
             vk_x = Pairing.addition(vk_x, vk_mul);
-            log("vk_mul " + string(i) + ":",vk_mul);
-            log("vk_x " + string(i) + ":",vk_x);
         }
         vk_x = Pairing.addition(vk_x, vk.IC[0]);
-        log("vk_x final:",vk_x);
         if (!Pairing.pairingProd4(
             Pairing.negate(proof.A), proof.B,
             vk.alfa1, vk.beta2,
