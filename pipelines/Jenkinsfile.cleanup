@@ -1,9 +1,9 @@
-def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true) {
+def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Boolean hasNodeYarn = false) {
 
   script {
     def diskspaceAvailableBefore = sh(
         returnStdout: true,
-        script: "df -x overlay | grep /datadrive | awk '{print \$4}'"
+        script: "df -x overlay | grep -P '${diskRoot}\$' | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
@@ -53,7 +53,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, Boolean hasNodeYarn = true)
     
     def diskspaceAvailableAfter = sh(
         returnStdout: true,
-        script: "df -x overlay | grep /datadrive | awk '{print \$4}'"
+        script: "df -x overlay | grep -P '${diskRoot}\$' | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"
@@ -87,7 +87,7 @@ pipeline {
           agent { label "test1" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces()
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
               echo "Diskspace freed on test1: $diskspaceFreed kilobytes"
             }
           }
@@ -106,7 +106,7 @@ pipeline {
           agent { label "test2" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces()
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
               echo "Diskspace freed on test2: $diskspaceFreed kilobytes"
             }
           }
@@ -125,7 +125,7 @@ pipeline {
           agent { label "test3" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces()
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
               echo "Diskspace freed on test3: $diskspaceFreed kilobytes"
             }
           }
@@ -144,7 +144,7 @@ pipeline {
           agent { label "test4" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces()
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
               echo "Diskspace freed on test4: $diskspaceFreed kilobytes"
             }
           }
@@ -163,7 +163,7 @@ pipeline {
           agent { label "test5" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces()
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
               echo "Diskspace freed on test5: $diskspaceFreed kilobytes"
             }
           }
@@ -182,7 +182,7 @@ pipeline {
           agent { label "testsync1" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
               echo "Diskspace freed on testsync1: $diskspaceFreed kilobytes"
             }
           }
@@ -201,7 +201,7 @@ pipeline {
           agent { label "testsync2" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
               echo "Diskspace freed on testsync2: $diskspaceFreed kilobytes"
             }
           }
@@ -220,7 +220,7 @@ pipeline {
           agent { label "testsync3" }
           steps {
             script {
-              def diskspaceFreed = cleanOldWorkspaces(4, false)
+              def diskspaceFreed = cleanOldWorkspaces(4, '/datadrive')
               echo "Diskspace freed on testsync3: $diskspaceFreed kilobytes"
             }
           }

@@ -1,4 +1,5 @@
 import "../concrete/BaseCodeCollection.sol";
+import "AdminRegistry.test.sol";
 import "main.groth16.sol";
 
 contract User {
@@ -147,11 +148,50 @@ contract Describe_Mercata {
 
     function it_can_verify_a_groth16_proof() {
         Verifier v = new Verifier();
-        uint[2] a = [1,2];
-        uint[2][2] b = [[3,4],[5,6]];
-        uint[2] c = [7,8];
-        uint[2] input = [9,10];
+        uint[2] a = [20348134256098970836791698380745204561149982307630007331497990210535215633804
+                    ,17047090529279272178521185816798077482473992365880795169418958005435937255996
+                    ];
+        uint[2][2] b = [[206876084447300627063121429396318370735584980167805529582154880449824344014
+                        ,14947686089120604769769784949379328695715511612486963200123048001762229853278
+                        ]
+                       ,[2141374389071108004656405359387431325641207078107831407433470926425711135283
+                        ,2661185514261631787375844320766919545104757118016155500592111776642041751995
+                        ]
+                       ];
+        uint[2] c = [6145793198071121393725752479858901773486324758290578166199925709581458279366
+                    ,12206080442278167004276900791675511277948731192661226368768045458330757029774
+                    ];
+        uint[2] input = [1517,41];
         bool success = v.verifyProof(a, b, c, input);
         require(success, "Groth16 proof failed!");
+    }
+
+    function intercalate(string s, string[] strs) internal returns (string) {
+        string r = "";
+        for (uint i = 0; i < strs.length; i++) {
+            if (i > 0) {
+                r += s;
+            }
+            r += strs[i];
+        }
+        return r;
+    }
+
+    string output;
+
+    function performIssue(uint num, bool should, address isDeadbeef, string message) public {
+        output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
+    }
+
+    function it_can_store_variadic_args() {
+        User adminUser = new User();
+        AdminRegistryV1 admin = new AdminRegistryV1([this, address(adminUser)]);
+        User u = new User();
+        (bool didExecute, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(!didExecute, "Why did the issue get executed without votes?");
+        admin.castVoteOnIssue(this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(output == "", "Got unexpected output before vote: " + output);
+        adminUser.do(address(admin), "castVoteOnIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(output == "7,true,00000000000000000000000000000000deadbeef,what", "Got unexpected output: " + output);
     }
 }

@@ -135,11 +135,11 @@ contract Verifier is Pairing {
             [4082367875863433681332203403145435568316851327593401208105741076214120093531,
              8495653923123431417604973247489272438418190587263600148770280649306958101930]
         );
-        vk.delta2 = G2Point(
-            [3584379968522022619634365628346410975556736316626957547116029667828682418805,
-             11512554035349554301421176942643325627946099835062924074168555354237747104822],
-            [6156868786562590650489063299728271613755083236710828314593911186147159679345,
-             21072145518894398796501907861726701678630506680125800880877447068382012091552]
+        vk.delta2 = Pairing.G2Point(
+            [12101754203754945271389443532153679833063226400685063301069666849221402992500,
+             14379262679244528034124170835668772583305430352268740321381555841508286014061],
+            [17070125538435644168504004496302943318520261011373627964574760168631649080455,
+             8953145113906301673169150492864629212925115921887262482624722630578005717320]
         );
         vk.IC = new G1Point[](3);
         
@@ -168,7 +168,8 @@ contract Verifier is Pairing {
         Pairing.G1Point vk_x = Pairing.G1Point(0, 0);
         for (uint i = 0; i < input.length; i++) {
             require(input[i] < snark_scalar_field,"verifier-gte-snark-scalar-field");
-            vk_x = Pairing.addition(vk_x, Pairing.scalar_mul(vk.IC[i + 1], input[i]));
+            Pairing.G1Point vk_mul = Pairing.scalar_mul(vk.IC[i + 1], input[i]);
+            vk_x = Pairing.addition(vk_x, vk_mul);
         }
         vk_x = Pairing.addition(vk_x, vk.IC[0]);
         if (!Pairing.pairingProd4(
@@ -188,7 +189,7 @@ contract Verifier is Pairing {
         ) public view returns (bool r) {
         Proof memory proof;
         proof.A = Pairing.G1Point(a[0], a[1]);
-        proof.B = Pairing.G2Point([b[0][0], b[0][1]], [b[1][0], b[1][1]]);
+        proof.B = Pairing.G2Point([b[0][1], b[0][0]], [b[1][1], b[1][0]]);
         proof.C = Pairing.G1Point(c[0], c[1]);
         uint[] memory inputValues = new uint[](input.length);
         for(uint i = 0; i < input.length; i++){
