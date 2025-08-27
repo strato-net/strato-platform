@@ -7,13 +7,11 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
 contract record CDPEngine is Ownable {
-    // External contracts
     CDPVault public immutable cdpVault;
     Token public immutable usdst;
     PriceOracle public priceOracle;
     FeeCollector public feeCollector;
 
-    // Per-collateral asset Risk Parameters
     struct CollateralConfig {
         uint256 liquidationRatio;
         uint256 liquidationPenaltyBps;
@@ -25,7 +23,6 @@ contract record CDPEngine is Ownable {
         bool isPaused;
     }
 
-    // Global state per collateral
     struct CollateralGlobalState {
         uint256 rateAccumulator;
         uint256 lastAccrual;
@@ -33,7 +30,6 @@ contract record CDPEngine is Ownable {
         uint256 mintedUSD;
     }
 
-    // Vault state per user per asset
     struct Vault {
         uint256 collateral;
         uint256 scaledDebt;
@@ -163,7 +159,6 @@ contract record CDPEngine is Ownable {
         require(_collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
         assetState.mintedUSD += amountUSD;
         
-        ERC20 usdst = ERC20(address(usdst));
         usdst.mint(msg.sender, amountUSD);
         
         emit USDSTMinted(msg.sender, asset, amountUSD);
