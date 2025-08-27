@@ -155,16 +155,16 @@ contract record CDPEngine is Ownable {
             require(assetState.mintedUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
         }
         
-        uint256 scaledAdd = (amountUSD * 1e27) / assetState.rateAccumulator; // RAY = 1e27
+        uint256 scaledAdd = (amountUSD * RAY) / assetState.rateAccumulator; // RAY = 1e27
         userVault.scaledDebt += scaledAdd;
         assetState.totalScaledDebt += scaledAdd;
         
-        uint256 totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / 1e27;
+        uint256 totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         if (assetConfig.debtFloor > 0) {
             require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
         }
 
-        require(_collateralizationRatio(userVault) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
+        require(_collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
         assetState.mintedUSD += amountUSD;
         
         ERC20 usdst = ERC20(address(usdst));
@@ -185,7 +185,7 @@ contract record CDPEngine is Ownable {
         // Initialize if first time
         if (assetState.lastAccrual == 0) {
             assetState.lastAccrual = block.timestamp;
-            assetState.rateAccumulator = 1e27;
+            assetState.rateAccumulator = RAY;
             return;
         }
         
@@ -194,8 +194,8 @@ contract record CDPEngine is Ownable {
         
         uint256 oldRate = assetState.rateAccumulator;
         
-        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, 1e27);
-        assetState.rateAccumulator = (oldRate * factor) / 1e27;
+        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
+        assetState.rateAccumulator = (oldRate * factor) / RAY;
         assetState.lastAccrual = block.timestamp;
         
         emit Accrued(asset, oldRate, assetState.rateAccumulator, dt);
@@ -212,7 +212,7 @@ contract record CDPEngine is Ownable {
         CollateralGlobalState memory assetState = collateralGlobalStates[asset];
         
         // Per outline: debtUSD = scaledDebt * rateAccumulator / 1e27
-        uint256 debtUSD = (vault.scaledDebt * assetState.rateAccumulator) / 1e27;
+        uint256 debtUSD = (vault.scaledDebt * assetState.rateAccumulator) / RAY;
         if (debtUSD == 0) return type(uint256).max; // Undefined/∞ if debtUSD == 0
         
         // Per outline: collateralValueUSD = collateral * price / unitScale
@@ -232,14 +232,10 @@ contract record CDPEngine is Ownable {
         Vault memory vault = vaults[user][asset];
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         
-        // Per outline: price = Oracle(asset) (USD 1e18)
-        // Per outline: collateralValueUSD = collateral * price / unitScale
-        // TODO: Integrate with PriceOracle
-        // uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
-        // return (vault.collateral * price) / assetConfig.unitScale;
+        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
+        require(price > 0, "CDPEngine: invalid price");
         
-        // Placeholder return - needs PriceOracle integration
-        return 0;
+        return (vault.collateral * price) / assetConfig.unitScale;
     }
 
     /**
