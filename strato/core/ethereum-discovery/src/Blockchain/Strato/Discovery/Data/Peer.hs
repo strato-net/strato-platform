@@ -4,6 +4,11 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
+
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
+
+
 module Blockchain.Strato.Discovery.Data.Peer
   (
     PPeer(..),
@@ -387,6 +392,12 @@ getPeersClosestTo limit targetNID requesterPubkey = do
     dist p1@(Point _ _) (Just p2@(Point _ _)) = -- xor of the points
       B.packZipWith xor (pointToBytes p1) (pointToBytes p2)
     dist _ _ = B.pack $ replicate 64 0xFF -- this case should never happen but just in case, make it the max distance possible
+
+resetPeerTimeouts :: Monad m =>
+                     m ()
+resetPeerTimeouts = do
+  return ()
+
 
 updateLastMessage ::
   (A.Replaceable T.Text PPeer m) =>
