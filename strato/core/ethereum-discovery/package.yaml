@@ -93,6 +93,7 @@ executables:
       - common-log
       - containers
       - ethereum-discovery
+      - format
       - hflags
       - network-info
       - text
