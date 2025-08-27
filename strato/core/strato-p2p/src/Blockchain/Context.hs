@@ -434,6 +434,7 @@ type MonadP2P m =
     MonadUnliftIO m,
     HasVault m,
     HasSQL m,
+    HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]
@@ -446,8 +447,6 @@ type MonadP2P m =
     All
       '[Mod.Accessible]
       '[ GenesisBlockHash,
-         AvailablePeers,
-         BondedPeers,
          PublicKey
        ]
       m,
@@ -463,18 +462,7 @@ type MonadP2P m =
       '[ '(Integer, Canonical BlockHeader),
          '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer),
-         '(Point, PPeer)
-       ]
-      m,
-    All2
-      '[A.Replaceable]
-      '[ '(PPeer, TcpEnableTime),
-         '(PPeer, UdpEnableTime),
-         '(PPeer, PeerDisable),
-         '(PPeer, PeerLastBestBlockHash),
-         '(PPeer, T.Text),
-         '((Host, Point), PeerBondingState)
+         '(Host, PPeer)
        ]
       m,
     All2
@@ -482,8 +470,7 @@ type MonadP2P m =
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '(Keccak256, Proxy (Inbound WireMessage)),
-         '((Host, Keccak256), Proxy (Outbound WireMessage)),
-         '((Host, TCPPort), ActivityState)
+         '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
   )

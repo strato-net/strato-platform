@@ -131,6 +131,7 @@ newtype ValidatorAddresses = ValidatorAddresses {unValidatorAddresses :: [Addres
 type HasPeerDB m = (
   Mod.Accessible AvailablePeers m,
   A.Replaceable (Host, TCPPort) ActivityState m,
+  A.Alters (Host, TCPPort) ActivityState m,
   Mod.Accessible ActivePeers m,
   A.Replaceable (Host, Point) PeerBondingState m,
   A.Selectable (Host, Point) PeerBondingState m,
