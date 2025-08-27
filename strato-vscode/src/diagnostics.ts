@@ -312,10 +312,11 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 		  const folder = currentFolder.uri.path;
       const fileName = doc.uri.path;
       const fileStr = doc.getText().replace(/\"/g, "\\\"");
-      console.log(`${fileName}`)
-      // const contractAST = await execShell(`solid-vm-cli parse --${fileName} "${fileStr.replace("\"", "\\\"")}"`);
-      const contractAST = JSON.parse(execSync(`solid-vm-cli compile json source "${fileName}" "${fileStr}"`).toString());
-      const annotations = JSON.parse(execSync(`solid-vm-cli analyze json source "${fileName}" "${fileStr}"`).toString());
+      const env = { ...process.env, PATH: `${process.env.HOME}/.local/bin:${process.env.PATH}` };
+      const maxBuffer = 1024 * 1024 * 32;
+      const opts = { env, maxBuffer };
+      const contractAST = JSON.parse(execSync(`solid-vm-cli compile json source "${fileName}" "${fileStr}"`, opts).toString());
+      const annotations = JSON.parse(execSync(`solid-vm-cli analyze json source "${fileName}" "${fileStr}"`, opts).toString());
 
       // Run dead code detector
       const deadCodeArr = await findDeadCode(doc, contractAST);
@@ -341,7 +342,7 @@ async function validate(counter: number, doc: vscode.TextDocument, solidityDiagn
 
 		  const shouldFuzz = vscode.workspace.getConfiguration().get('strato-vscode.autoFuzz') || false;
       if (shouldFuzz) {
-        const fuzzAnns = JSON.parse(execSync(`solid-vm-cli fuzz json source ${fileName} "${fileStr}"`).toString());
+        const fuzzAnns = JSON.parse(execSync(`solid-vm-cli fuzz json source ${fileName} "${fileStr}"`, opts).toString());
 
         for (let i = 0; i < fuzzAnns.length; i++) {
           const mDiag = createFuzzDiagnostic(doc, fuzzAnns[i]);
@@ -387,7 +388,8 @@ function createDiagnostic(doc: vscode.TextDocument, ann: any): vscode.Diagnostic
       case 'Debug': severity = vscode.DiagnosticSeverity.Hint; break;
     }
 
-    const diagnostic = new vscode.Diagnostic(range, ann.annotation._context,
+    const message = !ann.annotation._context || ann.annotation._context === '' ? 'Type error' : ann.annotation._context;
+    const diagnostic = new vscode.Diagnostic(range, message,
       severity);
     diagnostic.code = '';
     return diagnostic;
