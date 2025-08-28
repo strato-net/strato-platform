@@ -11,6 +11,7 @@ router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridg
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 
+
 // ----- Bridge Transactions -----
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
 
