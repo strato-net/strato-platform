@@ -62,8 +62,8 @@ const DepositTransactionDetails = () => {
       key: "from",
       render: (_: any, record: any) => {
         const chainName = record.chainId ? getChainName(record.chainId) : "Unknown Chain";
-        const addr = record?.depositInfo?.from
-          ? bridgeContractService.formatAddress(record.depositInfo.from)
+        const addr = record?.DepositInfo?.externalSender
+          ? bridgeContractService.formatAddress(record.DepositInfo.externalSender)
           : "";
         const chainIdStr = record?.chainId ? String(record.chainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
@@ -98,8 +98,8 @@ const DepositTransactionDetails = () => {
       key: "to",
       render: (_: any, record: any) =>
         renderTruncatedAddressWithCopy(
-          record?.depositInfo?.user
-            ? bridgeContractService.formatAddress(record.depositInfo.user)
+          record?.DepositInfo?.stratoRecipient
+            ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
             : "",
           handleCopyToClipboard
         ),
@@ -111,9 +111,8 @@ const DepositTransactionDetails = () => {
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
           <span className="text-sm text-gray-700">{
-            record.extSymbol ||
-            record.ethTokenSymbol ||
-            (record.extName === 'Ether' ? 'ETH' : record.extName) ||
+            record.externalSymbol ||
+            (record.externalName === 'Ether' ? 'ETH' : record.externalName) ||
             '-'
           }</span>
         </div>
@@ -125,7 +124,7 @@ const DepositTransactionDetails = () => {
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{record.tokenSymbol || record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,
@@ -134,14 +133,14 @@ const DepositTransactionDetails = () => {
       title: "Amount",
       key: "amount",
       render: (_: any, record: any) =>
-        formatWeiAmount(record?.depositInfo?.amount || '0'),
+        formatWeiAmount(record?.DepositInfo?.stratoTokenAmount || '0'),
       width: 80,
     },
     {
       title: "Status",
       key: "depositStatus",
       render: (_: any, record: any) => {
-        const statusStr = record?.depositStatus || record?.status || record?.depositInfo?.bridgeStatus || "0";
+        const statusStr = record?.status || record?.DepositInfo?.bridgeStatus || "0";
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (

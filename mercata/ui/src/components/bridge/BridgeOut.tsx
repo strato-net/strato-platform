@@ -142,13 +142,13 @@ const BridgeOut: React.FC = () => {
       const selectedNetworkConfig = availableNetworks.find(
         (n) => n.chainName === selectedNetwork,
       );
-      const destChainId = selectedNetworkConfig?.chainId || "";
+      const externalChainId = selectedNetworkConfig?.chainId || "";
 
       const response = await bridgeOutAPI({
-        amount: amountInSmallestUnit,
-        destAddress: address,
-        token: selectedToken.stratoTokenAddress,
-        destChainId: String(destChainId),
+        stratoTokenAmount: amountInSmallestUnit,
+        externalRecipient: address,
+        stratoToken: selectedToken.stratoTokenAddress,
+        externalChainId: String(externalChainId),
       });
 
       if (response?.success) {
@@ -206,9 +206,9 @@ const BridgeOut: React.FC = () => {
       <div className="space-y-1.5">
         <Label htmlFor="asset">Select Asset</Label>
         <Select
-          value={selectedToken?.extSymbol || ""}
+          value={selectedToken?.externalSymbol || ""}
           onValueChange={(v) => {
-            const newToken = bridgeableTokens.find((t) => t.extSymbol === v) || null;
+            const newToken = bridgeableTokens.find((t) => t.externalSymbol === v) || null;
             setSelectedToken(newToken);
           }}
           disabled={bridgeableTokens.length === 0}
@@ -222,7 +222,7 @@ const BridgeOut: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.extSymbol} value={t.extSymbol}>
+              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
                 {t.stratoTokenName} ({t.stratoTokenSymbol})
               </SelectItem>
             ))}
@@ -254,8 +254,7 @@ const BridgeOut: React.FC = () => {
         )}
         {amount && selectedToken && (
           <p className="text-sm text-gray-500">
-            Amount will be rounded down to {selectedToken.extDecimals} decimal
-            places
+            Amount will be rounded down to {selectedToken.externalDecimals} decimal places
           </p>
         )}
         
@@ -286,14 +285,14 @@ const BridgeOut: React.FC = () => {
                       </div>
                     )}
                   </div>
-                  {selectedToken?.extSymbol && (
+                  {selectedToken?.externalSymbol && (
                     <div className="text-sm">
                       <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
                         You will receive{" "}
                         {amount
-                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount} `
+                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount} `
                           : ""}
-                        {selectedToken?.extName} ({selectedToken?.extSymbol}) on{" "}
+                        {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
                         {selectedNetwork || "selected"} network
                       </p>
                     </div>
@@ -365,25 +364,25 @@ const BridgeOut: React.FC = () => {
               <p>From: STRATO</p>
               <p>To: {selectedNetwork || "Not selected"}</p>
               <p>
-                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount}{" "}
+                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount}{" "}
                 {selectedToken?.stratoTokenSymbol}
               </p>
-              {selectedToken?.extSymbol && (
+              {selectedToken?.externalSymbol && (
                 <p className="text-blue-600">
                   You will receive{" "}
                   {selectedToken
                     ? roundToDecimals(
                         amount,
-                        parseInt(selectedToken.extDecimals),
+                        parseInt(selectedToken.externalDecimals),
                       )
                     : amount}{" "}
-                  {selectedToken?.extName} ({selectedToken?.extSymbol}) on{" "}
+                  {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
                   {selectedNetwork || "selected"} network
                 </p>
               )}
               {!tokenLimitInfo.isUnlimited &&  (
                 <p className="text-orange-600 text-sm">
-                  Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.extSymbol}
+                  Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.externalSymbol}
                 </p>
               )}
             </div>

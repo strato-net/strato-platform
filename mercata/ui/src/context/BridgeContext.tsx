@@ -116,6 +116,22 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
+  const redeemOut = useCallback(
+    async (params: BridgeOutParams): Promise<BridgeResponse> => {
+      setLoading(true);
+      try {
+        const { data } = await api.post(`/bridge/redeemOut`, params);
+        return { success: true, data };
+      } catch (e) {
+        setError("Redeem out failed");
+        throw e;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
   // Internal balance fetching function used by useBalance hook
   const fetchBalance = useCallback(
     async (tokenAddress: string): Promise<BalanceResponse> => {
@@ -283,6 +299,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         selectedNetwork,
         selectedToken,
         bridgeOut,
+        redeemOut,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,

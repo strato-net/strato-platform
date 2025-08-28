@@ -77,7 +77,7 @@ const BridgeIn: React.FC = () => {
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork =
     isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.extToken === NATIVE_TOKEN_ADDRESS;
+  const isNativeToken = selectedToken?.externalToken === NATIVE_TOKEN_ADDRESS;
 
   const {
     data: nativeBalance,
@@ -99,7 +99,7 @@ const BridgeIn: React.FC = () => {
     isLoading: tokenLoading,
   } = useBalance({
     address,
-    token: selectedToken?.extToken as `0x${string}`,
+    token: selectedToken?.externalToken as `0x${string}`,
     chainId: expectedChainId || undefined,
     query: {
       enabled:
@@ -156,7 +156,7 @@ const BridgeIn: React.FC = () => {
     
     // Fetch minimum deposit amount for selected token
     if (selectedToken && selectedNetworkConfig) {
-      fetchMinDepositAmount(selectedToken.extToken, parseInt(selectedToken.extDecimals || "18"));
+      fetchMinDepositAmount(selectedToken.externalToken, parseInt(selectedToken.externalDecimals || "18"));
     }
   }, [selectedToken, selectedNetworkConfig]);
 
@@ -227,7 +227,7 @@ const BridgeIn: React.FC = () => {
     if (num > bal) {
       setErrors((e) => ({
         ...e,
-        amount: `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.extSymbol}`,
+        amount: `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.externalSymbol}`,
       }));
       return false;
     }
@@ -265,9 +265,9 @@ const BridgeIn: React.FC = () => {
 
     const depositAmount = safeParseUnits(
       amount,
-      parseInt(selectedToken.extDecimals || "18"),
+      parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.extToken === NATIVE_TOKEN_ADDRESS;
+    const isNative = selectedToken.externalToken === NATIVE_TOKEN_ADDRESS;
 
     return {
       selectedToken,
@@ -286,9 +286,9 @@ const BridgeIn: React.FC = () => {
     const validation = await bridgeContractService.validateRouterContract({
       depositRouterAddress: ctx.depositRouter,
       amount: ctx.amount,
-      decimals: ctx.selectedToken.extDecimals,
+      decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.extToken,
+      tokenAddress: ctx.selectedToken.externalToken,
     });
 
     if (!validation.isValid) {
@@ -298,7 +298,7 @@ const BridgeIn: React.FC = () => {
 
   const ensureAllowanceOrPermit = async (ctx: BridgeContext) => {
     const approval = await bridgeContractService.checkPermit2Approval({
-      token: ctx.selectedToken.extToken,
+      token: ctx.selectedToken.externalToken,
       owner: ctx.address,
       amount: ctx.depositAmount,
       chainId: ctx.activeChainId,
@@ -313,7 +313,7 @@ const BridgeIn: React.FC = () => {
 
       try {
         const approveTx = await writeContractAsync({
-          address: ctx.selectedToken.extToken as `0x${string}`,
+          address: ctx.selectedToken.externalToken as `0x${string}`,
           abi: ERC20_ABI,
           functionName: "approve",
           args: [
@@ -361,7 +361,7 @@ const BridgeIn: React.FC = () => {
     const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 minutes
     const nonce = bridgeContractService.getPermit2Nonce();
     const permitMessage = bridgeContractService.createPermit2Message({
-      token: ctx.selectedToken.extToken,
+      token: ctx.selectedToken.externalToken,
       amount: ctx.depositAmount,
       spender: ctx.depositRouter,
       nonce,
@@ -419,7 +419,7 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.extToken),
+          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),  
           ctx.depositAmount,
           bridgeContractService.formatAddress(ctx.userAddress),
           permitData!.nonce,
@@ -435,7 +435,7 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.extToken),
+          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),
           ctx.depositAmount,
           bridgeContractService.formatAddress(ctx.userAddress),
           permitData!.nonce,
@@ -561,10 +561,10 @@ const BridgeIn: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Select Asset</Label>
         <Select
-          value={selectedToken?.extSymbol || ""}
+          value={selectedToken?.externalSymbol || ""}
           onValueChange={(v) =>
             setSelectedToken(
-              bridgeableTokens.find((t) => t.extSymbol === v) || null,
+              bridgeableTokens.find((t) => t.externalSymbol === v) || null,
             )
           }
           disabled={bridgeableTokens.length === 0}
@@ -572,14 +572,14 @@ const BridgeIn: React.FC = () => {
           <SelectTrigger>
             <SelectValue>
               {selectedToken
-                ? `${selectedToken.extName} (${selectedToken.extSymbol})`
+                ? `${selectedToken.externalName} (${selectedToken.externalSymbol})`
                 : "Select asset"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.extSymbol} value={t.extSymbol}>
-                {t.extName} ({t.extSymbol})
+              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
+                {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}
           </SelectContent>
@@ -613,14 +613,14 @@ const BridgeIn: React.FC = () => {
             value={amount}
             maxValue={safeParseUnits(
               tokenBalance,
-              parseInt(selectedToken?.extDecimals || "18"),
+              parseInt(selectedToken?.externalDecimals || "18"),
             ).toString()}
             onChange={(v) => {
               setAmount(v);
               validateAmount(v);
             }}
             className="mt-2"
-            decimals={parseInt(selectedToken?.extDecimals || "18")}
+            decimals={parseInt(selectedToken?.externalDecimals || "18")}
           />
         )}
 
@@ -634,7 +634,7 @@ const BridgeIn: React.FC = () => {
             <div className="space-y-2 mt-1">
               <div className="flex justify-between items-center">
                 <p className="text-sm text-gray-500">
-                  Balance: {tokenBalance} {selectedToken?.extSymbol}
+                  Balance: {tokenBalance} {selectedToken?.externalSymbol}
                 </p>
                 {selectedToken && selectedNetworkConfig && (
                   <div className="flex items-center gap-1">
@@ -642,7 +642,7 @@ const BridgeIn: React.FC = () => {
                       <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                     ) : (
                       <span className="text-xs text-gray-500">
-                        Min: {minDepositInfo.amount} {selectedToken.extSymbol}
+                        Min: {minDepositInfo.amount} {selectedToken.externalSymbol}
                       </span>
                     )}
                   </div>
@@ -661,17 +661,6 @@ const BridgeIn: React.FC = () => {
             </div>
           ) : null)}
       </div>
-
-      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Bridge Fee:</span>
-          <span>{BRIDGE_FEE}</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Estimated Time:</span>
-          <span>{ESTIMATED_TIME}</span>
-        </div>
-      </div> */}
 
       <div className="text-sm text-gray-500 space-y-1">
         {[

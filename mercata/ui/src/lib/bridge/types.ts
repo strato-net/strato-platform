@@ -1,14 +1,16 @@
 // Bridge Types
 export interface Token {
-  stratoTokenAddress: string;
-  stratoTokenName: string;
-  stratoTokenSymbol: string;
-  chainId: string;
-  enabled: boolean;
-  extName: string;
-  extToken: string;
-  extSymbol: string;
-  extDecimals: string;
+  stratoTokenAddress: string;    // Key: address of the STRATO token
+  stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
+  stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
+  externalChainId: string;       // Matches AssetInfo.externalChainId
+  enabled: boolean;              // Matches AssetInfo.enabled
+  externalName: string;          // Matches AssetInfo.externalName
+  externalToken: string;         // Matches AssetInfo.externalToken
+  externalSymbol: string;        // Matches AssetInfo.externalSymbol
+  externalDecimals: string;      // Matches AssetInfo.externalDecimals
+  maxPerTx: string;              // Matches AssetInfo.maxPerTx
+  mintUSDST: boolean;            // Matches AssetInfo.mintUSDST
 }
 
 export interface NetworkConfig {
@@ -21,10 +23,10 @@ export interface NetworkConfig {
 
 // Bridge Context Types
 export interface BridgeOutParams {
-  amount: string;
-  destAddress: string;
-  token: string;
-  destChainId: string;
+  stratoTokenAmount: string;
+  externalRecipient: string;
+  stratoToken: string;
+  externalChainId: string;
 }
 
 export interface BalanceResponse {
@@ -90,6 +92,7 @@ export type BridgeContextType = {
   selectedNetwork: string | null;
   selectedToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
+  redeemOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
