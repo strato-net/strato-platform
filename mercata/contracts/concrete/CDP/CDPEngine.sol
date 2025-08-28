@@ -366,6 +366,49 @@ contract record CDPEngine is Ownable {
     }
 
     /**
+     * @notice Mint maximum safe amount of USDST against collateral (minus 1 wei safety)
+     * @param asset The collateral asset
+     * @return amountMinted The amount of USDST actually minted
+     */
+    function mintMax(address asset) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint256 amountMinted) {
+        _accrue(asset);
+        
+        CollateralConfig memory config = collateralConfigs[asset];
+        CollateralGlobalState storage assetState = collateralGlobalStates[asset];
+        Vault storage userVault = vaults[msg.sender][asset];
+        
+        uint256 currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint256 collateralValueUSD_calc = collateralValueUSD(msg.sender, asset);
+        uint256 maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.liquidationRatio;
+        require(maxBorrowableUSD > currentDebt, "No borrowing power");
+        uint256 available = maxBorrowableUSD - currentDebt;
+        
+        // Apply 1 wei safety buffer to keep CR strictly above liquidation ratio
+        amountMinted = available > 1 ? (available - 1) : 0;
+        require(amountMinted > 0, "No borrowing power");
+        
+        if (config.debtCeiling > 0) {
+            require(assetState.mintedUSD + amountMinted <= config.debtCeiling, "CDPEngine: debt ceiling exceeded");
+        }
+        
+        uint256 scaledAdd = (amountMinted * RAY) / assetState.rateAccumulator;
+        userVault.scaledDebt += scaledAdd;
+        assetState.totalScaledDebt += scaledAdd;
+        assetState.mintedUSD += amountMinted;
+        
+        // Check debt floor for final debt amount
+        uint256 totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        if (config.debtFloor > 0) {
+            require(totalDebtAfter >= config.debtFloor, "CDPEngine: below debt floor");
+        }
+        
+        require(usdst.mint(msg.sender, amountMinted), "CDPEngine: mint failed");
+        
+        emit USDSTMinted(msg.sender, asset, amountMinted);
+        emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    /**
      * @notice Repay USDST debt for a specific asset
      * @param asset The collateral asset 
      * @param amountUSD The amount of USDST to repay
