@@ -559,48 +559,17 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
           runTheCall to contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
-        let valList' = case valList of
-              OrderedVals vs -> vs
-              NamedVals vs -> snd <$> vs
-        mtheFunction' <- do
-              let boolTrueIfArgsSameLength thyFunc = (length valList') == (length $ CC._funcArgs thyFunc)
-                  filteredFuncsWithSameArgLength = filter boolTrueIfArgsSameLength ([theFunction] ++ (CC._funcOverload theFunction))
-                  boolTrueIfSignatureTheSame funck =
-                    and <$> traverse
-                      ( \(a, (_, (CC.IndexedType _ d))) -> testTypes (a, d))
-                      (zip valList' $ CC._funcArgs funck)
-                  testTypes = \case
-                            (SInteger _, SVMType.Int _ _) -> pure True
-                            (SString _, SVMType.String _) -> pure True
-                            (SString _, SVMType.Bytes _ _) -> pure True
-                            (SString _, SVMType.Address _) -> pure True
-                            (SString _, SVMType.Account _) -> pure True
-                            (SDecimal _, SVMType.Decimal) -> pure True
-                            (SInteger _, SVMType.Decimal) -> pure True
-                            (SBool _, SVMType.Bool) -> pure True
-                            (SAccount _ _, SVMType.Address _) -> pure True
-                            (SAccount _ _, SVMType.Account _) -> pure True
-                            (SStruct _ _, SVMType.UnknownLabel _ _) -> pure True
-                            (SContract x _, SVMType.UnknownLabel y _) -> pure $ x == y
-                            (SArray xs, SVMType.Array y _) -> and <$> traverse (testTypes . (,y) <=< getVar) xs 
-                            (_, SVMType.Variadic) -> pure True
-                            (SReference _, _) -> error "Reference variables not implemented for .call"
-                            _ -> pure False
-              finalFuncFind <- filterM boolTrueIfSignatureTheSame filteredFuncsWithSameArgLength
-              pure $ case finalFuncFind of
-                [a] -> Just a
-                _ -> Nothing
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
         when ((from /= to) && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
-        case mtheFunction' of
-          Just theFunction' -> do
+        validateFunctionArguments theFunction valList >>= \case
+          Just (theFunction', valList') -> do
             mCallInfo <- getCurrentCallInfoIfExists
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract functionName' hsh cc theFunction' valList ro False
+              runTheCall to contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
@@ -1800,30 +1769,20 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
               res <- do
-                let go (x:xs) = validateFunctionArguments x argVals >>= \case
-                                  Just argVals' -> pure $ Just (x, argVals')
-                                  Nothing -> go xs
-                    go [] = pure Nothing
                 if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
-                      Just argVals' -> runTheCall address contract' funcName hsh cc func argVals' ro True
-                      Nothing -> go (CC._funcOverload func) >>= \case
-                        Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
-                        Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
+                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
+                      Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
                   else do
                     validateFunctionArguments func argVals >>= \case
-                      Just argVals' -> runTheCall address contract' funcName hsh cc func argVals' ro False
-                      Nothing -> go (CC._funcOverload func) >>= \case
-                        Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
-                          Just ff -> do
-                            validateFunctionArguments ff argVals >>= \case
-                              Just argVals' -> runTheCall address contract' funcName hsh cc ff argVals' ro True
-                              Nothing -> go (CC._funcOverload ff) >>= \case
-                                Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                                Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
-                          Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                        Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro False
+                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro False
+                      Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
+                        Just ff -> do
+                          validateFunctionArguments ff argVals >>= \case
+                            Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
+                            Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                        Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
@@ -2433,28 +2392,22 @@ callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
 callBuiltin "ecMul" [SInteger x1, SInteger y1, SInteger s] =
   let (x, y) = Builtins.ecMul (x1, y1) s
    in pure . STuple . V.fromList $ Constant <$> [SInteger x, SInteger y]
-callBuiltin "ecPairing" [SVariadic xys] =
-  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
+callBuiltin "ecPairing" [SVariadic xs] =
+  let go (SInteger x : xs') = (x:) <$> go xs'
       go []   = Right []
-      go xys' = Left xys'
-   in case go xys of
+      go xs' = Left xs'
+   in case go xs of
         Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xys' -> typeError "invalid args passed to ecPairing" xys'
-callBuiltin "ecPairing" [SArray xys] = do
-  let go (x : y : xys') = ((x,y):) <$> go xys'
+        Left xs' -> typeError "invalid args passed to ecPairing" xs'
+callBuiltin "ecPairing" [SArray xs] =
+  SBool . Builtins.ecPairing <$> traverse getInt (V.toList xs)
+callBuiltin "ecPairing" xs =
+  let go (SInteger x : xs') = (x:) <$> go xs'
       go []   = Right []
-      go xys' = Left xys'
-  intArray <- traverse getInt $ V.toList xys
-  case go intArray of
-    Right points -> pure . SBool $ Builtins.ecPairing points
-    Left xys' -> typeError "invalid args passed to ecPairing" xys'
-callBuiltin "ecPairing" xys =
-  let go (SInteger x : SInteger y : xys') = ((x,y):) <$> go xys'
-      go []   = Right []
-      go xys' = Left xys'
-   in case go xys of
+      go xs' = Left xs'
+   in case go xs of
         Right points -> pure . SBool $ Builtins.ecPairing points
-        Left xys' -> typeError "invalid args passed to ecPairing" xys'
+        Left xs' -> typeError "invalid args passed to ecPairing" xs'
 callBuiltin ("payable") [SAccount a _] = return $ SAccount a True
 callBuiltin "require" (SBool cond : msg) = do
   case msg of
@@ -2683,7 +2636,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
   argVals <- case contract' ^. CC.constructor of
     Nothing -> pure argVals'
     Just theConstructor -> validateFunctionArguments theConstructor argVals' >>= \case
-      Just vals -> pure vals
+      Just (_, vals) -> pure vals
       Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
   let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
@@ -2812,7 +2765,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
   let !theModifiers = catMaybes theModifiers'
 
   argVals <- validateFunctionArguments theFunction argVals' >>= \case
-    Just av -> pure av
+    Just (_, av) -> pure av
     Nothing -> typeError
       "the argument values do not match up with the function signature" 
       (let valList' = case argVals' of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
@@ -3499,10 +3452,13 @@ solidVMExceptionHandler catchBlockMap ex =
           return res
 
 -- checks if an argument list is valid for a given function signature
-validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe ValList)
-validateFunctionArguments func argVals = do
-  testMatch func
+validateFunctionArguments:: MonadSM m => CC.Func -> ValList -> m (Maybe (CC.Func, ValList))
+validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload func
   where
+    checkFunc [] = pure Nothing
+    checkFunc (x:xs) = testMatch x >>= \case
+      Just argVals' -> pure $ Just (x, argVals') 
+      Nothing -> checkFunc xs
     argValsLength = case argVals of
       OrderedVals xs -> length xs
       NamedVals xs -> length xs

@@ -249,7 +249,7 @@ export async function proposeWithRetry(
     };
 
     const retryTransaction =
-      await protocolKit.createTransaction(retryDescriptor);
+    await protocolKit.createTransaction(retryDescriptor);
     const retryHash = await protocolKit.getTransactionHash(retryTransaction);
     const retrySignature = await protocolKit.signHash(retryHash);
 
@@ -281,7 +281,7 @@ export async function processChainWithdrawals(
   chainId: number,
   withdrawals: Withdrawal[],
   callCache: CallCache,
-): Promise<{ safeTxHash: string }[]> {
+): Promise<{ safeTxHash: string; nonce: number }[]> {
   const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
   const preparedWithdrawals = await prepareWithdrawals(
     chainId,
@@ -300,8 +300,8 @@ export async function proposeChainTransactions(
   protocolKit: any,
   apiKit: any,
   preparedWithdrawals: PreparedWithdrawal[],
-): Promise<{ safeTxHash: string }[]> {
-  const safeTxs: { safeTxHash: string }[] = [];
+): Promise<{ safeTxHash: string; nonce: number }[]> {
+  const safeTxs: { safeTxHash: string; nonce: number }[] = [];
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeOwnerAddress || "";
   let nonce: number = Number(await apiKit.getNextNonce(safeAddress));
@@ -322,7 +322,7 @@ export async function proposeChainTransactions(
       safeAddress,
       relayer,
     );
-    safeTxs.push({ safeTxHash });
+    safeTxs.push({ safeTxHash, nonce });
     nonce += 1;
   }
 

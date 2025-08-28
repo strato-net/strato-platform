@@ -45,7 +45,8 @@ const Borrow = () => {
     withdrawCollateral,
     repayLoan: repayLoanFn,
     repayAll,
-    withdrawCollateralMax
+    withdrawCollateralMax,
+    borrowMax
   } = useLendingContext();
 
   // Use the new smart polling hook for balance updates
@@ -165,12 +166,21 @@ const Borrow = () => {
   const executeEmbeddedBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
-      toast({
-        title: "Borrow Initiated",
-        description: `You borrowed ${amount} USDST`,
-        variant: "success",
-      });
+      if (amount === 'ALL') {
+        await borrowMax();
+        toast({
+          title: "Borrow Initiated",
+          description: `Borrowed max available USDST`,
+          variant: "success",
+        });
+      } else {
+        await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
+        toast({
+          title: "Borrow Initiated",
+          description: `You borrowed ${amount} USDST`,
+          variant: "success",
+        });
+      }
       setBorrowLoading(false);
       await Promise.all([
         refreshLoans(),

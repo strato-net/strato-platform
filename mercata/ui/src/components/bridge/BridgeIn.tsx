@@ -117,11 +117,48 @@ const BridgeIn: React.FC = () => {
     !!expectedChainId &&
     (nativeLoading || tokenLoading);
 
+  // State for minimum deposit amount
+  const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ 
+    amount: "", 
+    loading: false 
+  });
+
+  // Function to fetch minimum deposit amount using existing service
+  const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
+    if (!tokenAddress || !selectedNetworkConfig) return;
+    
+    setMinDepositInfo(prev => ({ ...prev, loading: true }));
+    
+    try {
+      const validation = await bridgeContractService.validateRouterContract({
+        depositRouterAddress: selectedNetworkConfig.depositRouter,
+        amount: "0", // We just need the config, not validation
+        decimals: decimals.toString(),
+        chainId: selectedNetworkConfig.chainId,
+        tokenAddress,
+      });
+
+      // Use the minAmount that's already fetched by the service
+      const formattedMinAmount = validation.minAmount ? 
+        (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
+      
+      setMinDepositInfo({ amount: formattedMinAmount, loading: false });
+    } catch (error) {
+      console.error("Error fetching min deposit amount:", error);
+      setMinDepositInfo({ amount: "0", loading: false });
+    }
+  };
+
   useEffect(() => {
     setAmount("");
     setErrors((e) => ({ ...e, amount: "" }));
     setApprovalState("idle");
-  }, [selectedToken]);
+    
+    // Fetch minimum deposit amount for selected token
+    if (selectedToken && selectedNetworkConfig) {
+      fetchMinDepositAmount(selectedToken.extToken, parseInt(selectedToken.extDecimals || "18"));
+    }
+  }, [selectedToken, selectedNetworkConfig]);
 
   useEffect(() => {
     const handleNetworkSwitch = async () => {
@@ -567,6 +604,7 @@ const BridgeIn: React.FC = () => {
           onChange={handleAmountChange}
           disabled={!isConnected || isBalanceLoading}
         />
+        
         {errors.amount && (
           <p className="text-sm text-red-500">{errors.amount}</p>
         )}
@@ -594,9 +632,22 @@ const BridgeIn: React.FC = () => {
             </div>
           ) : tokenBalance ? (
             <div className="space-y-2 mt-1">
-              <p className="text-sm text-gray-500">
-                Balance: {tokenBalance} {selectedToken?.extSymbol}
-              </p>
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-gray-500">
+                  Balance: {tokenBalance} {selectedToken?.extSymbol}
+                </p>
+                {selectedToken && selectedNetworkConfig && (
+                  <div className="flex items-center gap-1">
+                    {minDepositInfo.loading ? (
+                      <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
+                    ) : (
+                      <span className="text-xs text-gray-500">
+                        Min: {minDepositInfo.amount} {selectedToken.extSymbol}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               {selectedToken?.stratoTokenSymbol && amount && (
                 <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
                   You will receive ≈ {amount} {selectedToken.stratoTokenName} (
@@ -611,7 +662,7 @@ const BridgeIn: React.FC = () => {
           ) : null)}
       </div>
 
-      <div className="bg-gray-50 p-4 rounded-md space-y-2">
+      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Bridge Fee:</span>
           <span>{BRIDGE_FEE}</span>
@@ -620,7 +671,7 @@ const BridgeIn: React.FC = () => {
           <span className="text-gray-500">Estimated Time:</span>
           <span>{ESTIMATED_TIME}</span>
         </div>
-      </div>
+      </div> */}
 
       <div className="text-sm text-gray-500 space-y-1">
         {[

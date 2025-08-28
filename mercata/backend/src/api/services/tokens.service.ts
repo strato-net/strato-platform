@@ -126,12 +126,55 @@ export const getBalance = async (
     const rawPrices = lendingInfo.oracle?.prices || [];
     const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 
+    // NEW: Fetch token limits for all tokens in parallel
+    const tokenAddresses = response.data.map((token: any) => token.address);
+    const tokenLimitsPromises = tokenAddresses.map(async (tokenAddr: string) => {
+      try {
+        const { data: [tokenLimit] = [] } = await cirrus.get(accessToken, `/${constants.MercataBridge}-tokenLimits`, {
+          params: {
+            select: "token:key,tokenLimit:value",
+            "key": `eq.${tokenAddr}`,
+            address: `eq.${constants.mercataBridge}`
+          }
+        });
+        
+        // Use the correct data structure based on actual API response
+        const maxPerTx = tokenLimit?.tokenLimit?.maxPerTx || "0";
+        const isUnlimited = maxPerTx === "0" || maxPerTx === 0;
+        
+        return {
+          tokenAddress: tokenAddr,
+          maxPerTx: maxPerTx.toString(),
+          isUnlimited
+        };
+      } catch (error) {
+        console.error(`Error fetching token limit for ${tokenAddr}:`, error);
+        return {
+          tokenAddress: tokenAddr,
+          maxPerTx: "0",
+          isUnlimited: true
+        };
+      }
+    });
+    
+    const tokenLimits = await Promise.all(tokenLimitsPromises);
+    const limitsMap = new Map(tokenLimits.map(limit => [limit.tokenAddress, limit]));
+    
     return response.data
-      .map((token: any) => ({
-        ...token,
-        price: priceMap.get(token.address) || "0",
-        collateralBalance: collateralMap.get(token.address) || "0",
-      }))
+      .map((token: any) => {
+        const tokenLimitData = limitsMap.get(token.address) || {
+          maxPerTx: "0",
+          isUnlimited: true
+        };
+        
+        return {
+          ...token,
+          price: priceMap.get(token.address) || "0",
+          collateralBalance: collateralMap.get(token.address) || "0",
+          // NEW: Add token limit information
+          tokenLimit: tokenLimitData
+        };
+      })
       .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
   } catch (error) {
     throw error;

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import CopyButton from "../ui/copy";
 import { LiquidationEntry, useLiquidationContext } from "@/context/LiquidationContext";
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useUser } from "@/context/UserContext";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -28,11 +29,20 @@ const weiToEther = (v?: string) => {
 
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
+  const { userAddress } = useUser();
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
     collateral: CollateralData;
   } | null>(null);
+
+  // You cannot liquidate your own loans
+  const isOwnLoan = (loan: LiquidationEntry) => loan.user.toLowerCase() === userAddress?.toLowerCase();
+
+  // Refresh liquidation data when component mounts (tab is opened)
+  useEffect(() => {
+    refreshData();
+  }, [refreshData]);
 
   const openModal = (loan: LiquidationEntry, collateral: CollateralData) => setModalData({ loan, collateral });
   const closeModal = () => setModalData(null);
@@ -81,6 +91,12 @@ const LiquidationsSection: React.FC = () => {
                         {(ln.healthFactor * 100).toFixed(2)}%
                       </div>
                     </div>
+                    {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
+                    {isOwnLoan(ln) && (
+                      <div className="text-sm text-red-500">
+                        <span className="font-medium">(You)</span>
+                      </div>
+                    )}
                     <div className="text-sm text-gray-600">
                       Borrowed: <span className="font-medium">{weiToEther(ln.amount).toFixed(2)} {ln.assetSymbol}</span>
                     </div>
@@ -102,6 +118,13 @@ const LiquidationsSection: React.FC = () => {
                           <CopyButton address={ln.user} />
                         </div>
                       </div>
+
+                      {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
+                      {isOwnLoan(ln) && (
+                        <div className="text-sm text-red-500">
+                          <span className="font-medium">(You)</span>
+                        </div>
+                      )}
                     </div>
                     
                     {/* Borrowed amount */}
@@ -150,6 +173,7 @@ const LiquidationsSection: React.FC = () => {
                                   e.stopPropagation();
                                   openModal(ln, c);
                                 }}
+                                disabled={isOwnLoan(ln)}
                               >
                                 Liquidate
                               </Button>
@@ -221,6 +245,7 @@ const LiquidationsSection: React.FC = () => {
                                       e.stopPropagation();
                                       openModal(ln, c);
                                     }}
+                                    disabled={isOwnLoan(ln)}
                                   >
                                     Liquidate
                                   </Button>
