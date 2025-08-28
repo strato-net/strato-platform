@@ -171,7 +171,7 @@ contract record CDPEngine is Ownable {
         vault.collateral -= amount;
 
         if (vault.scaledDebt > 0) {
-            uint256 crAfter = _collateralizationRatio(msg.sender, asset);
+            uint256 crAfter = collateralizationRatio(msg.sender, asset);
             require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
         }
 
@@ -268,8 +268,14 @@ contract record CDPEngine is Ownable {
     function collateralValueUSD(
         address owner,
         address asset
-    ) external view returns (uint256) {
-        return _getCollateralValueUSD(owner, asset);
+    ) public view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        
+        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
+        require(price > 0, "CDPEngine: invalid price");
+        
+        return (vault.collateral * price) / assetConfig.unitScale;
     }
 
     /**
@@ -284,14 +290,14 @@ contract record CDPEngine is Ownable {
     ) external view returns (uint256) {
         Vault memory vault = vaults[owner][asset];
         
+        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
+        
         // Use fresh rate accumulator for accurate debt calculation
         (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
         uint256 debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
         
-        if (debtUSD == 0) return type(uint256).max; // Undefined/∞ if debtUSD == 0
-        
-        uint256 collateralValueUSD = _getCollateralValueUSD(owner, asset);
-        return (collateralValueUSD * WAD) / debtUSD;
+        uint256 collateralValueUSD_calc = collateralValueUSD(owner, asset);
+        return (collateralValueUSD_calc * WAD) / debtUSD;
     }
 
     /**
@@ -342,7 +348,7 @@ contract record CDPEngine is Ownable {
             require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
         }
 
-        require(_collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
+        require(collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
         assetState.mintedUSD += amountUSD;
         
         require(usdst.mint(msg.sender, amountUSD), "CDPEngine: mint failed");
@@ -435,8 +441,8 @@ contract record CDPEngine is Ownable {
         require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to liquidate");
 
         // Check if position is liquidatable
-        uint256 collateralizationRatio = _collateralizationRatio(borrower, collateralAsset);
-        require(collateralizationRatio < config.liquidationRatio, "CDPEngine: position healthy");
+        uint256 borrowerCR = collateralizationRatio(borrower, collateralAsset);
+        require(borrowerCR < config.liquidationRatio, "CDPEngine: position healthy");
 
         uint256 totalDebt = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
         
@@ -513,42 +519,9 @@ contract record CDPEngine is Ownable {
         emit Accrued(asset, oldRate, assetState.rateAccumulator, dt);
     }
 
-    /**
-     * @notice Calculate collateralization ratio for a user's vault
-     * @param user The user address
-     * @param asset The collateral asset
-     * @return The collateralization ratio in WAD (1e18)
-     */
-    function _collateralizationRatio(address user, address asset) internal view returns (uint256) {
-        Vault memory vault = vaults[user][asset];
-        CollateralGlobalState memory assetState = collateralGlobalStates[asset];
-        
-        // Per outline: debtUSD = scaledDebt * rateAccumulator / 1e27
-        uint256 debtUSD = (vault.scaledDebt * assetState.rateAccumulator) / RAY;
-        if (debtUSD == 0) return type(uint256).max; // Undefined/∞ if debtUSD == 0
-        
-        // Per outline: collateralValueUSD = collateral * price / unitScale
-        uint256 collateralValueUSD = _getCollateralValueUSD(user, asset);
-        
-        // Per outline: CR = collateralValueUSD / debtUSD
-        return (collateralValueUSD * WAD) / debtUSD;
-    }
 
-    /**
-     * @notice Get collateral value in USD for a user
-     * @param user The user address  
-     * @param asset The collateral asset
-     * @return The collateral value in USD (1e18 scale)
-     */
-    function _getCollateralValueUSD(address user, address asset) internal view returns (uint256) {
-        Vault memory vault = vaults[user][asset];
-        CollateralConfig memory assetConfig = collateralConfigs[asset];
-        
-        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
-        require(price > 0, "CDPEngine: invalid price");
-        
-        return (vault.collateral * price) / assetConfig.unitScale;
-    }
+
+
 
     /**
      * @notice Efficient integer exponentiation (from Maker's math library) https://github.com/sky-ecosystem/dss/blob/fa4f6630afb0624d04a003e920b0d71a00331d98/src/jug.sol#L62
