@@ -88,7 +88,16 @@ contract record CDPEngine is Ownable {
         uint256 amountUSD
     );
 
-    event Liquidation(
+    /**
+     * @notice Emitted after a successful liquidation
+     * @param borrower The borrower whose vault was liquidated
+     * @param asset The collateral asset that was seized
+     * @param debtBurnedUSD Amount of USDST debt that was burned
+     * @param penaltyUSD Penalty amount paid to FeeCollector in USDST
+     * @param collateralOut Collateral amount transferred to the liquidator
+     * @param liquidator The address that executed the liquidation
+     */
+    event LiquidationExecuted(
         address indexed borrower,
         address indexed asset,
         uint256 debtBurnedUSD,
@@ -469,12 +478,12 @@ contract record CDPEngine is Ownable {
         if (collateralToSeize > borrowerVault.collateral) {
             collateralToSeize = borrowerVault.collateral;
         }
-
+        
         require(collateralToSeize > 0, "CDPEngine: no collateral to seize");
         borrowerVault.collateral -= collateralToSeize;
         cdpVault.seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
-        emit Liquidation(
+        emit LiquidationExecuted(
             borrower,
             collateralAsset,
             debtToCover,
