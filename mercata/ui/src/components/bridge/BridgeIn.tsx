@@ -136,6 +136,7 @@ const BridgeIn: React.FC = () => {
         decimals: decimals.toString(),
         chainId: selectedNetworkConfig.chainId,
         tokenAddress,
+        mint: false, // bridge-in always uses mint = false
       });
 
       // Use the minAmount that's already fetched by the service
@@ -289,6 +290,7 @@ const BridgeIn: React.FC = () => {
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
       tokenAddress: ctx.selectedToken.externalToken,
+      mint: false, // bridge-in always uses mint = false
     });
 
     if (!validation.isValid) {
@@ -425,6 +427,7 @@ const BridgeIn: React.FC = () => {
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`,
+          false, // mintUSDST = false for bridge-in
         ],
         account: ctx.address as `0x${string}`,
       });
@@ -441,6 +444,7 @@ const BridgeIn: React.FC = () => {
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`,
+          false, // mintUSDST = false for bridge-in
         ],
         chain,
         account: ctx.address as `0x${string}`,
