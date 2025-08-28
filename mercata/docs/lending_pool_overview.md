@@ -12,16 +12,15 @@
 - Borrowers always borrow/repay in this same asset.
 - Multiple collateral assets supported; each with: `ltv`, `liquidationThreshold`, `liquidationBonus`, `interestRate`, `reserveFactor`.
 
-## Global Borrow Index (Interest Accrual) — Discrete Compounding
+## Global Borrow Index (Compound Accrual)
 
-- Per accrual step, a simple interest factor is computed; the index update multiplies, yielding discrete compounding over multiple steps.
-- Per-step factor (RAY scale): `factorRAY = (APRbps * RAY * dt) / (10000 * SECONDS_PER_YEAR)`
-- Index update: `idx_next = (idx_current * (RAY + factorRAY)) / RAY`
-- Across multiple steps: `idx_n = idx_0 * prod_i (1 + factor_i)`
+- Per-second compound base in RAY: `perSecondFactorRAY` (e.g., `(1+APR)^(1/SECONDS_PER_YEAR)` scaled by `1e27`).
+- Index update over `dt` seconds: `idx_next = idx_current * rpow(perSecondFactorRAY, dt, RAY) / RAY`
+- Weekly/daily/block steps multiply the index; debt compounds discretely as the index grows.
+- Persisted only when `_accrue()` runs on state-changing calls (borrow/repay/deposit/withdraw/collateral ops/config). Read-only helpers never write state.
 - Interest routed to protocol reserves when there is debt:
   - `interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY`
   - `reservesAccrued += (interestDelta * reserveFactorBps) / 10000`
-- Accrual runs on state-changing calls; preview functions compute projections read-only.
 
 ## User/System Debt (Index-Based)
 
@@ -60,6 +59,7 @@
 
 - Repay exact R (bounded by current scaled): `Δscaled = (R * RAY) / borrowIndex`
 - Repay all: `amountRepaid = (scaledDebt * borrowIndex) / RAY`
+- Dust cleanup: if residual owed `<= 1` wei after reduction, the loan is zeroed to avoid leftover dust.
 
 ## Collateral Supply/Withdraw
 
@@ -84,5 +84,5 @@
 
 ## Preview Helpers (Read-Only)
 
-- Index preview at current block time (dt = now - lastAccrual): `previewIndex = (borrowIndex * (RAY + factorRAY)) / RAY`
+- Index preview at current block time (dt = now - lastAccrual): `previewIndex = (borrowIndex * rpow(perSecondFactorRAY, dt, RAY)) / RAY`
 - Debt preview: `debtPreview = (scaledDebt * previewIndex) / RAY` 
