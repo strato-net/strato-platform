@@ -105,7 +105,6 @@ const LiquidityWithdrawModal = ({
       const tokenBName = selectedPool._name?.split('/')[1] || 'Token B';
 
       handleClose();
-      onWithdrawSuccess();
       toast({
         title: "Success",
         description: `Withdrew ${calculatedAmount.toString()} ${selectedPool._name}\n\nReceived:\n• ${tokenAAmount.toFixed(6)} ${tokenAName}\n• ${tokenBAmount.toFixed(6)} ${tokenBName}`,
@@ -120,6 +119,11 @@ const LiquidityWithdrawModal = ({
     } finally {
       setWithdrawLoading(false);
       operationInProgressRef.current = false;
+    }
+    
+    // Call onWithdrawSuccess AFTER the finally block to ensure operationInProgressRef.current is false
+    if (!withdrawLoading) {
+      onWithdrawSuccess();
     }
   };
 
