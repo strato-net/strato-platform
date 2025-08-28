@@ -215,7 +215,7 @@ const LiquidityWithdrawModal = ({
                   variant="ghost"
                   size="sm"
                   className="text-xs text-blue-500"
-                  onClick={async () => { try { await withdrawLiquidityAll(); onWithdrawSuccess(); onClose(); } catch {} }}
+                  onClick={() => setWithdrawPercent('100')}
                 >
                   Max
                 </Button>
