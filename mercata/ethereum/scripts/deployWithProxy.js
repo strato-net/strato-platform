@@ -7,7 +7,6 @@ const path = require("path");
  * Load configuration from environment variables
  */
 
-// test
 async function loadConfig() {
   // Required parameters
   if (!process.env.CONTRACT_NAME) {
