@@ -230,110 +230,6 @@ contract record CDPEngine is Ownable {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // VIEW FUNCTIONS
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    /**
-     * @notice Get vault data for a user
-     * @param owner The vault owner
-     * @param asset The collateral asset
-     * @return collateral The collateral amount
-     * @return scaledDebt The scaled debt amount
-     */
-    function getVault(
-        address owner,
-        address asset
-    ) external view returns (uint256 collateral, uint256 scaledDebt) {
-        Vault memory vault = vaults[owner][asset];
-        return (vault.collateral, vault.scaledDebt);
-    }
-
-    /**
-     * @notice Get current debt in USD for a user's vault
-     * @param owner The vault owner
-     * @param asset The collateral asset
-     * @return Current debt in USD (WAD)
-     */
-    function debtUSD(
-        address owner,
-        address asset
-    ) external view returns (uint256) {
-        Vault memory vault = vaults[owner][asset];
-        if (vault.scaledDebt == 0) return 0;
-
-        // Use fresh rate accumulator (with accrued interest)
-        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
-        return (vault.scaledDebt * rateAccumulatorFresh) / RAY;
-    }
-
-    /**
-     * @notice Get collateral value in USD for a user's vault
-     * @param owner The vault owner
-     * @param asset The collateral asset
-     * @return Collateral value in USD (WAD)
-     */
-    function collateralValueUSD(
-        address owner,
-        address asset
-    ) public view returns (uint256) {
-        Vault memory vault = vaults[owner][asset];
-        CollateralConfig memory assetConfig = collateralConfigs[asset];
-        
-        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
-        require(price > 0, "CDPEngine: invalid price");
-        
-        return (vault.collateral * price) / assetConfig.unitScale;
-    }
-
-    /**
-     * @notice Get collateralization ratio for a user's vault
-     * @param owner The vault owner
-     * @param asset The collateral asset
-     * @return Collateralization ratio in WAD (1e18 = 100%)
-     */
-    function collateralizationRatio(
-        address owner,
-        address asset
-    ) external view returns (uint256) {
-        Vault memory vault = vaults[owner][asset];
-        
-        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
-        
-        // Use fresh rate accumulator for accurate debt calculation
-        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
-        uint256 debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
-        
-        uint256 collateralValueUSD_calc = collateralValueUSD(owner, asset);
-        return (collateralValueUSD_calc * WAD) / debtUSD;
-    }
-
-    /**
-     * @notice Preview what the rate accumulator would be after accruing interest
-     * @param asset The asset to preview accrual for
-     * @return dt Time elapsed since last accrual
-     * @return rateAccumulatorNext Updated rate accumulator with accrued interest
-     */
-    function previewAccrual(
-        address asset
-    ) public view returns (uint256 dt, uint256 rateAccumulatorNext) {
-        CollateralConfig memory assetConfig = collateralConfigs[asset];
-        CollateralGlobalState memory assetState = collateralGlobalStates[asset];
-        
-        // Handle first time initialization
-        if (assetState.lastAccrual == 0) {
-            return (0, RAY);
-        }
-        
-        dt = block.timestamp - assetState.lastAccrual;
-        if (dt == 0) {
-            return (0, assetState.rateAccumulator);
-        }
-        
-        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
-        rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
-    }
-
      
     function mint(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amountUSD > 0, "CDPEngine: zero amount");
@@ -571,9 +467,6 @@ contract record CDPEngine is Ownable {
     }
 
 
-
-
-
     /**
      * @notice Efficient integer exponentiation (from Maker's math library) https://github.com/sky-ecosystem/dss/blob/fa4f6630afb0624d04a003e920b0d71a00331d98/src/jug.sol#L62
      * @param x Base in RAY
@@ -605,6 +498,109 @@ contract record CDPEngine is Ownable {
         }
     }
 
+ // ═══════════════════════════════════════════════════════════════════════════════
+    // VIEW FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Get vault data for a user
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return collateral The collateral amount
+     * @return scaledDebt The scaled debt amount
+     */
+    function getVault(
+        address owner,
+        address asset
+    ) external view returns (uint256 collateral, uint256 scaledDebt) {
+        Vault memory vault = vaults[owner][asset];
+        return (vault.collateral, vault.scaledDebt);
+    }
+
+    /**
+     * @notice Get current debt in USD for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Current debt in USD (WAD)
+     */
+    function debtUSD(
+        address owner,
+        address asset
+    ) external view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        if (vault.scaledDebt == 0) return 0;
+
+        // Use fresh rate accumulator (with accrued interest)
+        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
+        return (vault.scaledDebt * rateAccumulatorFresh) / RAY;
+    }
+
+    /**
+     * @notice Get collateral value in USD for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Collateral value in USD (WAD)
+     */
+    function collateralValueUSD(
+        address owner,
+        address asset
+    ) public view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        
+        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
+        require(price > 0, "CDPEngine: invalid price");
+        
+        return (vault.collateral * price) / assetConfig.unitScale;
+    }
+
+    /**
+     * @notice Get collateralization ratio for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Collateralization ratio in WAD (1e18 = 100%)
+     */
+    function collateralizationRatio(
+        address owner,
+        address asset
+    ) external view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        
+        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
+        
+        // Use fresh rate accumulator for accurate debt calculation
+        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
+        uint256 debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
+        
+        uint256 collateralValueUSD_calc = collateralValueUSD(owner, asset);
+        return (collateralValueUSD_calc * WAD) / debtUSD;
+    }
+
+    /**
+     * @notice Preview what the rate accumulator would be after accruing interest
+     * @param asset The asset to preview accrual for
+     * @return dt Time elapsed since last accrual
+     * @return rateAccumulatorNext Updated rate accumulator with accrued interest
+     */
+    function previewAccrual(
+        address asset
+    ) public view returns (uint256 dt, uint256 rateAccumulatorNext) {
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        CollateralGlobalState memory assetState = collateralGlobalStates[asset];
+        
+        // Handle first time initialization
+        if (assetState.lastAccrual == 0) {
+            return (0, RAY);
+        }
+        
+        dt = block.timestamp - assetState.lastAccrual;
+        if (dt == 0) {
+            return (0, assetState.rateAccumulator);
+        }
+        
+        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
+        rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
+    }
     // ═══════════════════════════════════════════════════════════════════════════════
     // ADMINISTRATIVE FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════════════
