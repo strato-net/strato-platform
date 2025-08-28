@@ -87,7 +87,7 @@ contract record CDPEngine is Ownable {
         uint256 amountUSD
     );
 
-    event LiquidationExecuted(
+    event Liquidation(
         address indexed borrower,
         address indexed asset,
         uint256 debtBurnedUSD,
@@ -222,6 +222,82 @@ contract record CDPEngine is Ownable {
         
         emit USDSTBurned(msg.sender, asset, owed);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
+    }
+
+    /**
+    * @notice Liquidate an unhealthy position
+    * @param collateralAsset The collateral asset to seize
+    * @param borrower The address of the borrower being liquidated
+    * @param debtToCover Amount of USDST debt the liquidator is repaying
+    * Requirements:
+    *  - Borrower collateralization ratio must be below liquidation threshold
+    *  - Liquidator can repay up to the close factor percentage of outstanding debt
+    */
+    function liquidationCall(
+        address collateralAsset,
+        address borrower,
+        uint256 debtToCover
+    ) external whenNotPaused(collateralAsset) onlySupportedAsset(collateralAsset) {
+        require(borrower != address(0) && borrower != msg.sender, "CDPEngine: invalid borrower");
+        require(debtToCover > 0, "CDPEngine: zero debt amount");
+        _accrue(collateralAsset);
+
+        CollateralConfig memory config = collateralConfigs[collateralAsset];
+        CollateralGlobalState storage assetState = collateralGlobalStates[collateralAsset];
+        Vault storage borrowerVault = vaults[borrower][collateralAsset];
+
+        require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to liquidate");
+
+        // Check if position is liquidatable
+        uint256 collateralizationRatio = _collateralizationRatio(borrower, collateralAsset);
+        require(collateralizationRatio < config.liquidationRatio, "CDPEngine: position healthy");
+
+        uint256 totalDebt = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        
+        // Apply close factor - liquidator can repay up to closeFactorBps% of debt
+        uint256 maxRepayable = (totalDebt * config.closeFactorBps) / 10000;
+        require(debtToCover <= maxRepayable, "CDPEngine: exceeds close factor");
+
+        require(usdst.burn(msg.sender, debtToCover), "CDPEngine: burn failed");
+
+        // Reduce borrower's debt
+        uint256 scaledDebtReduction = (debtToCover * RAY) / assetState.rateAccumulator;
+        if (scaledDebtReduction > borrowerVault.scaledDebt) {
+            scaledDebtReduction = borrowerVault.scaledDebt;
+        }
+        
+        borrowerVault.scaledDebt -= scaledDebtReduction;
+        assetState.totalScaledDebt -= scaledDebtReduction;
+        assetState.mintedUSD -= debtToCover;
+
+        // Calculate collateral to seize (debt + penalty)
+        uint256 collateralPrice = priceOracle.getAssetPrice(collateralAsset);
+        require(collateralPrice > 0, "CDPEngine: invalid collateral price");
+        
+        // Penalty amount in USD
+        uint256 penaltyUSD = (debtToCover * config.liquidationPenaltyBps) / 10000;
+        uint256 totalSeizureUSD = debtToCover + penaltyUSD;
+        uint256 collateralToSeize = (totalSeizureUSD * config.unitScale) / collateralPrice;
+        
+        // Cap seizure to available collateral
+        if (collateralToSeize > borrowerVault.collateral) {
+            collateralToSeize = borrowerVault.collateral;
+        }
+
+        require(collateralToSeize > 0, "CDPEngine: no collateral to seize");
+        borrowerVault.collateral -= collateralToSeize;
+        cdpVault.seize(borrower, collateralAsset, msg.sender, collateralToSeize);
+
+        emit Liquidation(
+            borrower,
+            collateralAsset,
+            debtToCover,
+            penaltyUSD,
+            collateralToSeize,
+            msg.sender
+        );
+        
+        emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
     }
 
     /**
