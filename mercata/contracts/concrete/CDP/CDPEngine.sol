@@ -372,7 +372,7 @@ contract record CDPEngine is Ownable {
     *  - Borrower collateralization ratio must be below liquidation threshold
     *  - Liquidator can repay up to the close factor percentage of outstanding debt
     */
-    function liquidationCall(
+    function liquidate(
         address collateralAsset,
         address borrower,
         uint256 debtToCover
