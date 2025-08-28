@@ -365,8 +365,9 @@ export const liquidityAndBalance = async (
       `oracle:priceOracle_fkey(address,` +
         `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
       `),` +
-      `liquidityPool:liquidityPool_fkey(address)`,
-    "lendingPool.userLoan.key": `eq.${userAddress}`,
+      `liquidityPool:liquidityPool_fkey(address)`
+  ,
+    "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
   const { borrowableAsset, mToken, assetConfigs } = registry.lendingPool || {};
@@ -693,10 +694,11 @@ export const executeLiquidation = async (
 
   // Determine repayAmount
   let repayAmount: bigint;
-  if (options.repayAmount !== undefined) {
-    repayAmount = toBig(options.repayAmount);
+  const treatAsAll = options.repayAmount === undefined || options.repayAmount === "ALL";
+  if (!treatAsAll) {
+    repayAmount = toBig(options.repayAmount as string | number | bigint);
   } else {
-    // Index-based total owed
+    // Index-based total owed (exact as of read time)
     const totalOwed = toBig(debtFromScaled(loan.scaledDebt || "0", borrowIndexStr.toString()));
 
     // Health factor to decide close factor (100% or 50%)
@@ -741,7 +743,9 @@ export const executeLiquidation = async (
       ceilCollateralCover = (num + den - 1n) / den;
     }
 
-    repayAmount = ceilCollateralCover <= debtLimit ? ceilCollateralCover : debtLimit;
+    // Final repay amount: min(total owed, protocol close factor limit, and collateral coverage)
+    const base = debtLimit < totalOwed ? debtLimit : totalOwed;
+    repayAmount = ceilCollateralCover <= base ? ceilCollateralCover : base;
   }
 
   const tx = buildFunctionTx([
@@ -767,10 +771,10 @@ export const executeLiquidation = async (
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
     );
-    return { status, hash };
+    return { status, hash, repayAmount: repayAmount.toString() };
   } catch (error: any) {
     const msg = error?.response?.data?.message || error.message || "";
-    if (msg.includes("Invalid borrower")) {
+    if (typeof msg === "string" && msg.includes("Invalid borrower")) {
       throw new Error(
         "Self-liquidation is not allowed. Use a different account to liquidate this position."
       );
@@ -1047,6 +1051,14 @@ export const listLoansForLiquidation = async (
         maxRepay: effectiveMaxRepay.toString(),
         liquidationBonus,
       };
+    })
+    // Filter out zero-amount or zero-USD-value collaterals
+    .filter((c) => {
+      try {
+        return BigInt(c.amount || "0") > 0n && BigInt(c.usdValue || "0") > 0n;
+      } catch {
+        return true;
+      }
     });
 
     const tokenBorrowInfo = tokenInfoMap.get(borrowableAsset);
