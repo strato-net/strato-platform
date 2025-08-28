@@ -1,4 +1,5 @@
 import "../concrete/BaseCodeCollection.sol";
+import "AdminRegistry.test.sol";
 import "main.groth16.sol";
 
 contract User {
@@ -163,5 +164,34 @@ contract Describe_Mercata {
         uint[2] input = [1517,41];
         bool success = v.verifyProof(a, b, c, input);
         require(success, "Groth16 proof failed!");
+    }
+
+    function intercalate(string s, string[] strs) internal returns (string) {
+        string r = "";
+        for (uint i = 0; i < strs.length; i++) {
+            if (i > 0) {
+                r += s;
+            }
+            r += strs[i];
+        }
+        return r;
+    }
+
+    string output;
+
+    function performIssue(uint num, bool should, address isDeadbeef, string message) public {
+        output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
+    }
+
+    function it_can_store_variadic_args() {
+        User adminUser = new User();
+        AdminRegistryV1 admin = new AdminRegistryV1([this, address(adminUser)]);
+        User u = new User();
+        (bool didExecute, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(!didExecute, "Why did the issue get executed without votes?");
+        admin.castVoteOnIssue(this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(output == "", "Got unexpected output before vote: " + output);
+        adminUser.do(address(admin), "castVoteOnIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        require(output == "7,true,00000000000000000000000000000000deadbeef,what", "Got unexpected output: " + output);
     }
 }

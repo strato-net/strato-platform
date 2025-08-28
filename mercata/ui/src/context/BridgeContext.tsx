@@ -124,11 +124,19 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
           ? tokenAddress.slice(2)
           : tokenAddress;
         const { data } = await api.get(`/tokens/balance?address=eq.${addr}`);
-        const balance =
-          Array.isArray(data) && data[0]?.balance
-            ? String(data[0].balance)
-            : "0";
-        return { balance };
+        
+        if (Array.isArray(data) && data[0]) {
+          const tokenData = data[0];
+          const balance = tokenData.balance ? String(tokenData.balance) : "0";
+          const tokenLimit = tokenData.tokenLimit ? {
+            maxPerTx: tokenData.tokenLimit.maxPerTx || "0",
+            isUnlimited: tokenData.tokenLimit.isUnlimited || false
+          } : undefined;
+          
+          return { balance, tokenLimit };
+        }
+        
+        return { balance: "0" };
       } catch (e) {
         setError("Failed to fetch balance");
         throw e;
@@ -139,7 +147,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
 
   // Custom useBalance hook similar to wagmi's useBalance
   const useBalance = useCallback((tokenAddress: string | null) => {
-    const [data, setData] = useState<{ balance: string; formatted: string } | null>(null);
+    const [data, setData] = useState<{ 
+      balance: string; 
+      formatted: string;
+      tokenLimit?: {
+        maxPerTx: string;
+        isUnlimited: boolean;
+      };
+    } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isError, setIsError] = useState(false);
     const [error, setError] = useState<Error | null>(null);
@@ -160,10 +175,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       try {
-        const { balance } = await fetchBalance(tokenAddress);
+        const { balance, tokenLimit } = await fetchBalance(tokenAddress);
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
           const formatted = formatBalance(balance);
-          setData({ balance, formatted });
+          setData({ balance, formatted, tokenLimit });
         }
       } catch (err) {
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { LiquidityPool, SwappableToken, SwapHistoryEntry, SetPoolRatesData } from '@/interface';
 import {api} from '@/lib/axios';
 
@@ -56,6 +56,8 @@ type SwapContextType = {
   refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
   swapHistory: SwapHistoryEntry[];
   swapHistoryCount: number;
+  swapHistoryLoading: boolean;
+  isTransitioning: boolean;
   setPoolRates: (data: SetPoolRatesData) => Promise<void>;
 };
 
@@ -73,6 +75,65 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const [pool, setPool] = useState<LiquidityPool | null>(null);
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
+  const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [lastHistoryPoolAddress, setLastHistoryPoolAddress] = useState<string | null>(null);
+
+  // refs to track current requests and prevent stale updates
+  const currentAssetPairRef = useRef<string>('');
+  const historyAbortControllerRef = useRef<AbortController | null>(null);
+
+  // Handle asset transitions
+  useEffect(() => {
+    if (fromAsset?.address && toAsset?.address) {
+      const newAssetPair = `${fromAsset.address}-${toAsset.address}`;
+      currentAssetPairRef.current = newAssetPair;
+
+      if (historyAbortControllerRef.current) {
+        historyAbortControllerRef.current.abort();
+        historyAbortControllerRef.current = null;
+      }
+
+      setIsTransitioning(true);
+      setPool(null);                     // ✅ Clear pool immediately to prevent stale data
+      setSwapHistory([]);
+      setSwapHistoryCount(0);
+      setSwapHistoryLoading(false);
+      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
+    } else {
+      // If no assets selected, not transitioning
+      currentAssetPairRef.current = '';
+
+      // Cancel any ongoing history requests
+      if (historyAbortControllerRef.current) {
+        historyAbortControllerRef.current.abort();
+        historyAbortControllerRef.current = null;
+      }
+
+      setIsTransitioning(false);
+      setPool(null);
+      setSwapHistory([]);
+      setSwapHistoryCount(0);
+      setSwapHistoryLoading(false);
+      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
+    }
+  }, [fromAsset?.address, toAsset?.address]);
+
+  // Clear transitioning state when we have pool and history fetch is complete
+  useEffect(() => {
+    if (isTransitioning && pool?.address && fromAsset?.address && toAsset?.address && !swapHistoryLoading && lastHistoryPoolAddress === pool.address) {
+      setIsTransitioning(false);
+    }
+  }, [isTransitioning, pool?.address, fromAsset?.address, toAsset?.address, swapHistoryLoading, lastHistoryPoolAddress, swapHistory.length]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (historyAbortControllerRef.current) {
+        historyAbortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   const fetchSwappableTokens = useCallback(async () => {
     setLoading(true);
@@ -209,7 +270,7 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const fetchTokenBalances = useCallback(async (pool: LiquidityPool, userAddress: string, usdstAddress: string) => {
+  const fetchTokenBalances = useCallback(async (pool: LiquidityPool, _userAddress: string, usdstAddress: string) => {
     const [balanceA, balanceB, balanceUsdst] = await Promise.all([
       api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
       api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
@@ -263,18 +324,52 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
 const refreshSwapHistory = useCallback(
   async (params?: Record<string, string>) => {
-    if (!pool?.address) return;
+    if (!pool?.address || !fromAsset?.address || !toAsset?.address) return;
+
+    // Cancel previous request
+    if (historyAbortControllerRef.current) {
+      historyAbortControllerRef.current.abort();
+    }
+
+    // Create new abort controller
+    historyAbortControllerRef.current = new AbortController();
+    const currentPoolAddress = pool.address;
+    const currentAssetPair = `${fromAsset.address}-${toAsset.address}`;
+
+    setSwapHistoryLoading(true);
+
     try {
-      const { data, totalCount } = await fetchSwapHistory(pool.address, params);
-      setSwapHistory(data);               // ✅ Set new history
-      setSwapHistoryCount(totalCount);   // ✅ Set new count
+      const { data, totalCount } = await fetchSwapHistory(currentPoolAddress, params);
+
+      // Only update state if this request is still for the current asset pair
+      if (currentAssetPairRef.current === currentAssetPair) {
+        setSwapHistory(data);               // ✅ Set new history
+        setSwapHistoryCount(totalCount);   // ✅ Set new count
+        setLastHistoryPoolAddress(currentPoolAddress); // ✅ Track which pool this history belongs to
+      }
+      // Don't clear isTransitioning here - let the effect handle it
     } catch (err) {
+      // Ignore aborted requests
+      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
+        return;
+      }
+
       console.error("Failed to refresh swap history", err);
-      setSwapHistory([]);                // Optional fallback
-      setSwapHistoryCount(0);            // Optional fallback
+
+      // Only update state if this request is still for the current asset pair
+      if (currentAssetPairRef.current === currentAssetPair) {
+        setSwapHistory([]);                // Optional fallback
+        setSwapHistoryCount(0);            // Optional fallback
+        setLastHistoryPoolAddress(currentPoolAddress); // ✅ Still track the pool even on error
+      }
+    } finally {
+      // Only update loading state if this request is still for the current asset pair
+      if (currentAssetPairRef.current === currentAssetPair) {
+        setSwapHistoryLoading(false);
+      }
     }
   },
-  [pool?.address, fetchSwapHistory]
+  [pool?.address, fromAsset?.address, toAsset?.address, fetchSwapHistory]
 );
 
   const setPoolRates = useCallback(async (data: SetPoolRatesData) => {
@@ -329,6 +424,8 @@ const refreshSwapHistory = useCallback(
         refreshSwapHistory,
         swapHistory,
         swapHistoryCount,
+        swapHistoryLoading,
+        isTransitioning,
         setPoolRates
       }}
     >

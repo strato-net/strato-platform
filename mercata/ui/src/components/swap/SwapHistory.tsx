@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Copy } from 'lucide-react';
+import { Copy, Loader2 } from 'lucide-react';
 import { useSwapContext } from '@/context/SwapContext';
 import { formatWeiAmount, formatHash } from '@/utils/numberUtils';
 
 const SwapHistory: React.FC = () => {
-  const { refreshSwapHistory, fromAsset, toAsset, pool, swapHistory, swapHistoryCount} = useSwapContext();
+  const { refreshSwapHistory, fromAsset, toAsset, pool, swapHistory, swapHistoryCount, swapHistoryLoading, isTransitioning } = useSwapContext();
   const tableRef = useRef<HTMLDivElement>(null);
 
   const copyToClipboard = async (text: string) => {
@@ -22,22 +22,23 @@ const SwapHistory: React.FC = () => {
 
   // State
   const itemsPerPage = 10;
-  const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
   const [swapHistoryError, setSwapHistoryError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const totalPages = Math.ceil(swapHistoryCount / itemsPerPage);
+
+  const shouldShowLoading = isTransitioning || swapHistoryLoading || (!!fromAsset?.address && !!toAsset?.address && !pool?.address);
 
    // Reset page when pool changes
   useEffect(() => {
     setCurrentPage(0);
   }, [pool?.address, fromAsset?.address, toAsset?.address]);
 
-  // Fetch swap history when pool address changes
+  // Fetch swap history when pool is available
   useEffect(() => {
-    const fetch = async () => {
-      if (pool?.address && fromAsset && toAsset) {
-        setSwapHistoryLoading(true);
+    const fetchHistory = async () => {
+      // Fetch if we have all required data (pool and assets)
+      if (pool?.address && fromAsset?.address && toAsset?.address) {
         setSwapHistoryError(null);
         
         try {
@@ -48,12 +49,10 @@ const SwapHistory: React.FC = () => {
         } catch (error) {
           console.error('Error refreshing swap history:', error);
           setSwapHistoryError('Failed to load swap history');
-        } finally {
-          setSwapHistoryLoading(false);
         }
       }
     };
-    fetch();
+    fetchHistory();
   }, [pool?.address, fromAsset?.address, toAsset?.address, currentPage, refreshSwapHistory]);
 
   return (
@@ -75,63 +74,71 @@ const SwapHistory: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {swapHistoryError ? (
+              {shouldShowLoading ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="text-center py-8">
+                    <p className="w-full flex justify-center items-center">
+                      <Loader2 className="h-6 w-6 animate-spin" />
+                    </p>
+                  </TableCell>
+                </TableRow>
+              ) : swapHistoryError ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
                     <p className="text-red-500">{swapHistoryError}</p>
                   </TableCell>
                 </TableRow>
               ) : swapHistory.length > 0 ? (
-                swapHistory.map((swap) => (
-                  <TableRow key={swap.id}>
-                    <TableCell className="text-sm">
-                      {swap.timestamp.toLocaleDateString([], {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
+                  swapHistory.map((swap) => (
+                    <TableRow key={swap.id}>
+                      <TableCell className="text-sm">
+                        {swap.timestamp.toLocaleDateString([], {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
                           hour12: false
-                      })}
-                    </TableCell>
-                    <TableCell className="font-medium text-sm">
-                      {swap.tokenIn}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {formatWeiAmount(swap.amountIn)}
-                    </TableCell>
-                    <TableCell className="font-medium text-sm">
-                      {swap.tokenOut}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {formatWeiAmount(swap.amountOut)}
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      ${swap.impliedPrice}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => copyToClipboard(swap.sender)}
-                              className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
-                            >
-                              <span>
-                                {copiedHash === swap.sender ? 'Copied!' : formatHash(swap.sender)}
-                              </span>
-                              <Copy className="h-3 w-3" />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Click to copy full address</p>
-                            <p className="font-mono text-xs break-all">{swap.sender}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        })}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {swap.tokenIn}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatWeiAmount(swap.amountIn)}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {swap.tokenOut}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {formatWeiAmount(swap.amountOut)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        ${swap.impliedPrice}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                onClick={() => copyToClipboard(swap.sender)}
+                                className="flex items-center gap-1 hover:text-blue-600 hover:bg-blue-50 active:bg-blue-100 active:scale-95 transition-all duration-150 rounded px-1 py-0.5"
+                              >
+                                <span>
+                                  {copiedHash === swap.sender ? 'Copied!' : formatHash(swap.sender)}
+                                </span>
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Click to copy full address</p>
+                              <p className="font-mono text-xs break-all">{swap.sender}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </TableCell>
+                    </TableRow>
+            ))
               ) : (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8">
@@ -139,8 +146,8 @@ const SwapHistory: React.FC = () => {
                   </TableCell>
                 </TableRow>
               )}
-            </TableBody>
-          </Table>
+          </TableBody>
+        </Table>
 
           {/* Pagination Controls */}
           <div className="flex items-center justify-between px-6 py-4 border-t">
@@ -157,30 +164,30 @@ const SwapHistory: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-                  disabled={currentPage === 0 || swapHistoryLoading}
+                  disabled={currentPage === 0 || shouldShowLoading}
                 >
                   Previous
                 </Button>
                 <span className="text-sm text-gray-600">
                   Page {currentPage + 1} of {totalPages}
-                  {swapHistoryLoading && <span className="ml-2 text-blue-500">Loading...</span>}
+                  {shouldShowLoading && <span className="ml-2 text-blue-500">Loading...</span>}
                 </span>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
-                  disabled={currentPage === totalPages - 1 || swapHistoryLoading}
+                  disabled={currentPage === totalPages - 1 || shouldShowLoading}
                 >
                   Next
                 </Button>
               </div>
             )}
           </div>
-        </div>
-      ) : (
-        <div className="bg-gray-50 rounded-lg p-6 text-center">
-          <p className="text-gray-500">Please select both token pairs to view swap history</p>
-        </div>
+    </div>
+  ) : (
+    <div className="bg-gray-50 rounded-lg p-6 text-center">
+      <p className="text-gray-500">Please select both token pairs to view swap history</p>
+    </div>
       )}
     </div>
   );
