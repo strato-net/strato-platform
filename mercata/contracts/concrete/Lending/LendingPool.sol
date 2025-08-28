@@ -321,7 +321,13 @@ contract record LendingPool is Ownable {
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
 
-        if (loan.scaledDebt == 0) {
+        // Dust cleanup: if residual underlying owed is <= 1 wei, zero out
+        uint owedAfter = (loan.scaledDebt * borrowIndex) / RAY;
+        if (owedAfter <= 1) {
+            if (loan.scaledDebt > 0) {
+                totalScaledDebt -= loan.scaledDebt;
+                loan.scaledDebt = 0;
+            }
             delete userLoan[msg.sender];
         } else {
             loan.lastUpdated = block.timestamp;
@@ -539,7 +545,13 @@ contract record LendingPool is Ownable {
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
 
-        if (loan.scaledDebt == 0) {
+        // Dust cleanup
+        uint owedAfterL = (loan.scaledDebt * borrowIndex) / RAY;
+        if (owedAfterL <= 1) {
+            if (loan.scaledDebt > 0) {
+                totalScaledDebt -= loan.scaledDebt;
+                loan.scaledDebt = 0;
+            }
             delete userLoan[borrower];
         } else {
             loan.lastUpdated = block.timestamp;
