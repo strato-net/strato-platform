@@ -42,7 +42,6 @@ contract record CDPEngine is Ownable {
     bool public globalPaused;
     uint256 public constant RAY = 1e27;
     uint256 public constant WAD = 1e18;
-    address[] public record supportedAssets;
     mapping(address => bool) public record isSupportedAsset;
 
     // Events
@@ -605,7 +604,6 @@ contract record CDPEngine is Ownable {
 
         if (!isSupportedAsset[asset]) {
             isSupportedAsset[asset] = true;
-            supportedAssets.push(asset);
         }
 
         emit CollateralConfigured(
