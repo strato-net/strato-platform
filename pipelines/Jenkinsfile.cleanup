@@ -3,7 +3,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Bool
   script {
     def diskspaceAvailableBefore = sh(
         returnStdout: true,
-        script: "df -x overlay | grep -P '${diskRoot}\$' | awk '{print \$4}'"
+        script: "df -x overlay | grep ${diskRoot} | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableBefore=$diskspaceAvailableBefore kilobytes"
@@ -53,7 +53,7 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Bool
     
     def diskspaceAvailableAfter = sh(
         returnStdout: true,
-        script: "df -x overlay | grep -P '${diskRoot}\$' | awk '{print \$4}'"
+        script: "df -x overlay | grep /datadrive | awk '{print \$4}'"
     ).trim()
 
     echo "diskspaceAvailableAfter=$diskspaceAvailableAfter kilobytes"

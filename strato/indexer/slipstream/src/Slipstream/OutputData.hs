@@ -1742,7 +1742,7 @@ solidityTypeToSQLType _ _ _ (SVMType.Struct _ _) = Just "jsonb"
 solidityTypeToSQLType _ _ _ (SVMType.Enum _ _ _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Contract _) = Just "text"
 solidityTypeToSQLType _ _ _ (SVMType.Error _ _) = Just "text"
-solidityTypeToSQLType _ _ _ SVMType.Variadic = Just "jsonb"
+solidityTypeToSQLType _ _ _ SVMType.Variadic = Nothing
 
 
 ------------------

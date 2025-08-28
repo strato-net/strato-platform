@@ -194,9 +194,6 @@ const SwapPoolsSection = () => {
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
-                      <div className="flex items-center text-xs text-gray-500 mt-1">
-                      <span>Your Liquidity: {formatBalance(pool.lpToken.balances?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                      </div>
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end space-x-4">

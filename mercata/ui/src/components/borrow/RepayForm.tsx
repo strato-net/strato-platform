@@ -85,10 +85,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
       return;
     }
     const feeWei = safeParseUnits(REPAY_FEE, 18);
-    const balWei = BigInt(usdstBalance || "0");
-    const availableWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-    const safeAvailableWei = availableWei > 1n ? (availableWei - 1n) : 0n; // 1-wei safety
-    const repayWei = inputWei > owed ? owed : (inputWei > safeAvailableWei ? safeAvailableWei : inputWei);
+    const availableWei = BigInt(usdstBalance || "0") > feeWei ? (BigInt(usdstBalance || "0") - feeWei) : 0n;
+    const repayWei = inputWei > owed ? owed : (inputWei > availableWei ? availableWei : inputWei);
     onRepay(formatUnits(repayWei, 18));
     setRepayAmount(""); setRepayDisplayAmount("");
   };
@@ -105,7 +103,6 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
   const feeWei = safeParseUnits(REPAY_FEE, 18);           // bigint
   const balWei = BigInt(usdstBalance || "0");             // bigint
   const availWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-  const safeAvailWei = availWei > 1n ? (availWei - 1n) : 0n; // 1-wei safety for display and validation
 
   return (
     <div className="space-y-4 pt-4">
@@ -178,8 +175,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             </button>
             <span>{(() => {
               const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
-              const max = maxWalletSafe < totalOwed ? maxWalletSafe : totalOwed;
+              const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+              const max = available < totalOwed ? available : totalOwed;
               return max <= 0n ? '-' : formatCurrency(formatUnits(max, 18));
             })()} USDST</span>
           </div>
@@ -190,8 +187,8 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             className={`pr-16 ${(() => { 
               const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
               const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
-              return repayAmountWei > totalOwed || repayAmountWei > maxWalletSafe ? 'text-red-600' : ''; 
+              const available = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+              return repayAmountWei > totalOwed || repayAmountWei > available ? 'text-red-600' : ''; 
             })()}`}
             value={repayDisplayAmount}
             onChange={handleRepayAmountChange}
@@ -202,24 +199,14 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           value={repayAmount}
           maxValue={(() => {
             const maxAvailable = BigInt(loans?.totalAmountOwed || 0);
-            const maxWalletSafe = safeAvailWei;
-            const maxAmount = maxWalletSafe > 0n && maxWalletSafe < maxAvailable ? maxWalletSafe : maxAvailable;
+            const availableAfterFee = BigInt(usdstBalance || "0") - safeParseUnits(REPAY_FEE, 18);
+            const maxAmount = availableAfterFee > 0n && availableAfterFee < maxAvailable ? availableAfterFee : maxAvailable;
             return maxAmount.toString();
           })()}
           onChange={(val) => {
             handleRepayPercentage(val);
           }}
           className="pt-2"
-          renderLabel={(p) => {
-            try {
-              const owed = BigInt(loans?.totalAmountOwed || 0);
-              const walletSafe = safeAvailWei;
-              const isWalletLimited = walletSafe < owed;
-              return p === 1 ? (isWalletLimited ? 'Max' : '100%') : `${Math.round(p*100)}%`;
-            } catch {
-              return p === 1 ? 'Max' : `${Math.round(p*100)}%`;
-            }
-          }}
         />
       </div>
 
@@ -283,13 +270,9 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           (() => { try { return safeParseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
           (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loans?.totalAmountOwed || 0); } catch { return true; } })() ||
           (() => {
-            try {
-              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-              const totalNeeded = repayAmountWei + feeWei;
-              return balWei < totalNeeded || repayAmountWei > safeAvailWei;
-            } catch {
-              return true;
-            }
+            const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
+            const totalNeeded = repayAmountWei + safeParseUnits(REPAY_FEE, 18);
+            return BigInt(usdstBalance || "0") < totalNeeded;
           })()
         }
         className="w-full"

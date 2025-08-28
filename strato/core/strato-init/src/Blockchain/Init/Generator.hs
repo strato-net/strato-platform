@@ -52,7 +52,6 @@ createGenesisInfo network = do
         case network of
           "helium" -> HELIUM.genesisBlock
           "mercata-uranium" -> URANIUM.genesisBlock
-          "uranium" -> HELIUM.genesisBlock -- Don't worry, be happy
           _ -> productionGenesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo

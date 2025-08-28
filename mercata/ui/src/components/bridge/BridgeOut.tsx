@@ -305,7 +305,7 @@ const BridgeOut: React.FC = () => {
         
       </div>
 
-      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
+      <div className="bg-gray-50 p-4 rounded-md space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-500">Bridge Fee:</span>
           <span>0.1%</span>
@@ -314,7 +314,7 @@ const BridgeOut: React.FC = () => {
           <span className="text-gray-500">Estimated Time:</span>
           <span>2-5 minutes</span>
         </div>
-      </div> */}
+      </div>
 
       <div className="text-sm text-gray-500">
         <p>• Bridge assets between STRATO and external networks</p>
