@@ -618,14 +618,14 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * Abort – user (after 48 h) *or* owner may cancel and refund the
-     * escrowed tokens.  Covers the scenario where Custody tx is never signed
-     * or relayer disappears.
+     * Abort – user (after 48 h) *or* owner may cancel and refund the escrowed tokens.
+     * Covers the scenario where relayer disappears before confirming.
+     * Does not cover the scenario where Custody tx is waiting to be signed.
      */
     function abortWithdrawal(uint256 id) external {
         WithdrawalInfo storage w = withdrawals[id];
         require(
-            w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+            w.bridgeStatus == BridgeStatus.INITIATED,
             "MB: not abortable"
         );
 
