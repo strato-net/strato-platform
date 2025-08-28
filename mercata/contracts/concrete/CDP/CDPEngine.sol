@@ -40,7 +40,8 @@ contract record CDPEngine is Ownable {
     mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
 
     bool public globalPaused;
-    uint256 public RAY = 1e27;
+    uint256 public constant RAY = 1e27;
+    uint256 public constant WAD = 1e18;
     address[] public record supportedAssets;
     mapping(address => bool) public record isSupportedAsset;
 
@@ -148,6 +149,175 @@ contract record CDPEngine is Ownable {
         vaults[msg.sender][asset].collateral += amount;
 
         emit Deposited(msg.sender, asset, amount);
+    }
+
+    /**
+     * @notice Withdraw collateral from vault
+     * @param asset The collateral asset
+     * @param amount The amount to withdraw
+     */
+    function withdraw(
+        address asset,
+        uint256 amount
+    ) external whenNotPaused(asset) onlySupportedAsset(asset) {
+        require(amount > 0, "CDPEngine: Invalid amount");
+        
+        Vault storage vault = vaults[msg.sender][asset];
+
+        require(vault.collateral >= amount, "CDPEngine: Insufficient collateral");
+
+        _accrue(asset);
+
+        vault.collateral -= amount;
+
+        if (vault.scaledDebt > 0) {
+            uint256 crAfter = _collateralizationRatio(msg.sender, asset);
+            require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
+        }
+
+        cdpVault.withdraw(msg.sender, asset, amount);
+
+        emit Withdrawn(msg.sender, asset, amount);
+    }
+
+    /**
+     * @notice Withdraw maximum safe amount of collateral
+     * @param asset The collateral asset
+     * @return maxAmount The maximum amount withdrawn
+     */
+    function withdrawMax(
+        address asset
+    ) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint256 maxAmount) {
+        _accrue(asset);
+
+        Vault storage vault = vaults[msg.sender][asset];
+        uint256 debt = (vault.scaledDebt * collateralGlobalStates[asset].rateAccumulator) / RAY;
+
+        if (debt == 0) {
+            // No debt, can withdraw all collateral
+            maxAmount = vault.collateral;
+        } else {
+            // Calculate required collateral to maintain liquidation ratio
+            uint256 price = priceOracle.getAssetPrice(asset);
+            CollateralConfig memory config = collateralConfigs[asset];
+            
+            uint256 requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
+            uint256 requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
+            
+            if (vault.collateral > requiredCollateral) {
+                maxAmount = vault.collateral - requiredCollateral;
+                // Apply 1 wei buffer for safety
+                if (maxAmount > 1) {
+                    maxAmount -= 1;
+                }
+            } else {
+                maxAmount = 0;
+            }
+        }
+
+        if (maxAmount > 0) {
+            vault.collateral -= maxAmount;
+            cdpVault.withdraw(msg.sender, asset, maxAmount);
+            emit Withdrawn(msg.sender, asset, maxAmount);
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // VIEW FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @notice Get vault data for a user
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return collateral The collateral amount
+     * @return scaledDebt The scaled debt amount
+     */
+    function getVault(
+        address owner,
+        address asset
+    ) external view returns (uint256 collateral, uint256 scaledDebt) {
+        Vault memory vault = vaults[owner][asset];
+        return (vault.collateral, vault.scaledDebt);
+    }
+
+    /**
+     * @notice Get current debt in USD for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Current debt in USD (WAD)
+     */
+    function debtUSD(
+        address owner,
+        address asset
+    ) external view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        if (vault.scaledDebt == 0) return 0;
+
+        // Use fresh rate accumulator (with accrued interest)
+        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
+        return (vault.scaledDebt * rateAccumulatorFresh) / RAY;
+    }
+
+    /**
+     * @notice Get collateral value in USD for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Collateral value in USD (WAD)
+     */
+    function collateralValueUSD(
+        address owner,
+        address asset
+    ) external view returns (uint256) {
+        return _getCollateralValueUSD(owner, asset);
+    }
+
+    /**
+     * @notice Get collateralization ratio for a user's vault
+     * @param owner The vault owner
+     * @param asset The collateral asset
+     * @return Collateralization ratio in WAD (1e18 = 100%)
+     */
+    function collateralizationRatio(
+        address owner,
+        address asset
+    ) external view returns (uint256) {
+        Vault memory vault = vaults[owner][asset];
+        
+        // Use fresh rate accumulator for accurate debt calculation
+        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
+        uint256 debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
+        
+        if (debtUSD == 0) return type(uint256).max; // Undefined/∞ if debtUSD == 0
+        
+        uint256 collateralValueUSD = _getCollateralValueUSD(owner, asset);
+        return (collateralValueUSD * WAD) / debtUSD;
+    }
+
+    /**
+     * @notice Preview what the rate accumulator would be after accruing interest
+     * @param asset The asset to preview accrual for
+     * @return dt Time elapsed since last accrual
+     * @return rateAccumulatorNext Updated rate accumulator with accrued interest
+     */
+    function previewAccrual(
+        address asset
+    ) public view returns (uint256 dt, uint256 rateAccumulatorNext) {
+        CollateralConfig memory assetConfig = collateralConfigs[asset];
+        CollateralGlobalState memory assetState = collateralGlobalStates[asset];
+        
+        // Handle first time initialization
+        if (assetState.lastAccrual == 0) {
+            return (0, RAY);
+        }
+        
+        dt = block.timestamp - assetState.lastAccrual;
+        if (dt == 0) {
+            return (0, assetState.rateAccumulator);
+        }
+        
+        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
+        rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
     }
 
      
@@ -285,7 +455,7 @@ contract record CDPEngine is Ownable {
         uint256 collateralValueUSD = _getCollateralValueUSD(user, asset);
         
         // Per outline: CR = collateralValueUSD / debtUSD
-        return (collateralValueUSD * 1e18) / debtUSD;
+        return (collateralValueUSD * WAD) / debtUSD;
     }
 
     /**
@@ -305,7 +475,7 @@ contract record CDPEngine is Ownable {
     }
 
     /**
-     * @notice Efficient integer exponentiation (from Maker's math library)
+     * @notice Efficient integer exponentiation (from Maker's math library) https://github.com/sky-ecosystem/dss/blob/fa4f6630afb0624d04a003e920b0d71a00331d98/src/jug.sol#L62
      * @param x Base in RAY
      * @param n Exponent
      * @param base Ray base (1e27)
@@ -361,7 +531,7 @@ contract record CDPEngine is Ownable {
         uint256 unitScale
     ) external onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
-        require(liquidationRatio > 1e18, "CDPEngine: liquidation ratio too low");
+        require(liquidationRatio > WAD, "CDPEngine: liquidation ratio too low");
         require(liquidationPenaltyBps <= 10000, "CDPEngine: penalty too high");
         require(closeFactorBps <= 10000, "CDPEngine: close factor too high");
         require(unitScale > 0, "CDPEngine: invalid unit scale");
