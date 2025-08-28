@@ -159,7 +159,7 @@ contract record CDPEngine is Ownable {
         require(_collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
         assetState.mintedUSD += amountUSD;
         
-        usdst.mint(msg.sender, amountUSD);
+        require(usdst.mint(msg.sender, amountUSD), "CDPEngine: mint failed");
         
         emit USDSTMinted(msg.sender, asset, amountUSD);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
