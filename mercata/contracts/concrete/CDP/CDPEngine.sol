@@ -135,6 +135,22 @@ contract record CDPEngine is Ownable {
         feeCollector = FeeCollector(_feeCollector);
     }
 
+
+    function deposit(
+        address asset,
+        uint256 amount
+    ) external whenNotPaused(asset) onlySupportedAsset(asset) {
+        require(amount > 0, "CDPEngine: Invalid amount");
+
+        cdpVault.deposit(msg.sender, asset, amount);
+
+        // Update vault state
+        vaults[msg.sender][asset].collateral += amount;
+
+        emit Deposited(msg.sender, asset, amount);
+    }
+
+     
     function mint(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amountUSD > 0, "CDPEngine: zero amount");
         _accrue(asset);
