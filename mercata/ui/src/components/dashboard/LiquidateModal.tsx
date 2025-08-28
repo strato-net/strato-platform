@@ -64,11 +64,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
   const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
+  const [isAllSelected, setIsAllSelected] = useState<boolean>(true);
 
   // Reset when collateral changes or modal opens anew
   useEffect(() => {
     setRepayStr(maxRepayEth.toString());
     setDisplayAmount(addCommasToInput(maxRepayEth.toString()));
+    setIsAllSelected(true);
   }, [maxRepayEth]);
 
   const { toast } = useToast();
@@ -113,6 +115,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
       setRepayStr(value);
+      setIsAllSelected(false);
     }
   };
 
@@ -120,9 +123,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     try {
       setRepayStr(value);
       setDisplayAmount(addCommasToInput(value));
+      setIsAllSelected(BigInt(value) === BigInt(maxRepayWei));
     } catch {
       setRepayStr("0");
       setDisplayAmount("0");
+      setIsAllSelected(false);
     }
   };
 
@@ -136,13 +141,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const repayUsdCost = repayEth * loanPriceUsd;
 
   const handleConfirm = async () => {
-    // If 100 % selected, use backend-supplied exact wei string to avoid JS rounding
-    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : toWeiFromStr(repayStr);
-    if (!repayWei || repayWei === "0") {
+    // If 100 % selected, delegate exact resolution to backend by sending 'ALL'
+    const repayWeiOrAll = isAllSelected ? ("ALL" as any) : toWeiFromStr(repayStr);
+    if (!repayWeiOrAll || repayWeiOrAll === "0") {
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
-    await executeLiquidation(loan.id, collateral.asset, repayWei);
+    await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
     toast({ title: "Liquidation submitted", variant: "success" });
     onSuccess();
     onOpenChange(false);

@@ -135,11 +135,12 @@ export function validateLiquidationArgs(args: any) {
       .try(
         Joi.string().regex(/^\d+$/),
         Joi.number().min(0),
-        Joi.string().valid("0")
+        Joi.string().valid("0"),
+        Joi.string().valid("ALL")
       )
       .optional()
       .messages({
-        "alternatives.match": "Repay amount must be a non-negative integer string or number.",
+        "alternatives.match": "Repay amount must be a non-negative integer string, 'ALL', or number.",
       }),
   });
 
