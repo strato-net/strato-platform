@@ -9,21 +9,21 @@ interface QueryConfig {
 }
 
 interface EnrichmentConfig {
-  chainIdField: string;
-  tokenField: string;
-  statusField: string;
+  externalChainIdField: string;
+  stratoTokenField: string;
+  bridgeStatusField: string;
 }
 
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
     tableName: `${constants.MercataBridge}-withdrawals`,
-    selectFields: "withdrawalId:key,withdrawalInfo:value,block_timestamp,transaction_hash",
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,transaction_hash",
     countField: "count()",
     enrichmentType: 'withdrawal'
   },
   deposit: {
     tableName: `${constants.MercataBridge}-deposits`,
-    selectFields: "chainId:key,depositInfo:value,block_timestamp,transaction_hash",
+    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp,transaction_hash",
     countField: "count()",
     enrichmentType: 'deposit'
   }
@@ -31,14 +31,14 @@ const QUERY_CONFIGS: Record<string, QueryConfig> = {
 
 const ENRICHMENT_CONFIGS: Record<string, EnrichmentConfig> = {
   withdrawal: {
-    chainIdField: 'withdrawalInfo?.destChainId',
-    tokenField: 'withdrawalInfo?.token',
-    statusField: 'withdrawalInfo?.bridgeStatus'
+    externalChainIdField: 'WithdrawalInfo?.externalChainId',
+    stratoTokenField: 'WithdrawalInfo?.stratoToken',
+    bridgeStatusField: 'WithdrawalInfo?.bridgeStatus'
   },
   deposit: {
-    chainIdField: 'chainId',
-    tokenField: 'depositInfo?.token',
-    statusField: 'depositInfo?.bridgeStatus'
+    externalChainIdField: 'externalChainId',
+    stratoTokenField: 'DepositInfo?.stratoToken',
+    bridgeStatusField: 'DepositInfo?.bridgeStatus'
   }
 };
 
@@ -57,7 +57,7 @@ export function buildQueryParams(
   };
 
   if (userAddress) {
-    baseParams["value->>user"] = `eq.${userAddress}`;
+    baseParams["value->>stratoSender"] = `eq.${userAddress}`;
   }
 
   return baseParams;
@@ -65,35 +65,27 @@ export function buildQueryParams(
 
 export function enrichTransactionData(
   results: any[],
-  bridgeAssets: any[],
+  bridgeAssets: Map<string, any>,
   enrichmentType: 'withdrawal' | 'deposit'
 ) {
   const config = ENRICHMENT_CONFIGS[enrichmentType];
   
-  return results.map((result: any) => {
-    const chainId = enrichmentType === 'withdrawal' 
-      ? result.withdrawalInfo?.destChainId 
-      : String(result.chainId);
-    
+  return results.map((result: any) => {    
     const token = enrichmentType === 'withdrawal'
-      ? result.withdrawalInfo?.token
-      : result.depositInfo?.token;
+      ? result.WithdrawalInfo?.stratoToken
+      : result.DepositInfo?.stratoToken;
 
-    const matchingAsset = bridgeAssets.find((asset: any) => 
-      asset.value.chainId === chainId && asset.key === token
-    );
-
-    const { stratoToken, stratoTokenName, stratoTokenSymbol, value } = matchingAsset || {};
+    const matchingAsset = bridgeAssets.get(token);
 
     return {
       ...result,
-      status: result[config.statusField.split('?')[0]]?.bridgeStatus || 0,
-      stratoToken: stratoToken || "-",
-      stratoTokenName: stratoTokenName || "-",
-      stratoTokenSymbol: stratoTokenSymbol || "-",
-      extName: value?.extName || "-",
-      extSymbol: value?.extSymbol || "-",
-      extToken: value?.extToken || "-"
+      status: result[config.bridgeStatusField.split('?')[0]]?.bridgeStatus || 0,
+      stratoToken: matchingAsset?.stratoToken || "-",
+      stratoTokenName: matchingAsset?.stratoTokenName || "-",
+      stratoTokenSymbol: matchingAsset?.stratoTokenSymbol || "-",
+      externalName: matchingAsset?.externalName || "-",
+      externalSymbol: matchingAsset?.externalSymbol || "-",
+      externalToken: matchingAsset?.externalToken || "-"
     };
   });
 }

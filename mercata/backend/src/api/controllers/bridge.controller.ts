@@ -1,11 +1,11 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  bridgeOut, 
+  requestWithdrawal, 
   getBridgeableTokens,
   getNetworkConfigs,
   getBridgeTransactions
 } from "../services/bridge.service";
-import { validateBridgeOut, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 
 class BridgeController {
@@ -15,10 +15,30 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
-      validateBridgeOut(body);
+      const { accessToken, body, address } = req;
+      validateRequestWithdrawal(body);
       
-      const result = await bridgeOut(accessToken, body);
+      const result = await requestWithdrawal(accessToken, body, address, false);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async redeemOut(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address } = req;
+      validateRequestWithdrawal(body);
+      
+      const result = await requestWithdrawal(accessToken, body, address, true);
 
       res.json({
         success: true,

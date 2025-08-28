@@ -143,6 +143,9 @@ export const constants = (() => {
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
+    GAS_FEE: 0.01,
+    GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
+    USDST: "0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
   };
 })();
 
