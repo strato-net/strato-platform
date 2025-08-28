@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useSwapContext } from '@/context/SwapContext';
+import { useLendingContext } from '@/context/LendingContext';
 import { usdstAddress, WITHDRAW_FEE } from "@/lib/constants";
 import { LiquidityPool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
@@ -40,6 +41,7 @@ const LiquidityWithdrawModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
 
   const { removeLiquidity, fetchTokenBalances } = useSwapContext();
+  const { withdrawLiquidityAll } = useLendingContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -95,11 +97,18 @@ const LiquidityWithdrawModal = ({
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      // Calculate the actual token amounts withdrawn
+      const tokenAAmount = Number(BigInt(selectedPool.lpToken.balances?.[0]?.balance || "0") * BigInt(selectedPool.tokenABalance || "0") * BigInt(Math.round(parseFloat(withdrawPercent) * 100)) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18;
+      const tokenBAmount = Number(BigInt(selectedPool.lpToken.balances?.[0]?.balance || "0") * BigInt(selectedPool.tokenBBalance || "0") * BigInt(Math.round(parseFloat(withdrawPercent) * 100)) / (BigInt(selectedPool.lpToken._totalSupply || "1") * BigInt(10000))) / 1e18;
+      
+      const tokenAName = selectedPool._name?.split('/')[0] || 'Token A';
+      const tokenBName = selectedPool._name?.split('/')[1] || 'Token B';
+
       handleClose();
       onWithdrawSuccess();
       toast({
         title: "Success",
-        description: `${calculatedAmount.toString()} ${selectedPool._name} withdrawn successfully.`,
+        description: `Withdrew ${calculatedAmount.toString()} ${selectedPool._name}\n\nReceived:\n• ${tokenAAmount.toFixed(6)} ${tokenAName}\n• ${tokenBAmount.toFixed(6)} ${tokenBName}`,
         variant: "success",
       });
     } catch (error) {
@@ -206,7 +215,7 @@ const LiquidityWithdrawModal = ({
                   variant="ghost"
                   size="sm"
                   className="text-xs text-blue-500"
-                  onClick={() => setWithdrawPercent('100')}
+                  onClick={async () => { try { await withdrawLiquidityAll(); onWithdrawSuccess(); onClose(); } catch {} }}
                 >
                   Max
                 </Button>

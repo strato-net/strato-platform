@@ -103,7 +103,7 @@ const Dashboard = () => {
 
     // Get USDST borrowed from loans data
     const usdstBorrowed = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18))
+      ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
       : 0;
 
     // Net Balance = All deposits (including supplied) - USDST Borrowed
@@ -150,7 +150,7 @@ const Dashboard = () => {
             <AssetSummary
               title="Borrowed"
               value={loans?.totalAmountOwed 
-                ? `${parseFloat(formatUnits(BigInt(loans.totalAmountOwed), 18)).toFixed(2)} USDST`
+                ? `${parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18)).toFixed(2)} USDST`
                 : "0.00 USDST"
               }
               icon={<Shield className="text-white" size={18} />}

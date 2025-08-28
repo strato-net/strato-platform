@@ -107,7 +107,7 @@ toUnionMaker f = toUnionMaker' f f match
 
 toUnionMaker' :: (Ord a) => (Contract -> M.Map a b) -> (Contract -> M.Map a b) -> (M.WhenMatched SolidEither a b b b) -> CodeCollection -> Contract -> SolidEither (M.Map a b)
 toUnionMaker' fSelf fAncestors onConflict cc c = do
-  parents' <- getParents cc c
+  parents' <- getParentsAndUsings cc c
   parentMaps <- traverse (toUnionMaker' fAncestors fAncestors onConflict cc) parents' -- this allows us to perform fSelf only once
   foldrM (M.mergeA miss miss onConflict) M.empty $ fSelf c : parentMaps
 

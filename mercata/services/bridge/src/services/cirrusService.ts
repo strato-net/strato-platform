@@ -1,239 +1,172 @@
-import axios from 'axios';
-import { getBAUserToken } from '../auth';
-import { config, getExchangeTokenInfoBridgeOut, TESTNET_STRATO_TOKENS } from '../config';
+import { cirrus } from "../utils/api";
+import { config } from "../config";
 
-const NODE_URL = process.env.NODE_URL;
+const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
 
- const MERCATA_URL = "BlockApps-Mercata-MercataEthBridge" ;
-//  const MERCATA_URL = "MercataEthBridge" ;
+// Get all enabled chains from the bridge contract
+export const getEnabledChains = async (): Promise<any[]> => {
+  const data = await cirrus.get(`/${MERCATA_URL}-chains`, {
+    params: {
+      "value->>enabled": "eq.true",
+      address: `eq.${config.bridge.address}`,
+    },
+  });
 
-// Helper to normalize Ethereum address (lowercase + remove '0x' prefix)
-const normalizeAddress = (address: string) => address?.replace(/^0x/i, '').toLowerCase();
-
-export const fetchDepositInitiatedStatus = async (
-  status: string,
-  limit?: number,
-  orderBy?: string,
-  orderDirection?: string,
-  pageNo?: string,
-  userAddress?: string
-): Promise<any | null> => {
-  const accessToken = await getBAUserToken();
-  if (!accessToken) return null;
-
-  try {
-    const limitParam = limit ? `&limit=${limit}` : '';
-    const offsetParam = (pageNo && limit) ? `&offset=${(Number(pageNo) - 1) * Number(limit)}` : '';
-    const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
-    const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
-
-    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}${limitParam}${offsetParam}${orderByParam}`;
-    const response = await axios.get(cirrusUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      return { success: true, data: [], totalCount: 0 };
-    }
-
-    const depositData = response.data;
-
-    // Collect all txHashes
-    const txHashes = depositData.map((item: any) => item.txHash).filter(Boolean);
-    const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
-    const depositStatusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}-depositStatus?key=in.(${txHashList})&select=key,value`;
-
-    const depositStatusResponse = await axios.get(depositStatusUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    const statusMap = new Map<string, string>();
-    if (Array.isArray(depositStatusResponse.data)) {
-      depositStatusResponse.data.forEach((entry: any) => {
-        if (entry?.key) statusMap.set(entry.key, entry.value);
-      });
-    }
-
-    const enrichedData = depositData.map((item: any) => {
-      const normalizedToken = normalizeAddress(item.token || '');
-
-      const getEthTokenInfo = '0x' + item.token || '';
-      const { exchangeTokenName, exchangeTokenSymbol ,exchangeTokenAddress} = getExchangeTokenInfoBridgeOut(getEthTokenInfo, true);
-
-      const matchedToken = TESTNET_STRATO_TOKENS.find(
-        (token) => normalizeAddress(token.tokenAddress) === normalizedToken
-      );
-      return {
-        ...item,
-        depositStatus: statusMap.get(item.txHash) || null,
-        tokenSymbol: matchedToken?.symbol || null,
-        tokenDecimal: matchedToken?.decimals ?? null,
-        ethTokenName: exchangeTokenName,
-        ethTokenSymbol: exchangeTokenSymbol,
-        ethTokenAddress: exchangeTokenAddress
-      };
-    });
-
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}&select=count`;
-    const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-
-
-    return {
-      success: true,
-      data: enrichedData,
-      totalCount: totalTransactionCountResponse.data?.[0]?.count || 0
-    };
-
-  } catch (error: any) {
-    console.error("Error in fetchDepositInitiatedStatus:", error.message);
-    return null;
+  if (Array.isArray(data) && data.length > 0) {
+    return data.map((item) => ({
+      ...item.value,
+      chainId: item.key,
+    }));
   }
+  return [];
 };
 
+// Get all enabled assets from the bridge contract
+export const getEnabledAssets = async (): Promise<any[]> => {
+  const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
+    params: {
+      "value->>enabled": "eq.true",
+      address: `eq.${config.bridge.address}`,
+    },
+  });
 
-export const fetchWithdrawalInitiatedStatus = async (
-  status: string,
-  limit?: number,
-  orderBy?: string,
-  orderDirection?: string,
-  pageNo?: string,
-  userAddress?: string
-): Promise<any | null> => {
-  const accessToken = await getBAUserToken();
-  if (!accessToken) return null;
-
-  try {
-    const limitParam = limit ? `&limit=${limit}` : '';
-    const offsetParam = (pageNo && limit) ? `&offset=${(Number(pageNo) - 1) * Number(limit)}` : '';
-    const orderByParam = orderBy ? `&order=${orderBy}.${orderDirection || 'desc'}` : '';
-    const selectFields = 'select=txHash,from,token,amount,to,mercataUser,address,transaction_hash,block_timestamp';
-
-    const cirrusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?${selectFields}&mercataUser=eq.${userAddress}&address=eq.${config.bridge.address}${limitParam}${offsetParam}${orderByParam}`;
-    const response = await axios.get(cirrusUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    if (!Array.isArray(response.data) || response.data.length === 0) {
-      return { success: true, data: [], totalCount: 0 };
-    }
-
-    const withdrawalData = response.data;
-
-    // Collect all txHashes
-    const txHashes = withdrawalData.map((item: any) => item.txHash).filter(Boolean);
-    const txHashList = txHashes.map((hash) => encodeURIComponent(hash)).join(',');
-
-    const withdrawalStatusUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}-withdrawStatus?key=in.(${txHashList})&select=key,value`;
-
-    const withdrawalStatusResponse = await axios.get(withdrawalStatusUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    const statusMap = new Map<string, string>();
-    if (Array.isArray(withdrawalStatusResponse.data)) {
-      withdrawalStatusResponse.data.forEach((entry: any) => {
-        if (entry?.key) statusMap.set(entry.key, entry.value);
-      });
-    }
-
-    const enrichedData = withdrawalData.map((item: any) => {
-      const normalizedToken = normalizeAddress(item.token || '');
-
-      const getEthTokenInfo = '0x' + item.token || '';
-      const { exchangeTokenName, exchangeTokenSymbol, exchangeTokenAddress } = getExchangeTokenInfoBridgeOut(getEthTokenInfo, true);
-
-      const matchedToken = TESTNET_STRATO_TOKENS.find(
-        (token) => normalizeAddress(token.tokenAddress) === normalizedToken
-      );
-
-      return {
-        ...item,
-        withdrawalStatus: statusMap.get(item.txHash) || null,
-        tokenSymbol: matchedToken?.symbol || null,
-        tokenDecimal: matchedToken?.decimals ?? null,
-        ethTokenName: exchangeTokenName,
-        ethTokenSymbol: exchangeTokenSymbol,
-        ethTokenAddress: exchangeTokenAddress
-      };
-    });
-
-    const totalTransactionCountUrl = `${NODE_URL}/cirrus/search/${MERCATA_URL}.${status}?mercataUser=eq.${userAddress}&&address=eq.${config.bridge.address}&select=count`;
-    const totalTransactionCountResponse = await axios.get(totalTransactionCountUrl, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-
-    return {
-      success: true,
-      data: enrichedData,
-      totalCount: totalTransactionCountResponse.data?.[0]?.count || 0
-    };
-
-  } catch (error: any) {
-    console.error("Error in fetchWithdrawalInitiatedStatus:", error.message);
-    return null;
+  if (Array.isArray(data) && data.length > 0) {
+    return data.map((item) => ({
+      ...item.value,
+      stratoToken: item.key,
+    }));
   }
+  return [];
 };
 
+// Get asset info by STRATO token address(es)
+export const getAssetInfo = async (
+  stratoTokenAddress: string | string[],
+): Promise<any | null | any[]> => {
+  const isArray = Array.isArray(stratoTokenAddress);
+  const key = isArray ? `in.(${stratoTokenAddress.join(",")})` : `eq.${stratoTokenAddress}`;
+  
+  const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
+    params: {
+      key,
+      "value->>enabled": "eq.true",
+      address: `eq.${config.bridge.address}`,
+    },
+  });
 
-export const fetchDepositInitiated = async (txHash: string): Promise<any | null> => {
-  const accessToken = await getBAUserToken();
-
-  if (!accessToken) return null;
-  try {
-    const depositInitiatedResponse = await axios.get(`${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=eq.${txHash}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    });
-    return depositInitiatedResponse.data;
-  } catch (error: any) {
-    return null;
+  if (!Array.isArray(data) || data.length === 0) {
+    return isArray ? [] : null;
   }
-}; 
-export const fetchDepositInitiatedTransactions= async (
-  transactionHashes: string[]
+
+  return isArray 
+    ? data.map(item => ({ ...item.value, stratoToken: item.key }))
+    : data[0].value ? { ...data[0].value, stratoToken: data[0].key } : null;
+};
+
+// Get withdrawals by status (reusable function)
+export const getWithdrawalsByStatus = async (
+  status: string,
 ): Promise<any[]> => {
+  const data = await cirrus.get(`/${MERCATA_URL}-withdrawals`, {
+    params: {
+      "value->>bridgeStatus": `eq.${status}`,
+      address: `eq.${config.bridge.address}`,
+      order: "value->>requestedAt.asc",
+    },
+  });
 
-  const accessToken = await getBAUserToken();
-  if (!accessToken || transactionHashes.length === 0) return [];
-
-  const queryFields = 'select=txHash,token,amount,to,mercataUser';
-
-  // Normalize and strip '0x' prefix from hashes
-  const normalizedHashes = transactionHashes.map((hash) =>
-    hash.replace(/^0x/, "")
-  );
-
-  const hashQueryParam = normalizedHashes.join(',');
-  const endpoint = `${NODE_URL}/cirrus/search/${MERCATA_URL}.DepositInitiated?txHash=in.(${hashQueryParam})&${queryFields}`;
-
-  try {
-    const response = await axios.get(endpoint, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-
-    if (Array.isArray(response.data)) {
-      return response.data;
-    }
-    return [];
-  } catch (error: any) {
-    console.error("❌ Error fetching DepositInitiated transactions:", error.message);
-    return [];
+  if (Array.isArray(data) && data.length > 0) {
+    return data.map((item) => ({
+      ...item.value,
+      id: item.key,
+      withdrawalId: item.key,
+    }));
   }
+  return [];
 };
 
+// Get deposits by status (reusable function)
+export const getDepositsByStatus = async (status: string): Promise<any[]> => {
+  const data = await cirrus.get(`/${MERCATA_URL}-deposits`, {
+    params: {
+      "value->>bridgeStatus": `eq.${status}`,
+      address: `eq.${config.bridge.address}`,
+      order: "value->>requestedAt.asc",
+    },
+  });
+
+  if (!Array.isArray(data) || data.length === 0) return [];
+
+  const tokenAddresses = [...new Set(data.map(item => item.value?.token).filter(Boolean))];
+  const [assetInfos, enabledChains] = await Promise.all([
+    getAssetInfo(tokenAddresses) as Promise<any[]>,
+    getEnabledChains(),
+  ]);
+  const assetMapping = new Map(assetInfos.map(asset => [asset.stratoToken, asset]));
+  const chainMapping = new Map(enabledChains.map(chain => [chain.chainId, chain]));
+
+  return data.map(({ value: v, key: srcChainId, key2: srcTxHash }) => {
+    const token = v?.token;
+    const asset = assetMapping.get(token);
+    if (!asset) throw new Error(`Asset info not found for token ${token}`);
+  
+    const chainInfo = chainMapping.get(Number(asset.chainId));
+    if (!chainInfo) throw new Error(`Chain info not found for chain ${asset.chainId}`);
+  
+    return {
+      ...v,
+      srcChainId,
+      srcTxHash,
+      id: srcChainId,
+      depositId: srcChainId,
+      extToken: asset.extToken,
+      extDecimals: asset.extDecimals,
+      chainId: asset.chainId,
+      enabled: asset.enabled,
+      depositRouter: chainInfo.depositRouter,
+    };
+  });
+};
+
+// Validate if a token is enabled in the bridge
+export const isTokenEnabled = async (
+  tokenAddress: string,
+): Promise<boolean> => {
+  const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
+    params: {
+      "value->>stratoToken": `eq.${tokenAddress}`,
+      "value->>enabled": "eq.true",
+      address: `eq.${config.bridge.address}`,
+    },
+  });
+
+  return Array.isArray(data) && data.length > 0;
+};
+
+// Get safeTxHash from WithdrawalPending events for multiple withdrawal IDs
+export const getSafeTxHashFromEvents = async (
+  withdrawalIds: string[],
+): Promise<Record<string, string | null>> => {
+  const ids = [...new Set(withdrawalIds)];
+  const result = Object.fromEntries(ids.map((id) => [id, null])) as Record<
+    string,
+    string | null
+  >;
+
+  const data = await cirrus.get(`/${MERCATA_URL}-WithdrawalPending`, {
+    params: {
+      address: `eq.${config.bridge.address}`,
+      withdrawalId: `in.(${ids.join(",")})`,
+      select: "withdrawalId,custodyTxHash",
+    },
+  });
+
+  for (const item of Array.isArray(data) ? data : []) {
+    const withdrawalId = item?.withdrawalId;
+    const custodyTxHash = item?.custodyTxHash;
+    if (withdrawalId && custodyTxHash && withdrawalId in result)
+      result[withdrawalId] = custodyTxHash;
+  }
+
+  return result;
+};

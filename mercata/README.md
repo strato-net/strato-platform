@@ -19,7 +19,7 @@ The app consists of multiple parts:
 ## DEV MODE
 
 ### Prerequisites
-- Node.js v22 (with nvm and npm) — see https://nodejs.org/en/download
+- Node.js v22.12+ (not tested with 23+) (with nvm and npm) — see https://nodejs.org/en/download
 
 ### Run Backend:
 ```
@@ -47,15 +47,18 @@ npm run dev
 ```
 
 ### Run Nginx Standalone:
-```
-cd ../nginx
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=localhost \
-  OAUTH_CLIENT_SECRET=client-secret-here \
-  docker compose -f docker-compose.nginx-standalone.yml up -d --build
-```
+- Make sure the port 80 is not used on your machine: `lsof -i :80` (should return empty output)
+- Then run:
+  ```
+  cd ../nginx
+  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
+    OAUTH_CLIENT_ID=localhost \
+    OAUTH_CLIENT_SECRET=client-secret-here \
+    docker compose -f docker-compose.nginx-standalone.yml up -d --build
+  ```
 
 - BEWARE! Disable any VPN on your host machine.  It can interfere with Docker networking and cause a hang on http://localhost.
+- If `http://localhost` does not open, try a browser incognito mode (the permanent redirect 301 to https could be cached in browser for the localhost domain, after running other software).
 - In most Linux scenarios 'host.docker.internal' will work just fine and there is no need to pass an explicit `HOST_IP` parameter into Docker Compose.  If there are network issues then you can drop back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the gateway IP of the default Docker bridge interface), or any static local IP of your host machine.  More details here: https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
 - You may also need to explicitly open ports in your Linux host's firewall configuration to allow Docker to communicate with the node processes running on your host.  See iptables example below.
 - Nginx also supports the live updates of the Next.js app during development, when it is deployed with `npm run dev`.

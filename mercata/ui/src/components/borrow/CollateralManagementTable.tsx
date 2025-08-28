@@ -125,9 +125,9 @@ const CollateralManagementTable = ({
                     <TableCell>
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
-                          <div className="font-medium">{formatBalance(asset?.userBalance || 0n, undefined, asset?.customDecimals ?? 18, 2)}</div>
+                          <div className="font-medium">{(() => { try { const v = BigInt(asset?.userBalance || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}</div>
                           <div className="text-xs text-gray-500">
-                            ${formatBalance(asset?.userBalanceValue, undefined, 18, 1, 2)}
+                            ${(() => { try { const v = BigInt(asset?.userBalanceValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2); } catch { return formatBalance(0n, undefined, 18, 1, 2); } })()}
                           </div>
                         </div>
                         <Tooltip>
@@ -151,10 +151,10 @@ const CollateralManagementTable = ({
                       <div className="flex items-center justify-end gap-4">
                         <div className="text-right">
                           <div className="font-medium">
-                            {formatBalance(asset?.collateralizedAmount || 0n, undefined, asset?.customDecimals ?? 18, 2)}
+                            {(() => { try { const v = BigInt(asset?.collateralizedAmount || 0); return formatBalance(v <= 1n ? 0n : v, undefined, asset?.customDecimals ?? 18, 2); } catch { return formatBalance(0n, undefined, asset?.customDecimals ?? 18, 2); } })()}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {formatBalance(asset?.collateralizedAmountValue, undefined, 18, 1, 2, true)}
+                            {(() => { try { const v = BigInt(asset?.collateralizedAmountValue || 0); return formatBalance(v <= 1n ? 0n : v, undefined, 18, 1, 2, true); } catch { return formatBalance(0n, undefined, 18, 1, 2, true); } })()}
                           </div>
                         </div>
                         {(() => {

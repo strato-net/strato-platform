@@ -8,7 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
-import { parseUnits } from 'ethers';
+import { parseUnits, formatUnits } from 'ethers';
 
 interface LiquidateModalProps {
   open: boolean;
@@ -56,8 +56,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   onSuccess,
 }) => {
 
-  // max repay from backend (wei) → ether
-  const maxRepayEth = weiToEth(collateral.maxRepay || loan.maxRepay || "0");
+  // max repay from backend (wei) → decimal string safely
+  const maxRepayWei = (collateral.maxRepay || loan.maxRepay || "0").toString();
+  const maxRepayDec = (() => { try { return formatUnits(BigInt(maxRepayWei), 18); } catch { return "0"; } })();
+  const maxRepayEth = parseFloat(maxRepayDec);
 
   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
@@ -85,9 +87,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   // Helper to decide if user selected the exact max value (string comparison tolerant of rounding)
   const isMaxSelected = (): boolean => {
-    const num = parseFloat(repayStr);
-    if (isNaN(num)) return false;
-    return Math.abs(num - maxRepayEth) < 1e-9; // within 1 wei at 18 decimals
+    try {
+      const rhs = parseUnits(repayStr || "0", 18);
+      const lhs = BigInt(maxRepayWei);
+      return rhs === lhs;
+    } catch {
+      return false;
+    }
   };
 
   // Collateral price in USD (heuristic) using usdValue / amount
@@ -111,8 +117,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   };
 
   const handlePercentageChange = (value: string) => {
-    setRepayStr(value);
-    setDisplayAmount(addCommasToInput(value));
+    try {
+      setRepayStr(value);
+      setDisplayAmount(addCommasToInput(value));
+    } catch {
+      setRepayStr("0");
+      setDisplayAmount("0");
+    }
   };
 
   // Determine loan token USD price. For now assume 1 if symbol contains "USD", else use collPriceUsd / bonus to approximate
@@ -162,11 +173,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 onChange={handleAmountChange}
               />
             </div>
-            <PercentageButtons
-              value={repayStr}
-              maxValue={maxRepayEth.toString()}
-              onChange={handlePercentageChange}
-            />
+                          <PercentageButtons
+                value={repayStr}
+                maxValue={maxRepayDec}
+                onChange={handlePercentageChange}
+              />
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">

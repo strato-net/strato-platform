@@ -347,6 +347,7 @@ function cleanupDB {
 function doInit {
 
   args="--addBootnodes=$addBootnodes \
+  --apiIPAddress=0.0.0.0 \
   --blockTime=${blockTime:-13} \
   --generateKey=$generateKey \
   --kafkahost=$kafkaHost \
