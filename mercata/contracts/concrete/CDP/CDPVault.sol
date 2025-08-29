@@ -1,8 +1,9 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "./CDPRegistry.sol";
 
 contract record CDPVault is Ownable {
-    address public cdpEngine;
+    CDPRegistry public registry;
 
     // borrower => asset => balance
     mapping(address => mapping(address => uint)) public userCollaterals;
@@ -10,19 +11,19 @@ contract record CDPVault is Ownable {
     event CollateralDeposited(address indexed user, address indexed asset, uint amount);
     event CollateralWithdrawn(address indexed user, address indexed asset, uint amount);
     event CollateralSeized(address indexed borrower, address indexed liquidator, address indexed asset, uint amount);
-    event CDPEngineUpdated(
-        address indexed oldEngine,
-        address indexed newEngine
+    event RegistryUpdated(
+        address indexed oldRegistry,
+        address indexed newRegistry
     );
 
     modifier onlyEngine() {
-        require(msg.sender == cdpEngine, "CDPVault: Only engine");
+        require(msg.sender == address(registry.cdpEngine()), "CDPVault: Only engine");
         _;
     }
 
-    constructor(address _cdpEngine, address initialOwner) Ownable(initialOwner) {
-        require(_cdpEngine != address(0), "CDPVault: Invalid engine");
-        cdpEngine = _cdpEngine;
+    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+        require(_registry != address(0), "CDPVault: Invalid registry");
+        registry = CDPRegistry(_registry);
     }
 
     function deposit(
@@ -76,13 +77,11 @@ contract record CDPVault is Ownable {
         return userCollaterals[user][asset];
     }
 
-
-    function setCDPEngine(address newEngine) external onlyOwner {
-        require(newEngine != address(0), "CDPVault: invalid engine");
-
-        address oldEngine = cdpEngine;
-        cdpEngine = newEngine;
-
-        emit CDPEngineUpdated(oldEngine, newEngine);
+    // Setter function for updating the CDPRegistry reference
+    function setRegistry(address _registry) external onlyOwner {
+        require(_registry != address(0), "Invalid registry address");
+        address oldRegistry = address(registry);
+        registry = CDPRegistry(_registry);
+        emit RegistryUpdated(oldRegistry, _registry);
     }
 }
