@@ -38,7 +38,6 @@ import           Blockchain.TimerSource
 import           Conduit
 import           Control.Lens                          ((^.))
 import           Control.Monad
-import qualified Control.Monad.Change.Alter            as A
 import           Control.Monad.Trans.Resource
 import qualified Data.ByteString                       as B
 import qualified Data.Conduit.List                     as CL
@@ -91,7 +90,7 @@ ethServerHandler pSource pSink seqSrc host = do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                     disErr <- storeDisableException p (T.pack "WrongGenesisBlock")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+                    _ <- setPeerBondingState (pPeerHost p) pubkey 3 -- 3 indicates wrong genesis block/networkID
                     logAndLengthenPeerDisableBy (24 * 60 * 60) p
                   e' | Just HeadMacIncorrect <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "HeadMacIncorrect")
@@ -103,7 +102,7 @@ ethServerHandler pSource pSink seqSrc host = do
                       $logErrorLS "stratoP2PServer/runEthServer" theUDPErr
                     disErr <- storeDisableException p (T.pack "NetworkIDMismatch")
                     whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/runEthServer" . T.pack $ "Unable to store disable exception: " ++ show err2
-                    A.replace (A.Proxy @PeerBondingState) (pPeerHost p, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+                    _ <- setPeerBondingState (pPeerHost p) pubkey 3 -- 3 indicates wrong genesis block/networkID
                     logAndLengthenPeerDisableBy (24 * 60 * 60) p
                   e' | Just PeerDisconnected <- fromException e' -> do
                     disErr <- storeDisableException p (T.pack "PeerDisconnected")
