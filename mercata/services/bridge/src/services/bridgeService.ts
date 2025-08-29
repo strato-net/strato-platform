@@ -181,3 +181,18 @@ export const handleRejectedWithdrawalBatch = async (
     `Successfully aborted ${withdrawals.length} rejected withdrawals`,
   );
 };
+
+export const updateLastProcessedBlock = async (
+  externalChainId: number,
+  blockNumber: number,
+): Promise<void> => {
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "setLastProcessedBlock",
+    args: {
+      externalChainId,
+      lastProcessedBlock: blockNumber,
+    },
+  });
+};

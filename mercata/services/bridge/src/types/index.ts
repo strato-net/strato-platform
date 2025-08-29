@@ -117,3 +117,12 @@ export interface Withdrawal {
   timestamp: string;        // timestamp of the withdrawal
   requestedAt: string;      // timestamp of the withdrawal request (for abort accuracy)
 }
+
+export interface ChainInfo {
+  externalChainId: number;
+  depositRouter: string;
+  lastProcessedBlock: string;
+  enabled: boolean;
+  custody: string;
+  chainName: string;
+}

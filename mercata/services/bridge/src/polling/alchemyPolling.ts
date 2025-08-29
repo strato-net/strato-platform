@@ -1,11 +1,10 @@
 import { config } from "../config";
-import { execute } from "../utils/stratoHelper";
 import {
   getEnabledChains,
   getEnabledAssets,
 } from "../services/cirrusService";
-import { depositBatch } from "../services/bridgeService";
-import { NonEmptyArray, Deposit } from "../types";
+import { depositBatch, updateLastProcessedBlock } from "../services/bridgeService";
+import { NonEmptyArray, Deposit, ChainInfo } from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
@@ -26,47 +25,30 @@ const getStratoTokenMapping = async (
   externalChainId: number,
 ): Promise<Map<string, { stratoToken: string; externalDecimals: number }>> => {
   const enabledAssets = await getEnabledAssets();
-  const mapping = new Map<
-    string,
-    { stratoToken: string; externalDecimals: number }
-  >();
-
-  for (const asset of enabledAssets) {
-    if (asset.externalChainId === externalChainId.toString() && asset.externalToken) {
-      const extTokenWith0x = ensureHexPrefix(asset.externalToken);
-      mapping.set(extTokenWith0x.toLowerCase(), {
-        stratoToken: asset.stratoToken,
-        externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
-      });
-    }
-  }
-
-  return mapping;
+  
+  return new Map(
+    enabledAssets
+      .filter(asset => 
+        asset.externalChainId === externalChainId.toString() && 
+        asset.externalToken
+      )
+      .map(asset => [
+        ensureHexPrefix(asset.externalToken).toLowerCase(),
+        {
+          stratoToken: asset.stratoToken,
+          externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
+        }
+      ])
+  );
 };
 
-const updateLastProcessedBlock = async (
-  externalChainId: number,
-  blockNumber: number,
-): Promise<void> => {
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "setLastProcessedBlock",
-    args: {
-      externalChainId,
-      lastProcessedBlock: blockNumber,
-    },
-  });
-};
-
-const parseDepositEvents = async (logs: any[], chainId: number) => {
-  const tokenMapping = await getStratoTokenMapping(chainId);
+const parseDepositEvents = async (logs: any[], externalChainId: number) => {
+  const tokenMapping = await getStratoTokenMapping(externalChainId);
   return logs.map((log) => {
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
-    const stratoUserAddress = normalizeAddress(log.topics[3]);
+    const stratoRecipient = normalizeAddress(log.topics[3]);
     const externalTokenAmount = "0x" + log.data.substring(2, 66);
-    const depositId = "0x" + log.data.substring(66, 130);
     const mint = log.data.substring(130, 132) === "01";
 
     const tokenInfo = tokenMapping.get(externalToken);
@@ -81,21 +63,18 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
     );
 
     return {
-      externalChainId: chainId,
+      externalChainId,
       externalTxHash: log.transactionHash,
       externalSender,
-      externalToken,
-      externalTokenAmount,
-      stratoRecipient: stratoUserAddress,
+      stratoRecipient,
       stratoToken: tokenInfo.stratoToken,
       stratoTokenAmount,
-      depositId,
       mintUSDST: mint,
     };
   });
 };
 
-const pollChainForDeposits = async (chainInfo: any) => {
+const pollChainForDeposits = async (chainInfo: ChainInfo) => {
   const externalChainId = chainInfo.externalChainId;
   const depositRouter = chainInfo.depositRouter;
   const lastProcessedBlock = parseInt(chainInfo.lastProcessedBlock) || 0;

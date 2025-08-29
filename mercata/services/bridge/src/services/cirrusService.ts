@@ -1,10 +1,11 @@
 import { cirrus } from "../utils/api";
 import { config } from "../config";
+import { ChainInfo } from "../types";
 
 const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
 
 // Get all enabled chains from the bridge contract
-export const getEnabledChains = async (): Promise<any[]> => {
+export const getEnabledChains = async (): Promise<ChainInfo[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-chains`, {
     params: {
       "value->>enabled": "eq.true",
@@ -15,7 +16,7 @@ export const getEnabledChains = async (): Promise<any[]> => {
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
       ...item.value,
-      externalChainId: item.key,
+      externalChainId: parseInt(item.key),
     }));
   }
   return [];
