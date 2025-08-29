@@ -350,26 +350,24 @@ const LiquidityDepositModal = ({
               })()}
             </div>
 
-            {/* Magnet Toggle */}
-            <div className="flex justify-center items-center py-2 gap-2">
+            {/* Deposit Mode Toggle */}
+            <div className="flex justify-center py-2">
               <button
                 type="button"
-                aria-label="toggle single-sided mode"
+                aria-label="toggle deposit mode"
                 onClick={toggleLockMode}
-                className="p-2 rounded-full hover:bg-gray-200 focus:outline-none"
+                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                  lockMode === 0 
+                    ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200' 
+                    : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'
+                }`}
               >
-                <svg 
-                  className={`w-6 h-6 ${lockMode === 0 ? 'text-gray-400' : 'text-blue-500'}`}
-                  fill="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M17 8h1a1 1 0 0 1 1 1v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V9a1 1 0 0 1 1-1h1V6a5 5 0 0 1 10 0v2zM7 10v7a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-7H7zm2-2h6V6a3 3 0 0 0-6 0v2z"/>
-                  <circle cx="12" cy="14" r="1"/>
-                </svg>
+                Deposit Mode ({
+                  lockMode === 0 ? 'A:B' : 
+                  lockMode === 1 ? 'A' : 
+                  'B'
+                })
               </button>
-              {lockMode !== 0 && (
-                <span className="text-blue-500 text-sm font-medium">Single Asset Deposit</span>
-              )}
             </div>
 
             {/* Second Token */}
