@@ -11,7 +11,6 @@ contract record CDPEngine is Ownable {
     CDPRegistry public registry;
     Token public usdst;
     TokenFactory public tokenFactory;
-    PriceOracle public priceOracle;
     FeeCollector public feeCollector;
 
     struct CollateralConfig {
@@ -153,20 +152,17 @@ contract record CDPEngine is Ownable {
         address _registry,
         address _usdst,
         address _tokenFactory,
-        address _priceOracle,
         address _feeCollector,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_registry != address(0), "CDPEngine: invalid registry");
         require(_usdst != address(0), "CDPEngine: invalid USDST");
         require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
-        require(_priceOracle != address(0), "CDPEngine: invalid oracle");
         require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
 
         registry = CDPRegistry(_registry);
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
-        priceOracle = PriceOracle(_priceOracle);
         feeCollector = FeeCollector(_feeCollector);
     }
 
@@ -232,7 +228,7 @@ contract record CDPEngine is Ownable {
             maxAmount = vault.collateral;
         } else {
             // Calculate required collateral to maintain liquidation ratio
-            uint256 price = priceOracle.getAssetPrice(asset);
+            uint256 price = _priceracle().getAssetPrice(asset);
             CollateralConfig memory config = collateralConfigs[asset];
             
             uint256 requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
@@ -448,7 +444,7 @@ contract record CDPEngine is Ownable {
         assetState.mintedUSD -= debtToCover;
 
         // Calculate collateral to seize (debt + penalty)
-        uint256 collateralPrice = priceOracle.getAssetPrice(collateralAsset);
+        uint256 collateralPrice = _priceOracle().getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "CDPEngine: invalid collateral price");
         
         // Penalty amount in USD
@@ -606,7 +602,7 @@ contract record CDPEngine is Ownable {
         Vault memory vault = vaults[owner][asset];
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         
-        uint256 price = priceOracle.getAssetPrice(asset); // USD 1e18
+        uint256 price = _priceOracle().getAssetPrice(asset); // USD 1e18
         require(price > 0, "CDPEngine: invalid price");
         
         return (vault.collateral * price) / assetConfig.unitScale;
@@ -736,14 +732,6 @@ contract record CDPEngine is Ownable {
         emit PausedGlobal(isPaused);
     }
 
-    /**
-     * @notice Update PriceOracle reference
-     * @param _priceOracle New price oracle address
-     */
-    function setPriceOracle(address _priceOracle) external onlyOwner {
-        require(_priceOracle != address(0), "CDPEngine: invalid oracle");
-        priceOracle = PriceOracle(_priceOracle);
-    }
 
           // Setter function for updating the CDPRegistry reference
      function setRegistry(address _registry) external onlyOwner {
