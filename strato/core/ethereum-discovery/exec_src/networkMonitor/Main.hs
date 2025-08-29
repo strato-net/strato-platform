@@ -7,9 +7,11 @@
 module Main (main) where
 
 import BlockApps.Logging
+import Blockchain.Strato.Discovery.Data.Peer
+import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Control.Applicative ((<|>))
 import Control.Concurrent (threadDelay)
-import Control.Monad (forever, forM_)
+import Control.Monad (forever, forM_, when)
 import Control.Monad.IO.Class
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -44,14 +46,12 @@ main = do
             $logInfoS "main" $ T.pack $ "Disconnected: " ++ name theInterface
           forM_ changes $ \(oldInterface, newInterface) ->
             $logInfoS "main" $ T.pack $ "Changed from " ++ format oldInterface ++ " to " ++ format newInterface
-          resetPeers
+          when (not $ null connected) $ do
+            $logInfoS "main" $ T.pack $ "New IP address added, resetting all peer timeouts so that we can reconnect to all peers"
+            resetAllPeerTimeouts
           loop new
         else do
             -- $logInfoS "main" "no change"
             -- no change, wait a bit
             liftIO $ threadDelay (5 * 1000000)  -- 5 seconds
             loop old
-
-resetPeers :: MonadIO m => m ()
-resetPeers = do
-  liftIO $ putStrLn "<need to implement resetPeers>"

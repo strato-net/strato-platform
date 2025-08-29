@@ -131,6 +131,8 @@ class HasPeerDB m where
   storeDisableException :: PPeer -> T.Text -> m (Either SomeException ())
   updateLastMessage :: PPeer -> T.Text -> m ()
 
+  resetAllPeerTimeouts :: m ()
+
 data PeerDisable
   = ExtendPeerDisableTime
       { epdtTcpEnableTime           :: TcpEnableTime,

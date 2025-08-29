@@ -156,3 +156,12 @@ instance MonadIO m => HasPeerDB m where
   updateLastMessage peer message = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
+
+  resetAllPeerTimeouts = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere []
+                      [
+                        PPeerBondState SQL.=. 0,
+                        PPeerEnableTime SQL.=. jamshidBirth,
+                        PPeerUdpEnableTime SQL.=. jamshidBirth
+                      ]
