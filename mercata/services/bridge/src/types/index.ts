@@ -80,6 +80,7 @@ export interface PreparedWithdrawal {
   type: TxType;
   externalToken: string;
   externalChainId: number;
+  withdrawalId: string;
 }
 
 export interface Deposit {

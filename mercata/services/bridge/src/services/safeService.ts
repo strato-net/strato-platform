@@ -3,7 +3,7 @@ import { logError, logInfo } from "../utils/logger";
 import { SafeTransactionResult, NonEmptyArray, Withdrawal } from "../types";
 import {
   CallCache,
-  validateAndGroupWithdrawals,
+  groupWithdrawalsByChain,
   processChainWithdrawals,
   initializeSafeForChain,
 } from "../utils/safeHelper";
@@ -12,7 +12,7 @@ import { config } from "../config";
 export const createSafeTransactionsForWithdrawals = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ): Promise<{ safeTxHash: string; nonce: number }[]> => {
-  const withdrawalsByChain = validateAndGroupWithdrawals(withdrawals);
+  const withdrawalsByChain = groupWithdrawalsByChain(withdrawals);
   const callCache = new CallCache();
 
   const allSafeTxs: { safeTxHash: string; nonce: number }[] = [];
