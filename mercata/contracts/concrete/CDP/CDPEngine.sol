@@ -159,7 +159,7 @@ contract record CDPEngine is Ownable {
         require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
         
-        cdpVault = CDPVault(_cdpVault);
+        registry = CDPRegistry(_registry);
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
