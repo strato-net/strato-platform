@@ -136,35 +136,34 @@ class BridgeContractService {
   // ============================================
 
   /**
-   * Gets the balance of a token or native currency
+   * Gets token configuration from the DepositRouter contract
    */
-  async getTokenBalance({ 
+  async getTokenConfig({ 
     tokenAddress, 
-    userAddress, 
     chainId, 
-    decimals 
-  }: TokenParams): Promise<string> {
-    const client = await this.getClient(chainId);
+    depositRouterAddress 
+  }: { 
+    tokenAddress: string; 
+    chainId: number; 
+    depositRouterAddress: string; 
+  }): Promise<{
+    minAmount: string;
+    permissions: number;
+  }> {
+    const client = await this.getClient(chainId.toString());
     const normalizedAddress = this.formatAddress(tokenAddress);
     
-    // Handle native token (ETH)
-    if (normalizedAddress === NATIVE_TOKEN_ADDRESS) {
-      const balance = await client.getBalance({ 
-        address: this.formatAddress(userAddress) 
-      });
-      return formatBalance(balance);
-    }
-    
-    // Handle ERC20 tokens
-    const balance = await client.readContract({
-      address: normalizedAddress,
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [this.formatAddress(userAddress)]
+    const [minAmount, permissions] = await client.readContract({
+      address: this.formatAddress(depositRouterAddress),
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "tokenConfig",
+      args: [normalizedAddress]
     });
     
-    const tokenDecimals = decimals ? parseInt(decimals) : 18;
-    return formatBalance(balance, undefined, tokenDecimals);
+    return {
+      minAmount: minAmount.toString(),
+      permissions: Number(permissions)
+    };
   }
 
   // ============================================

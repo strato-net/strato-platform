@@ -14,65 +14,113 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const externalSenders = deposits.map((deposit) => deposit.externalSender);
   const mintUSDSTs = deposits.map((deposit) => deposit.mintUSDST);
 
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "depositBatch",
-    args: {
-      externalChainIds,
-      externalTxHashes,
-      stratoTokens,
-      stratoTokenAmounts,
-      stratoRecipients,
-      externalSenders,
-      mintUSDSTs,
-    },
-  });
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "depositBatch",
+      args: {
+        externalChainIds,
+        externalTxHashes,
+        stratoTokens,
+        stratoTokenAmounts,
+        stratoRecipients,
+        externalSenders,
+        mintUSDSTs,
+      },
+    });
 
-  logInfo(
-    "BridgeService",
-    `Successfully deposited ${deposits.length} deposits`,
-  );
+    logInfo(
+      "BridgeService",
+      `Successfully deposited ${deposits.length} deposits`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Check if this is a duplicate key error (expected when multiple servers process same deposits)
+    if (errorMessage.includes("MB: dup key")) {
+      logInfo(
+        "BridgeService",
+        `Deposits already processed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+      );
+      return; // Gracefully handle duplicate deposits
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "confirmDepositBatch",
-    args: {
-      externalChainIds,
-      externalTxHashes,
-    },
-  });
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "confirmDepositBatch",
+      args: {
+        externalChainIds,
+        externalTxHashes,
+      },
+    });
 
-  logInfo(
-    "BridgeService",
-    `Successfully confirmed ${deposits.length} deposits`,
-  );
+    logInfo(
+      "BridgeService",
+      `Successfully confirmed ${deposits.length} deposits`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Check if this is a bad state error (expected when multiple servers confirm same deposits)
+    if (errorMessage.includes("MB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Deposits already confirmed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+      );
+      return; // Gracefully handle already confirmed deposits
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
   const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "reviewDepositBatch",
-    args: {
-      externalChainIds,
-      externalTxHashes,
-    },
-  });
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "reviewDepositBatch",
+      args: {
+        externalChainIds,
+        externalTxHashes,
+      },
+    });
 
-  logInfo(
-    "BridgeService",
-    `Successfully set ${deposits.length} deposits to pending review`,
-  );
+    logInfo(
+      "BridgeService",
+      `Successfully set ${deposits.length} deposits to pending review`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Check if this is a bad state error (expected when multiple servers review same deposits)
+    if (errorMessage.includes("MB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Deposits already reviewed by another server: ${deposits.length} deposits (${externalTxHashes.join(", ")})`,
+      );
+      return; // Gracefully handle already reviewed deposits
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 export const confirmWithdrawalBatch = async (
@@ -87,20 +135,31 @@ export const confirmWithdrawalBatch = async (
       const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
       const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
 
-      await execute({
-        contractName: "MercataBridge",
-        contractAddress: config.bridge.address!,
-        method: "confirmWithdrawalBatch",
-        args: {
-          ids: withdrawalIds,
-          custodyTxHashes,
-        },
-      });
-
-      logInfo(
-        "BridgeService",
-        `Successfully confirmed ${withdrawals.length} withdrawals`,
-      );
+      try {
+        await execute({
+          contractName: "MercataBridge",
+          contractAddress: config.bridge.address!,
+          method: "confirmWithdrawalBatch",
+          args: {
+            ids: withdrawalIds,
+            custodyTxHashes,
+          },
+        });
+      } catch (executeError) {
+        const errorMessage = (executeError as Error).message;
+        
+        // Check if this is a bad state error (expected when multiple servers confirm same withdrawals)
+        if (errorMessage.includes("MB: bad state")) {
+          logInfo(
+            "BridgeService",
+            `Withdrawals already confirmed by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
+          );
+          return; // Gracefully handle already confirmed withdrawals
+        }
+        
+        // Re-throw other errors
+        throw executeError;
+      }
 
       const emailPromises = withdrawals.map(async (withdrawal) => {
         try {
@@ -125,17 +184,43 @@ export const confirmWithdrawalBatch = async (
     }
   } catch (error) {
     if (safeTxs.length > 0) {
+      const rejectionErrors: Error[] = [];
+      
       for (const safeTx of safeTxs) {
+        const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
+        
         try {
-          const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
-          
           await createRejectionTransaction(Number(withdrawal.externalChainId), safeTx.nonce);
+          logInfo("BridgeService", `Successfully created rejection transaction for nonce ${safeTx.nonce}`);
         } catch (rejectError) {
-          throw rejectError;
+          rejectionErrors.push(rejectError as Error);
+          logError("BridgeService", rejectError as Error, {
+            operation: "createRejectionTransaction",
+            nonce: safeTx.nonce,
+            withdrawalId: withdrawal?.withdrawalId,
+          });
         }
+      }
+      
+      // If we have both original error and rejection errors, combine them
+      if (rejectionErrors.length > 0) {
+        const combinedError = new Error(
+          `confirmWithdrawalBatch failed AND ${rejectionErrors.length} rejection transaction(s) failed. Original error: ${(error as Error).message}`
+        );
+        (combinedError as any).cause = error;
+        (combinedError as any).rejectionErrors = rejectionErrors;
+        
+        logError("BridgeService", combinedError, {
+          operation: "confirmWithdrawalBatch",
+          withdrawalCount: withdrawals.length,
+          rejectionFailureCount: rejectionErrors.length,
+        });
+        
+        throw combinedError;
       }
     }
 
+    // If no safeTxs or all rejections succeeded, throw original error
     throw error;
   }
 };
@@ -146,20 +231,36 @@ export const finaliseWithdrawalBatch = async (
   const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
   const custodyTxHashes = withdrawals.map((w) => w.safeTxHash!);
 
-  await execute({
-    contractName: "MercataBridge",
-    contractAddress: config.bridge.address!,
-    method: "finaliseWithdrawalBatch",
-    args: {
-      ids: withdrawalIds,
-      custodyTxHashes,
-    },
-  });
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "finaliseWithdrawalBatch",
+      args: {
+        ids: withdrawalIds,
+        custodyTxHashes,
+      },
+    });
 
-  logInfo(
-    "BridgeService",
-    `Successfully finalized ${withdrawals.length} withdrawals`,
-  );
+    logInfo(
+      "BridgeService",
+      `Successfully finalized ${withdrawals.length} withdrawals`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Check if this is a bad state error (expected when multiple servers finalize same withdrawals)
+    if (errorMessage.includes("MB: bad state")) {
+      logInfo(
+        "BridgeService",
+        `Withdrawals already finalized by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
+      );
+      return; // Gracefully handle already finalized withdrawals
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
 };
 
 export const handleRejectedWithdrawalBatch = async (
@@ -167,17 +268,48 @@ export const handleRejectedWithdrawalBatch = async (
 ) => {
   const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
 
+  try {
+    await execute({
+      contractName: "MercataBridge",
+      contractAddress: config.bridge.address!,
+      method: "abortWithdrawalBatch",
+      args: {
+        ids: withdrawalIds,
+      },
+    });
+
+    logInfo(
+      "BridgeService",
+      `Successfully aborted ${withdrawals.length} rejected withdrawals`,
+    );
+  } catch (error) {
+    const errorMessage = (error as Error).message;
+    
+    // Check if this is a not abortable error (expected when multiple servers abort same withdrawals)
+    if (errorMessage.includes("MB: not abortable")) {
+      logInfo(
+        "BridgeService",
+        `Withdrawals already aborted by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
+      );
+      return; // Gracefully handle already aborted withdrawals
+    }
+    
+    // Re-throw other errors
+    throw error;
+  }
+};
+
+export const updateLastProcessedBlock = async (
+  externalChainId: number,
+  blockNumber: number,
+): Promise<void> => {
   await execute({
     contractName: "MercataBridge",
     contractAddress: config.bridge.address!,
-    method: "abortWithdrawalBatch",
+    method: "setLastProcessedBlock",
     args: {
-      ids: withdrawalIds,
+      externalChainId,
+      lastProcessedBlock: blockNumber,
     },
   });
-
-  logInfo(
-    "BridgeService",
-    `Successfully aborted ${withdrawals.length} rejected withdrawals`,
-  );
 };

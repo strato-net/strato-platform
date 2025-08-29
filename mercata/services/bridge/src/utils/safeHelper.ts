@@ -14,15 +14,52 @@ import {
   convertDecimals,
   ensureHexPrefix,
   safeChecksum,
-  validateAddress,
   safeToBigInt,
 } from "./utils";
-import { logError } from "./logger";
+import { logError, logInfo } from "./logger";
 import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType } from "../types";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
 const NONCE_CONFLICT_PATTERNS = /nonce|already exists|conflict/i;
+
+// Check if withdrawal is already pending in Safe by checking transaction metadata
+async function isWithdrawalPending(
+  apiKit: any,
+  safeAddress: string,
+  withdrawalId: string,
+  externalChainId: number
+): Promise<boolean> {
+  try {
+    // Get pending transactions from Safe
+    const pendingTxs = await apiKit.getPendingTransactions(safeAddress);
+    
+    // Look for transactions with matching withdrawalId in metadata
+    for (const tx of pendingTxs.results || []) {
+      if (tx.metadata && typeof tx.metadata === 'object') {
+        const metadata = tx.metadata as Record<string, any>;
+        
+        // Check if this transaction has our withdrawalId in metadata
+        if (metadata.withdrawalId === withdrawalId && 
+            metadata.externalChainId === externalChainId) {
+          logInfo("SafeService", `Found pending withdrawal ${withdrawalId} in transaction ${tx.safeTxHash}`);
+          return true;
+        }
+      }
+    }
+    
+    logInfo("SafeService", `No pending withdrawal found for ${withdrawalId} (${pendingTxs.results?.length || 0} pending txs checked)`);
+    return false;
+  } catch (error) {
+    // If we can't check pending transactions, assume it's not pending
+    logError("SafeService", error as Error, {
+      operation: "isWithdrawalPending",
+      withdrawalId,
+      externalChainId,
+    });
+    return false;
+  }
+}
 
 // Module-scope heavy objects
 const erc20Interface = new Interface(ERC20_ABI);
@@ -50,7 +87,7 @@ export async function getAssetInfoForChain(
   stratoToken: string,
   externalChainId: number,
   callCache: CallCache,
-): Promise<AssetInfo | null> {
+): Promise<AssetInfo> {
   const cacheKey = `${stratoToken}-${externalChainId}`;
   let assetInfo = callCache.get(cacheKey);
 
@@ -62,7 +99,9 @@ export async function getAssetInfoForChain(
       assetInfo.externalChainId !== externalChainId.toString() ||
       !assetInfo.enabled
     ) {
-      return null;
+      throw new Error(
+        `getAssetInfoForChain failed: No external mapping found for token ${stratoToken} on chain ${externalChainId}`
+      );
     }
 
     assetInfo = {
@@ -84,7 +123,8 @@ export function buildTxDescriptor(params: {
   externalTokenAmount: string;
   externalToken?: string;
   nonce: number;
-}): { transactions: MetaTransactionData[]; options: { nonce: number } } {
+  metadata: Record<string, any>;
+}): { transactions: MetaTransactionData[]; options: { nonce: number; metadata: Record<string, any> } } {
   if (params.type === "eth") {
     return {
       transactions: [
@@ -95,7 +135,10 @@ export function buildTxDescriptor(params: {
           operation: OperationType.Call,
         },
       ],
-      options: { nonce: params.nonce },
+      options: { 
+        nonce: params.nonce,
+        metadata: params.metadata
+      },
     };
   }
 
@@ -118,38 +161,24 @@ export function buildTxDescriptor(params: {
         operation: OperationType.Call,
       },
     ],
-    options: { nonce: params.nonce },
+    options: { 
+      nonce: params.nonce,
+      metadata: params.metadata
+    },
   };
 }
 
-export function validateAndGroupWithdrawals(
+export function groupWithdrawalsByChain(
   withdrawals: Withdrawal[],
 ): Map<number, Withdrawal[]> {
-  const grouped = new Map<number, Withdrawal[]>();
-
-  for (const withdrawal of withdrawals) {
+  return withdrawals.reduce((grouped, withdrawal) => {
     const externalChainId = Number(withdrawal.externalChainId);
-    const externalRecipient = withdrawal.externalRecipient;
-    if (!externalRecipient || !validateAddress(externalRecipient)) {
-      logError(
-        "SafeService",
-        new Error(`Invalid external recipient address: ${externalRecipient}`),
-        {
-          operation: "validateAndGroupWithdrawals",
-          withdrawalId: withdrawal.withdrawalId,
-          externalRecipient: externalRecipient,
-        },
-      );
-      continue;
-    }
-
     if (!grouped.has(externalChainId)) {
       grouped.set(externalChainId, []);
     }
     grouped.get(externalChainId)!.push(withdrawal);
-  }
-
-  return grouped;
+    return grouped;
+  }, new Map<number, Withdrawal[]>());
 }
 
 export async function prepareWithdrawals(
@@ -163,16 +192,8 @@ export async function prepareWithdrawals(
       externalChainId,
       callCache,
     );
-    if (!assetInfo) {
-      throw new Error(
-        `No external mapping found for token ${withdrawal.stratoToken} on chain ${externalChainId}`,
-      );
-    }
 
     const isEth = assetInfo.externalToken.toLowerCase() === ZERO_ADDRESS;
-    const type: TxType = isEth ? "eth" : "erc20";
-    const externalToken = isEth ? ZERO_ADDRESS : assetInfo.externalToken;
-
     const externalTokenAmount = convertDecimals(
       withdrawal.stratoTokenAmount.toString(),
       STRATO_DECIMALS,
@@ -182,9 +203,10 @@ export async function prepareWithdrawals(
     return {
       externalTokenAmount,
       externalRecipient: withdrawal.externalRecipient,
-      type,
-      externalToken,
+      type: (isEth ? "eth" : "erc20") as TxType,
+      externalToken: isEth ? ZERO_ADDRESS : assetInfo.externalToken,
       externalChainId,
+      withdrawalId: withdrawal.withdrawalId!,
     };
   });
 
@@ -216,53 +238,27 @@ export function isNonceConflict(err: any): boolean {
   );
 }
 
-export async function proposeWithRetry(
+export async function proposeTransaction(
   apiKit: any,
   protocolKit: any,
-  descriptor: { transactions: any[]; options: { nonce: number } },
+  descriptor: { transactions: any[]; options: { nonce: number; metadata: Record<string, any> } },
   safeAddress: string,
   relayer: string,
 ): Promise<{ safeTxHash: string }> {
-  try {
-    const safeTransaction = await protocolKit.createTransaction(descriptor);
-    const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
-    const signature = await protocolKit.signHash(safeTxHash);
+  const safeTransaction = await protocolKit.createTransaction(descriptor);
+  const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
+  const signature = await protocolKit.signHash(safeTxHash);
 
-    await apiKit.proposeTransaction({
-      safeAddress,
-      safeTransactionData: safeTransaction.data,
-      safeTxHash,
-      senderAddress: relayer,
-      senderSignature: signature.data,
-    });
+  await apiKit.proposeTransaction({
+    safeAddress,
+    safeTransactionData: safeTransaction.data,
+    safeTxHash,
+    senderAddress: relayer,
+    senderSignature: signature.data,
+    metadata: descriptor.options.metadata,
+  });
 
-    return { safeTxHash };
-  } catch (e: any) {
-    if (!isNonceConflict(e)) throw e;
-
-    const retryNonce: number = Number(await apiKit.getNextNonce(safeAddress));
-    if (retryNonce === descriptor.options.nonce) throw e;
-
-    const retryDescriptor = {
-      ...descriptor,
-      options: { nonce: retryNonce },
-    };
-
-    const retryTransaction =
-    await protocolKit.createTransaction(retryDescriptor);
-    const retryHash = await protocolKit.getTransactionHash(retryTransaction);
-    const retrySignature = await protocolKit.signHash(retryHash);
-
-    await apiKit.proposeTransaction({
-      safeAddress,
-      safeTransactionData: retryTransaction.data,
-      safeTxHash: retryHash,
-      senderAddress: relayer,
-      senderSignature: retrySignature.data,
-    });
-
-    return { safeTxHash: retryHash };
-  }
+  return { safeTxHash };
 }
 
 export async function initializeSafeForChain(chainId: number) {
@@ -304,27 +300,67 @@ export async function proposeChainTransactions(
   const safeTxs: { safeTxHash: string; nonce: number }[] = [];
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeOwnerAddress || "";
-  let nonce: number = Number(await apiKit.getNextNonce(safeAddress));
 
   for (const prepared of preparedWithdrawals) {
-    const descriptor = buildTxDescriptor({
-      type: prepared.type,
-      externalRecipient: prepared.externalRecipient,
-      externalTokenAmount: prepared.externalTokenAmount,
-      externalToken: prepared.type === "erc20" ? prepared.externalToken : undefined,
-      nonce,
-    });
-
-    const { safeTxHash } = await proposeWithRetry(
-      apiKit,
-      protocolKit,
-      descriptor,
-      safeAddress,
-      relayer,
-    );
-    safeTxs.push({ safeTxHash, nonce });
-    nonce += 1;
+    const result = await proposeWithdrawalWithRetry(apiKit, protocolKit, prepared, safeAddress, relayer);
+    if (result) {
+      safeTxs.push(result);
+    }
   }
 
   return safeTxs;
+}
+
+async function proposeWithdrawalWithRetry(
+  apiKit: any,
+  protocolKit: any,
+  prepared: PreparedWithdrawal,
+  safeAddress: string,
+  relayer: string,
+  retryCount: number = 0,
+): Promise<{ safeTxHash: string; nonce: number } | null> {
+  const maxRetries = 5;
+  
+  // Check if already pending (check on every attempt)
+  if (await isWithdrawalPending(apiKit, safeAddress, prepared.withdrawalId, prepared.externalChainId)) {
+    logInfo("SafeService", `Withdrawal ${prepared.withdrawalId} already pending${retryCount > 0 ? ` (after ${retryCount} retries)` : ''}, skipping`);
+    return null;
+  }
+
+  // Get nonce
+  const nonce = Number(await apiKit.getNextNonce(safeAddress));
+  const descriptor = buildTxDescriptor({
+    type: prepared.type,
+    externalRecipient: prepared.externalRecipient,
+    externalTokenAmount: prepared.externalTokenAmount,
+    externalToken: prepared.type === "erc20" ? prepared.externalToken : undefined,
+    nonce,
+    metadata: {
+      withdrawalId: prepared.withdrawalId,
+      externalChainId: prepared.externalChainId,
+    },
+  });
+
+  try {
+    const { safeTxHash } = await proposeTransaction(apiKit, protocolKit, descriptor, safeAddress, relayer);
+    logInfo("SafeService", `Proposed withdrawal ${prepared.withdrawalId} with nonce ${nonce}${retryCount > 0 ? ` (retry ${retryCount}/${maxRetries})` : ''}`);
+    return { safeTxHash, nonce };
+  } catch (error) {
+    if (!isNonceConflict(error)) throw error;
+
+    // Check if we've exhausted retries
+    if (retryCount >= maxRetries) {
+      logError("SafeService", error as Error, {
+        operation: "proposeWithdrawalWithRetry",
+        withdrawalId: prepared.withdrawalId,
+        retryCount,
+        maxRetries,
+      });
+      return null;
+    }
+
+    // Recursive retry with incremented counter
+    logInfo("SafeService", `Nonce conflict for withdrawal ${prepared.withdrawalId}, retrying (${retryCount + 1}/${maxRetries})`);
+    return proposeWithdrawalWithRetry(apiKit, protocolKit, prepared, safeAddress, relayer, retryCount + 1);
+  }
 }

@@ -33,19 +33,18 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { Token, BridgeContext } from "@/lib/bridge/types";
+import { BridgeContext } from "@/lib/bridge/types";
 import {
   normalizeError,
   formatTxHash,
   getExplorerUrl,
 } from "@/lib/bridge/utils";
-
-// Constants
-const DECIMAL_PATTERN = /^\d*\.?\d*$/;
-const BRIDGE_FEE = "0.1%";
-const ESTIMATED_TIME = "2-5 minutes";
+import { DECIMAL_PATTERN } from "@/lib/constants";
 
 const BridgeIn: React.FC = () => {
+  // ============================================
+  // Hooks & Context
+  // ============================================
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
@@ -61,24 +60,42 @@ const BridgeIn: React.FC = () => {
     selectedToken,
     setSelectedToken,
   } = useBridgeContext();
+
+  // ============================================
+  // State Management
+  // ============================================
   const [amount, setAmount] = useState("");
   const [tokenBalance, setTokenBalance] = useState("0");
   const [isLoading, setIsLoading] = useState(false);
-  const [approvalState, setApprovalState] = useState<
-    "idle" | "approving" | "approved"
-  >("idle");
+  const [approvalState, setApprovalState] = useState<"idle" | "approving" | "approved">("idle");
   const [errors, setErrors] = useState({ amount: "", network: "" });
   const inFlightRef = useRef(false);
 
+  // State for minimum deposit amount
+  const [minDepositInfo, setMinDepositInfo] = useState<{ 
+    amount: string; 
+    amountWei: bigint; 
+    loading: boolean 
+  }>({ 
+    amount: "", 
+    amountWei: 0n,
+    loading: false 
+  });
+
+  // ============================================
+  // Derived State & Computed Values
+  // ============================================
   const selectedNetworkConfig = availableNetworks.find(
     (n) => n.chainName === selectedNetwork,
   );
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
-  const isCorrectNetwork =
-    isConnected && chainId && expectedChainId && chainId === expectedChainId;
+  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
   const isNativeToken = selectedToken?.externalToken === NATIVE_TOKEN_ADDRESS;
 
+  // ============================================
+  // Balance Hooks
+  // ============================================
   const {
     data: nativeBalance,
     refetch: refetchNative,
@@ -117,36 +134,42 @@ const BridgeIn: React.FC = () => {
     !!expectedChainId &&
     (nativeLoading || tokenLoading);
 
-  // State for minimum deposit amount
-  const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ 
-    amount: "", 
-    loading: false 
-  });
-
-  // Function to fetch minimum deposit amount using existing service
+  // ============================================
+  // Utility Functions
+  // ============================================
+  
+  /**
+   * Fetches minimum deposit amount from router contract
+   */
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!tokenAddress || !selectedNetworkConfig) return;
     
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
     
     try {
-      const validation = await bridgeContractService.validateRouterContract({
-        depositRouterAddress: selectedNetworkConfig.depositRouter,
-        amount: "0", // We just need the config, not validation
-        decimals: decimals.toString(),
-        chainId: selectedNetworkConfig.chainId,
+      const tokenConfig = await bridgeContractService.getTokenConfig({
         tokenAddress,
-        mint: false, // bridge-in always uses mint = false
+        chainId: parseInt(selectedNetworkConfig.chainId),
+        depositRouterAddress: selectedNetworkConfig.depositRouter,
       });
 
-      // Use the minAmount that's already fetched by the service
-      const formattedMinAmount = validation.minAmount ? 
-        (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
+      // Store both formatted amount and wei value
+      const minAmountWei = tokenConfig.minAmount ? BigInt(tokenConfig.minAmount) : 0n;
+      const formattedMinAmount = minAmountWei > 0n ? 
+        formatBalance(minAmountWei, undefined, decimals) : "0";
       
-      setMinDepositInfo({ amount: formattedMinAmount, loading: false });
+      setMinDepositInfo({ 
+        amount: formattedMinAmount, 
+        amountWei: minAmountWei,
+        loading: false 
+      });
     } catch (error) {
       console.error("Error fetching min deposit amount:", error);
-      setMinDepositInfo({ amount: "0", loading: false });
+      setMinDepositInfo({ 
+        amount: "0", 
+        amountWei: 0n,
+        loading: false 
+      });
     }
   };
 
@@ -202,6 +225,9 @@ const BridgeIn: React.FC = () => {
     }
   }, [isNativeToken, nativeBalance, tokenBalanceData]);
 
+  /**
+   * Validates user input amount against balance and minimum requirements
+   */
   const validateAmount = (value: string): boolean => {
     if (!value) {
       setErrors((e) => ({ ...e, amount: "" }));
@@ -218,6 +244,19 @@ const BridgeIn: React.FC = () => {
             : "Please enter a valid number",
       }));
       return false;
+    }
+
+    // Check minimum amount using stored wei value
+    if (minDepositInfo.amountWei > 0n) {
+      const inputAmountWei = safeParseUnits(value, parseInt(selectedToken?.externalDecimals || "18"));
+      
+      if (inputAmountWei < minDepositInfo.amountWei) {
+        setErrors((e) => ({
+          ...e,
+          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedToken?.externalSymbol}`,
+        }));
+        return false;
+      }
     }
 
     const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
@@ -237,6 +276,10 @@ const BridgeIn: React.FC = () => {
     return true;
   };
 
+  // ============================================
+  // Event Handlers
+  // ============================================
+  
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (DECIMAL_PATTERN.test(value)) {
@@ -245,7 +288,13 @@ const BridgeIn: React.FC = () => {
     }
   };
 
-  // Structured bridge flow functions
+  // ============================================
+  // Bridge Flow Functions
+  // ============================================
+  
+  /**
+   * Validates configuration and prepares bridge context
+   */
   const preflight = (): BridgeContext => {
     if (
       !selectedToken ||
@@ -463,6 +512,10 @@ const BridgeIn: React.FC = () => {
     }
   };
 
+  // ============================================
+  // Main Bridge Handler
+  // ============================================
+  
   const handleBridge = async () => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
@@ -530,6 +583,10 @@ const BridgeIn: React.FC = () => {
     }
   };
 
+  // ============================================
+  // Render
+  // ============================================
+  
   return (
     <div className="space-y-6">
       <BridgeWalletStatus />
@@ -656,10 +713,6 @@ const BridgeIn: React.FC = () => {
                 <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
                   You will receive ≈ {amount} {selectedToken.stratoTokenName} (
                   {selectedToken.stratoTokenSymbol}) on STRATO
-                  <br />
-                  <span className="text-xs text-gray-500">
-                    Bridge fee: {BRIDGE_FEE}
-                  </span>
                 </p>
               )}
             </div>
@@ -668,10 +721,7 @@ const BridgeIn: React.FC = () => {
 
       <div className="text-sm text-gray-500 space-y-1">
         {[
-          "Bridge assets between Ethereum and STRATO networks",
-          "Small bridge fee applies",
           "Transaction time varies by network congestion",
-          "Wallet will automatically switch to the selected network",
         ].map((text, i) => (
           <p key={i}>• {text}</p>
         ))}

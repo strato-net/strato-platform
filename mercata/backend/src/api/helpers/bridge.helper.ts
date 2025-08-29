@@ -1,17 +1,11 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { ensureHexPrefix } from "../../utils/utils";
 
 interface QueryConfig {
   tableName: string;
   selectFields: string;
   countField: string;
-  enrichmentType: 'withdrawal' | 'deposit';
-}
-
-interface EnrichmentConfig {
-  externalChainIdField: string;
-  stratoTokenField: string;
-  bridgeStatusField: string;
 }
 
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
@@ -19,26 +13,11 @@ const QUERY_CONFIGS: Record<string, QueryConfig> = {
     tableName: `${constants.MercataBridge}-withdrawals`,
     selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,transaction_hash",
     countField: "count()",
-    enrichmentType: 'withdrawal'
   },
   deposit: {
     tableName: `${constants.MercataBridge}-deposits`,
     selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp,transaction_hash",
     countField: "count()",
-    enrichmentType: 'deposit'
-  }
-};
-
-const ENRICHMENT_CONFIGS: Record<string, EnrichmentConfig> = {
-  withdrawal: {
-    externalChainIdField: 'WithdrawalInfo?.externalChainId',
-    stratoTokenField: 'WithdrawalInfo?.stratoToken',
-    bridgeStatusField: 'WithdrawalInfo?.bridgeStatus'
-  },
-  deposit: {
-    externalChainIdField: 'externalChainId',
-    stratoTokenField: 'DepositInfo?.stratoToken',
-    bridgeStatusField: 'DepositInfo?.bridgeStatus'
   }
 };
 
@@ -69,12 +48,10 @@ export function buildQueryParams(
 export function enrichTransactionData(
   results: any[],
   bridgeAssets: Map<string, any>,
-  enrichmentType: 'withdrawal' | 'deposit'
+  type: 'withdrawal' | 'deposit'
 ) {
-  const config = ENRICHMENT_CONFIGS[enrichmentType];
-  
   return results.map((result: any) => {    
-    const token = enrichmentType === 'withdrawal'
+    const token = type === 'withdrawal'
       ? result.WithdrawalInfo?.stratoToken
       : result.DepositInfo?.stratoToken;
 
@@ -82,7 +59,6 @@ export function enrichTransactionData(
 
     return {
       ...result,
-      status: result[config.bridgeStatusField.split('?')[0]]?.bridgeStatus || 0,
       stratoToken: matchingAsset?.stratoToken || "-",
       stratoTokenName: matchingAsset?.stratoTokenName || "-",
       stratoTokenSymbol: matchingAsset?.stratoTokenSymbol || "-",
@@ -108,6 +84,23 @@ export async function executeParallelQueries(
     results: dataResponse.data || [],
     totalCount: countResponse.data?.[0]?.count || 0
   };
+}
+
+// Bridge-specific helper function to enrich assets with token metadata
+export function enrichAssetsWithTokenData(assets: any[], tokenMap: Map<string, any>, keyField: string) {
+  return assets.map((asset: any) => {
+    const tokenKey = asset[keyField];
+    const info = tokenMap.get(tokenKey);
+    if (asset.AssetInfo?.externalToken) {
+      asset.AssetInfo.externalToken = ensureHexPrefix(asset.AssetInfo.externalToken);
+    }
+    return {
+      [keyField]: tokenKey,
+      stratoTokenName: info?.name || "",
+      stratoTokenSymbol: info?.symbol || "",
+      ...asset.AssetInfo
+    };
+  });
 }
 
 export { QUERY_CONFIGS };

@@ -659,7 +659,7 @@ contract record MercataBridge is Ownable {
 
             // must be in an abortable state
             require(
-                w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+                w.bridgeStatus == BridgeStatus.INITIATED,
                 "MB: not abortable"
             );
 
