@@ -1,0 +1,186 @@
+import React, { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAccount } from "wagmi";
+import { useBridgeContext } from "@/context/BridgeContext";
+import { useUserTokens } from "@/context/UserTokensContext";
+import { safeParseUnits } from "@/utils/numberUtils";
+
+const DECIMAL_PATTERN = /^\d*\.?\d*$/;
+
+const WithdrawWidget: React.FC = () => {
+  const { address, isConnected } = useAccount();
+  const { toast } = useToast();
+
+  const {
+    redeemOut,
+    bridgeableTokens,
+    availableNetworks,
+    selectedNetwork,
+    setSelectedNetwork,
+    selectedToken,
+    setSelectedToken,
+    useBalance,
+  } = useBridgeContext();
+
+  const { usdstBalance } = useUserTokens();
+
+  const [amount, setAmount] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [amountError, setAmountError] = useState<string>("");
+
+  // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
+  const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
+
+  // Only show USDC / USDT as destinations (assets mapped by bridgeableTokens)
+  const stableTokens = useMemo(
+    () => (bridgeableTokens || []).filter((t) => t.externalSymbol === "USDC" || t.externalSymbol === "USDT"),
+    [bridgeableTokens]
+  );
+
+  useEffect(() => {
+    if (!selectedToken && stableTokens.length) setSelectedToken(stableTokens[0]);
+  }, [selectedToken, stableTokens, setSelectedToken]);
+
+  useEffect(() => {
+    if (!selectedNetwork && availableNetworks.length) setSelectedNetwork(availableNetworks[0].chainName);
+  }, [selectedNetwork, availableNetworks, setSelectedNetwork]);
+
+  const validateAmount = (value: string) => {
+    if (!value) { setAmountError(""); return true; }
+    const n = Number(value);
+    if (!Number.isFinite(n) || n <= 0) {
+      setAmountError("Please enter a valid amount");
+      return false;
+    }
+    setAmountError("");
+    return true;
+  };
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    if (DECIMAL_PATTERN.test(v)) {
+      setAmount(v);
+      validateAmount(v);
+    }
+  };
+
+  const handleWithdraw = async () => {
+    if (!selectedToken || !selectedNetwork || !address) return;
+    if (!validateAmount(amount)) return;
+    setIsLoading(true);
+    try {
+      const selectedNetworkConfig = availableNetworks.find((n) => n.chainName === selectedNetwork);
+      const externalChainId = selectedNetworkConfig?.chainId || "";
+      const stratoTokenAmount = safeParseUnits(amount, 18).toString();
+      const res = await redeemOut({
+        stratoTokenAmount,
+        externalRecipient: address,
+        stratoToken: selectedToken.stratoTokenAddress,
+        externalChainId: String(externalChainId),
+      });
+      if (res?.success) {
+        toast({
+          title: "Withdrawal requested",
+          description: `Burned ${amount} USDST; ${selectedToken.externalSymbol} will be sent to your ${selectedNetwork} address after review.`,
+        });
+        setAmount("");
+      } else {
+        throw new Error("Failed to request withdrawal");
+      }
+    } catch (e: any) {
+      toast({ title: "Withdraw failed", description: e?.message || String(e), variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Simple balance impact preview: we do not auto-withdraw from lending pool
+  const balanceImpact = useMemo(() => {
+    try {
+      const beforeWei = BigInt(currentUsdst || "0");
+      const before = Number((beforeWei / 10n ** 18n).toString());
+      const v = Number(amount || "0");
+      const after = Math.max(0, before - (Number.isFinite(v) ? v : 0));
+      return { before, after };
+    } catch {
+      return { before: 0, after: 0 };
+    }
+  }, [currentUsdst, amount]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <div className="flex-1 space-y-1.5">
+          <Label>From</Label>
+          <Input value="STRATO (USDST)" disabled className="bg-gray-50" />
+        </div>
+        <div className="flex-1 space-y-1.5">
+          <Label>To Network</Label>
+          <Select value={selectedNetwork || ""} onValueChange={setSelectedNetwork}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select network" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableNetworks.map((n) => (
+                <SelectItem key={n.chainId} value={n.chainName}>{n.chainName}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Receive Stablecoin</Label>
+        <Select value={selectedToken?.externalSymbol || ""} onValueChange={(v) => setSelectedToken(stableTokens.find(t => t.externalSymbol === v) || null)}>
+          <SelectTrigger>
+            <SelectValue placeholder="Choose token" />
+          </SelectTrigger>
+          <SelectContent>
+            {stableTokens.map(t => (
+              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>{t.externalName} ({t.externalSymbol})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Amount (USDST to burn)</Label>
+        <Input type="text" inputMode="decimal" placeholder="0.00" value={amount} onChange={handleAmountChange} className={amountError ? "border-red-500" : ""} />
+        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+      </div>
+
+      <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
+        <div className="flex items-center justify-between">
+          <span>USDST Balance</span>
+          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined,{maximumFractionDigits:6})} → {balanceImpact.after.toLocaleString(undefined,{maximumFractionDigits:6})}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Outcome</span>
+          <span className="font-medium">{amount || "0.00"} {selectedToken?.externalSymbol || "USDC/USDT"} to {selectedNetwork || "network"}</span>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedToken || !amount} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
+          {isLoading ? "Processing..." : "Withdraw"}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default WithdrawWidget;
+
+
+
+
