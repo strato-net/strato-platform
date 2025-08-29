@@ -38,6 +38,7 @@ import { OnRampProvider } from "./context/OnRampContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import Borrow from "./pages/Borrow";
+import Liquidations from "./pages/Liquidations";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
 
@@ -197,6 +198,15 @@ const App = () => {
                                     element={
                                       <ProtectedRoute>
                                         <BridgeTransactionsPage />
+                                      </ProtectedRoute>
+                                    }
+                                  />
+
+                                  <Route
+                                    path="/liquidations"
+                                    element={
+                                      <ProtectedRoute>
+                                        <Liquidations />
                                       </ProtectedRoute>
                                     }
                                   />
