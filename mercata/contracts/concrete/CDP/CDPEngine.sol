@@ -1,3 +1,4 @@
+import "./CDPVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./PriceOracle.sol";
@@ -228,7 +229,7 @@ contract record CDPEngine is Ownable {
             maxAmount = vault.collateral;
         } else {
             // Calculate required collateral to maintain liquidation ratio
-            uint256 price = _priceracle().getAssetPrice(asset);
+            uint256 price = _priceOracle().getAssetPrice(asset);
             CollateralConfig memory config = collateralConfigs[asset];
             
             uint256 requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
