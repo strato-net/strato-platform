@@ -242,15 +242,9 @@ contract record CDPEngine is Ownable {
             uint256 requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
             uint256 requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
             
-            if (vault.collateral > requiredCollateral) {
-                maxAmount = vault.collateral - requiredCollateral;
-                // Apply 1 wei buffer for safety
-                if (maxAmount > 1) {
-                    maxAmount -= 1;
-                }
-            } else {
-                maxAmount = 0;
-            }
+            // Only allow withdrawal if we have more than required + 1 wei buffer
+            require(vault.collateral > requiredCollateral + 1, "CDPEngine: insufficient excess collateral for safe withdrawal");
+            maxAmount = vault.collateral - requiredCollateral - 1;
         }
 
         if (maxAmount > 0) {
