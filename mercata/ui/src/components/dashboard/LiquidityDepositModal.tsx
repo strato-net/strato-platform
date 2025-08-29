@@ -133,7 +133,6 @@ const LiquidityDepositModal = ({
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       handleClose();
-      onDepositSuccess();
       toast({
         title: "Success",
         description: `${selectedPool._name} deposited successfully.`,
@@ -148,6 +147,11 @@ const LiquidityDepositModal = ({
     } finally {
       setDepositLoading(false);
       operationInProgressRef.current = false;
+    }
+    
+    // Call onDepositSuccess AFTER the finally block to ensure operationInProgressRef.current is false
+    if (!depositLoading) {
+      onDepositSuccess();
     }
   };
 
