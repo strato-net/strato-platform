@@ -2,13 +2,14 @@ import "./CDPVault.sol";
 import "../Tokens/Token.sol";
 import "./PriceOracle.sol";
 import "../Admin/FeeCollector.sol";
+import "./CDPRegistry.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
 contract record CDPEngine is Ownable {
-    CDPVault public immutable cdpVault;
-    Token public immutable usdst;
+    CDPRegistry public registry;
+    Token public usdst;
     PriceOracle public priceOracle;
     FeeCollector public feeCollector;
 
@@ -126,15 +127,30 @@ contract record CDPEngine is Ownable {
         require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
         _;
     }
+    
+     // ═══════════════════════════════════════════════════════════════════════════════
+    // REGISTRY ACCESS HELPERS
+    // ═══════════════════════════════════════════════════════════════════════════════
+    
+    function _cdpVault() internal view returns (CDPVault) {
+        return registry.cdpVault();
+    }
 
+    function _priceOracle() internal view returns (PriceOracle) {
+        return registry.priceOracle();
+    }
+
+     // ═══════════════════════════════════════════════════════════════════════════════
+    // LIQUIDITY OPERATIONS (DEPOSITS & WITHDRAWALS)
+    // ═
     constructor(
-        address _cdpVault,
+        address _registry,
         address _usdst,
         address _priceOracle,
         address _feeCollector,
         address initialOwner
     ) Ownable(initialOwner) {
-        require(_cdpVault != address(0), "CDPEngine: invalid vault");
+        require(_registry != address(0), "CDPEngine: invalid registry");
         require(_usdst != address(0), "CDPEngine: invalid USDST");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
         
@@ -151,7 +167,7 @@ contract record CDPEngine is Ownable {
     ) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
 
-        cdpVault.deposit(msg.sender, asset, amount);
+        _cdpVault().deposit(msg.sender, asset, amount);
 
         // Update vault state
         vaults[msg.sender][asset].collateral += amount;
@@ -183,7 +199,7 @@ contract record CDPEngine is Ownable {
             require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
         }
 
-        cdpVault.withdraw(msg.sender, asset, amount);
+        _cdpVault().withdraw(msg.sender, asset, amount);
 
         emit Withdrawn(msg.sender, asset, amount);
     }
@@ -225,7 +241,7 @@ contract record CDPEngine is Ownable {
 
         if (maxAmount > 0) {
             vault.collateral -= maxAmount;
-            cdpVault.withdraw(msg.sender, asset, maxAmount);
+            _cdpVault().withdraw(msg.sender, asset, maxAmount);
             emit Withdrawn(msg.sender, asset, maxAmount);
         }
     }
@@ -425,7 +441,7 @@ contract record CDPEngine is Ownable {
         
         require(collateralToSeize > 0, "CDPEngine: no collateral to seize");
         borrowerVault.collateral -= collateralToSeize;
-        cdpVault.seize(borrower, collateralAsset, msg.sender, collateralToSeize);
+        _cdpVault().seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
         emit LiquidationExecuted(
             borrower,
