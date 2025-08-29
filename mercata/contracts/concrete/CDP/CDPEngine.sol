@@ -153,17 +153,20 @@ contract record CDPEngine is Ownable {
         address _usdst,
         address _tokenFactory,
         address _priceOracle,
+        address _cdpVault,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_registry != address(0), "CDPEngine: invalid registry");
         require(_usdst != address(0), "CDPEngine: invalid USDST");
         require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
-        
+        require(_cdpVault != address(0), "CDPEngine: invalid vault");
+
         registry = CDPRegistry(_registry);
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
+        cdpVault = CDPVault(_cdpVault);
     }
 
 
@@ -623,7 +626,7 @@ contract record CDPEngine is Ownable {
         uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // ADMINISTRATIVE FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════════════
