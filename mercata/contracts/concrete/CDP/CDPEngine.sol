@@ -3,6 +3,7 @@ import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./PriceOracle.sol";
 import "./CDPRegistry.sol";
+import "../Admin/FeeCollector.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
@@ -12,6 +13,7 @@ contract record CDPEngine is Ownable {
     Token public usdst;
     TokenFactory public tokenFactory;
     PriceOracle public priceOracle;
+    FeeCollector public feeCollector;
 
     struct CollateralConfig {
         uint256 liquidationRatio;
@@ -153,6 +155,7 @@ contract record CDPEngine is Ownable {
         address _usdst,
         address _tokenFactory,
         address _priceOracle,
+        address _feeCollector,
         address _cdpVault,
         address initialOwner
     ) Ownable(initialOwner) {
@@ -160,12 +163,14 @@ contract record CDPEngine is Ownable {
         require(_usdst != address(0), "CDPEngine: invalid USDST");
         require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
+        require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
         require(_cdpVault != address(0), "CDPEngine: invalid vault");
 
         registry = CDPRegistry(_registry);
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
+        feeCollector = FeeCollector(_feeCollector);
         cdpVault = CDPVault(_cdpVault);
     }
 
@@ -344,21 +349,26 @@ contract record CDPEngine is Ownable {
         
         uint256 owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         require(owed > 0, "CDPEngine: no debt");
-        uint256 repay = amountUSD > owed ? owed : amountUSD;
-        uint256 scaledDelta = (repay * RAY) / assetState.rateAccumulator;
+        uint256 repayAmount = amountUSD > owed ? owed : amountUSD;
         
-        // Clamp scaledDelta to not exceed current scaledDebt (handle rounding)
+        uint256 scaledDelta = (repayAmount * RAY) / assetState.rateAccumulator;
         if (scaledDelta > userVault.scaledDebt) {
             scaledDelta = userVault.scaledDebt;
         }
         
-        require(usdst.burn(msg.sender, repay), "CDPEngine: burn failed");
+        // Collect stability fees for the portion being repaid
+        (, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+            scaledDelta,
+            assetState.rateAccumulator
+        );
+        
+        require(usdst.burn(msg.sender, repayAmount), "CDPEngine: burn failed");
 
         userVault.scaledDebt -= scaledDelta;
         assetState.totalScaledDebt -= scaledDelta;
-        assetState.mintedUSD -= repay;
+        assetState.mintedUSD -= repayAmount;
         
-        emit USDSTBurned(msg.sender, asset, repay);
+        emit USDSTBurned(msg.sender, asset, repayAmount);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
     }
 
@@ -374,7 +384,13 @@ contract record CDPEngine is Ownable {
         Vault storage userVault = vaults[msg.sender][asset];
         
         require(userVault.scaledDebt > 0, "CDPEngine: no debt");
-        uint256 owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        
+        // Calculate and collect stability fees
+        (uint256 owed, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+            userVault.scaledDebt,
+            assetState.rateAccumulator
+        );
+        
         uint256 scaledDebtToRemove = userVault.scaledDebt;
         
         require(usdst.burn(msg.sender, owed), "CDPEngine: burn failed");
@@ -424,14 +440,21 @@ contract record CDPEngine is Ownable {
 
         require(usdst.burn(msg.sender, debtToCover), "CDPEngine: burn failed");
 
-        // Reduce borrower's debt
-        uint256 scaledDebtReduction = (debtToCover * RAY) / assetState.rateAccumulator;
-        if (scaledDebtReduction > borrowerVault.scaledDebt) {
-            scaledDebtReduction = borrowerVault.scaledDebt;
+        // Calculate and collect stability fees on the liquidated portion
+        uint256 scaledDebtToLiquidate = (debtToCover * RAY) / assetState.rateAccumulator;
+        if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
+            scaledDebtToLiquidate = borrowerVault.scaledDebt;
         }
         
-        borrowerVault.scaledDebt -= scaledDebtReduction;
-        assetState.totalScaledDebt -= scaledDebtReduction;
+        // Collect stability fees for liquidated portion
+        (, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+            scaledDebtToLiquidate,
+            assetState.rateAccumulator
+        );
+
+        // Reduce borrower's debt
+        borrowerVault.scaledDebt -= scaledDebtToLiquidate;
+        assetState.totalScaledDebt -= scaledDebtToLiquidate;
         assetState.mintedUSD -= debtToCover;
 
         // Calculate collateral to seize (debt + penalty)
@@ -489,6 +512,26 @@ contract record CDPEngine is Ownable {
         assetState.lastAccrual = block.timestamp;
         
         emit Accrued(asset, oldRate, assetState.rateAccumulator, dt);
+    }
+
+    /**
+     * @notice Calculate and collect stability fees for a vault
+     * @param scaledDebt The scaled debt amount
+     * @param rateAccumulator Current rate accumulator
+     * @return totalDebt The total debt including fees
+     * @return stabilityFee The stability fee amount to collect
+     */
+    function _calculateAndCollectStabilityFee(
+        uint256 scaledDebt,
+        uint256 rateAccumulator
+    ) internal returns (uint256 totalDebt, uint256 stabilityFee) {
+        require(scaledDebt > 0, "CDPEngine: no debt");
+        
+        totalDebt = (scaledDebt * rateAccumulator) / RAY;
+        if (totalDebt > scaledDebt) {
+            stabilityFee = totalDebt - scaledDebt;
+            require(usdst.mint(address(feeCollector), stabilityFee), "CDPEngine: fee mint failed");
+        }
     }
 
 
@@ -588,7 +631,7 @@ contract record CDPEngine is Ownable {
     function collateralizationRatio(
         address owner,
         address asset
-    ) external view returns (uint256) {
+    ) public view returns (uint256) {
         Vault memory vault = vaults[owner][asset];
         
         if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
@@ -712,10 +755,19 @@ contract record CDPEngine is Ownable {
         priceOracle = PriceOracle(_priceOracle);
     }
 
-     // Setter function for updating the CDPRegistry reference
-    function setRegistry(address _registry) external onlyOwner {
-        require(_registry != address(0), "Invalid registry address");
-        registry = CDPRegistry(_registry);
-    }
+          // Setter function for updating the CDPRegistry reference
+     function setRegistry(address _registry) external onlyOwner {
+         require(_registry != address(0), "Invalid registry address");
+         registry = CDPRegistry(_registry);
+     }
+
+     /**
+      * @notice Update FeeCollector reference
+      * @param _feeCollector New fee collector address
+      */
+     function setFeeCollector(address _feeCollector) external onlyOwner {
+         require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
+         feeCollector = FeeCollector(_feeCollector);
+     }
 
 }
