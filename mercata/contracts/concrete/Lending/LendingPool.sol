@@ -612,7 +612,9 @@ contract record LendingPool is Ownable {
         uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
         require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
         uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
-        uint coverage = (borrowerCollateral * priceColl * 10000) / (priceDebt * cConfig.liquidationBonus);
+        uint num = borrowerCollateral * priceColl * 10000;
+        uint den = priceDebt * cConfig.liquidationBonus;
+        uint coverage = (num + den - 1) / den; // ceilDiv
 
         uint debtToCover = totalOwed;
         if (debtToCover > maxRepay) debtToCover = maxRepay;
