@@ -704,4 +704,10 @@ contract record CDPEngine is Ownable {
         priceOracle = PriceOracle(_priceOracle);
     }
 
+     // Setter function for updating the CDPRegistry reference
+    function setRegistry(address _registry) external onlyOwner {
+        require(_registry != address(0), "Invalid registry address");
+        registry = CDPRegistry(_registry);
+    }
+
 }
