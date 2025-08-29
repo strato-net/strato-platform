@@ -1,0 +1,1032 @@
+Migrating: CREATe TABLE "sync_task"("id" SERIAL8  PRIMARY KEY UNIQUE,"chiliad" INT8 NOT NULL DEFAULT nextval('chiliad'),"assignment_time" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),"host" VARCHAR NOT NULL,"status" VARCHAR NOT NULL DEFAULT 'Assigned')
+blockapps-init for ThreadId 4
+Instrumentation for strato-p2p is enabled
+[2025-08-20 15:51:46.438600000 UTC]  INFO | ThreadId 4     | HasVault                            | Calling vault-wrapper to get the node's public key
+[2025-08-20 15:51:46.721938000 UTC]  INFO | ThreadId 18    | stratoP2PLoopback                   | Reflecting PBFT back to unseq since 2019
+[2025-08-20 15:51:46.723316000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | maxConn: 1000
+[2025-08-20 15:51:46.723458000 UTC]  INFO | ThreadId 23    | stratoP2PServer                     | connect address: 127.0.0.1
+[2025-08-20 15:51:46.726854000 UTC]  INFO | ThreadId 23    | stratoP2PServer                     | listen port:     30303
+[2025-08-20 15:51:46.733496000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:51:51.736762000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:51:51.739559000 UTC]  INFO | ThreadId 27    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:51:51.739649000 UTC]  INFO | ThreadId 27    | runPeer                             | [34m============================[0m
+[2025-08-20 15:51:51.739710000 UTC]  INFO | ThreadId 27    | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:51:51.739791000 UTC]  INFO | ThreadId 27    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:51:51.739873000 UTC]  INFO | ThreadId 27    | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:51:51.748356000 UTC]  INFO | ThreadId 29    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:51:51.748474000 UTC]  INFO | ThreadId 29    | runPeer                             | [34m============================[0m
+[2025-08-20 15:51:51.748521000 UTC]  INFO | ThreadId 29    | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:51:51.748567000 UTC]  INFO | ThreadId 29    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:51:51.748658000 UTC]  INFO | ThreadId 29    | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:51:51.748975000 UTC]  INFO | ThreadId 30    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:51:51.749126000 UTC]  INFO | ThreadId 30    | runPeer                             | [34m============================[0m
+[2025-08-20 15:51:51.749168000 UTC]  INFO | ThreadId 30    | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:51:51.749203000 UTC]  INFO | ThreadId 30    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:51:51.749259000 UTC]  INFO | ThreadId 30    | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:51:51.749398000 UTC]  INFO | ThreadId 28    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:51:51.749435000 UTC]  INFO | ThreadId 28    | runPeer                             | [34m============================[0m
+[2025-08-20 15:51:51.749558000 UTC]  INFO | ThreadId 28    | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:51:51.749747000 UTC]  INFO | ThreadId 28    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:51:51.749897000 UTC]  INFO | ThreadId 28    | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:51:51.759555000 UTC]  INFO | ThreadId 27    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.767056000 UTC]  INFO | ThreadId 29    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.768296000 UTC]  INFO | ThreadId 28    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.768370000 UTC]  INFO | ThreadId 30    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.791940000 UTC]  INFO | ThreadId 27    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:51:51.848797000 UTC]  INFO | ThreadId 27    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.884516000 UTC]  INFO | ThreadId 27    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:51.921615000 UTC]  INFO | ThreadId 46    | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:51:51.942666000 UTC]  INFO | ThreadId 47    | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:51:51.947570000 UTC]  INFO | ThreadId 46    | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:51:51.972004000 UTC] ERROR | ThreadId 27    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:51:51.973982000 UTC]  INFO | ThreadId 27    | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:51:51.974066000 UTC]  INFO | ThreadId 27    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:51:51.975768000 UTC]  INFO | ThreadId 27    | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:51:52.050709000 UTC]  INFO | ThreadId 29    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:51:52.052544000 UTC]  INFO | ThreadId 28    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:51:52.100660000 UTC]  INFO | ThreadId 30    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:51:52.104476000 UTC]  INFO | ThreadId 29    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.112606000 UTC]  INFO | ThreadId 28    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.137946000 UTC]  INFO | ThreadId 29    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.144710000 UTC]  INFO | ThreadId 28    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.161005000 UTC]  INFO | ThreadId 30    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.174307000 UTC]  INFO | ThreadId 55    | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:51:52.182062000 UTC]  INFO | ThreadId 60    | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:51:52.196994000 UTC]  INFO | ThreadId 56    | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:51:52.201617000 UTC]  INFO | ThreadId 30    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:51:52.203134000 UTC]  INFO | ThreadId 61    | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:51:52.212752000 UTC]  INFO | ThreadId 55    | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:51:52.237593000 UTC] ERROR | ThreadId 29    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:51:52.242036000 UTC]  INFO | ThreadId 60    | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:51:52.243909000 UTC]  INFO | ThreadId 65    | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:51:52.248108000 UTC]  INFO | ThreadId 29    | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:51:52.248231000 UTC]  INFO | ThreadId 29    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:51:52.251766000 UTC]  INFO | ThreadId 29    | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:51:52.260850000 UTC]  INFO | ThreadId 66    | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:51:52.262809000 UTC]  INFO | ThreadId 65    | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:51:52.266993000 UTC] ERROR | ThreadId 28    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:51:52.268727000 UTC]  INFO | ThreadId 28    | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:51:52.268878000 UTC]  INFO | ThreadId 28    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:51:52.270961000 UTC]  INFO | ThreadId 28    | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:51:52.287944000 UTC] ERROR | ThreadId 30    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:51:52.289462000 UTC]  INFO | ThreadId 30    | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:51:52.289529000 UTC]  INFO | ThreadId 30    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:51:52.291128000 UTC]  INFO | ThreadId 30    | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:51:56.740369000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:01.745437000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:01.752047000 UTC]  INFO | ThreadId 74    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:01.752252000 UTC]  INFO | ThreadId 74    | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:01.752987000 UTC]  INFO | ThreadId 74    | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:01.753121000 UTC]  INFO | ThreadId 74    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:01.753864000 UTC]  INFO | ThreadId 75    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:01.753953000 UTC]  INFO | ThreadId 76    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:01.754078000 UTC]  INFO | ThreadId 77    | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:01.754153000 UTC]  INFO | ThreadId 74    | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:52:01.754255000 UTC]  INFO | ThreadId 75    | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:01.754403000 UTC]  INFO | ThreadId 76    | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:01.754488000 UTC]  INFO | ThreadId 77    | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:01.754710000 UTC]  INFO | ThreadId 75    | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:01.754841000 UTC]  INFO | ThreadId 76    | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:01.754914000 UTC]  INFO | ThreadId 77    | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:01.755029000 UTC]  INFO | ThreadId 75    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:01.755111000 UTC]  INFO | ThreadId 76    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:01.755193000 UTC]  INFO | ThreadId 77    | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:01.755289000 UTC]  INFO | ThreadId 75    | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:52:01.755409000 UTC]  INFO | ThreadId 76    | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:52:01.755590000 UTC]  INFO | ThreadId 77    | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:52:01.775281000 UTC]  INFO | ThreadId 74    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.776780000 UTC]  INFO | ThreadId 77    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.776946000 UTC]  INFO | ThreadId 76    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.777057000 UTC]  INFO | ThreadId 75    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.812602000 UTC]  INFO | ThreadId 77    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:01.812799000 UTC]  INFO | ThreadId 76    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:01.812855000 UTC]  INFO | ThreadId 74    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:01.857588000 UTC]  INFO | ThreadId 75    | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:01.864291000 UTC]  INFO | ThreadId 76    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.866095000 UTC]  INFO | ThreadId 77    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.897117000 UTC]  INFO | ThreadId 76    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.897998000 UTC]  INFO | ThreadId 77    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.909330000 UTC]  INFO | ThreadId 75    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.931679000 UTC]  INFO | ThreadId 79    | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:01.932264000 UTC]  INFO | ThreadId 84    | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:01.939980000 UTC]  INFO | ThreadId 75    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:01.948696000 UTC]  INFO | ThreadId 80    | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:52:01.950356000 UTC]  INFO | ThreadId 79    | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:01.950694000 UTC]  INFO | ThreadId 85    | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:52:01.952032000 UTC]  INFO | ThreadId 84    | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:01.970954000 UTC]  INFO | ThreadId 89    | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:01.977628000 UTC] ERROR | ThreadId 77    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:01.977764000 UTC] ERROR | ThreadId 76    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:01.979030000 UTC]  INFO | ThreadId 77    | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:01.979122000 UTC]  INFO | ThreadId 77    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:01.979381000 UTC]  INFO | ThreadId 76    | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:01.979418000 UTC]  INFO | ThreadId 76    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:01.980558000 UTC]  INFO | ThreadId 77    | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:01.980802000 UTC]  INFO | ThreadId 76    | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:01.991482000 UTC]  INFO | ThreadId 90    | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:52:01.993351000 UTC]  INFO | ThreadId 89    | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:02.018552000 UTC] ERROR | ThreadId 75    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:02.019703000 UTC]  INFO | ThreadId 75    | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:02.019893000 UTC]  INFO | ThreadId 75    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:02.020893000 UTC]  INFO | ThreadId 75    | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:02.415152000 UTC]  INFO | ThreadId 74    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:02.449169000 UTC]  INFO | ThreadId 74    | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:02.482662000 UTC]  INFO | ThreadId 95    | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:02.499047000 UTC]  INFO | ThreadId 96    | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:52:02.500259000 UTC]  INFO | ThreadId 95    | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:02.525635000 UTC] ERROR | ThreadId 74    | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:02.526794000 UTC]  INFO | ThreadId 74    | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:02.526853000 UTC]  INFO | ThreadId 74    | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:02.527752000 UTC]  INFO | ThreadId 74    | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:06.749665000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:11.752756000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:11.754500000 UTC]  INFO | ThreadId 103   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:11.754566000 UTC]  INFO | ThreadId 103   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:11.754624000 UTC]  INFO | ThreadId 103   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:11.754698000 UTC]  INFO | ThreadId 103   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:11.754787000 UTC]  INFO | ThreadId 103   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:52:11.754861000 UTC]  INFO | ThreadId 105   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:11.754901000 UTC]  INFO | ThreadId 104   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:11.754914000 UTC]  INFO | ThreadId 105   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:11.754946000 UTC]  INFO | ThreadId 106   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:11.754969000 UTC]  INFO | ThreadId 104   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:11.755035000 UTC]  INFO | ThreadId 105   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:11.755127000 UTC]  INFO | ThreadId 106   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:11.755166000 UTC]  INFO | ThreadId 104   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:11.755225000 UTC]  INFO | ThreadId 105   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:11.755295000 UTC]  INFO | ThreadId 106   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:11.755455000 UTC]  INFO | ThreadId 104   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:11.755611000 UTC]  INFO | ThreadId 105   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:52:11.756298000 UTC]  INFO | ThreadId 106   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:11.756578000 UTC]  INFO | ThreadId 104   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:52:11.756990000 UTC]  INFO | ThreadId 106   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:52:11.775289000 UTC]  INFO | ThreadId 106   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.775391000 UTC]  INFO | ThreadId 103   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.776956000 UTC]  INFO | ThreadId 105   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.777093000 UTC]  INFO | ThreadId 104   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.810734000 UTC]  INFO | ThreadId 106   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:11.810916000 UTC]  INFO | ThreadId 104   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:11.810982000 UTC]  INFO | ThreadId 103   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:11.811077000 UTC]  INFO | ThreadId 105   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:11.873586000 UTC]  INFO | ThreadId 103   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.873669000 UTC]  INFO | ThreadId 104   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.874531000 UTC]  INFO | ThreadId 106   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.874615000 UTC]  INFO | ThreadId 105   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.903777000 UTC]  INFO | ThreadId 104   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.903885000 UTC]  INFO | ThreadId 103   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.905674000 UTC]  INFO | ThreadId 105   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.905794000 UTC]  INFO | ThreadId 106   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:11.937963000 UTC]  INFO | ThreadId 108   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:11.938424000 UTC]  INFO | ThreadId 117   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:11.946505000 UTC]  INFO | ThreadId 113   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:11.946613000 UTC]  INFO | ThreadId 123   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:11.955708000 UTC]  INFO | ThreadId 118   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:52:11.955901000 UTC]  INFO | ThreadId 109   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:52:11.958216000 UTC]  INFO | ThreadId 117   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:11.958417000 UTC]  INFO | ThreadId 108   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:11.965835000 UTC]  INFO | ThreadId 124   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:52:11.965955000 UTC]  INFO | ThreadId 114   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:52:11.967437000 UTC]  INFO | ThreadId 123   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:11.967954000 UTC]  INFO | ThreadId 113   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:11.981499000 UTC] ERROR | ThreadId 104   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:11.981632000 UTC] ERROR | ThreadId 103   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:11.982645000 UTC]  INFO | ThreadId 103   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:11.982681000 UTC]  INFO | ThreadId 103   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:11.982749000 UTC]  INFO | ThreadId 104   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:11.982778000 UTC]  INFO | ThreadId 104   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:11.983614000 UTC]  INFO | ThreadId 104   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:11.983781000 UTC]  INFO | ThreadId 103   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:11.991561000 UTC] ERROR | ThreadId 106   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:11.991693000 UTC] ERROR | ThreadId 105   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:11.992606000 UTC]  INFO | ThreadId 105   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:11.992655000 UTC]  INFO | ThreadId 105   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:11.992731000 UTC]  INFO | ThreadId 106   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:11.992756000 UTC]  INFO | ThreadId 106   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:11.993637000 UTC]  INFO | ThreadId 105   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:11.993866000 UTC]  INFO | ThreadId 106   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:16.761964000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:21.766097000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:26.772140000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:26.778662000 UTC]  INFO | ThreadId 133   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:26.779184000 UTC]  INFO | ThreadId 133   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:26.779324000 UTC]  INFO | ThreadId 133   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:26.780555000 UTC]  INFO | ThreadId 133   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:26.781462000 UTC]  INFO | ThreadId 136   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:26.781476000 UTC]  INFO | ThreadId 133   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:52:26.781828000 UTC]  INFO | ThreadId 136   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:26.782147000 UTC]  INFO | ThreadId 136   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:26.782234000 UTC]  INFO | ThreadId 136   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:26.782362000 UTC]  INFO | ThreadId 136   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:52:26.782704000 UTC]  INFO | ThreadId 135   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:26.782775000 UTC]  INFO | ThreadId 135   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:26.782864000 UTC]  INFO | ThreadId 135   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:26.782964000 UTC]  INFO | ThreadId 134   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:26.782992000 UTC]  INFO | ThreadId 135   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:26.783193000 UTC]  INFO | ThreadId 134   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:26.783362000 UTC]  INFO | ThreadId 135   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:52:26.783507000 UTC]  INFO | ThreadId 134   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:26.783860000 UTC]  INFO | ThreadId 134   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:26.783948000 UTC]  INFO | ThreadId 134   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:52:26.817826000 UTC]  INFO | ThreadId 133   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.818215000 UTC]  INFO | ThreadId 134   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.821405000 UTC]  INFO | ThreadId 136   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.824165000 UTC]  INFO | ThreadId 135   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.866984000 UTC]  INFO | ThreadId 133   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:26.867266000 UTC]  INFO | ThreadId 135   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:26.867552000 UTC]  INFO | ThreadId 134   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:26.869470000 UTC]  INFO | ThreadId 136   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:26.921868000 UTC]  INFO | ThreadId 133   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.926547000 UTC]  INFO | ThreadId 136   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.926781000 UTC]  INFO | ThreadId 135   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.927055000 UTC]  INFO | ThreadId 134   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.959453000 UTC]  INFO | ThreadId 133   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.960251000 UTC]  INFO | ThreadId 134   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.962124000 UTC]  INFO | ThreadId 136   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:26.962434000 UTC]  INFO | ThreadId 135   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:27.007541000 UTC]  INFO | ThreadId 151   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:27.008002000 UTC]  INFO | ThreadId 138   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:27.008776000 UTC]  INFO | ThreadId 144   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:27.010780000 UTC]  INFO | ThreadId 143   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:27.030247000 UTC]  INFO | ThreadId 148   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:52:27.030775000 UTC]  INFO | ThreadId 152   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:52:27.030969000 UTC]  INFO | ThreadId 139   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:52:27.031082000 UTC]  INFO | ThreadId 145   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:52:27.034409000 UTC]  INFO | ThreadId 143   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:27.034930000 UTC]  INFO | ThreadId 151   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:27.035708000 UTC]  INFO | ThreadId 138   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:27.036032000 UTC]  INFO | ThreadId 144   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:27.058906000 UTC] ERROR | ThreadId 133   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:27.059053000 UTC] ERROR | ThreadId 134   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:27.059065000 UTC] ERROR | ThreadId 136   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:27.059364000 UTC] ERROR | ThreadId 135   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:27.061615000 UTC]  INFO | ThreadId 133   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:27.061748000 UTC]  INFO | ThreadId 133   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:27.061891000 UTC]  INFO | ThreadId 136   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:27.061957000 UTC]  INFO | ThreadId 136   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:27.062063000 UTC]  INFO | ThreadId 135   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:27.062139000 UTC]  INFO | ThreadId 135   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:27.062275000 UTC]  INFO | ThreadId 134   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:27.062343000 UTC]  INFO | ThreadId 134   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:27.063774000 UTC]  INFO | ThreadId 135   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:27.064144000 UTC]  INFO | ThreadId 133   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:27.064212000 UTC]  INFO | ThreadId 136   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:27.064279000 UTC]  INFO | ThreadId 134   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:31.777315000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:36.788377000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:41.793238000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:46.801981000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:51.809119000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:52:51.812355000 UTC]  INFO | ThreadId 159   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:51.812496000 UTC]  INFO | ThreadId 159   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:51.812605000 UTC]  INFO | ThreadId 159   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:51.812725000 UTC]  INFO | ThreadId 159   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:51.812892000 UTC]  INFO | ThreadId 159   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:52:51.814663000 UTC]  INFO | ThreadId 162   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:51.814774000 UTC]  INFO | ThreadId 161   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:51.814809000 UTC]  INFO | ThreadId 160   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:52:51.814819000 UTC]  INFO | ThreadId 162   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:51.814976000 UTC]  INFO | ThreadId 161   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:51.815065000 UTC]  INFO | ThreadId 160   | runPeer                             | [34m============================[0m
+[2025-08-20 15:52:51.815288000 UTC]  INFO | ThreadId 162   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:51.815380000 UTC]  INFO | ThreadId 161   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:51.815458000 UTC]  INFO | ThreadId 160   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:51.815562000 UTC]  INFO | ThreadId 162   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:51.815662000 UTC]  INFO | ThreadId 161   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:51.815740000 UTC]  INFO | ThreadId 160   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:52:51.815840000 UTC]  INFO | ThreadId 162   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:52:51.816067000 UTC]  INFO | ThreadId 161   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:52:51.816182000 UTC]  INFO | ThreadId 160   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:52:51.832874000 UTC]  INFO | ThreadId 159   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.834918000 UTC]  INFO | ThreadId 161   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.835084000 UTC]  INFO | ThreadId 160   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.836051000 UTC]  INFO | ThreadId 162   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.867390000 UTC]  INFO | ThreadId 161   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:51.868007000 UTC]  INFO | ThreadId 160   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:51.868156000 UTC]  INFO | ThreadId 159   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:51.868302000 UTC]  INFO | ThreadId 162   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:52:51.929991000 UTC]  INFO | ThreadId 161   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.933578000 UTC]  INFO | ThreadId 162   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.933892000 UTC]  INFO | ThreadId 159   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.933920000 UTC]  INFO | ThreadId 160   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.962675000 UTC]  INFO | ThreadId 161   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.978320000 UTC]  INFO | ThreadId 160   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.978567000 UTC]  INFO | ThreadId 162   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.978827000 UTC]  INFO | ThreadId 159   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:52:51.998107000 UTC]  INFO | ThreadId 164   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:52.014902000 UTC]  INFO | ThreadId 170   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:52.016254000 UTC]  INFO | ThreadId 175   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:52.016979000 UTC]  INFO | ThreadId 165   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:52:52.018246000 UTC]  INFO | ThreadId 180   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:52:52.019947000 UTC]  INFO | ThreadId 164   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:52.032146000 UTC]  INFO | ThreadId 171   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:52:52.034233000 UTC]  INFO | ThreadId 170   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:52.035997000 UTC]  INFO | ThreadId 176   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:52:52.037115000 UTC]  INFO | ThreadId 181   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:52:52.037751000 UTC]  INFO | ThreadId 175   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:52.038704000 UTC]  INFO | ThreadId 180   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:52:52.044598000 UTC] ERROR | ThreadId 161   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:52.046642000 UTC]  INFO | ThreadId 161   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:52:52.046736000 UTC]  INFO | ThreadId 161   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:52.047665000 UTC]  INFO | ThreadId 161   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:52.060168000 UTC] ERROR | ThreadId 159   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:52.061469000 UTC]  INFO | ThreadId 159   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:52:52.061547000 UTC]  INFO | ThreadId 159   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:52.062414000 UTC]  INFO | ThreadId 159   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:52.064393000 UTC] ERROR | ThreadId 162   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:52.064493000 UTC] ERROR | ThreadId 160   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:52:52.071119000 UTC]  INFO | ThreadId 162   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:52:52.071312000 UTC]  INFO | ThreadId 162   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:52.071451000 UTC]  INFO | ThreadId 160   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:52:52.071532000 UTC]  INFO | ThreadId 160   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:52:52.072632000 UTC]  INFO | ThreadId 162   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:52.072776000 UTC]  INFO | ThreadId 160   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:52:56.815990000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:01.820559000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:06.824929000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:11.828743000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:16.837460000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:21.840256000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:26.844641000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:31.850500000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:36.854857000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:36.860458000 UTC]  INFO | ThreadId 197   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:53:36.861050000 UTC]  INFO | ThreadId 197   | runPeer                             | [34m============================[0m
+[2025-08-20 15:53:36.861319000 UTC]  INFO | ThreadId 197   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:53:36.862004000 UTC]  INFO | ThreadId 197   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:53:36.862841000 UTC]  INFO | ThreadId 197   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:53:36.863313000 UTC]  INFO | ThreadId 199   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:53:36.863399000 UTC]  INFO | ThreadId 199   | runPeer                             | [34m============================[0m
+[2025-08-20 15:53:36.864104000 UTC]  INFO | ThreadId 199   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:53:36.864455000 UTC]  INFO | ThreadId 199   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:53:36.864605000 UTC]  INFO | ThreadId 199   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:53:36.864833000 UTC]  INFO | ThreadId 200   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:53:36.864956000 UTC]  INFO | ThreadId 200   | runPeer                             | [34m============================[0m
+[2025-08-20 15:53:36.865045000 UTC]  INFO | ThreadId 200   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:53:36.865125000 UTC]  INFO | ThreadId 200   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:53:36.865246000 UTC]  INFO | ThreadId 198   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:53:36.865256000 UTC]  INFO | ThreadId 200   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:53:36.865453000 UTC]  INFO | ThreadId 198   | runPeer                             | [34m============================[0m
+[2025-08-20 15:53:36.865729000 UTC]  INFO | ThreadId 198   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:53:36.865803000 UTC]  INFO | ThreadId 198   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:53:36.865927000 UTC]  INFO | ThreadId 198   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:53:36.883503000 UTC]  INFO | ThreadId 200   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:36.883688000 UTC]  INFO | ThreadId 198   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:36.883826000 UTC]  INFO | ThreadId 197   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:36.883850000 UTC]  INFO | ThreadId 199   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.180593000 UTC]  INFO | ThreadId 200   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:53:37.234703000 UTC]  INFO | ThreadId 200   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.247119000 UTC]  INFO | ThreadId 197   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:53:37.247278000 UTC]  INFO | ThreadId 199   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:53:37.247422000 UTC]  INFO | ThreadId 198   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:53:37.267090000 UTC]  INFO | ThreadId 200   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.306964000 UTC]  INFO | ThreadId 225   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:53:37.314051000 UTC]  INFO | ThreadId 198   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.314291000 UTC]  INFO | ThreadId 197   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.314306000 UTC]  INFO | ThreadId 199   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.327214000 UTC]  INFO | ThreadId 226   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:53:37.331595000 UTC]  INFO | ThreadId 225   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:53:37.347958000 UTC]  INFO | ThreadId 198   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.348541000 UTC]  INFO | ThreadId 199   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.350086000 UTC]  INFO | ThreadId 197   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:53:37.359000000 UTC] ERROR | ThreadId 200   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:53:37.364158000 UTC]  INFO | ThreadId 200   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:53:37.364346000 UTC]  INFO | ThreadId 200   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:53:37.372259000 UTC]  INFO | ThreadId 200   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:53:37.383037000 UTC]  INFO | ThreadId 231   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:53:37.383254000 UTC]  INFO | ThreadId 236   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:53:37.385058000 UTC]  INFO | ThreadId 241   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:53:37.402326000 UTC]  INFO | ThreadId 232   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:53:37.404262000 UTC]  INFO | ThreadId 237   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:53:37.404445000 UTC]  INFO | ThreadId 231   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:53:37.406287000 UTC]  INFO | ThreadId 236   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:53:37.408432000 UTC]  INFO | ThreadId 242   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:53:37.410352000 UTC]  INFO | ThreadId 241   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:53:37.428557000 UTC] ERROR | ThreadId 198   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:53:37.430307000 UTC]  INFO | ThreadId 198   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:53:37.430386000 UTC]  INFO | ThreadId 198   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:53:37.431542000 UTC]  INFO | ThreadId 198   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:53:37.432941000 UTC] ERROR | ThreadId 197   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:53:37.433912000 UTC]  INFO | ThreadId 197   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:53:37.433999000 UTC]  INFO | ThreadId 197   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:53:37.434986000 UTC]  INFO | ThreadId 197   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:53:37.436914000 UTC] ERROR | ThreadId 199   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:53:37.437927000 UTC]  INFO | ThreadId 199   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:53:37.438009000 UTC]  INFO | ThreadId 199   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:53:37.438887000 UTC]  INFO | ThreadId 199   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:53:41.863092000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:46.871610000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:51.880818000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:53:56.885335000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:01.893598000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:06.898148000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:11.905092000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:16.921590000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:21.927038000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:26.933244000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:31.947665000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:36.955327000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:41.964626000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:46.969792000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:51.980781000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:54:56.985570000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:01.992995000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:01.995744000 UTC]  INFO | ThreadId 265   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:55:01.995898000 UTC]  INFO | ThreadId 265   | runPeer                             | [34m============================[0m
+[2025-08-20 15:55:01.996038000 UTC]  INFO | ThreadId 265   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:55:01.996421000 UTC]  INFO | ThreadId 265   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:55:01.996566000 UTC]  INFO | ThreadId 267   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:55:01.996968000 UTC]  INFO | ThreadId 266   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:55:01.997211000 UTC]  INFO | ThreadId 268   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:55:01.997220000 UTC]  INFO | ThreadId 265   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:55:01.997340000 UTC]  INFO | ThreadId 267   | runPeer                             | [34m============================[0m
+[2025-08-20 15:55:01.997431000 UTC]  INFO | ThreadId 266   | runPeer                             | [34m============================[0m
+[2025-08-20 15:55:01.997509000 UTC]  INFO | ThreadId 268   | runPeer                             | [34m============================[0m
+[2025-08-20 15:55:01.998130000 UTC]  INFO | ThreadId 267   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:55:01.998225000 UTC]  INFO | ThreadId 266   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:55:01.998395000 UTC]  INFO | ThreadId 268   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:55:01.998523000 UTC]  INFO | ThreadId 267   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:55:01.998649000 UTC]  INFO | ThreadId 266   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:55:01.998750000 UTC]  INFO | ThreadId 268   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:55:01.998937000 UTC]  INFO | ThreadId 267   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:55:01.999039000 UTC]  INFO | ThreadId 266   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:55:01.999148000 UTC]  INFO | ThreadId 268   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:55:02.021258000 UTC]  INFO | ThreadId 268   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.021444000 UTC]  INFO | ThreadId 267   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.022345000 UTC]  INFO | ThreadId 266   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.022365000 UTC]  INFO | ThreadId 265   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.319421000 UTC]  INFO | ThreadId 265   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:55:02.398138000 UTC]  INFO | ThreadId 266   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:55:02.398332000 UTC]  INFO | ThreadId 267   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:55:02.399475000 UTC]  INFO | ThreadId 268   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:55:02.415936000 UTC]  INFO | ThreadId 265   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.450239000 UTC]  INFO | ThreadId 265   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.454601000 UTC]  INFO | ThreadId 266   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.460725000 UTC]  INFO | ThreadId 267   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.464510000 UTC]  INFO | ThreadId 268   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.486513000 UTC]  INFO | ThreadId 266   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.491212000 UTC]  INFO | ThreadId 294   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:55:02.493518000 UTC]  INFO | ThreadId 267   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.495417000 UTC]  INFO | ThreadId 268   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:55:02.513319000 UTC]  INFO | ThreadId 295   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:55:02.560093000 UTC]  INFO | ThreadId 302   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:55:02.560302000 UTC]  INFO | ThreadId 294   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:55:02.560471000 UTC]  INFO | ThreadId 299   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:55:02.560650000 UTC]  INFO | ThreadId 309   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:55:02.581564000 UTC]  INFO | ThreadId 303   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:55:02.581731000 UTC]  INFO | ThreadId 310   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:55:02.581811000 UTC]  INFO | ThreadId 300   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:55:02.584648000 UTC]  INFO | ThreadId 302   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:55:02.585601000 UTC]  INFO | ThreadId 309   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:55:02.585940000 UTC]  INFO | ThreadId 299   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:55:02.589195000 UTC] ERROR | ThreadId 265   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:55:02.590509000 UTC]  INFO | ThreadId 265   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:55:02.590571000 UTC]  INFO | ThreadId 265   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:55:02.591681000 UTC]  INFO | ThreadId 265   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:55:02.609786000 UTC] ERROR | ThreadId 267   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:55:02.611507000 UTC]  INFO | ThreadId 267   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:55:02.611612000 UTC]  INFO | ThreadId 267   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:55:02.612802000 UTC]  INFO | ThreadId 267   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:55:02.613794000 UTC] ERROR | ThreadId 266   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:55:02.615259000 UTC]  INFO | ThreadId 266   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:55:02.615371000 UTC]  INFO | ThreadId 266   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:55:02.616407000 UTC]  INFO | ThreadId 266   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:55:02.621801000 UTC] ERROR | ThreadId 268   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:55:02.623379000 UTC]  INFO | ThreadId 268   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:55:02.623472000 UTC]  INFO | ThreadId 268   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:55:02.624512000 UTC]  INFO | ThreadId 268   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:55:07.000102000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:12.006975000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:17.012701000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:22.016317000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:27.022073000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:32.027430000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:37.033277000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:42.038410000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:47.044298000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:52.051005000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:55:57.055356000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:02.071167000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:07.077067000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:12.082588000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:17.088881000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:22.095090000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:27.115562000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:32.121543000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:37.134038000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:42.137653000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:47.143667000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:52.153165000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:56:57.159918000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:02.182562000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:07.189320000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:12.194419000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:17.201607000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:22.208230000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:27.214033000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:32.226375000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:37.232239000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:42.238889000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:47.251535000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:47.261534000 UTC]  INFO | ThreadId 349   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:57:47.261882000 UTC]  INFO | ThreadId 349   | runPeer                             | [34m============================[0m
+[2025-08-20 15:57:47.261997000 UTC]  INFO | ThreadId 349   | runPeer                             | [32m * Attempting to connect to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:57:47.262336000 UTC]  INFO | ThreadId 349   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:57:47.262970000 UTC]  INFO | ThreadId 351   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:57:47.263094000 UTC]  INFO | ThreadId 350   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:57:47.263127000 UTC]  INFO | ThreadId 352   | runPeer                             | [34mWelcome to strato-p2p-client[0m
+[2025-08-20 15:57:47.263248000 UTC]  INFO | ThreadId 349   | runPeer                             | [32m * server pubkey is: [33m3df1e7272ef708af11161d4050cedd...[0m[0m
+[2025-08-20 15:57:47.263358000 UTC]  INFO | ThreadId 351   | runPeer                             | [34m============================[0m
+[2025-08-20 15:57:47.263454000 UTC]  INFO | ThreadId 350   | runPeer                             | [34m============================[0m
+[2025-08-20 15:57:47.263607000 UTC]  INFO | ThreadId 352   | runPeer                             | [34m============================[0m
+[2025-08-20 15:57:47.264290000 UTC]  INFO | ThreadId 351   | runPeer                             | [32m * Attempting to connect to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:57:47.264372000 UTC]  INFO | ThreadId 350   | runPeer                             | [32m * Attempting to connect to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:57:47.264467000 UTC]  INFO | ThreadId 352   | runPeer                             | [32m * Attempting to connect to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:57:47.264564000 UTC]  INFO | ThreadId 351   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:57:47.264645000 UTC]  INFO | ThreadId 350   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:57:47.264731000 UTC]  INFO | ThreadId 352   | runPeer                             | [32m * my pubkey is: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m[0m
+[2025-08-20 15:57:47.264855000 UTC]  INFO | ThreadId 351   | runPeer                             | [32m * server pubkey is: [33mbc0872ac5ad6707e5b7809f98eda8e...[0m[0m
+[2025-08-20 15:57:47.265055000 UTC]  INFO | ThreadId 350   | runPeer                             | [32m * server pubkey is: [33ma86e26439c2eff21d29485f403e0ad...[0m[0m
+[2025-08-20 15:57:47.265194000 UTC]  INFO | ThreadId 352   | runPeer                             | [32m * server pubkey is: [33m08a23d220d5ad911f3c7c4d7627d52...[0m[0m
+[2025-08-20 15:57:47.286187000 UTC]  INFO | ThreadId 352   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.286484000 UTC]  INFO | ThreadId 351   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.288812000 UTC]  INFO | ThreadId 349   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.288928000 UTC]  INFO | ThreadId 350   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.578808000 UTC]  INFO | ThreadId 351   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:57:47.665411000 UTC]  INFO | ThreadId 351   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.681396000 UTC]  INFO | ThreadId 349   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:57:47.686402000 UTC]  INFO | ThreadId 350   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:57:47.686669000 UTC]  INFO | ThreadId 352   | HasVault                            | Calling vault-wrapper for a signature
+[2025-08-20 15:57:47.701282000 UTC]  INFO | ThreadId 351   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.736022000 UTC]  INFO | ThreadId 349   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.741567000 UTC]  INFO | ThreadId 378   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:57:47.750168000 UTC]  INFO | ThreadId 352   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.750315000 UTC]  INFO | ThreadId 350   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.762516000 UTC]  INFO | ThreadId 379   | displayMessage                      | [36m>44.206.83.54:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33mbc0872ac5ad6707....
+[2025-08-20 15:57:47.768633000 UTC]  INFO | ThreadId 378   | displayMessage                      | [32m>44.206.83.54:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:57:47.770672000 UTC]  INFO | ThreadId 349   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.785871000 UTC]  INFO | ThreadId 350   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.786435000 UTC]  INFO | ThreadId 352   | HasVault                            | Calling vault-wrapper to get a shared key
+[2025-08-20 15:57:47.793368000 UTC] ERROR | ThreadId 351   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:57:47.796455000 UTC]  INFO | ThreadId 351   | runPeer/exit                        | [32m * Connection ended to [33m44.206.83.54:30303[0m[0m
+[2025-08-20 15:57:47.796698000 UTC]  INFO | ThreadId 351   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:57:47.798266000 UTC]  INFO | ThreadId 351   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.206.83.54", exponential reset will occur in 86400s seconds
+[2025-08-20 15:57:47.805992000 UTC]  INFO | ThreadId 383   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:57:47.825401000 UTC]  INFO | ThreadId 388   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:57:47.825816000 UTC]  INFO | ThreadId 384   | displayMessage                      | [36m>44.198.225.165:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m3df1e7272ef708a....
+[2025-08-20 15:57:47.826368000 UTC]  INFO | ThreadId 393   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63, IST 1
+    port: 0
+    nodeId: [33m95f4815b672e13a....
+[2025-08-20 15:57:47.827595000 UTC]  INFO | ThreadId 383   | displayMessage                      | [32m>44.198.225.165:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:57:47.846628000 UTC]  INFO | ThreadId 389   | displayMessage                      | [36m>34.194.64.79:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33m08a23d220d5ad91....
+[2025-08-20 15:57:47.847634000 UTC]  INFO | ThreadId 394   | displayMessage                      | [36m>34.197.19.103:30303 recv: [0m[34mHello[0m    version: 4
+    cliendId: "Ethereum(G)/v?.?.?/linux/Haskell"
+    capability: ETH 63
+    port: 0
+    nodeId: [33ma86e26439c2eff2....
+[2025-08-20 15:57:47.849817000 UTC]  INFO | ThreadId 388   | displayMessage                      | [32m>34.194.64.79:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:57:47.850124000 UTC]  INFO | ThreadId 393   | displayMessage                      | [32m>34.197.19.103:30303 send: [0m[34mStatus[0m    protocolVersion: 63
+    networkID: 114784819836269
+    totalDifficulty: 0
+    latestHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+    genesisHash: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:57:47.851150000 UTC] ERROR | ThreadId 349   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:57:47.852199000 UTC]  INFO | ThreadId 349   | runPeer/exit                        | [32m * Connection ended to [33m44.198.225.165:30303[0m[0m
+[2025-08-20 15:57:47.852300000 UTC]  INFO | ThreadId 349   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:57:47.853248000 UTC]  INFO | ThreadId 349   | logAndLengthenPeerDisableBy         | Disabling Peer Host "44.198.225.165", exponential reset will occur in 86400s seconds
+[2025-08-20 15:57:47.874325000 UTC] ERROR | ThreadId 352   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:57:47.874477000 UTC] ERROR | ThreadId 350   | runPeer                             | Peer did not run successfully: HeadCipherTooShort
+[2025-08-20 15:57:47.875677000 UTC]  INFO | ThreadId 352   | runPeer/exit                        | [32m * Connection ended to [33m34.194.64.79:30303[0m[0m
+[2025-08-20 15:57:47.875771000 UTC]  INFO | ThreadId 352   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:57:47.875879000 UTC]  INFO | ThreadId 350   | runPeer/exit                        | [32m * Connection ended to [33m34.197.19.103:30303[0m[0m
+[2025-08-20 15:57:47.876043000 UTC]  INFO | ThreadId 350   | stratoP2PClient/handleRunPeerResult | Connection ended: HeadCipherTooShort
+[2025-08-20 15:57:47.876832000 UTC]  INFO | ThreadId 352   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.194.64.79", exponential reset will occur in 86400s seconds
+[2025-08-20 15:57:47.877031000 UTC]  INFO | ThreadId 350   | logAndLengthenPeerDisableBy         | Disabling Peer Host "34.197.19.103", exponential reset will occur in 86400s seconds
+[2025-08-20 15:57:52.257402000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:57:57.262596000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:02.269037000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:07.274625000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:12.280911000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:17.287242000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:22.292614000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:27.296120000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:32.300250000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:37.308279000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:42.317447000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:47.321810000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:52.329278000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:58:57.333105000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:02.337551000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:07.341833000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:12.349766000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:17.356898000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:22.363983000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:27.373025000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:32.380789000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:37.387927000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:42.394919000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:47.405244000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:52.411682000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 15:59:57.420395000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:02.425597000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:07.430309000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:12.438040000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:17.445974000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:22.451451000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:27.456898000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:32.468559000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:37.474481000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:42.482944000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:47.591852000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:52.599370000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:00:57.609807000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:02.618886000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:07.628750000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:12.636265000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:17.642685000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:22.649049000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:27.658001000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:32.662985000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:37.670010000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:42.678249000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:47.684063000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:52.691596000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:01:57.696379000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:02:02.705905000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:02:07.712717000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:02:12.721324000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:02:17.727458000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again
+[2025-08-20 16:02:22.738897000 UTC]  INFO | ThreadId 21    | stratoP2PClient                     | Waiting 5 seconds before looping over peers again

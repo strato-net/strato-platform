@@ -1,0 +1,11 @@
+blockapps-init for ThreadId 11
+[2025-08-20 15:51:49.371079000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 1 of them are blocks
+[2025-08-20 15:51:49.371554000 UTC]  INFO | ThreadId 11    | apiIndexer                          |   (inserting 1 output blocks)
+[2025-08-20 15:51:49.554267000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 1 of them are blocks
+[2025-08-20 15:51:49.554464000 UTC]  INFO | ThreadId 11    | apiIndexer                          |   (inserting 1 output blocks)
+[2025-08-20 15:53:29.628450000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks
+[2025-08-20 15:55:09.775316000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks
+[2025-08-20 15:56:49.869026000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks
+[2025-08-20 15:58:29.967264000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks
+[2025-08-20 16:00:10.061530000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks
+[2025-08-20 16:01:50.192091000 UTC]  INFO | ThreadId 11    | apiIndexer                          | 0 of them are blocks

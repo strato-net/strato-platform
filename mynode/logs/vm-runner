@@ -1,0 +1,131 @@
+blockapps-init for ThreadId 4
+Instrumentation for vm-runner is enabled
+[2025-08-20 15:51:46.495673000 UTC]  INFO | ThreadId 7     | Bagger.processNewBestBlock          | 0 private hashses in Bagger cache
+[2025-08-20 15:51:46.498275000 UTC]  INFO | ThreadId 7     | Bagger.demoteUnexecutables          | pulling from mempool
+[2025-08-20 15:51:46.498461000 UTC]  INFO | ThreadId 7     | Bagger.promoteExecutables           | pulling from mempool
+[2025-08-20 15:51:49.418111000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "\ESC[33m3dc1e4bdb54f6cce80c92d5d494160545a78db35\ESC[0m"
+[2025-08-20 15:51:49.423275000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 1 Block, 1 CreateBlockCommand, 1 VmSelfAddress
+[2025-08-20 15:51:49.426228000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705109426207
+[2025-08-20 15:51:49.426336000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 15:51:49.426471000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 1 blocks
+[2025-08-20 15:51:49.555890000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 1
+[2025-08-20 15:51:49.556063000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 15:51:49.556230000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 15:51:49.556755000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:51:49.557115000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 15:51:49.557221000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:51:49.557317000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:51:49.557396000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 15:51:49.557478000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 15:51:49.557564000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 15:51:49.557650000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:51:49.557733000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 15:51:49.559000000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0010s
+[2025-08-20 15:53:29.648096000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 15:53:29.656389000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 15:53:29.659229000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705209659208
+[2025-08-20 15:53:29.659522000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 15:53:29.659717000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 15:53:29.660191000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 15:53:29.660253000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 15:53:29.660567000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 15:53:29.660967000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:53:29.661147000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 15:53:29.661207000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:53:29.661249000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:53:29.661302000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 15:53:29.661353000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 15:53:29.661410000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 15:53:29.661489000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:53:29.661539000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 15:53:29.662427000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0006s
+[2025-08-20 15:55:09.775603000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 15:55:09.788165000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 15:55:09.916724000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705309916600
+[2025-08-20 15:55:09.916846000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 15:55:09.916921000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 15:55:09.917003000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 15:55:09.917210000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 15:55:09.917254000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 15:55:09.917411000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:55:09.917460000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 15:55:09.917494000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:55:09.917527000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:55:09.917559000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 15:55:09.917591000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 15:55:09.917624000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 15:55:09.917661000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:55:09.917692000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 15:55:09.918119000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0002s
+[2025-08-20 15:56:49.938814000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 15:56:49.947946000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 15:56:49.956681000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705409956480
+[2025-08-20 15:56:49.956797000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 15:56:49.956852000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 15:56:49.957206000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 15:56:49.957243000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 15:56:49.957365000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 15:56:49.957591000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:56:49.957786000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 15:56:49.957828000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:56:49.957866000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:56:49.957904000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 15:56:49.957945000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 15:56:49.957979000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 15:56:49.958019000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:56:49.958053000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 15:56:49.959232000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0008s
+[2025-08-20 15:58:29.990383000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 15:58:29.999039000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 15:58:30.009357000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705510009028
+[2025-08-20 15:58:30.009595000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 15:58:30.009802000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 15:58:30.010343000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 15:58:30.010396000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 15:58:30.010503000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 15:58:30.011147000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:58:30.011444000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 15:58:30.011493000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:58:30.011672000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 15:58:30.011722000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 15:58:30.011763000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 15:58:30.011808000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 15:58:30.011855000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 15:58:30.011893000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 15:58:30.012935000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0007s
+[2025-08-20 16:00:10.070070000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 16:00:10.079876000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 16:00:10.087099000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705610086709
+[2025-08-20 16:00:10.087252000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 16:00:10.087362000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 16:00:10.087771000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 16:00:10.087821000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 16:00:10.087969000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 16:00:10.088638000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 16:00:10.088859000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 16:00:10.088917000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 16:00:10.088972000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 16:00:10.089030000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 16:00:10.089097000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 16:00:10.089150000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 16:00:10.089203000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 16:00:10.089248000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 16:00:10.090298000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0007s
+[2025-08-20 16:01:50.196251000 UTC]  INFO | ThreadId 7     | ethereumVM/maybeSelfAddress         | "Nothing"
+[2025-08-20 16:01:50.211083000 UTC]  INFO | ThreadId 7     | logEventSummaries                   | #### Got: 
+[2025-08-20 16:01:50.218667000 UTC]  INFO | ThreadId 7     | evm/getNumPoolable                  | currentMicrotime :: Microtime 1755705710218328
+[2025-08-20 16:01:50.218791000 UTC]  INFO | ThreadId 7     | evm/loop                            | adding 0/0 txs to mempool
+[2025-08-20 16:01:50.218851000 UTC]  INFO | ThreadId 7     | evm/processBlocks                   | Running 0 blocks
+[2025-08-20 16:01:50.219202000 UTC]  INFO | ThreadId 7     | addBlocks                           | Unfiltered count: 0
+[2025-08-20 16:01:50.219251000 UTC]  INFO | ThreadId 7     | addBlocks                           | Filtered count: 0
+[2025-08-20 16:01:50.219312000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | Num poolable: 0, num pending: 0
+[2025-08-20 16:01:50.219824000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 16:01:50.220027000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37m[33mDecision making for block creation:[0m[0m[35m |[0m
+[2025-08-20 16:01:50.220078000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mpbft: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 16:01:50.220117000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mreqd: [32mTrue[0m[0m                         [35m |[0m
+[2025-08-20 16:01:50.220156000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mhasTxs: [31mFalse[0m[0m                      [35m |[0m
+[2025-08-20 16:01:50.220351000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mmakeLazyBlocks: [31mFalse[0m[0m              [35m |[0m
+[2025-08-20 16:01:50.220386000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m| [0m[37mshouldOutputBlocks: [31mFalse[0m[0m          [35m |[0m
+[2025-08-20 16:01:50.220427000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | [35m=======================================[0m
+[2025-08-20 16:01:50.220462000 UTC]  INFO | ThreadId 7     | evm/loop/newBlock                   | about to evaluate shouldOutputBlocks
+[2025-08-20 16:01:50.222349000 UTC]  INFO | ThreadId 7     | timeit                              | #### compactContextM time = 0.0007s

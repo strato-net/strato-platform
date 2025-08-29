@@ -1,0 +1,170 @@
+blockapps-init for ThreadId 1
+Instrumentation for ethereum-discovery is enabled
+[2025-08-20 15:51:46.261090000 UTC]  INFO | ThreadId 1     | ethereumDiscovery                   | [34mWelcome to ethereum-discovery[0m
+[2025-08-20 15:51:46.265169000 UTC]  INFO | ThreadId 1     | ethereumDiscovery                   | [34m=============================[0m
+[2025-08-20 15:51:46.265295000 UTC]  INFO | ThreadId 1     | ethereumDiscovery                   | [32mTalking to vault-wrapper at http://localhost:8013/strato/v2.3[0m
+[2025-08-20 15:51:46.283838000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for the node's public key
+[2025-08-20 15:51:46.570150000 UTC]  INFO | ThreadId 1     | ethereumDiscovery                   | My NodeID: [33m0495f4815b672e13ab2e02c79740cac910f036a5598b4ebfc0907b37f3d52a62b55614d98f89d4e4867237934b1335e05e5630c82b27255375723654ba8db597f3[0m
+[2025-08-20 15:51:46.570539000 UTC]  INFO | ThreadId 1     | ethereumDiscovery                   | My Node Address: [33m3dc1e4bdb54f6cce80c92d5d494160545a78db35[0m
+[2025-08-20 15:51:46.593422000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:51:46.606590000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (44.198.225.165:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 44.198.225.165:30303/30303
+[2025-08-20 15:51:46.607286000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.680969000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (34.197.19.103:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 34.197.19.103:30303/30303
+[2025-08-20 15:51:46.681095000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.722732000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (44.206.83.54:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 44.206.83.54:30303/30303
+[2025-08-20 15:51:46.722894000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.763133000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (34.194.64.79:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 34.194.64.79:30303/30303
+[2025-08-20 15:51:46.763292000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.807237000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:46.810976000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (44.198.225.165:30303 3df1e7272e....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:46.872541000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 1 / 0
+[2025-08-20 15:51:46.882835000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (34.197.19.103:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 34.197.19.103:30303/30303
+[2025-08-20 15:51:46.882949000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.927278000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (44.206.83.54:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 44.206.83.54:30303/30303
+[2025-08-20 15:51:46.927406000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:46.965504000 UTC]  INFO | ThreadId 1     | sendPacket                          | [32msending to[0m (34.194.64.79:30303) [34mPing[0m 0:0:0:0:0:0:0:0:30303/30303 to: 34.194.64.79:30303/30303
+[2025-08-20 15:51:46.965734000 UTC]  INFO | ThreadId 1     | HasVault                            | asking vault-proxy for a message signature
+[2025-08-20 15:51:47.001720000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.003418000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (34.197.19.103:30303 a86e26439c....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.016252000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 2 / 0
+[2025-08-20 15:51:47.017577000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.017938000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (44.206.83.54:30303 bc0872ac5a....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.029417000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 3 / 0
+[2025-08-20 15:51:47.031885000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.032633000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (34.194.64.79:30303 08a23d220d....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.050410000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:51:47.055410000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.055732000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (34.197.19.103:30303 a86e26439c....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.113653000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:51:47.118154000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.118304000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (44.206.83.54:30303 bc0872ac5a....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.135673000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:51:47.137429000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | received bytes: len=129
+[2025-08-20 15:51:47.137549000 UTC]  INFO | ThreadId 1     | udpHandshakeServer/handler          | [36mreceiving [0m (34.194.64.79:30303 08a23d220d....) [34mPong[0m to: 0:0:0:0:0:0:0:0:30303/30303
+[2025-08-20 15:51:47.147462000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:51:57.151081000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:51:57.154398000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:52:07.158675000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:07.166004000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 3 / 0
+[2025-08-20 15:52:17.170532000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:17.179697000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:52:27.192074000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:27.198316000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:52:37.203122000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:37.209171000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:52:47.213806000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:47.227994000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:52:57.233569000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:52:57.253308000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:07.259840000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:07.263871000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:17.268556000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:17.275516000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:27.281332000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:27.283366000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:37.288335000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:37.295741000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:47.303014000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:47.312322000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:53:57.321355000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:53:57.327689000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:07.335053000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:07.341203000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:17.350886000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:17.358005000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:27.362412000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:27.381392000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:37.391088000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:37.409172000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:47.419344000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:47.424282000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:54:57.443311000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:54:57.453015000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 4 / 0
+[2025-08-20 15:55:07.457778000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:07.469981000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:55:17.477873000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:17.489447000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:55:27.493838000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:27.507800000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:55:37.515529000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:37.520127000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:55:47.525630000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:47.529228000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:55:57.541129000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:55:57.546756000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:07.551075000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:07.554864000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:17.561543000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:17.566757000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:27.572193000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:27.577113000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:37.584326000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:37.589256000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:47.592418000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:47.596542000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:56:57.603459000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:56:57.609159000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:07.614373000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:07.619476000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:17.622272000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:17.629910000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:27.636198000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:27.639682000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:37.643890000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:37.653721000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:47.661218000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:47.667875000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:57:57.674162000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:57:57.680597000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:07.689002000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:07.695788000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:17.698698000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:17.705230000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:27.712086000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:27.716938000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:37.724241000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:37.732089000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:47.739463000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:47.746554000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:58:57.752671000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:58:57.759054000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:07.761834000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:07.770803000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:17.777266000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:17.781293000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:27.787416000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:27.791857000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:37.798415000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:37.802195000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:47.809657000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:47.816931000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 15:59:57.821270000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 15:59:57.828716000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:07.832459000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:07.837533000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:17.843990000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:17.850907000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:27.857488000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:27.863709000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:37.871193000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:37.879611000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:47.883376000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:48.001265000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:00:58.009141000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:00:58.022361000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:08.027622000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:08.039904000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:18.047924000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:18.056829000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:28.064648000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:28.071079000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:38.080203000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:38.086976000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:48.095604000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:48.101633000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:01:58.108451000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:01:58.114506000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:02:08.120630000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:02:08.129755000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0
+[2025-08-20 16:02:18.134178000 UTC]  INFO | ThreadId 1     | udpHandshakeServer                  | timeout triggered
+[2025-08-20 16:02:18.136809000 UTC]  INFO | ThreadId 1     | addPeersIfNeeded                    | Number of available peers: 0 / 0

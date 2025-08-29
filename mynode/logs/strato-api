@@ -1,0 +1,540 @@
+Identity server url is valid to connect to
+The url for fileServer is https://fileserver.mercata.blockapps.net/highway
+The url for monitor is 
+The url for notificationServer is 
+The url for oauthDiscovery is https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration
+The url for vault is https://vault.blockapps.net:8093
+blockapps-init for ThreadId 4
+Instrumentation for strato-api is enabled
+[36mGET[0m /eth/v1.2/stats/totaltx
+[37m  Accept: [0m*/*
+[37m  Status: [0m[32m200 OK[0m 0.22388s
+[36mGET[0m /bloc/v2.2
+[37m  Accept: [0m*/*
+[37m  Status: [0m[32m200 OK[0m 0.187341s
+[36mGET[0m /eth/v1.2/stats/totaltx
+[37m  Accept: [0m*/*
+[37m  Status: [0m[32m200 OK[0m 0.057723s
+[2025-08-20 15:51:47.345177000 UTC]  INFO | ThreadId 29    |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0m*/*
+[37m  Status: [0m[32m200 OK[0m 0.327335s
+[2025-08-20 15:51:50.051461000 UTC]  INFO | ThreadId 46    |                                     | Querying Vault Wrapper
+[2025-08-20 15:51:50.176978000 UTC]  INFO | ThreadId 59    |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/coinbase
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[31m404 Not Found[0m 0.000024s
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.375063s
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.311183s
+[2025-08-20 15:51:50.537987000 UTC]  INFO | ThreadId 59    |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.321228s
+[2025-08-20 15:52:05.423267000 UTC]  INFO | ThreadId 94    |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.329021s
+[2025-08-20 15:52:05.970135000 UTC]  INFO | ThreadId 108   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.343959s
+[2025-08-20 15:52:06.352892000 UTC]  INFO | ThreadId 108   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.340815s
+[2025-08-20 15:52:20.455962000 UTC]  INFO | ThreadId 141   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.356405s
+[2025-08-20 15:52:20.929050000 UTC]  INFO | ThreadId 156   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.330349s
+[2025-08-20 15:52:21.298969000 UTC]  INFO | ThreadId 156   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.320307s
+[2025-08-20 15:52:35.458573000 UTC]  INFO | ThreadId 189   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.34818s
+[2025-08-20 15:52:35.933941000 UTC]  INFO | ThreadId 203   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.335969s
+[2025-08-20 15:52:36.356932000 UTC]  INFO | ThreadId 203   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.333456s
+[2025-08-20 15:52:50.462323000 UTC]  INFO | ThreadId 236   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.351831s
+[2025-08-20 15:52:50.949683000 UTC]  INFO | ThreadId 251   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.333807s
+[2025-08-20 15:52:51.350184000 UTC]  INFO | ThreadId 251   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.33942s
+[2025-08-20 15:53:05.457026000 UTC]  INFO | ThreadId 284   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.33558s
+[2025-08-20 15:53:05.910172000 UTC]  INFO | ThreadId 298   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.313945s
+[2025-08-20 15:53:06.288784000 UTC]  INFO | ThreadId 298   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.333783s
+[2025-08-20 15:53:20.455095000 UTC]  INFO | ThreadId 331   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.324035s
+[2025-08-20 15:53:20.946780000 UTC]  INFO | ThreadId 346   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.343521s
+[2025-08-20 15:53:21.327098000 UTC]  INFO | ThreadId 346   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.334262s
+[2025-08-20 15:53:35.488115000 UTC]  INFO | ThreadId 379   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.359554s
+[2025-08-20 15:53:35.952300000 UTC]  INFO | ThreadId 393   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.325948s
+[2025-08-20 15:53:36.364711000 UTC]  INFO | ThreadId 393   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.367371s
+[2025-08-20 15:53:50.481169000 UTC]  INFO | ThreadId 426   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.332122s
+[2025-08-20 15:53:50.968366000 UTC]  INFO | ThreadId 441   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.331041s
+[2025-08-20 15:53:51.374541000 UTC]  INFO | ThreadId 441   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.326094s
+[2025-08-20 15:54:05.521446000 UTC]  INFO | ThreadId 474   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.362809s
+[2025-08-20 15:54:05.951494000 UTC]  INFO | ThreadId 488   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.32645s
+[2025-08-20 15:54:06.349463000 UTC]  INFO | ThreadId 488   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.335413s
+[2025-08-20 15:54:20.529885000 UTC]  INFO | ThreadId 521   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.360431s
+[2025-08-20 15:54:21.023065000 UTC]  INFO | ThreadId 536   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.359273s
+[2025-08-20 15:54:21.490893000 UTC]  INFO | ThreadId 536   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349641s
+[2025-08-20 15:54:35.498293000 UTC]  INFO | ThreadId 570   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.345903s
+[2025-08-20 15:54:35.998888000 UTC]  INFO | ThreadId 584   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.338797s
+[2025-08-20 15:54:36.415834000 UTC]  INFO | ThreadId 584   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.347063s
+[2025-08-20 15:54:50.541532000 UTC]  INFO | ThreadId 617   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.354429s
+[2025-08-20 15:54:51.002951000 UTC]  INFO | ThreadId 632   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.339906s
+[2025-08-20 15:54:51.370628000 UTC]  INFO | ThreadId 632   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.326692s
+[2025-08-20 15:55:05.552512000 UTC]  INFO | ThreadId 665   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.356276s
+[2025-08-20 15:55:06.052778000 UTC]  INFO | ThreadId 679   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.389385s
+[2025-08-20 15:55:06.462336000 UTC]  INFO | ThreadId 679   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.342354s
+[2025-08-20 15:55:20.557464000 UTC]  INFO | ThreadId 712   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.372764s
+[2025-08-20 15:55:21.016125000 UTC]  INFO | ThreadId 727   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.346359s
+[2025-08-20 15:55:21.386782000 UTC]  INFO | ThreadId 727   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.335279s
+[2025-08-20 15:55:35.565137000 UTC]  INFO | ThreadId 760   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.357386s
+[2025-08-20 15:55:36.009532000 UTC]  INFO | ThreadId 774   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.339225s
+[2025-08-20 15:55:36.436788000 UTC]  INFO | ThreadId 774   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.346799s
+[2025-08-20 15:55:50.570431000 UTC]  INFO | ThreadId 807   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.358443s
+[2025-08-20 15:55:51.027205000 UTC]  INFO | ThreadId 822   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.334277s
+[2025-08-20 15:55:51.442229000 UTC]  INFO | ThreadId 822   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.350955s
+[2025-08-20 15:56:05.583059000 UTC]  INFO | ThreadId 855   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.362119s
+[2025-08-20 15:56:06.020615000 UTC]  INFO | ThreadId 869   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.33448s
+[2025-08-20 15:56:06.425337000 UTC]  INFO | ThreadId 869   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.338154s
+[2025-08-20 15:56:20.597116000 UTC]  INFO | ThreadId 902   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.361479s
+[2025-08-20 15:56:21.006272000 UTC]  INFO | ThreadId 917   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.333839s
+[2025-08-20 15:56:21.433318000 UTC]  INFO | ThreadId 917   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.348612s
+[2025-08-20 15:56:35.603315000 UTC]  INFO | ThreadId 950   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.36047s
+[2025-08-20 15:56:36.040137000 UTC]  INFO | ThreadId 964   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.343687s
+[2025-08-20 15:56:36.458906000 UTC]  INFO | ThreadId 964   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.348108s
+[2025-08-20 15:56:50.618954000 UTC]  INFO | ThreadId 997   |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.355327s
+[2025-08-20 15:56:51.043378000 UTC]  INFO | ThreadId 1012  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.332917s
+[2025-08-20 15:56:51.444843000 UTC]  INFO | ThreadId 1012  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.34476s
+[2025-08-20 15:57:05.606735000 UTC]  INFO | ThreadId 1045  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.340333s
+[2025-08-20 15:57:06.036235000 UTC]  INFO | ThreadId 1059  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.342464s
+[2025-08-20 15:57:06.458368000 UTC]  INFO | ThreadId 1059  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.355117s
+[2025-08-20 15:57:20.618834000 UTC]  INFO | ThreadId 1092  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.367244s
+[2025-08-20 15:57:21.041915000 UTC]  INFO | ThreadId 1106  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.341875s
+[2025-08-20 15:57:21.447075000 UTC]  INFO | ThreadId 1106  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.354057s
+[2025-08-20 15:57:35.639829000 UTC]  INFO | ThreadId 1139  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.373461s
+[2025-08-20 15:57:36.102574000 UTC]  INFO | ThreadId 1153  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.328032s
+[2025-08-20 15:57:36.523696000 UTC]  INFO | ThreadId 1153  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.358508s
+[2025-08-20 15:57:50.601931000 UTC]  INFO | ThreadId 1186  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.335128s
+[2025-08-20 15:57:51.066020000 UTC]  INFO | ThreadId 1201  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.342338s
+[2025-08-20 15:57:51.440701000 UTC]  INFO | ThreadId 1201  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.332291s
+[2025-08-20 15:58:05.633607000 UTC]  INFO | ThreadId 1234  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.368423s
+[2025-08-20 15:58:06.062812000 UTC]  INFO | ThreadId 1248  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.345557s
+[2025-08-20 15:58:06.447916000 UTC]  INFO | ThreadId 1248  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.338116s
+[2025-08-20 15:58:20.634838000 UTC]  INFO | ThreadId 1281  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.37105s
+[2025-08-20 15:58:21.070152000 UTC]  INFO | ThreadId 1296  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.35022s
+[2025-08-20 15:58:21.497369000 UTC]  INFO | ThreadId 1296  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.347279s
+[2025-08-20 15:58:35.651886000 UTC]  INFO | ThreadId 1329  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.361534s
+[2025-08-20 15:58:36.069635000 UTC]  INFO | ThreadId 1343  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349332s
+[2025-08-20 15:58:36.475662000 UTC]  INFO | ThreadId 1343  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.337153s
+[2025-08-20 15:58:50.650187000 UTC]  INFO | ThreadId 1376  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.358824s
+[2025-08-20 15:58:51.075655000 UTC]  INFO | ThreadId 1391  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.339561s
+[2025-08-20 15:58:51.489468000 UTC]  INFO | ThreadId 1391  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.344599s
+[2025-08-20 15:59:05.653361000 UTC]  INFO | ThreadId 1424  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.361424s
+[2025-08-20 15:59:06.101712000 UTC]  INFO | ThreadId 1438  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.355643s
+[2025-08-20 15:59:06.523198000 UTC]  INFO | ThreadId 1438  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.343837s
+[2025-08-20 15:59:20.667864000 UTC]  INFO | ThreadId 1472  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.374998s
+[2025-08-20 15:59:21.082649000 UTC]  INFO | ThreadId 1487  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.353524s
+[2025-08-20 15:59:21.495732000 UTC]  INFO | ThreadId 1487  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.33476s
+[2025-08-20 15:59:35.647524000 UTC]  INFO | ThreadId 1520  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.35542s
+[2025-08-20 15:59:36.060528000 UTC]  INFO | ThreadId 1534  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.331527s
+[2025-08-20 15:59:36.475877000 UTC]  INFO | ThreadId 1534  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.352635s
+[2025-08-20 15:59:50.670234000 UTC]  INFO | ThreadId 1567  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.370462s
+[2025-08-20 15:59:51.085155000 UTC]  INFO | ThreadId 1582  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.34639s
+[2025-08-20 15:59:51.520968000 UTC]  INFO | ThreadId 1582  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349367s
+[2025-08-20 16:00:05.676286000 UTC]  INFO | ThreadId 1615  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.371247s
+[2025-08-20 16:00:06.091608000 UTC]  INFO | ThreadId 1629  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349146s
+[2025-08-20 16:00:06.516282000 UTC]  INFO | ThreadId 1629  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.34674s
+[2025-08-20 16:00:20.689622000 UTC]  INFO | ThreadId 1662  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.36998s
+[2025-08-20 16:00:21.104188000 UTC]  INFO | ThreadId 1677  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.365579s
+[2025-08-20 16:00:21.534596000 UTC]  INFO | ThreadId 1677  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.347983s
+[2025-08-20 16:00:35.713923000 UTC]  INFO | ThreadId 1710  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.379735s
+[2025-08-20 16:00:36.139166000 UTC]  INFO | ThreadId 1724  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.353482s
+[2025-08-20 16:00:36.549858000 UTC]  INFO | ThreadId 1724  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.350942s
+[2025-08-20 16:00:50.700121000 UTC]  INFO | ThreadId 1757  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.35417s
+[2025-08-20 16:00:51.139243000 UTC]  INFO | ThreadId 1772  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.334329s
+[2025-08-20 16:00:51.526529000 UTC]  INFO | ThreadId 1772  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.333521s
+[2025-08-20 16:01:05.680004000 UTC]  INFO | ThreadId 1805  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.328822s
+[2025-08-20 16:01:06.140669000 UTC]  INFO | ThreadId 1819  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.329702s
+[2025-08-20 16:01:06.513635000 UTC]  INFO | ThreadId 1819  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.345389s
+[2025-08-20 16:01:20.719861000 UTC]  INFO | ThreadId 1852  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.368696s
+[2025-08-20 16:01:21.136398000 UTC]  INFO | ThreadId 1867  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.341659s
+[2025-08-20 16:01:21.547808000 UTC]  INFO | ThreadId 1867  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.351352s
+[2025-08-20 16:01:35.729994000 UTC]  INFO | ThreadId 1900  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.374415s
+[2025-08-20 16:01:36.145219000 UTC]  INFO | ThreadId 1914  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.346035s
+[2025-08-20 16:01:36.558546000 UTC]  INFO | ThreadId 1914  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.351745s
+[2025-08-20 16:01:50.726082000 UTC]  INFO | ThreadId 1947  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.372349s
+[2025-08-20 16:01:51.118342000 UTC]  INFO | ThreadId 1962  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.337851s
+[2025-08-20 16:01:51.530973000 UTC]  INFO | ThreadId 1962  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.358592s
+[2025-08-20 16:02:05.718542000 UTC]  INFO | ThreadId 1995  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.34214s
+[2025-08-20 16:02:06.228508000 UTC]  INFO | ThreadId 2009  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349507s
+[2025-08-20 16:02:06.657103000 UTC]  INFO | ThreadId 2009  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.341846s
+[2025-08-20 16:02:20.723598000 UTC]  INFO | ThreadId 2042  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.350257s
+[2025-08-20 16:02:21.124719000 UTC]  INFO | ThreadId 2057  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.329221s
+[2025-08-20 16:02:21.547263000 UTC]  INFO | ThreadId 2057  |                                     | Querying Vault Wrapper
+[36mGET[0m /eth/v1.2/metadata
+[37m  Accept: [0mapplication/json
+[37m  Status: [0m[32m200 OK[0m 0.349038s

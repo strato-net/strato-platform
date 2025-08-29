@@ -1,0 +1,86 @@
+blockapps-init for ThreadId 4
+Instrumentation for strato-sequencer is enabled
+strato-sequencer ignoring unknown flags: []
+strato-sequencer network: "helium"
+strato-sequencer validators: [Validator "NodeOne",Validator "NodeTwo",Validator "NodeThree",Validator "NodeFour"]
+strato-sequencer vault-proxy URL: "http://localhost:8013/strato/v2.3"
+strato-sequencer validatorBehavior: True
+asking vault-proxy for the node address
+strato-sequencer nodeAddress: [33m3dc1e4bdb54f6cce80c92d5d494160545a78db35[0m
+ACTUAL validators list: [Validator "NodeOne",Validator "NodeTwo",Validator "NodeThree",Validator "NodeFour"]
+[2025-08-20 15:51:47.090662000 UTC]  INFO | ThreadId 14    | sequencer                           | Awaiting node identity verification...
+[2025-08-20 15:51:47.092772000 UTC]  INFO | ThreadId 14    | sequencer                           | Sequencer startup
+[2025-08-20 15:51:47.444210000 UTC]  INFO | ThreadId 14    | sequencer                           | Sequencer initialized
+[2025-08-20 15:51:47.444807000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:53:27.555287000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 15:53:27.557036000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:53:47.447223000 UTC]  INFO | ThreadId 14    | blockstanbul/InShortLog             | [34mTIMEOUT [0m0
+[2025-08-20 15:53:47.447632000 UTC]  INFO | ThreadId 14    | showctx/view                        | View (round = 0, sequence = 0)
+[2025-08-20 15:53:47.447714000 UTC]  INFO | ThreadId 14    | showctx/proposer                    | NodeFour
+
+[2025-08-20 15:53:47.447795000 UTC]  INFO | ThreadId 14    | showctx/validators                  | ["NodeFour","NodeOne","NodeThree","NodeTwo"]
+[2025-08-20 15:53:47.447870000 UTC]  INFO | ThreadId 14    | showctx/mBlockNumber                | Nothing
+[2025-08-20 15:53:47.448119000 UTC]  INFO | ThreadId 14    | showctx/mLockedBlockNo              | Nothing
+[2025-08-20 15:53:47.448191000 UTC]  INFO | ThreadId 14    | showctx/mLockedSender               | Nothing
+[2025-08-20 15:53:47.448266000 UTC]  INFO | ThreadId 14    | showctx/isValidator                 | False
+[2025-08-20 15:53:47.448811000 UTC]       src/Blockchain/Blockstanbul/EventLoop.hs:462 |  WARN | ThreadId 14    | blockstanbul                        | Round 0 timed out
+[2025-08-20 15:53:47.449091000 UTC]  INFO | ThreadId 14    | blockstanbul/roundchange            | timeout
+[2025-08-20 15:53:47.449898000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:55:07.574143000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 15:55:07.577102000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:55:47.449540000 UTC]  INFO | ThreadId 14    | blockstanbul/InShortLog             | [34mTIMEOUT [0m0
+[2025-08-20 15:55:47.451625000 UTC]  INFO | ThreadId 14    | showctx/view                        | View (round = 0, sequence = 0)
+[2025-08-20 15:55:47.451765000 UTC]  INFO | ThreadId 14    | showctx/proposer                    | NodeFour
+
+[2025-08-20 15:55:47.451843000 UTC]  INFO | ThreadId 14    | showctx/validators                  | ["NodeFour","NodeOne","NodeThree","NodeTwo"]
+[2025-08-20 15:55:47.451934000 UTC]  INFO | ThreadId 14    | showctx/mBlockNumber                | Nothing
+[2025-08-20 15:55:47.452008000 UTC]  INFO | ThreadId 14    | showctx/mLockedBlockNo              | Nothing
+[2025-08-20 15:55:47.452092000 UTC]  INFO | ThreadId 14    | showctx/mLockedSender               | Nothing
+[2025-08-20 15:55:47.452164000 UTC]  INFO | ThreadId 14    | showctx/isValidator                 | False
+[2025-08-20 15:55:47.453042000 UTC]       src/Blockchain/Blockstanbul/EventLoop.hs:462 |  WARN | ThreadId 14    | blockstanbul                        | Round 0 timed out
+[2025-08-20 15:55:47.453481000 UTC]  INFO | ThreadId 14    | blockstanbul/roundchange            | timeout
+[2025-08-20 15:55:47.454629000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:56:47.611499000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 15:56:47.612033000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:57:47.453444000 UTC]  INFO | ThreadId 14    | blockstanbul/InShortLog             | [34mTIMEOUT [0m0
+[2025-08-20 15:57:47.454529000 UTC]  INFO | ThreadId 14    | showctx/view                        | View (round = 0, sequence = 0)
+[2025-08-20 15:57:47.454729000 UTC]  INFO | ThreadId 14    | showctx/proposer                    | NodeFour
+
+[2025-08-20 15:57:47.454865000 UTC]  INFO | ThreadId 14    | showctx/validators                  | ["NodeFour","NodeOne","NodeThree","NodeTwo"]
+[2025-08-20 15:57:47.454963000 UTC]  INFO | ThreadId 14    | showctx/mBlockNumber                | Nothing
+[2025-08-20 15:57:47.455045000 UTC]  INFO | ThreadId 14    | showctx/mLockedBlockNo              | Nothing
+[2025-08-20 15:57:47.455137000 UTC]  INFO | ThreadId 14    | showctx/mLockedSender               | Nothing
+[2025-08-20 15:57:47.455216000 UTC]  INFO | ThreadId 14    | showctx/isValidator                 | False
+[2025-08-20 15:57:47.455773000 UTC]       src/Blockchain/Blockstanbul/EventLoop.hs:462 |  WARN | ThreadId 14    | blockstanbul                        | Round 0 timed out
+[2025-08-20 15:57:47.456032000 UTC]  INFO | ThreadId 14    | blockstanbul/roundchange            | timeout
+[2025-08-20 15:57:47.457174000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:58:27.648847000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 15:58:27.649371000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 15:59:47.455986000 UTC]  INFO | ThreadId 14    | blockstanbul/InShortLog             | [34mTIMEOUT [0m0
+[2025-08-20 15:59:47.457168000 UTC]  INFO | ThreadId 14    | showctx/view                        | View (round = 0, sequence = 0)
+[2025-08-20 15:59:47.457350000 UTC]  INFO | ThreadId 14    | showctx/proposer                    | NodeFour
+
+[2025-08-20 15:59:47.457497000 UTC]  INFO | ThreadId 14    | showctx/validators                  | ["NodeFour","NodeOne","NodeThree","NodeTwo"]
+[2025-08-20 15:59:47.457675000 UTC]  INFO | ThreadId 14    | showctx/mBlockNumber                | Nothing
+[2025-08-20 15:59:47.457817000 UTC]  INFO | ThreadId 14    | showctx/mLockedBlockNo              | Nothing
+[2025-08-20 15:59:47.457940000 UTC]  INFO | ThreadId 14    | showctx/mLockedSender               | Nothing
+[2025-08-20 15:59:47.458045000 UTC]  INFO | ThreadId 14    | showctx/isValidator                 | False
+[2025-08-20 15:59:47.458809000 UTC]       src/Blockchain/Blockstanbul/EventLoop.hs:462 |  WARN | ThreadId 14    | blockstanbul                        | Round 0 timed out
+[2025-08-20 15:59:47.459252000 UTC]  INFO | ThreadId 14    | blockstanbul/roundchange            | timeout
+[2025-08-20 15:59:47.460398000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 16:00:07.673890000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 16:00:07.674761000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 16:01:47.459692000 UTC]  INFO | ThreadId 14    | blockstanbul/InShortLog             | [34mTIMEOUT [0m0
+[2025-08-20 16:01:47.462210000 UTC]  INFO | ThreadId 14    | showctx/view                        | View (round = 0, sequence = 0)
+[2025-08-20 16:01:47.462327000 UTC]  INFO | ThreadId 14    | showctx/proposer                    | NodeFour
+
+[2025-08-20 16:01:47.462480000 UTC]  INFO | ThreadId 14    | showctx/validators                  | ["NodeFour","NodeOne","NodeThree","NodeTwo"]
+[2025-08-20 16:01:47.462577000 UTC]  INFO | ThreadId 14    | showctx/mBlockNumber                | Nothing
+[2025-08-20 16:01:47.462667000 UTC]  INFO | ThreadId 14    | showctx/mLockedBlockNo              | Nothing
+[2025-08-20 16:01:47.462766000 UTC]  INFO | ThreadId 14    | showctx/mLockedSender               | Nothing
+[2025-08-20 16:01:47.462857000 UTC]  INFO | ThreadId 14    | showctx/isValidator                 | False
+[2025-08-20 16:01:47.463501000 UTC]       src/Blockchain/Blockstanbul/EventLoop.hs:462 |  WARN | ThreadId 14    | blockstanbul                        | Round 0 timed out
+[2025-08-20 16:01:47.463866000 UTC]  INFO | ThreadId 14    | blockstanbul/roundchange            | timeout
+[2025-08-20 16:01:47.465155000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...
+[2025-08-20 16:01:47.719511000 UTC]  INFO | ThreadId 14    | transformEvents/emitTxs             | Sending 0 public transactions to P2P and the VM
+[2025-08-20 16:01:47.720262000 UTC]  INFO | ThreadId 14    | sequencer/events                    | Reading from fused channels...

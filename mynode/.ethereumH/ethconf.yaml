@@ -1,0 +1,38 @@
+apiConfig:
+  ipAddress: 127.0.0.1
+blockConfig:
+  blockTime: 13
+  minBlockDifficulty: 131072
+cirrusConfig:
+  database: cirrus
+  host: postgres
+  password: api
+  poolsize: 10
+  port: 5432
+  user: postgres
+discoveryConfig:
+  discoveryPort: 30303
+  minAvailablePeers: 0
+kafkaConfig:
+  kafkaHost: localhost
+  kafkaPort: 9092
+levelDBConfig:
+  path: ''
+  table: ''
+quarryConfig:
+  coinbaseAddress: 3dc1e4bdb54f6cce80c92d5d494160545a78db35
+  lazyBlocks: false
+redisBlockDBConfig:
+  redisAuth: null
+  redisDBNumber: 0
+  redisHost: localhost
+  redisMaxConnections: 10
+  redisMaxIdleTime: 30
+  redisPort: 6379
+sqlConfig:
+  database: eth
+  host: localhost
+  password: api
+  poolsize: 10
+  port: 5432
+  user: postgres

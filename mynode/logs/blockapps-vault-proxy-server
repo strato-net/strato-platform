@@ -1,0 +1,24 @@
+blockapps-init for ThreadId 4
+                                      mm                                                                     
+*@@@@*   *@@@*                      *@@@    @@           *@@@***@@m                                          
+  *@@     m@                          @@    @@             @@   *@@m                                         
+   @@m   m@    m@*@@m  *@@@  *@@@     @@  @@@@@@           @@   m@@ *@@@m@@@   m@@*@@m *@@*   *@@**@@*   *@@*
+    @@m  @*   @@   @@    @@    @@     !@    @@             @@@@@@@    @@* **  @@*   *@@  *@@ m@*    @@   m@  
+    *!@ !*     m@@@!@    !@    @@     !@    @@     @@@@@   @@         @!      @@     @@    @@@       @@ m!   
+     !@@m     @!   !@    !@    @!     !@    @!             @!         @!      @@     !@    !!@@       @@!    
+     !! !*     !!!!:!    !@    !!     !!    !!             @!         !!      !@     !!    !!@        @!!    
+     !!::     !!   :!    !!    !!     :!    !!             !!         !:      !!!   !!!  !!* !!!      !!:    
+      :       :!: : !:   :: !: :!:  : : :   ::: :        :!:!:      : :::      : : : :  ::    :!:     !!     
+                                                                                                    ::!      
+                                                                                                  :::        
+
+Trying to parse the oauth url
+Checking the version of the foreign vault
+The version of the foreign vault provided is :Version {version = 0}
+Setting up the locking mechanism
+Setting up the caching service
+Starting the proxy server on port: 8013
+Try and acquire a lock to change the token
+One thread got control and is getting the new token
+Trying to get a new token from OAuth provider
+Successfully inserted the new token into the cache, releasing lock and notifiying other threads

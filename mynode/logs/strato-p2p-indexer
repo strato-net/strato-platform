@@ -1,0 +1,3 @@
+blockapps-init for ThreadId 11
+[2025-08-20 15:51:49.371676000 UTC]  INFO | ThreadId 11    | p2pIndexer                          | Inserting Redis block with sha: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m
+[2025-08-20 15:51:49.555746000 UTC]  INFO | ThreadId 11    | p2pIndexer                          | Inserting Redis block with sha: [33m89445b855a5f99f52e1da29d02b12b0e84001b0af87c7be00a10564e3cd9e1fa[0m

@@ -1,0 +1,5 @@
+2025/08/20-11:51:23.633596 0x20c988c80 Creating DB .ethereumH/hash/ since it was missing.
+2025/08/20-11:51:23.659363 0x20c988c80 Delete type=3 #1
+2025/08/20-11:51:28.676188 0x16b64f000 Level-0 table #5: started
+2025/08/20-11:51:28.689263 0x16b64f000 Level-0 table #5: 575553 bytes OK
+2025/08/20-11:51:28.696220 0x16b64f000 Delete type=0 #3
