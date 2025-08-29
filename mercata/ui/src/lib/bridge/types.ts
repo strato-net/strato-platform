@@ -1,6 +1,6 @@
 // Bridge Types
 export interface Token {
-  stratoTokenAddress: string;    // Key: address of the STRATO token
+  stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId

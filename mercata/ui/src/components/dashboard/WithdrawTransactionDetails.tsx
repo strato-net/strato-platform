@@ -141,7 +141,7 @@ const WithdrawTransactionDetails = () => {
       title: 'Status',
       key: 'withdrawalStatus',
       render: (_: any, record: any) => {
-        const statusStr = record?.status || record?.WithdrawalInfo?.bridgeStatus || '0';
+        const statusStr = record?.WithdrawalInfo?.bridgeStatus || '0';
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (

@@ -20,6 +20,7 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
+import { DECIMAL_PATTERN } from "@/lib/constants";
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -46,7 +47,7 @@ const BridgeOut: React.FC = () => {
     data: balanceData,
     isLoading: isBalanceLoading,
     refetch: refetchBalance,
-  } = useBalance(selectedToken?.stratoTokenAddress || null);
+  } = useBalance(selectedToken?.stratoToken || null);
 
   const tokenBalance = balanceData?.formatted || "0";
   const tokenLimitInfo = balanceData?.tokenLimit ? {
@@ -94,7 +95,7 @@ const BridgeOut: React.FC = () => {
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
+    if (DECIMAL_PATTERN.test(value)) {
       setAmount(value);
       validateAmount(value);
     }
@@ -106,7 +107,7 @@ const BridgeOut: React.FC = () => {
   };
 
   const showConfirmModal = () => {
-    if (!selectedToken?.stratoTokenAddress || !address) {
+    if (!selectedToken?.stratoToken || !address) {
       toast({
         title: "Error",
         description: "Invalid configuration",
@@ -147,7 +148,7 @@ const BridgeOut: React.FC = () => {
       const response = await bridgeOutAPI({
         stratoTokenAmount: amountInSmallestUnit,
         externalRecipient: address,
-        stratoToken: selectedToken.stratoTokenAddress,
+        stratoToken: selectedToken.stratoToken,
         externalChainId: String(externalChainId),
       });
 
@@ -304,22 +305,12 @@ const BridgeOut: React.FC = () => {
         
       </div>
 
-      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Bridge Fee:</span>
-          <span>0.1%</span>
-        </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Estimated Time:</span>
-          <span>2-5 minutes</span>
-        </div>
-      </div> */}
-
-      <div className="text-sm text-gray-500">
-        <p>• Bridge assets between STRATO and external networks</p>
-        <p>• Small bridge fee applies</p>
-        <p>• Transaction time varies by network congestion</p>
-        <p>• Maximum transfer limits apply per token</p>
+      <div className="text-sm text-gray-500 space-y-1">
+        {[
+          "Transaction time varies by network congestion",
+        ].map((text, i) => (
+          <p key={i}>• {text}</p>
+        ))}
       </div>
 
       <div className="flex justify-end gap-4">

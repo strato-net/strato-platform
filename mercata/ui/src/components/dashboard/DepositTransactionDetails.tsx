@@ -140,7 +140,7 @@ const DepositTransactionDetails = () => {
       title: "Status",
       key: "depositStatus",
       render: (_: any, record: any) => {
-        const statusStr = record?.status || record?.DepositInfo?.bridgeStatus || "0";
+        const statusStr = record?.DepositInfo?.bridgeStatus || "0";
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (

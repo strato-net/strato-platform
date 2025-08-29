@@ -3,18 +3,19 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName, ensureHexPrefix, ensure } from "../../utils/utils";
-import { fetchBalances } from "../helpers/cirrusHelpers";
+import { fetchTokenBalances, getTokenMetadata } from "../helpers/cirrusHelpers";
 import { 
   buildQueryParams, 
   enrichTransactionData, 
   executeParallelQueries, 
+  enrichAssetsWithTokenData,
   QUERY_CONFIGS 
 } from "../helpers/bridge.helper";
 
 const { MercataBridge, Token } = constants;
 
 const assetParams = (mint: boolean, token: string) => ({
-  select: "stratoTokenAddress:key,assetInfo:value",
+  select: "count()",
   key: `eq.${token}`,
   "value->>enabled": "eq.true",
   ...(mint ? { "value->>mintUSDST": "eq.true" } : {}),
@@ -42,14 +43,14 @@ export const requestWithdrawal = async (
 
   const addresses = mintUSDST ? [constants.USDST] : [approveToken, constants.USDST];
 
-  const [balances, bridgeAssets] = await Promise.all([
-    fetchBalances(accessToken, userAddress, addresses),
-    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, approveToken) }).then(r => r.data)
+  const [balances, assetCount] = await Promise.all([
+    fetchTokenBalances(accessToken, userAddress, addresses),
+    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, approveToken) }).then(r => r.data?.[0]?.count || 0)
   ]);
 
   ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");
   ensure(requiredUSDST === 0n || (balances.get(constants.USDST) ?? 0n) >= requiredUSDST, "Insufficient USDST for gas");
-  ensure(bridgeAssets.length > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled");
+  ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled");
 
   const tx = buildFunctionTx(actions);
 
@@ -87,32 +88,31 @@ export const getBridgeTransactions = async (
     return { data: [], totalCount };
   }
 
-  const enrichedData = enrichTransactionData(results, bridgeAssets, config.enrichmentType);
+  const enrichedData = enrichTransactionData(results, bridgeAssets, type);
   
   return { data: enrichedData, totalCount };
 };
 
-export const getBridgeableTokens = async (accessToken: string, chainId: string) => {
+export const getBridgeableTokens = async (accessToken: string, chainId: string, mintUSDST = false) => {
   const params = {
-    select: "stratoTokenAddress:key,AssetInfo:value",
+    select: "stratoToken:key,AssetInfo:value",
     "value->>enabled": "eq.true",
-    "value->>mintUSDST": "eq.false",
+    "value->>mintUSDST": `eq.${mintUSDST}`,
     "value->>externalChainId": `eq.${chainId}`,
     address: `eq.${constants.mercataBridge}`
   };
+  
   const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
-  if (!assets.length) return [];
-  const tokenAddresses = assets.map((a: any) => a.stratoTokenAddress).filter(Boolean);
-  const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
-  });
-  const tokenMap = new Map(tokenData.map((t: any) => [t.address, { name: t._name, symbol: t._symbol }]));
-  return assets.map((a: any) => {
-    const info = tokenMap.get(a.stratoTokenAddress) as { name?: string; symbol?: string } | undefined;
-    if (a.AssetInfo.externalToken) a.AssetInfo.externalToken = ensureHexPrefix(a.AssetInfo.externalToken);
-    return { stratoTokenAddress: a.stratoTokenAddress, stratoTokenName: info?.name || "", stratoTokenSymbol: info?.symbol || "", ...a.AssetInfo };
-  });
+  if (!assets?.length) return [];
+  
+  const tokenAddresses = assets.map((a: any) => a.stratoToken).filter(Boolean);
+  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
+  
+  return enrichAssetsWithTokenData(assets, tokenMap, 'stratoToken');
 };
+
+export const getRedeemableTokens = async (accessToken: string, chainId: string) => 
+  getBridgeableTokens(accessToken, chainId, true);
 
 export const getNetworkConfigs = async (accessToken: string) => {
   try {
@@ -133,34 +133,25 @@ export const getNetworkConfigs = async (accessToken: string) => {
 };
 
 export const getBridgeAssets = async (accessToken: string) => {
-  try {
-    const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
-      params: {
-        select: "stratoTokenAddress:key,AssetInfo:value",
-        address: `eq.${constants.mercataBridge}`
-      }
-    });
+  const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
+    params: {
+      select: "stratoToken:key,AssetInfo:value",
+      address: `eq.${constants.mercataBridge}`
+    }
+  });
 
-    if (!assets.length) return new Map();
+  if (!assets?.length) return new Map();
 
-    const tokenAddresses = assets.map((asset: any) => asset.stratoTokenAddress).filter(Boolean);
-    const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
-      params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
-    });
+  const tokenAddresses = assets.map((asset: any) => asset.stratoToken).filter(Boolean);
+  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
 
-    const tokenMap = new Map(tokenData.map((t: any) => [t.address, { name: t._name, symbol: t._symbol }]));
-
-    return new Map<string, any>(assets.map((asset: any) => [
-      asset.stratoTokenAddress,
-      {
-        ...asset.AssetInfo,
-        stratoToken: asset.stratoTokenAddress,
-        stratoTokenName: (tokenMap.get(asset.stratoTokenAddress) as any)?.name || "",
-        stratoTokenSymbol: (tokenMap.get(asset.stratoTokenAddress) as any)?.symbol || ""
-      }
-    ]));
-  } catch (error) {
-    console.error("Error in getBridgeAssets:", error);
-    throw error;
-  }
+  return new Map(assets.map((asset: any) => [
+    asset.stratoToken,
+    {
+      ...asset.AssetInfo,
+      stratoToken: asset.stratoToken,
+      stratoTokenName: tokenMap.get(asset.stratoToken)?.name || "",
+      stratoTokenSymbol: tokenMap.get(asset.stratoToken)?.symbol || ""
+    }
+  ]));
 };

@@ -10,6 +10,7 @@ router.post("/redeemOut", authHandler.authorizeRequest(), BridgeController.redee
 
 // ----- Bridge Configuration -----
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 
 
