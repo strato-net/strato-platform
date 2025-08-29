@@ -253,222 +253,219 @@ const LiquidityDepositModal = ({
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
-            {/* First Token */}
-            <div className={`rounded-lg border p-2 ${lockMode === 1 ? 'border-blue-500' : ''}`}>
-              <span className="text-sm text-gray-500">Amount</span>
-              <div className="flex items-center gap-2">
-                <Input
-                  disabled={balanceLoading}
-                  readOnly={lockMode === 2}
-                  placeholder="0.0"
-                  className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                    safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""}
-                     ${lockMode === 2 ? 'text-gray-400' : ''}`}
-                  value={token1Amount}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      if (value === '.') {
-                        handleInputChange('0.', 'token1');
-                      } else {
-                        handleInputChange(value, 'token1');
-                      }
-                    }
-                  }}
-                />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
-                  {selectedPool && (
-                    <>
-                      {selectedPool.tokenA?.images?.[0]?.value ? (
-                        <img
-                          src={selectedPool.tokenA.images[0].value}
-                          alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {selectedPool._name?.split('/')[0]?.slice(0, 2)}
-                        </div>
-                      )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[0]}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className='flex items-center'>
-                <span className="text-sm text-gray-500 flex gap-1">
-                  Balance: {balanceLoading ?
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-                    : formatUnits(tokenABalance || "0", 18)}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-blue-500"
-                  onClick={() => handleMaxClick(true)}
-                  disabled={balanceLoading}
-                >
-                  Max
-                </Button>
-              </div>
-              {safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") && (
-                <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
-              )}
-              {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
-               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
-               safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {selectedPool?.tokenA.address !== usdstAddress && 
-               selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {(() => {
-                if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
-                  const inputAmountWei = safeParseUnits(token1Amount, 18);
-                  const balanceWei = BigInt(tokenABalance || "0");
-                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                  const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n &&
-                    remainingBalance >= 0n &&
-                    remainingBalance <= lowBalanceThreshold &&
-                    inputAmountWei <= balanceWei - feeWei;
-
-                  return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                    </p>
-                  ) : null;
-                }
-                return null;
-              })()}
-            </div>
-
-            {/* Deposit Mode Toggle */}
-            <div className="flex justify-center py-2">
-              <button
-                type="button"
-                aria-label="toggle deposit mode"
-                onClick={toggleLockMode}
-                className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
-                  lockMode === 0 
-                    ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200' 
-                    : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'
-                }`}
-              >
-                Deposit Mode ({
-                  lockMode === 0 ? 'A:B' : 
-                  lockMode === 1 ? 'A' : 
-                  'B'
-                })
-              </button>
-            </div>
-
-            {/* Second Token */}
-            <div className={`rounded-lg border p-3 ${lockMode === 2 ? 'border-blue-500' : ''}`}>
-              <div className="flex justify-between mb-2">
+            {/* First Token - Only show when lockMode is not 2 (B mode) */}
+            {lockMode !== 2 && (
+              <div className={`rounded-lg border p-2 ${lockMode === 1 ? 'border-blue-500' : ''}`}>
                 <span className="text-sm text-gray-500">Amount</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Input
-                  disabled={balanceLoading}
-                  readOnly={lockMode === 1}
-                  placeholder="0.0"
-                  className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
-                    safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
-                  } ${lockMode === 1 ? 'text-gray-400' : ''}`}
-                  value={token2Amount}
-                  onChange={(e) => {
-                    if (lockMode === 1) return;
-                    const value = e.target.value;
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      if (value === '.') {
-                        handleInputChange('0.', 'token2');
-                      } else {
-                        handleInputChange(value, 'token2');
+                <div className="flex items-center gap-2">
+                  <Input
+                    disabled={balanceLoading}
+                    placeholder="0.0"
+                    className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
+                      safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""}`}
+                    value={token1Amount}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        if (value === '.') {
+                          handleInputChange('0.', 'token1');
+                        } else {
+                          handleInputChange(value, 'token1');
+                        }
                       }
-                    }
-                  }}
-                />
-                <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
-                  {selectedPool && (
-                    <>
-                      {selectedPool.tokenB?.images?.[0]?.value ? (
-                        <img
-                          src={selectedPool.tokenB.images[0].value}
-                          alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
-                          style={{ backgroundColor: "red" }}
-                        >
-                          {selectedPool._name?.split('/')[1]?.slice(0, 2)}
-                        </div>
-                      )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[1]}</span>
-                    </>
-                  )}
+                    }}
+                  />
+                  <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
+                    {selectedPool && (
+                      <>
+                        {selectedPool.tokenA?.images?.[0]?.value ? (
+                          <img
+                            src={selectedPool.tokenA.images[0].value}
+                            alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                            style={{ backgroundColor: "red" }}
+                          >
+                            {selectedPool._name?.split('/')[0]?.slice(0, 2)}
+                          </div>
+                        )}
+                        <span className="font-medium text-sm">{selectedPool._name?.split('/')[0]}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className='flex items-center'>
-                <span className="text-sm text-gray-500 flex gap-1">
-                  Balance: {balanceLoading ?
-                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-                    : formatUnits(tokenBBalance || "0", 18)}
-                </span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-xs text-blue-500"
-                  onClick={() => handleMaxClick(false)}
-                  disabled={balanceLoading}
-                >
-                  Max
-                </Button>
-              </div>
-              {safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") && (
-                <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
-              )}
-              {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
-               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
-               safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {selectedPool?.tokenA.address !== usdstAddress && 
-               selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {(() => {
-                if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
-                  const inputAmountWei = safeParseUnits(token2Amount, 18);
-                  const balanceWei = BigInt(tokenBBalance || "0");
-                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                  const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n &&
-                    remainingBalance >= 0n &&
-                    remainingBalance <= lowBalanceThreshold &&
-                    inputAmountWei <= balanceWei - feeWei;
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenABalance || "0", 18)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-blue-500"
+                    onClick={() => handleMaxClick(true)}
+                    disabled={balanceLoading}
+                  >
+                    Max
+                  </Button>
+                </div>
+                {safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") && (
+                  <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                )}
+                {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
+                 safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
+                 safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                )}
+                {selectedPool?.tokenA.address !== usdstAddress && 
+                 selectedPool?.tokenB.address !== usdstAddress && 
+                 BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                )}
+                {(() => {
+                  if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
+                    const inputAmountWei = safeParseUnits(token1Amount, 18);
+                    const balanceWei = BigInt(tokenABalance || "0");
+                    const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n &&
+                      remainingBalance >= 0n &&
+                      remainingBalance <= lowBalanceThreshold &&
+                      inputAmountWei <= balanceWei - feeWei;
 
-                  return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                    </p>
-                  ) : null;
-                }
-                return null;
-              })()}
-            </div>
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+
+            {/* Second Token - Only show when lockMode is not 1 (A mode) */}
+            {lockMode !== 1 && (
+              <div className={`rounded-lg border p-3 ${lockMode === 2 ? 'border-blue-500' : ''}`}>
+                <div className="flex justify-between mb-2">
+                  <span className="text-sm text-gray-500">Amount</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    disabled={balanceLoading}
+                    placeholder="0.0"
+                    className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
+                      safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""}`}
+                    value={token2Amount}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        if (value === '.') {
+                          handleInputChange('0.', 'token2');
+                        } else {
+                          handleInputChange(value, 'token2');
+                        }
+                      }
+                    }}
+                  />
+                  <div className="flex items-center space-x-2 bg-gray-100 rounded-md px-2 py-1 flex-shrink-0">
+                    {selectedPool && (
+                      <>
+                        {selectedPool.tokenB?.images?.[0]?.value ? (
+                          <img
+                            src={selectedPool.tokenB.images[0].value}
+                            alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                            className="w-6 h-6 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                            style={{ backgroundColor: "red" }}
+                          >
+                            {selectedPool._name?.split('/')[1]?.slice(0, 2)}
+                          </div>
+                        )}
+                        <span className="font-medium text-sm">{selectedPool._name?.split('/')[1]}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className='flex items-center'>
+                  <span className="text-sm text-gray-500 flex gap-1">
+                    Balance: {balanceLoading ?
+                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+                      : formatUnits(tokenBBalance || "0", 18)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs text-blue-500"
+                    onClick={() => handleMaxClick(false)}
+                    disabled={balanceLoading}
+                  >
+                    Max
+                  </Button>
+                </div>
+                {safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") && (
+                  <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
+                )}
+                {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
+                 safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
+                 safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                )}
+                {selectedPool?.tokenA.address !== usdstAddress && 
+                 selectedPool?.tokenB.address !== usdstAddress && 
+                 BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
+                  <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+                )}
+                {(() => {
+                  if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
+                    const inputAmountWei = safeParseUnits(token2Amount, 18);
+                    const balanceWei = BigInt(tokenBBalance || "0");
+                    const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
+                    const lowBalanceThreshold = safeParseUnits("0.10", 18);
+                    const remainingBalance = balanceWei - inputAmountWei - feeWei;
+                    const isLowBalanceWarning = inputAmountWei > 0n &&
+                      remainingBalance >= 0n &&
+                      remainingBalance <= lowBalanceThreshold &&
+                      inputAmountWei <= balanceWei - feeWei;
+
+                    return isLowBalanceWarning ? (
+                      <p className="text-yellow-600 text-sm mt-1">
+                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
+                      </p>
+                    ) : null;
+                  }
+                  return null;
+                })()}
+              </div>
+            )}
+          </div>
+
+          {/* Deposit Mode Toggle */}
+          <div className="flex justify-center py-2">
+            <button
+              type="button"
+              aria-label="toggle deposit mode"
+              onClick={toggleLockMode}
+              className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors ${
+                lockMode === 0 
+                  ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200' 
+                  : 'bg-blue-50 text-blue-600 border-blue-300 hover:bg-blue-100'
+              }`}
+            >
+              {lockMode === 0 ? 'Asset Deposit (A&B)' : 
+               lockMode === 1 ? 'Single Asset Deposit (A)' : 
+               'Single Asset Deposit (B)'}
+            </button>
           </div>
 
           <div className="rounded-lg bg-gray-50 p-3">
