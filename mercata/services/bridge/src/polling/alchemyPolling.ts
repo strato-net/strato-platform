@@ -23,20 +23,20 @@ import { STRATO_DECIMALS } from "../config";
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 
 const getStratoTokenMapping = async (
-  chainId: number,
-): Promise<Map<string, { stratoToken: string; extDecimals: number }>> => {
+  externalChainId: number,
+): Promise<Map<string, { stratoToken: string; externalDecimals: number }>> => {
   const enabledAssets = await getEnabledAssets();
   const mapping = new Map<
     string,
-    { stratoToken: string; extDecimals: number }
+    { stratoToken: string; externalDecimals: number }
   >();
 
   for (const asset of enabledAssets) {
-    if (asset.chainId === chainId.toString() && asset.extToken) {
-      const extTokenWith0x = ensureHexPrefix(asset.extToken);
+    if (asset.externalChainId === externalChainId.toString() && asset.externalToken) {
+      const extTokenWith0x = ensureHexPrefix(asset.externalToken);
       mapping.set(extTokenWith0x.toLowerCase(), {
         stratoToken: asset.stratoToken,
-        extDecimals: parseInt(asset.extDecimals) || STRATO_DECIMALS,
+        externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
       });
     }
   }
@@ -45,7 +45,7 @@ const getStratoTokenMapping = async (
 };
 
 const updateLastProcessedBlock = async (
-  chainId: number,
+  externalChainId: number,
   blockNumber: number,
 ): Promise<void> => {
   await execute({
@@ -53,7 +53,7 @@ const updateLastProcessedBlock = async (
     contractAddress: config.bridge.address!,
     method: "setLastProcessedBlock",
     args: {
-      chainId: chainId,
+      externalChainId,
       lastProcessedBlock: blockNumber,
     },
   });
@@ -63,9 +63,11 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
   const tokenMapping = await getStratoTokenMapping(chainId);
   return logs.map((log) => {
     const externalToken = normalizeAddress(log.topics[1]);
-    const sender = normalizeAddress(log.topics[2]);
-    const stratoAddress = normalizeAddress(log.topics[3]);
-    const amount = "0x" + log.data.substring(2, 66);
+    const externalSender = normalizeAddress(log.topics[2]);
+    const stratoUserAddress = normalizeAddress(log.topics[3]);
+    const externalTokenAmount = "0x" + log.data.substring(2, 66);
+    const depositId = "0x" + log.data.substring(66, 130);
+    const mint = log.data.substring(130, 132) === "01";
 
     const tokenInfo = tokenMapping.get(externalToken);
     if (!tokenInfo) {
@@ -73,38 +75,42 @@ const parseDepositEvents = async (logs: any[], chainId: number) => {
     }
 
     // Convert amount from external decimals to STRATO decimals
-    const convertedAmount = convertToStratoDecimals(
-      amount,
-      tokenInfo.extDecimals,
+    const stratoTokenAmount = convertToStratoDecimals(
+      externalTokenAmount,
+      tokenInfo.externalDecimals,
     );
 
     return {
-      srcChainId: chainId,
-      srcTxHash: log.transactionHash,
-      token: tokenInfo.stratoToken,
-      amount: convertedAmount,
-      user: stratoAddress,
-      from: sender,
+      externalChainId: chainId,
+      externalTxHash: log.transactionHash,
+      externalSender,
+      externalToken,
+      externalTokenAmount,
+      stratoRecipient: stratoUserAddress,
+      stratoToken: tokenInfo.stratoToken,
+      stratoTokenAmount,
+      depositId,
+      mintUSDST: mint,
     };
   });
 };
 
-const pollChainForDeposits = async (chain: any) => {
-  const chainId = chain.chainId;
-  const depositRouter = chain.depositRouter;
-  const lastProcessedBlock = parseInt(chain.lastProcessedBlock) || 0;
+const pollChainForDeposits = async (chainInfo: any) => {
+  const externalChainId = chainInfo.externalChainId;
+  const depositRouter = chainInfo.depositRouter;
+  const lastProcessedBlock = parseInt(chainInfo.lastProcessedBlock) || 0;
   let currentBlock: number | null = null;
 
   try {
-    if (!isChainConfigured(chainId)) return;
+    if (!isChainConfigured(externalChainId)) return;
 
-    currentBlock = await getCurrentBlockNumber(chainId);
+    currentBlock = await getCurrentBlockNumber(externalChainId);
     if (currentBlock <= lastProcessedBlock) {
       return;
     }
 
     const logs = await getChainLogs(
-      chainId,
+      externalChainId,
       lastProcessedBlock + 1,
       currentBlock,
       depositRouter,
@@ -115,7 +121,7 @@ const pollChainForDeposits = async (chain: any) => {
       return;
     }
 
-    const validDeposits = await parseDepositEvents(logs, chainId);
+    const validDeposits = await parseDepositEvents(logs, externalChainId);
 
     const filteredDeposits = validDeposits.filter(
       (deposit) => deposit !== null,
@@ -129,16 +135,16 @@ const pollChainForDeposits = async (chain: any) => {
 
     // If there were parse failures, throw error after processing valid ones
     if (failedParses > 0) {
-      throw new Error(`Failed to parse ${failedParses} out of ${validDeposits.length} deposits for chain ${chainId}`);
+      throw new Error(`Failed to parse ${failedParses} out of ${validDeposits.length} deposits for chain ${externalChainId}`);
     }
   } finally {
     // Always update lastProcessedBlock if we got a currentBlock
     if (currentBlock !== null && currentBlock > lastProcessedBlock) {
       try {
-        await updateLastProcessedBlock(chainId, currentBlock);
+        await updateLastProcessedBlock(externalChainId, currentBlock);
       } catch (updateError) {
         // Enhance error with context before re-throwing
-        const enhancedError = new Error(`updateLastProcessedBlock failed for chain ${chainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
+        const enhancedError = new Error(`updateLastProcessedBlock failed for chain ${externalChainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
         throw enhancedError;
       }
     }

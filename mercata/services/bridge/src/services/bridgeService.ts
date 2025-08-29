@@ -6,24 +6,26 @@ import { createSafeTransactionsForWithdrawals, createRejectionTransaction } from
 import { logInfo, logError } from "../utils/logger";
 
 export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
-  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
-  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
-  const tokens = deposits.map((deposit) => deposit.token);
-  const amounts = deposits.map((deposit) => deposit.amount);
-  const users = deposits.map((deposit) => deposit.user);
-  const froms = deposits.map((deposit) => deposit.from);
+  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
+  const stratoTokens = deposits.map((deposit) => deposit.stratoToken);
+  const stratoTokenAmounts = deposits.map((deposit) => deposit.stratoTokenAmount);
+  const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
+  const externalSenders = deposits.map((deposit) => deposit.externalSender);
+  const mintUSDSTs = deposits.map((deposit) => deposit.mintUSDST);
 
   await execute({
     contractName: "MercataBridge",
     contractAddress: config.bridge.address!,
     method: "depositBatch",
     args: {
-      srcChainIds: srcChainIds,
-      srcTxHashes: srcTxHashes,
-      tokens: tokens,
-      amounts: amounts,
-      users: users,
-      froms: froms,
+      externalChainIds,
+      externalTxHashes,
+      stratoTokens,
+      stratoTokenAmounts,
+      stratoRecipients,
+      externalSenders,
+      mintUSDSTs,
     },
   });
 
@@ -34,16 +36,16 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
 };
 
 export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
-  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
-  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
   await execute({
     contractName: "MercataBridge",
     contractAddress: config.bridge.address!,
     method: "confirmDepositBatch",
     args: {
-      srcChainIds: srcChainIds,
-      srcTxHashes: srcTxHashes,
+      externalChainIds,
+      externalTxHashes,
     },
   });
 
@@ -54,16 +56,16 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
 };
 
 export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
-  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
-  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+  const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
   await execute({
     contractName: "MercataBridge",
     contractAddress: config.bridge.address!,
     method: "reviewDepositBatch",
     args: {
-      srcChainIds: srcChainIds,
-      srcTxHashes: srcTxHashes,
+      externalChainIds,
+      externalTxHashes,
     },
   });
 

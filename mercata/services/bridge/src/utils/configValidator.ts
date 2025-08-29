@@ -143,13 +143,13 @@ export async function validateBridgeConfig(): Promise<boolean> {
       const enabledChains = await getEnabledChains();
       const missingChainRpcUrls: string[] = [];
 
-      for (const chain of enabledChains) {
-        const chainId = chain?.chainId;
-        if (!chainId) {
+      for (const chainInfo of enabledChains) {
+        const externalChainId = chainInfo?.externalChainId;
+        if (!externalChainId) {
           continue;
         }
 
-        const envVarName = `CHAIN_${chainId}_RPC_URL`;
+        const envVarName = `CHAIN_${externalChainId}_RPC_URL`;
 
         if (!process.env[envVarName]) {
           missingChainRpcUrls.push(envVarName);
@@ -184,7 +184,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
             }
           } catch (error) {
             warnings.push(
-              `RPC URL for chain ${chainId} is not accessible: ${(error as Error).message}`,
+              `RPC URL for chain ${externalChainId} is not accessible: ${(error as Error).message}`,
             );
           }
         }
@@ -199,7 +199,7 @@ export async function validateBridgeConfig(): Promise<boolean> {
       // Validate assets configuration
       const enabledAssets = await getEnabledAssets();
       for (const asset of enabledAssets) {
-        const stratoToken = asset?.stratoToken || asset?.key;
+        const stratoToken = asset?.stratoToken;
         const assetPrefix = `   Asset ${stratoToken || "unknown"}:`;
 
         if (!stratoToken) {
@@ -210,35 +210,35 @@ export async function validateBridgeConfig(): Promise<boolean> {
           );
         }
 
-        if (!asset.extToken) {
-          errors.push(`${assetPrefix} Missing extToken address`);
-        } else if (!/^(0x)?[a-fA-F0-9]{40}$/.test(asset.extToken)) {
+        if (!asset.externalToken) {
+          errors.push(`${assetPrefix} Missing externalToken address`);
+        } else if (!/^(0x)?[a-fA-F0-9]{40}$/.test(asset.externalToken)) {
           errors.push(
-            `${assetPrefix} Invalid extToken address format: ${asset.extToken}`,
+            `${assetPrefix} Invalid externalToken address format: ${asset.externalToken}`,
           );
         }
 
-        if (!asset.chainId) {
-          errors.push(`${assetPrefix} Missing chainId`);
+        if (!asset.externalChainId) {
+          errors.push(`${assetPrefix} Missing externalChainId`);
         }
 
         if (asset.enabled === undefined) {
           errors.push(`${assetPrefix} Missing enabled flag`);
         }
 
-        if (!asset.extSymbol) {
-          errors.push(`${assetPrefix} Missing extSymbol`);
+        if (!asset.externalSymbol) {
+          errors.push(`${assetPrefix} Missing externalSymbol`);
         }
 
-        if (!asset.extName) {
-          errors.push(`${assetPrefix} Missing extName`);
+        if (!asset.externalName) {
+          errors.push(`${assetPrefix} Missing externalName`);
         }
 
-        if (!asset.extDecimals) {
-          errors.push(`${assetPrefix} Missing extDecimals`);
-        } else if (isNaN(Number(asset.extDecimals))) {
+        if (!asset.externalDecimals) {
+          errors.push(`${assetPrefix} Missing externalDecimals`);
+        } else if (isNaN(Number(asset.externalDecimals))) {
           errors.push(
-            `${assetPrefix} Invalid extDecimals format: ${asset.extDecimals}`,
+            `${assetPrefix} Invalid externalDecimals format: ${asset.externalDecimals}`,
           );
         }
       }

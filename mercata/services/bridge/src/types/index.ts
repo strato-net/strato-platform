@@ -68,9 +68,14 @@ export interface SafeTransactionResult {
 }
 
 export interface AssetInfo {
+  externalToken: string;
+  externalDecimals: number;
+  enabled: boolean;
+  externalChainId: string;
+
+  //TODO: remove these
   extToken: string;
   extDecimals: number;
-  enabled: boolean;
   chainId: string;
 }
 
@@ -83,16 +88,17 @@ export interface PreparedWithdrawal {
 }
 
 export interface Deposit {
-  srcChainId: string | number;
-  srcTxHash: string;
-  token: string;
-  amount: string;
-  user: string;
-  from: string;
-  extToken: string;
-  extDecimals: number;
-  chainId: string;
-  enabled: boolean;
+  externalChainId: string | number;
+  externalTxHash: string;
+  stratoToken: string;
+  stratoRecipient: string;
+  stratoTokenAmount: string;
+  externalSender: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  externalDecimals: number;
+  depositId: string;
+  mintUSDST: boolean;
   depositRouter: string;
 }
 
