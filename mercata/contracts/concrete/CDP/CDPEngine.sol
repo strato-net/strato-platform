@@ -2,7 +2,6 @@ import "./CDPVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./PriceOracle.sol";
-import "../Admin/FeeCollector.sol";
 import "./CDPRegistry.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -13,7 +12,6 @@ contract record CDPEngine is Ownable {
     Token public usdst;
     TokenFactory public tokenFactory;
     PriceOracle public priceOracle;
-    FeeCollector public feeCollector;
 
     struct CollateralConfig {
         uint256 liquidationRatio;
@@ -95,7 +93,7 @@ contract record CDPEngine is Ownable {
      * @param borrower The borrower whose vault was liquidated
      * @param asset The collateral asset that was seized
      * @param debtBurnedUSD Amount of USDST debt that was burned
-     * @param penaltyUSD Penalty amount paid to FeeCollector in USDST
+     * @param penaltyUSD Penalty amount paid to the liquidator in USDST
      * @param collateralOut Collateral amount transferred to the liquidator
      * @param liquidator The address that executed the liquidation
      */
@@ -151,7 +149,6 @@ contract record CDPEngine is Ownable {
         address _usdst,
         address _tokenFactory,
         address _priceOracle,
-        address _feeCollector,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_registry != address(0), "CDPEngine: invalid registry");
@@ -163,7 +160,6 @@ contract record CDPEngine is Ownable {
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
-        feeCollector = FeeCollector(_feeCollector);
     }
 
 
@@ -708,12 +704,4 @@ contract record CDPEngine is Ownable {
         priceOracle = PriceOracle(_priceOracle);
     }
 
-    /**
-     * @notice Update FeeCollector reference
-     * @param _feeCollector New fee collector address
-     */
-    function setFeeCollector(address _feeCollector) external onlyOwner {
-        require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
-        feeCollector = FeeCollector(_feeCollector);
-    }
 }
