@@ -61,6 +61,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const maxRepayDec = (() => { try { return formatUnits(BigInt(maxRepayWei), 18); } catch { return "0"; } })();
   const maxRepayEth = parseFloat(maxRepayDec);
 
+  // Total current debt (from loan entry)
+  const totalDebtDec = (() => { try { return formatUnits(BigInt(loan.amount || "0"), 18); } catch { return "0"; } })();
+  const totalDebtEth = parseFloat(totalDebtDec);
+
   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
   const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
@@ -121,9 +125,12 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const handlePercentageChange = (value: string) => {
     try {
+      // value from PercentageButtons is a decimal string; store it directly
       setRepayStr(value);
       setDisplayAmount(addCommasToInput(value));
-      setIsAllSelected(BigInt(value) === BigInt(maxRepayWei));
+      // Determine ALL selection by comparing wei values
+      const wei = parseUnits(value || "0", 18);
+      setIsAllSelected(wei === BigInt(maxRepayWei));
     } catch {
       setRepayStr("0");
       setDisplayAmount("0");
@@ -164,8 +171,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Min: 0.01</span>
-              <span>Max: {maxRepayEth.toFixed(2)}</span>
+              <span>Total debt: {isFinite(totalDebtEth) ? totalDebtEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
+              <span>Max repayable now: {isFinite(maxRepayEth) ? maxRepayEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
             </div>
             <div className="relative">
               <Input
