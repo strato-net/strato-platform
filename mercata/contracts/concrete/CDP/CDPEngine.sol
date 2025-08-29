@@ -116,7 +116,10 @@ contract record CDPEngine is Ownable {
         uint256 scaledDebt
     );
 
-    // Modifiers
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // MODIFIERS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
     modifier whenNotPaused(address asset) {
         require(!globalPaused, "CDPEngine: global pause");
         require(!collateralConfigs[asset].isPaused, "CDPEngine: asset paused");
@@ -141,9 +144,10 @@ contract record CDPEngine is Ownable {
         return registry.priceOracle();
     }
 
-     // ═══════════════════════════════════════════════════════════════════════════════
-    // LIQUIDITY OPERATIONS (DEPOSITS & WITHDRAWALS)
-    // ═
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // CONSTRUCTOR
+    // ═══════════════════════════════════════════════════════════════════════════════
+
     constructor(
         address _registry,
         address _usdst,
@@ -619,6 +623,7 @@ contract record CDPEngine is Ownable {
         uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
     }
+    
     // ═══════════════════════════════════════════════════════════════════════════════
     // ADMINISTRATIVE FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════════════
