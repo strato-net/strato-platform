@@ -82,28 +82,28 @@ const LiquidityDepositModal = ({
   }, [lockMode]);
 
   useEffect(() => {
-    if (selectedPool && isOpen) {
-      const fetchBalances = async () => {
-        try {
-          setBalanceLoading(true);
-          const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
-          setTokenABalance(balances.tokenABalance);
-          setTokenBBalance(balances.tokenBBalance);
-          setUsdstBalance(balances.usdstBalance);
-          setBalanceLoading(false);
-        } catch (error) {
-          toast({
-            title: "Error",
-            description: "Failed to fetch token balances",
-            variant: "destructive",
-          });
-          setBalanceLoading(false);
-        }
-      };
+  if (selectedPool && isOpen) {
+    const fetchBalances = async () => {
+      try {
+        setBalanceLoading(true);
+        const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
+        setTokenABalance(balances.tokenABalance);
+        setTokenBBalance(balances.tokenBBalance);
+        setUsdstBalance(balances.usdstBalance);
+        setBalanceLoading(false);
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch token balances",
+          variant: "destructive",
+        });
+        setBalanceLoading(false);
+      }
+    };
 
-      fetchBalances();
-    }
-  }, [selectedPool, isOpen, fetchTokenBalances, userAddress, toast]);
+    fetchBalances();
+  }
+}, [selectedPool?.address, isOpen, fetchTokenBalances, userAddress, toast]);  
 
   useEffect(() => {
     console.log('[Deposit Modal] tokenA amount:', token1Amount, 'tokenB amount:', token2Amount);
@@ -152,7 +152,6 @@ const LiquidityDepositModal = ({
       await new Promise(resolve => setTimeout(resolve, 2000));
 
       handleClose();
-      onDepositSuccess();
       toast({
         title: "Success",
         description: `${selectedPool._name} deposited successfully.`,
@@ -167,6 +166,11 @@ const LiquidityDepositModal = ({
     } finally {
       setDepositLoading(false);
       operationInProgressRef.current = false;
+    }
+    
+    // Call onDepositSuccess AFTER the finally block to ensure operationInProgressRef.current is false
+    if (!depositLoading) {
+      onDepositSuccess();
     }
   };
 

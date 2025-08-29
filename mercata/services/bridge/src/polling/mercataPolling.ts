@@ -15,7 +15,7 @@ import {
 import { monitorSafeTransactionStatus } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
-import { verifyDepositTransferEvents } from "../services/verificationService";
+import { verifyDepositsBatch } from "../services/verificationService";
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
@@ -48,20 +48,19 @@ export const startDepositInitiatedPolling = (): void => {
       const deposits = await getDepositsByStatus("1");
       if (!Array.isArray(deposits) || deposits.length === 0) return;
 
-      const results = await Promise.all(
-        deposits.map(async (deposit) => {
-          try {
-            await verifyDepositTransferEvents(deposit);
-            return { deposit, verified: true as const };
-          } catch (error) {
-            logError("MercataPolling", error as Error, {
-              operation: "verifyDepositTransferEvents",
-              depositId: (deposit as any)?.id,
-            });
-            return { deposit, verified: false as const };
-          }
-        })
-      );
+      const verificationResults = await verifyDepositsBatch(deposits);
+      
+      const results = deposits.map((deposit) => {
+        const error = verificationResults.get(deposit.srcTxHash);
+        if (error) {
+          logError("MercataPolling", error, {
+            operation: "verifyDepositTransferEvents",
+            depositId: (deposit as any)?.id,
+          });
+          return { deposit, verified: false as const };
+        }
+        return { deposit, verified: true as const };
+      });
 
       const verifiedDeposits = results
         .filter(r => r.verified)

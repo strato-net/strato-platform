@@ -1,9 +1,8 @@
 import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { createSafeTransactionsForWithdrawals } from "./safeService";
 import { NonEmptyArray, Withdrawal, Deposit } from "../types";
-
+import { createSafeTransactionsForWithdrawals, createRejectionTransaction } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 
 export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
@@ -77,49 +76,66 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
 export const confirmWithdrawalBatch = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  const safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
+  let safeTxs: { safeTxHash: string; nonce: number }[] = [];
+  
+  try {
+    safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
 
-  if (safeTxs?.length > 0) {
-    const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
-    const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
+    if (safeTxs?.length > 0) {
+      const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+      const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
 
-    await execute({
-      contractName: "MercataBridge",
-      contractAddress: config.bridge.address!,
-      method: "confirmWithdrawalBatch",
-      args: {
-        ids: withdrawalIds,
-        custodyTxHashes: custodyTxHashes,
-      },
-    });
+      await execute({
+        contractName: "MercataBridge",
+        contractAddress: config.bridge.address!,
+        method: "confirmWithdrawalBatch",
+        args: {
+          ids: withdrawalIds,
+          custodyTxHashes: custodyTxHashes,
+        },
+      });
 
-    logInfo(
-      "BridgeService",
-      `Successfully confirmed ${withdrawals.length} withdrawals`,
-    );
+      logInfo(
+        "BridgeService",
+        `Successfully confirmed ${withdrawals.length} withdrawals`,
+      );
 
-    // Send emails for successful withdrawals (parallel)
-    const emailPromises = withdrawals.map(async (withdrawal) => {
-      try {
-        await sendEmail(withdrawal.id || withdrawal.withdrawalId!);
-        return "success";
-      } catch (emailError) {
-        logError("BridgeService", emailError as Error, {
-          operation: "sendEmail",
-          withdrawalId: withdrawal.id || withdrawal.withdrawalId!,
-        });
-        return "failed";
+      const emailPromises = withdrawals.map(async (withdrawal) => {
+        try {
+          await sendEmail(withdrawal.id || withdrawal.withdrawalId!);
+          return "success";
+        } catch (emailError) {
+          logError("BridgeService", emailError as Error, {
+            operation: "sendEmail",
+            withdrawalId: withdrawal.id || withdrawal.withdrawalId!,
+          });
+          return "failed";
+        }
+      });
+
+      const emailResults = await Promise.all(emailPromises);
+      const successCount = emailResults.filter((r) => r === "success").length;
+      const failureCount = emailResults.filter((r) => r === "failed").length;
+      logInfo(
+        "BridgeService",
+        `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+      );
+    }
+  } catch (error) {
+    if (safeTxs.length > 0) {
+      for (const safeTx of safeTxs) {
+        try {
+          const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
+          const chainId = Number(withdrawal.destChainId);
+          
+          await createRejectionTransaction(chainId, safeTx.nonce);
+        } catch (rejectError) {
+          throw rejectError;
+        }
       }
-    });
+    }
 
-    // Wait for all emails to complete and log results
-    const emailResults = await Promise.all(emailPromises);
-    const successCount = emailResults.filter((r) => r === "success").length;
-    const failureCount = emailResults.filter((r) => r === "failed").length;
-    logInfo(
-      "BridgeService",
-      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
-    );
+    throw error;
   }
 };
 

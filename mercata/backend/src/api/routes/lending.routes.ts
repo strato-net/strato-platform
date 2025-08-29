@@ -65,4 +65,10 @@ router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingControll
 // Configure asset with all parameters
 router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingController.configureAsset);
 
+// Sweep protocol reserves to fee collector
+router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingController.sweepReserves);
+
+// Set debt ceilings for protocol risk management
+router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
+
 export default router; 

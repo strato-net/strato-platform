@@ -16,6 +16,8 @@ import {
   listLiquidatableLoans,
   listNearUnhealthyLoans,
   repayAll,
+  sweepReserves as sweepReservesService,
+  setDebtCeilings as setDebtCeilingsService,
   borrowMax,
   withdrawCollateralMax,
 } from "../services/lending.service";
@@ -26,8 +28,11 @@ import {
   validateRepayArgs,
   validateSupplyCollateralArgs,
   validateWithdrawCollateralArgs,
+  validateWithdrawCollateralMaxArgs,
   validateConfigureAssetArgs,
   validateLiquidationArgs,
+  validateSweepReservesArgs,
+  validateSetDebtCeilingsArgs,
 } from "../validators/lending.validator";
 import { validateUserAddress } from "../validators/common.validators";
 
@@ -188,7 +193,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, body } = req;
-      validateWithdrawCollateralArgs(body);
+      validateWithdrawCollateralMaxArgs(body);
       const result = await withdrawCollateralMax(accessToken, body.asset);
       res.status(RestStatus.OK).json(result);
       return next();
@@ -282,6 +287,40 @@ class LendingController {
       validateConfigureAssetArgs(body);
 
       const result = await configureAssetService(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async sweepReserves(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSweepReservesArgs(body);
+
+      const result = await sweepReservesService(accessToken, body);
+      res.status(RestStatus.OK).json(result);
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  }
+
+  static async setDebtCeilings(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSetDebtCeilingsArgs(body);
+
+      const result = await setDebtCeilingsService(accessToken, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
