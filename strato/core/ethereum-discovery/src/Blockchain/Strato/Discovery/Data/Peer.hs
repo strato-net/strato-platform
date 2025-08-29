@@ -150,6 +150,41 @@ type HasPeerDB m = (
   A.Replaceable T.Text PPeer m
   )
 
+{-
+class HasPeerDB where
+  getNumAvailablePeers :: m Int
+  setPeerActiveState :: Host -> Int -> ActivityState -> m (Either SomeException ())
+  getActivePeers :: m (Either SomeException [PPeer])
+  setPeerBondingState :: Host -> Point -> Int -> m (Either SomeException ())
+  getPeerBondingState :: Host -> Point -> m Int
+  getBondedPeers :: m (Either SomeException [PPeer])
+  getBondedPeersForUDP :: m (Either SomeException [PPeer])
+  getUnbondedPeers :: m [PPeer]
+  getPeersClosestTo :: Natural -> NodeID -> Point -> m [PPeer]
+
+  updateUdpEnableTime :: UTCTime -> m ()
+  updateIP :: IP -> m ()
+  updateTcpEnableTime :: UTCTime -> m ()
+  updatePeerDisable :: PeerDisable -> m ()
+  updatePeerLastBestBlockHash :: PeerLastBestBlockHash -> m ()
+  updatePeerUdpDisable :: PeerUdpDisable -> m ()
+  updatePoint :: Point -> m ()
+  updateDisableException :: String -> m ()
+
+  A.Replaceable T.Text PPeer m
+
+instance MonadIO m => A.Replaceable T.Text PPeer m where
+  replace _ message peer = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
+-}
+
+
+
+
+
+
+
 data PeerDisable
   = ExtendPeerDisableTime
       { epdtTcpEnableTime           :: TcpEnableTime,
