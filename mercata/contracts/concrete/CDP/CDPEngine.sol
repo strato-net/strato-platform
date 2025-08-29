@@ -1,4 +1,3 @@
-import "./CDPVault.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
 import "./PriceOracle.sol";
@@ -156,7 +155,6 @@ contract record CDPEngine is Ownable {
         address _tokenFactory,
         address _priceOracle,
         address _feeCollector,
-        address _cdpVault,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_registry != address(0), "CDPEngine: invalid registry");
@@ -164,14 +162,12 @@ contract record CDPEngine is Ownable {
         require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
         require(_feeCollector != address(0), "CDPEngine: invalid fee collector");
-        require(_cdpVault != address(0), "CDPEngine: invalid vault");
 
         registry = CDPRegistry(_registry);
         usdst = Token(_usdst);
         tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
         feeCollector = FeeCollector(_feeCollector);
-        cdpVault = CDPVault(_cdpVault);
     }
 
 
