@@ -11,6 +11,7 @@ import "../../abstract/ERC20/IERC20.sol";
 contract record CDPEngine is Ownable {
     CDPRegistry public registry;
     Token public usdst;
+    TokenFactory public tokenFactory;
     PriceOracle public priceOracle;
     FeeCollector public feeCollector;
 
@@ -126,7 +127,7 @@ contract record CDPEngine is Ownable {
 
     modifier onlySupportedAsset(address asset) {
         require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
-        require(token != address(0) && tokenFactory.isTokenActive(token), "Invalid or inactive token");
+        require(asset != address(0) && tokenFactory.isTokenActive(asset), "Invalid or inactive token");
         _;
     }
     
@@ -148,16 +149,19 @@ contract record CDPEngine is Ownable {
     constructor(
         address _registry,
         address _usdst,
+        address _tokenFactory,
         address _priceOracle,
         address _feeCollector,
         address initialOwner
     ) Ownable(initialOwner) {
         require(_registry != address(0), "CDPEngine: invalid registry");
         require(_usdst != address(0), "CDPEngine: invalid USDST");
+        require(_tokenFactory != address(0), "CDPEngine: invalid token factory");
         require(_priceOracle != address(0), "CDPEngine: invalid oracle");
         
         cdpVault = CDPVault(_cdpVault);
         usdst = Token(_usdst);
+        tokenFactory = TokenFactory(_tokenFactory);
         priceOracle = PriceOracle(_priceOracle);
         feeCollector = FeeCollector(_feeCollector);
     }
