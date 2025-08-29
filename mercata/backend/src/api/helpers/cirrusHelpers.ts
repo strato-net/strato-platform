@@ -5,7 +5,7 @@ export const fetchBalances = (accessToken: string, userAddress: string, tokenAdd
   cirrus.get(accessToken, `/${constants.Token}-_balances`, {
     params: { 
       select: "address,balance:value::text", 
-      user: `eq.${userAddress}`, 
+      key: `eq.${userAddress}`, 
       address: `in.(${tokenAddrs.join(",")})` 
     }
   }).then((r: any) => new Map<string, bigint>(r.data.map((b: any) => [b.address, BigInt(b.balance || "0")])));

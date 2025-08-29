@@ -17,9 +17,9 @@ export const createSafeTransactionsForWithdrawals = async (
 
   const allSafeTxs: { safeTxHash: string; nonce: number }[] = [];
 
-  for (const [chainId, chainWithdrawals] of withdrawalsByChain) {
+  for (const [externalChainId, chainWithdrawals] of withdrawalsByChain) {
     const chainSafeTxs = await processChainWithdrawals(
-      chainId,
+      externalChainId,
       chainWithdrawals,
       callCache,
     );

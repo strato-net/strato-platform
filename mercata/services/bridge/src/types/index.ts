@@ -80,11 +80,11 @@ export interface AssetInfo {
 }
 
 export interface PreparedWithdrawal {
-  amount: string;
-  toAddress: string;
+  externalTokenAmount: string;
+  externalRecipient: string;
   type: TxType;
-  tokenAddress: string;
-  chainId: number;
+  externalToken: string;
+  externalChainId: number;
 }
 
 export interface Deposit {
@@ -103,12 +103,17 @@ export interface Deposit {
 }
 
 export interface Withdrawal {
-  destChainId: string | number;
-  token: string;
-  dest?: string;
-  destAddress?: string;
-  amount: string | bigint;
-  id?: string;
+
   withdrawalId?: string;
   safeTxHash?: string;
+  // NEW:
+  externalChainId: string | number;   // Chain where Custody resides
+  externalRecipient: string; // External recipient address
+  stratoToken: string;       // Token to burn
+  stratoTokenAmount: string; // Escrowed amount of stratoToken
+  stratoSender: string;      // STRATO sender
+  bridgeStatus: string; // NONE / INITIATED / PENDING_REVIEW / ...
+  mintUSDST: boolean;           // true = burn USDST, false = unwrap token
+  timestamp: string;        // timestamp of the withdrawal
+  requestedAt: string;      // timestamp of the withdrawal request (for abort accuracy)
 }

@@ -43,7 +43,7 @@ export interface BridgeResponse {
 }
 
 export interface NetworkConfigFromAPI {
-  externalChainId: string;
+  externalChainId: number;
   chainInfo: {
     custody: string;
     enabled: boolean;

@@ -84,7 +84,7 @@ export const confirmWithdrawalBatch = async (
     safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
 
     if (safeTxs?.length > 0) {
-      const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+      const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
       const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
 
       await execute({
@@ -93,7 +93,7 @@ export const confirmWithdrawalBatch = async (
         method: "confirmWithdrawalBatch",
         args: {
           ids: withdrawalIds,
-          custodyTxHashes: custodyTxHashes,
+          custodyTxHashes,
         },
       });
 
@@ -104,12 +104,12 @@ export const confirmWithdrawalBatch = async (
 
       const emailPromises = withdrawals.map(async (withdrawal) => {
         try {
-          await sendEmail(withdrawal.id || withdrawal.withdrawalId!);
+          await sendEmail(withdrawal.withdrawalId!);
           return "success";
         } catch (emailError) {
           logError("BridgeService", emailError as Error, {
             operation: "sendEmail",
-            withdrawalId: withdrawal.id || withdrawal.withdrawalId!,
+            withdrawalId: withdrawal.withdrawalId!,
           });
           return "failed";
         }
@@ -128,9 +128,8 @@ export const confirmWithdrawalBatch = async (
       for (const safeTx of safeTxs) {
         try {
           const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
-          const chainId = Number(withdrawal.destChainId);
           
-          await createRejectionTransaction(chainId, safeTx.nonce);
+          await createRejectionTransaction(Number(withdrawal.externalChainId), safeTx.nonce);
         } catch (rejectError) {
           throw rejectError;
         }
@@ -144,7 +143,7 @@ export const confirmWithdrawalBatch = async (
 export const finaliseWithdrawalBatch = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+  const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
   const custodyTxHashes = withdrawals.map((w) => w.safeTxHash!);
 
   await execute({
@@ -153,7 +152,7 @@ export const finaliseWithdrawalBatch = async (
     method: "finaliseWithdrawalBatch",
     args: {
       ids: withdrawalIds,
-      custodyTxHashes: custodyTxHashes,
+      custodyTxHashes,
     },
   });
 
@@ -166,7 +165,7 @@ export const finaliseWithdrawalBatch = async (
 export const handleRejectedWithdrawalBatch = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+  const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
 
   await execute({
     contractName: "MercataBridge",

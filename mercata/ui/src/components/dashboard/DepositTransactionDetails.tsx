@@ -61,11 +61,11 @@ const DepositTransactionDetails = () => {
       title: "From",
       key: "from",
       render: (_: any, record: any) => {
-        const chainName = record.chainId ? getChainName(record.chainId) : "Unknown Chain";
+        const chainName = record.externalChainId ? getChainName(record.externalChainId) : "Unknown Chain";
         const addr = record?.DepositInfo?.externalSender
           ? bridgeContractService.formatAddress(record.DepositInfo.externalSender)
           : "";
-        const chainIdStr = record?.chainId ? String(record.chainId) : '1';
+        const chainIdStr = record?.externalChainId ? String(record.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
         const addressUrl = addr ? `${base}/address/${addr}` : '';

@@ -66,7 +66,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       const networks: NetworkSummary[] = (data || [])
         .filter((cfg) => cfg?.chainInfo?.enabled)
         .map((cfg) => ({
-          chainId: cfg.externalChainId,
+          chainId: cfg.externalChainId.toString(),
           chainName: cfg.chainInfo.chainName,
           enabled: cfg.chainInfo.enabled,
           depositRouter: cfg.chainInfo.depositRouter,

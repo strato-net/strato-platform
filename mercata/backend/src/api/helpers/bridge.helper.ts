@@ -45,7 +45,8 @@ const ENRICHMENT_CONFIGS: Record<string, EnrichmentConfig> = {
 export function buildQueryParams(
   rawParams: Record<string, string | undefined>,
   userAddress?: string,
-  excludeFields: string[] = []
+  excludeFields: string[] = [],
+  queryType?: 'withdrawal' | 'deposit'
 ): Record<string, string> {
   const baseParams: Record<string, string> = {
     address: `eq.${constants.mercataBridge}`,
@@ -57,7 +58,9 @@ export function buildQueryParams(
   };
 
   if (userAddress) {
-    baseParams["value->>stratoSender"] = `eq.${userAddress}`;
+    // For withdrawals, use stratoSender; for deposits, use stratoRecipient
+    const userField = queryType === 'deposit' ? 'stratoRecipient' : 'stratoSender';
+    baseParams[`value->>${userField}`] = `eq.${userAddress}`;
   }
 
   return baseParams;

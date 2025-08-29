@@ -15,7 +15,7 @@ const { MercataBridge, Token } = constants;
 
 const assetParams = (mint: boolean, token: string) => ({
   select: "stratoTokenAddress:key,assetInfo:value",
-  stratoTokenAddress: `eq.${token}`,
+  key: `eq.${token}`,
   "value->>enabled": "eq.true",
   ...(mint ? { "value->>mintUSDST": "eq.true" } : {}),
   address: `eq.${constants.mercataBridge}`,
@@ -71,12 +71,12 @@ export const getBridgeTransactions = async (
   
   const dataParams = {
     select: config.selectFields,
-    ...buildQueryParams(rawParams, userAddress)
+    ...buildQueryParams(rawParams, userAddress, [], type)
   };
 
   const countParams = {
     select: config.countField,
-    ...buildQueryParams(rawParams, userAddress, ['limit', 'offset', 'order', 'select'])
+    ...buildQueryParams(rawParams, userAddress, ['limit', 'offset', 'order', 'select'], type)
   };
 
   const { results, totalCount } = await executeParallelQueries(

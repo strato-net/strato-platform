@@ -78,7 +78,6 @@ export const getWithdrawalsByStatus = async (
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
       ...item.value,
-      id: item.key,
       withdrawalId: item.key,
     }));
   }

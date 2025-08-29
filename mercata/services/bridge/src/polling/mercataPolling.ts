@@ -100,7 +100,7 @@ export const startWithdrawalTxPolling = (): void => {
       const pending = await getWithdrawalsByStatus("2");
       if (!Array.isArray(pending) || pending.length === 0) return;
 
-      const idOf = (t: any) => String(t.id ?? t.withdrawalId);
+      const idOf = (t: any) => String(t.withdrawalId);
       const ids = pending.map(idOf);
       const hashMap = await getSafeTxHashFromEvents(ids);
 
@@ -118,7 +118,7 @@ export const startWithdrawalTxPolling = (): void => {
           try {
             const status = await monitorSafeTransactionStatus(
               safeTxHash,
-              safeToBigInt(tx.destChainId),
+              safeToBigInt(tx.externalChainId),
             );
             if (status === "executed") toFinalize.push({ ...tx, safeTxHash });
             else if (status === "rejected") toReject.push(tx);

@@ -48,10 +48,10 @@ export class CallCache {
 
 export async function getAssetInfoForChain(
   stratoToken: string,
-  chainId: number,
+  externalChainId: number,
   callCache: CallCache,
 ): Promise<AssetInfo | null> {
-  const cacheKey = `${stratoToken}-${chainId}`;
+  const cacheKey = `${stratoToken}-${externalChainId}`;
   let assetInfo = callCache.get(cacheKey);
 
   if (!assetInfo) {
@@ -59,17 +59,17 @@ export async function getAssetInfoForChain(
 
     if (
       !assetInfo ||
-      assetInfo.chainId !== chainId.toString() ||
+      assetInfo.externalChainId !== externalChainId.toString() ||
       !assetInfo.enabled
     ) {
       return null;
     }
 
     assetInfo = {
-      extToken: ensureHexPrefix(assetInfo.extToken),
-      extDecimals: parseInt(assetInfo.extDecimals) || STRATO_DECIMALS,
+      externalToken: ensureHexPrefix(assetInfo.externalToken),
+      externalDecimals: parseInt(assetInfo.externalDecimals) || STRATO_DECIMALS,
       enabled: assetInfo.enabled,
-      chainId: assetInfo.chainId,
+      externalChainId: assetInfo.externalChainId,
     };
 
     callCache.set(cacheKey, assetInfo);
@@ -79,18 +79,18 @@ export async function getAssetInfoForChain(
 }
 
 export function buildTxDescriptor(params: {
-  kind: "eth" | "erc20";
-  to: string;
-  amount: string;
-  token?: string;
+  type: "eth" | "erc20";
+  externalRecipient: string;
+  externalTokenAmount: string;
+  externalToken?: string;
   nonce: number;
 }): { transactions: MetaTransactionData[]; options: { nonce: number } } {
-  if (params.kind === "eth") {
+  if (params.type === "eth") {
     return {
       transactions: [
         {
-          to: safeChecksum(params.to),
-          value: params.amount,
+          to: safeChecksum(params.externalRecipient),
+          value: params.externalTokenAmount,
           data: "0x",
           operation: OperationType.Call,
         },
@@ -99,21 +99,21 @@ export function buildTxDescriptor(params: {
     };
   }
 
-  const token = params.token!;
-  if (token.toLowerCase() === ZERO_ADDRESS) {
+  const externalToken = params.externalToken!;
+  if (externalToken.toLowerCase() === ZERO_ADDRESS) {
     throw new Error(
-      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead",
+      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' type instead",
     );
   }
 
   return {
     transactions: [
       {
-        to: safeChecksum(token),
+        to: safeChecksum(externalToken),
         value: "0",
         data: erc20Interface.encodeFunctionData("transfer", [
-          safeChecksum(params.to),
-          params.amount,
+          safeChecksum(params.externalRecipient),
+          params.externalTokenAmount,
         ]),
         operation: OperationType.Call,
       },
@@ -128,63 +128,63 @@ export function validateAndGroupWithdrawals(
   const grouped = new Map<number, Withdrawal[]>();
 
   for (const withdrawal of withdrawals) {
-    const chainId = Number(withdrawal.destChainId);
-    const toAddress = withdrawal.dest || withdrawal.destAddress;
-    if (!toAddress || !validateAddress(toAddress)) {
+    const externalChainId = Number(withdrawal.externalChainId);
+    const externalRecipient = withdrawal.externalRecipient;
+    if (!externalRecipient || !validateAddress(externalRecipient)) {
       logError(
         "SafeService",
-        new Error(`Invalid destination address: ${toAddress}`),
+        new Error(`Invalid external recipient address: ${externalRecipient}`),
         {
           operation: "validateAndGroupWithdrawals",
-          withdrawalId: withdrawal.id || withdrawal.withdrawalId,
-          address: toAddress,
+          withdrawalId: withdrawal.withdrawalId,
+          externalRecipient: externalRecipient,
         },
       );
       continue;
     }
 
-    if (!grouped.has(chainId)) {
-      grouped.set(chainId, []);
+    if (!grouped.has(externalChainId)) {
+      grouped.set(externalChainId, []);
     }
-    grouped.get(chainId)!.push(withdrawal);
+    grouped.get(externalChainId)!.push(withdrawal);
   }
 
   return grouped;
 }
 
 export async function prepareWithdrawals(
-  chainId: number,
+  externalChainId: number,
   withdrawals: Withdrawal[],
   callCache: CallCache,
 ): Promise<PreparedWithdrawal[]> {
   const preparationPromises = withdrawals.map(async (withdrawal) => {
     const assetInfo = await getAssetInfoForChain(
-      withdrawal.token,
-      chainId,
+      withdrawal.stratoToken,
+      externalChainId,
       callCache,
     );
     if (!assetInfo) {
       throw new Error(
-        `No external mapping found for token ${withdrawal.token} on chain ${chainId}`,
+        `No external mapping found for token ${withdrawal.stratoToken} on chain ${externalChainId}`,
       );
     }
 
-    const isEth = assetInfo.extToken.toLowerCase() === ZERO_ADDRESS;
+    const isEth = assetInfo.externalToken.toLowerCase() === ZERO_ADDRESS;
     const type: TxType = isEth ? "eth" : "erc20";
-    const tokenAddress = isEth ? ZERO_ADDRESS : assetInfo.extToken;
+    const externalToken = isEth ? ZERO_ADDRESS : assetInfo.externalToken;
 
-    const amount = convertDecimals(
-      withdrawal.amount.toString(),
+    const externalTokenAmount = convertDecimals(
+      withdrawal.stratoTokenAmount.toString(),
       STRATO_DECIMALS,
-      assetInfo.extDecimals,
+      assetInfo.externalDecimals,
     ).toString();
 
     return {
-      amount,
-      toAddress: withdrawal.dest || withdrawal.destAddress!,
+      externalTokenAmount,
+      externalRecipient: withdrawal.externalRecipient,
       type,
-      tokenAddress,
-      chainId,
+      externalToken,
+      externalChainId,
     };
   });
 
@@ -198,9 +198,9 @@ export async function prepareWithdrawals(
       // Log the error but don't fail the entire batch
       logError("SafeService", result.reason as Error, {
         operation: "prepareWithdrawals",
-        withdrawalId: withdrawals[index].id || withdrawals[index].withdrawalId,
-        token: withdrawals[index].token,
-        chainId,
+        withdrawalId: withdrawals[index].withdrawalId,
+        token: withdrawals[index].stratoToken,
+        externalChainId,
       });
     }
   });
@@ -278,13 +278,13 @@ export async function initializeSafeForChain(chainId: number) {
 }
 
 export async function processChainWithdrawals(
-  chainId: number,
+  externalChainId: number,
   withdrawals: Withdrawal[],
   callCache: CallCache,
 ): Promise<{ safeTxHash: string; nonce: number }[]> {
-  const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
+  const { protocolKit, apiKit } = await initializeSafeForChain(externalChainId);
   const preparedWithdrawals = await prepareWithdrawals(
-    chainId,
+    externalChainId,
     withdrawals,
     callCache,
   );
@@ -308,10 +308,10 @@ export async function proposeChainTransactions(
 
   for (const prepared of preparedWithdrawals) {
     const descriptor = buildTxDescriptor({
-      kind: prepared.type,
-      to: prepared.toAddress,
-      amount: prepared.amount,
-      token: prepared.type === "erc20" ? prepared.tokenAddress : undefined,
+      type: prepared.type,
+      externalRecipient: prepared.externalRecipient,
+      externalTokenAmount: prepared.externalTokenAmount,
+      externalToken: prepared.type === "erc20" ? prepared.externalToken : undefined,
       nonce,
     });
 
