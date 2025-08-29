@@ -1,6 +1,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "./CDPRegistry.sol";
+import "./CDPEngine.sol";
 
 contract record CDPVault is Ownable {
     CDPRegistry public registry;
