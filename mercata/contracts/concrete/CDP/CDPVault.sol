@@ -29,7 +29,7 @@ contract record CDPVault is Ownable {
     function deposit(
         address borrower,
         address asset,
-        uint256 amount
+        uint amount
     ) public onlyEngine {
         require(borrower != address(0), "CDPVault: Invalid borrower");
         require(asset != address(0), "CDPVault: Invalid asset");
@@ -43,7 +43,7 @@ contract record CDPVault is Ownable {
     function withdraw(
         address borrower,
         address asset,
-        uint256 amount
+        uint amount
     ) public onlyEngine {
         require(
             userCollaterals[borrower][asset] >= amount,
@@ -59,7 +59,7 @@ contract record CDPVault is Ownable {
         address borrower,
         address asset,
         address liquidator,
-        uint256 amount
+        uint amount
     ) public onlyEngine {
         require(amount > 0, "Invalid amount");
         require(

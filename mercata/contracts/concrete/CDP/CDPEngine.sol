@@ -15,26 +15,26 @@ contract record CDPEngine is Ownable {
     FeeCollector public feeCollector;
 
     struct CollateralConfig {
-        uint256 liquidationRatio;
-        uint256 liquidationPenaltyBps;
-        uint256 closeFactorBps;
-        uint256 stabilityFeeRate;
-        uint256 debtFloor;
-        uint256 debtCeiling;
-        uint256 unitScale;
+        uint liquidationRatio;
+        uint liquidationPenaltyBps;
+        uint closeFactorBps;
+        uint stabilityFeeRate;
+        uint debtFloor;
+        uint debtCeiling;
+        uint unitScale;
         bool isPaused;
     }
 
     struct CollateralGlobalState {
-        uint256 rateAccumulator;
-        uint256 lastAccrual;
-        uint256 totalScaledDebt;
-        uint256 mintedUSD;
+        uint rateAccumulator;
+        uint lastAccrual;
+        uint totalScaledDebt;
+        uint mintedUSD;
     }
 
     struct Vault {
-        uint256 collateral;
-        uint256 scaledDebt;
+        uint collateral;
+        uint scaledDebt;
     }
 
     mapping(address => CollateralConfig) public record collateralConfigs;
@@ -42,51 +42,51 @@ contract record CDPEngine is Ownable {
     mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
 
     bool public globalPaused;
-    uint256 public constant RAY = 1e27;
-    uint256 public constant WAD = 1e18;
+    uint public constant RAY = 1e27;
+    uint public constant WAD = 1e18;
     mapping(address => bool) public record isSupportedAsset;
 
     // Events
     event CollateralConfigured(
         address indexed asset,
-        uint256 liquidationRatio,
-        uint256 liquidationPenaltyBps,
-        uint256 closeFactorBps,
-        uint256 stabilityFeeRate,
-        uint256 debtFloor,
-        uint256 debtCeiling,
-        uint256 unitScale
+        uint liquidationRatio,
+        uint liquidationPenaltyBps,
+        uint closeFactorBps,
+        uint stabilityFeeRate,
+        uint debtFloor,
+        uint debtCeiling,
+        uint unitScale
     );
 
     event Accrued(
         address indexed asset,
-        uint256 oldRate,
-        uint256 newRate,
-        uint256 deltaTime
+        uint oldRate,
+        uint newRate,
+        uint deltaTime
     );
 
     event Deposited(
         address indexed owner,
         address indexed asset,
-        uint256 amount
+        uint amount
     );
 
     event Withdrawn(
         address indexed owner,
         address indexed asset,
-        uint256 amount
+        uint amount
     );
 
     event USDSTMinted(
         address indexed owner,
         address indexed asset,
-        uint256 amountUSD
+        uint amountUSD
     );
 
     event USDSTBurned(
         address indexed owner,
         address indexed asset,
-        uint256 amountUSD
+        uint amountUSD
     );
 
     /**
@@ -101,9 +101,9 @@ contract record CDPEngine is Ownable {
     event LiquidationExecuted(
         address indexed borrower,
         address indexed asset,
-        uint256 debtBurnedUSD,
-        uint256 penaltyUSD,
-        uint256 collateralOut,
+        uint debtBurnedUSD,
+        uint penaltyUSD,
+        uint collateralOut,
         address indexed liquidator
     );
 
@@ -113,8 +113,8 @@ contract record CDPEngine is Ownable {
     event VaultUpdated(
         address indexed user,
         address indexed asset,
-        uint256 collateral,
-        uint256 scaledDebt
+        uint collateral,
+        uint scaledDebt
     );
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -170,7 +170,7 @@ contract record CDPEngine is Ownable {
 
     function deposit(
         address asset,
-        uint256 amount
+        uint amount
     ) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
 
@@ -189,7 +189,7 @@ contract record CDPEngine is Ownable {
      */
     function withdraw(
         address asset,
-        uint256 amount
+        uint amount
     ) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
         
@@ -202,7 +202,7 @@ contract record CDPEngine is Ownable {
         vault.collateral -= amount;
 
         if (vault.scaledDebt > 0) {
-            uint256 crAfter = collateralizationRatio(msg.sender, asset);
+            uint crAfter = collateralizationRatio(msg.sender, asset);
             require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
         }
 
@@ -218,22 +218,22 @@ contract record CDPEngine is Ownable {
      */
     function withdrawMax(
         address asset
-    ) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint256 maxAmount) {
+    ) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint maxAmount) {
         _accrue(asset);
 
         Vault storage vault = vaults[msg.sender][asset];
-        uint256 debt = (vault.scaledDebt * collateralGlobalStates[asset].rateAccumulator) / RAY;
+        uint debt = (vault.scaledDebt * collateralGlobalStates[asset].rateAccumulator) / RAY;
 
         if (debt == 0) {
             // No debt, can withdraw all collateral
             maxAmount = vault.collateral;
         } else {
             // Calculate required collateral to maintain liquidation ratio
-            uint256 price = _priceOracle().getAssetPrice(asset);
+            uint price = _priceOracle().getAssetPrice(asset);
             CollateralConfig memory config = collateralConfigs[asset];
             
-            uint256 requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
-            uint256 requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
+            uint requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
+            uint requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
             
             // Only allow withdrawal if we have more than required + 1 wei buffer
             require(vault.collateral > requiredCollateral + 1, "CDPEngine: insufficient excess collateral for safe withdrawal");
@@ -248,7 +248,7 @@ contract record CDPEngine is Ownable {
     }
 
      
-    function mint(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
+    function mint(address asset, uint amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amountUSD > 0, "CDPEngine: zero amount");
         _accrue(asset);
         
@@ -260,11 +260,11 @@ contract record CDPEngine is Ownable {
             require(assetState.mintedUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
         }
         
-        uint256 scaledAdd = (amountUSD * RAY) / assetState.rateAccumulator; // RAY = 1e27
+        uint scaledAdd = (amountUSD * RAY) / assetState.rateAccumulator; // RAY = 1e27
         userVault.scaledDebt += scaledAdd;
         assetState.totalScaledDebt += scaledAdd;
         
-        uint256 totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         if (assetConfig.debtFloor > 0) {
             require(totalDebtAfter >= assetConfig.debtFloor, "CDPEngine: below debt floor");
         }
@@ -283,18 +283,18 @@ contract record CDPEngine is Ownable {
      * @param asset The collateral asset
      * @return amountMinted The amount of USDST actually minted
      */
-    function mintMax(address asset) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint256 amountMinted) {
+    function mintMax(address asset) external whenNotPaused(asset) onlySupportedAsset(asset) returns (uint amountMinted) {
         _accrue(asset);
         
         CollateralConfig memory config = collateralConfigs[asset];
         CollateralGlobalState storage assetState = collateralGlobalStates[asset];
         Vault storage userVault = vaults[msg.sender][asset];
         
-        uint256 currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        uint256 collateralValueUSD_calc = collateralValueUSD(msg.sender, asset);
-        uint256 maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.liquidationRatio;
+        uint currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint collateralValueUSD_calc = collateralValueUSD(msg.sender, asset);
+        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.liquidationRatio;
         require(maxBorrowableUSD > currentDebt, "No borrowing power");
-        uint256 available = maxBorrowableUSD - currentDebt;
+        uint available = maxBorrowableUSD - currentDebt;
         
         // Apply 1 wei safety buffer to keep CR strictly above liquidation ratio
         amountMinted = available > 1 ? (available - 1) : 0;
@@ -304,13 +304,13 @@ contract record CDPEngine is Ownable {
             require(assetState.mintedUSD + amountMinted <= config.debtCeiling, "CDPEngine: debt ceiling exceeded");
         }
         
-        uint256 scaledAdd = (amountMinted * RAY) / assetState.rateAccumulator;
+        uint scaledAdd = (amountMinted * RAY) / assetState.rateAccumulator;
         userVault.scaledDebt += scaledAdd;
         assetState.totalScaledDebt += scaledAdd;
         assetState.mintedUSD += amountMinted;
         
         // Check debt floor for final debt amount
-        uint256 totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint totalDebtAfter = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         if (config.debtFloor > 0) {
             require(totalDebtAfter >= config.debtFloor, "CDPEngine: below debt floor");
         }
@@ -327,24 +327,24 @@ contract record CDPEngine is Ownable {
      * @param amountUSD The amount of USDST to repay
      * @dev User must first approve(CDPEngine, amountUSD) before calling this
      */
-    function repay(address asset, uint256 amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
+    function repay(address asset, uint amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
         _accrue(asset);
         require(amountUSD > 0, "CDPEngine: zero amount");
         
         CollateralGlobalState storage assetState = collateralGlobalStates[asset];
         Vault storage userVault = vaults[msg.sender][asset];
         
-        uint256 owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint owed = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
         require(owed > 0, "CDPEngine: no debt");
-        uint256 repayAmount = amountUSD > owed ? owed : amountUSD;
+        uint repayAmount = amountUSD > owed ? owed : amountUSD;
         
-        uint256 scaledDelta = (repayAmount * RAY) / assetState.rateAccumulator;
+        uint scaledDelta = (repayAmount * RAY) / assetState.rateAccumulator;
         if (scaledDelta > userVault.scaledDebt) {
             scaledDelta = userVault.scaledDebt;
         }
         
         // Collect stability fees for the portion being repaid
-        (, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+        (, uint stabilityFee) = _calculateAndCollectStabilityFee(
             scaledDelta,
             assetState.rateAccumulator
         );
@@ -373,12 +373,12 @@ contract record CDPEngine is Ownable {
         require(userVault.scaledDebt > 0, "CDPEngine: no debt");
         
         // Calculate and collect stability fees
-        (uint256 owed, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+        (uint owed, uint stabilityFee) = _calculateAndCollectStabilityFee(
             userVault.scaledDebt,
             assetState.rateAccumulator
         );
         
-        uint256 scaledDebtToRemove = userVault.scaledDebt;
+        uint scaledDebtToRemove = userVault.scaledDebt;
         
         require(usdst.burn(msg.sender, owed), "CDPEngine: burn failed");
 
@@ -403,7 +403,7 @@ contract record CDPEngine is Ownable {
     function liquidate(
         address collateralAsset,
         address borrower,
-        uint256 debtToCover
+        uint debtToCover
     ) external whenNotPaused(collateralAsset) onlySupportedAsset(collateralAsset) {
         require(borrower != address(0) && borrower != msg.sender, "CDPEngine: invalid borrower");
         require(debtToCover > 0, "CDPEngine: zero debt amount");
@@ -416,25 +416,25 @@ contract record CDPEngine is Ownable {
         require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to liquidate");
 
         // Check if position is liquidatable
-        uint256 borrowerCR = collateralizationRatio(borrower, collateralAsset);
+        uint borrowerCR = collateralizationRatio(borrower, collateralAsset);
         require(borrowerCR < config.liquidationRatio, "CDPEngine: position healthy");
 
-        uint256 totalDebt = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint totalDebt = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
         
         // Apply close factor - liquidator can repay up to closeFactorBps% of debt
-        uint256 maxRepayable = (totalDebt * config.closeFactorBps) / 10000;
+        uint maxRepayable = (totalDebt * config.closeFactorBps) / 10000;
         require(debtToCover <= maxRepayable, "CDPEngine: exceeds close factor");
 
         require(usdst.burn(msg.sender, debtToCover), "CDPEngine: burn failed");
 
         // Calculate and collect stability fees on the liquidated portion
-        uint256 scaledDebtToLiquidate = (debtToCover * RAY) / assetState.rateAccumulator;
+        uint scaledDebtToLiquidate = (debtToCover * RAY) / assetState.rateAccumulator;
         if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
             scaledDebtToLiquidate = borrowerVault.scaledDebt;
         }
         
         // Collect stability fees for liquidated portion
-        (, uint256 stabilityFee) = _calculateAndCollectStabilityFee(
+        (, uint stabilityFee) = _calculateAndCollectStabilityFee(
             scaledDebtToLiquidate,
             assetState.rateAccumulator
         );
@@ -445,13 +445,13 @@ contract record CDPEngine is Ownable {
         assetState.mintedUSD -= debtToCover;
 
         // Calculate collateral to seize (debt + penalty)
-        uint256 collateralPrice = _priceOracle().getAssetPrice(collateralAsset);
+        uint collateralPrice = _priceOracle().getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "CDPEngine: invalid collateral price");
         
         // Penalty amount in USD
-        uint256 penaltyUSD = (debtToCover * config.liquidationPenaltyBps) / 10000;
-        uint256 totalSeizureUSD = debtToCover + penaltyUSD;
-        uint256 collateralToSeize = (totalSeizureUSD * config.unitScale) / collateralPrice;
+        uint penaltyUSD = (debtToCover * config.liquidationPenaltyBps) / 10000;
+        uint totalSeizureUSD = debtToCover + penaltyUSD;
+        uint collateralToSeize = (totalSeizureUSD * config.unitScale) / collateralPrice;
         
         // Cap seizure to available collateral
         if (collateralToSeize > borrowerVault.collateral) {
@@ -489,12 +489,12 @@ contract record CDPEngine is Ownable {
             return;
         }
         
-        uint256 dt = block.timestamp - assetState.lastAccrual;
+        uint dt = block.timestamp - assetState.lastAccrual;
         if (dt == 0) return; // No time elapsed
         
-        uint256 oldRate = assetState.rateAccumulator;
+        uint oldRate = assetState.rateAccumulator;
         
-        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
+        uint factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         assetState.rateAccumulator = (oldRate * factor) / RAY;
         assetState.lastAccrual = block.timestamp;
         
@@ -509,9 +509,9 @@ contract record CDPEngine is Ownable {
      * @return stabilityFee The stability fee amount to collect
      */
     function _calculateAndCollectStabilityFee(
-        uint256 scaledDebt,
-        uint256 rateAccumulator
-    ) internal returns (uint256 totalDebt, uint256 stabilityFee) {
+        uint scaledDebt,
+        uint rateAccumulator
+    ) internal returns (uint totalDebt, uint stabilityFee) {
         require(scaledDebt > 0, "CDPEngine: no debt");
         
         totalDebt = (scaledDebt * rateAccumulator) / RAY;
@@ -529,20 +529,20 @@ contract record CDPEngine is Ownable {
      * @param base Ray base (1e27)
      * @return z Result in RAY
      */
-    function _rpow(uint256 x, uint256 n, uint256 base) internal pure returns (uint256 z) {
+    function _rpow(uint x, uint n, uint base) internal pure returns (uint z) {
         if (x == 0) return n == 0 ? base : 0;
 
         z = (n % 2 == 0) ? base : x;
-        uint256 half = base / 2;
+        uint half = base / 2;
 
         for (n /= 2; n > 0; n /= 2) {
             // x = round(x * x / base)
-            uint256 xx = x * x;
+            uint xx = x * x;
             x = (xx + half) / base;
 
             if (n % 2 == 1) {
                 // z = round(z * x / base)
-                uint256 zx = z * x;
+                uint zx = z * x;
                 z = (zx + half) / base;
             }
         }
@@ -562,7 +562,7 @@ contract record CDPEngine is Ownable {
     function getVault(
         address owner,
         address asset
-    ) external view returns (uint256 collateral, uint256 scaledDebt) {
+    ) external view returns (uint collateral, uint scaledDebt) {
         Vault memory vault = vaults[owner][asset];
         return (vault.collateral, vault.scaledDebt);
     }
@@ -576,12 +576,12 @@ contract record CDPEngine is Ownable {
     function debtUSD(
         address owner,
         address asset
-    ) external view returns (uint256) {
+    ) external view returns (uint) {
         Vault memory vault = vaults[owner][asset];
         if (vault.scaledDebt == 0) return 0;
 
         // Use fresh rate accumulator (with accrued interest)
-        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
+        (, uint rateAccumulatorFresh) = previewAccrual(asset);
         return (vault.scaledDebt * rateAccumulatorFresh) / RAY;
     }
 
@@ -594,11 +594,11 @@ contract record CDPEngine is Ownable {
     function collateralValueUSD(
         address owner,
         address asset
-    ) public view returns (uint256) {
+    ) public view returns (uint) {
         Vault memory vault = vaults[owner][asset];
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         
-        uint256 price = _priceOracle().getAssetPrice(asset); // USD 1e18
+        uint price = _priceOracle().getAssetPrice(asset); // USD 1e18
         require(price > 0, "CDPEngine: invalid price");
         
         return (vault.collateral * price) / assetConfig.unitScale;
@@ -613,16 +613,16 @@ contract record CDPEngine is Ownable {
     function collateralizationRatio(
         address owner,
         address asset
-    ) public view returns (uint256) {
+    ) public view returns (uint) {
         Vault memory vault = vaults[owner][asset];
         
-        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
+        if (vault.scaledDebt == 0) return type(uint).max; // Undefined/∞ if no debt
         
         // Use fresh rate accumulator for accurate debt calculation
-        (, uint256 rateAccumulatorFresh) = previewAccrual(asset);
-        uint256 debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
+        (, uint rateAccumulatorFresh) = previewAccrual(asset);
+        uint debtUSD = (vault.scaledDebt * rateAccumulatorFresh) / RAY;
         
-        uint256 collateralValueUSD_calc = collateralValueUSD(owner, asset);
+        uint collateralValueUSD_calc = collateralValueUSD(owner, asset);
         return (collateralValueUSD_calc * WAD) / debtUSD;
     }
 
@@ -634,7 +634,7 @@ contract record CDPEngine is Ownable {
      */
     function previewAccrual(
         address asset
-    ) public view returns (uint256 dt, uint256 rateAccumulatorNext) {
+    ) public view returns (uint dt, uint rateAccumulatorNext) {
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         CollateralGlobalState memory assetState = collateralGlobalStates[asset];
         
@@ -648,7 +648,7 @@ contract record CDPEngine is Ownable {
             return (0, assetState.rateAccumulator);
         }
         
-        uint256 factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
+        uint factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
     }
 
@@ -669,13 +669,13 @@ contract record CDPEngine is Ownable {
      */
     function setCollateralAssetParams(
         address asset,
-        uint256 liquidationRatio,
-        uint256 liquidationPenaltyBps,
-        uint256 closeFactorBps,
-        uint256 stabilityFeeRate,
-        uint256 debtFloor,
-        uint256 debtCeiling,
-        uint256 unitScale
+        uint liquidationRatio,
+        uint liquidationPenaltyBps,
+        uint closeFactorBps,
+        uint stabilityFeeRate,
+        uint debtFloor,
+        uint debtCeiling,
+        uint unitScale
     ) external onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
         require(liquidationRatio > WAD, "CDPEngine: liquidation ratio too low");
