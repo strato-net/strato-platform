@@ -97,11 +97,6 @@ export const confirmWithdrawalBatch = async (
         },
       });
 
-      logInfo(
-        "BridgeService",
-        `Successfully confirmed ${withdrawals.length} withdrawals`,
-      );
-
       const emailPromises = withdrawals.map(async (withdrawal) => {
         try {
           await sendEmail(withdrawal.withdrawalId!);

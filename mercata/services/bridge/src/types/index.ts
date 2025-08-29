@@ -72,11 +72,6 @@ export interface AssetInfo {
   externalDecimals: number;
   enabled: boolean;
   externalChainId: string;
-
-  //TODO: remove these
-  extToken: string;
-  extDecimals: number;
-  chainId: string;
 }
 
 export interface PreparedWithdrawal {
@@ -106,16 +101,15 @@ export interface Withdrawal {
 
   withdrawalId?: string;
   safeTxHash?: string;
-  // NEW:
-  externalChainId: string | number;   // Chain where Custody resides
-  externalRecipient: string; // External recipient address
-  stratoToken: string;       // Token to burn
-  stratoTokenAmount: string; // Escrowed amount of stratoToken
-  stratoSender: string;      // STRATO sender
-  bridgeStatus: string; // NONE / INITIATED / PENDING_REVIEW / ...
-  mintUSDST: boolean;           // true = burn USDST, false = unwrap token
-  timestamp: string;        // timestamp of the withdrawal
-  requestedAt: string;      // timestamp of the withdrawal request (for abort accuracy)
+  externalChainId: string | number;
+  externalRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  stratoSender: string;
+  bridgeStatus: string;
+  mintUSDST: boolean;
+  timestamp: string;
+  requestedAt: string;
 }
 
 export interface ChainInfo {
