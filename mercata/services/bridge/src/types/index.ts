@@ -70,7 +70,7 @@ export interface SafeTransactionResult {
 export interface AssetInfo {
   externalToken: string;
   externalDecimals: number;
-  enabled: boolean;
+  permissions: number;
   externalChainId: string;
 }
 

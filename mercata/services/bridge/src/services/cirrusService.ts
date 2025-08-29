@@ -26,7 +26,7 @@ export const getEnabledChains = async (): Promise<ChainInfo[]> => {
 export const getEnabledAssets = async (): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
-      "value->>enabled": "eq.true",
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });
@@ -50,7 +50,7 @@ export const getAssetInfo = async (
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       key,
-      "value->>enabled": "eq.true",
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });
@@ -119,7 +119,7 @@ export const getDepositsByStatus = async (status: string): Promise<any[]> => {
       externalTxHash,
       externalToken: asset.externalToken,
       externalDecimals: asset.externalDecimals,
-      enabled: asset.enabled,
+      permissions: asset.permissions,
       depositRouter: chainInfo.depositRouter,
     };
   });
@@ -132,7 +132,7 @@ export const isTokenEnabled = async (
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       "value->>stratoToken": `eq.${tokenAddress}`,
-      "value->>enabled": "eq.true",
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });

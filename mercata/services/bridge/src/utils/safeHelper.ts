@@ -97,7 +97,7 @@ export async function getAssetInfoForChain(
     if (
       !assetInfo ||
       assetInfo.externalChainId !== externalChainId.toString() ||
-      !assetInfo.enabled
+      assetInfo.permissions === 0
     ) {
       throw new Error(
         `getAssetInfoForChain failed: No external mapping found for token ${stratoToken} on chain ${externalChainId}`
@@ -107,7 +107,7 @@ export async function getAssetInfoForChain(
     assetInfo = {
       externalToken: ensureHexPrefix(assetInfo.externalToken),
       externalDecimals: parseInt(assetInfo.externalDecimals) || STRATO_DECIMALS,
-      enabled: assetInfo.enabled,
+      permissions: assetInfo.permissions,
       externalChainId: assetInfo.externalChainId,
     };
 
