@@ -1,5 +1,6 @@
 import "./CDPVault.sol";
 import "../Tokens/Token.sol";
+import "../Tokens/TokenFactory.sol";
 import "./PriceOracle.sol";
 import "../Admin/FeeCollector.sol";
 
@@ -124,6 +125,7 @@ contract record CDPEngine is Ownable {
 
     modifier onlySupportedAsset(address asset) {
         require(isSupportedAsset[asset], "CDPEngine: unsupported asset");
+        require(token != address(0) && tokenFactory.isTokenActive(token), "Invalid or inactive token");
         _;
     }
 
