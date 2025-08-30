@@ -154,7 +154,6 @@ services:
     - mercata-ui
     environment:
     - APEX_HOST=${APEX_HOST}
-    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}

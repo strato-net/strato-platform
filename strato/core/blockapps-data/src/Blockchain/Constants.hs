@@ -1,19 +1,18 @@
-{-# OPTIONS_GHC -fno-warn-missing-signatures -fno-warn-type-defaults #-}
 
-module Blockchain.Constants where
-
-import Blockchain.EthConf
-import System.FilePath
+module Blockchain.Constants (
+  dbDir,
+  hashDBPath,
+  codeDBPath,
+  blockSummaryCacheDBPath,
+  sequencerDependentBlockDBPath,
+  stateDBPath,
+  stratoVersionString
+  ) where
 
 --TODO choose a better Identifier string, add version number
+stratoVersionString :: String
 stratoVersionString = "Ethereum(G)/v?.?.?/linux/Haskell"
-
-ethVersion :: Integer
-ethVersion = 63
-
-shhVersion :: Integer
-shhVersion = 2
-
+{-
 _Uether = 1000000000 * 1000000000 * 1000000000 * 1000000000 * 1000000000 * 1000000000
 
 _Vether = 1000000000 * 1000000000 * 1000000000 * 1000000000 * 1000000000 * 1000000
@@ -51,22 +50,7 @@ _Mwei = 1000000
 _Kwei = 1000
 
 wei = 1
-
---------
-
--- ethereum mainnet is 131072
-minimumDifficulty = minBlockDifficulty $ blockConfig $ ethConf
-
-difficultyDurationLimit testnet = if testnet then 8 else (blockTime $ blockConfig ethConf)
-
-difficultyAdjustment = 11 :: Int
-
-difficultyExpDiffPeriod = 100000
-
-minGasLimit testnet = if testnet then 125000 else 5000
-
-rewardBase testnet = if testnet then 1500 * finney else 5000 * finney
-
+-}
 -------------
 
 stateDBPath :: String
@@ -83,17 +67,6 @@ sequencerDependentBlockDBPath = "/sequencer_dependent_blocks/"
 
 blockSummaryCacheDBPath :: String
 blockSummaryCacheDBPath = "/blocksummarycachedb/"
-
-indexOffsetPath :: String
-indexOffsetPath = "/indexOffset"
-
-getDataDir :: IO FilePath
-getDataDir = do
-  return $ ".ethereumH"
-
-getConfDir :: IO FilePath
-getConfDir = do
-  return $ ".ethereumH" </> "conf"
 
 dbDir :: String -> String
 dbDir "c" = ".ethereum"

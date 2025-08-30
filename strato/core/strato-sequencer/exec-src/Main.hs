@@ -78,20 +78,16 @@ main = do
   
   putStrLn $ "strato-sequencer nodeAddress: " ++ format selfAddress
   
-  mCtx <-
-    if not flags_blockstanbul
-      then return Nothing
-      else do
-        unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
-          "--blockstanbul_block_period_ms must be nonnegative"
-        unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
-          "--blockstanbul_round_period_s must be positive"
+  unless (flags_blockstanbul_block_period_ms >= 0) . ioError . userError $
+    "--blockstanbul_block_period_ms must be nonnegative"
+  unless (flags_blockstanbul_round_period_s > 0) . ioError . userError $
+    "--blockstanbul_round_period_s must be positive"
 
-        putStrLn $ "ACTUAL validators list: " ++ show validators
+  putStrLn $ "ACTUAL validators list: " ++ show validators
       
-        let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
+  let ckpt = def {checkpointValidators = validators, checkpointView=View 0 $ fromIntegral $ bestSequencedBlockNumber bestSequencedBlock}
 
-        return $ Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
+  let mCtx = Just $ newContext flags_network ckpt (Just selfAddress) flags_validatorBehavior Nothing
 
   cht <- atomically newTMChan
 

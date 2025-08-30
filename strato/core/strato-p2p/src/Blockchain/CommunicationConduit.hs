@@ -16,7 +16,7 @@ module Blockchain.CommunicationConduit
 where
 
 import           BlockApps.Logging
-import           Blockchain.Constants                  hiding (ethVersion)
+import           Blockchain.Constants
 import           Blockchain.Context
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.RLP
