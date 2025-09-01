@@ -57,26 +57,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 const PositionSection = ({ loanData }: BorrowingSectionProps) => {
   const { userAddress } = useUser();
-  const { liquidatable, watchlist } = useLiquidationContext();
-
-  // Check if user's loan is at liquidation risk
-  const isUserAtLiquidationRisk = () => {
-    if (!userAddress || !liquidatable || !watchlist) return false;
-    
-    const userAddressLower = userAddress.toLowerCase();
-    
-    // Check if user's loan is in liquidatable list
-    const isInLiquidatable = liquidatable.some(loan => 
-      loan.user.toLowerCase() === userAddressLower
-    );
-    
-    // Check if user's loan is in watchlist (near unhealthy)
-    const isInWatchlist = watchlist.some(loan => 
-      loan.user.toLowerCase() === userAddressLower
-    );
-    
-    return isInLiquidatable || isInWatchlist;
-  };
+  const { liquidatable, watchlist, loading } = useLiquidationContext();
 
   function getTextColor(value: number, maxValue = 10) {
   const clamped = Math.min(Math.max(value, 1), maxValue);
@@ -146,15 +127,15 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                   })()}
                 </span>
                 {/* Liquidation Risk Button */}
-                {  isUserAtLiquidationRisk() &&  (
+                {loanData?.healthFactor<1 &&  (
                   <span >
-                    <Link to="/liquidations">
+                    <Link to="/dashboard/pools?tab=liquidationSection">
                       <Button 
                         variant="outline" 
                         size="sm"
                         className="border-red-500 text-red-700 hover:bg-red-100"
                       >
-                        <AlertTriangle/> view liquidations
+                        <AlertTriangle/>Your Loan May be Liquidated
                       </Button>
                     </Link>
                   </span>

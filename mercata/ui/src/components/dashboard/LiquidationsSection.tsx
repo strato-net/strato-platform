@@ -14,8 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { useUser } from "@/context/UserContext";
+import { Alert, AlertDescription } from "../ui/alert";
+import { useSearchParams } from "react-router-dom";
 
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -30,6 +32,7 @@ const weiToEther = (v?: string) => {
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
   const { userAddress } = useUser();
+  const [searchParams] = useSearchParams();
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
@@ -38,6 +41,14 @@ const LiquidationsSection: React.FC = () => {
 
   // You cannot liquidate your own loans
   const isOwnLoan = (loan: LiquidationEntry) => loan.user.toLowerCase() === userAddress?.toLowerCase();
+
+  // Show banner only when visiting via Pools tab (tab=liquidationSection) and user has a liquidatable own loan
+  const showOwnRiskBanner = useMemo(() => {
+    if (loading) return false;
+    const fromPoolsLiquidationsTab = searchParams.get('tab') === 'liquidationSection';
+    if (!fromPoolsLiquidationsTab) return false;
+    return liquidatable.some((ln) => isOwnLoan(ln));
+  }, [loading, searchParams, liquidatable, userAddress]);
 
   // Refresh liquidation data when component mounts (tab is opened)
   useEffect(() => {
@@ -59,6 +70,23 @@ const LiquidationsSection: React.FC = () => {
       <CardHeader className="pb-3">
         <CardTitle className="text-lg md:text-xl">Liquidatable Positions</CardTitle>
       </CardHeader>
+      {showOwnRiskBanner && (
+            <Card className="m-6 border-red-200 bg-red-50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-red-800 flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  Your Loan is at Risk
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Alert className="border-red-200 bg-red-100 m-3">
+                  <AlertDescription className="text-red-800">
+                    Your loan is currently liquidatable. Take immediate action to prevent liquidation.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+          )}
       <CardContent className="px-3 md:px-6">
         {loading ? (
           <div className="flex justify-center items-center h-12">
@@ -112,19 +140,18 @@ const LiquidationsSection: React.FC = () => {
                       
                       {/* Borrower */}
                       <div>
+                        <div className="flex items-center gap-2">
                         <div className="text-sm text-gray-500">Borrower</div>
+                        {isOwnLoan(ln) && (
+                        <div className="text-sm text-red-500">
+                          <span className="font-medium">(You)</span>
+                        </div>
+                      )} </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{shorten(ln.user)}</span>
                           <CopyButton address={ln.user} />
                         </div>
                       </div>
-
-                      {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
-                      {isOwnLoan(ln) && (
-                        <div className="text-sm text-red-500">
-                          <span className="font-medium">(You)</span>
-                        </div>
-                      )}
                     </div>
                     
                     {/* Borrowed amount */}
