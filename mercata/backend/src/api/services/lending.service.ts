@@ -748,18 +748,25 @@ export const executeLiquidation = async (
     repayAmount = ceilCollateralCover <= base ? ceilCollateralCover : base;
   }
 
+  // For ALL path, approve MAX_UINT256 to avoid under-allowance if debt/coverage shifts before execution
+  const MAX_UINT256 = ((1n << 256n) - 1n).toString();
+  const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
+
   const tx = buildFunctionTx([
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
       method: "approve",
-      args: { spender: liquidityPoolAddr, value: repayAmount.toString() },
+      args: { spender: liquidityPoolAddr, value: approveValue },
     },
     {
       contractName: extractContractName(LendingPool),
       contractAddress: registry.lendingPool?.address,
-      method: "liquidationCall",
-      args: {
+      method: treatAsAll ? "liquidationCallAll" : "liquidationCall",
+      args: treatAsAll ? {
+        collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
+        borrower: loanId,
+      } : {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
         debtToCover: repayAmount.toString(),
@@ -1060,6 +1067,11 @@ export const listLoansForLiquidation = async (
         return true;
       }
     });
+
+    // If nothing left to seize, skip showing this loan in the liquidations list
+    if (collateralDisplay.length === 0) {
+      continue;
+    }
 
     const tokenBorrowInfo = tokenInfoMap.get(borrowableAsset);
 
