@@ -1,8 +1,8 @@
 import { config } from "../config";
 import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import { NonEmptyArray, Withdrawal, Deposit } from "../types";
-import { createSafeTransactionsForWithdrawals, createRejectionTransaction } from "./safeService";
+import { NonEmptyArray, Withdrawal, Deposit, SafeTransactionData } from "../types";
+import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
 
 export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
@@ -126,102 +126,55 @@ export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
 export const confirmWithdrawalBatch = async (
   withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  let safeTxs: { safeTxHash: string; nonce: number }[] = [];
-  
-  try {
-    safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
+  const transactionProposals = await createSafeTransactions(withdrawals);
 
-    if (safeTxs?.length > 0) {
-      const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
-      const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
+  if (transactionProposals && transactionProposals.length > 0) {
+    const withdrawalIds = withdrawals.map((w) => w.withdrawalId!);
+    const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
 
-      try {
-        await execute({
-          contractName: "MercataBridge",
-          contractAddress: config.bridge.address!,
-          method: "confirmWithdrawalBatch",
-          args: {
-            ids: withdrawalIds,
-            custodyTxHashes,
-          },
-        });
-      } catch (executeError) {
-        const errorMessage = (executeError as Error).message;
-        
-        // Check if this is a bad state error (expected when multiple servers confirm same withdrawals)
-        if (errorMessage.includes("MB: bad state")) {
-          logInfo(
-            "BridgeService",
-            `Withdrawals already confirmed by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
-          );
-          return; // Gracefully handle already confirmed withdrawals
-        }
-        
-        // Re-throw other errors
-        throw executeError;
-      }
-
-      const emailPromises = withdrawals.map(async (withdrawal) => {
-        try {
-          await sendEmail(withdrawal.withdrawalId!);
-          return "success";
-        } catch (emailError) {
-          logError("BridgeService", emailError as Error, {
-            operation: "sendEmail",
-            withdrawalId: withdrawal.withdrawalId!,
-          });
-          return "failed";
-        }
+    try {
+      await execute({
+        contractName: "MercataBridge",
+        contractAddress: config.bridge.address!,
+        method: "confirmWithdrawalBatch",
+        args: {
+          ids: withdrawalIds,
+          custodyTxHashes,
+        },
       });
-
-      const emailResults = await Promise.all(emailPromises);
-      const successCount = emailResults.filter((r) => r === "success").length;
-      const failureCount = emailResults.filter((r) => r === "failed").length;
-      logInfo(
-        "BridgeService",
-        `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
-      );
-    }
-  } catch (error) {
-    if (safeTxs.length > 0) {
-      const rejectionErrors: Error[] = [];
-      
-      for (const safeTx of safeTxs) {
-        const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
-        
-        try {
-          await createRejectionTransaction(Number(withdrawal.externalChainId), safeTx.nonce);
-          logInfo("BridgeService", `Successfully created rejection transaction for nonce ${safeTx.nonce}`);
-        } catch (rejectError) {
-          rejectionErrors.push(rejectError as Error);
-          logError("BridgeService", rejectError as Error, {
-            operation: "createRejectionTransaction",
-            nonce: safeTx.nonce,
-            withdrawalId: withdrawal?.withdrawalId,
-          });
-        }
-      }
-      
-      // If we have both original error and rejection errors, combine them
-      if (rejectionErrors.length > 0) {
-        const combinedError = new Error(
-          `confirmWithdrawalBatch failed AND ${rejectionErrors.length} rejection transaction(s) failed. Original error: ${(error as Error).message}`
+      await proposeSafeTransactions(transactionProposals as NonEmptyArray<SafeTransactionData>);
+    } catch (executeError) {
+      const errorMessage = (executeError as Error).message;
+      if (errorMessage.includes("MB: bad state")) {
+        logInfo(
+          "BridgeService",
+          `Withdrawals already confirmed by another server: ${withdrawals.length} withdrawals (${withdrawalIds.join(", ")})`,
         );
-        (combinedError as any).cause = error;
-        (combinedError as any).rejectionErrors = rejectionErrors;
-        
-        logError("BridgeService", combinedError, {
-          operation: "confirmWithdrawalBatch",
-          withdrawalCount: withdrawals.length,
-          rejectionFailureCount: rejectionErrors.length,
-        });
-        
-        throw combinedError;
+        return;
       }
+      throw executeError;
     }
 
-    // If no safeTxs or all rejections succeeded, throw original error
-    throw error;
+    const emailPromises = withdrawals.map(async (withdrawal) => {
+      try {
+        await sendEmail(withdrawal.withdrawalId!);
+        return "success";
+      } catch (emailError) {
+        logError("BridgeService", emailError as Error, {
+          operation: "sendEmail",
+          withdrawalId: withdrawal.withdrawalId!,
+        });
+        return "failed";
+      }
+    });
+
+    const emailResults = await Promise.all(emailPromises);
+    const successCount = emailResults.filter((r) => r === "success").length;
+    const failureCount = emailResults.filter((r) => r === "failed").length;
+    logInfo(
+      "BridgeService",
+      `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+    );
   }
 };
 
