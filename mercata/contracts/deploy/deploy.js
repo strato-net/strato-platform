@@ -47,16 +47,11 @@ async function main() {
     console.log('\n====== Deployment Successful ======');
     console.log(`Contract: ${deployedContract.name}`);
     console.log(`Address: ${deployedContract.address}`);
-    console.log(`Rate Strategy: ${deployedContract.managers.rateStrategy}`);
-    console.log(`Collateral Vault: ${deployedContract.managers.collateralVault}`);
+    console.log(`CDP Registry: ${deployedContract.managers.cdpRegistry}`);
+    console.log(`CDP Engine: ${deployedContract.managers.cdpEngine}`);
+    console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
+    console.log(`USDST Token: ${deployedContract.managers.usdst}`);
     console.log(`Price Oracle: ${deployedContract.managers.priceOracle}`);
-    console.log(`Pool Configurator: ${deployedContract.managers.poolConfigurator}`);
-    console.log(`Lending Pool: ${deployedContract.managers.lendingPool}`);
-    console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
-    console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
-    console.log(`Mercata Bridge: ${deployedContract.managers.mercataBridge}`);
-    console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
-    console.log(`Pool Factory: ${deployedContract.managers.poolFactory}`);
     console.log(`Token Factory: ${deployedContract.managers.tokenFactory}`);
     console.log(`Fee Collector: ${deployedContract.managers.feeCollector}`);
     console.log(`Admin Registry: ${deployedContract.managers.adminRegistry}`);
@@ -71,19 +66,14 @@ async function main() {
     console.log('# Paste these into your .env');
     console.log('# ------------------------');
     const envLines = {
-      POOL_FACTORY: deployedContract.managers.poolFactory,
-      TOKEN_FACTORY: deployedContract.managers.tokenFactory,
-      ADMIN_REGISTRY: deployedContract.managers.adminRegistry,
-      FEE_COLLECTOR: deployedContract.managers.feeCollector,
+      CDP_REGISTRY: deployedContract.managers.cdpRegistry,
+      CDP_ENGINE: deployedContract.managers.cdpEngine,
+      CDP_VAULT: deployedContract.managers.cdpVault,
+      USDST_TOKEN: deployedContract.managers.usdst,
       PRICE_ORACLE: deployedContract.managers.priceOracle,
-      RATE_STRATEGY: deployedContract.managers.rateStrategy,
-      LIQUIDITY_POOL: deployedContract.managers.liquidityPool,
-      COLLATERAL_VAULT: deployedContract.managers.collateralVault,
-      LENDING_POOL: deployedContract.managers.lendingPool,
-      LENDING_REGISTRY: deployedContract.managers.lendingRegistry,
-      POOL_CONFIGURATOR: deployedContract.managers.poolConfigurator,
-      MERCATA_BRIDGE: deployedContract.managers.mercataBridge,
-      ON_RAMP: deployedContract.managers.onRamp,
+      TOKEN_FACTORY: deployedContract.managers.tokenFactory,
+      FEE_COLLECTOR: deployedContract.managers.feeCollector,
+      ADMIN_REGISTRY: deployedContract.managers.adminRegistry,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {

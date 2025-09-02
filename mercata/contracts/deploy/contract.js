@@ -96,6 +96,7 @@ async function uploadDappContract(token, options) {
     }
 
     console.log("Comments stripped from combined source(s)");
+    fs.writeFile("contract_source",source);
 
     // Deployment arguments
     const contractArgs = {
@@ -120,7 +121,7 @@ async function uploadDappContract(token, options) {
     console.log(`Deploying contract ${contractName}...`);
     const contract = await createContract(token, contractArgs, deployOptions);
     const contractState = await util.until(
-      (r) => r && r.lendingPool,
+      (r) => r && r.cdpEngine,
       (opts) => getState(token, contract, opts),
       options
     );

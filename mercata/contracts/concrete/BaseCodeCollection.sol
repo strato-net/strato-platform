@@ -45,6 +45,11 @@ import "./Bridge/MercataBridge.sol";
 //Fee Collector
 import "Admin/FeeCollector.sol";
 
+//CDP
+import "CDP/CDPRegistry.sol";
+import "CDP/CDPEngine.sol";
+import "CDP/CDPVault.sol";
+
 //TODO
 contract record Mercata {
     RateStrategy public rateStrategy;
@@ -62,38 +67,60 @@ contract record Mercata {
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
 
+    CDPRegistry public cdpRegistry;
+    CDPEngine public cdpEngine;
+    CDPVault public cdpVault;
+
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry(this);
-        adminRegistry.addAdmin(msg.sender);
+        // adminRegistry = new AdminRegistry(this);
+        // adminRegistry.addAdmin(msg.sender);
 
-        // Create FeeCollector
-        feeCollector = new FeeCollector(msg.sender);
+        // // Create FeeCollector
+        // feeCollector = new FeeCollector(msg.sender);
 
-        // Create Factories
-        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
-        adminRegistry.addAdmin(address(poolFactory));
-        adminRegistry.removeAdmin(this);
-        Ownable(adminRegistry).transferOwnership(msg.sender);
+        // // Create Factories
+        // tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
+        // poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
+        // adminRegistry.addAdmin(address(poolFactory));
+        // adminRegistry.removeAdmin(this);
+        // Ownable(adminRegistry).transferOwnership(msg.sender);
 
-        // Create Lending related contracts
-        lendingRegistry = new LendingRegistry(this);
-        collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
-        liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
-        rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(msg.sender); 
-        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
+        // // Create Lending related contracts
+        // lendingRegistry = new LendingRegistry(this);
+        // collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
+        // liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
+        // rateStrategy = new RateStrategy();
+        // priceOracle = new PriceOracle(msg.sender); 
+        // poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        // lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
-        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],0,0);
-        Ownable(poolConfigurator).transferOwnership(msg.sender);
+        // Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
+        // poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],0,0);
+        // Ownable(poolConfigurator).transferOwnership(msg.sender);
 
-        // Create Services
-        mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
+        // // Create Services
+        // mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
+        // onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
 
-        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
+        // rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
+
+
+        // Create CDP related contracts
+       
+        address usdst = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+        address tokenFactory = address(0x000000000000000000000000000000000000100b);
+        address priceOracle = address(0x0000000000000000000000000000000000001002);
+        address feeCollector = address(0x000000000000000000000000000000000000100d);
+        address initialOwner = address(msg.sender);
+        cdpRegistry = new CDPRegistry(address(this));
+        cdpEngine = new CDPEngine(address(cdpRegistry), usdst, tokenFactory, feeCollector, initialOwner);
+        cdpVault = new CDPVault(address(cdpRegistry), initialOwner);
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle));
+         Ownable(cdpRegistry).transferOwnership(msg.sender); 
+        // cdpEngine.setTokenFactory(address(tokenFactory));
+        // cdpEngine.setFeeCollector(address(feeCollector));
+
+
     }
 }
