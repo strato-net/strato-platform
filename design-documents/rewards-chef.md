@@ -97,3 +97,12 @@ pools. If it exists, the add function will return.
 * Emits a `PoolAdded` event when a new pool is successfully added, including the
 pool ID (index), LP token address, and allocation points.
 
+#### Updating allocation points
+
+Similar to `set` function in the `MasterChef` with few differences
+
+* The function name should be `updateAllocationPoints`
+
+* It should not take `withUpdate`
+
+* Should emit an event

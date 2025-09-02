@@ -11,6 +11,7 @@ contract record RewardsChef is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
 
     event PoolAdded(uint256 indexed pid, address indexed lpToken, uint256 allocPoint);
+    event AllocationPointsUpdated(uint256 indexed pid, uint256 oldAllocPoint, uint256 newAllocPoint);
 
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -70,8 +71,21 @@ contract record RewardsChef is Ownable {
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         PoolInfo memory poolInfo = PoolInfo(_lpToken, _allocPoint, block.timestamp, 0);
         pools.push(poolInfo);
-        
+
         emit PoolAdded(pools.length - 1, _lpToken, _allocPoint);
+    }
+
+    function updateAllocationPoints(
+        uint256 _pid,
+        uint256 _allocPoint
+    ) public onlyOwner {
+        require(_pid < pools.length, "Pool does not exist");
+
+        uint256 oldAllocPoint = pools[_pid].allocPoint;
+        totalAllocPoint = totalAllocPoint.sub(oldAllocPoint).add(_allocPoint);
+        pools[_pid].allocPoint = _allocPoint;
+
+        emit AllocationPointsUpdated(_pid, oldAllocPoint, _allocPoint);
     }
 
 }
