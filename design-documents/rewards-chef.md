@@ -61,3 +61,20 @@ inspired our implementation.
   that announced the contract.
 
   I don't believe we have to do it, and for now I will assume that we don't.
+
+## RewardsChef 1.0 - the design
+
+At its core, the `RewardsChef` will resemble `MasterChef` (`V1`) algorithm with
+few adjustments.
+
+### Structures
+
+We will keep the same data structures: `UserInfo` and `PoolInfo` with some changes:
+
+* since our blockchain allows us to retrieve timestamps from blocks
+  `block.timestamp` we we will have a `uint256 lastRewardTimestamp` instead of
+  `lastRewardBlock`
+
+* since our reward is cata (not sushi) we will call the `accSushiPerShare` more
+  general `accPerToken`
+

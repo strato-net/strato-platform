@@ -14,6 +14,18 @@ contract record RewardsChef is Ownable {
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
 
+    struct UserInfo {
+        uint256 amount;      // How many LP tokens the user has provided.
+        uint256 rewardDebt;  // Reward debt
+    }
+
+    struct PoolInfo {
+        address lpToken;             // The LP Token added to the stake pool
+        uint256 allocPoint;          // How many allocation points assigned to
+	                             // this pool.  Importance of the pool.
+        uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
+        uint256 accPerToken;         // Accumulated CATA per share (per token)
+    }
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
