@@ -327,7 +327,7 @@ contract record CDPEngine is Ownable {
      * @param amountUSD The amount of USDST to repay
      * @dev User must first approve(CDPEngine, amountUSD) before calling this
      */
-    function repay(address asset, uint amountUSD) external whenNotPaused(asset) onlySupportedAsset(asset) {
+    function repay(address asset, uint amountUSD) external onlySupportedAsset(asset) {
         _accrue(asset);
         require(amountUSD > 0, "CDPEngine: zero amount");
         
@@ -364,7 +364,7 @@ contract record CDPEngine is Ownable {
      * @param asset The collateral asset
      * @dev Consumes rounding residual to set scaledDebt=0 exactly
      */
-    function repayAll(address asset) external whenNotPaused(asset) onlySupportedAsset(asset) {
+    function repayAll(address asset) external onlySupportedAsset(asset) {
         _accrue(asset);
         
         CollateralGlobalState storage assetState = collateralGlobalStates[asset];
