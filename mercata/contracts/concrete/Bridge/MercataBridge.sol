@@ -674,7 +674,7 @@ contract record MercataBridge is Ownable {
         require(n > 0, "MB: empty");
 
         for (uint256 i = 0; i < n; i++) {
-            abortWithdrawal(id);
+            abortWithdrawal(ids[i]);
         }
     }
 }
