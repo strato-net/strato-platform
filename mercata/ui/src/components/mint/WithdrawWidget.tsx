@@ -14,6 +14,8 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { safeParseUnits } from "@/utils/numberUtils";
+import { usdstAddress } from "@/lib/constants";
+import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
@@ -23,13 +25,13 @@ const WithdrawWidget: React.FC = () => {
 
   const {
     redeemOut,
-    bridgeableTokens,
     availableNetworks,
     selectedNetwork,
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
-    useBalance,
+    loadNetworksAndTokens,
+    fetchRedeemableTokens,
   } = useBridgeContext();
 
   const { usdstBalance } = useUserTokens();
@@ -41,19 +43,43 @@ const WithdrawWidget: React.FC = () => {
   // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
   const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
 
-  // Only show USDC / USDT as destinations (assets mapped by bridgeableTokens)
+  // State for redeemable tokens (loaded separately)
+  const [redeemableTokens, setRedeemableTokens] = useState<any[]>([]);
+  
+  // Only show USDC / USDT as destinations
   const stableTokens = useMemo(
-    () => (bridgeableTokens || []).filter((t) => t.externalSymbol === "USDC" || t.externalSymbol === "USDT"),
-    [bridgeableTokens]
+    () => redeemableTokens.filter((t) => 1 /* already filtered */ ),
+    [redeemableTokens]
   );
 
   useEffect(() => {
-    if (!selectedToken && stableTokens.length) setSelectedToken(stableTokens[0]);
+    if (!selectedToken && stableTokens.length) {
+      setSelectedToken(stableTokens[0]);
+    }
   }, [selectedToken, stableTokens, setSelectedToken]);
+
+  // Load networks and redeemable tokens on mount
+  useEffect(() => {
+    loadNetworksAndTokens();
+  }, [loadNetworksAndTokens]);
 
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) setSelectedNetwork(availableNetworks[0].chainName);
   }, [selectedNetwork, availableNetworks, setSelectedNetwork]);
+
+  // Load redeemable tokens when network changes
+  useEffect(() => {
+    const loadRedeemableTokens = async () => {
+      if (!selectedNetwork) return;
+      const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
+      if (!networkConfig) return;
+      
+      const tokens = await fetchRedeemableTokens(networkConfig.chainId);
+      setRedeemableTokens(tokens);
+    };
+    
+    loadRedeemableTokens();
+  }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
   const validateAmount = (value: string) => {
     if (!value) { setAmountError(""); return true; }
@@ -85,7 +111,7 @@ const WithdrawWidget: React.FC = () => {
       const res = await redeemOut({
         stratoTokenAmount,
         externalRecipient: address,
-        stratoToken: selectedToken.stratoTokenAddress,
+        stratoToken: usdstAddress, // Always use USDST address for burning
         externalChainId: String(externalChainId),
       });
       if (res?.success) {
@@ -119,6 +145,10 @@ const WithdrawWidget: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Withdraw USDST</h2>
+      </div>
+      <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label>From</Label>
@@ -154,24 +184,32 @@ const WithdrawWidget: React.FC = () => {
       </div>
 
       <div className="space-y-1.5">
-        <Label>Amount (USDST to burn)</Label>
-        <Input type="text" inputMode="decimal" placeholder="0.00" value={amount} onChange={handleAmountChange} className={amountError ? "border-red-500" : ""} />
+        <Label>Amount (USDST to withdraw)</Label>
+        <Input
+          type="text"
+          inputMode="decimal"
+          placeholder="0.00"
+          value={amount}
+          onChange={handleAmountChange}
+          className={amountError ? "border-red-500" : ""}
+          disabled={!isConnected}
+        />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
       </div>
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
         <div className="flex items-center justify-between">
           <span>USDST Balance</span>
-          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined,{maximumFractionDigits:6})} → {balanceImpact.after.toLocaleString(undefined,{maximumFractionDigits:6})}</span>
+          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} → {balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex items-center justify-between">
           <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} {selectedToken?.externalSymbol || "USDC/USDT"} to {selectedNetwork || "network"}</span>
+          <span className="font-medium">{amount || "0.00"} {selectedToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "externalal network"}</span>
         </div>
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedToken || !amount} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
+        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedToken || !amount || !!amountError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
           {isLoading ? "Processing..." : "Withdraw"}
         </Button>
       </div>
@@ -180,6 +218,7 @@ const WithdrawWidget: React.FC = () => {
 };
 
 export default WithdrawWidget;
+
 
 
 

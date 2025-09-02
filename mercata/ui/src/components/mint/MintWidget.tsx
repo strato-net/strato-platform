@@ -21,6 +21,7 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
 import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { formatUnits } from "ethers";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
@@ -38,11 +39,12 @@ const MintWidget: React.FC = () => {
 
   const {
     availableNetworks,
-    bridgeableTokens,
     selectedNetwork,
     setSelectedNetwork,
     selectedToken,
     setSelectedToken,
+    loadNetworksAndTokens,
+    fetchRedeemableTokens,
   } = useBridgeContext();
 
   const [amount, setAmount] = useState<string>("");
@@ -52,21 +54,43 @@ const MintWidget: React.FC = () => {
   const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ amount: "", loading: false });
   const inFlightRef = useRef(false);
 
+  // State for mintable tokens (loaded separately)
+  const [mintableTokens, setMintableTokens] = useState<any[]>([]);
+  
   // Only show stablecoins that can mint USDST
-  const mintableTokens = useMemo(() => {
-    return (bridgeableTokens || []).filter(t => t.mintUSDST && (t.externalSymbol === "USDC" || t.externalSymbol === "USDT"));
-  }, [bridgeableTokens]);
+  const stableTokens = useMemo(() => {
+    return mintableTokens.filter(t => 1 /* already filtered */ );
+  }, [mintableTokens]);
 
   const selectedNetworkConfig = useMemo(() => availableNetworks.find(n => n.chainName === selectedNetwork), [availableNetworks, selectedNetwork]);
   const expectedChainId = selectedNetworkConfig?.chainId ? parseInt(selectedNetworkConfig.chainId) : undefined;
   const isCorrectNetwork = isConnected && expectedChainId && chainId === expectedChainId;
 
+  // Load networks and tokens on mount
+  useEffect(() => {
+    loadNetworksAndTokens();
+  }, [loadNetworksAndTokens]);
+
   useEffect(() => {
     // When switching networks, choose first token by default
-    if (!selectedToken && mintableTokens.length > 0) {
-      setSelectedToken(mintableTokens[0]);
+    if (!selectedToken && stableTokens.length > 0) {
+      setSelectedToken(stableTokens[0]);
     }
-  }, [mintableTokens, selectedToken, setSelectedToken]);
+  }, [stableTokens, selectedToken, setSelectedToken]);
+
+  // Load mintable tokens when network changes
+  useEffect(() => {
+    const loadMintableTokens = async () => {
+      if (!selectedNetwork) return;
+      const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
+      if (!networkConfig) return;
+      
+      const tokens = await fetchRedeemableTokens(networkConfig.chainId);
+      setMintableTokens(tokens);
+    };
+    
+    loadMintableTokens();
+  }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
   useEffect(() => {
     const ensureNetwork = async () => {
@@ -291,8 +315,9 @@ const MintWidget: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Mint USDST</h2>
+        <h2 className="text-lg font-semibold text-gray-900">Get USDST</h2>
       </div>
+      <BridgeWalletStatus />
 
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
@@ -324,13 +349,13 @@ const MintWidget: React.FC = () => {
         <Label>Select Stablecoin</Label>
         <Select
           value={selectedToken?.externalSymbol || ""}
-          onValueChange={(v) => setSelectedToken(mintableTokens.find(t => t.externalSymbol === v) || null)}
+          onValueChange={(v) => setSelectedToken(stableTokens.find(t => t.externalSymbol === v) || null)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
-            {mintableTokens.map(t => (
+            {stableTokens.map(t => (
               <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>

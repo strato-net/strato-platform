@@ -289,6 +289,19 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
+  const fetchRedeemableTokens = useCallback(
+    async (chainId: string): Promise<Token[]> => {
+      try {
+        const { data } = await api.get<Token[]>(`/bridge/redeemableTokens/${chainId}`);
+        return Array.isArray(data) ? data : [];
+      } catch (error) {
+        console.error('Failed to load redeemable tokens:', error);
+        return [];
+      }
+    },
+    []
+  );
+
   return (
     <BridgeContext.Provider
       value={{
@@ -306,6 +319,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         loadNetworksAndTokens,
         fetchDepositTransactions,
         fetchWithdrawTransactions,
+        fetchRedeemableTokens,
       }}
     >
       {children}

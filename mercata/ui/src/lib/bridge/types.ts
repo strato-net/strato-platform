@@ -113,6 +113,7 @@ export type BridgeContextType = {
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
+  fetchRedeemableTokens: (chainId: string) => Promise<Token[]>;
 };
 
 export interface ContractValidationResult {
