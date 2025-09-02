@@ -309,7 +309,7 @@ contract record MercataBridge is Ownable {
         address stratoRecipient,
         bool mintUSDST
     )
-        external
+        public
         onlyRelayer
         whenDepositsOpen
     {
@@ -342,6 +342,7 @@ contract record MercataBridge is Ownable {
     
     // ─────────────────────────── BATCH: deposit ───────────────────────────
     function depositBatch(
+        // out-of-order arguments left for compatibility
         uint256[] calldata externalChainIds,
         string[]  calldata externalTxHashes,
         address[] calldata stratoTokens,
@@ -366,32 +367,15 @@ contract record MercataBridge is Ownable {
         );
 
         for (uint256 i = 0; i < n; i++) {
-            uint256 externalChainId = externalChainIds[i];
-            string memory h = externalTxHashes[i];
-
-            require(tokenFactory.isTokenActive(stratoTokens[i]), "MB: inactive token");
-            AssetInfo memory a = assets[stratoTokens[i]];
-            require(a.permissions != 0, "MB: asset disabled");
-            require(a.externalChainId == externalChainId, "MB: wrong chain");
-            require(chains[externalChainId].enabled, "MB: chain off");
-            require(stratoTokenAmounts[i] > 0, "MB: zero");
-            uint8 need = mintUSDSTs[i] ? PERMISSION_MINT : PERMISSION_WRAP;
-            require((a.permissions & need) != 0, "MB: not permitted");
-
-            // replay protection
-            require(deposits[externalChainId][h].bridgeStatus == BridgeStatus.NONE, "MB: dup key");
-
-            deposits[externalChainId][h] = DepositInfo(
-                stratoTokens[i],
-                stratoRecipients[i],
-                stratoTokenAmounts[i],
+            deposit(
+                externalChainIds[i],
                 externalSenders[i],
-                BridgeStatus.INITIATED,
-                mintUSDSTs[i],
-                block.timestamp
+                externalTxHashes[i],
+                stratoTokens[i],
+                stratoTokenAmounts[i],
+                stratoRecipients[i],
+                mintUSDSTs[i]
             );
-
-            emit DepositInitiated(externalChainId, h, stratoTokens[i], stratoTokenAmounts[i], stratoRecipients[i], externalSenders[i], mintUSDSTs[i]);
         }
     }
 
@@ -399,7 +383,7 @@ contract record MercataBridge is Ownable {
      * Step-2.1 (relayer) – Verification passed, mint wrapped tokens.
      */
     function confirmDeposit(uint256 externalChainId, string calldata externalTxHash)
-        external
+        public
         onlyRelayer
         whenDepositsOpen
     {
@@ -429,20 +413,10 @@ contract record MercataBridge is Ownable {
         require(n == externalTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            string memory h = externalTxHashes[i];
-
-            DepositInfo storage d = deposits[externalChainIds[i]][h];
-            require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
-
-            if (d.mintUSDST) {
-                Token(USDST_ADDRESS).mint(d.stratoRecipient, d.stratoTokenAmount);
-            } else {
-                Token(d.stratoToken).mint(d.stratoRecipient, d.stratoTokenAmount);
-            }
-            
-            d.bridgeStatus = BridgeStatus.COMPLETED;
-
-            emit DepositCompleted(externalChainIds[i], h);
+            confirmDeposit(
+                externalChainIds[i],
+                externalTxHashes[i]
+            );
         }
     }
 
@@ -450,7 +424,7 @@ contract record MercataBridge is Ownable {
      * Step-2.2 (relayer) – Verification failed, set deposit for manual review
      */
     function reviewDeposit(uint256 externalChainId, string calldata externalTxHash)
-        external
+        public
         onlyRelayer
         whenDepositsOpen
     {
@@ -474,13 +448,10 @@ contract record MercataBridge is Ownable {
         require(n == externalTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            string memory h = externalTxHashes[i];
-
-            DepositInfo storage d = deposits[externalChainIds[i]][h];
-            require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
-
-            d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
-            emit DepositPendingReview(externalChainIds[i], h);
+            reviewDeposit(
+                externalChainIds[i],
+                externalTxHashes[i]
+            );
         }
     }
 
@@ -543,7 +514,7 @@ contract record MercataBridge is Ownable {
      * We store the hash so UI can show approval progress.
      */
     function confirmWithdrawal(uint256 id, string custodyTxHash)
-        external
+        public
         onlyRelayer
         whenWithdrawalsOpen
     {
@@ -568,14 +539,10 @@ contract record MercataBridge is Ownable {
         require(n == custodyTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            string memory h = custodyTxHashes[i];
-
-            WithdrawalInfo storage w = withdrawals[ids[i]];
-            require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
-
-            w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
-            w.timestamp = block.timestamp;
-            emit WithdrawalPending(ids[i], h);
+            confirmWithdrawal(
+                ids[i],
+                custodyTxHashes[i]
+            );
         }
     }
 
@@ -583,7 +550,7 @@ contract record MercataBridge is Ownable {
      * Step-3 (relayer) – Custody tx executed successfully; burn escrow.
      */
     function finaliseWithdrawal(uint256 id, string custodyTxHash)
-        external
+        public
         onlyRelayer
         whenWithdrawalsOpen
     {
@@ -614,21 +581,10 @@ contract record MercataBridge is Ownable {
         require(n == custodyTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            string memory h = custodyTxHashes[i];
-
-            WithdrawalInfo storage w = withdrawals[ids[i]];
-            require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
-
-            if (w.mintUSDST) {
-                Token(USDST_ADDRESS).burn(address(this), w.stratoTokenAmount);
-            } else {
-                Token(w.stratoToken).burn(address(this), w.stratoTokenAmount);
-            }
-            
-            w.bridgeStatus = BridgeStatus.COMPLETED;
-            w.timestamp = block.timestamp;
-
-            emit WithdrawalCompleted(ids[i], h);
+            finaliseWithdrawal(
+                ids[i],
+                custodyTxHashes[i]
+            );
         }
     }
 
