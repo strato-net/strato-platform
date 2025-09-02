@@ -44,12 +44,13 @@ export const validateAddressField = (label: string) =>
 export const numericStringField = (label: string, { allowZero = false } = {}) =>
   Joi.string()
     .trim()
-    .pattern(/^\d+$/)
+    .pattern(/^\d+(\.\d+)?$/)
     .required()
     .custom((value, helpers) => {
       try {
-        const big = BigInt(value);
-        if (!allowZero && big <= 0n) return helpers.error("number.positive");
+        const num = parseFloat(value);
+        if (isNaN(num)) return helpers.error("string.pattern.base");
+        if (!allowZero && num <= 0) return helpers.error("number.positive");
         return value; // Keep the original string
       } catch {
         return helpers.error("string.pattern.base");
@@ -58,7 +59,34 @@ export const numericStringField = (label: string, { allowZero = false } = {}) =>
     .messages({
       "string.empty": `"${label}" is required`,
       "string.base": `"${label}" must be a string`,
-      "string.pattern.base": `"${label}" must be a numeric string (integers only)`,
+      "string.pattern.base": `"${label}" must be a valid numeric string (supports decimals)`,
       "number.positive": `"${label}" must be greater than 0`,
       "any.required": `"${label}" is required`,
     });
+
+export function validateRawParams(args: any): Record<string, string | undefined> {
+  if (!args || typeof args !== "object") {
+    return {};
+  }
+
+  // Convert to proper format and filter out undefined values
+  const validatedParams = Object.fromEntries(
+    Object.entries(args).filter(([_, v]) => v !== undefined)
+  ) as Record<string, string | undefined>;
+
+  // Validate that all values are strings
+  const schema = Joi.object().pattern(
+    Joi.string(),
+    Joi.string().allow("")
+  );
+
+  const { error } = schema.validate(validatedParams);
+  if (error) {
+    const err = new Error("Query Parameter Validation Error: " + error.message);
+    (err as any).statusCode = StatusCodes.BAD_REQUEST;
+    throw err;
+  }
+
+  return validatedParams;
+}
+  

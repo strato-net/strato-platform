@@ -10,10 +10,10 @@ import "../../abstract/ERC20/IERC20.sol";
  */
 
 contract record LiquidityPool is Ownable  {
-    event Deposited(address indexed user, uint256 amount, uint256 mTokenMinted);
-    event Withdrawn(address indexed user, uint256 amount, uint256 mTokenBurned);
-    event Borrowed(address indexed user, uint256 amount);
-    event Repaid(address indexed user, uint256 amount);
+    event Deposited(address indexed user, uint amount, uint mTokenMinted);
+    event Withdrawn(address indexed user, uint amount, uint mTokenBurned);
+    event Borrowed(address indexed user, uint amount);
+    event Repaid(address indexed user, uint amount);
 
     LendingRegistry public registry;
     Token public mToken;
@@ -39,7 +39,7 @@ contract record LiquidityPool is Ownable  {
     /**
      * @notice Get current underlying balance
      */
-    function getUnderlyingBalance() external view returns (uint256) {
+    function getUnderlyingBalance() external view returns (uint) {
         address asset = _getAsset();
         return IERC20(asset).balanceOf(address(this));
     }
@@ -50,7 +50,7 @@ contract record LiquidityPool is Ownable  {
      * @param mintAmount   Number of mTokens that should be minted for the user (calculated in LendingPool)
      * @param user         Recipient of the minted mTokens
      */
-    function deposit(uint256 amount, uint256 mintAmount, address user) external onlyLendingPool {
+    function deposit(uint amount, uint mintAmount, address user) external onlyLendingPool {
         require(amount > 0 && mintAmount > 0 && user != address(0), "Invalid deposit");
         require(address(mToken) != address(0), "mToken not set");
 
@@ -71,13 +71,13 @@ contract record LiquidityPool is Ownable  {
      * @param user Recipient of underlying asset
      * @param underlyingAmount Exact amount of underlying asset to transfer
      */
-    function withdraw(uint256 mTokenAmount, address user, uint256 underlyingAmount) external onlyLendingPool {
+    function withdraw(uint mTokenAmount, address user, uint underlyingAmount) external onlyLendingPool {
         require(mTokenAmount > 0 && user != address(0), "Invalid withdrawal");
         require(underlyingAmount > 0, "Invalid underlying amount");
         require(address(mToken) != address(0), "mToken not set");
 
         address asset = _getAsset();
-        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        uint currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= underlyingAmount, "Insufficient liquidity");
 
         // Burn mTokens from user first
@@ -94,11 +94,11 @@ contract record LiquidityPool is Ownable  {
      * @param amount Amount to borrow
      * @param borrower Address receiving the funds
      */
-    function borrow(uint256 amount, address borrower) external onlyLendingPool {
+    function borrow(uint amount, address borrower) external onlyLendingPool {
         require(amount > 0 && borrower != address(0), "Invalid borrow");
 
         address asset = _getAsset();
-        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        uint currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= amount, "Insufficient liquidity");
 
         // Transfer underlying to borrower
@@ -112,7 +112,7 @@ contract record LiquidityPool is Ownable  {
      * @param amount Amount to repay
      * @param borrower Payer of the repayment
      */
-    function repay(uint256 amount, address borrower) external onlyLendingPool {
+    function repay(uint amount, address borrower) external onlyLendingPool {
         require(amount > 0 && borrower != address(0), "Invalid repayment");
 
         address asset = _getAsset();
@@ -128,11 +128,11 @@ contract record LiquidityPool is Ownable  {
      * @param reserveAmount Amount to transfer as reserve fees
      * @param feeCollector Address to receive the reserve fees
      */
-    function transferReserve(uint256 reserveAmount, address feeCollector) external onlyLendingPool {
+    function transferReserve(uint reserveAmount, address feeCollector) external onlyLendingPool {
         require(reserveAmount > 0 && feeCollector != address(0), "Invalid reserve transfer");
         
         address asset = _getAsset();
-        uint256 currentBalance = IERC20(asset).balanceOf(address(this));
+        uint currentBalance = IERC20(asset).balanceOf(address(this));
         require(currentBalance >= reserveAmount, "Insufficient liquidity to transfer to reserve");
         
         // Transfer reserve to fee collector

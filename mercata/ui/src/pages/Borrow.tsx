@@ -44,7 +44,9 @@ const Borrow = () => {
     supplyCollateral,
     withdrawCollateral,
     repayLoan: repayLoanFn,
-    repayAll
+    repayAll,
+    withdrawCollateralMax,
+    borrowMax
   } = useLendingContext();
 
   // Use the new smart polling hook for balance updates
@@ -131,13 +133,17 @@ const Borrow = () => {
   const executeWithdraw = async (asset: CollateralData, amount: string) => {
     try {
       setModalLoading(true);
-      await withdrawCollateral({
-        asset: asset.address,
-        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
-      });
+      if (amount === 'ALL') {
+        await withdrawCollateralMax({ asset: asset.address });
+      } else {
+        await withdrawCollateral({
+          asset: asset.address,
+          amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
+        });
+      }
       toast({
         title: "Withdraw Initiated",
-        description: `You withdrew ${amount} ${asset._symbol}`,
+        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
         variant: "success",
       });
       setModalLoading(false);
@@ -160,12 +166,21 @@ const Borrow = () => {
   const executeEmbeddedBorrow = async (amount: string) => {
     try {
       setBorrowLoading(true);
-      await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
-      toast({
-        title: "Borrow Initiated",
-        description: `You borrowed ${amount} USDST`,
-        variant: "success",
-      });
+      if (amount === 'ALL') {
+        await borrowMax();
+        toast({
+          title: "Borrow Initiated",
+          description: `Borrowed max available USDST`,
+          variant: "success",
+        });
+      } else {
+        await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
+        toast({
+          title: "Borrow Initiated",
+          description: `You borrowed ${amount} USDST`,
+          variant: "success",
+        });
+      }
       setBorrowLoading(false);
       await Promise.all([
         refreshLoans(),

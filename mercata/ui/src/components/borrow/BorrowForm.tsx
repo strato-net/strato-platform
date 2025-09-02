@@ -31,7 +31,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     healthImpact: 0,
     isHealthy: true,
   });
-  const { getSafeMaxBorrow } = useLendingContext();
+  const { borrowMax } = useLendingContext();
 
   // Calculate risk level for borrow form
   useEffect(() => {
@@ -77,7 +77,19 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     handlePollingUpdate(percentageAmount);
   };
 
-  const handleBorrow = () => {
+  const handleBorrow = async () => {
+    const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
+    const wei = safeParseUnits(borrowAmount || "0", 18);
+
+    // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
+    if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
+      onBorrow('ALL');
+      setBorrowAmount("");
+      setBorrowDisplayAmount("");
+      handlePollingUpdate("");
+      return;
+    }
+
     onBorrow(borrowAmount);
     setBorrowAmount("");
     setBorrowDisplayAmount("");
@@ -135,11 +147,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
               type="button"
               onClick={async () => {
                 try {
-                  const { safeMaxBorrow } = await getSafeMaxBorrow();
-                  const formatted = formatUnits(BigInt(safeMaxBorrow || '0'), 18);
-                  setBorrowAmount(formatted);
-                  setBorrowDisplayAmount(addCommasToInput(formatted));
-                  handlePollingUpdate(formatted);
+                  await borrowMax();
+                  // After borrowMax, clear input and rely on refresh from parent
+                  setBorrowAmount("");
+                  setBorrowDisplayAmount("");
+                  handlePollingUpdate("");
                 } catch {
                   // noop
                 }

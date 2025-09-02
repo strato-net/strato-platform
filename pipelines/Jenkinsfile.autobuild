@@ -55,6 +55,8 @@ pipeline {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
             lib.spinUpFileServer()
+            // TODO: deploy the local bridge server (url fed to the node)
+            // TODO: deploy the oracle and payment servers
           }
 
           // TODO: run node on https (also update check_availability function)
@@ -76,7 +78,6 @@ pipeline {
                 ONRAMP=0000000000000000000000000000000000001009 \\
                 TOKEN_FACTORY=000000000000000000000000000000000000100b \\
                 ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
-                BRIDGE_API_BASE_URL=bridge.mercata-testnet.blockapps.net \\
                 ./strato --single
             """
           }
@@ -166,10 +167,12 @@ pipeline {
                     set -x
                     docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000
                     docker compose -f docker-compose.push.yml push 2>&1
+                    docker compose -f docker-compose.allDocker.push.yml push 2>&1
                     docker compose -f docker-compose.vault.push.yml push 2>&1
                     docker compose -f docker-compose.highway.push.yml push 2>&1
                     AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} AWS_DEFAULT_REGION="us-east-1" aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 406773134706.dkr.ecr.us-east-1.amazonaws.com
                     docker compose -f docker-compose.push.ecr.yml push 2>&1
+                    docker compose -f docker-compose.allDocker.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.vault.push.ecr.yml push 2>&1
                     docker compose -f docker-compose.highway.push.ecr.yml push 2>&1
                     
@@ -185,7 +188,7 @@ pipeline {
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
-                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml"
+                archiveArtifacts artifacts: "docker-compose.yml, docker-compose.allDocker.yml, docker-compose.vault.yml, docker-compose.highway.yml, docker-compose.ecr.yml, docker-compose.allDocker.ecr.yml, docker-compose.vault.ecr.yml, docker-compose.highway.ecr.yml"
                 withCredentials([
                     usernamePassword(credentialsId: 'block-apps-jenkins-s3',  passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID'),
                 ]) {
@@ -280,61 +283,60 @@ pipeline {
 //                }
 //              }
 //            }
-//            
-//            stage('Deploy to Testnet') {
-//              // only deploy if building develop branch
-//              when {
-//                beforeAgent true
-//                allOf {
-//                  branch "develop"
-//                }
-//              }
-//              agent { label "testnet-build1" }
-//              steps {
-//                withCredentials([
-//                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
-//                ]) {
-//                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
-//                }
-//                unstash 'stratoGettingStarted'
-//                dir("strato-getting-started"){
-//                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
-//                    writeFile file: "strato-run.sh", text: """#!/bin/bash
-//                        NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
-//                          network='helium' \\
-//                          OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
-//                          OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
-//                          OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
-//                          ssl='true' \\
-//                          BRIDGE_API_BASE_URL=https://bridge.mercata-testnet.blockapps.net \\
-//                          ./strato
-//                    """
-//                    sh "sudo ./strato --pull"
-//                    sh "sudo ./strato --wipe"
-//                    sh "sudo ./strato-run.sh"
-//                    script {
-//                      lib.waitLocalNodeIsSynced()
-//                    }
-//                  }
-//                }
-//              }
-//              post {
-//                success {
-//                  script {
-//                    def VERSION = sh(
-//                        returnStdout: true,
-//                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
-//                    ).trim()
-//                    slackSend(
-//                        channel: '#engineering',
-//                        color: 'good',
-//                        message: "buildtest.mercata-testnet.blockapps.net was redeployed from develop with STRATO v.${VERSION}"
-//                    )
-//                  }
-//                  
-//                }
-//              }
-//            } /////////////////////
+            
+            stage('Deploy to Testnet') {
+              // only deploy if building develop branch
+              when {
+                beforeAgent true
+                allOf {
+                  branch "develop"
+                }
+              }
+              agent { label "testnet-build1" }
+              steps {
+                withCredentials([
+                    usernamePassword(credentialsId: 'docker-aws-registry-login', passwordVariable: 'DOCKER_PASSWD', usernameVariable: 'DOCKER_USER'),
+                ]) {
+                  sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
+                }
+                unstash 'stratoGettingStarted'
+                dir("strato-getting-started"){
+                  withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
+                    writeFile file: "strato-run.sh", text: """#!/bin/bash
+                        NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
+                          network='helium' \\
+                          OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
+                          OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
+                          OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
+                          ssl='true' \\
+                          ./strato
+                    """
+                    sh "sudo ./strato --pull"
+                    sh "sudo ./strato --wipe"
+                    sh "sudo ./strato-run.sh"
+                    script {
+                      lib.waitLocalNodeIsSynced()
+                    }
+                  }
+                }
+              }
+              post {
+                success {
+                  script {
+                    def VERSION = sh(
+                        returnStdout: true,
+                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
+                    ).trim()
+                    slackSend(
+                        channel: '#engineering',
+                        color: 'good',
+                        message: "buildtest.mercata-testnet.blockapps.net was redeployed from develop with STRATO v.${VERSION}"
+                    )
+                  }
+
+                }
+              }
+            }
             
           }
         }

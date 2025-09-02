@@ -1,325 +1,182 @@
-import {
-  config,
-  getExchangeTokenInfoBridgeIn,
-  getExchangeTokenInfoBridgeOut,
-  MAINNET_ERC20_TOKEN_CONTRACTS,
-  MAINNET_ETH_STRATO_TOKEN_MAPPING,
-  TESTNET_ERC20_TOKEN_CONTRACTS,
-  TESTNET_ETH_STRATO_TOKEN_MAPPING,
-} from "../config";
-import BridgeContractCall from "../utils/bridgeContractCall";
-import TokenContractCall from "../utils/tokenContractCall";
+import { config } from "../config";
+import { execute } from "../utils/stratoHelper";
 import sendEmail from "./emailService";
-import safeTransactionGenerator, {
-  checkEthTransaction,
-} from "./safeService";
-import {
-  fetchDepositInitiated,
-  fetchDepositInitiatedStatus,
-  fetchDepositInitiatedTransactions,
-  fetchWithdrawalInitiatedStatus,
-} from "./cirrusService";
-import {
-  TESTNET_ETH_TOKENS,
-  MAINNET_ETH_TOKENS,
-  TESTNET_STRATO_TOKENS,
-  MAINNET_STRATO_TOKENS,
-} from "../config";
-import { mintVouchersForDeposits } from "../utils/voucherMinting";
+import { NonEmptyArray, Withdrawal, Deposit } from "../types";
+import { createSafeTransactionsForWithdrawals, createRejectionTransaction } from "./safeService";
+import { logInfo, logError } from "../utils/logger";
 
-const showTestnet = process.env.SHOW_TESTNET === "true";
+export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
+  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+  const tokens = deposits.map((deposit) => deposit.token);
+  const amounts = deposits.map((deposit) => deposit.amount);
+  const users = deposits.map((deposit) => deposit.user);
+  const froms = deposits.map((deposit) => deposit.from);
 
-const checkDepositStatus = async (txHash: string): Promise<any | null> => {
-  const strippedHash = txHash.toLowerCase().replace(/^0x/, "");
-  let data;
-  for (let i = 0; i < 3; i++) {
-    data = await fetchDepositInitiated(strippedHash);
-    if (data) {
-      break;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-  }
-  return data[0];
-};
-
-export const stratoTokenBalance = async (
-  userAddress: string,
-  tokenAddress: string
-) => {
-  const tokenContract = new TokenContractCall(tokenAddress);
-  const balanceData = await tokenContract.balanceOf({
-    accountAddress: userAddress,
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "depositBatch",
+    args: {
+      srcChainIds: srcChainIds,
+      srcTxHashes: srcTxHashes,
+      tokens: tokens,
+      amounts: amounts,
+      users: users,
+      froms: froms,
+    },
   });
-  return {
-    // Convert balance from wei to ether by dividing by 10^18 bignumber using ethers
-    balance: balanceData,
-  };
-};
 
-export const bridgeIn = async (
-  ethHash: string,
-  tokenAddress: string,
-  fromAddress: string,
-  amount: string,
-  toAddress: string,
-  userAddress: string
-) => {
-  const bridgeContract = new BridgeContractCall();
-
-
-
-  const depositResponse = await bridgeContract.deposit({
-    txHash: ethHash.toString().replace("0x", ""),
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-    mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  });
-  return depositResponse;
-};
-
-export const bridgeOut = async (
-  tokenAddress: string,
-  fromAddress: string,
-  amount: string,
-  toAddress: string,
-  userAddress: string
-) => {
-
-
-  const isTestnet = process.env.SHOW_TESTNET === "true";
-  const tokenContract = isTestnet
-    ? TESTNET_ERC20_TOKEN_CONTRACTS
-    : MAINNET_ERC20_TOKEN_CONTRACTS;
-
-  const tokenMapping = isTestnet
-    ? TESTNET_ETH_STRATO_TOKEN_MAPPING
-    : MAINNET_ETH_STRATO_TOKEN_MAPPING;
-
-  const ethTokenAddress: any =
-    Object.entries(tokenMapping).find(
-      ([_, value]) => value.toLowerCase() === tokenAddress.toLowerCase()
-    )?.[0] || null;
-
-  const isERC20 = tokenContract.find((token: any) => token === ethTokenAddress);
-
-  const generator = await safeTransactionGenerator(
-    amount,
-    toAddress,
-    isERC20 ? "erc20" : "eth",
-    ethTokenAddress
+  logInfo(
+    "BridgeService",
+    `Successfully deposited ${deposits.length} deposits`,
   );
-  const {
-    value: { hash },
-  } = await generator.next();
-
-  const bridgeContract = new BridgeContractCall();
-  await bridgeContract.withdraw({
-    txHash: hash.toString().replace("0x", ""),
-    token: tokenAddress.toLowerCase().replace("0x", ""),
-    from: fromAddress.toLowerCase().replace("0x", ""),
-    amount: amount.toString(),
-    to: toAddress.toLowerCase().replace("0x", ""),
-    mercataUser: userAddress.toLowerCase().replace("0x", ""),
-  });
-
-  const {
-    value: { success },
-  } = await generator.next();
-
-  const markPendindResponse =
-    await bridgeContract.markWithdrawalPendingApproval({
-      txHash: hash.toString().replace("0x", ""),
-    });
-
-  sendEmail(hash.toString());
-
-  return markPendindResponse;
 };
 
-export const confirmBridgeinSafePolling = async (txList: any[]) => {
-  if (!config.safe?.address) return;
+export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
+  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
 
-  const txBatch = txList.map((tx) => tx.result.transactionHash);
-
-  const depositStatus = await fetchDepositInitiatedTransactions(txBatch);
-
-  // ⚠️ TEMPORARY FIX: Filter out deposits with invalid token addresses from previous testnet deployment
-  const INVALID_TOKEN_ADDRESSES = [
-    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
-    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
-  ];
-  
-  const validDeposits = depositStatus.filter((deposit: any) => {
-    const tokenAddress = deposit.token.toLowerCase().replace("0x", "");
-    const isInvalid = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-    
-    if (isInvalid) {
-    }
-    
-    return !isInvalid;
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "confirmDepositBatch",
+    args: {
+      srcChainIds: srcChainIds,
+      srcTxHashes: srcTxHashes,
+    },
   });
 
-  if (validDeposits.length === 0) {
-    return;
-  }
+  logInfo(
+    "BridgeService",
+    `Successfully confirmed ${deposits.length} deposits`,
+  );
+};
 
+export const reviewDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
+  const srcChainIds = deposits.map((deposit) => deposit.srcChainId);
+  const srcTxHashes = deposits.map((deposit) => deposit.srcTxHash);
+
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "reviewDepositBatch",
+    args: {
+      srcChainIds: srcChainIds,
+      srcTxHashes: srcTxHashes,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Successfully set ${deposits.length} deposits to pending review`,
+  );
+};
+
+export const confirmWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
+) => {
+  let safeTxs: { safeTxHash: string; nonce: number }[] = [];
+  
   try {
-    const bridgeContract = new BridgeContractCall();
-    const result = await bridgeContract.batchConfirmDeposits({
-      deposits: validDeposits,
-    });
+    safeTxs = await createSafeTransactionsForWithdrawals(withdrawals);
 
-    if (result && result.status === "Success") {
-      
-      try {
-        await mintVouchersForDeposits(validDeposits);
-      } catch (voucherError) {
-        console.error("Failed to mint vouchers (bridge deposits still succeeded):", voucherError);
+    if (safeTxs?.length > 0) {
+      const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+      const custodyTxHashes = safeTxs.map((tx) => tx.safeTxHash);
+
+      await execute({
+        contractName: "MercataBridge",
+        contractAddress: config.bridge.address!,
+        method: "confirmWithdrawalBatch",
+        args: {
+          ids: withdrawalIds,
+          custodyTxHashes: custodyTxHashes,
+        },
+      });
+
+      logInfo(
+        "BridgeService",
+        `Successfully confirmed ${withdrawals.length} withdrawals`,
+      );
+
+      const emailPromises = withdrawals.map(async (withdrawal) => {
+        try {
+          await sendEmail(withdrawal.id || withdrawal.withdrawalId!);
+          return "success";
+        } catch (emailError) {
+          logError("BridgeService", emailError as Error, {
+            operation: "sendEmail",
+            withdrawalId: withdrawal.id || withdrawal.withdrawalId!,
+          });
+          return "failed";
+        }
+      });
+
+      const emailResults = await Promise.all(emailPromises);
+      const successCount = emailResults.filter((r) => r === "success").length;
+      const failureCount = emailResults.filter((r) => r === "failed").length;
+      logInfo(
+        "BridgeService",
+        `Email notifications: ${successCount} sent, ${failureCount} failed for batch of ${withdrawals.length} withdrawals`,
+      );
+    }
+  } catch (error) {
+    if (safeTxs.length > 0) {
+      for (const safeTx of safeTxs) {
+        try {
+          const withdrawal = withdrawals.find(w => w.safeTxHash === safeTx.safeTxHash) || withdrawals[0];
+          const chainId = Number(withdrawal.destChainId);
+          
+          await createRejectionTransaction(chainId, safeTx.nonce);
+        } catch (rejectError) {
+          throw rejectError;
+        }
       }
-    } else {
-      console.error("Bridge deposits failed:", result?.status || "Unknown error");
     }
-  } catch (error) {
-    console.error("Error in BatchconfirmDeposit for tx:", error);
+
+    throw error;
   }
 };
 
-// get the possible data from alchemy and verify in this call
-export const confirmBridgeIn = async (tx: any) => {
-  if (!config.safe?.address) {
-    return null;
-  }
-
-  // Check deposit status from Mercata endpoint
-  const depositStatus = await checkDepositStatus(tx.hash);
-
-  if (!depositStatus) {
-    return null;
-  }
-
-  // ⚠️ TEMPORARY FIX: Skip deposits with invalid token addresses from previous testnet deployment
-  const INVALID_TOKEN_ADDRESSES = [
-    "581ee622fb866f3c2076d4260824ce681b15b715", // Old incorrect ETHST address
-    "500fb797b0be4ce0edf070a9b17bae56d22a2131", // Old incorrect USDCST address
-  ];
-  
-  const tokenAddress = depositStatus.token.toLowerCase().replace("0x", "");
-  const isInvalidToken = INVALID_TOKEN_ADDRESSES.includes(tokenAddress);
-  
-  if (isInvalidToken) {
-    return null;
-  }
-
-  try {
-    const bridgeContract = new BridgeContractCall();
-
-    await bridgeContract.confirmDeposit({
-      txHash: depositStatus.txHash.toString().replace("0x", ""),
-      token: depositStatus.token.toLowerCase().replace("0x", ""),
-      to: config.safe.address.toLowerCase().replace("0x", ""),
-      amount: depositStatus.amount.toString(),
-      mercataUser: depositStatus.mercataUser.toLowerCase().replace("0x", ""),
-    });
-  } catch (error) {
-    console.log("error in confirmBridgeIn", error);
-    return null;
-  }
-};
-
-export const confirmBridgeOut = async (tx: any) => {
-  const transactionHash = tx.hash;
-  const transaction = await checkEthTransaction(transactionHash);
-  if (!transaction) {
-    return null;
-  }
-
-  const safeTxHash = transaction.safeTxHash.toString().replace("0x", "");
-
-  const bridgeContract = new BridgeContractCall();
-  await bridgeContract.confirmWithdrawal({
-    txHash: safeTxHash,
-  });
-};
-
-export const confirmBridgeOutSafePolling = async (txs: string[]) => {
-    if (!txs || txs.length === 0) {
-    return;
-  }
-  
-  const bridgeContract = new BridgeContractCall();
-  await bridgeContract.batchConfirmWithdrawals({
-    txHashes: txs,
-  });
-};
-
-export const userDepositStatus = async (
-  status: string,
-  limit?: number,
-  orderBy?: string,
-  orderDirection?: string,
-  pageNo?: string,
-  userAddress?: string
+export const finaliseWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  return await fetchDepositInitiatedStatus(
-    status,
-    limit,
-    orderBy,
-    orderDirection,
-    pageNo,
-    userAddress
+  const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+  const custodyTxHashes = withdrawals.map((w) => w.safeTxHash!);
+
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "finaliseWithdrawalBatch",
+    args: {
+      ids: withdrawalIds,
+      custodyTxHashes: custodyTxHashes,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Successfully finalized ${withdrawals.length} withdrawals`,
   );
 };
 
-export const userWithdrawalStatus = async (
-  status: string,
-  limit?: number,
-  orderBy?: string,
-  orderDirection?: string,
-  pageNo?: string,
-  userAddress?: string
+export const handleRejectedWithdrawalBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal>,
 ) => {
-  return await fetchWithdrawalInitiatedStatus(
-    status,
-    limit,
-    orderBy,
-    orderDirection,
-    pageNo,
-    userAddress
+  const withdrawalIds = withdrawals.map((w) => w.id || w.withdrawalId!);
+
+  await execute({
+    contractName: "MercataBridge",
+    contractAddress: config.bridge.address!,
+    method: "abortWithdrawalBatch",
+    args: {
+      ids: withdrawalIds,
+    },
+  });
+
+  logInfo(
+    "BridgeService",
+    `Successfully aborted ${withdrawals.length} rejected withdrawals`,
   );
-};
-
-export const getBridgeInTokens = async () => {
-  const bridgeInTokens = showTestnet ? TESTNET_ETH_TOKENS : MAINNET_ETH_TOKENS;
-
-  const enrichedTokens = bridgeInTokens.map((token) => {
-    const { exchangeTokenName, exchangeTokenSymbol } =
-      getExchangeTokenInfoBridgeIn(token.tokenAddress, showTestnet);
-    return {
-      ...token,
-      exchangeTokenName,
-      exchangeTokenSymbol,
-    };
-  });
-
-  return { bridgeInTokens: enrichedTokens };
-};
-
-export const getBridgeOutTokens = async () => {
-  const bridgeOutTokens = showTestnet
-    ? TESTNET_STRATO_TOKENS
-    : MAINNET_STRATO_TOKENS;
-
-  const enrichedTokens = bridgeOutTokens.map((token) => {
-    const { exchangeTokenName, exchangeTokenSymbol } =
-      getExchangeTokenInfoBridgeOut(token.tokenAddress, showTestnet);
-    return {
-      ...token,
-      exchangeTokenName,
-      exchangeTokenSymbol,
-    };
-  });
-
-  return { bridgeOutTokens: enrichedTokens };
 };

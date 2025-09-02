@@ -1,20 +1,21 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ArrowLeftRight } from 'lucide-react';
 import { Tabs } from 'antd';
 import 'antd/dist/reset.css';
 import './BridgeTransactionsPage.css';
 import DepositTransactionDetails from './DepositTransactionDetails';
 import WithdrawTransactionDetails from './WithdrawTransactionDetails';
-
-interface BridgeTransactionsPageProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
+import { useBridgeContext } from '@/context/BridgeContext';
 
 type TransactionType = 'DepositRecorded' | 'WithdrawalInitiated';
 
-const BridgeTransactionsPage = ({ isOpen, onClose }: BridgeTransactionsPageProps) => {
+const BridgeTransactionsPage = () => {
   const [transactionType, setTransactionType] = useState<TransactionType>('DepositRecorded');
+  const { loadNetworksAndTokens } = useBridgeContext();
+
+  useEffect(() => {
+    loadNetworksAndTokens();
+  }, [loadNetworksAndTokens]);
 
   const mainItems = [
     {

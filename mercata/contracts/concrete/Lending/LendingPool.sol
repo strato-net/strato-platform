@@ -27,7 +27,7 @@ contract record LendingPool is Ownable {
     event SuppliedCollateral(address indexed user, address indexed asset, uint amount);
     event WithdrawnCollateral(address indexed user, address indexed asset, uint amount);
     event ExchangeRateUpdated(address indexed asset, uint newRate);
-    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor);
+    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
     event ReservesSwept(uint amount, address to);
@@ -47,6 +47,7 @@ contract record LendingPool is Ownable {
         uint liquidationBonus;       // Liquidation bonus in basis points
         uint interestRate;          // Interest rate in basis points
         uint reserveFactor;         // Reserve factor in basis points (percentage to protocol treasury)
+        uint perSecondFactorRAY;    // Optional per-second compound factor in RAY (1e27). 0 = disabled
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -127,6 +128,29 @@ contract record LendingPool is Ownable {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // FIXED-POINT HELPERS (RAY MATH)
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Exponentiation by squaring for RAY base. Returns (x^n) with base b.
+    function rpow(uint x, uint n, uint b) internal pure returns (uint z) {
+        z = b;
+        if (n == 0) return z;
+        uint y = x;
+        while (n > 0) {
+            if (n % 2 == 1) {
+                // z = z * y / b
+                z = (z * y) / b;
+            }
+            n /= 2;
+            if (n > 0) {
+                // y = y * y / b
+                y = (y * y) / b;
+            }
+        }
+        return z;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDITY OPERATIONS (DEPOSITS & WITHDRAWALS)
     // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -138,20 +162,19 @@ contract record LendingPool is Ownable {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
         
-        // Check that borrowable asset has lending parameters configured
-        AssetConfig memory config = assetConfigs[borrowableAsset];
-        require(config.interestRate > 0, "Interest rate not configured");
-    
-        _accrue(); // ensure borrow index & reserves are up-to-date before mint calc
+        // 1) bring index & reserves current
+        _accrue();
         
-        // Calculate current exchange rate and corresponding mToken amount to mint
+        // 2) compute mTokens to mint from exchange rate
         uint exchangeRate = getExchangeRate();
+        require(exchangeRate > 0, "Invalid rate");
         uint mTokenAmount = (amount * 1e18) / exchangeRate;
-        require(mTokenAmount > 0, "Deposit too small");
-
-        // Transfer underlying and mint mTokens via LiquidityPool
+        require(mTokenAmount > 0, "Mint calc");
+        
+        // 3) move funds & mint
         LiquidityPool(_liquidityPool()).deposit(amount, mTokenAmount, msg.sender);
         
+        // cash ↑ (after deposit)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Deposited(msg.sender, borrowableAsset, amount);
     }
@@ -268,6 +291,7 @@ contract record LendingPool is Ownable {
     // ═══════════════════════════════════════════════════════════════════════════════
     // REPAYMENT OPERATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
+
     /**
     * @notice Repay part or all of the caller’s outstanding debt (index-based)
     * @param amount Repayment amount in underlying units (18 decimals)
@@ -297,7 +321,13 @@ contract record LendingPool is Ownable {
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
 
-        if (loan.scaledDebt == 0) {
+        // Dust cleanup: if residual underlying owed is <= 1 wei, zero out
+        uint owedAfter = (loan.scaledDebt * borrowIndex) / RAY;
+        if (owedAfter <= 1) {
+            if (loan.scaledDebt > 0) {
+                totalScaledDebt -= loan.scaledDebt;
+                loan.scaledDebt = 0;
+            }
             delete userLoan[msg.sender];
         } else {
             loan.lastUpdated = block.timestamp;
@@ -306,6 +336,164 @@ contract record LendingPool is Ownable {
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Repaid(msg.sender, borrowableAsset, repayAmount);
     }
+
+    /**
+     * @notice Borrow the maximum amount allowed by current collateral (minus 1 wei safety)
+     * @return amountBorrowed The amount actually borrowed
+     */
+    function borrowMax() external onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
+        // Bring index & reserves current, then enforce system caps on the final amount
+        _accrue();
+
+        uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
+        uint currentOwed = getUserDebt(msg.sender);
+        require(maxBorrowAmount > currentOwed, "No borrowing power");
+
+        uint available = maxBorrowAmount - currentOwed;
+        // 1 wei safety to keep HF strictly > 1 after rounding
+        amountBorrowed = available > 1 ? (available - 1) : 0;
+        require(amountBorrowed > 0, "No borrowing power");
+
+        _checkDebtLimits(amountBorrowed);
+
+        // Update index-based loan storage
+        LoanInfo storage loan = userLoan[msg.sender];
+        uint scaledAdd = (amountBorrowed * RAY) / borrowIndex;
+        loan.scaledDebt += scaledAdd;
+        loan.lastUpdated = block.timestamp;
+        totalScaledDebt += scaledAdd;
+
+        // Move funds
+        LiquidityPool(_liquidityPool()).borrow(amountBorrowed, msg.sender);
+
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit Borrowed(msg.sender, borrowableAsset, amountBorrowed);
+        return amountBorrowed;
+    }
+
+    /**
+     * @notice Repay the caller's entire outstanding debt
+     * @return amountRepaid The amount actually repaid
+     */
+    function repayAll() external onlyTokenFactory(borrowableAsset) returns (uint amountRepaid) {
+        LoanInfo storage loan = userLoan[msg.sender];
+        require(loan.scaledDebt > 0, "No active loan");
+ 
+        _accrue();
+ 
+        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
+        require(owed > 0, "Nothing to repay");
+ 
+        // Move exact owed into the pool
+        LiquidityPool(_liquidityPool()).repay(owed, msg.sender);
+        amountRepaid = owed;
+ 
+        // Reduce scaled debt fully (eliminate dust)
+        uint scaledDelta = (amountRepaid * RAY) / borrowIndex;
+        if (scaledDelta > loan.scaledDebt) {
+            scaledDelta = loan.scaledDebt;
+        } else if (scaledDelta < loan.scaledDebt) {
+            // Force full zero by consuming any residual due to truncation
+            uint remaining = loan.scaledDebt - scaledDelta;
+            scaledDelta += remaining;
+        }
+        loan.scaledDebt -= scaledDelta; // zero
+        totalScaledDebt -= scaledDelta;
+ 
+        if (loan.scaledDebt == 0) {
+            delete userLoan[msg.sender];
+        } else {
+            loan.lastUpdated = block.timestamp;
+        }
+ 
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        emit Repaid(msg.sender, borrowableAsset, amountRepaid);
+        return amountRepaid;
+    }
+
+    /**
+     * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
+     * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
+     */
+    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
+        _accrue();
+        require(mToken != address(0), "mToken not set");
+        uint userShares = IERC20(mToken).balanceOf(msg.sender);
+        require(userShares > 0, "No mTokens to withdraw");
+
+        // Underlying amount based on current exchange rate
+        uint exchangeRate = getExchangeRate();
+        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
+        underlyingAmount = (userShares * exchangeRate) / 1e18;
+
+        // Ensure pool has liquidity
+        address asset = borrowableAsset;
+        uint poolCash = IERC20(asset).balanceOf(address(_liquidityPool()));
+        require(poolCash >= underlyingAmount, "Insufficient liquidity");
+
+        LiquidityPool(_liquidityPool()).withdraw(userShares, msg.sender, underlyingAmount);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+    }
+
+    /**
+     * @notice Withdraw the maximum collateral for an asset while remaining healthy (minus 1 wei safety)
+     * @param asset The collateral asset to withdraw
+     * @return amountWithdrawn The amount actually withdrawn
+     */
+        function withdrawCollateralMax(address asset) external onlyTokenFactory(asset) returns (uint amountWithdrawn) {
+         // Current user collateral for asset
+         uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
+         require(totalCollateral > 0, "No collateral");
+ 
+         _accrue();
+ 
+         // Current borrow capacity and debt
+         uint maxBorrowAmount = calculateMaxBorrowingPower(msg.sender, address(0), 0);
+         uint currentOwed = getUserDebt(msg.sender);
+ 
+         // If no outstanding debt, allow full withdrawal with no dust
+         if (currentOwed == 0) {
+             CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, totalCollateral);
+             emit WithdrawnCollateral(msg.sender, asset, totalCollateral);
+             return totalCollateral;
+         }
+         require(maxBorrowAmount > currentOwed, "No room");
+ 
+         // Prices and LTV
+         uint priceAsset = PriceOracle(_priceOracle()).getAssetPrice(asset); // 1e18
+         uint priceBorrow = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18
+         uint ltv = assetConfigs[asset].ltv; // bps
+         require(priceAsset > 0 && priceBorrow > 0 && ltv > 0, "Config");
+ 
+         // roomBorrow = maxBorrowAmount - currentOwed (in borrowable units)
+         uint roomBorrow = maxBorrowAmount - currentOwed;
+ 
+         // From calculateMaxBorrowingPower math, the reduction in borrow capacity for withdrawing `amount` is:
+         // deltaBorrow = amount * priceAsset * ltv / (priceBorrow * 10000)
+         // Solve for amount: amount = roomBorrow * priceBorrow * 10000 / (priceAsset * ltv)
+         uint numerator = roomBorrow * priceBorrow * 10000;
+         uint denom = priceAsset * ltv;
+         if (denom == 0) {
+             return 0;
+         }
+         uint maxByHealth = numerator / denom;
+ 
+         // Cap by user's available collateral
+         amountWithdrawn = maxByHealth < totalCollateral ? maxByHealth : totalCollateral;
+         // 1 wei safety when there is outstanding debt
+         if (amountWithdrawn > 1) {
+             amountWithdrawn = amountWithdrawn - 1;
+         }
+         require(amountWithdrawn > 0, "No withdrawable amount");
+ 
+         // Final health check using existing path for consistency
+         uint newMaxBorrow = calculateMaxBorrowingPower(msg.sender, asset, amountWithdrawn);
+         require(currentOwed <= newMaxBorrow, "Withdrawal would exceed existing loan");
+ 
+         CollateralVault(_collateralVault()).removeCollateral(msg.sender, asset, amountWithdrawn);
+         emit WithdrawnCollateral(msg.sender, asset, amountWithdrawn);
+         return amountWithdrawn;
+     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDATION OPERATIONS
@@ -325,7 +513,7 @@ contract record LendingPool is Ownable {
         address collateralAsset,
         address borrower,
         uint debtToCover
-    ) external onlyTokenFactory(borrowableAsset) {
+    ) public onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
         require(debtToCover > 0, "Invalid debt amount");
@@ -357,7 +545,13 @@ contract record LendingPool is Ownable {
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
 
-        if (loan.scaledDebt == 0) {
+        // Dust cleanup
+        uint owedAfterL = (loan.scaledDebt * borrowIndex) / RAY;
+        if (owedAfterL <= 1) {
+            if (loan.scaledDebt > 0) {
+                totalScaledDebt -= loan.scaledDebt;
+                loan.scaledDebt = 0;
+            }
             delete userLoan[borrower];
         } else {
             loan.lastUpdated = block.timestamp;
@@ -383,6 +577,51 @@ contract record LendingPool is Ownable {
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
+    }
+
+    /**
+     * @notice Helper to liquidate using the maximum allowable amount at execution time.
+     *         Computes repay amount as min(currentDebt, close-factor limit, and collateral coverage)
+     *         to avoid overpaying when collateral cannot cover more.
+     * @param collateralAsset The collateral asset to seize
+     * @param borrower The address of the borrower being liquidated
+     */
+    function liquidationCallAll(
+        address collateralAsset,
+        address borrower
+    ) external onlyTokenFactory(borrowableAsset) {
+        require(collateralAsset != address(0), "Invalid collateral asset");
+        require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
+
+        // Ensure collateral asset is configured and has liquidation parameters
+        AssetConfig memory cConfig = assetConfigs[collateralAsset];
+        require(cConfig.liquidationBonus >= 10000, "Asset not eligible for liquidation");
+
+        // Accrue and read current debt and health
+        _accrue();
+        uint totalOwed = getUserDebt(borrower);
+        require(totalOwed > 0, "Borrower has no debt");
+        uint health = getHealthFactor(borrower);
+        require(health < 1e18, "Position healthy");
+
+        // Close factor cap
+        uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
+
+        // Coverage cap = borrowerCollateral * priceColl / (priceDebt * bonus)
+        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
+        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        uint num = borrowerCollateral * priceColl * 10000;
+        uint den = priceDebt * cConfig.liquidationBonus;
+        uint coverage = (num + den - 1) / den; // ceilDiv
+
+        uint debtToCover = totalOwed;
+        if (debtToCover > maxRepay) debtToCover = maxRepay;
+        if (debtToCover > coverage) debtToCover = coverage;
+        require(debtToCover > 0, "Nothing liquidatable");
+
+        liquidationCall(collateralAsset, borrower, debtToCover);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -437,6 +676,7 @@ contract record LendingPool is Ownable {
      * @param liquidationBonus Liquidation bonus in basis points (e.g., 500 = 5%)
      * @param interestRate Interest rate in basis points (e.g., 500 = 5%)
      * @param reserveFactor Reserve factor in basis points (e.g., 1000 = 10%)
+     * @param perSecondFactorRAY Per-second compound factor in RAY (1e27). Must be >= RAY.
      */
     function configureAsset(
         address asset,
@@ -444,7 +684,8 @@ contract record LendingPool is Ownable {
         uint liquidationThreshold,
         uint liquidationBonus,
         uint interestRate,
-        uint reserveFactor
+        uint reserveFactor,
+        uint perSecondFactorRAY
     ) external onlyPoolConfigurator {
         require(asset != address(0) && tokenFactory.isTokenActive(asset), "Invalid or inactive asset"); 
         require(ltv <= liquidationThreshold, "LTV must be <= liquidation threshold");
@@ -452,6 +693,7 @@ contract record LendingPool is Ownable {
         require(liquidationBonus >= 10000 && liquidationBonus <= 12500, "Invalid liquidation bonus"); // 100-125%
         require(interestRate <= 10000, "Interest rate too high"); // Max 100%
         require(reserveFactor <= 5000, "Reserve factor too high"); // Max 50%
+        require(perSecondFactorRAY >= RAY, "Invalid per-second factor");
 
         _accrue();
         
@@ -465,20 +707,22 @@ contract record LendingPool is Ownable {
             liquidationThreshold,
             liquidationBonus,
             interestRate,
-            reserveFactor
+            reserveFactor,
+            perSecondFactorRAY
         );
         
-        emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor);
+        emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY);
     }
+
 
     /**
      * @notice Get asset configuration
      * @param asset The asset address
      * @return ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor
      */
-    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint) {
+    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint, uint) {
         AssetConfig memory config = assetConfigs[asset];
-        return (config.ltv, config.liquidationThreshold, config.liquidationBonus, config.interestRate, config.reserveFactor);
+        return (config.ltv, config.liquidationThreshold, config.liquidationBonus, config.interestRate, config.reserveFactor, config.perSecondFactorRAY);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -540,13 +784,13 @@ contract record LendingPool is Ownable {
         uint idx0 = borrowIndex;
         uint dt = uint(ts - last);
 
-        uint rateBps = _currentAprBps();
-        // factorRAY = (APR * dt / YEAR) in RAY
-        uint factorRAY = (rateBps * RAY * dt) / (10000 * SECONDS_PER_YEAR);
-
-        uint idx1 = (idx0 * (RAY + factorRAY)) / RAY;
+        uint perSec = assetConfigs[borrowableAsset].perSecondFactorRAY;
+        require(perSec > 0, "Compound factor not set");
+        uint idx1 = (idx0 * rpow(perSec, dt, RAY)) / RAY;
         borrowIndex = idx1;
         lastAccrual = ts;
+
+        uint rateBps = assetConfigs[borrowableAsset].interestRate;
 
         if (totalScaledDebt > 0) {
             uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
@@ -728,7 +972,7 @@ contract record LendingPool is Ownable {
     * @notice Preview the borrow index as if interest were accrued at the current block timestamp.
     * @dev
     *  - Read-only projection: DOES NOT modify state (no writes to `borrowIndex` or `lastAccrual`).
-    *  - Uses simple-interest over elapsed time since `lastAccrual` at the static APR from `assetConfigs[borrowableAsset].interestRate`.
+    *  - Uses compound if `perSecondFactorRAY` is set
     *  - If `block.timestamp == lastAccrual`, returns the current `borrowIndex` unchanged.
     *  - Units: RAY (1e27).
     * @return projectedIndex The projected borrow index in RAY units.
@@ -736,9 +980,10 @@ contract record LendingPool is Ownable {
     function previewBorrowIndex() public view returns (uint projectedIndex) {
         if (block.timestamp == lastAccrual) return borrowIndex;
         uint dt = uint(block.timestamp - lastAccrual);
-        uint rateBps = assetConfigs[borrowableAsset].interestRate; // static APR in bps
-        uint factorRAY = (rateBps * RAY * dt) / (10000 * SECONDS_PER_YEAR);
-        return (borrowIndex * (RAY + factorRAY)) / RAY;
+        uint perSec = assetConfigs[borrowableAsset].perSecondFactorRAY;
+        require(perSec > 0, "Compound factor not set");
+        uint mul = rpow(perSec, dt, RAY);
+        return (borrowIndex * mul) / RAY;
     }
 
     /**

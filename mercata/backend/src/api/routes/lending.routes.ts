@@ -7,10 +7,10 @@ const router = Router();
 // ----- Pool Information -----
 // Get lending pool information
 router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
-
-// New: Safe max endpoints
-router.get("/safe/max-borrow", authHandler.authorizeRequest(), LendingController.getSafeMaxBorrow);
-router.get("/safe/max-repay", authHandler.authorizeRequest(), LendingController.getSafeMaxRepay);
+ 
+// New: Helper actions
+router.post("/loans/borrow-max", authHandler.authorizeRequest(), LendingController.borrowMax);
+router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingController.withdrawCollateralMax);
 
 // ----- User Balances & Positions -----
 // Get user's collateral and balance information
@@ -28,6 +28,8 @@ router.post("/pools/liquidity", authHandler.authorizeRequest(), LendingControlle
 
 // Withdraw liquidity from the lending pool
 router.delete("/pools/liquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
+// Withdraw all liquidity (no dust)
+router.post("/pools/withdraw-all", authHandler.authorizeRequest(), LendingController.withdrawLiquidityAll);
 
 // ----- Collateral Management -----
 // Supply collateral
@@ -62,5 +64,11 @@ router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingControll
 // ----- Admin Configuration -----
 // Configure asset with all parameters
 router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingController.configureAsset);
+
+// Sweep protocol reserves to fee collector
+router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingController.sweepReserves);
+
+// Set debt ceilings for protocol risk management
+router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
 
 export default router; 

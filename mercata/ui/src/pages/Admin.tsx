@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp } from 'lucide-react';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
@@ -11,6 +11,7 @@ import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import OnRampTab from '@/components/admin/OnRampTab';
+import LendingTab from '@/components/admin/LendingTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ const Admin = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-6 w-full max-w-6xl min-w-[800px] md:min-w-0">
+            <TabsList className="grid grid-cols-7 w-full max-w-7xl min-w-[900px] md:min-w-0">
               <TabsTrigger value="tokens" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Coins className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Tokens</span>
@@ -60,6 +61,11 @@ const Admin = () => {
                 <Droplets className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Pools</span>
                 <span className="sm:hidden">Pools</span>
+              </TabsTrigger>
+              <TabsTrigger value="lending" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Lending</span>
+                <span className="sm:hidden">Lending</span>
               </TabsTrigger>
               <TabsTrigger value="pricing" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
@@ -112,6 +118,10 @@ const Admin = () => {
               </CardContent>
             </Card>
             <SwapPoolsTable />
+          </TabsContent>
+
+          <TabsContent value="lending" className="space-y-6">
+            <LendingTab />
           </TabsContent>
 
           <TabsContent value="pricing" className="space-y-6">

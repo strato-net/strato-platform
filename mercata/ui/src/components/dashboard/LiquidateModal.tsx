@@ -8,7 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
-import { parseUnits } from 'ethers';
+import { parseUnits, formatUnits } from 'ethers';
 
 interface LiquidateModalProps {
   open: boolean;
@@ -56,17 +56,25 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   onSuccess,
 }) => {
 
-  // max repay from backend (wei) → ether
-  const maxRepayEth = weiToEth(collateral.maxRepay || loan.maxRepay || "0");
+  // max repay from backend (wei) → decimal string safely
+  const maxRepayWei = (collateral.maxRepay || loan.maxRepay || "0").toString();
+  const maxRepayDec = (() => { try { return formatUnits(BigInt(maxRepayWei), 18); } catch { return "0"; } })();
+  const maxRepayEth = parseFloat(maxRepayDec);
+
+  // Total current debt (from loan entry)
+  const totalDebtDec = (() => { try { return formatUnits(BigInt(loan.amount || "0"), 18); } catch { return "0"; } })();
+  const totalDebtEth = parseFloat(totalDebtDec);
 
   // Controlled string state so user can freely type
   const [repayStr, setRepayStr] = useState<string>(maxRepayEth.toString());
   const [displayAmount, setDisplayAmount] = useState<string>(addCommasToInput(maxRepayEth.toString()));
+  const [isAllSelected, setIsAllSelected] = useState<boolean>(true);
 
   // Reset when collateral changes or modal opens anew
   useEffect(() => {
     setRepayStr(maxRepayEth.toString());
     setDisplayAmount(addCommasToInput(maxRepayEth.toString()));
+    setIsAllSelected(true);
   }, [maxRepayEth]);
 
   const { toast } = useToast();
@@ -85,9 +93,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   // Helper to decide if user selected the exact max value (string comparison tolerant of rounding)
   const isMaxSelected = (): boolean => {
-    const num = parseFloat(repayStr);
-    if (isNaN(num)) return false;
-    return Math.abs(num - maxRepayEth) < 1e-9; // within 1 wei at 18 decimals
+    try {
+      const rhs = parseUnits(repayStr || "0", 18);
+      const lhs = BigInt(maxRepayWei);
+      return rhs === lhs;
+    } catch {
+      return false;
+    }
   };
 
   // Collateral price in USD (heuristic) using usdValue / amount
@@ -107,12 +119,23 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
     if (/^\d*\.?\d*$/.test(value)) {
       setDisplayAmount(addCommasToInput(value));
       setRepayStr(value);
+      setIsAllSelected(false);
     }
   };
 
   const handlePercentageChange = (value: string) => {
-    setRepayStr(value);
-    setDisplayAmount(addCommasToInput(value));
+    try {
+      // value from PercentageButtons is a decimal string; store it directly
+      setRepayStr(value);
+      setDisplayAmount(addCommasToInput(value));
+      // Determine ALL selection by comparing wei values
+      const wei = parseUnits(value || "0", 18);
+      setIsAllSelected(wei === BigInt(maxRepayWei));
+    } catch {
+      setRepayStr("0");
+      setDisplayAmount("0");
+      setIsAllSelected(false);
+    }
   };
 
   // Determine loan token USD price. For now assume 1 if symbol contains "USD", else use collPriceUsd / bonus to approximate
@@ -125,13 +148,13 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
   const repayUsdCost = repayEth * loanPriceUsd;
 
   const handleConfirm = async () => {
-    // If 100 % selected, use backend-supplied exact wei string to avoid JS rounding
-    const repayWei = isMaxSelected() ? (collateral.maxRepay || loan.maxRepay) : toWeiFromStr(repayStr);
-    if (!repayWei || repayWei === "0") {
+    // If 100 % selected, delegate exact resolution to backend by sending 'ALL'
+    const repayWeiOrAll = isAllSelected ? ("ALL" as any) : toWeiFromStr(repayStr);
+    if (!repayWeiOrAll || repayWeiOrAll === "0") {
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
-    await executeLiquidation(loan.id, collateral.asset, repayWei);
+    await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
     toast({ title: "Liquidation submitted", variant: "success" });
     onSuccess();
     onOpenChange(false);
@@ -148,8 +171,8 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           <div className="space-y-3">
             <label className="text-sm font-medium">Repay Amount ({loan.assetSymbol})</label>
             <div className="flex justify-between text-xs text-gray-500">
-              <span>Min: 0.01</span>
-              <span>Max: {maxRepayEth.toFixed(2)}</span>
+              <span>Total debt: {isFinite(totalDebtEth) ? totalDebtEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
+              <span>Max repayable now: {isFinite(maxRepayEth) ? maxRepayEth.toFixed(6) : "0.000000"} {loan.assetSymbol}</span>
             </div>
             <div className="relative">
               <Input
@@ -162,11 +185,11 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
                 onChange={handleAmountChange}
               />
             </div>
-            <PercentageButtons
-              value={repayStr}
-              maxValue={maxRepayEth.toString()}
-              onChange={handlePercentageChange}
-            />
+                          <PercentageButtons
+                value={repayStr}
+                maxValue={maxRepayDec}
+                onChange={handlePercentageChange}
+              />
           </div>
 
           <div className="grid grid-cols-2 gap-4 text-sm pt-2">

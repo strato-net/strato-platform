@@ -35,7 +35,6 @@ import AdminRoute from "./components/AdminRoute";
 import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
 import { OnRampProvider } from "./context/OnRampContext";
-import { TransactionProvider } from "@/context/TransactionContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
 import Borrow from "./pages/Borrow";
@@ -111,8 +110,7 @@ const App = () => {
                   <TokenProvider>
                     <OnRampProvider>
                       <LiquidationProvider>
-                        <TransactionProvider>
-                          <BridgeProvider>
+                        <BridgeProvider>
                             <TooltipProvider>
                               <Toaster />
                               <BrowserRouter>
@@ -209,7 +207,6 @@ const App = () => {
                               </BrowserRouter>
                             </TooltipProvider>
                           </BridgeProvider>
-                        </TransactionProvider>
                       </LiquidationProvider>
                     </OnRampProvider>
                   </TokenProvider>
