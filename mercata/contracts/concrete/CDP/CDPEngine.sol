@@ -42,8 +42,8 @@ contract record CDPEngine is Ownable {
     mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
 
     bool public globalPaused;
-    uint public constant RAY = 1e27;
-    uint public constant WAD = 1e18;
+    uint public RAY = 1e27;
+    uint public WAD = 1e18;
     mapping(address => bool) public record isSupportedAsset;
 
     // Events
@@ -174,7 +174,7 @@ contract record CDPEngine is Ownable {
     ) external whenNotPaused(asset) onlySupportedAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
 
-        _cdpVault().deposit(msg.sender, asset, amount);
+        CDPVault(_cdpVault()).deposit(msg.sender, asset, amount);
 
         // Update vault state
         vaults[msg.sender][asset].collateral += amount;
@@ -206,7 +206,7 @@ contract record CDPEngine is Ownable {
             require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
         }
 
-        _cdpVault().withdraw(msg.sender, asset, amount);
+        CDPVault(_cdpVault()).withdraw(msg.sender, asset, amount);
 
         emit Withdrawn(msg.sender, asset, amount);
     }
@@ -229,7 +229,7 @@ contract record CDPEngine is Ownable {
             maxAmount = vault.collateral;
         } else {
             // Calculate required collateral to maintain liquidation ratio
-            uint price = _CDPpriceOracle().getAssetPrice(asset);
+            uint price = PriceOracle(_CDPpriceOracle()).getAssetPrice(asset);
             CollateralConfig memory config = collateralConfigs[asset];
             
             uint requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
@@ -242,7 +242,7 @@ contract record CDPEngine is Ownable {
 
         if (maxAmount > 0) {
             vault.collateral -= maxAmount;
-            _cdpVault().withdraw(msg.sender, asset, maxAmount);
+            CDPVault(_cdpVault()).withdraw(msg.sender, asset, maxAmount);
             emit Withdrawn(msg.sender, asset, maxAmount);
         }
     }
@@ -445,7 +445,7 @@ contract record CDPEngine is Ownable {
         assetState.mintedUSD -= debtToCover;
 
         // Calculate collateral to seize (debt + penalty)
-        uint collateralPrice = _CDPpriceOracle().getAssetPrice(collateralAsset);
+        uint collateralPrice = PriceOracle(_CDPpriceOracle()).getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "CDPEngine: invalid collateral price");
         
         // Penalty amount in USD
@@ -460,7 +460,7 @@ contract record CDPEngine is Ownable {
         
         require(collateralToSeize > 0, "CDPEngine: no collateral to seize");
         borrowerVault.collateral -= collateralToSeize;
-        _cdpVault().seize(borrower, collateralAsset, msg.sender, collateralToSeize);
+        CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
         emit LiquidationExecuted(
             borrower,
@@ -600,7 +600,7 @@ contract record CDPEngine is Ownable {
         Vault memory vault = vaults[owner][asset];
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         
-        uint price = _CDPpriceOracle().getAssetPrice(asset); // USD 1e18
+        uint price = PriceOracle(_CDPpriceOracle()).getAssetPrice(asset); // USD 1e18
         require(price > 0, "CDPEngine: invalid price");
         
         return (vault.collateral * price) / assetConfig.unitScale;
@@ -618,7 +618,7 @@ contract record CDPEngine is Ownable {
     ) public view returns (uint) {
         Vault memory vault = vaults[owner][asset];
         
-        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
+        if (vault.scaledDebt == 0) return (2**256 - 1); // Undefined/∞ if no debt
         
         // Use fresh rate accumulator for accurate debt calculation
         (, uint rateAccumulatorFresh) = previewAccrual(asset);
