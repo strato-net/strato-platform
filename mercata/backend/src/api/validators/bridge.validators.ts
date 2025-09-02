@@ -12,6 +12,7 @@ export function validateRequestWithdrawal(args: any) {
     stratoToken: Joi.string().required(),
     stratoTokenAmount: Joi.string().required(),
     externalRecipient: Joi.string().required(),
+    targetStratoToken: Joi.string().optional(),
   }).strict();
 
   const { error: baseError } = baseSchema.validate(args);
@@ -37,6 +38,7 @@ export function validateRequestWithdrawal(args: any) {
     stratoToken: validateAddressField("stratoToken"),
     stratoTokenAmount: numericStringField("stratoTokenAmount"),
     externalRecipient: validateAddressField("externalRecipient"),
+    targetStratoToken: validateAddressField("targetStratoToken").optional(),
   }).strict();
 
   const { error } = finalSchema.validate(args);

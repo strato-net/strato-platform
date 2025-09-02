@@ -26,6 +26,7 @@ export interface BridgeOutParams {
   externalRecipient: string;
   stratoToken: string;
   externalChainId: string;
+  targetStratoToken?: string; // For withdrawals: which asset mapping to use
 }
 
 export interface BalanceResponse {

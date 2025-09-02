@@ -47,10 +47,11 @@ const WithdrawWidget: React.FC = () => {
   const [redeemableTokens, setRedeemableTokens] = useState<any[]>([]);
   
   // Only show USDC / USDT as destinations
-  const stableTokens = useMemo(
-    () => redeemableTokens.filter((t) => 1 /* already filtered */ ),
-    [redeemableTokens]
-  );
+  const stableTokens = useMemo(() => {
+    const filtered = redeemableTokens.filter((t) => 1 /* already filtered */ );
+    console.log('Stable tokens:', filtered);
+    return filtered;
+  }, [redeemableTokens]);
 
   useEffect(() => {
     if (!selectedToken && stableTokens.length) {
@@ -113,6 +114,7 @@ const WithdrawWidget: React.FC = () => {
         externalRecipient: address,
         stratoToken: usdstAddress, // Always use USDST address for burning
         externalChainId: String(externalChainId),
+        targetStratoToken: selectedToken.stratoToken, // Which asset mapping to use
       });
       if (res?.success) {
         toast({
@@ -171,13 +173,23 @@ const WithdrawWidget: React.FC = () => {
 
       <div className="space-y-1.5">
         <Label>Receive Stablecoin</Label>
-        <Select value={selectedToken?.externalSymbol || ""} onValueChange={(v) => setSelectedToken(stableTokens.find(t => t.externalSymbol === v) || null)}>
+        <Select 
+          value={selectedToken?.stratoToken || ""} 
+          onValueChange={(v) => {
+            console.log('Selected value:', v);
+            const token = stableTokens.find(t => t.stratoToken === v);
+            console.log('Found token:', token);
+            if (token) {
+              setSelectedToken(token);
+            }
+          }}
+        >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
             {stableTokens.map(t => (
-              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>{t.externalName} ({t.externalSymbol})</SelectItem>
+              <SelectItem key={t.stratoToken} value={t.stratoToken}>{t.externalName} ({t.externalSymbol})</SelectItem>
             ))}
           </SelectContent>
         </Select>
