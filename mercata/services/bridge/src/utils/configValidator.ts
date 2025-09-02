@@ -222,8 +222,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
           errors.push(`${assetPrefix} Missing externalChainId`);
         }
 
-        if (asset.enabled === undefined) {
-          errors.push(`${assetPrefix} Missing enabled flag`);
+        if (asset.permissions === undefined) {
+          errors.push(`${assetPrefix} Missing permissions flag`);
         }
 
         if (!asset.externalSymbol) {
