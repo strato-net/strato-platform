@@ -43,7 +43,7 @@ contract record MercataBridge is Ownable {
         PENDING_REVIEW, // deposit: verification failed, needs review
                       // withdrawal: custody tx proposed, waiting for review
         COMPLETED,    // flow fully executed
-        ABORTED       // owner/user reclaimed escrow
+        ABORTED       // user/relayer reclaimed escrow
     }
 
 /* --------------------------------------------------------------------- */
@@ -633,14 +633,24 @@ contract record MercataBridge is Ownable {
     }
 
     /**
-     * Abort – user (after 48 h) *or* owner may cancel and refund the escrowed tokens.
+     * Abort – user (after 48 h) *or* relayer may cancel and refund the escrowed tokens.
      * Covers the scenario where relayer disappears before confirming.
      * Does not cover the scenario where Custody tx is waiting to be signed.
      */
     function abortWithdrawal(uint256 id) public {
         WithdrawalInfo storage w = withdrawals[id];
 
-        if (msg.sender == w.stratoSender) {
+        if (msg.sender == relayer) {
+            /* withdrawal must not be completed */
+            if (w.bridgeStatus == BridgeStatus.ABORTED) {return;} //idempotent 
+            require(
+                w.bridgeStatus == BridgeStatus.INITIATED ||
+                w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+                "MB: not abortable"
+            );
+        }
+        else {
+            require(msg.sender == w.stratoSender, "MB: not sender");
             /* user path - may only abort if withdrawal not confirmed */
             require(
                 w.bridgeStatus == BridgeStatus.INITIATED,
@@ -650,15 +660,6 @@ contract record MercataBridge is Ownable {
             require(
                 block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY,
                 "MB: wait 48h"
-            );
-        } else {
-            /* owner path – immediate override */
-            require(msg.sender == owner(), "MB: only owner");
-            /* withdrawal must not be completed */
-            require(
-                w.bridgeStatus == BridgeStatus.INITIATED ||
-                w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
-                "MB: not abortable"
             );
         }
 
