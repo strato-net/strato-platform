@@ -35,6 +35,12 @@ contract record RewardsChef is Ownable {
     // STATE VARIABLES
     // ═════════════════════════════════════════════════════════════════════════
 
+    // Total allocation poitns. Must be the sum of all allocation points in all
+    // pools.
+    uint256 public totalAllocPoint = 0;
+
+    // Info of each of the stake pool.
+    PoolInfo[] public pools;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -44,5 +50,24 @@ contract record RewardsChef is Ownable {
 	pools = [];
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // STAKE POOL MANAGEMENT
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function addPool(
+        uint256 _allocPoint,
+        address _lpToken,
+    ) public onlyOwner {
+        // Check if LP token already exists in pools. If it does exists, return
+        // early
+        for (uint256 i = 0; i < pools.length; i++) {
+            if (pools[i].lpToken == _lpToken) {
+                return;
+            }
+        }
+        totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        PoolInfo memory poolInfo = PoolInfo(_lpToken, _allocPoint, block.timestamp, 0);
+        pools.push(poolInfo);
+    }
 
 }

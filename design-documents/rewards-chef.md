@@ -78,3 +78,18 @@ We will keep the same data structures: `UserInfo` and `PoolInfo` with some chang
 * since our reward is cata (not sushi) we will call the `accSushiPerShare` more
   general `accPerToken`
 
+### Pool management
+
+#### Adding stake pool
+
+Similar logic to `add` in the `MasterChef` with few differences
+
+* The `add` funtion was renamed to `addPool`
+
+* It will not take `withUpdate` variable
+
+* We also don't have to track the `startBlock`, we will start calculating
+  rewards the moment the first pool is added
+
+* It is also not expensive for us to check if given LP token is already in the
+pools. If it exists, the add function will return.
