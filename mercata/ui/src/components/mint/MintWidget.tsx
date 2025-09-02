@@ -12,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 import PercentageButtons from "@/components/ui/PercentageButtons";
-import { useAccount, useChainId, useSignTypedData, useSwitchChain, useWriteContract } from "wagmi";
+import { useAccount, useBalance, useChainId, useSignTypedData, useSwitchChain, useWriteContract } from "wagmi";
 import { createPublicClient, http } from "viem";
 import { bridgeContractService } from "@/lib/bridge/contractService";
 import { DEPOSIT_ROUTER_ABI, ERC20_ABI, PERMIT2_ADDRESS, resolveViemChain } from "@/lib/bridge/constants";
@@ -46,6 +46,16 @@ const MintWidget: React.FC = () => {
     loadNetworksAndTokens,
     fetchRedeemableTokens,
   } = useBridgeContext();
+
+  // Get external token balance for percentage buttons
+  const { data: externalTokenBalance } = useBalance({
+    address: address,
+    token: selectedToken?.externalToken as `0x${string}` | undefined,
+    chainId: selectedToken ? parseInt(availableNetworks.find(n => n.chainName === selectedNetwork)?.chainId || "0") : undefined,
+    query: {
+      enabled: !!address && !!selectedToken?.externalToken && !!isConnected,
+    },
+  });
 
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -157,7 +167,7 @@ const MintWidget: React.FC = () => {
   };
 
   // Derived displays
-  const formattedUsdstBalance = useMemo(() => formatBalance(usdstBalance || "0", undefined, 18), [usdstBalance]);
+  const formattedUsdstBalance = useMemo(() => formatBalance(usdstBalance || "0", undefined, 18, 2, 2), [usdstBalance]);
   const afterBalance = useMemo(() => {
     try {
       const before = parseFloat((formattedUsdstBalance || "0").replace(/,/g, ""));
@@ -387,12 +397,19 @@ const MintWidget: React.FC = () => {
             </span>
           </div>
         )}
+        {isConnected && selectedToken && (
+          <div className="flex justify-between items-center text-xs text-gray-500">
+            <span>
+              Balance: {externalTokenBalance?.formatted || "0"} {selectedToken.externalSymbol}
+            </span>
+          </div>
+        )}
         <PercentageButtons
           value={amount}
-          maxValue={safeParseUnits("1000000", 6).toString()}
+          maxValue={externalTokenBalance?.formatted || "0"}
           onChange={setAmount}
           className="mt-2"
-          decimals={parseInt(selectedToken?.externalDecimals || "18")}
+          decimals={externalTokenBalance?.decimals || parseInt(selectedToken?.externalDecimals || "18")}
         />
       </div>
 
