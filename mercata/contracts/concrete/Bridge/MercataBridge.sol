@@ -624,12 +624,13 @@ contract record MercataBridge is Ownable {
      */
     function abortWithdrawal(uint256 id) external {
         WithdrawalInfo storage w = withdrawals[id];
-        require(
-            w.bridgeStatus == BridgeStatus.INITIATED,
-            "MB: not abortable"
-        );
 
         if (msg.sender == w.stratoSender) {
+            /* user path - may only abort if withdrawal not confirmed */
+            require(
+                w.bridgeStatus == BridgeStatus.INITIATED,
+                "MB: not abortable"
+            );
             /* user path – enforce timeout */
             require(
                 block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY,
@@ -638,6 +639,12 @@ contract record MercataBridge is Ownable {
         } else {
             /* owner path – immediate override */
             require(msg.sender == owner(), "MB: only owner");
+            /* withdrawal must not be completed */
+            require(
+                w.bridgeStatus == BridgeStatus.INITIATED ||
+                w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
+                "MB: not abortable"
+            );
         }
 
         w.bridgeStatus = BridgeStatus.ABORTED;
