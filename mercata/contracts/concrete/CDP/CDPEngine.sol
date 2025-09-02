@@ -1,8 +1,8 @@
 import "./CDPVault.sol";
+import "./CDPRegistry.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
-import "./PriceOracle.sol";
-import "./CDPRegistry.sol";
+import "../Lending/PriceOracle.sol";
 import "../Admin/FeeCollector.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
@@ -141,7 +141,7 @@ contract record CDPEngine is Ownable {
         return registry.cdpVault();
     }
 
-    function _priceOracle() internal view returns (PriceOracle) {
+    function _CDPpriceOracle() internal view returns (PriceOracle) {
         return registry.priceOracle();
     }
 
@@ -229,7 +229,7 @@ contract record CDPEngine is Ownable {
             maxAmount = vault.collateral;
         } else {
             // Calculate required collateral to maintain liquidation ratio
-            uint price = _priceOracle().getAssetPrice(asset);
+            uint price = _CDPpriceOracle().getAssetPrice(asset);
             CollateralConfig memory config = collateralConfigs[asset];
             
             uint requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
@@ -272,7 +272,7 @@ contract record CDPEngine is Ownable {
         require(collateralizationRatio(msg.sender, asset) >= assetConfig.liquidationRatio, "CDPEngine: insufficient collateral");
         assetState.mintedUSD += amountUSD;
         
-        require(usdst.mint(msg.sender, amountUSD), "CDPEngine: mint failed");
+        usdst.mint(msg.sender, amountUSD);
         
         emit USDSTMinted(msg.sender, asset, amountUSD);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
@@ -315,7 +315,7 @@ contract record CDPEngine is Ownable {
             require(totalDebtAfter >= config.debtFloor, "CDPEngine: below debt floor");
         }
         
-        require(usdst.mint(msg.sender, amountMinted), "CDPEngine: mint failed");
+        usdst.mint(msg.sender, amountMinted);
         
         emit USDSTMinted(msg.sender, asset, amountMinted);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
@@ -349,7 +349,7 @@ contract record CDPEngine is Ownable {
             assetState.rateAccumulator
         );
         
-        require(usdst.burn(msg.sender, repayAmount), "CDPEngine: burn failed");
+        usdst.burn(msg.sender, repayAmount);
 
         userVault.scaledDebt -= scaledDelta;
         assetState.totalScaledDebt -= scaledDelta;
@@ -380,7 +380,7 @@ contract record CDPEngine is Ownable {
         
         uint scaledDebtToRemove = userVault.scaledDebt;
         
-        require(usdst.burn(msg.sender, owed), "CDPEngine: burn failed");
+        usdst.burn(msg.sender, owed);
 
         // Fully clear scaledDebt regardless of rounding
         userVault.scaledDebt = 0;
@@ -425,7 +425,7 @@ contract record CDPEngine is Ownable {
         uint maxRepayable = (totalDebt * config.closeFactorBps) / 10000;
         require(debtToCover <= maxRepayable, "CDPEngine: exceeds close factor");
 
-        require(usdst.burn(msg.sender, debtToCover), "CDPEngine: burn failed");
+        usdst.burn(msg.sender, debtToCover);
 
         // Calculate and collect stability fees on the liquidated portion
         uint scaledDebtToLiquidate = (debtToCover * RAY) / assetState.rateAccumulator;
@@ -445,7 +445,7 @@ contract record CDPEngine is Ownable {
         assetState.mintedUSD -= debtToCover;
 
         // Calculate collateral to seize (debt + penalty)
-        uint collateralPrice = _priceOracle().getAssetPrice(collateralAsset);
+        uint collateralPrice = _CDPpriceOracle().getAssetPrice(collateralAsset);
         require(collateralPrice > 0, "CDPEngine: invalid collateral price");
         
         // Penalty amount in USD
@@ -517,7 +517,7 @@ contract record CDPEngine is Ownable {
         totalDebt = (scaledDebt * rateAccumulator) / RAY;
         if (totalDebt > scaledDebt) {
             stabilityFee = totalDebt - scaledDebt;
-            require(usdst.mint(address(feeCollector), stabilityFee), "CDPEngine: fee mint failed");
+            usdst.mint(address(feeCollector), stabilityFee);
         }
     }
 
@@ -546,6 +546,8 @@ contract record CDPEngine is Ownable {
                 z = (zx + half) / base;
             }
         }
+
+        return z;
     }
 
  // ═══════════════════════════════════════════════════════════════════════════════
@@ -598,7 +600,7 @@ contract record CDPEngine is Ownable {
         Vault memory vault = vaults[owner][asset];
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         
-        uint price = _priceOracle().getAssetPrice(asset); // USD 1e18
+        uint price = _CDPpriceOracle().getAssetPrice(asset); // USD 1e18
         require(price > 0, "CDPEngine: invalid price");
         
         return (vault.collateral * price) / assetConfig.unitScale;
@@ -616,7 +618,7 @@ contract record CDPEngine is Ownable {
     ) public view returns (uint) {
         Vault memory vault = vaults[owner][asset];
         
-        if (vault.scaledDebt == 0) return type(uint).max; // Undefined/∞ if no debt
+        if (vault.scaledDebt == 0) return type(uint256).max; // Undefined/∞ if no debt
         
         // Use fresh rate accumulator for accurate debt calculation
         (, uint rateAccumulatorFresh) = previewAccrual(asset);
@@ -650,6 +652,7 @@ contract record CDPEngine is Ownable {
         
         uint factor = _rpow(assetConfig.stabilityFeeRate, dt, RAY);
         rateAccumulatorNext = (assetState.rateAccumulator * factor) / RAY;
+        return (dt, rateAccumulatorNext);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

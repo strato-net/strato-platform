@@ -1,7 +1,7 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./CDPVault.sol";
 import "./CDPEngine.sol";
-import "./PriceOracle.sol";
+import "../Lending/PriceOracle.sol";
 
 /**
  * @title CDPRegistry
