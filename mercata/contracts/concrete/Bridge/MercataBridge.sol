@@ -622,7 +622,7 @@ contract record MercataBridge is Ownable {
      * Covers the scenario where relayer disappears before confirming.
      * Does not cover the scenario where Custody tx is waiting to be signed.
      */
-    function abortWithdrawal(uint256 id) external {
+    function abortWithdrawal(uint256 id) public {
         WithdrawalInfo storage w = withdrawals[id];
 
         if (msg.sender == w.stratoSender) {
@@ -658,33 +658,8 @@ contract record MercataBridge is Ownable {
         uint256 n = ids.length;
         require(n > 0, "MB: empty");
 
-        // Cache once for gas
-        bool callerIsOwner = (msg.sender == owner());
-
         for (uint256 i = 0; i < n; i++) {
-            WithdrawalInfo storage w = withdrawals[ids[i]];
-
-            // must be in an abortable state
-            require(
-                w.bridgeStatus == BridgeStatus.INITIATED,
-                "MB: not abortable"
-            );
-
-            if (!callerIsOwner) {
-                // only the original user can self-abort, and only after timeout
-                require(msg.sender == w.stratoSender, "MB: only owner/user");
-
-                // keep time math in uint256 to match block.timestamp
-                uint256 deadline = w.requestedAt + WITHDRAWAL_ABORT_DELAY;
-                require(block.timestamp >= deadline, "MB: wait 48h");
-            }
-
-            // mark aborted and refund escrow
-            w.bridgeStatus = BridgeStatus.ABORTED;
-            w.timestamp = block.timestamp;
-            IERC20(w.stratoToken).transfer(w.stratoSender, w.stratoTokenAmount);
-
-            emit WithdrawalAborted(ids[i]);
+            abortWithdrawal(id);
         }
     }
 }
