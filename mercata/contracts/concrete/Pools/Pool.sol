@@ -218,7 +218,7 @@ contract record Pool is Ownable {
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        _skim(owner());
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         
         if (totalLiquidity > 0) {
@@ -272,7 +272,7 @@ contract record Pool is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        _skim(owner());
         uint256 tokenAReserve = tokenABalance;
         uint256 tokenBReserve = tokenBBalance;
         uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
@@ -327,7 +327,7 @@ contract record Pool is Ownable {
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        _skim(owner());
 
         Token inputToken = isAToB ? tokenA : tokenB;
         Token outputToken = isAToB ? tokenB : tokenA;
@@ -476,7 +476,7 @@ contract record Pool is Ownable {
         require(amountIn > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        _skim(owner());
 
         // Transfer full amount from user to pool
         Token depositToken = isAToB ? tokenA : tokenB;
