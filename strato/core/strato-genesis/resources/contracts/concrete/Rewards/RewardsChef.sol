@@ -10,6 +10,8 @@ contract record RewardsChef is Ownable {
     // EVENTS
     // ═════════════════════════════════════════════════════════════════════════
 
+    event PoolAdded(uint256 indexed pid, address indexed lpToken, uint256 allocPoint);
+
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
     // ═════════════════════════════════════════════════════════════════════════
@@ -68,6 +70,8 @@ contract record RewardsChef is Ownable {
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         PoolInfo memory poolInfo = PoolInfo(_lpToken, _allocPoint, block.timestamp, 0);
         pools.push(poolInfo);
+        
+        emit PoolAdded(pools.length - 1, _lpToken, _allocPoint);
     }
 
 }
