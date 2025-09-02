@@ -26,10 +26,11 @@ import "../Tokens/Token.sol";
 
 /* ───────────────────────────────────────────────────────────────────────── */
 contract record MercataBridge is Ownable {
-    // ============ Constants ============
-    uint8 constant PERMISSION_WRAP = 1;   // 0b01 - wrap original token
-    uint8 constant PERMISSION_MINT = 2;   // 0b10 - mint USDST
-    uint8 constant PERMISSION_MASK = PERMISSION_WRAP | PERMISSION_MINT;
+    // ============ Permission Constants ============
+    // Permission system uses bitwise flags for token operations
+    uint8 public PERMISSION_WRAP = 1;   // 0b01 - permission to wrap original token
+    uint8 public PERMISSION_MINT = 2;   // 0b10 - permission to mint USDST
+    uint8 public PERMISSION_MASK = 3;   // 0b11 - maximum valid permission value (both wrap and mint)
 /* --------------------------------------------------------------------- */
 /*                            ─  ENUMS  ─                               */
 /* --------------------------------------------------------------------- */
@@ -153,6 +154,7 @@ contract record MercataBridge is Ownable {
     event ChainUpdated(uint256 indexed externalChainId, address custody, address router, uint256 lastProcessedBlock, bool enabled, string chainName);
     event AssetUpdated(address indexed stratoToken, uint256 externalChainId, address externalToken, uint256 externalDecimals, string externalName, string externalSymbol, uint256 maxPerTx, uint8 permissions);
     event LastProcessedBlockUpdated(uint256 indexed externalChainId, uint256 lastProcessedBlock);
+    event USDSTAddressUpdated(address indexed oldAddress, address indexed newAddress);
 
 /* --------------------------------------------------------------------- */
 /*                           ─  MODIFIERS  ─                             */
@@ -206,6 +208,14 @@ contract record MercataBridge is Ownable {
         emit PauseToggled(_deposits, _withdrawals);
     }
 
+    /* update USDST address */
+    function setUSDSTAddress(address newUSDSTAddress) external onlyOwner {
+        require(newUSDSTAddress != address(0), "MB: zero USDST address");
+        address old = USDST_ADDRESS;
+        USDST_ADDRESS = newUSDSTAddress;
+        emit USDSTAddressUpdated(old, newUSDSTAddress);
+    }
+
     /* hard per-tx cap */
     function setTokenLimits(address stratoToken, uint256 maxPerTx)
         external
@@ -253,7 +263,7 @@ contract record MercataBridge is Ownable {
         uint8 permissions
     ) external onlyOwner {
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
-        require((permissions & ~PERMISSION_MASK) == 0, "MB: invalid permissions");
+        require((permissions & PERMISSION_MASK) == permissions, "MB: invalid permissions");
 
         AssetInfo storage a = assets[stratoToken];
         a.externalToken    = externalToken;
