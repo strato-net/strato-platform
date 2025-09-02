@@ -7,6 +7,7 @@ import {
   createWithdrawalProposals,
   proposeTransactions,
 } from "../utils/safeHelper";
+import { retry } from "../utils/api";
 
 export const createSafeTransactions = async (
   withdrawals: NonEmptyArray<Withdrawal>,
@@ -57,13 +58,19 @@ export const monitorSafeTransactionStatus = async (
 
   try {
     const apiKit = new SafeApiKit({ chainId });
-    const tx = await apiKit.getTransaction(safeTxHash);
+    const tx = await retry(
+      () => apiKit.getTransaction(safeTxHash),
+      { logPrefix: "SafeService" }
+    );
 
     if (tx.isExecuted) return "executed";
 
-    const allTxs = await apiKit.getMultisigTransactions(tx.safe, {
-      nonce: tx.nonce,
-    } as any);
+    const allTxs = await retry(
+      () => apiKit.getMultisigTransactions(tx.safe, {
+        nonce: tx.nonce,
+      } as any),
+      { logPrefix: "SafeService" }
+    );
 
     const executedTx = (allTxs as any)?.results?.find(
       (m: any) => m?.nonce === tx.nonce && m?.isExecuted,
