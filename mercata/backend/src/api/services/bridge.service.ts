@@ -17,8 +17,7 @@ const { MercataBridge, Token } = constants;
 const assetParams = (mint: boolean, token: string) => ({
   select: "count()",
   key: `eq.${token}`,
-  "value->>enabled": "eq.true",
-  ...(mint ? { "value->>mintUSDST": "eq.true" } : {}),
+  "value->>permissions": mint ? "gte.2" : "gte.1", // 2+ for mint, 1+ for wrap
   address: `eq.${constants.mercataBridge}`,
 });
 
@@ -50,7 +49,7 @@ export const requestWithdrawal = async (
 
   ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");
   ensure(requiredUSDST === 0n || (balances.get(constants.USDST) ?? 0n) >= requiredUSDST, "Insufficient USDST for gas");
-  ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled");
+  ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled for wrapping");
 
   const tx = buildFunctionTx(actions);
 
@@ -96,8 +95,7 @@ export const getBridgeTransactions = async (
 export const getBridgeableTokens = async (accessToken: string, chainId: string, mintUSDST = false) => {
   const params = {
     select: "stratoToken:key,AssetInfo:value",
-    "value->>enabled": "eq.true",
-    "value->>mintUSDST": `eq.${mintUSDST}`,
+    "value->>permissions": mintUSDST ? "in.(2,3)" : "in.(1,3)", // 2,3 for mint, 1,3 for wrap
     "value->>externalChainId": `eq.${chainId}`,
     address: `eq.${constants.mercataBridge}`
   };

@@ -67,10 +67,21 @@ export interface SafeTransactionResult {
   safeTxHash: string;
 }
 
+// Clear types for Safe transaction data
+export interface SafeTransactionData {
+  safeAddress: string;
+  safeTransactionData: any;
+  safeTxHash: string;
+  senderAddress: string;
+  senderSignature: any;
+  nonce: number;
+  externalChainId: number;
+}
+
 export interface AssetInfo {
   externalToken: string;
   externalDecimals: number;
-  enabled: boolean;
+  permissions: number;
   externalChainId: string;
 }
 

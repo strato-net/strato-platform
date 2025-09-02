@@ -4,13 +4,12 @@ export interface Token {
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
   externalChainId: string;       // Matches AssetInfo.externalChainId
-  enabled: boolean;              // Matches AssetInfo.enabled
+  permissions: number;           // Matches AssetInfo.permissions
   externalName: string;          // Matches AssetInfo.externalName
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
   maxPerTx: string;              // Matches AssetInfo.maxPerTx
-  mintUSDST: boolean;            // Matches AssetInfo.mintUSDST
 }
 
 export interface NetworkConfig {
