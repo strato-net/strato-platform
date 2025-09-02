@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -29,7 +29,6 @@ const weiToEther = (v?: string) => {
 const LiquidationsSection: React.FC = () => {
   const { liquidatable, loading, error, refreshData } = useLiquidationContext();
   const { userAddress } = useUser();
- 
 
   const [modalData, setModalData] = React.useState<{
     loan: LiquidationEntry;
