@@ -111,8 +111,8 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                 <InfoTooltip content="Measures your position's safety. Higher is better. Close to 1.0 means high risk of liquidation. Below 1.0 means your position can be liquidated. No loan means you have no outstanding debt.">
                   <span className="text-gray-600 text-sm font-medium">Health Factor</span>
                 </InfoTooltip>
-                <div className="flex flex-row gap-3">
-                <span className="font-semibold text-lg" style={{ color: getTextColor((loanData?.healthFactor)) }}>
+                <div className="flex flex-row gap-3 ">
+                <span className="font-semibold text-lg mt-3" style={{ color: getTextColor((loanData?.healthFactor)) }}>
                   {(() => {
                     // Check if there's no outstanding debt
                     const totalAmountOwed = loanData?.totalAmountOwed ? parseFloat(formatUnits(loanData.totalAmountOwed.toString(), 18)) : 0;
@@ -128,17 +128,10 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                 </span>
                 {/* Liquidation Risk Button */}
                 {loanData?.healthFactor<1 &&  (
-                  <span >
-                    <Link to="/dashboard/pools?tab=liquidationSection">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        className="border-red-500 text-red-700 hover:bg-red-100"
-                      >
-                        <AlertTriangle/>Your Loan May be Liquidated
-                      </Button>
-                    </Link>
-                  </span>
+                  <div className="flex items-center gap-2 text-red-500 text-sm border border-red-500 rounded-md p-2 mt-2"> 
+                      <AlertTriangle className="flex-shrink-0" />
+                      <span className="text-red-500 text-xs sm:text-sm">Your position is at risk—add collateral or repay to restore health.</span>
+                  </div>
                 )}
               </div>
               </div>

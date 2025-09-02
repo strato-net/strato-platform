@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useState } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -10,17 +9,8 @@ import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
 
 const Pools = () => {
-  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations">("lending");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-  // Set initial tab based on URL query parameter
-  useEffect(() => {
-    const tabParam = searchParams.get('tab');
-    if (tabParam === 'liquidationSection') {
-      setActiveTab('liquidations');
-    }
-  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-gray-50">
