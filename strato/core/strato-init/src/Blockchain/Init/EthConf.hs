@@ -7,6 +7,7 @@ import Blockchain.EthConf
 import Blockchain.Init.Options
 import Blockchain.Strato.Model.Address
 import Control.Concurrent
+import Data.Default
 import Data.Maybe
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Network.HTTP.Types.Status
@@ -99,6 +100,7 @@ defaultConfig =
       levelDBConfig = defaultLevelDBConfig,
       kafkaConfig = defaultKafkaConfig,
       blockConfig = defaultBlockConfig,
+      p2pConfig = def,
       quarryConfig = defaultQuarryConfig,
       discoveryConfig = defaultDiscoveryConfig,
       apiConfig = defaultApiConfig

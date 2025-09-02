@@ -202,8 +202,8 @@ instance RunsClient ContextM where
       handler conduits
 
 instance RunsServer ContextM (LoggingT IO) where
-  runServer (TCPPort listenPort) runner handler = do
-    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
+  runServer (TCPPort listenPort') runner handler = do
+    let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort' "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
       let pSource = appSource app
           pSink = appSink app
@@ -337,7 +337,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral flags_connectionTimeout
+    if diffTime > fromIntegral (connectionTimeout $ p2pConfig ethConf)
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -355,7 +355,7 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    if diffTime > fromIntegral flags_connectionTimeout
+    if diffTime > fromIntegral (connectionTimeout $ p2pConfig ethConf)
       then do
         -- stale cache; override it
         let emptyRBH = RemainingBlockHeaders []

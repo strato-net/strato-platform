@@ -23,13 +23,13 @@ import           Blockchain.CommunicationConduit
 import           Blockchain.Context hiding (Inbound, Outbound)
 import           Blockchain.Data.PubKey (secPubKeyToPoint)
 import           Blockchain.Display (displayMessage, MsgDirection(..))
+import           Blockchain.EthConf
 import           Blockchain.EthEncryptionException
 import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.ExtMergeSources
 import           Blockchain.Frame
 import           Blockchain.Metrics
-import           Blockchain.Options
 import           Blockchain.RLPx
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -171,7 +171,7 @@ runPeerInList thePeer sSource = do
 
 stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
 stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main loop" $ do
-  $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
+  $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show (maxConn $ p2pConfig ethConf)
   forever $ do
     $logDebugS "stratoP2PClient" "About to fetch available peers and loop over them"
     ePeers <- getBondedPeers
@@ -181,7 +181,7 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
         liftIO $ threadDelay 1000000
       Right peers -> do
         numActivePeers <- liftIO $ fmap length getPeersByThreads
-        forM_ (take (flags_maxConn - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
+        forM_ (take ((maxConn $ p2pConfig ethConf) - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
           _ <- liftIO . forkIO . runLoggingT . runner $ \_ -> do
               result <- try . liftIO . runLoggingT . runner $ runPeerInList peer
               handleRunPeerResult peer result
@@ -208,7 +208,7 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
                 return ()
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
-            disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
+            disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * (connectionTimeout $ p2pConfig ethConf)) False
           e' | Just (EventBeforeHandshake _) <- fromException e' -> do
             disableException thePeer "EventBeforeHandshake" Nothing False
           e' | Just NetworkIDMismatch <- fromException e' -> do
@@ -219,14 +219,14 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
                 return ()
               Nothing -> return ()
           e' | Just PeerDisconnected <- fromException e' -> do
-            disableException thePeer "PeerDisconnected" (Just . fromIntegral $ 2 * flags_connectionTimeout) True
+            disableException thePeer "PeerDisconnected" (Just . fromIntegral $ 2 * (connectionTimeout $ p2pConfig ethConf)) True
           e' | Just PeerNonResponsive <- fromException e' -> do
-            disableException thePeer "PeerNonResponsive" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
+            disableException thePeer "PeerNonResponsive" (Just . fromIntegral $ 2 * (connectionTimeout $ p2pConfig ethConf)) False
           e' | Just NoPeerCertificate <- fromException e' -> do
             disableException thePeer "NoPeerCertificate" Nothing True
           e' | Just (IOError _ ioErrType _ _ _ _) <- fromException e' -> do
             case ioErrType of
-              NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * flags_connectionTimeout) True
+              NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * (connectionTimeout $ p2pConfig ethConf)) True
               i -> disableException thePeer ("ioErrType: " <> show i) Nothing True
           e' | Just HeadCipherTooShort <- fromException e' -> do  -- this is what we get when the remote machine crashes (obviously, it isn't sending us any reason for hangup)
             disableException thePeer "HeadCipherTooShort" Nothing True

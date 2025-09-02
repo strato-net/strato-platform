@@ -21,13 +21,13 @@ import           Blockchain.Context
 import           Blockchain.Data.Control               (P2PCNC (..))
 import           Blockchain.Data.RLP
 import           Blockchain.Data.Wire                  as W
+import           Blockchain.EthConf                    hiding (port)
 import           Blockchain.Event
 import           Blockchain.EventException
 import           Blockchain.Frame
 import           Blockchain.Metrics
 import           Blockchain.Model.SyncState
 import           Blockchain.Model.SyncTask
-import           Blockchain.Options
 import           Blockchain.Participation
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
@@ -132,7 +132,7 @@ handleMsgClientConduit myId peer = do
           $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
           if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
             then do
-              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+              yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (maxReturnedHeaders $ p2pConfig ethConf) 0 Forward
             else do
               $logInfoS "handleMsgClientConduit" $ T.pack $ "sync task chiliad higher than world highest block (#" ++ show highestBlockNum' ++ "), marking the new chiliad as 'NotReady'"
               lift $ setSyncTaskNotReady (pPeerHost peer)
@@ -153,7 +153,7 @@ handleMsgServerConduit myPubkey peer = do
 
   numActivePeers <- liftIO $ fmap length getPeersByThreads
 
-  when (numActivePeers > flags_maxConn) $ do
+  when (numActivePeers > (maxConn $ p2pConfig ethConf)) $ do
     yield $ Right $ Disconnect TooManyPeers
     throwIO CurrentlyTooManyPeers
 
@@ -201,7 +201,7 @@ handleMsgServerConduit myPubkey peer = do
           $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
-          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) flags_maxReturnedHeaders 0 Forward
+          yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (maxReturnedHeaders $ p2pConfig ethConf) 0 Forward
 
       lift stampActionTimestamp
     other -> assertHandshake other

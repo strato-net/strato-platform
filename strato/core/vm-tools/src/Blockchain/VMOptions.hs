@@ -2,14 +2,10 @@
 
 module Blockchain.VMOptions
   ( flags_debug,
-    flags_trace,
     flags_svmTrace,
     flags_svmDev,
     flags_sqlDiff,
     flags_diffPublish,
-    flags_queryBlocks,
-    flags_transactionRootVerification,
-    flags_startingBlock,
     flags_txSizeLimit,
     flags_gasLimit,
     flags_strictGas,
@@ -32,9 +28,6 @@ defineFlag
   \ evmMetrics -> Profile runtimes labeled by opcode, collected by prometheus"
 defineFlag "sqlDiff" True "runs sqlDiff and updates account state and storage in SQL DB"
 defineFlag "diffPublish" False "publishes all state changes to kafka"
-defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to process in one batch"
-defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
-defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
 defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"

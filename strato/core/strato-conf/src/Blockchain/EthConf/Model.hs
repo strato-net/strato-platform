@@ -10,6 +10,7 @@ module Blockchain.EthConf.Model where
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
+import Data.Default
 import Data.Ratio
 import Data.Yaml
 import qualified Database.PostgreSQL.Simple as PS (ConnectInfo (..), postgreSQLConnectionString)
@@ -44,6 +45,7 @@ data EthConf = EthConf
     redisBlockDBConfig :: RedisBlockDBConf,
     kafkaConfig :: KafkaConf,
     levelDBConfig :: LevelDBConf,
+    p2pConfig :: P2PConfig,
     quarryConfig :: QuarryConf,
     blockConfig :: BlockConf,
     discoveryConfig :: DiscoveryConf,
@@ -60,6 +62,30 @@ data DiscoveryConf = DiscoveryConf
     minAvailablePeers :: Int
   }
   deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+data P2PConfig = P2PConfig
+  {
+    listenHost :: String, --Connect to server at address
+    listenPort :: Int, --Listen on port
+    maxConn :: Int, --Maximum number of client connections.
+    connectionTimeout :: Int, --Number of seconds to tolerate a useless peer
+    maxReturnedHeaders :: Int, --Number of headers to return from a GetBlockHeaders request
+    maxHeadersTxsLens :: Int, --Number of txs size to return from a BlockHeader request
+    averageTxsPerBlock :: Int --Average number of txs per block
+  }
+  deriving (Show, Eq, Generic, FromJSON, ToJSON)
+
+instance Default P2PConfig where
+  def =
+    P2PConfig {
+    listenHost="127.0.0.1",
+    listenPort=30303,
+    maxConn=20,
+    connectionTimeout=30,
+    maxReturnedHeaders=500,
+    maxHeadersTxsLens=2500,
+    averageTxsPerBlock=40
+    }
 
 data SqlConf = SqlConf
   { user :: String,

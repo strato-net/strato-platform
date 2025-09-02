@@ -18,6 +18,7 @@ library:
     - base
     - bytestring
     - containers
+    - data-default
     - hedis
     - kafka-monad
     - postgresql-simple

@@ -31,13 +31,13 @@ import           Blockchain.Data.PubKey
 import           Blockchain.Data.Transaction
 import qualified Blockchain.Data.TXOrigin              as Origin
 import           Blockchain.Data.Wire
+import           Blockchain.EthConf
 import           Blockchain.EventException
 import           Blockchain.EventModel
 import           Blockchain.HeaderCache
 import           Blockchain.Model.SyncState
 import           Blockchain.Model.SyncTask
 import           Blockchain.Model.WrappedBlock
-import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address       (Address)
@@ -141,7 +141,7 @@ handleEvents peer = awaitForever $ \case
     -- When the skip is 0, none of the blocks are skipped but when the skip is 3,
     -- 3/4s of the blocks will be dropped when creating the blockheaders
     -- so we overcompensate here.
-    let count = (1 + skip') * min flags_maxReturnedHeaders max'
+    let count = (1 + skip') * min (maxReturnedHeaders $ p2pConfig ethConf) max'
     chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
     when (null chain) $
       $logInfoS "handleEvents/GetBlockHeaders" $
@@ -166,7 +166,7 @@ handleEvents peer = awaitForever $ \case
                 if num > fromIntegral max'
                   then num - fromIntegral max'
                   else 1
-        let count = (1 + skip') * min flags_maxReturnedHeaders (fromIntegral max')
+        let count = (1 + skip') * min (maxReturnedHeaders $ p2pConfig ethConf) (fromIntegral max')
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start' ..]
         yieldR . BlockHeaders . skipEntries skip' $ morphBlockHeader . unCanonical . snd <$> chain
   MsgEvt (BlockHeaders bHeaders) -> do
@@ -200,7 +200,7 @@ handleEvents peer = awaitForever $ \case
     yieldR (BlockBodies []) -- todo parity bans peers when they do this. should we?
   MsgEvt (GetBlockBodies shas') -> do
     lift stampActionTimestamp
-    let shas = take flags_maxReturnedHeaders shas'
+    let shas = take (maxReturnedHeaders $ p2pConfig ethConf) shas'
     lift (getUntilMissing shas) >>= \bodies -> do
       yieldR . BlockBodies $ map (second (map morphBlockHeader) . toBody) bodies
     where
@@ -376,7 +376,7 @@ handleEvents peer = awaitForever $ \case
     P2pPushBlocks start end p -> do
       ss <- lift $ shouldSendToPeer p
       when ss $ do
-        let count = min flags_maxReturnedHeaders . fromIntegral $ end - start + 1
+        let count = min (maxReturnedHeaders $ p2pConfig ethConf) . fromIntegral $ end - start + 1
         chain <- fmap M.toList . lift . selectMany (Proxy @(Canonical BlockHeader)) $ take count [start ..]
         when (null chain) $
           $logErrorS "handleEvents/P2pPushBlocks" . T.pack $
@@ -409,8 +409,8 @@ handleEvents peer = awaitForever $ \case
       Just oldTS -> do
         ts <- liftIO getCurrentTime
         let diffTime = ts `diffUTCTime` oldTS
-        liftIO $ setTitle $ "timer: " ++ show (fromIntegral flags_connectionTimeout - diffTime)
-        when (diffTime > fromIntegral flags_connectionTimeout) $ do
+        liftIO $ setTitle $ "timer: " ++ show (fromIntegral (connectionTimeout $ p2pConfig ethConf) - diffTime)
+        when (diffTime > fromIntegral (connectionTimeout $ p2pConfig ethConf)) $ do
           yieldR $ Disconnect UselessPeer
           liftIO $ setTitle "timer timed out!"
           throwIO PeerNonResponsive
@@ -431,7 +431,7 @@ syncFetch ::
   Integer ->
   ConduitM Event (Either P2PCNC Message) m ()
 syncFetch d num = do
-  yieldR $ GetBlockHeaders (BlockNumber num) flags_maxReturnedHeaders 0 d
+  yieldR $ GetBlockHeaders (BlockNumber num) (maxReturnedHeaders $ p2pConfig ethConf) 0 d
   lift stampActionTimestamp
 
 shouldRespond :: PPeer -> Origin.TXOrigin -> Bool

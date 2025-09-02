@@ -29,6 +29,7 @@ library:
   - common-log
   - conduit
   - containers
+  - data-default
   - directory
   - ethereum-discovery
   - ethereum-rlp

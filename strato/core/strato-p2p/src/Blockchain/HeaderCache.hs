@@ -13,7 +13,7 @@ import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader (BlockHeader)
 import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.Transaction
-import Blockchain.Options
+import Blockchain.EthConf
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Verification
@@ -85,6 +85,6 @@ instance MonadP2P m => HasHeaderCache m where
 splitNeededHeaders :: [BlockHeader] -> ([BlockHeader], [BlockHeader])
 splitNeededHeaders neededHeaders =
   let txsLens = BlockHeader.extraData2TxsLen <$> BlockHeader.extraData <$> neededHeaders
-      txsLensInSums = scanl (+) (0) $ fromMaybe flags_averageTxsPerBlock <$> txsLens
-      txsLensInLimit = takeWhile (< flags_maxHeadersTxsLens) $ tail txsLensInSums
+      txsLensInSums = scanl (+) (0) $ fromMaybe (averageTxsPerBlock $ p2pConfig ethConf) <$> txsLens
+      txsLensInLimit = takeWhile (< (maxHeadersTxsLens $ p2pConfig ethConf)) $ tail txsLensInSums
    in splitAt (length txsLensInLimit) neededHeaders

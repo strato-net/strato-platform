@@ -69,17 +69,17 @@ createCommandsFile :: IO ()
 createCommandsFile = 
   writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
 
-strato-p2p --connectionTimeout=3600 --maxConn=1000 --networkID=-1 --sqlPeers=true --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
+strato-p2p --networkID=-1 --minLogLevel=LevelInfo --network=helium +RTS -T -RTS
 
 strato-sequencer --blockstanbul_round_period_s=120 --minLogLevel=LevelInfo --network=helium +RTS -T -RTS +RTS -N1
 
-vm-runner --blockstanbul=true --debug=false --debugEnabled=false --debugPort=8051 --debugWSHost=strato --debugWSPort=8052 --diffPublish=true --maxTxsPerBlock=500 --minLogLevel=LevelInfo --networkID=-1 --seqEventsBatchSize=-1 --seqEventsCostHeuristic=20000 --sqlDiff=true --svmDev=false --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
+vm-runner --blockstanbul=true --debug=false --debugWSHost=strato --diffPublish=true --minLogLevel=LevelInfo --svmTrace=false --network=helium +RTS -T -RTS +RTS -I2 -N1
 
 strato-p2p-indexer
 
 strato-api-indexer
 
-slipstream --database=cirrus --kafkahost=localhost --kafkaport=9092 --minLogLevel=LevelInfo --pghost=localhost --pgport=5432 --pguser=postgres --password=api --stratourl=http://localhost:3000/eth/v1.2 +RTS -T -RTS
+slipstream --database=cirrus --kafkahost=localhost --kafkaport=9092 --minLogLevel=LevelInfo --pghost=localhost --pgport=5432 --pguser=postgres --password=api +RTS -T -RTS
 
 strato-api --minLogLevel=LevelInfo --networkID=-1 --vaultUrl=https://vault.blockapps.net:8093 --oauthDiscoveryUrl=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration --network=helium +RTS -T -RTS +RTS -N1
 
