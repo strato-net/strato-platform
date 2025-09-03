@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
-import { cdpService, PositionData } from "@/services/cdpService";
+import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -26,7 +26,7 @@ const getHealthFactorColor = (healthFactor: number): string => {
  * Currently uses dummy data - will connect to backend API later
  */
 const PositionsList: React.FC = () => {
-  const [positions, setPositions] = useState<PositionData[]>([]);
+  const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   
@@ -97,7 +97,7 @@ const PositionsList: React.FC = () => {
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
+  const calculateMaxValue = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
     const currentCollateral = parseFloat(position.collateralAmount);
     const currentDebt = parseFloat(position.debtAmount);
     const currentCollateralUSD = parseFloat(position.collateralValueUSD);
@@ -164,7 +164,7 @@ const PositionsList: React.FC = () => {
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
@@ -244,10 +244,10 @@ const PositionsList: React.FC = () => {
           throw new Error(`Unknown action: ${action}`);
       }
 
-      if (result.success) {
+      if (result.status === "success") {
         toast({
           title: "Success",
-          description: result.message || `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully`,
+          description: `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
         });
         
         // Clear the input and reset states after successful action

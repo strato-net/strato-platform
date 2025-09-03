@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cdpService, AssetConfig } from "@/services/cdpService";
+import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
+import { useUserTokens } from "@/context/UserTokensContext";
 
 /**
  * CDP Mint flow widget - now connected to backend
@@ -19,9 +20,11 @@ const MintWidget: React.FC = () => {
   const [borrowAmount, setBorrowAmount] = useState("0");
   const [loading, setLoading] = useState(false);
   const [isMintMaxEnabled, setIsMintMaxEnabled] = useState(false);
+  const [isDepositMaxEnabled, setIsDepositMaxEnabled] = useState(false);
   const [isRatioLocked, setIsRatioLocked] = useState(false);
   const [lockedCR, setLockedCR] = useState<number | null>(null);
   const { toast } = useToast();
+  const { activeTokens } = useUserTokens();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
   
@@ -63,9 +66,21 @@ const MintWidget: React.FC = () => {
     return Math.max(0, maxBorrowableUSD);
   };
 
+  // Get user's balance for the selected deposit asset
+  const getUserDepositBalance = (): string => {
+    if (!depositAsset) return "0";
+    
+    const userToken = activeTokens.find(token => 
+      token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
+    );
+    
+    return userToken?.balance || "0";
+  };
+
   const maxBorrowable = calculateMaxBorrowable();
   const currentCR = calculateCurrentCR();
   const liquidationRatio = depositAsset?.liquidationRatio || 150;
+  const userDepositBalance = getUserDepositBalance();
 
   // Fetch supported assets on component mount
   useEffect(() => {
@@ -124,7 +139,9 @@ const MintWidget: React.FC = () => {
   // Reset mint MAX state and ratio lock when deposit asset changes
   useEffect(() => {
     setIsMintMaxEnabled(false);
+    setIsDepositMaxEnabled(false);
     setBorrowAmount("0");
+    setDepositAmount("0");
     setIsRatioLocked(false);
     setLockedCR(null);
   }, [depositAsset]);
@@ -204,8 +221,32 @@ const MintWidget: React.FC = () => {
     }
   };
 
+  // Handle deposit MAX button click
+  const handleDepositMaxClick = () => {
+    if (isDepositMaxEnabled) {
+      // Disable MAX and clear amount
+      setIsDepositMaxEnabled(false);
+      setDepositAmount("0");
+    } else {
+      // Enable MAX and set to user's full balance
+      setIsDepositMaxEnabled(true);
+      setDepositAmount(userDepositBalance);
+    }
+  };
+
   // Handle manual input change for deposit amount
   const handleDepositAmountChange = (value: string) => {
+    // Check if user manually typed the max deposit amount
+    const isTypingMaxAmount = Math.abs(parseFloat(value || "0") - parseFloat(userDepositBalance)) < 0.000001 && parseFloat(userDepositBalance) > 0;
+    
+    if (isTypingMaxAmount && !isDepositMaxEnabled) {
+      // User typed the max amount, activate MAX styling
+      setIsDepositMaxEnabled(true);
+    } else if (!isTypingMaxAmount && isDepositMaxEnabled) {
+      // User changed away from max amount, disable MAX styling
+      setIsDepositMaxEnabled(false);
+    }
+    
     // Deposit is only affected by user input - never by slider or other inputs
     setDepositAmount(value);
     
@@ -286,19 +327,19 @@ const MintWidget: React.FC = () => {
     try {
       // First deposit collateral
       const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
-      if (!depositResult.success) {
-        throw new Error(depositResult.message || "Deposit failed");
+      if (depositResult.status !== "success") {
+        throw new Error("Deposit failed");
       }
 
       // Then mint USDST
       const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
-      if (!mintResult.success) {
-        throw new Error(mintResult.message || "Mint failed");
+      if (mintResult.status !== "success") {
+        throw new Error("Mint failed");
       }
 
       toast({
         title: "Vault Created Successfully",
-        description: `Deposited ${depositAmount} ${depositAsset.symbol} and minted ${borrowAmount} USDST`,
+        description: `Deposited ${depositAmount} ${depositAsset.symbol} and minted ${borrowAmount} USDST. Tx: ${mintResult.hash}`,
       });
 
       // Reset form
@@ -325,6 +366,11 @@ const MintWidget: React.FC = () => {
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Deposit</h3>
+            {depositAsset && parseFloat(userDepositBalance) > 0 && (
+              <span className="text-xs text-gray-500">
+                Balance: {parseFloat(userDepositBalance).toFixed(6)} {depositAsset.symbol}
+              </span>
+            )}
           </div>
 
           <Select 
@@ -346,14 +392,23 @@ const MintWidget: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <Input
-              className="flex-1 text-right"
+              className={`flex-1 text-right ${isDepositMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={depositAmount}
               onChange={(e) => handleDepositAmountChange(e.target.value)}
               placeholder="0.0"
               type="number"
               step="any"
+              readOnly={isDepositMaxEnabled}
             />
-            <Button variant="ghost" size="sm">MAX</Button>
+            <Button 
+              variant={isDepositMaxEnabled ? "default" : "ghost"}
+              size="sm" 
+              className={`min-w-[50px] ${isDepositMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+              onClick={handleDepositMaxClick}
+              disabled={!userDepositBalance || parseFloat(userDepositBalance) <= 0}
+            >
+              MAX
+            </Button>
           </div>
           <p className="text-xs text-gray-500">
             ${(parseFloat(depositAmount || "0") * 4000).toFixed(2)}
@@ -405,17 +460,7 @@ const MintWidget: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
         <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4 space-y-3">
           <div className="flex justify-between items-center text-sm font-medium">
-            <div className="flex items-center gap-2">
-              <span>Collateralization Ratio (CR)</span>
-              {isRatioLocked && (
-                <div className="flex items-center gap-1">
-                  <div className="w-3 h-3 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs">🔗</span>
-                  </div>
-                  <span className="text-xs text-blue-600">Mint ↔ Slider</span>
-                </div>
-              )}
-            </div>
+            <span>Collateralization Ratio (CR)</span>
             <span className={isPositionDangerous ? 'text-red-500 font-bold' : ''}>
               {isRatioLocked && lockedCR ? lockedCR.toFixed(2) : (currentCR > 0 ? currentCR.toFixed(2) : '0.00')}%
             </span>
