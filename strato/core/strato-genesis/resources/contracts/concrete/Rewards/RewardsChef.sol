@@ -83,7 +83,7 @@ contract record RewardsChef is Ownable {
         }
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
 
-        totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        totalAllocPoint += _allocPoint;
 
         // Create new pool info with first bonus period
         PoolInfo memory poolInfo;
@@ -106,7 +106,7 @@ contract record RewardsChef is Ownable {
         require(_pid < pools.length, "Pool does not exist");
 
         uint256 oldAllocPoint = pools[_pid].allocPoint;
-        totalAllocPoint = totalAllocPoint.sub(oldAllocPoint).add(_allocPoint);
+        totalAllocPoint = totalAllocPoint - oldAllocPoint + _allocPoint;
         pools[_pid].allocPoint = _allocPoint;
 
         emit AllocationPointsUpdated(_pid, oldAllocPoint, _allocPoint);
