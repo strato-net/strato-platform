@@ -621,7 +621,12 @@ contract record MercataBridge is Ownable {
 
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = block.timestamp;
-        IERC20(w.stratoToken).transfer(w.stratoSender, w.stratoTokenAmount);
+
+        if (w.mintUSDST) {
+            IERC20(USDST_ADDRESS).transfer(w.stratoSender, w.stratoTokenAmount);
+        } else {
+            IERC20(w.stratoToken).transfer(w.stratoSender, w.stratoTokenAmount);
+        }
 
         emit WithdrawalAborted(id);
     }
