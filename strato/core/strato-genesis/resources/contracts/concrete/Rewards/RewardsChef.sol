@@ -10,7 +10,7 @@ contract record RewardsChef is Ownable {
     // EVENTS
     // ═════════════════════════════════════════════════════════════════════════
 
-    event PoolAdded(uint256 indexed pid, address indexed lpToken, uint256 allocPoint);
+    event PoolAdded(uint256 indexed pid, address indexed lpToken, uint256 allocPoint, uint256 initialBonusMultiplier);
     event AllocationPointsUpdated(uint256 indexed pid, uint256 oldAllocPoint, uint256 newAllocPoint);
     event BonusPeriodAdded(uint256 indexed pid, uint256 startTimestamp, uint256 bonusMultiplier);
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
@@ -91,12 +91,12 @@ contract record RewardsChef is Ownable {
         poolInfo.allocPoint = _allocPoint;
         poolInfo.lastRewardTimestamp = block.timestamp;
         poolInfo.accPerToken = 0;
-        poolInfo.bonusPeriods = new BonusPeriod[](1);
-        poolInfo.bonusPeriods[0] = BonusPeriod(block.timestamp, _bonusMultiplier);
+        poolInfo.bonusPeriods = [];
+        poolInfo.bonusPeriods.push(BonusPeriod(block.timestamp, _bonusMultiplier));
 
         pools.push(poolInfo);
 
-        emit PoolAdded(pools.length - 1, _lpToken, _allocPoint);
+        emit PoolAdded(pools.length - 1, _lpToken, _allocPoint, _bonusMultiplier);
     }
 
     function updateAllocationPoints(

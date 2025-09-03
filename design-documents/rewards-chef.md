@@ -111,7 +111,7 @@ Similar logic to `add` in the `MasterChef` with few differences
 pools. If it exists, the add function will return.
 
 * Emits a `PoolAdded` event when a new pool is successfully added, including the
-pool ID (index), LP token address, and allocation points.
+pool ID (index), LP token address, allocation points, and initial bonus multiplier.
 
 * Initializes the pool with the first bonus period using the provided multiplier
 and current block timestamp.
