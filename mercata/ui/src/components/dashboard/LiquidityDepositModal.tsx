@@ -54,7 +54,7 @@ const LiquidityDepositModal = ({
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
-  const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A');
+  const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
   const { addLiquidity, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
   const { toast } = useToast();
