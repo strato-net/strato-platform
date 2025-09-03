@@ -21,6 +21,7 @@ const MintWidget: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 w-full">
+      <h2 className="text-xl font-semibold text-gray-900">Create Vault</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}

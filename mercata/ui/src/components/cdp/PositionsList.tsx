@@ -2,6 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { MoreVertical } from "lucide-react";
 
 interface PositionData {
   asset: string;
@@ -36,6 +39,10 @@ const getHealthFactorColor = (healthFactor: number): string => {
 const PositionsList: React.FC = () => {
   const [positions, setPositions] = useState<PositionData[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // State for active action and input amounts for each position
+  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
+  const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
 
   // Dummy data - will replace with API call
   useEffect(() => {
@@ -85,13 +92,56 @@ const PositionsList: React.FC = () => {
       ];
       
       setPositions(dummyPositions);
+      
+      // Initialize state for each position
+      const initialActiveActions: Record<string, null> = {};
+      const initialAmounts: Record<string, string> = {};
+      dummyPositions.forEach(position => {
+        initialActiveActions[position.asset] = null;
+        initialAmounts[position.asset] = "";
+      });
+      setActiveActions(initialActiveActions);
+      setInputAmounts(initialAmounts);
+      
       setLoading(false);
     };
 
     fetchPositions();
   }, []);
 
+  // Handle dropdown action selection
+  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+    const currentAction = activeActions[asset];
+    
+    if (currentAction === action) {
+      // If selecting the same action, hide the input/button
+      setActiveActions(prev => ({ ...prev, [asset]: null }));
+      setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+    } else {
+      // Show the selected action input/button
+      setActiveActions(prev => ({ ...prev, [asset]: action }));
+      setInputAmounts(prev => ({ ...prev, [asset]: "" })); // Reset input amount
+    }
+  };
 
+  // Handle input amount changes
+  const handleInputChange = (asset: string, value: string) => {
+    setInputAmounts(prev => ({ ...prev, [asset]: value }));
+  };
+
+  // Handle action button clicks
+  const handleAction = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
+    if (!amount || parseFloat(amount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    // TODO: Implement actual action calls to backend
+    console.log(`${action} ${amount} for asset ${asset}`);
+    alert(`${action.charAt(0).toUpperCase() + action.slice(1)} ${amount} - This will be implemented later`);
+    
+    // Clear the input after action
+    setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+  };
 
   if (loading) {
     return (
@@ -112,7 +162,7 @@ const PositionsList: React.FC = () => {
     return (
       <Card className="w-full">
         <CardHeader>
-          <CardTitle>Your Positions</CardTitle>
+          <CardTitle>Your Vaults</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
@@ -127,7 +177,7 @@ const PositionsList: React.FC = () => {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Your Positions</CardTitle>
+        <CardTitle>Your Vaults</CardTitle>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -148,6 +198,29 @@ const PositionsList: React.FC = () => {
                     <h4 className="font-semibold">{position.symbol}</h4>
                   </div>
                 </div>
+                
+                {/* 3-dot options menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'deposit')}>
+                      Deposit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'withdraw')}>
+                      Withdraw
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'mint')}>
+                      Mint
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'repay')}>
+                      Repay
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
@@ -171,20 +244,27 @@ const PositionsList: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  Deposit
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  Withdraw
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  Mint
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
-                  Repay
-                </Button>
-              </div>
+              {/* Conditional Action Input/Button */}
+              {activeActions[position.asset] && (
+                <div className="mt-4 flex gap-2">
+                  <Input
+                    placeholder="Amount"
+                    value={inputAmounts[position.asset] || ""}
+                    onChange={(e) => handleInputChange(position.asset, e.target.value)}
+                    className="flex-1"
+                    type="number"
+                    step="any"
+                  />
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="min-w-[80px]"
+                    onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
+                  >
+                    {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)}
+                  </Button>
+                </div>
+              )}
             </div>
             );
           })}
