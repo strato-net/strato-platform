@@ -41,6 +41,8 @@ contract record RewardsChef is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
     // ═════════════════════════════════════════════════════════════════════════
+    // Workaround for `type(uint256).max`
+    uint256 private MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -138,6 +140,37 @@ contract record RewardsChef is Ownable {
         uint256 oldMinFutureTime = minFutureTime;
         minFutureTime = _minFutureTime;
         emit MinFutureTimeUpdated(oldMinFutureTime, _minFutureTime);
+    }
+
+    function getMultiplier(uint256 _pid, uint256 _from, uint256 _to) public view returns (uint256) {
+        require(_pid < pools.length, "Pool does not exist");
+        require(_from <= _to, "From timestamp must be less than or equal to to timestamp");
+
+        if (_from == _to) {
+            return 0;
+        }
+
+        BonusPeriod[] storage periods = pools[_pid].bonusPeriods;
+        uint256 totalMultipliedTime = 0;
+        uint256 currentTime = _from;
+
+        for (uint256 i = 0; i < periods.length && currentTime < _to; i++) {
+            uint256 periodStart = periods[i].startTimestamp;
+            uint256 periodEnd = (i + 1 < periods.length) ? periods[i + 1].startTimestamp : MAX_INT;
+
+            if (currentTime < periodStart) {
+                currentTime = periodStart;
+            }
+
+            if (currentTime < _to && currentTime < periodEnd) {
+                uint256 segmentEnd = (_to < periodEnd) ? _to : periodEnd;
+                uint256 segmentDuration = segmentEnd - currentTime;
+                totalMultipliedTime += segmentDuration * (periods[i].bonusMultiplier);
+                currentTime = segmentEnd;
+            }
+        }
+
+        return totalMultipliedTime;
     }
 
 }

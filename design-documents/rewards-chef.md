@@ -85,11 +85,11 @@ We will keep the same data structures: `UserInfo` and `PoolInfo` with some chang
   if the pools were accruing rewards in special period (between start and end
   block that were defined in the contract).
 
-  We extend this concept by allowing multiple bonus periods per pool. Each 
+  We extend this concept by allowing multiple bonus periods per pool. Each
   `PoolInfo` contains an array of `BonusPeriod` structs, where each period has:
   - `startTimestamp`: When this bonus period begins
   - `bonusMultiplier`: The multiplier for this period (not smaller than 1)
-  
+
   This approach prevents gaming attacks where users could time deposits/withdrawals
   around multiplier changes, since all periods are immutable once created and
   rewards are calculated accurately across different time periods.
@@ -155,3 +155,38 @@ Configuration function to adjust the minimum time requirement for new bonus peri
 * Prevents last-minute bonus period additions that could be gamed
 
 * Emits a `MinFutureTimeUpdated` event with old and new values
+
+### Reward calculation
+
+#### Getting multiplier for time periods
+
+Similar to `getMultiplier` function in MasterChef V1 with key differences:
+
+* The function name is `getMultiplier`
+
+* Takes pool ID as additional parameter since each pool has different bonus periods
+
+* Takes timestamp parameters (`_from`, `_to`) instead of block numbers
+
+* Handles multiple bonus periods instead of single bonus period
+
+* Calculates the total multiplied time across all relevant bonus periods in the given time range
+
+* Returns the sum of (time_duration × bonus_multiplier) for each period segment
+
+**Examples:**
+
+1. **Single period query**:
+   - Pool has period: [100, ∞) with multiplier 2x
+   - Query: `getMultiplier(0, 150, 200)`
+   - Result: `(200-150) × 2 = 50 × 2 = 100`
+
+2. **Cross-period query**:
+   - Pool has periods: [100, 300) with 2x, [300, ∞) with 3x
+   - Query: `getMultiplier(0, 250, 350)`
+   - Result: `(300-250) × 2 + (350-300) × 3 = 50 × 2 + 50 × 3 = 100 + 150 = 250`
+
+3. **Query before period starts**:
+   - Pool has period: [100, ∞) with multiplier 2x
+   - Query: `getMultiplier(0, 50, 150)`
+   - Result: `(150-100) × 2 = 50 × 2 = 100` (time before period start is ignored)
