@@ -37,13 +37,13 @@ docker: build_all_docker docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe docker-compose
+mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle docker-compose
 
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-stripe mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -92,14 +92,6 @@ mercata-oracle:
 	# TODO: #dcpush - replace with proper docker compose push flow
 	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_image_tag
 	#echo "${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}" > oracle_image_tag_ecr
-
-mercata-stripe:
-	@echo Now building mercata-stripe...
-	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
-	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}
-	# TODO: #dcpush - replace with proper docker compose push flow
-	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}" > stripe_image_tag_ecr
 
 eks:
 	@echo Now generating eks manifest files

@@ -87,20 +87,6 @@ pipeline {
             
             archiveArtifacts artifacts: 'docker-compose*.yml', fingerprint: true
             
-            // Build Stripe
-            def stripeRepo = "registry-aws.blockapps.net:5000/blockapps/mercata-stripe"
-            def stripeRepoECR = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"
-            sh "docker build -t stripe:latest services/payment/stripe"
-            sh """
-              docker tag stripe:latest ${stripeRepo}:${env.GIT_SHA}
-              docker tag stripe:latest ${stripeRepoECR}:${env.GIT_SHA}
-              docker push ${stripeRepo}:${env.GIT_SHA}
-              docker push ${stripeRepoECR}:${env.GIT_SHA}
-            """
-            writeFile file: 'docker-image-stripe.txt', text: "${stripeRepo}:${env.GIT_SHA}\n${stripeRepoECR}:${env.GIT_SHA}"
-            archiveArtifacts artifacts: 'docker-image-stripe.txt', fingerprint: true
-            
-
             // Build and Push Bridge Service
             def bridgeRepo = "registry-aws.blockapps.net:5000/blockapps/mercata-bridge"
             def bridgeRepoECR = "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/mercata/bridge"

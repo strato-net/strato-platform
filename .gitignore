@@ -23,10 +23,6 @@ docker-compose.identity.push.yml
 docker-compose.identity.push.ecr.yml
 docker-compose.identity.yml
 docker-compose.identity.ecr.yml
-docker-compose.stripe-ps.yml
-docker-compose.stripe-ps.ecr.yml
-docker-compose.stripe-ps.push.yml
-docker-compose.stripe-ps.push.ecr.yml
 docker-compose.payment.ecr.yml
 docker-compose.payment.push.ecr.yml
 docker-compose.payment.push.yml
@@ -52,4 +48,3 @@ strato/hpc
 *~
 rewards-server/src/config/latestBlock.json
 bridge_image_tag*
-stripe_image_tag*
