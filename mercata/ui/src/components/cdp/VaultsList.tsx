@@ -5,19 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical } from "lucide-react";
-
-interface PositionData {
-  asset: string;
-  symbol: string;
-  collateralAmount: string;
-  collateralValueUSD: string;
-  debtAmount: string;
-  debtValueUSD: string;
-  collateralizationRatio: number;
-  liquidationRatio: number;
-  stabilityFeeRate: number;
-  health: "healthy" | "warning" | "danger";
-}
+import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
+import { useToast } from "@/hooks/use-toast";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -32,86 +21,54 @@ const getHealthFactorColor = (healthFactor: number): string => {
 };
 
 /**
- * PositionsList component displays user's CDP positions
- * Each position represents a collateral vault with corresponding debt
- * Currently uses dummy data - will connect to backend API later
+ * VaultsList component displays user's CDP vaults
+ * Each vault represents a collateral position with corresponding debt
+ * Connected to backend API for real-time data
  */
-const PositionsList: React.FC = () => {
-  const [positions, setPositions] = useState<PositionData[]>([]);
+const VaultsList: React.FC = () => {
+  const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
 
-  // Dummy data - will replace with API call
+  // Fetch positions from backend
   useEffect(() => {
     const fetchPositions = async () => {
       setLoading(true);
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Dummy position data - each represents collateral + debt pair
-      const dummyPositions: PositionData[] = [
-        {
-          asset: "0x1234567890123456789012345678901234567890",
-          symbol: "wstETH",
-          collateralAmount: "2.5",
-          collateralValueUSD: "10000.00",
-          debtAmount: "5000.00",
-          debtValueUSD: "5000.00",
-          collateralizationRatio: 200,
-          liquidationRatio: 150,
-          stabilityFeeRate: 5.54,
-          health: "healthy"
-        },
-        {
-          asset: "0x2345678901234567890123456789012345678901",
-          symbol: "WBTC",
-          collateralAmount: "0.15",
-          collateralValueUSD: "15000.00",
-          debtAmount: "8000.00",
-          debtValueUSD: "8000.00",
-          collateralizationRatio: 187.5,
-          liquidationRatio: 150,
-          stabilityFeeRate: 4.25,
-          health: "healthy"
-        },
-        {
-          asset: "0x3456789012345678901234567890123456789012",
-          symbol: "ETH",
-          collateralAmount: "5.0",
-          collateralValueUSD: "20000.00",
-          debtAmount: "12000.00",
-          debtValueUSD: "12000.00",
-          collateralizationRatio: 166.67,
-          liquidationRatio: 150,
-          stabilityFeeRate: 6.12,
-          health: "warning"
-        }
-      ];
-      
-      setPositions(dummyPositions);
-      
-      // Initialize state for each position
-      const initialActiveActions: Record<string, null> = {};
-      const initialAmounts: Record<string, string> = {};
-      const initialMaxStates: Record<string, boolean> = {};
-      dummyPositions.forEach(position => {
-        initialActiveActions[position.asset] = null;
-        initialAmounts[position.asset] = "";
-        initialMaxStates[position.asset] = false;
-      });
-      setActiveActions(initialActiveActions);
-      setInputAmounts(initialAmounts);
-      setMaxStates(initialMaxStates);
-      
-      setLoading(false);
+      try {
+        const fetchedPositions = await cdpService.getVaults();
+        setPositions(fetchedPositions);
+        
+        // Initialize state for each position
+        const initialActiveActions: Record<string, null> = {};
+        const initialAmounts: Record<string, string> = {};
+        const initialMaxStates: Record<string, boolean> = {};
+        fetchedPositions.forEach(position => {
+          initialActiveActions[position.asset] = null;
+          initialAmounts[position.asset] = "";
+          initialMaxStates[position.asset] = false;
+        });
+        setActiveActions(initialActiveActions);
+        setInputAmounts(initialAmounts);
+        setMaxStates(initialMaxStates);
+      } catch (error) {
+        console.error("Failed to fetch positions:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load your vaults. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchPositions();
-  }, []);
+  }, [toast]);
 
   // Handle dropdown action selection
   const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
@@ -140,7 +97,7 @@ const PositionsList: React.FC = () => {
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
+  const calculateMaxValue = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
     const currentCollateral = parseFloat(position.collateralAmount);
     const currentDebt = parseFloat(position.debtAmount);
     const currentCollateralUSD = parseFloat(position.collateralValueUSD);
@@ -207,7 +164,7 @@ const PositionsList: React.FC = () => {
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
@@ -257,17 +214,61 @@ const PositionsList: React.FC = () => {
   };
 
   // Handle action button clicks
-  const handleAction = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
+  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
     if (!amount || parseFloat(amount) <= 0) {
-      alert('Please enter a valid amount');
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount greater than 0",
+        variant: "destructive",
+      });
       return;
     }
-    // TODO: Implement actual action calls to backend
-    console.log(`${action} ${amount} for asset ${asset}`);
-    alert(`${action.charAt(0).toUpperCase() + action.slice(1)} ${amount} - This will be implemented later`);
-    
-    // Clear the input after action
-    setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+
+    try {
+      let result;
+      
+      switch (action) {
+        case 'deposit':
+          result = await cdpService.deposit(asset, amount);
+          break;
+        case 'withdraw':
+          result = await cdpService.withdraw(asset, amount);
+          break;
+        case 'mint':
+          result = await cdpService.mint(asset, amount);
+          break;
+        case 'repay':
+          result = await cdpService.repay(asset, amount);
+          break;
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
+
+      if (result.status === "success") {
+        toast({
+          title: "Success",
+          description: `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
+        });
+        
+        // Clear the input and reset states after successful action
+        setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+        setMaxStates(prev => ({ ...prev, [asset]: false }));
+        setActiveActions(prev => ({ ...prev, [asset]: null }));
+        
+        // Refresh positions data
+        const updatedPositions = await cdpService.getVaults();
+        setPositions(updatedPositions);
+      } else {
+        throw new Error(result.message || `${action} failed`);
+      }
+    } catch (error) {
+      console.error(`Failed to ${action}:`, error);
+      toast({
+        title: "Transaction Failed",
+        description: `Failed to ${action}. Please try again.`,
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -442,4 +443,4 @@ const PositionsList: React.FC = () => {
   );
 };
 
-export default PositionsList;
+export default VaultsList;
