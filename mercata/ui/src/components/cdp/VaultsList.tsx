@@ -21,11 +21,11 @@ const getHealthFactorColor = (healthFactor: number): string => {
 };
 
 /**
- * PositionsList component displays user's CDP positions
- * Each position represents a collateral vault with corresponding debt
- * Currently uses dummy data - will connect to backend API later
+ * VaultsList component displays user's CDP vaults
+ * Each vault represents a collateral position with corresponding debt
+ * Connected to backend API for real-time data
  */
-const PositionsList: React.FC = () => {
+const VaultsList: React.FC = () => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -443,4 +443,4 @@ const PositionsList: React.FC = () => {
   );
 };
 
-export default PositionsList;
+export default VaultsList;

@@ -1,5 +1,5 @@
 import MintWidget from '@/components/cdp/MintWidget';
-import PositionsList from '@/components/cdp/PositionsList';
+import VaultsList from '@/components/cdp/VaultsList';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,7 +18,7 @@ const ExchangeCart = () => {
             <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
               <MintWidget />
             </div>
-            <PositionsList />
+            <VaultsList />
           </div>
         </TabsContent>
         <TabsContent value="bridge">
