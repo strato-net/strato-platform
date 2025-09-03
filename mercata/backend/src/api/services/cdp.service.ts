@@ -21,7 +21,6 @@ const {
   PriceOracle,
 } = constants;
 
-// Constants for calculations
 const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
 
@@ -35,6 +34,8 @@ export const getCDPRegistry = async (
   options: Record<string, string> = {}
 ): Promise<Record<string, any>> => {
   const { select, ...filters } = options;
+
+  // Filter out undefined values
   const cleanedFilters = Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined)
   );
@@ -45,17 +46,27 @@ export const getCDPRegistry = async (
     address: `eq.${cdpRegistry}`,
   };
 
-  const {
-    data: [registryData],
-  } = await cirrus.get(accessToken, `/${CDPRegistry}`, { params });
-
-  if (!registryData) {
-    throw new Error(
-      `Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`
+  try {
+    const { data: [registryData], } = await cirrus.get(
+      accessToken,
+      `/${CDPRegistry}`,
+      { params }
     );
-  }
 
-  return registryData;
+    if (!registryData) {
+      console.error(`No CDP Registry found at address: ${cdpRegistry}`);
+      throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
+    }
+
+    return registryData;
+  } catch (error: any) {
+    console.error("Error in getCDPRegistry:", {
+      cdpRegistry,
+      params,
+      error: error.response?.data || error.message
+    });
+    throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
+  }
 };
 
 // Helper function to calculate health factor
@@ -68,30 +79,6 @@ const getHealthStatus = (healthFactor: number): "healthy" | "warning" | "danger"
   if (healthFactor >= 1.5) return "healthy";
   if (healthFactor >= 1.1) return "warning";
   return "danger";
-};
-
-// Helper function to calculate rate accumulator with accrued interest
-const calculateAccruedRate = (
-  rateAccumulator: string,
-  stabilityFeeRate: string,
-  lastAccrual: number
-): string => {
-  const currentTime = Math.floor(Date.now() / 1000);
-  const dt = currentTime - lastAccrual;
-  
-  if (dt === 0) return rateAccumulator;
-  
-  // Simplified compound interest calculation
-  // For more accurate calculation, we would need to implement the _rpow function from the contract
-  const rateNum = BigInt(rateAccumulator);
-  const feeRateNum = BigInt(stabilityFeeRate);
-  
-  // Approximate: newRate = oldRate * (1 + (feeRate - RAY) / RAY * dt)
-  const feePerSecond = (feeRateNum - RAY) * BigInt(dt);
-  const factor = RAY + feePerSecond;
-  const newRate = (rateNum * factor) / RAY;
-  
-  return newRate.toString();
 };
 
 // Helper function to get token info
@@ -175,18 +162,15 @@ export const getVaults = async (
     const priceEntry = registry.priceOracle?.prices?.find(
       (p: any) => p.asset.toLowerCase() === asset.toLowerCase()
     );
-    const price = BigInt(priceEntry?.price || "0");
+    const price = BigInt(priceEntry?.value || "0");
     
     if (!config || !globalState || !vault) {
       return null;
     }
     
-    // Calculate current debt with accrued interest
-    const currentRateAccumulator = calculateAccruedRate(
-      globalState.rateAccumulator,
-      config.stabilityFeeRate,
-      parseInt(globalState.lastAccrual)
-    );
+    // Use the current rate accumulator from the indexed data
+    // This is already up-to-date as it's updated on every transaction
+    const currentRateAccumulator = globalState.rateAccumulator;
     
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
