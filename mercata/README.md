@@ -11,7 +11,6 @@ The app consists of multiple parts:
       - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
 - services
   - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
-  - Currently there is only the Stripe service for token on ramping.
   - Look at the individual services read me for further details.
 
 ---
