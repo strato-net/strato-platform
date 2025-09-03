@@ -54,6 +54,7 @@ const LiquidityDepositModal = ({
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
+  const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A');
 
   const { addLiquidity, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
   const { toast } = useToast();
@@ -93,7 +94,29 @@ const LiquidityDepositModal = ({
   const handleClose = () => {
     setToken1Amount('');
     setToken2Amount('');
+    setDepositMode('A');
     onClose();
+  };
+
+  const handleDepositModeChange = (mode: 'A' | 'B' | 'A&B') => {
+    setDepositMode(mode);
+    
+    // Clear amounts when switching to single token modes
+    if (mode === 'A') {
+      setToken2Amount('');
+    } else if (mode === 'B') {
+      setToken1Amount('');
+    }
+  };
+
+  const toggleDepositMode = () => {
+    if (depositMode === 'A') {
+      handleDepositModeChange('B');
+    } else if (depositMode === 'B') {
+      handleDepositModeChange('A&B');
+    } else {
+      handleDepositModeChange('A');
+    }
   };
 
   const handleDepositSubmit = async (values: DepositFormValues) => {
@@ -105,7 +128,26 @@ const LiquidityDepositModal = ({
     const token1Balance = BigInt(tokenABalance || "0");
     const token2Balance = BigInt(tokenBBalance || "0");
 
-    if (token1AmountWei > token1Balance || token2AmountWei > token2Balance) {
+    // Validate based on deposit mode
+    if (depositMode === 'A' && (token1AmountWei > token1Balance || !token1Amount)) {
+      toast({
+        title: "Error",
+        description: "Insufficient balance for token A",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (depositMode === 'B' && (token2AmountWei > token2Balance || !token2Amount)) {
+      toast({
+        title: "Error",
+        description: "Insufficient balance for token B",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (depositMode === 'A&B' && (token1AmountWei > token1Balance || token2AmountWei > token2Balance)) {
       toast({
         title: "Error",
         description: "Insufficient balance",
@@ -118,17 +160,31 @@ const LiquidityDepositModal = ({
       operationInProgressRef.current = true;
       setDepositLoading(true);
       
-      const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-      const tokenAAmount = isInitialLiquidity 
-        ? safeParseUnits(token1Amount, 18)
-        : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
-      const tokenBAmount = safeParseUnits(token2Amount, 18);
-
-      await addLiquidity({
+      let liquidityParams: any = {
         poolAddress: selectedPool.address,
-        maxTokenAAmount: tokenAAmount.toString(),
-        tokenBAmount: tokenBAmount.toString(),
-      });
+      };
+
+      if (depositMode === 'A') {
+        // Single token mode - Token A
+        liquidityParams.singleTokenAmount = token1AmountWei.toString();
+        liquidityParams.isAToB = true;
+      } else if (depositMode === 'B') {
+        // Single token mode - Token B
+        liquidityParams.singleTokenAmount = token2AmountWei.toString();
+        liquidityParams.isAToB = false;
+      } else {
+        // Dual token mode
+        const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
+        const tokenAAmount = isInitialLiquidity 
+          ? safeParseUnits(token1Amount, 18)
+          : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
+        const tokenBAmount = safeParseUnits(token2Amount, 18);
+        
+        liquidityParams.maxTokenAAmount = tokenAAmount.toString();
+        liquidityParams.tokenBAmount = tokenBAmount.toString();
+      }
+
+      await addLiquidity(liquidityParams);
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -189,7 +245,8 @@ const LiquidityDepositModal = ({
         if (
           value &&
           selectedPool?.aToBRatio &&
-          BigInt(safeParseUnits(selectedPool.aToBRatio, 18)) > BigInt(0)
+          BigInt(safeParseUnits(selectedPool.aToBRatio, 18)) > BigInt(0) &&
+          depositMode === 'A&B'
         ) {
           const token1Wei = safeParseUnits(value, 18);
           const ratioWei = safeParseUnits(selectedPool.aToBRatio, 18);
@@ -201,7 +258,8 @@ const LiquidityDepositModal = ({
         if (
           value &&
           selectedPool?.bToARatio &&
-          BigInt(safeParseUnits(selectedPool.bToARatio, 18)) > BigInt(0)
+          BigInt(safeParseUnits(selectedPool.bToARatio, 18)) > BigInt(0) &&
+          depositMode === 'A&B'
         ) {
           const token2Wei = safeParseUnits(value, 18);
           const ratioWei = safeParseUnits(selectedPool.bToARatio, 18);
@@ -221,6 +279,34 @@ const LiquidityDepositModal = ({
     }
   };
 
+  const isInputDisabled = (tokenType: 'A' | 'B') => {
+    if (depositMode === 'A') return tokenType === 'B';
+    if (depositMode === 'B') return tokenType === 'A';
+    return false; // Both enabled in A&B mode
+  };
+
+  const isConfirmButtonDisabled = () => {
+    if (depositLoading) return true;
+    
+    // Check USDST balance for transaction fee
+    if (BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)) return true;
+    
+    // Check based on deposit mode
+    switch (depositMode) {
+      case 'A':
+        return !token1Amount || safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0");
+      case 'B':
+        return !token2Amount || safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0");
+      case 'A&B':
+        return !token1Amount || !token2Amount || 
+               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
+               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0");
+      default:
+        return true;
+    }
+  };
+
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -233,15 +319,19 @@ const LiquidityDepositModal = ({
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
             {/* First Token */}
-            <div className="rounded-lg border p-2">
+            <div className={`rounded-lg border p-2 transition-colors ${
+              depositMode === 'A' ? 'border-blue-400 ' : 
+              depositMode === 'A&B' ? 'border-blue-400 ' :
+              'border-gray-200 bg-gray-50'
+            }`}>
               <span className="text-sm text-gray-500">Amount</span>
               <div className="flex items-center gap-2">
                 <Input
-                  disabled={balanceLoading}
+                  disabled={balanceLoading || isInputDisabled('A')}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ? "text-red-500" : ""
-                  }`}
+                  } ${isInputDisabled('A') ? "opacity-50 cursor-not-allowed" : ""}`}
                   value={token1Amount}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -288,7 +378,7 @@ const LiquidityDepositModal = ({
                   size="sm"
                   className="text-xs text-blue-500"
                   onClick={() => handleMaxClick(true)}
-                  disabled={balanceLoading}
+                  disabled={balanceLoading || isInputDisabled('A')}
                 >
                   Max
                 </Button>
@@ -328,18 +418,35 @@ const LiquidityDepositModal = ({
               })()}
             </div>
 
+            {/* Deposit Mode Toggle */}
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="px-4 py-2 text-sm font-medium rounded-md border-blue-200 bg-blue-50 text-blue-700 transition-colors"
+                onClick={toggleDepositMode} 
+              >
+                Deposit Mode ({depositMode === 'A' ? 'A' : depositMode === 'B' ? 'B' : 'A&B'})
+              </Button>
+            </div>
+
             {/* Second Token */}
-            <div className="rounded-lg border p-3">
+            <div className={`rounded-lg border p-3 transition-colors ${
+              depositMode === 'B' ? 'border-blue-400 ' : 
+              depositMode === 'A&B' ? 'border-blue-400 ' :
+              'border-gray-200 '
+            }`}>
               <div className="flex justify-between mb-2">
                 <span className="text-sm text-gray-500">Amount</span>
               </div>
               <div className="flex items-center gap-2">
                 <Input
-                  disabled={balanceLoading}
+                  disabled={balanceLoading || isInputDisabled('B')}
                   placeholder="0.0"
                   className={`flex-1 border-none text-xl font-medium p-0 h-auto focus-visible:ring-0 ${
                     safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ? "text-red-500" : ""
-                  }`}
+                  } ${isInputDisabled('B') ? "opacity-50 cursor-not-allowed" : ""}`}
                   value={token2Amount}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -386,7 +493,7 @@ const LiquidityDepositModal = ({
                   size="sm"
                   className="text-xs text-blue-500"
                   onClick={() => handleMaxClick(false)}
-                  disabled={balanceLoading}
+                  disabled={balanceLoading || isInputDisabled('B')}
                 >
                   Max
                 </Button>
@@ -458,14 +565,7 @@ const LiquidityDepositModal = ({
 
           <div className="pt-2">
             <Button 
-              disabled={
-                depositLoading || 
-                !token1Amount || 
-                !token2Amount || 
-                safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") ||
-                safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") ||
-                BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)
-              } 
+              disabled={isConfirmButtonDisabled()} 
               type="submit" 
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
             >

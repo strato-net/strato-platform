@@ -232,15 +232,19 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
 
   const addLiquidity = useCallback(async (data: {
     poolAddress: string;
-    tokenBAmount: string;
-    maxTokenAAmount: string;
+    tokenBAmount?: string;
+    maxTokenAAmount?: string;
+    singleTokenAmount?: string;
+    isAToB?: boolean;
   }) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
-        tokenBAmount: data.tokenBAmount,
-        maxTokenAAmount: data.maxTokenAAmount
+        ...(data.tokenBAmount && { tokenBAmount: data.tokenBAmount }),
+        ...(data.maxTokenAAmount && { maxTokenAAmount: data.maxTokenAAmount }),
+        ...(data.singleTokenAmount && { singleTokenAmount: data.singleTokenAmount }),
+        ...(data.isAToB !== undefined && { isAToB: data.isAToB })
       });
       return response.data;
     } catch (err) {
