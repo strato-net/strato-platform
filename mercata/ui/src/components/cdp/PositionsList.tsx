@@ -43,6 +43,7 @@ const PositionsList: React.FC = () => {
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
+  const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
 
   // Dummy data - will replace with API call
   useEffect(() => {
@@ -96,12 +97,15 @@ const PositionsList: React.FC = () => {
       // Initialize state for each position
       const initialActiveActions: Record<string, null> = {};
       const initialAmounts: Record<string, string> = {};
+      const initialMaxStates: Record<string, boolean> = {};
       dummyPositions.forEach(position => {
         initialActiveActions[position.asset] = null;
         initialAmounts[position.asset] = "";
+        initialMaxStates[position.asset] = false;
       });
       setActiveActions(initialActiveActions);
       setInputAmounts(initialAmounts);
+      setMaxStates(initialMaxStates);
       
       setLoading(false);
     };
@@ -117,16 +121,89 @@ const PositionsList: React.FC = () => {
       // If selecting the same action, hide the input/button
       setActiveActions(prev => ({ ...prev, [asset]: null }));
       setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+      setMaxStates(prev => ({ ...prev, [asset]: false }));
     } else {
       // Show the selected action input/button
       setActiveActions(prev => ({ ...prev, [asset]: action }));
       setInputAmounts(prev => ({ ...prev, [asset]: "" })); // Reset input amount
+      setMaxStates(prev => ({ ...prev, [asset]: false })); // Reset max state
     }
   };
 
   // Handle input amount changes
   const handleInputChange = (asset: string, value: string) => {
+    // If user manually types, disable max state
+    if (maxStates[asset]) {
+      setMaxStates(prev => ({ ...prev, [asset]: false }));
+    }
     setInputAmounts(prev => ({ ...prev, [asset]: value }));
+  };
+
+  // Calculate maximum allowed value for each action
+  const calculateMaxValue = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
+    const currentCollateral = parseFloat(position.collateralAmount);
+    const currentDebt = parseFloat(position.debtAmount);
+    const currentCollateralUSD = parseFloat(position.collateralValueUSD);
+    const pricePerUnit = currentCollateralUSD / currentCollateral;
+
+    switch (action) {
+      case 'deposit': {
+        // For deposit, we could set a reasonable limit or user's wallet balance
+        // For now, using a placeholder max value
+        return "1000"; // TODO: Replace with actual wallet balance
+      }
+      
+      case 'withdraw': {
+        // Maximum withdraw is current collateral, but we should consider maintaining health factor
+        // For safety, allow withdrawal that keeps health factor above 1.5
+        if (currentDebt === 0) {
+          return currentCollateral.toString();
+        }
+        // Calculate max withdrawal while maintaining health factor > 1.5
+        const minHealthFactor = 1.5;
+        const requiredCollateralRatio = position.liquidationRatio * minHealthFactor;
+        const requiredCollateralUSD = (currentDebt * requiredCollateralRatio) / 100;
+        const requiredCollateral = requiredCollateralUSD / pricePerUnit;
+        const maxWithdraw = Math.max(0, currentCollateral - requiredCollateral);
+        return maxWithdraw.toFixed(6);
+      }
+      
+      case 'mint': {
+        // Maximum mint while maintaining health factor above 1.5
+        const safeHealthFactor = 1.5;
+        const safeCollateralRatio = position.liquidationRatio * safeHealthFactor;
+        const maxDebtUSD = (currentCollateralUSD * 100) / safeCollateralRatio;
+        const maxMint = Math.max(0, maxDebtUSD - currentDebt);
+        return maxMint.toFixed(2);
+      }
+      
+      case 'repay': {
+        // Maximum repay is current debt
+        return currentDebt.toString();
+      }
+      
+      default:
+        return "0";
+    }
+  };
+
+  // Handle MAX button click
+  const handleMaxClick = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+    const position = positions.find(p => p.asset === asset);
+    if (!position) return;
+
+    const isCurrentlyMax = maxStates[asset];
+    
+    if (isCurrentlyMax) {
+      // If currently in max state, disable it and clear input
+      setMaxStates(prev => ({ ...prev, [asset]: false }));
+      setInputAmounts(prev => ({ ...prev, [asset]: "" }));
+    } else {
+      // Enable max state and set max value
+      const maxValue = calculateMaxValue(position, action);
+      setMaxStates(prev => ({ ...prev, [asset]: true }));
+      setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+    }
   };
 
   // Calculate preview values based on input
@@ -333,10 +410,19 @@ const PositionsList: React.FC = () => {
                     placeholder="Amount"
                     value={inputAmounts[position.asset] || ""}
                     onChange={(e) => handleInputChange(position.asset, e.target.value)}
-                    className="flex-1"
+                    className={`flex-1 ${maxStates[position.asset] ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
                     type="number"
                     step="any"
+                    readOnly={maxStates[position.asset]}
                   />
+                  <Button 
+                    variant={maxStates[position.asset] ? "default" : "outline"}
+                    size="sm" 
+                    className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                    onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
+                  >
+                    MAX
+                  </Button>
                   <Button 
                     variant="outline" 
                     size="sm" 
