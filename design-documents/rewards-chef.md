@@ -5,7 +5,7 @@
 Third attempt to the [Create CATA rewards smart contract
 #4408](https://github.com/blockapps/strato-platform/issues/4408).
 
-There are essentially two types scenarios where we give CATA rewards to our
+There are essentially two types of scenarios where we give CATA rewards to our
 users:
 
 * time accrued rewards - rewards grow as time passes (most in our system)
@@ -21,36 +21,36 @@ inspired our implementation.
 
 ## Core requirements / ideas
 
-* Stacking mechanism for LP tokens
+* Staking mechanism for LP tokens
 
-  Ability to stake LP tokens owned by our users. The award is CATA token. The
-  awards accrue over time.
+  Ability to stake LP tokens owned by our users. The reward is CATA token. The
+  rewards accrue over time.
 
   This means that once the pool (Liquidity Pools, Swap Pools) mints an LP token,
-  it is responsibility of the user to stake those tokens in the staking
-  pool. This can be obviously done by the UI in our system.
+  it is the responsibility of the user to stake those tokens in the staking
+  pool. This can obviously be done by the UI in our system.
 
-* The accrual should be computational efficient.
+* The accrual should be computationally efficient.
 
   Global to the whole stake pool, individual rewards per user calculated on
   demand.
 
 * Consider rewards for early adopters
 
-  We should consider multiplier for early adopters built into the smart
+  We should consider a multiplier for early adopters built into the smart
   contract.
 
-* Consider supporting multiple awards
+* Consider supporting multiple rewards
 
   Initially we need to support just CATA. But we might want to consider using
   other tokens.
 
-  The first implementation - that will be based on the MasterChef V1 - will only support CATA. We might want
+  The first implementation - that will be based on the MasterChef V1 - will only support CATA.
 
-* Should we feed portion of rewards to the developers?
+* Should we feed a portion of rewards to the developers?
 
   The SushiSwap (following [@LawMaster](https://twitter.com/LawMaster))
-  suggestion, delegated 10% of rewards to the developers of the smart contract
+  suggestion delegated 10% of rewards to the developers of the smart contract
   for the sustainability of the project.
 
 * Do we need to defer when rewards start to be calculated?
@@ -64,26 +64,26 @@ inspired our implementation.
 
 ## RewardsChef 1.0 - the design
 
-At its core, the `RewardsChef` will resemble `MasterChef` (`V1`) algorithm with
-few adjustments.
+At its core, the `RewardsChef` will resemble the `MasterChef` (`V1`) algorithm with
+a few adjustments.
 
 ### Structures
 
 We will keep the same data structures: `UserInfo` and `PoolInfo` with some changes:
 
 * since our blockchain allows us to retrieve timestamps from blocks
-  `block.timestamp` we we will have a `uint256 lastRewardTimestamp` instead of
+  `block.timestamp`, we will have a `uint256 lastRewardTimestamp` instead of
   `lastRewardBlock`
 
-* since our reward is cata (not sushi) we will call the `accSushiPerShare` more
+* since our reward is CATA (not sushi), we will call the `accSushiPerShare` the more
   general `accPerToken`
 
 * each individual pool will have bonus periods with different multipliers
 
   The original MasterChef had a multiplier that would represent time passed (or
-  number of blocks that has passed), multiplied by bonus. Bonus was only added
-  if the pools were accruing rewards in special period (between start and end
-  block that were defined in the contract).
+  the number of blocks that had passed), multiplied by a bonus. The bonus was only added
+  if the pools were accruing rewards in a special period (between start and end
+  blocks that were defined in the contract).
 
   We extend this concept by allowing multiple bonus periods per pool. Each
   `PoolInfo` contains an array of `BonusPeriod` structs, where each period has:
@@ -98,27 +98,27 @@ We will keep the same data structures: `UserInfo` and `PoolInfo` with some chang
 
 #### Adding stake pool
 
-Similar logic to `add` in the `MasterChef` with few differences
+Similar logic to `add` in `MasterChef` with a few differences
 
-* The `add` funtion was renamed to `addPool`
+* The `add` function was renamed to `addPool`
 
-* It will not take `withUpdate` variable
+* It will not take a `withUpdate` variable
 
 * We also don't have to track the `startBlock`, we will start calculating
   rewards the moment the first pool is added
 
-* It is also not expensive for us to check if given LP token is already in the
+* It is also not expensive for us to check if a given LP token is already in the
 pools. If it exists, the add function will return.
 
 * Emits a `PoolAdded` event when a new pool is successfully added, including the
 pool ID (index), LP token address, allocation points, and initial bonus multiplier.
 
 * Initializes the pool with the first bonus period using the provided multiplier
-and current block timestamp.
+and the current block timestamp.
 
 #### Updating allocation points
 
-Similar to `set` function in the `MasterChef` with few differences
+Similar to the `set` function in `MasterChef` with a few differences
 
 * The function name should be `updateAllocationPoints`
 
@@ -128,7 +128,7 @@ Similar to `set` function in the `MasterChef` with few differences
 
 #### Adding bonus periods
 
-New functionality not present in MasterChef to manage bonus multipliers over time:
+New functionality not present in MasterChef for managing bonus multipliers over time:
 
 * The function name should be `addBonusPeriod`
 
