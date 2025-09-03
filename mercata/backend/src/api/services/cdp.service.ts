@@ -366,17 +366,11 @@ export const repay = async (
     throw new Error("CDP Engine not found");
   }
 
-  // Get USDST address
-  const { data: usdstData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: {
-      select: "address",
-      _symbol: "eq.USDST",
-    }
-  });
-  const usdstAddress = usdstData?.[0]?.address;
+  // Get USDST address from registry
+  const usdstAddress = registry.usdst;
   
   if (!usdstAddress) {
-    throw new Error("USDST token not found");
+    throw new Error("USDST token not found in registry");
   }
 
   const tx: FunctionInput[] = [
@@ -410,17 +404,11 @@ export const repayAll = async (
     throw new Error("CDP Engine not found");
   }
 
-  // Get USDST address
-  const { data: usdstData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: {
-      select: "address",
-      _symbol: "eq.USDST",
-    }
-  });
-  const usdstAddress = usdstData?.[0]?.address;
+  // Get USDST address from registry
+  const usdstAddress = registry.usdst;
   
   if (!usdstAddress) {
-    throw new Error("USDST token not found");
+    throw new Error("USDST token not found in registry");
   }
 
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
@@ -456,17 +444,11 @@ export const liquidate = async (
     throw new Error("CDP Engine not found");
   }
 
-  // Get USDST address
-  const { data: usdstData } = await cirrus.get(accessToken, `/${Token}`, {
-    params: {
-      select: "address",
-      _symbol: "eq.USDST",
-    }
-  });
-  const usdstAddress = usdstData?.[0]?.address;
+  // Get USDST address from registry
+  const usdstAddress = registry.usdst;
   
   if (!usdstAddress) {
-    throw new Error("USDST token not found");
+    throw new Error("USDST token not found in registry");
   }
 
   const tx: FunctionInput[] = [
