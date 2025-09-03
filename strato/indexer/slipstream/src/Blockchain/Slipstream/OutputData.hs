@@ -128,13 +128,14 @@ instance Ord ForeignKeyInfo where
         compare (tableName x, columnNames x, foreignTableName x, foreignColumnNames x)
                 (tableName y, columnNames y, foreignTableName y, foreignColumnNames y)
 
-data SqlType = SqlBool | SqlDecimal | SqlText | SqlJsonb deriving (Eq, Ord, Show)
+data SqlType = SqlBool | SqlDecimal | SqlText | SqlJsonb | SqlSerial deriving (Eq, Ord, Show)
 
 sqlTypePostgres :: SqlType -> Text
 sqlTypePostgres SqlBool    = "bool"
 sqlTypePostgres SqlDecimal = "decimal"
 sqlTypePostgres SqlText    = "text"
 sqlTypePostgres SqlJsonb   = "jsonb"
+sqlTypePostgres SqlSerial  = "serial"
 
 data OnConflict = OnConflict [Text] [Text] (Maybe Text) deriving (Eq, Ord, Show)
 
@@ -157,6 +158,11 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mUc) = T.concat $
   [ "CREATE TABLE IF NOT EXISTS ",
     tableNameToDoubleQuoteText tableName,
     " (",
+    case tableName of
+      EventTableName{} -> case sqlTypeText SqlSerial of
+        "" -> ""
+        serial -> "id " <> serial <> " NOT NULL, "
+      _ -> "",
     csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeText t) <$> cols,
     case pk of
       [] -> ""

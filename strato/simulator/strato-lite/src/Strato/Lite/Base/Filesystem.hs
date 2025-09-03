@@ -215,6 +215,7 @@ sqlTypeSQLite SqlBool    = "bool"
 sqlTypeSQLite SqlDecimal = "decimal"
 sqlTypeSQLite SqlText    = "text"
 sqlTypeSQLite SqlJsonb   = "jsonb"
+sqlTypeSQLite SqlSerial  = ""
 
 slipstreamQuerySQLite :: SlipstreamQuery -> [T.Text]
 slipstreamQuerySQLite (CreateTable tableName cols pk mUc) = [T.concat
