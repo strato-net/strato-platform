@@ -159,7 +159,7 @@ const AssetDetail = () => {
   const { userAddress } = useUser()
   const { activeTokens: assets, inactiveTokens, loading, fetchTokens, allActiveTokens } = useUserTokens()
 
-  
+  const PRICE_WINDOW = 30; // Number of days to show in the price chart
   const getChartColor = (currentPrice: string | undefined, priceData: PricePoint[]): string => {
     if (!currentPrice || priceData.length === 0) return CHART_COLORS.BLUE;
     
