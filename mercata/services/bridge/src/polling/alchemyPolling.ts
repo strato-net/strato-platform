@@ -24,21 +24,15 @@ import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 const getStratoTokenMapping = async (
   externalChainId: number,
 ): Promise<Map<string, { stratoToken: string; externalDecimals: number }>> => {
-  const enabledAssets = await getEnabledAssets();
-  
+  const enabledAssets = await getEnabledAssets(externalChainId);
   return new Map(
-    enabledAssets
-      .filter(asset => 
-        asset.externalChainId === externalChainId.toString() && 
-        asset.externalToken
-      )
-      .map(asset => [
-        ensureHexPrefix(asset.externalToken).toLowerCase(),
-        {
-          stratoToken: asset.stratoToken,
-          externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
-        }
-      ])
+    enabledAssets.map(asset => [
+      ensureHexPrefix(asset.externalToken).toLowerCase(),
+      {
+        stratoToken: asset.stratoToken,
+        externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
+      },
+    ]),
   );
 };
 

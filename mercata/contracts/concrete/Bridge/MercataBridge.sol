@@ -101,7 +101,7 @@ contract record MercataBridge is Ownable {
     }
 
     mapping(uint256 => ChainInfo) public record chains;   
-    mapping(address => AssetInfo) public record assets;   
+    mapping(address => mapping(uint256 => AssetInfo)) public record assets;   
 
     /* ─────────────────────────────── */
 
@@ -217,12 +217,12 @@ contract record MercataBridge is Ownable {
     }
 
     /* hard per-tx cap */
-    function setTokenLimits(address stratoToken, uint256 maxPerTx)
+    function setTokenLimits(address stratoToken, uint256 externalChainId, uint256 maxPerTx)
         external
         onlyOwner
     {
-        require(assets[stratoToken].externalToken != address(0), "MB: asset missing");
-        AssetInfo storage a = assets[stratoToken];
+        require(assets[stratoToken][externalChainId].externalToken != address(0), "MB: asset missing");
+        AssetInfo storage a = assets[stratoToken][externalChainId];
         a.maxPerTx = maxPerTx;
         emit AssetUpdated(stratoToken, a.externalChainId, a.externalToken, a.externalDecimals, a.externalName, a.externalSymbol, maxPerTx, a.permissions);
     }
@@ -265,7 +265,7 @@ contract record MercataBridge is Ownable {
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
         require((permissions & PERMISSION_MASK) == permissions, "MB: invalid permissions");
 
-        AssetInfo storage a = assets[stratoToken];
+        AssetInfo storage a = assets[stratoToken][externalChainId];
         a.externalToken    = externalToken;
         a.externalDecimals = externalDecimals;
         a.externalChainId  = externalChainId;
@@ -279,11 +279,12 @@ contract record MercataBridge is Ownable {
 
     function setAssetMetadata(
         address stratoToken,
+        uint256 externalChainId,
         string calldata externalName,
         string calldata externalSymbol
     ) external onlyOwner {
-        require(assets[stratoToken].externalToken != address(0), "MB: asset missing");
-        AssetInfo storage a = assets[stratoToken];
+        require(assets[stratoToken][externalChainId].externalToken != address(0), "MB: asset missing");
+        AssetInfo storage a = assets[stratoToken][externalChainId];
         a.externalName   = externalName;
         a.externalSymbol = externalSymbol;
         emit AssetUpdated(stratoToken, a.externalChainId, a.externalToken, a.externalDecimals, externalName, externalSymbol, a.maxPerTx, a.permissions);
@@ -314,7 +315,7 @@ contract record MercataBridge is Ownable {
         whenDepositsOpen
     {
         require(tokenFactory.isTokenActive(stratoToken), "MB: inactive token");
-        AssetInfo memory a = assets[stratoToken];
+        AssetInfo memory a = assets[stratoToken][externalChainId];
         require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
@@ -476,7 +477,7 @@ contract record MercataBridge is Ownable {
         returns (uint256 id)
     {
         require(tokenFactory.isTokenActive(stratoToken),"MB: inactive");
-        AssetInfo memory a = assets[stratoToken];
+        AssetInfo memory a = assets[stratoToken][externalChainId];
         require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
