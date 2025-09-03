@@ -15,6 +15,16 @@ import {
   getAssetConfig,
   getSupportedAssets,
 } from "../services/cdp.service";
+import {
+  validateDepositArgs,
+  validateWithdrawArgs,
+  validateWithdrawMaxArgs,
+  validateMintArgs,
+  validateMintMaxArgs,
+  validateRepayArgs,
+  validateRepayAllArgs,
+  validateLiquidateArgs,
+} from "../validators/cdp.validator";
 
 class CDPController {
   static async getVaults(
@@ -53,6 +63,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateDepositArgs(body);
       const result = await deposit(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -67,6 +78,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateWithdrawArgs(body);
       const result = await withdraw(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -81,6 +93,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateWithdrawMaxArgs(body);
       const result = await withdrawMax(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -95,6 +108,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateMintArgs(body);
       const result = await mint(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -109,6 +123,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateMintMaxArgs(body);
       const result = await mintMax(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -123,6 +138,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateRepayArgs(body);
       const result = await repay(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -137,6 +153,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateRepayAllArgs(body);
       const result = await repayAll(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
@@ -151,6 +168,7 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      validateLiquidateArgs(body);
       const result = await liquidate(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
