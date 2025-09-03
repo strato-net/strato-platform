@@ -59,6 +59,7 @@ import Blockchain.Sequencer.Monad
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
 import Blockchain.Slipstream.QueryFormatHelper
+import Blockchain.Strato.Discovery.Data.MemPeerDB ()
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.ApiIndexer
 import Blockchain.Strato.Indexer.IContext (API (..), P2P (..))
@@ -631,16 +632,6 @@ instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m (LoggingT IO)) => RunsServ
     c <- ask
     liftIO . loggingFunc $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
     pure ()
-
-instance {-# OVERLAPPING #-} MonadBase m => ((Host, TCPPort) `A.Alters` ActivityState) (CoreT m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
-
-instance {-# OVERLAPPING #-} MonadBase m => ((Host, TCPPort) `A.Alters` ActivityState) (MonadCoreP2P m) where
-  lookup p k   = lift $ A.lookup p k
-  insert p k v = lift $ A.insert p k v
-  delete p k   = lift $ A.delete p k
 
 instance {-# OVERLAPPING #-} MonadBase m => HasSyncDB (CoreT m) where
   clearAllSyncTasks   = lift . clearAllSyncTasks

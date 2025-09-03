@@ -449,6 +449,7 @@ type MonadP2P m =
     MonadUnliftIO m,
     HasVault m,
     HasSyncDB m,
+    HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]
@@ -461,8 +462,6 @@ type MonadP2P m =
     All
       '[Mod.Accessible]
       '[ GenesisBlockHash,
-         AvailablePeers,
-         BondedPeers,
          PublicKey
        ]
       m,
@@ -482,22 +481,11 @@ type MonadP2P m =
        ]
       m,
     All2
-      '[A.Replaceable]
-      '[ '(PPeer, TcpEnableTime),
-         '(PPeer, UdpEnableTime),
-         '(PPeer, PeerDisable),
-         '(PPeer, PeerLastBestBlockHash),
-         '(PPeer, T.Text),
-         '((Host, Point), PeerBondingState)
-       ]
-      m,
-    All2
       '[A.Alters]
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '(Keccak256, Proxy (Inbound WireMessage)),
-         '((Host, Keccak256), Proxy (Outbound WireMessage)),
-         '((Host, TCPPort), ActivityState)
+         '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
   )
@@ -605,15 +593,15 @@ shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Pro
 
 withActivePeer ::
   ( MonadUnliftIO m,
-    ((Host, TCPPort) `A.Alters` ActivityState) m
+    HasPeerDB m
   ) =>
   PPeer ->
   m a ->
   m a
 withActivePeer p = bracket a b . const
   where
-    a = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Active
-    b _ = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
+    a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
+    b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
 
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const

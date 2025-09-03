@@ -42,7 +42,6 @@ import           Control.Concurrent hiding (yield)
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, forM_, when, void)
-import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
@@ -205,7 +204,9 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           e' | Just WrongGenesisBlock <- fromException e' -> do
             disableException thePeer "WrongGenesisBlock" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> do
+                _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
+                return ()
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
@@ -214,7 +215,9 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> do
+                _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
+                return ()
               Nothing -> return ()
           e' | Just PeerDisconnected <- fromException e' -> do
             disableException thePeer "PeerDisconnected" (Just . fromIntegral $ 2 * flags_connectionTimeout) True

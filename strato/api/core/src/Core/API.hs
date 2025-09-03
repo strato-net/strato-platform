@@ -32,7 +32,7 @@ import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
 import           Blockchain.Sequencer.Event (IngestEvent)
-import           Blockchain.Strato.Discovery.Data.Peer (ActivePeers)
+import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Options
 import           Blockchain.Strato.Model.Secp256k1
@@ -84,7 +84,7 @@ type CoreAPI =
 type MonadCoreAPI m =
   ( MonadUnliftIO m,
     MonadLogger m,
-    Accessible ActivePeers m,
+    HasPeerDB m,
     Accessible Metadata.UrlMap m,
     Accessible IdentityData m,
     Accessible [RawTransaction] m,

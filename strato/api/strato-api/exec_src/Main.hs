@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -27,6 +28,7 @@ import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
@@ -158,22 +160,23 @@ fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (Acc
 ----------------
 
 hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
-hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors r x = Handler $ do
-      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
-      case y of
-        Right a -> pure a
-        Left e -> throwE $ apiErrorToServantErr e
-    runM f =
-      runLoggingT
+    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))))) a -> Handler a
+    convertErrors x = Handler $ do
+      y <- liftIO 
+        . try
+        . runLoggingT
         . runSQLM
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runVaultM ("http://localhost:8013/strato/v2.3")
         . runIdentitytM getIdentityServerUrl
-        $ f
+        $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy

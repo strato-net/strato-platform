@@ -29,6 +29,7 @@ executables:
     - common-log
     - containers
     - core-api2
+    - ethereum-discovery
     - format
     - http-types
     - identity-monad

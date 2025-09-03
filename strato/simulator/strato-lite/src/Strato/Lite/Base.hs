@@ -36,8 +36,6 @@ import Core.API
 import Crypto.Types.PubKey.ECC
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.NibbleString as N
-import Data.Text (Text)
-import Numeric.Natural
 import Prelude hiding (round)
 import Prometheus
 
@@ -64,25 +62,11 @@ type MonadBase m = ( MonadFail m
                    , A.Selectable Host PPeer m
                    , A.Replaceable Host PPeer m
                    , (Host `A.Alters` PPeer) m
-                   , A.Selectable (Point, Natural) ClosestPeers m
                    -- , A.Selectable Keccak256 [DataDefs.TransactionResult] m
                    , Mod.Accessible TCPPort m
                    , Mod.Accessible UDPPort m
                    , Mod.Accessible PublicKey m
-                   , Mod.Accessible ActivePeers m
-                   , Mod.Accessible AvailablePeers m
-                   , Mod.Accessible BondedPeers m
-                   , Mod.Accessible BondedPeersForUDP m
                    , Mod.Accessible TransactionCount m
-                   , Mod.Accessible UnbondedPeersForUDP m
-                   , ((Host, TCPPort) `A.Alters` ActivityState) m
-                   , A.Replaceable (Host, TCPPort) ActivityState m
-                   , A.Replaceable PPeer PeerUdpDisable m
-                   , A.Replaceable Text PPeer m
-                   , A.Replaceable PPeer TcpEnableTime m
-                   , A.Replaceable PPeer UdpEnableTime m
-                   , A.Replaceable PPeer PeerDisable m
-                   , A.Replaceable PPeer Text m
                    , m `Mod.Yields` DataDefs.TransactionResult
                    , m `Mod.Outputs` StateDiff
                    , m `Mod.Outputs` SlipstreamQuery

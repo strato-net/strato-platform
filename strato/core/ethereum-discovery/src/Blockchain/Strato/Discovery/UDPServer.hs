@@ -198,8 +198,9 @@ handleValidPacket addr otherUdpPort packet otherPubKey = case packet of
     getPeerByIP' ip >>= \case
       Nothing -> $logInfoS "handleValidPacket/FindNeighbors" "Ignoring FindNeigbors request from unknown peer"
       Just peer -> do
-        A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
-          Just (PeerBondingState b) | b > 1 -> do
+        getPeerBondingState (pPeerHost peer) otherPubKey >>= \case
+--        A.select (A.Proxy @PeerBondingState) (pPeerHost peer, otherPubKey) >>= \case
+          Just b | b > 1 -> do
             peers <- getPeersClosestTo (20 :: Natural) targetPubkey otherPubKey
             let theNeighbors = catMaybes $ (\p -> Neighbor (mkEndpoint p) <$> mkNodeId p) <$> peers
             sendPacket peer $ Neighbors theNeighbors nextTime

@@ -4,10 +4,14 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeApplications  #-}
+
+{-# OPTIONS -fno-warn-unused-top-binds #-}
+
+
+
 module Blockchain.Strato.Discovery.Data.Peer
   (
-    PPeer(..),
-    HasPeerDB,
+    HasPeerDB(..),
     TCPPort(..),
     UDPPort(..),
     NodeID(..),
@@ -26,23 +30,12 @@ module Blockchain.Strato.Discovery.Data.Peer
     buildPeer,
     createPeer,
     pointToNodeID,
-    updateLastMessage,
     nodeIDToPoint,
-    setPeerActiveState,
     thisPeer,
     lengthenPeerDisable',
     resetPeerUdp,
-    storeDisableException,
-    setPeerBondingState,
-    setPeerPubkey,
     getPeersClosestTo,
-    getUnbondedPeers,
-    getBondedPeersForUDP,
     disableUDPPeerForSeconds,
-    getNumAvailablePeers,
-    parseEnode,
-    getActivePeers,
-    getBondedPeers,
     jamshidBirth,
     lengthenPeerDisableBy,
     pPeerString,
@@ -69,7 +62,6 @@ import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Util                    (byteString2Integer)
 import           Blockchain.Strato.Model.Validator
 import           Control.Exception                               hiding (try)
-import qualified Control.Monad.Change.Alter                      as A
 import qualified Control.Monad.Change.Modify                     as Mod
 import           Crypto.Types.PubKey.ECC
 import qualified Data.ByteString                                 as B
@@ -90,7 +82,6 @@ import           Network.URI                                     (URI (..),
                                                                   URIAuth (..))
 import qualified Network.URI                                     as URI
 import           Numeric.Natural
-import           Prometheus
 import           Text.Format
 import           UnliftIO
 
@@ -120,26 +111,28 @@ newtype NodeID = NodeID B.ByteString deriving (Show, Read, Eq)
 
 newtype PeerLastBestBlockHash = PeerLastBestBlockHash { unPeerLastBestBlockHash :: Keccak256 }
 
-type HasPeerDB m = (
-  Mod.Accessible AvailablePeers m,
-  A.Replaceable (Host, TCPPort) ActivityState m,
-  Mod.Accessible ActivePeers m,
-  A.Replaceable (Host, Point) PeerBondingState m,
-  A.Selectable (Host, Point) PeerBondingState m,
-  Mod.Accessible BondedPeers m,
-  Mod.Accessible BondedPeersForUDP m,
-  Mod.Accessible UnbondedPeersForUDP m,
-  A.Selectable (Point, Natural) ClosestPeers m,
-  A.Replaceable PPeer UdpEnableTime m,
-  A.Replaceable PPeer IP m,
-  A.Replaceable PPeer TcpEnableTime m,
-  A.Replaceable PPeer PeerDisable m,
-  A.Replaceable PPeer PeerLastBestBlockHash m,
-  A.Replaceable PPeer PeerUdpDisable m,
-  A.Replaceable PPeer Point m,
-  A.Replaceable PPeer T.Text m,
-  A.Replaceable T.Text PPeer m
-  )
+class HasPeerDB m where
+  getNumAvailablePeers :: m Int
+  setPeerActiveState :: Host -> Int -> ActivityState -> m ()
+  getActivePeers :: m (Either SomeException [PPeer])
+  setPeerBondingState :: Host -> Point -> Int -> m (Either SomeException ())
+  getPeerBondingState :: Host -> Point -> m (Maybe Int)
+  getBondedPeers :: m (Either SomeException [PPeer])
+  getBondedPeersForUDP :: m (Either SomeException [PPeer])
+  getUnbondedPeers :: m [PPeer]
+  getClosestPeers :: Point -> Natural -> m [PPeer]
+
+  updateUdpEnableTime :: PPeer -> UTCTime -> m ()
+  updateIP :: PPeer -> IP -> m ()
+  updateTcpEnableTime :: PPeer -> UTCTime -> m ()
+  updatePeerDisable :: PPeer -> PeerDisable -> m ()
+  updatePeerLastBestBlockHash :: PPeer -> PeerLastBestBlockHash -> m ()
+  updatePeerUdpDisable :: PPeer -> PeerUdpDisable -> m ()
+  setPeerPubkey :: PPeer -> Point -> m ()
+  storeDisableException :: PPeer -> T.Text -> m (Either SomeException ())
+  updateLastMessage :: PPeer -> T.Text -> m ()
+
+  resetAllPeerTimeouts :: m ()
 
 data PeerDisable
   = ExtendPeerDisableTime
@@ -237,41 +230,6 @@ parseHostname uriAuth = fromString $ filter (\ch -> ch /= '[' && ch /= ']') (URI
 parsePort :: URIAuth -> Int
 parsePort uriAuth = LabeledError.read "Peer/parsePort" $ filter (/= ':') (URI.uriPort uriAuth)
 
-setPeerActiveState ::
-  (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) =>
-  Host ->
-  Int ->
-  ActivityState ->
-  m (Either SomeException ())
-setPeerActiveState host port state = do
-  recordStateChange state
-  try $ A.replace (A.Proxy @ActivityState) (host, TCPPort port) state
-
-getActivePeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m (Either SomeException [PPeer])
-getActivePeers = try $ unActivePeers <$> Mod.access (Mod.Proxy @ActivePeers)
-
-setPeerBondingState ::
-  (MonadUnliftIO m, A.Replaceable (Host, Point) PeerBondingState m) =>
-  Host ->
-  Point ->
-  Int ->
-  m (Either SomeException ())
-setPeerBondingState host point state = do
-  try $ A.replace (A.Proxy @PeerBondingState) (host, point) (PeerBondingState state)
-
-setPeerPubkey :: HasPeerDB m =>
-                 PPeer -> Point -> m ()
-setPeerPubkey = A.replace (A.Proxy @Point)
-
-getBondedPeers :: (MonadUnliftIO m, Mod.Accessible BondedPeers m) => m (Either SomeException [PPeer])
-getBondedPeers = try $ unBondedPeers <$> Mod.access (Mod.Proxy @BondedPeers)
-
-getBondedPeersForUDP :: (MonadUnliftIO m, Mod.Accessible BondedPeersForUDP m) => m (Either SomeException [PPeer])
-getBondedPeersForUDP = try $ unBondedPeersForUDP <$> Mod.access (Mod.Proxy @BondedPeersForUDP)
-
-getUnbondedPeers :: (MonadUnliftIO m, Mod.Accessible UnbondedPeersForUDP m) => m [PPeer]
-getUnbondedPeers = unUnbondedPeers <$> Mod.access (Mod.Proxy @UnbondedPeersForUDP)
-
 thisPeer :: PPeer -> [SQL.Filter PPeer]
 thisPeer peer = [PPeerHost SQL.==. pPeerHost peer, PPeerTcpPort SQL.==. pPeerTcpPort peer]
 
@@ -279,7 +237,7 @@ thisOr100Years :: Int -> Int
 thisOr100Years = min (100 * 365 * 24 * 60 * 60) -- there is no need to be disabling peers for > 100 years y'all
 
 disableUDPPeerForSeconds ::
-  (MonadUnliftIO m, A.Replaceable PPeer UdpEnableTime m) =>
+  (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->
   Int ->
   m (Either SomeException ())
@@ -289,27 +247,27 @@ disableUDPPeerForSeconds peer seconds = try $ do
     then return ()
     else
       let seconds' = thisOr100Years seconds
-          enableTime = UdpEnableTime $ fromIntegral seconds' `addUTCTime` currentTime
-       in A.replace (A.Proxy @UdpEnableTime) peer enableTime
+          enableTime = fromIntegral seconds' `addUTCTime` currentTime
+       in updateUdpEnableTime peer enableTime
 
 resetPeers :: IO ()
 resetPeers = withGlobalSQLPool $ runSqlPool (SQL.updateWhere [] [PPeerActiveState SQL.=. 0])
 
 nonviolentDisable ::
-  (MonadUnliftIO m, A.Replaceable PPeer TcpEnableTime m) =>
+  (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->
   m (Either SomeException ())
 nonviolentDisable peer' = try $ do
   currentTime <- liftIO getCurrentTime
-  let enableTime = TcpEnableTime $ 10 `addUTCTime` currentTime
-  A.replace (A.Proxy @TcpEnableTime) peer' enableTime
+  let enableTime = 10 `addUTCTime` currentTime
+  updateTcpEnableTime peer' enableTime
 
 -- The first time a peer is disabled, the timeout is five seconds. Every subsequent failure that
 -- window is doubled, but those windows are reset every day. This prevents a mostly healthy node
 -- from building up longer and longer disables, e.g. if it caused an exception once a day
 -- by the end of the month it would be disabled for years.
 lengthenPeerDisableBy ::
-  (MonadUnliftIO m, A.Replaceable PPeer PeerDisable m) =>
+  (MonadUnliftIO m, HasPeerDB m) =>
   NominalDiffTime ->
   PPeer ->
   m (Either SomeException ())
@@ -318,11 +276,11 @@ lengthenPeerDisableBy secs peer = try $ do
   let disable = if currentTime < pPeerDisableExpiration peer
                 then ExtendPeerDisableTime (TcpEnableTime $ fromIntegral (pPeerNextDisableWindowSeconds peer) `addUTCTime` currentTime) 2
                 else SetPeerDisableTime (TcpEnableTime $ 5 `addUTCTime` currentTime) 5 (secs `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerDisable) peer disable
+  updatePeerDisable peer disable
 
 -- A variation of 'lengthenPeerDisable' but for UDP instead, currently used for ethereum-discovery.
 lengthenPeerDisable' ::
-  (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m) =>
+  (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->
   m (Either SomeException ())
 lengthenPeerDisable' peer' = try $ do
@@ -333,17 +291,7 @@ lengthenPeerDisable' peer' = try $ do
             let seconds = thisOr100Years $ pPeerNextUdpDisableWindowSeconds peer'
             in ExtendPeerUdpDisableTime (UdpEnableTime $ fromIntegral seconds `addUTCTime` currentTime) 2
           else SetPeerUdpDisableTime (UdpEnableTime $ 5 `addUTCTime` currentTime) 5 ((24 * 60 * 60) `addUTCTime` currentTime)
-  A.replace (A.Proxy @PeerUdpDisable) peer' disable
-
-storeDisableException ::
-  (MonadUnliftIO m, A.Replaceable PPeer T.Text m) =>
-  PPeer ->
-  T.Text ->
-  m (Either SomeException ())
-storeDisableException peer' e = try $ A.replace A.Proxy peer' e
-
-getNumAvailablePeers :: (MonadUnliftIO m, Mod.Accessible AvailablePeers m) => m Int
-getNumAvailablePeers = length . unAvailablePeers <$> Mod.access (Mod.Proxy @AvailablePeers) -- lolololol ever heard of SELECT COUNT
+  updatePeerUdpDisable peer' disable
 
 nodeIDToPoint :: NodeID -> Point
 nodeIDToPoint (NodeID nodeID) | B.length nodeID /= 64 = error "NodeID contains a bytestring that is not 64 bytes long"
@@ -358,7 +306,7 @@ pointToNodeID (Point x y) = NodeID $ word256ToBytes (fromInteger x) <> word256To
 
 getPeersClosestTo ::
   ( MonadLogger m
-  , A.Selectable (Point, Natural) ClosestPeers m
+  , HasPeerDB m
   , Mod.Accessible [Validator] m
   ) =>
   Natural ->
@@ -366,7 +314,7 @@ getPeersClosestTo ::
   Point ->
   m [PPeer]
 getPeersClosestTo limit targetNID requesterPubkey = do
-    peers <- maybe Set.empty (Set.fromDistinctAscList . unClosestPeers) <$> A.select (A.Proxy @ClosestPeers) (requesterPubkey, limit)
+    peers <- Set.fromDistinctAscList <$> getClosestPeers requesterPubkey limit
     $logInfoS "getPeersClosestTo" $ T.pack $ "peer list: " ++ show peers
     validators <- Mod.access (Mod.Proxy @[Validator])
     $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show validators
@@ -385,18 +333,16 @@ getPeersClosestTo limit targetNID requesterPubkey = do
       B.packZipWith xor (pointToBytes p1) (pointToBytes p2)
     dist _ _ = B.pack $ replicate 64 0xFF -- this case should never happen but just in case, make it the max distance possible
 
-updateLastMessage ::
-  (A.Replaceable T.Text PPeer m) =>
-  T.Text ->
-  PPeer ->
-  m ()
-updateLastMessage = A.replace (A.Proxy @PPeer)
+resetPeerTimeouts :: Monad m =>
+                     m ()
+resetPeerTimeouts = do
+  return ()
 
 resetPeerUdp ::
-  (MonadUnliftIO m, A.Replaceable PPeer PeerUdpDisable m) =>
+  (MonadUnliftIO m, HasPeerDB m) =>
   PPeer ->
   m (Either SomeException ())
-resetPeerUdp peer' = try $ A.replace (A.Proxy @PeerUdpDisable) peer' ResetPeerUdpDisable
+resetPeerUdp peer' = try $ updatePeerUdpDisable peer' ResetPeerUdpDisable
 
 addressIP :: SockAddr -> IP
 addressIP (SockAddrInet _ addr)      = IPv4 (fromHostAddress addr)

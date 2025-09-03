@@ -12,16 +12,15 @@
 - Borrowers always borrow/repay in this same asset.
 - Multiple collateral assets supported; each with: `ltv`, `liquidationThreshold`, `liquidationBonus`, `interestRate`, `reserveFactor`.
 
-## Global Borrow Index (Interest Accrual) — Discrete Compounding
+## Global Borrow Index (Compound Accrual)
 
-- Per accrual step, a simple interest factor is computed; the index update multiplies, yielding discrete compounding over multiple steps.
-- Per-step factor (RAY scale): `factorRAY = (APRbps * RAY * dt) / (10000 * SECONDS_PER_YEAR)`
-- Index update: `idx_next = (idx_current * (RAY + factorRAY)) / RAY`
-- Across multiple steps: `idx_n = idx_0 * prod_i (1 + factor_i)`
+- Per-second compound base in RAY: `perSecondFactorRAY` (e.g., `(1+APR)^(1/SECONDS_PER_YEAR)` scaled by `1e27`).
+- Index update over `dt` seconds: `idx_next = idx_current * rpow(perSecondFactorRAY, dt, RAY) / RAY`
+- Weekly/daily/block steps multiply the index; debt compounds discretely as the index grows.
+- Persisted only when `_accrue()` runs on state-changing calls (borrow/repay/deposit/withdraw/collateral ops/config). Read-only helpers never write state.
 - Interest routed to protocol reserves when there is debt:
   - `interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY`
   - `reservesAccrued += (interestDelta * reserveFactorBps) / 10000`
-- Accrual runs on state-changing calls; preview functions compute projections read-only.
 
 ## User/System Debt (Index-Based)
 
@@ -60,6 +59,7 @@
 
 - Repay exact R (bounded by current scaled): `Δscaled = (R * RAY) / borrowIndex`
 - Repay all: `amountRepaid = (scaledDebt * borrowIndex) / RAY`
+- Dust cleanup: if residual owed `<= 1` wei after reduction, the loan is zeroed to avoid leftover dust.
 
 ## Collateral Supply/Withdraw
 
@@ -84,5 +84,23 @@
 
 ## Preview Helpers (Read-Only)
 
-- Index preview at current block time (dt = now - lastAccrual): `previewIndex = (borrowIndex * (RAY + factorRAY)) / RAY`
+- Index preview at current block time (dt = now - lastAccrual): `previewIndex = (borrowIndex * rpow(perSecondFactorRAY, dt, RAY)) / RAY`
 - Debt preview: `debtPreview = (scaledDebt * previewIndex) / RAY` 
+
+## Liquidation
+
+- Close-factor cap based on health:
+  - If `HF < 0.95`: up to 100% of outstanding debt
+  - Else: up to 50% of outstanding debt
+- Coverage cap (selected collateral):
+  - Let `bonus = liquidationBonusBps` and prices be 1e18 scaled
+  - `coverage = ceil((borrowerCollateral * price_coll * 10000) / (price_borrow * bonus))`
+    - where `ceil(x/y) = (x + y - 1) / y`
+- Execution amount:
+  - If caller provides an amount `R`: `repay = min(R, closeFactorCap)` (legacy call).
+  - If caller uses “ALL”: contract computes `repay = min(currentDebt, closeFactorCap, coverage)` at execution time.
+- Seizure:
+  - `collateralToSeize = (repay * price_borrow * bonus) / (price_coll * 10000)`
+  - Then clamped to the borrower’s available collateral for that asset.
+- Dust cleanup:
+  - After reducing scaled debt, if residual owed `<= 1 wei`, loan is zeroed. 

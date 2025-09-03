@@ -87,7 +87,7 @@ contract record Mercata {
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],0,0);
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
         Ownable(poolConfigurator).transferOwnership(msg.sender);
 
         // Create Services

@@ -10,9 +10,7 @@ module Handlers.Peers
 where
 
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import           Blockchain.Strato.Model.Host
-import qualified Control.Monad.Change.Modify                   as Mod
 import           Data.Aeson
 import qualified Data.Aeson.Key                                as DAK
 import qualified Data.Text                                     as T
@@ -23,12 +21,12 @@ import           UnliftIO
 
 type API = "peers" :> Get '[JSON] Value
 
-server :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => ServerT API m
+server :: (MonadUnliftIO m, HasPeerDB m) => ServerT API m
 server = getPeers
 
 ---------------------
 
-getPeers :: (MonadUnliftIO m, Mod.Accessible ActivePeers m) => m Value
+getPeers :: (MonadUnliftIO m, HasPeerDB m) => m Value
 getPeers = do
   eActivePeers <- getActivePeers
   case eActivePeers of
