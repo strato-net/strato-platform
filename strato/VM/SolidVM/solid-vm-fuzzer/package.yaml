@@ -43,8 +43,11 @@ executables:
       - aeson
       - bytestring
       - containers
+      - data-default
+      - debugger
       - exceptions
       - hflags
+      - lens
       - monad-alter
       - solid-vm-compiler
       - solid-vm-fuzzer

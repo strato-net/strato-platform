@@ -86,6 +86,7 @@ import Data.Decimal
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as M
 import Data.Maybe
@@ -321,7 +322,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
 
-  solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
@@ -398,7 +398,6 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
       traverse (fmap Just . maybe (return "()") encodeForReturn)
         =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) Nothing (textToLabel funcName) isRCC argVals
 
-    solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
@@ -1154,7 +1153,7 @@ expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack $ labelToString x
-  case x `M.lookup` localVariables callInfo of
+  case x `M.lookup` NE.head (localVariables callInfo) of
     Just (_, var) -> do
       val <- weakGetVar var
       case val of
@@ -1327,7 +1326,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       functionName <- getCurrentFunctionName
       callInfo <- getCurrentCallInfo
       let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-          localVars = localVariables callInfo
+          localVars = NE.head $ localVariables callInfo
       argVals <- forM argList (\(n, _) -> getVar . snd $ localVars M.! (fromMaybe "" n))
       argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
       return . Constant . SString $ "(" ++ argsToStr ++ ")"
@@ -2673,12 +2672,13 @@ addLocalVariable theType name value = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
-    (currentSlice : rest) ->
+    (currentSlice : rest) -> do
+      let lvs NE.:| lvs' = localVariables currentSlice
       Mod.put (Mod.Proxy @[CallInfo]) $
         currentSlice
           { localVariables =
-              M.insert name (theType, newVariable) $
-                localVariables currentSlice
+              M.insert name (theType, newVariable) lvs
+                NE.:| lvs'
           } :
         rest
 
@@ -2810,7 +2810,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               -- SolidVM cannot distinguish between
               -- a value and single-tupled value
               currentCallInfo <- getCurrentCallInfo
-              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
                 Just returnVar -> fmap Just . forceLoadVar =<< getVar (snd returnVar)
@@ -2818,7 +2818,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               Just . STuple . V.fromList <$> do
                 currentCallInfo <- getCurrentCallInfo
                 for (fst <$> xs) $ \name -> do
-                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                  let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
                     Just returnVar -> fmap Constant . forceLoadVar =<< getVar (snd returnVar)

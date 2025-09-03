@@ -324,7 +324,7 @@
 		"blockapps-rest": "^8.4.0",
 		"js-yaml": "^4.0.0",
 		"qs": "^6.11.2",
-		"vscode-debugadapter": "^1.43.0",
+		"vscode-debugadapter": "^1.68.0",
 		"ws": "^7.4.2"
 	},
 	"devDependencies": {

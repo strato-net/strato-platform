@@ -56,6 +56,11 @@ stepOut dSettings@DebugSettings {..} = do
 getBreakpoints :: MonadIO m => DebugSettings -> m [Breakpoint]
 getBreakpoints DebugSettings {..} = fmap S.toList . atomically $ readTVar breakpoints
 
+setBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
+setBreakpoints bPoints dSettings@DebugSettings {..} = do
+  void . atomically $ writeTVar breakpoints $ S.fromList bPoints
+  status dSettings
+
 addBreakpoints :: MonadIO m => [Breakpoint] -> DebugSettings -> m DebuggerStatus
 addBreakpoints bPoints dSettings@DebugSettings {..} = do
   void . atomically $ do

@@ -8,11 +8,16 @@ import * as Net from 'net';
 
 // first parse command line arguments to see whether the debug adapter should run as a server
 let port = 0;
+let filepath = '';
 const args = process.argv.slice(2);
 args.forEach(function (val, index, array) {
 	const portMatch = /^--server=(\d{4,5})$/.exec(val);
 	if (portMatch) {
 		port = parseInt(portMatch[1], 10);
+	}
+	const fileMatch = /^--file=(.*)$/.exec(val);
+	if (fileMatch) {
+		filepath = fileMatch[1];
 	}
 });
 
@@ -25,14 +30,14 @@ if (port > 0) {
 		socket.on('end', () => {
 			console.error('>> client connection closed\n');
 		});
-		const session = new StratoDebugSession();
+		const session = new StratoDebugSession(filepath);
 		session.setRunAsServer(true);
 		session.start(socket, socket);
 	}).listen(port);
 } else {
 
 	// start a single session that communicates via stdin/stdout
-	const session = new StratoDebugSession();
+	const session = new StratoDebugSession(filepath);
 	process.on('SIGTERM', () => {
 		session.shutdown();
 	});
