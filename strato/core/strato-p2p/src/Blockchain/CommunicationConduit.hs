@@ -122,12 +122,12 @@ handleMsgClientConduit myId peer = do
       let highestBlockNum'' = if ver < 63 then highestBlockNum' - 8192 else highestBlockNum'
       lift . updatePeerLastBestBlockHash peer $ PeerLastBestBlockHash peerBestHash
       lift . Mod.put (Mod.Proxy @WorldBestBlock) . WorldBestBlock $ BestBlock peerBestHash highestBlockNum''
-      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
+      $logDebugS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show highestBlockNum''
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) highestBlockNum''
 
       case maybeSyncTask of
         Nothing ->
-          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+          $logDebugS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "handleMsgClientConduit" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
           if 1000 * syncTaskChiliad syncTask <= fromInteger highestBlockNum'
@@ -194,11 +194,11 @@ handleMsgServerConduit myPubkey peer = do
                       genesisHash = genHash
                     }
           )
-      $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show theirHighestBlockNum
+      $logDebugS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show theirHighestBlockNum
       maybeSyncTask <- lift $ getNewSyncTask (pPeerHost peer) theirHighestBlockNum
       case maybeSyncTask of
         Nothing ->
-          $logInfoS "serverHandshake" $ T.pack $ "no new SyncTask available"
+          $logDebugS "serverHandshake" $ T.pack $ "no new SyncTask available"
         Just syncTask -> do
           $logInfoS "serverHandshake" $ T.pack $ "new SyncTask: " ++ shortDescription syncTask
           yield . Right $ GetBlockHeaders (BlockNumber $ fromIntegral $ 1000 * syncTaskChiliad syncTask) (maxReturnedHeaders $ p2pConfig ethConf) 0 Forward

@@ -244,11 +244,13 @@ handleEvents peer = awaitForever $ \case
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block header " ++ show maxBlockNumber ++ ", we have finished loading chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             lift $ setSyncTaskFinished (pPeerHost peer)
 
-            $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+            $logDebugS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
 
-            syncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
-            $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
-            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) syncTask
+            mSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
+            case mSyncTask of
+              Nothing -> $logDebugS "handleEvents/BlockBodies" "No new sync task"
+              Just syncTask -> $logInfoS "handleEvents/BlockBodies" $ T.pack $ "new SyncTask: " ++ show syncTask
+            return $ fmap (\v -> fromIntegral $ 1000 * syncTaskChiliad v) mSyncTask
           else do
             $logInfoS "handleEvents/BlockBodies" $ T.pack $ "downloaded up to block " ++ show maxBlockNumber ++ ", we are still working on  chiliad #" ++ show (syncTaskChiliad currentSyncTask)
             return $ Just $ maxBlockNumber + 1
@@ -397,12 +399,14 @@ handleEvents peer = awaitForever $ \case
       case maybeSyncTask of
         Just _ -> return () -- Already have a task, do nothing
         Nothing -> do
-          $logInfoS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
+          $logDebugS "serverHandshake" $ T.pack $ "Attempting to get a new sync task, highest block number is " ++ show worldNumber
           maybeNewSyncTask <- lift $ getNewSyncTask (pPeerHost peer) worldNumber
-          $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
           case maybeNewSyncTask of
-            Nothing -> return ()
-            Just syncTask -> syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
+            Nothing -> do
+              $logDebugS "TimerEvt" $ "No new syncTasks available"
+            Just syncTask -> do
+              $logInfoS "TimerEvt" $ T.pack $ "I've grabbed a new syncTask: " ++ show maybeNewSyncTask
+              syncFetch Forward $ fromIntegral $ 1000 * syncTaskChiliad syncTask
 
     maybeOldTS <- unActionTimestamp <$> lift getActionTimestamp
     case maybeOldTS of
