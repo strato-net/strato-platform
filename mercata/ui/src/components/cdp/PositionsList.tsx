@@ -129,6 +129,56 @@ const PositionsList: React.FC = () => {
     setInputAmounts(prev => ({ ...prev, [asset]: value }));
   };
 
+  // Calculate preview values based on input
+  const calculatePreviewValues = (position: PositionData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+    const amount = parseFloat(inputAmount);
+    if (isNaN(amount) || amount <= 0) return null;
+
+    const currentCollateral = parseFloat(position.collateralAmount);
+    const currentDebt = parseFloat(position.debtAmount);
+    const currentCollateralUSD = parseFloat(position.collateralValueUSD);
+    const currentDebtUSD = parseFloat(position.debtValueUSD);
+    
+    // Assume price per unit of collateral
+    const pricePerUnit = currentCollateralUSD / currentCollateral;
+    
+    let newCollateral = currentCollateral;
+    let newCollateralUSD = currentCollateralUSD;
+    let newDebt = currentDebt;
+    let newDebtUSD = currentDebtUSD;
+
+    switch (action) {
+      case 'deposit':
+        newCollateral = currentCollateral + amount;
+        newCollateralUSD = newCollateral * pricePerUnit;
+        break;
+      case 'withdraw':
+        newCollateral = Math.max(0, currentCollateral - amount);
+        newCollateralUSD = newCollateral * pricePerUnit;
+        break;
+      case 'mint':
+        newDebt = currentDebt + amount;
+        newDebtUSD = newDebt; // Assuming 1:1 USD peg for USDST
+        break;
+      case 'repay':
+        newDebt = Math.max(0, currentDebt - amount);
+        newDebtUSD = newDebt;
+        break;
+    }
+
+    // Calculate new health factor
+    const newCR = newDebt > 0 ? (newCollateralUSD / newDebtUSD) * 100 : 999999;
+    const newHealthFactor = calculateHealthFactor(newCR, position.liquidationRatio);
+
+    return {
+      collateralAmount: newCollateral.toFixed(2),
+      collateralValueUSD: newCollateralUSD.toFixed(2),
+      debtAmount: newDebt.toFixed(2),
+      debtValueUSD: newDebtUSD.toFixed(2),
+      healthFactor: newHealthFactor
+    };
+  };
+
   // Handle action button clicks
   const handleAction = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -183,6 +233,9 @@ const PositionsList: React.FC = () => {
         <div className="space-y-4">
           {positions.map((position, index) => {
             const healthFactor = calculateHealthFactor(position.collateralizationRatio, position.liquidationRatio);
+            const activeAction = activeActions[position.asset];
+            const inputAmount = inputAmounts[position.asset] || "";
+            const previewValues = activeAction && inputAmount ? calculatePreviewValues(position, activeAction, inputAmount) : null;
             
             return (
             <div
@@ -243,6 +296,35 @@ const PositionsList: React.FC = () => {
                   <p className="font-semibold">{position.stabilityFeeRate.toFixed(2)}%</p>
                 </div>
               </div>
+
+              {/* Preview Values */}
+              {previewValues && (
+                <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <h5 className="text-sm font-medium text-blue-900 mb-2">New Values After {activeAction}:</h5>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Collateral</p>
+                      <p className="font-semibold text-blue-900">{previewValues.collateralAmount} {position.symbol}</p>
+                      <p className="text-xs text-blue-500">${previewValues.collateralValueUSD}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Borrowed</p>
+                      <p className="font-semibold text-blue-900">{previewValues.debtAmount} USDST</p>
+                      <p className="text-xs text-blue-500">${previewValues.debtValueUSD}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Health Factor</p>
+                      <p className={`font-semibold ${getHealthFactorColor(previewValues.healthFactor)}`}>
+                        {previewValues.healthFactor.toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-blue-600 mb-1">Stability Fee</p>
+                      <p className="font-semibold text-blue-900">{position.stabilityFeeRate.toFixed(2)}%</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
