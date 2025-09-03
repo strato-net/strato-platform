@@ -10,55 +10,52 @@ import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { formatUnits, parseUnits } from "ethers";
 
-// Contract constants
-const CONTRACT_PREFIX = "BlockApps-Mercata-";
-const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
-const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
-const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
-const Token = `${CONTRACT_PREFIX}Token`;
-const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
+// Extract constants for consistency with lending service
+const {
+  cdpRegistrySelectFields,
+  cdpRegistry,
+  CDPEngine,
+  CDPVault,
+  CDPRegistry,
+  Token,
+  PriceOracle,
+} = constants;
 
 // Constants for calculations
 const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
 
-// Helper function to get CDP registry address from env or use default
-const getCDPRegistryAddress = () => {
-  return process.env.CDP_REGISTRY || "0000000000000000000000000000000000001010";
-};
-
-// Helper function to get CDP registry data
-const getCDPRegistry = async (
+/**
+ * Generic Cirrus fetch for the CDPRegistry row.
+ * Similar to getPool() in lending service
+ */
+export const getCDPRegistry = async (
   accessToken: string,
-  selectOverride?: string,
-  queryOverride?: Record<string, string>
-) => {
-  const cdpRegistryAddress = getCDPRegistryAddress();
-
-  const defaultSelect = `address,
-    cdpEngine:cdpEngine_fkey(
-      address,
-      collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),
-      collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value),
-      vaults:${CDPEngine}-vaults(user:key,asset:key2,Vault:value)
-    ),
-    cdpVault:cdpVault_fkey(
-      address,
-      userCollaterals:${CDPVault}-userCollaterals(user:key,asset:key2,amount:value::text)
-    ),
-    priceOracle:priceOracle_fkey(
-      address,
-      prices:${PriceOracle}-prices(asset:key,price:value::text)
-    )`;
+  _userAddress: string | undefined,
+  options: Record<string, string> = {}
+): Promise<Record<string, any>> => {
+  const { select, ...filters } = options;
+  const cleanedFilters = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined)
+  );
 
   const params = {
-    select: selectOverride || defaultSelect,
-    address: "eq." + cdpRegistryAddress,
-    ...queryOverride,
+    ...cleanedFilters,
+    select: select ?? cdpRegistrySelectFields.join(","),
+    address: `eq.${cdpRegistry}`,
   };
 
-  const { data } = await cirrus.get(accessToken, `/${CDPRegistry}`, { params });
-  return data?.[0];
+  const {
+    data: [registryData],
+  } = await cirrus.get(accessToken, `/${CDPRegistry}`, { params });
+
+  if (!registryData) {
+    throw new Error(
+      `Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`
+    );
+  }
+
+  return registryData;
 };
 
 // Helper function to calculate health factor
@@ -148,7 +145,7 @@ export const getVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -248,7 +245,7 @@ export const deposit = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -279,7 +276,7 @@ export const withdraw = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -300,7 +297,7 @@ export const withdrawMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -321,7 +318,7 @@ export const mint = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -342,7 +339,7 @@ export const mintMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -363,7 +360,7 @@ export const repay = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -407,7 +404,7 @@ export const repayAll = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -453,7 +450,7 @@ export const liquidate = async (
   userAddress: string,
   body: { collateralAsset: string; borrower: string; debtToCover: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -501,7 +498,7 @@ export const getLiquidatable = async (
   userAddress: string
 ): Promise<VaultData[]> => {
   // Get all vaults from the registry
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -539,7 +536,7 @@ export const getAssetConfig = async (
   userAddress: string,
   asset: string
 ): Promise<AssetConfig | null> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -578,7 +575,7 @@ export const getSupportedAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken);
+  const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
