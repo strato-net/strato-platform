@@ -78,6 +78,22 @@ We will keep the same data structures: `UserInfo` and `PoolInfo` with some chang
 * since our reward is cata (not sushi) we will call the `accSushiPerShare` more
   general `accPerToken`
 
+* each individual pool will have bonus periods with different multipliers
+
+  The original MasterChef had a multiplier that would represent time passed (or
+  number of blocks that has passed), multiplied by bonus. Bonus was only added
+  if the pools were accruing rewards in special period (between start and end
+  block that were defined in the contract).
+
+  We extend this concept by allowing multiple bonus periods per pool. Each 
+  `PoolInfo` contains an array of `BonusPeriod` structs, where each period has:
+  - `startTimestamp`: When this bonus period begins
+  - `bonusMultiplier`: The multiplier for this period (not smaller than 1)
+  
+  This approach prevents gaming attacks where users could time deposits/withdrawals
+  around multiplier changes, since all periods are immutable once created and
+  rewards are calculated accurately across different time periods.
+
 ### Pool management
 
 #### Adding stake pool
@@ -97,6 +113,9 @@ pools. If it exists, the add function will return.
 * Emits a `PoolAdded` event when a new pool is successfully added, including the
 pool ID (index), LP token address, and allocation points.
 
+* Initializes the pool with the first bonus period using the provided multiplier
+and current block timestamp.
+
 #### Updating allocation points
 
 Similar to `set` function in the `MasterChef` with few differences
@@ -106,3 +125,33 @@ Similar to `set` function in the `MasterChef` with few differences
 * It should not take `withUpdate`
 
 * Should emit an event
+
+#### Adding bonus periods
+
+New functionality not present in MasterChef to manage bonus multipliers over time:
+
+* The function name should be `addBonusPeriod`
+
+* Takes pool ID, start timestamp, and bonus multiplier parameters
+
+* Validates that the start timestamp is far enough in the future (using `minFutureTime`) and after the last existing period
+
+* Prevents gaming by ensuring periods are immutable once the timestamp is reached
+
+* Emits a `BonusPeriodAdded` event
+
+#### Updating minimum future time
+
+Configuration function to adjust the minimum time requirement for new bonus periods:
+
+* The function name should be `updateMinFutureTime`
+
+* Takes the new minimum future time in seconds
+
+* Validates that the value is at least 60 seconds (1 minute)
+
+* Initialized to 3600 seconds (1 hour) in the constructor
+
+* Prevents last-minute bonus period additions that could be gamed
+
+* Emits a `MinFutureTimeUpdated` event with old and new values
