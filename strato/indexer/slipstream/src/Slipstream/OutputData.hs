@@ -601,7 +601,12 @@ createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType)
   let tableName = collectionTableName creator a n collectionName
       keySqlTypes = fromMaybe "text" . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       valueSqlType = fromMaybe "text" $ solidityTypeToSQLType False (Just c) cc valueType
+      keyNames = keyColumnNames keySqlTypes
+      keyColumnsCombined = map (\(k, t) -> k <> " " <> t) keyNames
+  
   yield $ createCollectionTableQuery creator a n collectionName keySqlTypes valueSqlType
+  yield $ expandTableQuery tableName keyColumnsCombined
+  
   let fkeys1 = getDeferredForeignKeysForCollection tableName creator a
       fkeys2 = case valueType of
                 (SVMType.UnknownLabel contractNameForFkey _) -> getDeferredForeignKeysForCollectionType tableName creator a (T.pack $ contractNameForFkey)
