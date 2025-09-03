@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/table";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useUser } from "@/context/UserContext";
-
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
   if (!v) return 0;
@@ -112,19 +111,18 @@ const LiquidationsSection: React.FC = () => {
                       
                       {/* Borrower */}
                       <div>
+                        <div className="flex items-center gap-2">
                         <div className="text-sm text-gray-500">Borrower</div>
+                        {isOwnLoan(ln) && (
+                        <div className="text-sm text-red-500">
+                          <span className="font-medium">(You)</span>
+                        </div>
+                      )} </div>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{shorten(ln.user)}</span>
                           <CopyButton address={ln.user} />
                         </div>
                       </div>
-
-                      {/* Alert users to their own unhealthy loans, which they cannot liquidate */}
-                      {isOwnLoan(ln) && (
-                        <div className="text-sm text-red-500">
-                          <span className="font-medium">(You)</span>
-                        </div>
-                      )}
                     </div>
                     
                     {/* Borrowed amount */}
