@@ -19,9 +19,6 @@ import "./Pools/PoolFactory.sol";
 //Admin
 import "Admin/FeeCollector.sol";
 
-//OnRamp
-import "./OnRamp/OnRamp.sol";
-
 //Redemption
 //import "Redemptions/RedemptionService.sol";
 //import "Redemptions/CryptoRedemptionService.sol"; incomplete
@@ -55,7 +52,6 @@ contract record Mercata {
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
     MercataBridge public mercataBridge;
-    OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
@@ -92,8 +88,6 @@ contract record Mercata {
 
         // Create Services
         mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
-
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
     }
 }

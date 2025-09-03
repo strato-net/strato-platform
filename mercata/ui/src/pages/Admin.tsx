@@ -10,7 +10,6 @@ import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
 import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
-import OnRampTab from '@/components/admin/OnRampTab';
 import LendingTab from '@/components/admin/LendingTab';
 
 const Admin = () => {
@@ -82,12 +81,6 @@ const Admin = () => {
                 <span className="hidden sm:inline">Token Status</span>
                 <span className="sm:hidden">Status</span>
               </TabsTrigger>
-              <TabsTrigger value="listing" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Settings className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">OnRamp</span>
-                <span className="sm:hidden">OnRamp</span>
-              </TabsTrigger>
-
             </TabsList>
           </div>
 
@@ -144,10 +137,6 @@ const Admin = () => {
 
           <TabsContent value="status" className="space-y-6">
             <TokenStatusTable />
-          </TabsContent>
-
-          <TabsContent value="listing" className="space-y-6">
-            <OnRampTab />
           </TabsContent>
         </Tabs>
       </div>
