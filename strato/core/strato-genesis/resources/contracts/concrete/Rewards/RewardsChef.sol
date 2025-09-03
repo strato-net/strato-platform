@@ -51,6 +51,9 @@ contract record RewardsChef is Ownable {
     // The CATA token (reward token)
     Token public rewardToken;
 
+    // CATA tokens created per second for all pools
+    uint256 public cataPerSecond;
+
     // Total allocation poitns. Must be the sum of all allocation points in all
     // pools.
     uint256 public totalAllocPoint = 0;
@@ -65,8 +68,9 @@ contract record RewardsChef is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(address initialOwner, address _rewardToken) Ownable(initialOwner) {
+    constructor(address initialOwner, address _rewardToken, uint256 _cataPerSecond) Ownable(initialOwner) {
         rewardToken = Token(_rewardToken);
+        cataPerSecond = _cataPerSecond;
         pools = [];
         minFutureTime = 3600; // Initialize with 1 hour
     }
