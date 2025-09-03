@@ -89,19 +89,28 @@ export const constants = (() => {
 
   const cdpRegistrySelectFields = [
     "address",
+    "feeCollector",
+    "tokenFactory", 
+    "usdst",
     "cdpEngine:cdpEngine_fkey(" +
       "address," +
+      "registry," +
+      "globalPaused," +
+      "RAY::text," +
+      "WAD::text," +
       `collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),` +
       `collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value),` +
-      `vaults:${CDPEngine}-vaults(user:key,asset:key2,Vault:value)` +
+      `vaults:${CDPEngine}-vaults(user:key,asset:key2,Vault:value),` +
+      `isSupportedAsset:${CDPEngine}-isSupportedAsset(asset:key,value)` +
     ")",
     "cdpVault:cdpVault_fkey(" +
       "address," +
-      `userCollaterals:${CDPVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
+      "registry," +
+      `userCollaterals:${CDPVault}-userCollaterals(user:key,asset:key2,value::text)` +
     ")",
     "priceOracle:priceOracle_fkey(" +
       "address," +
-      `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
+      `prices:${PriceOracle}-prices(asset:key,value::text)` +
     ")",
   ];
 
