@@ -105,8 +105,7 @@ export const constants = (() => {
     ")",
     "cdpVault:cdpVault_fkey(" +
       "address," +
-      "registry," +
-      `userCollaterals:${CDPVault}-userCollaterals(user:key,asset:key2,value::text)` +
+      "registry" +
     ")",
     "priceOracle:priceOracle_fkey(" +
       "address," +
