@@ -3,7 +3,8 @@ import RestStatus from "http-status-codes";
 import {
   getPools,
   createPool,
-  addLiquidity,
+  addLiquidityDualToken,
+  addLiquiditySingleToken,
   removeLiquidity,
   swap,
   calculateSwap,
@@ -17,7 +18,8 @@ import {
   validateTokenAddressArgs,
   validateTokenPairArgs,
   validateCreatePoolsArgs,
-  validateAddLiquidityArgs,
+  validateAddLiquidityDualTokenArgs,
+  validateAddLiquiditySingleTokenArgs,
   validateRemoveLiquidityArgs,
   validateSwapArgs,
   validateQueryParams,
@@ -86,9 +88,9 @@ class SwappingController {
   }
 
   // Liquidity
-  static async addLiquidity(req: Request, res: Response, next: NextFunction) {
+  static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction) {
     const { accessToken, body, params } = req;
-    validateAddLiquidityArgs(body);
+    validateAddLiquidityDualTokenArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
     const liquidityParams = {
@@ -97,7 +99,23 @@ class SwappingController {
       deadline
     };
 
-    const result = await addLiquidity(accessToken, liquidityParams);
+    const result = await addLiquidityDualToken(accessToken, liquidityParams);
+    res.status(200).json(result);
+    return next();
+  }
+
+  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction) {
+    const { accessToken, body, params } = req;
+    validateAddLiquiditySingleTokenArgs(body);
+
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+    const liquidityParams = {
+      ...body,
+      poolAddress: params.poolAddress,
+      deadline
+    };
+
+    const result = await addLiquiditySingleToken(accessToken, liquidityParams);
     res.status(200).json(result);
     return next();
   }

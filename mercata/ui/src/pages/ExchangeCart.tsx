@@ -1,4 +1,3 @@
-import { DepositForm } from '@/components/dashboard/DepositModal';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
 import MintWidget from '@/components/mint/MintWidget';
@@ -16,11 +15,6 @@ const ExchangeCart = () => {
           <TabsTrigger value="mint">Deposit</TabsTrigger>
           <TabsTrigger value="withdraw">Withdraw</TabsTrigger>
         </TabsList>
-        <TabsContent value="buy">
-          <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-            <DepositForm />
-          </div>
-        </TabsContent>
         <TabsContent value="bridge">
           <BridgeWidget />
         </TabsContent>

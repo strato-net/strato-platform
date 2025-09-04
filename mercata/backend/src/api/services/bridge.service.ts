@@ -14,9 +14,10 @@ import {
 
 const { MercataBridge, Token } = constants;
 
-const assetParams = (mint: boolean, token: string) => ({
+const assetParams = (mint: boolean, externalChainId: string, token: string) => ({
   select: "count()",
   key: `eq.${token}`,
+  key2: `eq.${externalChainId}`,
   "value->>permissions": mint ? "in.(2,3)" : "in.(1,3)", // 2,3 for mint, 1,3 for wrap
   address: `eq.${constants.mercataBridge}`,
 });
@@ -45,7 +46,7 @@ export const requestWithdrawal = async (
 
   const [balances, assetCount] = await Promise.all([
     fetchTokenBalances(accessToken, userAddress, addresses),
-    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, assetLookupToken) }).then(r => r.data?.[0]?.count || 0)
+    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, externalChainId, approveToken) }).then(r => r.data?.[0]?.count || 0)
   ]);
 
   ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");
@@ -95,9 +96,9 @@ export const getBridgeTransactions = async (
 
 export const getBridgeableTokens = async (accessToken: string, chainId: string, mintUSDST = false) => {
   const params = {
-    select: "stratoToken:key,AssetInfo:value",
+    select: "stratoToken:key,externalChainId:key2,AssetInfo:value",
     "value->>permissions": mintUSDST ? "in.(2,3)" : "in.(1,3)", // 2,3 for mint, 1,3 for wrap
-    "value->>externalChainId": `eq.${chainId}`,
+    externalChainId: `eq.${chainId}`,
     address: `eq.${constants.mercataBridge}`
   };
   
@@ -134,7 +135,7 @@ export const getNetworkConfigs = async (accessToken: string) => {
 export const getBridgeAssets = async (accessToken: string) => {
   const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, {
     params: {
-      select: "stratoToken:key,AssetInfo:value",
+      select: "stratoToken:key,externalChainId:key2,AssetInfo:value",
       address: `eq.${constants.mercataBridge}`
     }
   });
@@ -149,6 +150,7 @@ export const getBridgeAssets = async (accessToken: string) => {
     {
       ...asset.AssetInfo,
       stratoToken: asset.stratoToken,
+      externalChainId: asset.externalChainId,
       stratoTokenName: tokenMap.get(asset.stratoToken)?.name || "",
       stratoTokenSymbol: tokenMap.get(asset.stratoToken)?.symbol || ""
     }

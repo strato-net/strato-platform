@@ -55,12 +55,13 @@ async function main() {
     console.log(`Liquidity Pool: ${deployedContract.managers.liquidityPool}`);
     console.log(`Lending Registry: ${deployedContract.managers.lendingRegistry}`);
     console.log(`Mercata Bridge: ${deployedContract.managers.mercataBridge}`);
-    console.log(`On Ramp: ${deployedContract.managers.onRamp}`);
     console.log(`Pool Factory: ${deployedContract.managers.poolFactory}`);
     console.log(`Token Factory: ${deployedContract.managers.tokenFactory}`);
     console.log(`Fee Collector: ${deployedContract.managers.feeCollector}`);
     console.log(`Admin Registry: ${deployedContract.managers.adminRegistry}`);
-
+    console.log(`CDP Registry: ${deployedContract.managers.cdpRegistry}`);
+    console.log(`CDP Engine: ${deployedContract.managers.cdpEngine}`);
+    console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
@@ -83,7 +84,9 @@ async function main() {
       LENDING_REGISTRY: deployedContract.managers.lendingRegistry,
       POOL_CONFIGURATOR: deployedContract.managers.poolConfigurator,
       MERCATA_BRIDGE: deployedContract.managers.mercataBridge,
-      ON_RAMP: deployedContract.managers.onRamp,
+      CDP_REGISTRY: deployedContract.managers.cdpRegistry,
+      CDP_ENGINE: deployedContract.managers.cdpEngine,
+      CDP_VAULT: deployedContract.managers.cdpVault,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {

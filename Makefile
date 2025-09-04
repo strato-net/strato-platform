@@ -16,7 +16,6 @@ FAKEROOT=$(shell pwd)/.docker-work
 HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
-IDENTITYDIR=${FAKEROOT}/identity-provider
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -37,13 +36,13 @@ docker: build_all_docker docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe docker-compose
+mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle docker-compose
 
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle mercata-stripe
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-stripe mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -93,14 +92,6 @@ mercata-oracle:
 	#echo "${REPO_URL}mercata-oracle:${VERSION}" > oracle_image_tag
 	#echo "${REPO_AWS_ECR_URL_MERCATA}oracle:${VERSION}" > oracle_image_tag_ecr
 
-mercata-stripe:
-	@echo Now building mercata-stripe...
-	docker build -t ${REPO_URL}mercata-stripe:${VERSION} ./mercata/services/payment/stripe
-	docker tag ${REPO_URL}mercata-stripe:${VERSION} ${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}
-	# TODO: #dcpush - replace with proper docker compose push flow
-	echo "${REPO_URL}mercata-stripe:${VERSION}" > stripe_image_tag
-	echo "${REPO_AWS_ECR_URL_MERCATA}stripe:${VERSION}" > stripe_image_tag_ecr
-
 eks:
 	@echo Now generating eks manifest files
 	cd k8s/eks/strato && sed -e 's|<REPO_URL>|'"${REPO_AWS_ECR_URL}"'|g' -e 's|<VERSION>|'"${VERSION}"'|g' strato-platform-manifest.tpl.yaml > strato-platform-manifest.yaml
@@ -116,7 +107,6 @@ build_common:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack install \
 		--test --no-run-tests
 
@@ -125,7 +115,6 @@ build_common_docker:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -135,7 +124,6 @@ build_common_profiled:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -144,7 +132,6 @@ build_common_fast:
 	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin

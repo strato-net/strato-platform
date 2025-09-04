@@ -32,16 +32,6 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/swap/quote": "Swap Quote Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
   
-  // OnRamp operations
-  "/onramp": "OnRamp Error",
-  "/onramp/buy": "Buy Error",
-  "/onramp/sell": "Sell Error",
-  "/onramp/lock": "Lock Error",
-  "/onramp/unlock": "Unlock Error",
-  "/onramp/addPaymentProvider": "Add Payment Provider Error",
-  "/onramp/removePaymentProvider": "Remove Payment Provider Error",
-  "/onramp/cancelListing": "Cancel Listing Error",
-  
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
   "/bridge/bridgeableTokens": "Bridge Tokens Error",

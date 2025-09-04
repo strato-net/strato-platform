@@ -66,6 +66,7 @@ module Crypto.Secp256k1
 #ifdef ECDH
     -- * Diffie Hellman
     , ecdh
+    , ecdhHashed
 #endif
 
 #ifdef SCHNORR
@@ -583,6 +584,18 @@ ecdh (PubKey pk) (SecKey sk) = withContext $ \ctx ->
     withForeignPtr pk $ \pkPtr -> withForeignPtr sk $ \skPtr ->
         allocaBytes size $ \o -> do
             ret <- ecEcdh ctx o pkPtr skPtr nullPtr nullPtr
+            unless (isSuccess ret) $ error "ecdh failed"
+            packByteString (o, size)
+  where
+    size :: Integral a => a
+    size = 32
+
+-- | Compute Diffie-Hellman secret with hashed X coordinate.
+ecdhHashed :: PubKey -> SecKey -> ByteString
+ecdhHashed (PubKey pk) (SecKey sk) = withContext $ \ctx ->
+    withForeignPtr pk $ \pkPtr -> withForeignPtr sk $ \skPtr ->
+        allocaBytes size $ \o -> do
+            ret <- ecEcdhHashed ctx o pkPtr skPtr nullPtr nullPtr
             unless (isSuccess ret) $ error "ecdh failed"
             packByteString (o, size)
   where
