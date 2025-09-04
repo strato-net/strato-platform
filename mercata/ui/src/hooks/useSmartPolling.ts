@@ -60,23 +60,6 @@ export const useSmartPolling = (config: PollingConfig): PollingReturn => {
 export const useBalancePolling = (userAddress: string, fetchBalance: (address: string) => Promise<any>, shouldPoll: (amount: string) => boolean = () => true) =>
   useSmartPolling({ fetchFn: () => fetchBalance(userAddress), shouldPoll, interval: 10000, onError: (error) => console.error("Balance polling error:", error) });
 
-export const useOnRampPolling = (getOnRampData: () => Promise<any>, shouldPoll: (amount: string) => boolean = () => true) =>
-  useSmartPolling({
-    fetchFn: getOnRampData,
-    shouldPoll,
-    transformData: (data) => {
-      const usdstListing = data?.listings?.find((l: any) => l.ListingInfo._name === "USDST");
-      if (usdstListing) {
-        const listingInfo = usdstListing.ListingInfo;
-        const providers = (listingInfo.providers || []).filter((p: any) => p?.providerAddress && p?.name).map((p: any) => ({ name: p.name, providerAddress: p.providerAddress }));
-        return { listingInfo, providers };
-      }
-      return null;
-    },
-    interval: 10000,
-    onError: (error) => console.error("On-ramp polling error:", error)
-  });
-
 export const useFormPolling = (fetchFn: () => Promise<any>, shouldPoll: (amount: string) => boolean = () => true, onDataUpdate?: (data: any) => void) =>
   useSmartPolling({ fetchFn, shouldPoll, onDataUpdate, interval: 10000, onError: (error) => console.error("Form polling error:", error) });
 

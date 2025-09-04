@@ -118,7 +118,7 @@ export const createPool = async (
   }
 };
 
-export const addLiquidity = async (
+export const addLiquidityDualToken = async (
   accessToken: string,
   params: {
     poolAddress: string;
@@ -159,6 +159,58 @@ export const addLiquidity = async (
         args: {
           tokenBAmount,
           maxTokenAAmount,
+          deadline
+        },
+      }
+    ]);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const addLiquiditySingleToken = async (
+  accessToken: string,
+  params: {
+    poolAddress: string;
+    singleTokenAmount: string;
+    isAToB: boolean;
+    deadline: number;
+  }
+) => {
+  try {
+    const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
+
+    const pools = await getPools(accessToken, undefined, {
+      address: "eq." + poolAddress,
+      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+    });
+    if (!pools || pools.length === 0) {
+      throw new Error("No pools found for the given address");
+    }
+    const pool = pools[0];
+
+    const depositTokenAddress = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+    
+    const tx = buildFunctionTx([
+      {
+        contractName: extractContractName(Token),
+        contractAddress: depositTokenAddress || "",
+        method: "approve",
+        args: { spender: poolAddress || "", value: singleTokenAmount || "" },
+      },
+      {
+        contractName: extractContractName(Pool),
+        contractAddress: poolAddress || "",
+        method: "addLiquiditySingleToken",
+        args: {
+          isAToB,
+          amountIn: singleTokenAmount,
           deadline
         },
       }

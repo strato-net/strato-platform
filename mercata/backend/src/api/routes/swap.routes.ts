@@ -27,8 +27,11 @@ router.get("/swap-pools/:poolAddress", authHandler.authorizeRequest(true), Swapp
 router.post("/swap-pools", authHandler.authorizeRequest(), SwappingController.create);
 
 // ----- Liquidity Management -----
-// Add liquidity to a specific pool
-router.post("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.addLiquidity);
+// Add liquidity to a specific pool (dual token)
+router.post("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.addLiquidityDualToken);
+
+// Add liquidity to a specific pool (single token)
+router.post("/swap-pools/:poolAddress/liquidity/single", authHandler.authorizeRequest(), SwappingController.addLiquiditySingleToken);
 
 // Remove liquidity from a specific pool
 router.delete("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
