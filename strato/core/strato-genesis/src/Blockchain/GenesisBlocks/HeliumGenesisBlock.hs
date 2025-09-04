@@ -269,7 +269,7 @@ omega :: Integer
 omega = 2_000_000 * oneE18
 
 lastAccrual :: Integer
-lastAccrual = 1755144000 -- August 14th, 2025, 12:00:00 AM
+lastAccrual = 1756958400 -- September 4th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
