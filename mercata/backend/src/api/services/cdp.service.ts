@@ -52,7 +52,7 @@ export const getCDPRegistry = async (
       `/${CDPRegistry}`,
       { params }
     );
-
+    console.log("registryData", registryData);
     if (!registryData) {
       console.error(`No CDP Registry found at address: ${cdpRegistry}`);
       throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
@@ -100,6 +100,8 @@ const getTokenInfo = async (
   };
 };
 
+
+
 interface VaultData {
   asset: string;
   symbol: string;
@@ -138,9 +140,13 @@ export const getVaults = async (
     throw new Error("CDP Engine not found");
   }
 
-  const userVaults = registry.cdpEngine.vaults?.filter(
-    (v: any) => v.user.toLowerCase() === userAddress.toLowerCase()
-  ) || [];
+  // Use vaults directly from the registry data
+  const allVaults = registry.cdpEngine.vaults || [];
+  
+  // Filter for user's vaults
+  const userVaults = allVaults.filter(
+    (v: any) => v.user?.toLowerCase() === userAddress.toLowerCase()
+  );
 
   const vaultPromises = userVaults.map(async (vaultEntry: any) => {
     const asset = vaultEntry.asset;
@@ -217,11 +223,86 @@ export const getVault = async (
   userAddress: string,
   asset: string
 ): Promise<VaultData | null> => {
-  const vaults = await getVaults(accessToken, userAddress);
-  return vaults.find(v => 
-    v.asset.toLowerCase() === asset.toLowerCase() || 
-    v.symbol.toLowerCase() === asset.toLowerCase()
-  ) || null;
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Find the specific vault from registry data
+  const allVaults = registry.cdpEngine.vaults || [];
+  const vaultEntry = allVaults.find(
+    (v: any) => 
+      v.user?.toLowerCase() === userAddress.toLowerCase() &&
+      v.asset?.toLowerCase() === asset.toLowerCase()
+  );
+  
+  if (!vaultEntry) {
+    return null;
+  }
+
+  const vault = vaultEntry.Vault;
+
+  // Get token info
+  const tokenInfo = await getTokenInfo(accessToken, asset);
+    
+    // Get asset config and global state
+    const config = registry.cdpEngine.collateralConfigs?.find(
+      (c: any) => c.asset.toLowerCase() === asset.toLowerCase()
+    )?.CollateralConfig;
+    
+    const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+      (s: any) => s.asset.toLowerCase() === asset.toLowerCase()
+    )?.CollateralGlobalState;
+    
+    // Get price
+    const priceEntry = registry.priceOracle?.prices?.find(
+      (p: any) => p.asset.toLowerCase() === asset.toLowerCase()
+    );
+    const price = BigInt(priceEntry?.value || "0");
+    
+    if (!config || !globalState || !vault) {
+      return null;
+    }
+    
+    // Use the current rate accumulator from the indexed data
+    // This is already up-to-date as it's updated on every transaction
+    const currentRateAccumulator = globalState.rateAccumulator;
+    
+    const scaledDebt = BigInt(vault.scaledDebt || "0");
+    const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
+    
+    // Calculate collateral value
+    const collateralAmount = BigInt(vault.collateral || "0");
+    const collateralValueUSD = (collateralAmount * price) / BigInt(config.unitScale);
+    
+    // Calculate collateralization ratio
+    let cr = 0;
+    if (currentDebt > 0n) {
+      cr = Number((collateralValueUSD * WAD) / currentDebt) / Number(WAD) * 100;
+    } else if (collateralAmount > 0n) {
+      cr = Number.MAX_SAFE_INTEGER; // Infinite CR when no debt
+    }
+    
+    const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
+    const healthFactor = calculateHealthFactor(cr, liquidationRatio);
+    
+    // Convert stability fee rate from RAY per second to annual percentage
+    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    
+    return {
+      asset,
+      symbol: tokenInfo.symbol,
+      collateralAmount: formatUnits(collateralAmount, tokenInfo.decimals),
+      collateralValueUSD: formatUnits(collateralValueUSD, 18),
+      debtAmount: formatUnits(currentDebt, 18),
+      debtValueUSD: formatUnits(currentDebt, 18), // USDST is 1:1 with USD
+      collateralizationRatio: cr,
+      liquidationRatio,
+      healthFactor,
+      stabilityFeeRate,
+      health: getHealthStatus(healthFactor),
+    };
 };
 
 export const deposit = async (
@@ -548,11 +629,12 @@ export const getSupportedAssets = async (
   }
 
   const configEntries = registry.cdpEngine.collateralConfigs || [];
-  
+  console.log("configEntries", configEntries);
   const configPromises = configEntries.map(async (entry: any) => {
     return getAssetConfig(accessToken, userAddress, entry.asset);
   });
   
   const configs = await Promise.all(configPromises);
+  console.log("configs", configs);
   return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null);
 };
