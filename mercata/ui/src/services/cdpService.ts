@@ -3,10 +3,11 @@ import { api } from "@/lib/axios";
 export interface VaultData {
   asset: string;                               // Collateral asset address
   symbol: string;                              // Asset symbol (e.g., "ETH", "WBTC")
-  collateralAmount: string;                    // Amount of collateral deposited
-  collateralValueUSD: string;                  // USD value of collateral
-  debtAmount: string;                          // Amount of USDST debt
-  debtValueUSD: string;                        // USD value of debt (should equal debtAmount)
+  collateralAmount: string;                    // Raw integer string (wei format)
+  collateralAmountDecimals: number;            // Decimals for proper formatting
+  collateralValueUSD: string;                  // Raw integer string (18 decimals)
+  debtAmount: string;                          // Raw integer string (18 decimals)
+  debtValueUSD: string;                        // Raw integer string (18 decimals)
   collateralizationRatio: number;              // Ratio of collateral to debt (percentage)
   liquidationRatio: number;                    // Minimum required collateralization ratio
   healthFactor: number;                        // Vault health (CR / liquidationRatio)

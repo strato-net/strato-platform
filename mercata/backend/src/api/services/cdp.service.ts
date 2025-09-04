@@ -52,10 +52,17 @@ export const getCDPRegistry = async (
       `/${CDPRegistry}`,
       { params }
     );
-    console.log("registryData", registryData);
     if (!registryData) {
       console.error(`No CDP Registry found at address: ${cdpRegistry}`);
       throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
+    }
+
+    // Validate required components
+    if (!registryData.cdpEngine?.address) {
+      console.error('CDP Engine address missing from registry');
+    }
+    if (!registryData.cdpVault?.address) {
+      console.error('CDP Vault address missing from registry');
     }
 
     return registryData;
@@ -106,6 +113,7 @@ interface VaultData {
   asset: string;
   symbol: string;
   collateralAmount: string;
+  collateralAmountDecimals: number; // Decimals for proper formatting
   collateralValueUSD: string;
   debtAmount: string;
   debtValueUSD: string;
@@ -114,6 +122,7 @@ interface VaultData {
   healthFactor: number;
   stabilityFeeRate: number;
   health: "healthy" | "warning" | "danger";
+  borrower?: string; // Optional for liquidatable positions
 }
 
 interface AssetConfig {
@@ -181,9 +190,12 @@ export const getVaults = async (
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
     
+    
     // Calculate collateral value
     const collateralAmount = BigInt(vault.collateral || "0");
+    // Unit scale should now be 1e18 (fixed on-chain configuration)
     const collateralValueUSD = (collateralAmount * price) / BigInt(config.unitScale);
+    
     
     // Calculate collateralization ratio
     let cr = 0;
@@ -202,10 +214,11 @@ export const getVaults = async (
     return {
       asset,
       symbol: tokenInfo.symbol,
-      collateralAmount: formatUnits(collateralAmount, tokenInfo.decimals),
-      collateralValueUSD: formatUnits(collateralValueUSD, 18),
-      debtAmount: formatUnits(currentDebt, 18),
-      debtValueUSD: formatUnits(currentDebt, 18), // USDST is 1:1 with USD
+      collateralAmount: collateralAmount.toString(), // Raw integer string
+      collateralAmountDecimals: tokenInfo.decimals, // Include decimals info for frontend formatting
+      collateralValueUSD: collateralValueUSD.toString(), // Raw integer string (18 decimals)
+      debtAmount: currentDebt.toString(), // Raw integer string (18 decimals)
+      debtValueUSD: currentDebt.toString(), // Raw integer string (18 decimals) - USDST is 1:1 with USD
       collateralizationRatio: cr,
       liquidationRatio,
       healthFactor,
@@ -274,6 +287,7 @@ export const getVault = async (
     
     // Calculate collateral value
     const collateralAmount = BigInt(vault.collateral || "0");
+    // Unit scale should now be 1e18 (fixed on-chain configuration)
     const collateralValueUSD = (collateralAmount * price) / BigInt(config.unitScale);
     
     // Calculate collateralization ratio
@@ -293,10 +307,11 @@ export const getVault = async (
     return {
       asset,
       symbol: tokenInfo.symbol,
-      collateralAmount: formatUnits(collateralAmount, tokenInfo.decimals),
-      collateralValueUSD: formatUnits(collateralValueUSD, 18),
-      debtAmount: formatUnits(currentDebt, 18),
-      debtValueUSD: formatUnits(currentDebt, 18), // USDST is 1:1 with USD
+      collateralAmount: collateralAmount.toString(), // Raw integer string
+      collateralAmountDecimals: tokenInfo.decimals, // Include decimals info for frontend formatting
+      collateralValueUSD: collateralValueUSD.toString(), // Raw integer string (18 decimals)
+      debtAmount: currentDebt.toString(), // Raw integer string (18 decimals)
+      debtValueUSD: currentDebt.toString(), // Raw integer string (18 decimals) - USDST is 1:1 with USD
       collateralizationRatio: cr,
       liquidationRatio,
       healthFactor,
@@ -316,18 +331,24 @@ export const deposit = async (
     throw new Error("CDP Engine not found");
   }
 
+  // Get token info to determine decimals for proper conversion
+  const tokenInfo = await getTokenInfo(accessToken, body.asset);
+  
+  // Convert decimal amount to wei format (CRITICAL: prevents financial loss)
+  const amountWei = parseUnits(body.amount, tokenInfo.decimals).toString();
+
   const tx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: body.asset,
       method: "approve",
-      args: { spender: registry.cdpVault.address, value: body.amount },
+      args: { spender: registry.cdpVault.address, value: amountWei },
     },
     {
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "deposit",
-      args: { asset: body.asset, amount: body.amount },
+      args: { asset: body.asset, amount: amountWei },
     },
   ];
 
@@ -347,12 +368,18 @@ export const withdraw = async (
     throw new Error("CDP Engine not found");
   }
 
+  // Get token info to determine decimals for proper conversion
+  const tokenInfo = await getTokenInfo(accessToken, body.asset);
+  
+  // Convert decimal amount to wei format (CRITICAL: prevents financial loss)
+  const amountWei = parseUnits(body.amount, tokenInfo.decimals).toString();
+
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "withdraw",
-      args: { asset: body.asset, amount: body.amount },
+      args: { asset: body.asset, amount: amountWei },
     }))
   );
 };
@@ -389,12 +416,16 @@ export const mint = async (
     throw new Error("CDP Engine not found");
   }
 
+  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
+  const amountWei = parseUnits(body.amount, 18).toString();
+
+
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "mint",
-      args: { asset: body.asset, amountUSD: body.amount },
+      args: { asset: body.asset, amountUSD: amountWei },
     }))
   );
 };
@@ -438,18 +469,21 @@ export const repay = async (
     throw new Error("USDST token not found in registry");
   }
 
+  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
+  const amountWei = parseUnits(body.amount, 18).toString();
+
   const tx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: usdstAddress,
       method: "approve",
-      args: { spender: registry.cdpEngine.address, value: body.amount },
+      args: { spender: registry.cdpEngine.address, value: amountWei },
     },
     {
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "repay",
-      args: { asset: body.asset, amountUSD: body.amount },
+      args: { asset: body.asset, amountUSD: amountWei },
     },
   ];
 
@@ -516,12 +550,15 @@ export const liquidate = async (
     throw new Error("USDST token not found in registry");
   }
 
+  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
+  const debtToCoverWei = parseUnits(body.debtToCover, 18).toString();
+
   const tx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: usdstAddress,
       method: "approve",
-      args: { spender: registry.cdpEngine.address, value: body.debtToCover },
+      args: { spender: registry.cdpEngine.address, value: debtToCoverWei },
     },
     {
       contractName: extractContractName(CDPEngine),
@@ -530,7 +567,7 @@ export const liquidate = async (
       args: {
         collateralAsset: body.collateralAsset,
         borrower: body.borrower,
-        debtToCover: body.debtToCover,
+        debtToCover: debtToCoverWei,
       },
     },
   ];
@@ -629,12 +666,10 @@ export const getSupportedAssets = async (
   }
 
   const configEntries = registry.cdpEngine.collateralConfigs || [];
-  console.log("configEntries", configEntries);
   const configPromises = configEntries.map(async (entry: any) => {
     return getAssetConfig(accessToken, userAddress, entry.asset);
   });
   
   const configs = await Promise.all(configPromises);
-  console.log("configs", configs);
   return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null);
 };

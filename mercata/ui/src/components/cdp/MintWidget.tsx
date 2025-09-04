@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { api } from "@/lib/axios";
 
 /**
  * CDP Mint flow widget - now connected to backend
@@ -23,10 +25,17 @@ const MintWidget: React.FC = () => {
   const [isDepositMaxEnabled, setIsDepositMaxEnabled] = useState(false);
   const [isRatioLocked, setIsRatioLocked] = useState(false);
   const [lockedCR, setLockedCR] = useState<number | null>(null);
+  const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
+  
+  // Get real asset price from dynamic data only
+  const getAssetPrice = (): number => {
+    if (!depositAsset) return 0;
+    return assetPrices[depositAsset.asset] || 0;
+  };
   
   // Calculate current collateralization ratio and related values
   const calculateCurrentCR = (): number => {
@@ -37,7 +46,7 @@ const MintWidget: React.FC = () => {
     
     const collateralAmount = parseFloat(depositAmount);
     const debtAmount = parseFloat(borrowAmount);
-    const assetPriceUSD = 4000; // Assuming ETH/wstETH price ~$4000
+    const assetPriceUSD = getAssetPrice();
     const collateralValueUSD = collateralAmount * assetPriceUSD;
     
     // CR = (collateral value / debt value) * 100
@@ -51,8 +60,7 @@ const MintWidget: React.FC = () => {
     }
     
     const collateralAmount = parseFloat(depositAmount);
-    // Assume price for demo (in real app, would fetch from price oracle)
-    const assetPriceUSD = 4000; // Assuming ETH/wstETH price ~$4000
+    const assetPriceUSD = getAssetPrice();
     const collateralValueUSD = collateralAmount * assetPriceUSD;
     
     // liquidationRatio from backend is the liquidation threshold (e.g., 150 means 150%)
@@ -77,19 +85,125 @@ const MintWidget: React.FC = () => {
     return userToken?.balance || "0";
   };
 
+  // Format large numbers for display
+  const formatNumber = (num: number | string, decimals: number = 2): string => {
+    const value = typeof num === 'string' ? parseFloat(num) : num;
+    if (isNaN(value)) return '0';
+    
+    // For very large numbers, use scientific notation
+    if (value >= 1e21) {
+      return value.toExponential(2);
+    }
+    
+    // For large numbers, use K/M/B notation
+    if (value >= 1e9) {
+      return (value / 1e9).toFixed(1) + 'B';
+    }
+    if (value >= 1e6) {
+      return (value / 1e6).toFixed(1) + 'M';
+    }
+    if (value >= 1e3) {
+      return (value / 1e3).toFixed(1) + 'K';
+    }
+    
+    // For normal numbers, limit decimal places
+    return value.toFixed(decimals);
+  };
+
+  // Format percentage with reasonable precision
+  const formatPercentage = (num: number, decimals: number = 2): string => {
+    if (isNaN(num)) return '0.00%';
+    return num.toFixed(decimals) + '%';
+  };
+
+
+  // Convert wei string to decimal for display (handles raw integer strings from backend)
+  const formatWeiToDecimal = (weiString: string, decimals: number): string => {
+    if (!weiString || weiString === '0') return '0';
+    
+    const wei = BigInt(weiString);
+    const divisor = BigInt(10) ** BigInt(decimals);
+    const quotient = wei / divisor;
+    const remainder = wei % divisor;
+    
+    if (remainder === 0n) {
+      return quotient.toString();
+    }
+    
+    // For non-zero remainder, show decimal places
+    const decimalPart = remainder.toString().padStart(decimals, '0');
+    const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
+    
+    if (trimmedDecimal === '') {
+      return quotient.toString();
+    }
+    
+    return `${quotient}.${trimmedDecimal}`;
+  };
+
   const maxBorrowable = calculateMaxBorrowable();
   const currentCR = calculateCurrentCR();
   const liquidationRatio = depositAsset?.liquidationRatio || 150;
   const userDepositBalance = getUserDepositBalance();
 
-  // Fetch supported assets on component mount
+  // Dynamic slider configuration based on LT
+  const getSliderConfig = () => {
+    if (!depositAsset) {
+      return { min: 100, max: 500, safeDefault: 200 };
+    }
+    
+    const lt = depositAsset.liquidationRatio;
+    const minCR = Math.ceil(lt * 1.01); // LT + 1% minimum
+    const safeDefault = Math.ceil(lt * 1.5); // 1.5x LT as safe starting point
+    
+    // Dynamic max based on LT for better scale
+    let maxCR;
+    if (lt <= 110) {
+      maxCR = 300; // For low LT assets, show up to 300%
+    } else if (lt <= 150) {
+      maxCR = Math.max(400, lt * 2.5); // For medium LT, show 2.5x or 400%
+    } else {
+      maxCR = Math.max(500, lt * 2); // For high LT, show 2x or 500%
+    }
+    
+    return { min: minCR, max: maxCR, safeDefault };
+  };
+
+  const sliderConfig = getSliderConfig();
+
+  // Fetch supported assets and prices on component mount
   useEffect(() => {
-    const fetchAssets = async () => {
+    const fetchAssetsAndPrices = async () => {
       try {
         const assets = await cdpService.getSupportedAssets();
         setSupportedAssets(assets);
         if (assets.length > 0) {
           setDepositAsset(assets[0]); // Set first asset as default
+        }
+
+        // Fetch real asset prices for all supported assets
+        try {
+          const priceResponse = await api.get('/tokens/balance');
+          const tokensData = priceResponse.data;
+          
+          const prices: Record<string, number> = {};
+          assets.forEach(asset => {
+            // Find the token data that matches this asset
+            const tokenData = tokensData.find((token: { address?: string; price?: string }) => 
+              token.address?.toLowerCase() === asset.asset.toLowerCase()
+            );
+            
+            if (tokenData?.price) {
+              // Convert price from wei format (18 decimals) to regular number
+              prices[asset.asset] = parseFloat(formatWeiToDecimal(tokenData.price, 18));
+            }
+            // No fallback prices - only use real data
+          });
+          
+          setAssetPrices(prices);
+        } catch (priceError) {
+          console.error("Could not fetch real asset prices:", priceError);
+          setAssetPrices({}); // Empty object - no prices available
         }
       } catch (error) {
         console.error("Failed to fetch supported assets:", error);
@@ -101,22 +215,11 @@ const MintWidget: React.FC = () => {
       }
     };
 
-    fetchAssets();
+    fetchAssetsAndPrices();
   }, [toast]);
 
   // Update max borrowable amount display when collateral amount changes
   useEffect(() => {
-    // Debug log to verify calculation
-    if (depositAsset && depositAmount && parseFloat(depositAmount) > 0) {
-      console.log('Calculating max borrowable:', {
-        depositAmount,
-        depositAsset: depositAsset.symbol,
-        liquidationRatio: depositAsset.liquidationRatio,
-        maxBorrowable,
-        isRatioLocked,
-        lockedCR
-      });
-    }
 
     // Check if current mint amount equals max borrowable (within tolerance)
     const currentMintAmount = parseFloat(borrowAmount);
@@ -159,7 +262,7 @@ const MintWidget: React.FC = () => {
       // Lock the ratio when MAX is used
       if (parseFloat(depositAmount) > 0 && maxBorrowable > 0 && depositAsset) {
         const collateralAmount = parseFloat(depositAmount);
-        const assetPriceUSD = 4000;
+        const assetPriceUSD = getAssetPrice();
         const collateralValueUSD = collateralAmount * assetPriceUSD;
         const newCR = (collateralValueUSD / maxBorrowable) * 100;
         setIsRatioLocked(true);
@@ -185,17 +288,15 @@ const MintWidget: React.FC = () => {
     if (parseFloat(depositAmount) > 0 && parseFloat(value) > 0 && depositAsset) {
       const collateralAmount = parseFloat(depositAmount);
       const debtAmount = parseFloat(value);
-      const assetPriceUSD = 4000;
+      const assetPriceUSD = getAssetPrice();
       const collateralValueUSD = collateralAmount * assetPriceUSD;
       const newCR = (collateralValueUSD / debtAmount) * 100;
-      const minAllowedCR = depositAsset.liquidationRatio * 1.01; // LT + 1%
-      
-      // Prevent mint amount that would result in CR below minimum
-      if (newCR < minAllowedCR) {
-        const maxAllowedDebt = (collateralValueUSD * 100) / minAllowedCR;
+      // Prevent mint amount that would result in CR below minimum using dynamic config
+      if (newCR < sliderConfig.min) {
+        const maxAllowedDebt = (collateralValueUSD * 100) / sliderConfig.min;
         setBorrowAmount(maxAllowedDebt.toFixed(2));
         setIsRatioLocked(true);
-        setLockedCR(minAllowedCR);
+        setLockedCR(sliderConfig.min);
         return;
       }
     }
@@ -207,7 +308,7 @@ const MintWidget: React.FC = () => {
     if (parseFloat(depositAmount) > 0 && parseFloat(value) > 0) {
       const collateralAmount = parseFloat(depositAmount);
       const debtAmount = parseFloat(value);
-      const assetPriceUSD = 4000;
+      const assetPriceUSD = getAssetPrice();
       const collateralValueUSD = collateralAmount * assetPriceUSD;
       const newCR = (collateralValueUSD / debtAmount) * 100;
       
@@ -262,12 +363,15 @@ const MintWidget: React.FC = () => {
       return;
     }
     
-    // Enforce minimum CR constraint (LT + 1%)
-    const minAllowedCR = depositAsset.liquidationRatio * 1.01;
-    const effectiveTargetCR = Math.max(targetCR, minAllowedCR);
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) {
+      return;
+    }
+    
+    // Enforce minimum CR constraint using dynamic slider config
+    const effectiveTargetCR = Math.max(targetCR, sliderConfig.min);
     
     const collateralAmount = parseFloat(depositAmount);
-    const assetPriceUSD = 4000;
     const collateralValueUSD = collateralAmount * assetPriceUSD;
     
     // Calculate mint amount based on effective target CR and current deposit
@@ -327,19 +431,21 @@ const MintWidget: React.FC = () => {
     try {
       // First deposit collateral
       const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
-      if (depositResult.status !== "success") {
-        throw new Error("Deposit failed");
+      
+      if (depositResult.status.toLowerCase() !== "success") {
+        throw new Error(`Deposit failed with status: ${depositResult.status}`);
       }
 
       // Then mint USDST
       const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
-      if (mintResult.status !== "success") {
-        throw new Error("Mint failed");
+      
+      if (mintResult.status.toLowerCase() !== "success") {
+        throw new Error(`Mint failed with status: ${mintResult.status}`);
       }
 
       toast({
         title: "Vault Created Successfully",
-        description: `Deposited ${depositAmount} ${depositAsset.symbol} and minted ${borrowAmount} USDST. Tx: ${mintResult.hash}`,
+        description: `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol} and minted ${formatNumber(parseFloat(borrowAmount))} USDST. Tx: ${mintResult.hash}`,
       });
 
       // Reset form
@@ -347,9 +453,24 @@ const MintWidget: React.FC = () => {
       setBorrowAmount("0");
     } catch (error) {
       console.error("Failed to create vault:", error);
+      
+      // Extract more detailed error information
+      let errorMessage = "Please try again";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle API errors
+        const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+        if (apiError.response?.data?.message) {
+          errorMessage = apiError.response.data.message;
+        } else if (apiError.message) {
+          errorMessage = apiError.message;
+        }
+      }
+      
       toast({
         title: "Vault Creation Failed",
-        description: "Please try again",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -366,11 +487,6 @@ const MintWidget: React.FC = () => {
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Deposit</h3>
-            {depositAsset && parseFloat(userDepositBalance) > 0 && (
-              <span className="text-xs text-gray-500">
-                Balance: {parseFloat(userDepositBalance).toFixed(6)} {depositAsset.symbol}
-              </span>
-            )}
           </div>
 
           <Select 
@@ -389,6 +505,13 @@ const MintWidget: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
+
+          {/* Balance display under asset selector */}
+          {depositAsset && parseFloat(userDepositBalance) > 0 && (
+            <div className="text-xs text-gray-500 text-center">
+              {formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4)} {depositAsset.symbol}
+            </div>
+          )}
 
           <div className="flex items-center gap-3">
             <Input
@@ -411,7 +534,10 @@ const MintWidget: React.FC = () => {
             </Button>
           </div>
           <p className="text-xs text-gray-500">
-            ${(parseFloat(depositAmount || "0") * 4000).toFixed(2)}
+            {getAssetPrice() > 0 
+              ? `$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())}`
+              : "Price unavailable"
+            }
           </p>
         </div>
 
@@ -421,7 +547,7 @@ const MintWidget: React.FC = () => {
             <h3 className="font-semibold">Mint</h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
-                Max: ${maxBorrowable.toFixed(2)} (~{(depositAsset.liquidationRatio * 1.01).toFixed(0)}% CR)
+                Max: ${formatNumber(maxBorrowable)} (~{formatNumber(depositAsset.liquidationRatio * 1.01, 0)}% CR)
               </span>
             )}
           </div>
@@ -451,7 +577,7 @@ const MintWidget: React.FC = () => {
             </Button>
           </div>
           <p className="text-xs text-gray-500">
-            ${parseFloat(borrowAmount || "0").toFixed(2)}
+            ${formatNumber(parseFloat(borrowAmount || "0"))}
           </p>
         </div>
       </div>
@@ -462,31 +588,32 @@ const MintWidget: React.FC = () => {
           <div className="flex justify-between items-center text-sm font-medium">
             <span>Collateralization Ratio (CR)</span>
             <span className={isPositionDangerous ? 'text-red-500 font-bold' : ''}>
-              {isRatioLocked && lockedCR ? lockedCR.toFixed(2) : (currentCR > 0 ? currentCR.toFixed(2) : '0.00')}%
+              {isRatioLocked && lockedCR ? formatPercentage(lockedCR, 1) : (currentCR > 0 ? formatPercentage(currentCR, 1) : '0.0%')}
             </span>
           </div>
           <div className="relative">
             <div className={isPositionDangerous ? 'cr-slider-dangerous' : ''}>
               <Slider 
-                value={isRatioLocked && lockedCR ? [lockedCR] : (currentCR > 0 ? [currentCR] : [liquidationRatio])} 
-                max={500} 
-                min={depositAsset ? Math.ceil(depositAsset.liquidationRatio * 1.01) : 100}
+                value={isRatioLocked && lockedCR ? [lockedCR] : (currentCR > 0 ? [currentCR] : [sliderConfig.safeDefault])} 
+                max={sliderConfig.max} 
+                min={sliderConfig.min}
                 step={1} 
                 onValueChange={handleCRSliderChange}
-                disabled={!depositAsset || parseFloat(depositAmount) <= 0}
+                disabled={!depositAsset || parseFloat(depositAmount) <= 0 || getAssetPrice() <= 0}
                 className="w-full"
               />
             </div>
             {/* Liquidation threshold marker */}
-            <div 
-              className="absolute top-0 w-px h-4 bg-red-500 z-10"
-              style={{ 
-                left: `${((liquidationRatio - (depositAsset ? Math.ceil(depositAsset.liquidationRatio * 1.01) : 100)) / 
-                         (500 - (depositAsset ? Math.ceil(depositAsset.liquidationRatio * 1.01) : 100))) * 100}%` 
-              }}
-            >
-              <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full"></div>
-            </div>
+            {depositAsset && (
+              <div 
+                className="absolute top-0 w-px h-4 bg-red-500 z-10"
+                style={{ 
+                  left: `${((liquidationRatio - sliderConfig.min) / (sliderConfig.max - sliderConfig.min)) * 100}%` 
+                }}
+              >
+                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full"></div>
+              </div>
+            )}
           </div>
           <style>{`
             .cr-slider-dangerous [data-radix-collection-item] {
@@ -498,16 +625,16 @@ const MintWidget: React.FC = () => {
             }
           `}</style>
           <div className="flex justify-between text-xs text-gray-500">
-            <span className="text-orange-500">Min: {depositAsset ? Math.ceil(depositAsset.liquidationRatio * 1.01) : 100}%</span>
-            <span className="text-red-500">LT: {liquidationRatio}%</span>
-            <span>Safe: {Math.round(liquidationRatio * 1.5)}%+</span>
-            <span>500%</span>
+            <span className="text-orange-500">Min: {formatPercentage(sliderConfig.min, 0)}</span>
+            <span className="text-red-500">LT: {formatPercentage(liquidationRatio, 0)}</span>
+            <span className="text-green-600">Safe: {formatPercentage(sliderConfig.safeDefault, 0)}+</span>
+            <span>{formatPercentage(sliderConfig.max, 0)}</span>
           </div>
         </div>
 
         <div className="border border-gray-200 rounded-xl p-6 bg-gray-50 text-center">
           <p className="text-sm text-gray-600 mb-2">Stability Fee</p>
-          <p className="text-3xl font-semibold">{borrowRate}%</p>
+          <p className="text-3xl font-semibold">{formatPercentage(borrowRate)}</p>
         </div>
       </div>
 
@@ -519,7 +646,7 @@ const MintWidget: React.FC = () => {
               <span className="text-white text-xs font-bold">!</span>
             </div>
             <span className="text-sm text-red-700 font-medium">
-              Warning: Position below liquidation threshold ({liquidationRatio}%). This position can be liquidated.
+              Warning: Position below liquidation threshold ({formatPercentage(liquidationRatio, 0)}). This position can be liquidated.
             </span>
           </div>
         </div>
@@ -528,9 +655,14 @@ const MintWidget: React.FC = () => {
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
-        disabled={loading || !depositAsset}
+        disabled={loading || !depositAsset || getAssetPrice() <= 0}
       >
-        {loading ? "Creating Vault..." : "Create Vault"}
+        {loading 
+          ? "Creating Vault..." 
+          : getAssetPrice() <= 0 
+            ? "Price data required" 
+            : "Create Vault"
+        }
       </Button>
     </div>
   );

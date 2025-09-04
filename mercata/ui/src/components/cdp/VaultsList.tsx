@@ -20,6 +20,61 @@ const getHealthFactorColor = (healthFactor: number): string => {
   return "text-red-600"; // Danger - red
 };
 
+// Format large numbers for display
+const formatNumber = (num: number | string, decimals: number = 2): string => {
+  const value = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(value)) return '0';
+  
+  // For very large numbers, use scientific notation
+  if (value >= 1e21) {
+    return value.toExponential(2);
+  }
+  
+  // For large numbers, use K/M/B notation
+  if (value >= 1e9) {
+    return (value / 1e9).toFixed(1) + 'B';
+  }
+  if (value >= 1e6) {
+    return (value / 1e6).toFixed(1) + 'M';
+  }
+  if (value >= 1e3) {
+    return (value / 1e3).toFixed(1) + 'K';
+  }
+  
+  // For normal numbers, limit decimal places
+  return value.toFixed(decimals);
+};
+
+// Format percentage with reasonable precision
+const formatPercentage = (num: number, decimals: number = 2): string => {
+  if (isNaN(num)) return '0.00%';
+  return num.toFixed(decimals) + '%';
+};
+
+// Convert wei string to decimal for display (handles raw integer strings from backend)
+const formatWeiToDecimal = (weiString: string, decimals: number): string => {
+  if (!weiString || weiString === '0') return '0';
+  
+  const wei = BigInt(weiString);
+  const divisor = BigInt(10) ** BigInt(decimals);
+  const quotient = wei / divisor;
+  const remainder = wei % divisor;
+  
+  if (remainder === 0n) {
+    return quotient.toString();
+  }
+  
+  // For non-zero remainder, show decimal places
+  const decimalPart = remainder.toString().padStart(decimals, '0');
+  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
+  
+  if (trimmedDecimal === '') {
+    return quotient.toString();
+  }
+  
+  return `${quotient}.${trimmedDecimal}`;
+};
+
 /**
  * VaultsList component displays user's CDP vaults
  * Each vault represents a collateral position with corresponding debt
@@ -98,9 +153,10 @@ const VaultsList: React.FC = () => {
 
   // Calculate maximum allowed value for each action
   const calculateMaxValue = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
-    const currentCollateral = parseFloat(position.collateralAmount);
-    const currentDebt = parseFloat(position.debtAmount);
-    const currentCollateralUSD = parseFloat(position.collateralValueUSD);
+    // Convert wei strings to decimal numbers for calculations
+    const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
+    const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+    const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
     const pricePerUnit = currentCollateralUSD / currentCollateral;
 
     switch (action) {
@@ -122,7 +178,7 @@ const VaultsList: React.FC = () => {
         const requiredCollateralUSD = (currentDebt * requiredCollateralRatio) / 100;
         const requiredCollateral = requiredCollateralUSD / pricePerUnit;
         const maxWithdraw = Math.max(0, currentCollateral - requiredCollateral);
-        return maxWithdraw.toFixed(6);
+        return formatNumber(maxWithdraw, 6);
       }
       
       case 'mint': {
@@ -131,12 +187,12 @@ const VaultsList: React.FC = () => {
         const safeCollateralRatio = position.liquidationRatio * safeHealthFactor;
         const maxDebtUSD = (currentCollateralUSD * 100) / safeCollateralRatio;
         const maxMint = Math.max(0, maxDebtUSD - currentDebt);
-        return maxMint.toFixed(2);
+        return formatNumber(maxMint);
       }
       
       case 'repay': {
         // Maximum repay is current debt
-        return currentDebt.toString();
+        return formatNumber(currentDebt);
       }
       
       default:
@@ -168,10 +224,11 @@ const VaultsList: React.FC = () => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
-    const currentCollateral = parseFloat(position.collateralAmount);
-    const currentDebt = parseFloat(position.debtAmount);
-    const currentCollateralUSD = parseFloat(position.collateralValueUSD);
-    const currentDebtUSD = parseFloat(position.debtValueUSD);
+    // Convert wei strings to decimal numbers for calculations
+    const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
+    const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+    const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
+    const currentDebtUSD = parseFloat(formatWeiToDecimal(position.debtValueUSD, 18));
     
     // Assume price per unit of collateral
     const pricePerUnit = currentCollateralUSD / currentCollateral;
@@ -202,13 +259,15 @@ const VaultsList: React.FC = () => {
 
     // Calculate new health factor
     const newCR = newDebt > 0 ? (newCollateralUSD / newDebtUSD) * 100 : 999999;
-    const newHealthFactor = calculateHealthFactor(newCR, position.liquidationRatio);
+    const newHealthFactor = newDebt > 0 
+      ? calculateHealthFactor(newCR, position.liquidationRatio)
+      : Infinity;
 
     return {
-      collateralAmount: newCollateral.toFixed(2),
-      collateralValueUSD: newCollateralUSD.toFixed(2),
-      debtAmount: newDebt.toFixed(2),
-      debtValueUSD: newDebtUSD.toFixed(2),
+      collateralAmount: formatNumber(newCollateral),
+      collateralValueUSD: formatNumber(newCollateralUSD),
+      debtAmount: formatNumber(newDebt),
+      debtValueUSD: formatNumber(newDebtUSD),
       healthFactor: newHealthFactor
     };
   };
@@ -244,7 +303,7 @@ const VaultsList: React.FC = () => {
           throw new Error(`Unknown action: ${action}`);
       }
 
-      if (result.status === "success") {
+      if (result.status.toLowerCase() === "success") {
         toast({
           title: "Success",
           description: `${action.charAt(0).toUpperCase() + action.slice(1)} completed successfully. Tx: ${result.hash}`,
@@ -310,7 +369,11 @@ const VaultsList: React.FC = () => {
       <CardContent>
         <div className="space-y-4">
           {positions.map((position, index) => {
-            const healthFactor = calculateHealthFactor(position.collateralizationRatio, position.liquidationRatio);
+            const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+            const hasDebt = currentDebt > 0;
+            const healthFactor = hasDebt 
+              ? calculateHealthFactor(position.collateralizationRatio, position.liquidationRatio)
+              : Infinity;
             const activeAction = activeActions[position.asset];
             const inputAmount = inputAmounts[position.asset] || "";
             const previewValues = activeAction && inputAmount ? calculatePreviewValues(position, activeAction, inputAmount) : null;
@@ -357,21 +420,23 @@ const VaultsList: React.FC = () => {
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Collateral</p>
-                  <p className="font-semibold">{position.collateralAmount} {position.symbol}</p>
-                  <p className="text-xs text-gray-400">${position.collateralValueUSD}</p>
+                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
+                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18)))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Debt</p>
-                  <p className="font-semibold">{position.debtAmount} USDST</p>
-                  <p className="text-xs text-gray-400">${position.debtValueUSD}</p>
+                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(position.debtAmount, 18)))} USDST</p>
+                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimal(position.debtValueUSD, 18)))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Health Factor</p>
-                  <p className={`font-semibold ${getHealthFactorColor(healthFactor)}`}>{healthFactor.toFixed(2)}</p>
+                  <p className={`font-semibold ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600'}`}>
+                    {hasDebt ? formatNumber(healthFactor) : '∞'}
+                  </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Stability Fee</p>
-                  <p className="font-semibold">{position.stabilityFeeRate.toFixed(2)}%</p>
+                  <p className="font-semibold">{formatPercentage(position.stabilityFeeRate)}</p>
                 </div>
               </div>
 
@@ -392,13 +457,13 @@ const VaultsList: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 mb-1">Health Factor</p>
-                      <p className={`font-semibold ${getHealthFactorColor(previewValues.healthFactor)}`}>
-                        {previewValues.healthFactor.toFixed(2)}
+                      <p className={`font-semibold ${previewValues.healthFactor === Infinity ? 'text-green-600' : getHealthFactorColor(previewValues.healthFactor)}`}>
+                        {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 mb-1">Stability Fee</p>
-                      <p className="font-semibold text-blue-900">{position.stabilityFeeRate.toFixed(2)}%</p>
+                      <p className="font-semibold text-blue-900">{formatPercentage(position.stabilityFeeRate)}</p>
                     </div>
                   </div>
                 </div>
