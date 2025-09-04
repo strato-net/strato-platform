@@ -28,9 +28,8 @@ export const requestWithdrawal = async (
   userAddress: string,
   mintUSDST = false
 ) => {
-  const { externalChainId, stratoToken, stratoTokenAmount, externalRecipient, targetStratoToken } = body;
+  const { externalChainId, stratoToken, stratoTokenAmount, externalRecipient } = body;
   const approveToken = mintUSDST ? constants.USDST : stratoToken;
-  const assetLookupToken = targetStratoToken || stratoToken; // Use targetStratoToken if provided
 
   const actions = [
     { contractName: extractContractName(Token), contractAddress: approveToken, method: "approve", args: { spender: constants.mercataBridge, value: stratoTokenAmount } },
@@ -46,7 +45,7 @@ export const requestWithdrawal = async (
 
   const [balances, assetCount] = await Promise.all([
     fetchTokenBalances(accessToken, userAddress, addresses),
-    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, externalChainId, approveToken) }).then(r => r.data?.[0]?.count || 0)
+    cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, externalChainId, stratoToken) }).then(r => r.data?.[0]?.count || 0)
   ]);
 
   ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");

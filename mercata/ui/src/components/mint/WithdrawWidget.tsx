@@ -111,9 +111,8 @@ const WithdrawWidget: React.FC = () => {
       const res = await redeemOut({
         stratoTokenAmount,
         externalRecipient: address,
-        stratoToken: usdstAddress, // Always use USDST address for burning
-        externalChainId: String(externalChainId),
-        targetStratoToken: selectedToken.stratoToken, // Which asset mapping to use
+        stratoToken: selectedToken.stratoToken,
+        externalChainId: String(externalChainId)
       });
       if (res?.success) {
         toast({
