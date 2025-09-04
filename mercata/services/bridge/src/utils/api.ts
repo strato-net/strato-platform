@@ -33,7 +33,7 @@ export const extractErrorMessage = (error: any): string => {
 // Retry Logic
 // ============================================================================
 
-const retry = async <T>(
+export const retry = async <T>(
   fn: () => Promise<T>,
   {
     maxAttempts = config.api.defaults.maxAttempts,

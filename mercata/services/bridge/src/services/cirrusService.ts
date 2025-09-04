@@ -23,9 +23,11 @@ export const getEnabledChains = async (): Promise<ChainInfo[]> => {
 };
 
 // Get all enabled assets from the bridge contract
-export const getEnabledAssets = async (): Promise<any[]> => {
+export const getEnabledAssets = async (externalChainId?: number): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
+      select: "stratoToken:key,externalChainId:key2,AssetInfo:value",
+      ...(externalChainId ? { key2: `eq.${externalChainId}` } : {}),
       "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
@@ -33,8 +35,9 @@ export const getEnabledAssets = async (): Promise<any[]> => {
 
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
-      ...item.value,
-      stratoToken: item.key,
+      ...item.AssetInfo,
+      stratoToken: item.stratoToken,
+      externalChainId: item.externalChainId,
     }));
   }
   return [];

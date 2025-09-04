@@ -98,7 +98,8 @@ export function enrichAssetsWithTokenData(assets: any[], tokenMap: Map<string, a
       [keyField]: tokenKey,
       stratoTokenName: info?.name || "",
       stratoTokenSymbol: info?.symbol || "",
-      ...asset.AssetInfo
+      ...asset.AssetInfo,
+      externalChainId: asset.externalChainId
     };
   });
 }

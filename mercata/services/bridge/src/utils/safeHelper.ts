@@ -18,6 +18,7 @@ import {
 } from "./utils";
 import { logError, logInfo } from "./logger";
 import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType, SafeTransactionData } from "../types";
+import { retry } from "./api";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -203,11 +204,28 @@ export async function proposeTransactions(
 ): Promise<void> {
   const { apiKit } = await initializeSafeForChain(chainId);
   
+  let successful = 0;
+  let failed = 0;
+  
   for (const tx of transactions) {
-    await apiKit.proposeTransaction(tx);
+    try {
+      await retry(
+        () => apiKit.proposeTransaction(tx),
+        { logPrefix: "SafeService" }
+      );
+      successful++;
+    } catch (error) {
+      logError("SafeService", error as Error, {
+        operation: "proposeTransaction",
+        safeTxHash: tx.safeTxHash,
+        nonce: tx.nonce,
+        chainId,
+      });
+      failed++;
+    }
   }
   
-  logInfo("SafeService", `Proposed ${transactions.length} transactions for chain ${chainId}`);
+  logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${successful} successful, ${failed} failed out of ${transactions.length} total`);
 }
 
 export async function initializeSafeForChain(chainId: number) {
@@ -237,7 +255,10 @@ export async function createWithdrawalProposals(
   const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeOwnerAddress || "";
-  let currentNonce = Number(await apiKit.getNextNonce(safeAddress));
+  let currentNonce = Number(await retry(
+    () => apiKit.getNextNonce(safeAddress),
+    { logPrefix: "SafeService" }
+  ));
 
   for (const prepared of preparedWithdrawals) {
     const nonce = currentNonce++;
