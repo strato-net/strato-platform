@@ -63,16 +63,34 @@ function saveResults(poolConfigs, batchCalls, batchResults) {
   return filepath;
 }
 
-// Pool addresses from your deployment
+// Pool addresses from environment variables
 const POOL_ADDRESSES = {
-  WBTCST: "55d9e1551f52dcc3d3c233e002a0a4421fb81ff8",
-  GOLDST: "34d7caf576cf9493f054d9eced99dcd463eba4b7", 
-  SILVST: "f115302afd125d048caedd47353f01d1a5e9dba8",
-  USDTST: "50160ce5184913cada2660ab51a4f464f904d5eb",
-  USDCST: "d86cb1d4d55328b0837d32ecf2c78ac2ff490b3a",
-  PAXGST: "ff2befcd850183170627dcbc377c3fd573789172",
-  ETHST: "cb85e12ca5d98de95715fc75ae251a66b662ea06"
+  WBTCST: process.env.WBTCST_POOL_ADDRESS,
+  GOLDST: process.env.GOLDST_POOL_ADDRESS, 
+  SILVST: process.env.SILVST_POOL_ADDRESS,
+  USDTST: process.env.USDTST_POOL_ADDRESS,
+  USDCST: process.env.USDCST_POOL_ADDRESS,
+  PAXGST: process.env.PAXGST_POOL_ADDRESS,
+  ETHST: process.env.ETHST_POOL_ADDRESS
 };
+
+// Validate that all required environment variables are set
+const requiredEnvVars = [
+  'WBTCST_POOL_ADDRESS',
+  'GOLDST_POOL_ADDRESS', 
+  'SILVST_POOL_ADDRESS',
+  'USDTST_POOL_ADDRESS',
+  'USDCST_POOL_ADDRESS',
+  'PAXGST_POOL_ADDRESS',
+  'ETHST_POOL_ADDRESS'
+];
+
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingEnvVars.length > 0) {
+  console.error('Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('Please set all pool address environment variables before running this script.');
+  process.exit(1);
+}
 
 // Pool configurations with token pairs and mint amounts
 const POOL_CONFIGS = [
@@ -123,7 +141,15 @@ const POOL_CONFIGS = [
     poolAddress: POOL_ADDRESSES.PAXGST,
     tokenAMintAmount: toWei("59.8"), // 59.8 PAXGST
     tokenBMintAmount: toWei("200000") // 200,000 USDST
-  }
+  },
+  {
+    name: "ETHST-USDST",
+    tokenA: "93fb7295859b2d70199e0a4883b7c320cf874e6c", // ETHST
+    tokenB: USDST_ADDRESS,
+    poolAddress: POOL_ADDRESSES.ETHST,
+    tokenAMintAmount: toWei("100"), // 100 ETHST
+    tokenBMintAmount: toWei("3000000") // 3,000,000 USDST
+  },
 ];
 
 /**
