@@ -617,16 +617,3 @@ foreign import ccall
     -> Ptr b
     -> IO Ret
 #endif
-
-#ifdef ECDH
-foreign import ccall
-    "secp256k1_ecdh.h secp256k1_ecdh_hashed"
-    ecEcdhHashed
-    :: Ptr Ctx
-    -> Ptr CUChar
-    -> Ptr PubKey64
-    -> Ptr SecKey32
-    -> Ptr a
-    -> Ptr b
-    -> IO Ret
-#endif
