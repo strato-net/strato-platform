@@ -9,7 +9,7 @@ import { PriceHistoryEntry, PriceHistoryResponse } from "../../types";
 const {
   PriceOracle,
   PriceOracleEvents,
-  priceHistorySelectFields,
+  PriceOracleBatchUpdateEvents,
 } = constants;
 
 export const getPrice = async (
@@ -91,40 +91,61 @@ export const getPriceHistory = async (
 
     const params = {
       address: `eq.${oracleAddress}`,
-      asset: `eq.${assetAddress}`,
       block_timestamp: `gte.${oneMonthAgoISO}`,
-      select: rawParams.select || priceHistorySelectFields.join(','),
-      order: rawParams.order || 'block_timestamp.asc',
-      ...Object.fromEntries(
-        Object.entries(rawParams).filter(([key, value]) => 
-          value !== undefined && 
-          !['select', 'order'].includes(key)
-        )
-      )
+      order: rawParams.order || "block_timestamp.asc",
     };
 
-    const [priceEventsResponse, countResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${PriceOracleEvents}`, { params }).catch(err => {
+    // --- Query both tables ---
+    const [singleResponse, batchResponse] = await Promise.all([
+      cirrus.get(accessToken, `/${PriceOracleEvents}`, { params: { ...params, asset: `eq.${assetAddress}` } }).catch(err => {
         console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
         return { data: [] };
       }),
-      cirrus.get(accessToken, `/${PriceOracleEvents}`, { 
-        params: { 
-          address: `eq.${oracleAddress}`, 
-          asset: `eq.${assetAddress}`,
-          block_timestamp: `gte.${oneMonthAgoISO}`,
-          select: 'id.count()' 
-        }
+      cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, {
+        params
       }).catch(err => {
-        console.error(`[getPriceHistory] Error counting events:`, err);
-        return { data: [{ count: 0 }] };
+        console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
+        return { data: [] };
       })
     ]);
 
-    const priceEvents = priceEventsResponse.data;
-    const totalCount = countResponse.data?.[0]?.count || 0;
+    function toPlainString(num: number): string {
+      return num.toLocaleString("fullwide", { useGrouping: false });
+    }
 
-    if (!Array.isArray(priceEvents)) {
+    const priceEvents: PriceHistoryEntry[] = [];
+
+    // --- Normalize single asset events ---
+    if (Array.isArray(singleResponse.data)) {
+      singleResponse.data.forEach((event: any) => {
+        priceEvents.push({
+          id: event.id.toString(),
+          timestamp: new Date(parseInt(event.timestamp) * 1000),
+          asset: event.asset,
+          price: toPlainString(event.price), // normalize to string
+          blockTimestamp: new Date(event.block_timestamp),
+        });
+      });
+    }
+
+    // --- Normalize batch events ---
+    if (Array.isArray(batchResponse.data)) {
+      batchResponse.data.forEach((event: any) => {
+        const idx = event.assets.indexOf(assetAddress);
+        if (idx !== -1) {
+          priceEvents.push({
+            id: event.id.toString(),
+            timestamp: new Date(parseInt(event.timestamp) * 1000),
+            asset: assetAddress,
+            price: toPlainString(event.priceValues[idx]), // normalize to string
+            blockTimestamp: new Date(event.block_timestamp),
+          });
+        }
+      });
+    }
+
+    if (priceEvents.length === 0) {
+      console.log(`[getPriceHistory] No data found for ${assetAddress}`);
       return { data: [], totalCount: 0 };
     }
 
@@ -132,9 +153,8 @@ export const getPriceHistory = async (
     const hourlyPrices = new Map<string, PriceHistoryEntry>();
 
     priceEvents.forEach((event: any) => {
-      const blockTimestamp = new Date(event.block_timestamp);
-      const eventTimestamp = new Date(parseInt(event.timestamp) * 1000);
-      
+      const blockTimestamp = event.blockTimestamp;
+
       // Create hourly bucket (round down to the hour)
       const hourBucket = new Date(blockTimestamp);
       hourBucket.setMinutes(0, 0, 0);
@@ -142,13 +162,7 @@ export const getPriceHistory = async (
 
       // Keep the latest price for each hour
       if (!hourlyPrices.has(hourKey) || blockTimestamp > hourlyPrices.get(hourKey)!.blockTimestamp) {
-        hourlyPrices.set(hourKey, {
-          id: event.id.toString(),
-          timestamp: eventTimestamp,
-          asset: event.asset,
-          price: event.price,
-          blockTimestamp: blockTimestamp
-        });
+        hourlyPrices.set(hourKey, event);
       }
     });
 
@@ -162,26 +176,25 @@ export const getPriceHistory = async (
     const sortedEvents = Array.from(hourlyPrices.values()).sort(
       (a, b) => a.blockTimestamp.getTime() - b.blockTimestamp.getTime()
     );
-    
+
     const earliestDataPoint = sortedEvents[0];
     const latestDataPoint = sortedEvents[sortedEvents.length - 1];
-    
+
     // Start from the earliest actual data point (rounded to hour)
     const startTime = new Date(earliestDataPoint.blockTimestamp);
     startTime.setMinutes(0, 0, 0);
-    
+
     // End at current time (or latest data point if it's more recent)
     const now = new Date();
     const endTime = latestDataPoint.blockTimestamp > now ? latestDataPoint.blockTimestamp : now;
 
     const filledPriceHistory: PriceHistoryEntry[] = [];
     let currentPrice = earliestDataPoint.price;
-    
+
     // Generate hourly timestamps from first data point to now
-    let hoursGenerated = 0;
     for (let currentHour = new Date(startTime); currentHour <= endTime; currentHour.setHours(currentHour.getHours() + 1)) {
       const hourKey = currentHour.toISOString();
-      
+
       if (hourlyPrices.has(hourKey)) {
         // We have actual data for this hour
         const actualData = hourlyPrices.get(hourKey)!;
@@ -193,14 +206,14 @@ export const getPriceHistory = async (
           id: `filled-${currentHour.getTime()}`,
           timestamp: new Date(currentHour),
           asset: assetAddress,
-          price: currentPrice,
+          price: currentPrice.toString(),
           blockTimestamp: new Date(currentHour)
         });
       }
-      hoursGenerated++;
+      
     }
 
-    
+
     return { data: filledPriceHistory, totalCount: filledPriceHistory.length };
   } catch (error) {
     console.error('Error fetching price history:', error);
