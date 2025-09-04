@@ -48,8 +48,20 @@ const parseDepositEvents = async (logs: any[], externalChainId: number) => {
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
     const stratoRecipient = normalizeAddress(log.topics[3]);
+    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId, bool mint)
+    // Data layout: [amount(32 bytes)][depositId(32 bytes)][mint(32 bytes)]
     const externalTokenAmount = "0x" + log.data.substring(2, 66);
-    const mint = log.data.substring(130, 132) === "01";
+    const depositId = "0x" + log.data.substring(66, 130);
+    const mintHex = log.data.substring(130, 194);
+    const mint = mintHex.substring(62) === "01";
+    
+    console.log("Event parsing:", {
+      externalTokenAmount,
+      depositId: parseInt(depositId, 16),
+      mintHex,
+      mint,
+      txHash: log.transactionHash
+    });
 
     const tokenInfo = tokenMapping.get(externalToken);
     if (!tokenInfo) {

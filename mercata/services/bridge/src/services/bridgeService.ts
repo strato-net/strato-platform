@@ -15,6 +15,7 @@ export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const mintUSDSTs = deposits.map((deposit) => deposit.mintUSDST);
 
   try {
+    logError("depositBatch", "", {externalChainIds, externalTxHashes, stratoTokens, stratoTokenAmounts, stratoRecipients, externalSenders, mintUSDSTs});
     await execute({
       contractName: "MercataBridge",
       contractAddress: config.bridge.address!,

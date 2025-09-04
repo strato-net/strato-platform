@@ -23,6 +23,8 @@ import { useLendingContext } from "@/context/LendingContext";
 import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { formatUnits } from "ethers";
+import { api } from "@/lib/axios";
+import { usdstAddress } from "@/lib/constants";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
@@ -290,30 +292,45 @@ const MintWidget: React.FC = () => {
 
       toast({ title: "Mint transaction sent", description: `Tx: ${txHash.slice(0,10)}…` });
 
-      // Auto-deposit: poll for USDST balance increase and deposit
+      console.log("After toast, before autoDeposit check");
+      console.log("autoDeposit value:", autoDeposit, typeof autoDeposit);
+      
+      // Auto-deposit: poll for USDST balance increase and deposit (TODO this is a really hacky way to do this)
       if (autoDeposit) {
         const beforeWei = BigInt(usdstBalance || "0");
-        await fetchUsdstBalance(userAddress);
+        console.log("beforeWei", beforeWei);
+        await fetchUsdstBalance(userAddress)
         const targetIncreaseWei = safeParseUnits(amount, 18);
         const start = Date.now();
         const timeoutMs = 8 * 60 * 1000; // 8 minutes
         let deposited = false;
 
         while (Date.now() - start < timeoutMs) {
-          await new Promise(r => setTimeout(r, 8000));
+          await new Promise(r => setTimeout(r, 4000));
           await fetchUsdstBalance(userAddress);
           try {
-            const nowWei = BigInt(usdstBalance || "0");
-            if (nowWei - beforeWei >= targetIncreaseWei) {
+            // Get fresh balance directly from API instead of using React state
+            const nowRes = await api.get(`/tokens/balance?address=eq.${usdstAddress}`);
+            const nowBalanceFromAPI = nowRes?.data?.[0]?.balance || "0";
+            const nowWei = BigInt(nowBalanceFromAPI);
+            console.log("nowWei from API", nowWei);
+            console.log("difference", nowWei - beforeWei);
+            console.log("target", targetIncreaseWei);
+            
+            if (nowWei - beforeWei == targetIncreaseWei) {
               // Deposit the minted amount
-              const amtDec = formatUnits(targetIncreaseWei, 18);
+              const amtDec = safeParseUnits(amount, 18).toString();
               await depositLiquidity({ amount: amtDec });
               await refreshLiquidity();
+              // Also update the React state
+              await fetchUsdstBalance(userAddress);
               toast({ title: "Auto-deposit complete", description: `Supplied ${amtDec} USDST to lending pool` });
               deposited = true;
               break;
             }
-          } catch {}
+          } catch (balanceErr) {
+            console.error("Error checking balance:", balanceErr);
+          }
         }
         if (!deposited) {
           toast({ title: "Auto-deposit pending", description: "We'll deposit after USDST arrives. If it takes too long, deposit from Lending section.", variant: "default" });
