@@ -265,4 +265,23 @@ contract record RewardsChef is Ownable {
 
         emit Withdraw(msg.sender, _pid, _amount);
     }
+
+    function pendingCata(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][_user];
+
+        uint256 accPerToken = pool.accPerToken;
+        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+
+        if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
+            uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+            uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
+            accPerToken += (cataReward * 1e12) / lpSupply;
+        }
+
+        return ((user.amount * accPerToken) / 1e12) - user.rewardDebt;
+    }
+
 }
