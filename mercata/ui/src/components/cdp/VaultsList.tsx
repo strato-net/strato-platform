@@ -259,7 +259,7 @@ const VaultsList: React.FC = () => {
         const updatedPositions = await cdpService.getVaults();
         setPositions(updatedPositions);
       } else {
-        throw new Error(result.message || `${action} failed`);
+        throw new Error(`${action} failed`);
       }
     } catch (error) {
       console.error(`Failed to ${action}:`, error);
