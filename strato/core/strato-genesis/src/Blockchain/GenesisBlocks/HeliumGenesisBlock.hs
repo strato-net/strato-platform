@@ -485,6 +485,10 @@ mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount
   , (".withdrawalCounter", BInteger 0)
   , (".withdrawalsPaused", BBool False)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
+  , (".PERMISSION_WRAP", BInteger 1)
+  , (".PERMISSION_MINT", BInteger 2)
+  , (".PERMISSION_MASK", BInteger 3)
+  , (".USDST_ADDRESS", BAccount $ unspecifiedChain usdstAddress)
   ]
 
 poolFactory :: AccountInfo
