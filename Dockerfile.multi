@@ -11,6 +11,7 @@ RUN apt -y update && apt install -y \
       libpcre3-dev \
       libpq-dev \
       libsodium-dev \
+      libsecp256k1-dev \
       libstdc++6 \
       libtool \
       locales \
@@ -24,15 +25,6 @@ RUN apt -y update && apt install -y \
   && apt clean \
   && ln -s /lib/x86_64-linux-gnu/libleveldb.so.1.23.0 /lib/x86_64-linux-gnu/libleveldb.so.1 \
   && locale-gen en_US.UTF-8 \
-  && git clone https://github.com/blockapps/secp256k1 -b ecdh-optional-hashing \
-  && cd secp256k1/ \
-  && ./autogen.sh \
-  && ./configure --enable-module-recovery --enable-experimental --enable-module-ecdh \
-  && make \
-  && make install \
-  && ln -s /usr/local/lib/libsecp256k1.so.0.0.0 /lib/x86_64-linux-gnu/libsecp256k1.so.1 \
-  && cd .. \
-  && rm -rf secp256k1 \
   && ldconfig
 
 ENV LANG="en_US.UTF-8" \

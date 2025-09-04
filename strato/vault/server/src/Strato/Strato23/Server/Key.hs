@@ -69,28 +69,22 @@ postKey' userName oauthProvider = withSecretKey $ \key -> do
 
 -- Get an ECDH shared secret from the user's private key and a supplied public key
 getSharedKey :: Text -> Bool -> PublicKey -> VaultM SharedKey
-getSharedKey userName hashed otherPub = withSecretKey $ \key -> do
+getSharedKey userName _ otherPub = withSecretKey $ \key -> do
   (_ :: ByteString, nonce, encKey, (_ :: Address)) <-
     toUserError ("User " <> userName <> " doesn't exist")
       . vaultQuery1
       $ getUserKeyQuery userName
   case decryptSecKey key nonce encKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
-    Just pKey -> return $
-      if hashed
-        then deriveSharedKey pKey otherPub
-        else deriveSharedKeyUnhashed pKey otherPub
+    Just pKey -> return $ deriveSharedKey pKey otherPub
 
 -- Get an ECDH shared secret from the user's private key and a supplied public key
 getSharedKey' :: Text -> Text -> Bool -> PublicKey -> VaultM SharedKey
-getSharedKey' userName oauthProvider hashed otherPub = withSecretKey $ \key -> do
+getSharedKey' userName oauthProvider _ otherPub = withSecretKey $ \key -> do
   (_ :: ByteString, nonce, encKey, (_ :: Address)) <-
     toUserError ("User " <> userName <> " " <> oauthProvider <> " doesn't exist")
       . vaultQuery1
       $ getUserKeyQuery' userName oauthProvider
   case decryptSecKey key nonce encKey of
     Nothing -> vaultWrapperError IncorrectPasswordError
-    Just pKey -> return $
-      if hashed
-        then deriveSharedKey pKey otherPub
-        else deriveSharedKeyUnhashed pKey otherPub
+    Just pKey -> return $ deriveSharedKey pKey otherPub
