@@ -168,14 +168,20 @@ const MintWidget: React.FC = () => {
 
   // Derived displays
   const formattedUsdstBalance = useMemo(() => formatBalance(usdstBalance || "0", undefined, 18, 2, 2), [usdstBalance]);
+  const formattedSuppliedBalance = useMemo(() => formatBalance(liquidityInfo?.withdrawable?.userBalance || "0", undefined, 18, 2, 2), [liquidityInfo?.withdrawable?.userBalance]);
+  
   const afterBalance = useMemo(() => {
     try {
-      const before = parseFloat((formattedUsdstBalance || "0").replace(/,/g, ""));
+      // Use supplied balance if auto-deposit is enabled, wallet balance otherwise
+      const currentBalance = autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance;
+      const before = parseFloat((currentBalance || "0").replace(/,/g, ""));
       const add = parseFloat(amount || "0");
       const sum = isNaN(before) || isNaN(add) ? 0 : before + add;
       return sum.toLocaleString(undefined, { maximumFractionDigits: 6 });
-    } catch { return formattedUsdstBalance; }
-  }, [formattedUsdstBalance, amount]);
+    } catch { 
+      return autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance; 
+    }
+  }, [formattedUsdstBalance, formattedSuppliedBalance, amount, autoDeposit]);
 
   const apr = liquidityInfo?.supplyAPY || liquidityInfo?.maxSupplyAPY || "0";
   const estYearly = useMemo(() => {
@@ -413,25 +419,29 @@ const MintWidget: React.FC = () => {
         />
       </div>
 
-      <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
-        <div className="flex items-center justify-between text-gray-600 text-sm">
-          <span>Current APY</span>
-          <span className="font-medium">{apr ? `${apr}%` : "N/A"} <span className="text-xs ml-1 text-gray-500">Earn ~{estYearly} USDST/year</span></span>
-        </div>
-        <div className="flex items-center justify-between text-gray-600 text-sm">
-          <span>USDST Balance</span>
-          <span className="font-medium">{formattedUsdstBalance || "0"} → {afterBalance}</span>
-        </div>
-        <div className="flex items-center justify-between text-gray-600 text-sm">
-          <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} USDST minted</span>
-        </div>
-      </div>
-
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
         Automatically deposit minted USDST into lending pool
       </label>
+
+      <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
+        {autoDeposit && (
+          <div className="flex items-center justify-between text-gray-600 text-sm">
+            <span>Current APY</span>
+            <span className="font-medium">{apr ? `${apr}%` : "N/A"}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between text-gray-600 text-sm">
+          <span>USDST {autoDeposit ? "Supplied" : "Balance"}</span>
+          <span className="font-medium">{autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance || "0"} → {afterBalance}</span>
+        </div>
+        <div className="flex items-center justify-between text-gray-600 text-sm">
+          <span>Outcome</span>
+          <span className="font-medium">{amount || "0.00"} USDST deposited {autoDeposit ? "and lent" : ""}</span>
+        </div>
+      </div>
+
+
 
       <div className="flex justify-end">
         <Button
