@@ -144,12 +144,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         if (Array.isArray(data) && data[0]) {
           const tokenData = data[0];
           const balance = tokenData.balance ? String(tokenData.balance) : "0";
-          const tokenLimit = tokenData.tokenLimit ? {
-            maxPerTx: tokenData.tokenLimit.maxPerTx || "0",
-            isUnlimited: tokenData.tokenLimit.isUnlimited || false
-          } : undefined;
           
-          return { balance, tokenLimit };
+          return { balance };
         }
         
         return { balance: "0" };
@@ -166,10 +162,6 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     const [data, setData] = useState<{ 
       balance: string; 
       formatted: string;
-      tokenLimit?: {
-        maxPerTx: string;
-        isUnlimited: boolean;
-      };
     } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isError, setIsError] = useState(false);
@@ -191,10 +183,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
       setError(null);
 
       try {
-        const { balance, tokenLimit } = await fetchBalance(tokenAddress);
+        const { balance } = await fetchBalance(tokenAddress);
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {
           const formatted = formatBalance(balance);
-          setData({ balance, formatted, tokenLimit });
+          setData({ balance, formatted });
         }
       } catch (err) {
         if (mountedRef.current && !abortControllerRef.current.signal.aborted) {

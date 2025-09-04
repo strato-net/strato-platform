@@ -50,15 +50,6 @@ const BridgeOut: React.FC = () => {
   } = useBalance(selectedToken?.stratoToken || null);
 
   const tokenBalance = balanceData?.formatted || "0";
-  const tokenLimitInfo = balanceData?.tokenLimit ? {
-    maxPerTx: balanceData.tokenLimit.maxPerTx,
-    isUnlimited: balanceData.tokenLimit.isUnlimited,
-    loading: false,
-  } : {
-    maxPerTx: "0",
-    isUnlimited: false,
-    loading: false,
-  };
 
   // Set initial network selection
   useEffect(() => {
@@ -278,9 +269,7 @@ const BridgeOut: React.FC = () => {
                           <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
                           <span className="text-xs text-gray-500">
-                            { !(tokenLimitInfo.isUnlimited) &&
-                             `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.stratoTokenSymbol}`
-                            }
+                            { `Max: ${selectedToken.maxPerTx} ${selectedToken.stratoTokenSymbol}`}
                           </span>
                         )}
                       </div>
@@ -371,9 +360,9 @@ const BridgeOut: React.FC = () => {
                   {selectedNetwork || "selected"} network
                 </p>
               )}
-              {!tokenLimitInfo.isUnlimited &&  (
+              {!selectedToken?.maxPerTx &&  (
                 <p className="text-orange-600 text-sm">
-                  Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.externalSymbol}
+                  Transfer limit: {selectedToken?.maxPerTx} {selectedToken?.externalSymbol}
                 </p>
               )}
             </div>

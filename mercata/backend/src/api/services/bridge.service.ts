@@ -98,7 +98,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId: string, 
   const params = {
     select: "stratoToken:key,externalChainId:key2,AssetInfo:value",
     "value->>permissions": mintUSDST ? "in.(2,3)" : "in.(1,3)", // 2,3 for mint, 1,3 for wrap
-    externalChainId: `eq.${chainId}`,
+    key2: `eq.${chainId}`,
     address: `eq.${constants.mercataBridge}`
   };
   
