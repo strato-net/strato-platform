@@ -97,20 +97,16 @@ export const getPriceHistory = async (
 
     // --- Query both tables ---
     const [singleResponse, batchResponse] = await Promise.all([
-      cirrus
-        .get(accessToken, `/${PriceOracleEvents}`, {
-          params: { ...params, asset: `eq.${assetAddress}` },
-        })
-        .catch(err => {
-          console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
-          return { data: [] };
-        }),
-      cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, { 
-          params
-        }).catch(err => {
-          console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
-          return { data: [] };
-        })
+      cirrus.get(accessToken, `/${PriceOracleEvents}`, { params: { ...params, asset: `eq.${assetAddress}` } }).catch(err => {
+        console.error(`[getPriceHistory] Error querying ${PriceOracleEvents}:`, err);
+        return { data: [] };
+      }),
+      cirrus.get(accessToken, `/${PriceOracleBatchUpdateEvents}`, {
+        params
+      }).catch(err => {
+        console.error(`[getPriceHistory] Error querying ${PriceOracleBatchUpdateEvents}:`, err);
+        return { data: [] };
+      })
     ]);
 
     function toPlainString(num: number): string {
