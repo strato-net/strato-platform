@@ -17,7 +17,7 @@ const { MercataBridge, Token } = constants;
 const assetParams = (mint: boolean, token: string) => ({
   select: "count()",
   key: `eq.${token}`,
-  "value->>permissions": mint ? "gte.2" : "gte.1", // 2+ for mint, 1+ for wrap
+  "value->>permissions": mint ? "in.(2,3)" : "in.(1,3)", // 2,3 for mint, 1,3 for wrap
   address: `eq.${constants.mercataBridge}`,
 });
 
