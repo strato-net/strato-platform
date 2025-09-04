@@ -190,3 +190,21 @@ Similar to `getMultiplier` function in MasterChef V1 with key differences:
    - Pool has period: [100, ∞) with multiplier 2x
    - Query: `getMultiplier(0, 50, 150)`
    - Result: `(150-100) × 2 = 50 × 2 = 100` (time before period start is ignored)
+
+#### Updating pool rewards
+
+Similar to `updatePool` function in MasterChef V1 with key differences:
+
+* The function name is `updatePool`
+
+* Uses timestamps instead of block numbers for calculations
+
+* Uses `getMultiplier` to handle multiple bonus periods correctly
+
+* Calculates rewards based on `cataPerSecond` instead of `sushiPerBlock`
+
+* Updates `accPerToken` (accumulated CATA per LP token) using the time-based multiplier
+
+* Formula: `cataReward = (multiplier × cataPerSecond × allocPoint) / totalAllocPoint`
+
+* Early returns if no time has passed or no LP tokens are staked

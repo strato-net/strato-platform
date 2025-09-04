@@ -181,4 +181,27 @@ contract record RewardsChef is Ownable {
         return totalMultipliedTime;
     }
 
+    function updatePool(uint256 _pid) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        if (block.timestamp <= pool.lastRewardTimestamp) {
+            return;
+        }
+
+        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+        if (lpSupply == 0) {
+            pool.lastRewardTimestamp = block.timestamp;
+            return;
+        }
+
+        uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
+
+        rewardToken.mint(address(this), cataReward);
+
+        pool.accPerToken += (cataReward * 1e12) / lpSupply;
+        pool.lastRewardTimestamp = block.timestamp;
+    }
+
 }
