@@ -61,7 +61,8 @@ contract record CDPEngine is Ownable {
         uint stabilityFeeRate,
         uint debtFloor,
         uint debtCeiling,
-        uint unitScale
+        uint unitScale,
+        bool pause
     );
 
     event Accrued(
@@ -539,7 +540,8 @@ contract record CDPEngine is Ownable {
         uint stabilityFeeRate,
         uint debtFloor,
         uint debtCeiling,
-        uint unitScale
+        uint unitScale,
+        bool pause
     ) public onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
         require(liquidationRatio >= WAD, "CDPEngine: liquidation ratio too low");
@@ -549,9 +551,16 @@ contract record CDPEngine is Ownable {
         require(unitScale > 0, "CDPEngine: invalid unit scale");
         if (debtCeiling > 0) { require(debtFloor <= debtCeiling, "CDPEngine: debt floor above ceiling"); }
         CollateralConfig storage config = collateralConfigs[asset];
-        config.liquidationRatio = liquidationRatio; config.liquidationPenaltyBps = liquidationPenaltyBps; config.closeFactorBps = closeFactorBps; config.stabilityFeeRate = stabilityFeeRate; config.debtFloor = debtFloor; config.debtCeiling = debtCeiling; config.unitScale = unitScale;
+        config.liquidationRatio = liquidationRatio; 
+        config.liquidationPenaltyBps = liquidationPenaltyBps; 
+        config.closeFactorBps = closeFactorBps; 
+        config.stabilityFeeRate = stabilityFeeRate; 
+        config.debtFloor = debtFloor; 
+        config.debtCeiling = debtCeiling; 
+        config.unitScale = unitScale;
+        config.isPaused = pause;
         if (!isSupportedAsset[asset]) { isSupportedAsset[asset] = true; }
-        emit CollateralConfigured(asset, liquidationRatio, liquidationPenaltyBps, closeFactorBps, stabilityFeeRate, debtFloor, debtCeiling, unitScale);
+        emit CollateralConfigured(asset, liquidationRatio, liquidationPenaltyBps, closeFactorBps, stabilityFeeRate, debtFloor, debtCeiling, unitScale, pause);
     }
 
     /**
@@ -566,7 +575,8 @@ contract record CDPEngine is Ownable {
         uint[] calldata stabilityFeeRates,
         uint[] calldata debtFloors,
         uint[] calldata debtCeilings,
-        uint[] calldata unitScales
+        uint[] calldata unitScales,
+        bool[] calldata pauses
     ) external onlyOwner {
         uint len = assets.length;
         require(len > 0, "CDPEngine: empty batch");
@@ -577,7 +587,8 @@ contract record CDPEngine is Ownable {
             stabilityFeeRates.length == len &&
             debtFloors.length == len &&
             debtCeilings.length == len &&
-            unitScales.length == len,
+            unitScales.length == len &&
+            pauses.length == len,
             "CDPEngine: array length mismatch"
         );
         for (uint i = 0; i < len; i++) {
@@ -590,7 +601,8 @@ contract record CDPEngine is Ownable {
                 stabilityFeeRates[i],
                 debtFloors[i],
                 debtCeilings[i],
-                unitScales[i]
+                unitScales[i],
+                pauses[i]
             );
         }
     }
