@@ -75,7 +75,6 @@ pipeline {
                 useCustomGenesis=false \\
                 POOL_FACTORY=000000000000000000000000000000000000100a \\
                 LENDING_REGISTRY=0000000000000000000000000000000000001007 \\
-                ONRAMP=0000000000000000000000000000000000001009 \\
                 TOKEN_FACTORY=000000000000000000000000000000000000100b \\
                 ADMIN_REGISTRY=000000000000000000000000000000000000100c \\
                 ./strato --single
@@ -179,10 +178,8 @@ pipeline {
                     # TODO: #dcpush - replace with proper docker compose push flow
                     docker push $(<bridge_image_tag)
                     docker push $(<bridge_image_tag_ecr)
-                    docker push $(<stripe_image_tag)
-                    docker push $(<stripe_image_tag_ecr)
                   '''
-                  archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr, stripe_image_tag, stripe_image_tag_ecr"
+                  archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
                   stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
                   stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }

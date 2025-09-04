@@ -50,10 +50,17 @@ export function validateCreatePoolsArgs(args: any) {
 
 export function validateAddLiquidityArgs(args: any) {
   const schema = Joi.object({
-    tokenBAmount: numericStringField("TokenBAmount"),
-    maxTokenAAmount: numericStringField("MaxTokenAAmount"),
-  });
-
+    // Dual token mode parameters
+    tokenBAmount: numericStringField("TokenBAmount").optional(),
+    maxTokenAAmount: numericStringField("MaxTokenAAmount").optional(),
+    
+    // Single token mode parameters
+    singleTokenAmount: numericStringField("SingleTokenAmount").optional(),
+    isAToB: Joi.boolean().optional(),
+    
+    // Ensure at least one mode is specified
+  }).or('tokenBAmount', 'singleTokenAmount');
+  
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Add Liquidity Argument Validation Error: " + error.message);

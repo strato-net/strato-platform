@@ -1,4 +1,4 @@
-import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry, mercataBridge } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -21,7 +21,6 @@ export const constants = (() => {
   const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
   const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
-  const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
@@ -85,13 +84,6 @@ export const constants = (() => {
     "liquidityPool:liquidityPool_fkey(address)",
   ];
 
-  const onRampSelectFields = [
-    "address",
-    `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`,
-    `listings:${OnRamp}-listings(key,value)`,
-    `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
-  ];
-
   const swapHistorySelectFields = [
     "address",
     "id",
@@ -116,7 +108,6 @@ export const constants = (() => {
   return {
     poolFactory,
     lendingRegistry,
-    onRamp,
     tokenFactory,
     adminRegistry,
     Token,
@@ -130,7 +121,6 @@ export const constants = (() => {
     PoolSwap,
     PriceOracleEvents,
     PriceOracleBatchUpdateEvents,
-    OnRamp,
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
@@ -141,14 +131,8 @@ export const constants = (() => {
     tokenBalanceSelectFields,
     poolSelectFields,
     registrySelectFields,
-    onRampSelectFields,
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
   };
 })();
-
-export const stripeConfig = {
-  confirmUrl: `/api/onRamp/buy`,
-  cancelUrl: `/api/onRamp/cancel`,
-};
