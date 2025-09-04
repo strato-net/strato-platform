@@ -15,6 +15,7 @@ contract record RewardsChef is Ownable {
     event BonusPeriodAdded(uint256 indexed pid, uint256 startTimestamp, uint256 bonusMultiplier);
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
+    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -240,4 +241,28 @@ contract record RewardsChef is Ownable {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
+    function withdraw(uint256 _pid, uint256 _amount) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        require(user.amount >= _amount, "withdraw: not good");
+
+        updatePool(_pid);
+
+        uint256 pending = ((user.amount * pool.accPerToken) / 1e12) - user.rewardDebt;
+        if (pending > 0) {
+            rewardToken.transfer(msg.sender, pending);
+        }
+
+        if (_amount > 0) {
+            user.amount -= _amount;
+            Token(pool.lpToken).transfer(msg.sender, _amount);
+        }
+
+        user.rewardDebt = (user.amount * pool.accPerToken) / 1e12;
+
+        emit Withdraw(msg.sender, _pid, _amount);
+    }
 }
