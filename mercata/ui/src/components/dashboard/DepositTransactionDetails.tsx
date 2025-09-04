@@ -33,6 +33,8 @@ const DepositTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
+        (params as any)["value->>mintUSDST"] = 'eq.false';
+        
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
         }

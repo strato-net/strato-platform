@@ -31,6 +31,8 @@ const WithdrawTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
+        (params as any)["value->>mintUSDST"] = 'eq.false';
+        
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
