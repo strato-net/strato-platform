@@ -11,7 +11,6 @@ The app consists of multiple parts:
       - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
 - services
   - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
-  - Currently there is only the Stripe service for token on ramping.
   - Look at the individual services read me for further details.
 
 ---
@@ -32,7 +31,6 @@ OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-kno
   BASE_URL=http://localhost \
   POOL_FACTORY=0x100a \
   LENDING_REGISTRY=0x1007 \
-  ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
   npm run dev
@@ -92,7 +90,6 @@ sudo \
   BASE_URL=host-url-here \
   POOL_FACTORY=0x100a \
   LENDING_REGISTRY=0x1007 \
-  ONRAMP=0x1009 \
   TOKEN_FACTORY=0x100b \
   ADMIN_REGISTRY=0x100c \
   docker compose up -d --build

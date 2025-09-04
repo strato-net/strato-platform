@@ -5,7 +5,6 @@ const { createPool } = require("../pool/createPool");
 const poolFactoryAddress = "000000000000000000000000000000000000100a";
 const lendingPoolAddress = "0000000000000000000000000000000000001005";
 const liquidityPoolAddress = "0000000000000000000000000000000000001004";
-const onRampAddress = "0000000000000000000000000000000000001009";
 const USDST_ADDRESS = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
 const GOLDST_ADDRESS = "cdc93d30182125e05eec985b631c7c61b3f63ff0";
 const DECIMALS = "000000000000000000";
@@ -61,12 +60,8 @@ if (require.main === module) {
     const TOKEN_B_MINT_AMOUNT = getEnvVar("TOKEN_B_MINT_AMOUNT"); // GOLDST
     const TOKEN_B_AMOUNT = getEnvVar("TOKEN_B_AMOUNT"); // GOLDST
     const MAX_TOKEN_A_AMOUNT = getEnvVar("MAX_TOKEN_A_AMOUNT"); // USDST
-    const PAYMENT_PROVIDER_ADDRESS = getEnvVar("PAYMENT_PROVIDER_ADDRESS");
-    const PAYMENT_PROVIDER_NAME = getEnvVar("PAYMENT_PROVIDER_NAME");
-    const PAYMENT_PROVIDER_ENDPOINT = getEnvVar("PAYMENT_PROVIDER_ENDPOINT");
-    const LISTING_MARGIN_BPS = getEnvVar("LISTING_MARGIN_BPS");
     console.log(
-      `Batching addLiquidity, depositLiquidity, and on-ramp setup...`
+      `Batching addLiquidity, and depositLiquidity setup...`
     );
     const batchCalls = [
       {
@@ -123,52 +118,6 @@ if (require.main === module) {
         args: {
           asset: USDST_ADDRESS,
           amount: MAX_TOKEN_A_AMOUNT + DECIMALS, // 10000 USDST
-        },
-      },
-      // === On-ramp setup: add payment provider, whitelist token, approve seller ===
-      {
-        contract: { address: USDST_ADDRESS, name: "ERC20" },
-        method: "transfer",
-        args: {
-          to: PAYMENT_PROVIDER_ADDRESS,
-          value: MAX_TOKEN_A_AMOUNT + DECIMALS,
-        },
-      },
-      {
-        contract: { address: onRampAddress, name: "OnRamp" },
-        method: "addPaymentProvider",
-        args: {
-          provider: PAYMENT_PROVIDER_ADDRESS,
-          name: PAYMENT_PROVIDER_NAME,
-          endpoint: PAYMENT_PROVIDER_ENDPOINT,
-        },
-      },
-      {
-        contract: { address: onRampAddress, name: "OnRamp" },
-        method: "setApprovedSeller",
-        args: {
-          seller: BA_TEST_ADDRESS,
-          approved: true,
-        },
-      },
-      {
-        contract: { address: USDST_ADDRESS, name: "ERC20" },
-        method: "approve",
-        args: {
-          spender: onRampAddress,
-          value: MAX_TOKEN_A_AMOUNT + DECIMALS, // 10000 USDST
-        },
-      },
-      {
-        contract: { address: onRampAddress, name: "OnRamp" },
-        method: "createListing",
-        args: {
-          token: USDST_ADDRESS,
-          amount: MAX_TOKEN_A_AMOUNT + DECIMALS, // 10000 USDST
-          marginBps: LISTING_MARGIN_BPS, // 1% margin
-          providerAddresses: [
-            PAYMENT_PROVIDER_ADDRESS, // STRIPE
-          ],
         },
       },
     ];

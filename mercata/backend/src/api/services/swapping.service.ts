@@ -122,13 +122,15 @@ export const addLiquidity = async (
   accessToken: string,
   params: {
     poolAddress: string;
-    tokenBAmount: string;
-    maxTokenAAmount: string;
+    tokenBAmount?: string;
+    maxTokenAAmount?: string;
+    singleTokenAmount?: string;
+    isAToB?: boolean;
     deadline: number;
   }
 ) => {
   try {
-    const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
+    const { poolAddress, tokenBAmount, maxTokenAAmount, singleTokenAmount, isAToB, deadline } = params;
 
     const pools = await getPools(accessToken, undefined, {
       address: "eq." + poolAddress,
@@ -139,36 +141,68 @@ export const addLiquidity = async (
     }
     const pool = pools[0];
 
-    const tx = buildFunctionTx([
-      {
-        contractName: extractContractName(Token),
-        contractAddress: pool.tokenAAddress || "",
-        method: "approve",
-        args: { spender: poolAddress || "", value: maxTokenAAmount || "" },
-      },
-      {
-        contractName: extractContractName(Token),
-        contractAddress: pool.tokenBAddress || "",
-        method: "approve",
-        args: { spender: poolAddress || "", value: tokenBAmount || "" },
-      },
-      {
-        contractName: extractContractName(Pool),
-        contractAddress: poolAddress || "",
-        method: "addLiquidity",
-        args: {
-          tokenBAmount,
-          maxTokenAAmount,
-          deadline
+    // Check if it's single token mode or dual token mode
+    if (singleTokenAmount && isAToB !== undefined) {
+      // Single token mode
+      const depositTokenAddress = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+      
+      const tx = buildFunctionTx([
+        {
+          contractName: extractContractName(Token),
+          contractAddress: depositTokenAddress || "",
+          method: "approve",
+          args: { spender: poolAddress || "", value: singleTokenAmount || "" },
         },
-      }
-    ]);
+        {
+          contractName: extractContractName(Pool),
+          contractAddress: poolAddress || "",
+          method: "addLiquiditySingleToken",
+          args: {
+            isAToB,
+            amountIn: singleTokenAmount,
+            deadline
+          },
+        }
+      ]);
 
-    const { status, hash } = await postAndWaitForTx(accessToken, () =>
-      strato.post(accessToken, StratoPaths.transactionParallel, tx)
-    );
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
 
-    return { status, hash };
+      return { status, hash };
+    } else {
+      // Dual token mode (existing logic)
+      const tx = buildFunctionTx([
+        {
+          contractName: extractContractName(Token),
+          contractAddress: pool.tokenAAddress || "",
+          method: "approve",
+          args: { spender: poolAddress || "", value: maxTokenAAmount || "" },
+        },
+        {
+          contractName: extractContractName(Token),
+          contractAddress: pool.tokenBAddress || "",
+          method: "approve",
+          args: { spender: poolAddress || "", value: tokenBAmount || "" },
+        },
+        {
+          contractName: extractContractName(Pool),
+          contractAddress: poolAddress || "",
+          method: "addLiquidity",
+          args: {
+            tokenBAmount,
+            maxTokenAAmount,
+            deadline
+          },
+        }
+      ]);
+
+      const { status, hash } = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, tx)
+      );
+
+      return { status, hash };
+    }
   } catch (error) {
     throw error;
   }

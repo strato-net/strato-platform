@@ -1,4 +1,3 @@
-import { DepositForm } from '@/components/dashboard/DepositModal';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -6,17 +5,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const ExchangeCart = () => {
   return (
     <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
-      <Tabs defaultValue="buy" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="buy">Buy</TabsTrigger>
+      <Tabs defaultValue="bridge" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="bridge">Bridge</TabsTrigger>
           <TabsTrigger value="swap">Swap</TabsTrigger>
         </TabsList>
-        <TabsContent value="buy">
-          <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-            <DepositForm />
-          </div>
-        </TabsContent>
         <TabsContent value="bridge">
           <BridgeWidget />
         </TabsContent>
