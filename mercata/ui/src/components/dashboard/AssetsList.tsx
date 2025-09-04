@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { Plus, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
-import DepositModal from "./DepositModal";
-import DepositOptionsModal from "./DepositOptionsModal";
 import { Token } from "../../interface";
 import { formatUnits } from "ethers";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
@@ -24,17 +22,8 @@ const AssetsList = ({
   isDashboard = true,
   shouldPreventFlash = false,
 }: AssetsProps) => {
-  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
-  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [showNonEarningAssetsTable, setShowNonEarningAssetsTable] =
     useState(false);
-
-  const handleOptionSelect = (option: "credit-card" | "bridge") => {
-    setIsOptionsModalOpen(false);
-    if (option === "credit-card") {
-      setIsDepositModalOpen(true);
-    }
-  };
 
   // Don't show loading indicator immediately if shouldPreventFlash is true
   const shouldShowLoading = loading && !shouldPreventFlash;
@@ -347,16 +336,6 @@ const AssetsList = ({
           </div>
         </div>
       )}
-
-      <DepositOptionsModal
-        isOpen={isOptionsModalOpen}
-        onClose={() => setIsOptionsModalOpen(false)}
-        onSelectOption={handleOptionSelect}
-      />
-      <DepositModal
-        isOpen={isDepositModalOpen}
-        onClose={() => setIsDepositModalOpen(false)}
-      />
     </div>
   );
 };

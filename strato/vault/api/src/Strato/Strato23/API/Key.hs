@@ -27,6 +27,7 @@ type PostKey =
 type GetSharedKey =
   "sharedkey"
     :> Header' '[Optional, Strict] "X-USER-ACCESS-TOKEN" Text
+    :> QueryFlag "hashed"
     :> ReqBody '[JSON] PublicKey
     :> Get '[JSON] SharedKey
 
@@ -55,5 +56,6 @@ type GetSharedKey' =
   "sharedkey"
     :> Header' '[Required, Strict] "X-USER-UNIQUE-NAME" Text
     :> Header' '[Required, Strict] "X-IDENTITY-PROVIDER-ID" Text
+    :> QueryFlag "hashed"
     :> ReqBody '[JSON] PublicKey
     :> Get '[JSON] SharedKey

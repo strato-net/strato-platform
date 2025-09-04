@@ -26,7 +26,7 @@ getKey = client (Proxy @GetKey)
 postKey :: Maybe Text -> ClientM AddressAndKey
 postKey = client (Proxy @PostKey)
 
-getSharedKey :: Maybe Text -> PublicKey -> ClientM SharedKey
+getSharedKey :: Maybe Text -> Bool -> PublicKey -> ClientM SharedKey
 getSharedKey = client (Proxy @GetSharedKey)
 
 getUsers :: Maybe Text -> Maybe Address -> Maybe Int -> Maybe Int -> ClientM [User]

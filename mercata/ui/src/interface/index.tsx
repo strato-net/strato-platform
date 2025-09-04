@@ -157,68 +157,7 @@ export interface PoolFormValues {
   // poolName?: string;
 }
 
-/*-------- OnRamp Values --------*/
-
-export interface OnRampListing {
-  id: number;
-  token: string;
-  seller: string;
-  amount: string;
-  marginBps: number;
-}
-
-export interface OnRampLock {
-  amount: string;
-  timestamp: number;
-}
-
-export interface OnRampPaymentProvider {
-  providerAddress: string;
-  name: string;
-  endpoint: string;
-}
-
-export interface OnRampToken {
-  token: Token;
-}
-
-export interface BuyPayload {
-  amount: string;
-  token: string;
-  paymentProviderAddress: string;
-}
-
-export interface SellPayload {
-  token: string;
-  amount: string;
-  marginBps: string;
-  providerAddresses: string[];
-}
-
-export interface OnRampContextType {
-  token: OnRampToken | null;
-  loading: boolean;
-  error: string | null;
-  onRampData: OnrampApiResponse | null;
-  providers: PaymentProvider[];
-  listings: Listing[];
-  
-  get: () => Promise<OnrampApiResponse>;
-  buy: (payload: BuyPayload, userAddress: string) => Promise<{ url: string }>;
-  sell: (payload: SellPayload) => Promise<any>;
-  lock: (body: any) => Promise<{ url: string }>;
-  unlockTokens: (listingId: string) => Promise<void>;
-  addPaymentProvider: (providerData: AddPaymentProviderData) => Promise<any>;
-  removePaymentProvider: (providerAddress: string) => Promise<any>;
-  cancelListing: (token: string) => Promise<any>;
-  updateListing: (payload: {
-    token: string;
-    amount: string;
-    marginBps: string;
-    providerAddresses: string[];
-  }) => Promise<any>;
-}
-
+/*-------- Withdraw Interfaces --------*/
 export interface RawWithdrawData {
   withdrawalId: number;
   WithdrawalInfo: {
@@ -468,13 +407,6 @@ export interface ListingInfo {
 export interface Listing {
   key: string;
   ListingInfo: ListingInfo;
-}
-
-export interface OnrampApiResponse {
-  address: string;
-  listings: Listing[];
-  paymentProviders: PaymentProvider[];
-  approvedTokens: ApprovedToken[];
 }
 
 export interface Pool {

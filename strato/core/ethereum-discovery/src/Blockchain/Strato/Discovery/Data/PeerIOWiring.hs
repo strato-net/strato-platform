@@ -1,17 +1,7 @@
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE DerivingStrategies    #-}
-{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
-{-# LANGUAGE GADTs                 #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NoDeriveAnyClass      #-}
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE TypeApplications      #-}
-{-# LANGUAGE TypeFamilies          #-}
-{-# LANGUAGE TypeOperators         #-}
 {-# LANGUAGE UndecidableInstances  #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
 
 module Blockchain.Strato.Discovery.Data.PeerIOWiring where
 
@@ -20,95 +10,59 @@ import           Blockchain.DB.SQLDB                   (runSqlPool,
                                                         withGlobalSQLPool)
 import           Blockchain.MiscJSON                   ()
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256     (zeroHash)
-import           Control.Monad                         (void)
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
 import           Control.Monad.Reader
-import           Crypto.Types.PubKey.ECC               (Point)
-import           Data.IP
-import qualified Data.Text                             as T
 import           Data.Time
 import qualified Database.Esqueleto.Experimental       as E
 import qualified Database.Persist.Postgresql           as SQL
-import           Numeric.Natural
-import           Prometheus
 import           UnliftIO
 
-
-
-
-
-
-
-
-
-
-instance MonadIO m => Mod.Accessible AvailablePeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+instance MonadIO m => HasPeerDB m where
+  getNumAvailablePeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- liftIO getCurrentTime
-    fmap (AvailablePeers . map SQL.entityVal) $
-      flip runSqlPool sqldb $
-        SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime] []
+    flip runSqlPool sqldb $
+        SQL.count [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime]
 
-instance MonadIO m => A.Replaceable (Host, TCPPort) ActivityState m where
-  replace _ (host, TCPPort port) state = liftIO $ withGlobalSQLPool . runSqlPool $ do
+  setPeerActiveState host port state = liftIO $ withGlobalSQLPool . runSqlPool $ do
     SQL.updateWhere
       [PPeerHost SQL.==. host, PPeerTcpPort SQL.==. port]
       [PPeerActiveState SQL.=. fromEnum state]
 
-instance MonadIO m => Mod.Accessible ActivePeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  getActivePeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
-    fmap (ActivePeers . map SQL.entityVal) $
+    try $ fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerActiveState SQL.==. fromEnum Active, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => (A.Replaceable (Host, Point) PeerBondingState) m where
-  replace _ (host, point) (PeerBondingState state) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  setPeerBondingState host point state = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
+      try $ SQL.updateWhere [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] [PPeerBondState SQL.=. state]
 
-instance MonadIO m => (A.Replaceable PPeer Point) m where
-  replace _ peer point = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    flip runSqlPool sqldb $
-      SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
-
-instance MonadIO m => (A.Selectable (Host, Point) PeerBondingState) m where
-  select _ (host, point) = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    fmap (fmap $ PeerBondingState . pPeerBondState . SQL.entityVal) $
+  getPeerBondingState host point = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    fmap (fmap $ pPeerBondState . SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectFirst [PPeerHost SQL.==. host, PPeerPubkey SQL.==. Just point] []
 
-instance MonadIO m => (A.Replaceable PPeer PeerLastBestBlockHash) m where
-  replace _ p (PeerLastBestBlockHash h) = liftIO $ withGlobalSQLPool $ runSqlPool $
-    SQL.updateWhere [PPeerHost SQL.==. pPeerHost p, PPeerPubkey SQL.==. pPeerPubkey p] [PPeerLastBestBlockHash SQL.=. h]
-
-instance MonadIO m => Mod.Accessible BondedPeers m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  getBondedPeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
-    fmap (BondedPeers . map SQL.entityVal) $
+    try $ fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => Mod.Accessible BondedPeersForUDP m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  getBondedPeersForUDP = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
-    fmap (BondedPeersForUDP . map SQL.entityVal) $
+    try $ fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 2, PPeerUdpEnableTime SQL.<. currentTime, PPeerLastBestBlockHash SQL.!=. zeroHash] []
 
-instance MonadIO m => Mod.Accessible UnbondedPeersForUDP m where
-  access _ = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  getUnbondedPeers = liftIO $ withGlobalSQLPool $ \sqldb -> do
     currentTime <- getCurrentTime
-    fmap (UnbondedPeersForUDP . map SQL.entityVal) $
+    fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $
         SQL.selectList [PPeerBondState SQL.==. 0, PPeerUdpEnableTime SQL.<. currentTime] []
 
-instance MonadIO m => A.Selectable (Point, Natural) ClosestPeers m where
-  select _ (point, limit) = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    fmap (Just . ClosestPeers . map SQL.entityVal) $
+  getClosestPeers point limit = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    fmap (map SQL.entityVal) $
       flip runSqlPool sqldb $ do
         lowers <- E.select $ do
           peer <- E.from $ E.table @PPeer
@@ -133,23 +87,19 @@ instance MonadIO m => A.Selectable (Point, Natural) ClosestPeers m where
             zipAll [] bs = bs
         pure . take (fromIntegral limit) $ zipAll lowers highers
 
-instance MonadIO m => A.Replaceable PPeer UdpEnableTime m where
-  replace _ peer (UdpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  updateUdpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerUdpEnableTime SQL.=. enableTime]
 
-instance MonadIO m => A.Replaceable PPeer IP m where
-  replace _ peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  updateIP peer ip = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerIp SQL.=. Just ip]
 
-instance MonadIO m => A.Replaceable PPeer TcpEnableTime m where
-  replace _ peer (TcpEnableTime enableTime) = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  updateTcpEnableTime peer enableTime = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerEnableTime SQL.=. enableTime]
 
-instance MonadIO m => A.Replaceable PPeer PeerDisable m where
-  replace _ peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  updatePeerDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     flip runSqlPool sqldb $ case d of
       ExtendPeerDisableTime (TcpEnableTime enableTime) nextDisableWindowFactor ->
@@ -167,9 +117,7 @@ instance MonadIO m => A.Replaceable PPeer PeerDisable m where
             PPeerNextDisableWindowSeconds SQL.=. nextDisableWindow,
             PPeerDisableExpiration SQL.=. disableExpiration
           ]
-
-instance MonadIO m => A.Replaceable PPeer PeerUdpDisable m where
-  replace _ peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  updatePeerUdpDisable peer d = liftIO $ withGlobalSQLPool $ \sqldb -> do
     let selector = thisPeer peer
     currentTime <- liftIO getCurrentTime
     flip runSqlPool sqldb $ case d of
@@ -194,19 +142,26 @@ instance MonadIO m => A.Replaceable PPeer PeerUdpDisable m where
             PPeerDisableExpiration SQL.=. currentTime
           ]
 
-instance MonadIO m => A.Replaceable PPeer T.Text m where
-  replace _ peer exception = liftIO $ withGlobalSQLPool $ \sqldb -> do
-    flip runSqlPool sqldb $
-      SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+  updatePeerLastBestBlockHash  p (PeerLastBestBlockHash h) = liftIO $ withGlobalSQLPool $ runSqlPool $
+    SQL.updateWhere [PPeerHost SQL.==. pPeerHost p, PPeerPubkey SQL.==. pPeerPubkey p] [PPeerLastBestBlockHash SQL.=. h]
 
-instance MonadIO m => A.Replaceable T.Text PPeer m where
-  replace _ message peer = liftIO $ withGlobalSQLPool $ \sqldb -> do
+  setPeerPubkey peer point = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere [PPeerHost SQL.==. pPeerHost peer] [PPeerPubkey SQL.=. Just point]
+
+  storeDisableException peer exception = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      try $ SQL.updateWhere (thisPeer peer) [PPeerDisableException SQL.=. exception]
+
+  updateLastMessage peer message = liftIO $ withGlobalSQLPool $ \sqldb -> do
     flip runSqlPool sqldb $
       SQL.updateWhere (thisPeer peer) [PPeerLastMsg SQL.=. message]
 
-
-instance (MonadUnliftIO m, MonadMonitor m, HasPeerDB m) => ((Host, TCPPort) `A.Alters` ActivityState) m where
-  lookup _ _ = error "lookup ActivityState undefined for ContextM"
-  insert _ (i, TCPPort p) = void . setPeerActiveState i p
-  delete _ _ = error "lookup ActivityState undefined for ContextM"
-
+  resetAllPeerTimeouts = liftIO $ withGlobalSQLPool $ \sqldb -> do
+    flip runSqlPool sqldb $
+      SQL.updateWhere []
+                      [
+                        PPeerBondState SQL.=. 0,
+                        PPeerEnableTime SQL.=. jamshidBirth,
+                        PPeerUdpEnableTime SQL.=. jamshidBirth
+                      ]

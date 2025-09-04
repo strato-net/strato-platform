@@ -19,9 +19,6 @@ import "./Pools/PoolFactory.sol";
 //Admin
 import "Admin/FeeCollector.sol";
 
-//OnRamp
-import "./OnRamp/OnRamp.sol";
-
 //Redemption
 //import "Redemptions/RedemptionService.sol";
 //import "Redemptions/CryptoRedemptionService.sol"; incomplete
@@ -45,6 +42,11 @@ import "./Bridge/MercataBridge.sol";
 //Fee Collector
 import "Admin/FeeCollector.sol";
 
+//CDP
+import "CDP/CDPRegistry.sol";
+import "CDP/CDPEngine.sol";
+import "CDP/CDPVault.sol";
+
 //TODO
 contract record Mercata {
     RateStrategy public rateStrategy;
@@ -55,12 +57,14 @@ contract record Mercata {
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
     MercataBridge public mercataBridge;
-    OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
+    CDPEngine public cdpEngine;
+    CDPVault public cdpVault;   
+    CDPRegistry public cdpRegistry;
 
     constructor() public {
         // Create AdminRegistry first
@@ -92,8 +96,11 @@ contract record Mercata {
 
         // Create Services
         mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
-        onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
-
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
+
+        // Deploy CDP registry, vault, and engine
+        cdpRegistry = new CDPRegistry(msg.sender);
+        cdpVault = new CDPVault(address(cdpRegistry), msg.sender);
+        cdpEngine = new CDPEngine(address(cdpRegistry), msg.sender);
     }
 }

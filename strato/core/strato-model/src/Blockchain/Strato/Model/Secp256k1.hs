@@ -18,6 +18,7 @@ module Blockchain.Strato.Model.Secp256k1
     exportPublicKey,
     importPublicKey,
     deriveSharedKey,
+    deriveSharedKeyUnhashed,
     recoverPub,
     signMsg,
     verifySig,
@@ -189,9 +190,14 @@ exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 importPublicKey :: B.ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
 
+-- We're making hashed be the default, but allow Vault to still call unhashed for backwards compatibility
 -- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
 deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
-deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv
+deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdhHashed pub prv
+
+-- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
+deriveSharedKeyUnhashed :: PrivateKey -> PublicKey -> SharedKey
+deriveSharedKeyUnhashed (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv
 
 ------------------------------------------------------------------
 ------------------------- SIGNATURES -----------------------------

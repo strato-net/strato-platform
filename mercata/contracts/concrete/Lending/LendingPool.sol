@@ -513,7 +513,7 @@ contract record LendingPool is Ownable {
         address collateralAsset,
         address borrower,
         uint debtToCover
-    ) external onlyTokenFactory(borrowableAsset) {
+    ) public onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
         require(debtToCover > 0, "Invalid debt amount");
@@ -577,6 +577,51 @@ contract record LendingPool is Ownable {
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
+    }
+
+    /**
+     * @notice Helper to liquidate using the maximum allowable amount at execution time.
+     *         Computes repay amount as min(currentDebt, close-factor limit, and collateral coverage)
+     *         to avoid overpaying when collateral cannot cover more.
+     * @param collateralAsset The collateral asset to seize
+     * @param borrower The address of the borrower being liquidated
+     */
+    function liquidationCallAll(
+        address collateralAsset,
+        address borrower
+    ) external onlyTokenFactory(borrowableAsset) {
+        require(collateralAsset != address(0), "Invalid collateral asset");
+        require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
+
+        // Ensure collateral asset is configured and has liquidation parameters
+        AssetConfig memory cConfig = assetConfigs[collateralAsset];
+        require(cConfig.liquidationBonus >= 10000, "Asset not eligible for liquidation");
+
+        // Accrue and read current debt and health
+        _accrue();
+        uint totalOwed = getUserDebt(borrower);
+        require(totalOwed > 0, "Borrower has no debt");
+        uint health = getHealthFactor(borrower);
+        require(health < 1e18, "Position healthy");
+
+        // Close factor cap
+        uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
+
+        // Coverage cap = borrowerCollateral * priceColl / (priceDebt * bonus)
+        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
+        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        uint num = borrowerCollateral * priceColl * 10000;
+        uint den = priceDebt * cConfig.liquidationBonus;
+        uint coverage = (num + den - 1) / den; // ceilDiv
+
+        uint debtToCover = totalOwed;
+        if (debtToCover > maxRepay) debtToCover = maxRepay;
+        if (debtToCover > coverage) debtToCover = coverage;
+        require(debtToCover > 0, "Nothing liquidatable");
+
+        liquidationCall(collateralAsset, borrower, debtToCover);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════

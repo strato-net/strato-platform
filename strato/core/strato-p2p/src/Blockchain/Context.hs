@@ -412,7 +412,7 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   getShared pub = do
     vc <- asks configVaultClient
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing pub) vc
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing True pub) vc
 
 instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
@@ -434,6 +434,7 @@ type MonadP2P m =
     MonadUnliftIO m,
     HasVault m,
     HasSQL m,
+    HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]
@@ -446,8 +447,6 @@ type MonadP2P m =
     All
       '[Mod.Accessible]
       '[ GenesisBlockHash,
-         AvailablePeers,
-         BondedPeers,
          PublicKey
        ]
       m,
@@ -463,18 +462,7 @@ type MonadP2P m =
       '[ '(Integer, Canonical BlockHeader),
          '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer),
-         '(Point, PPeer)
-       ]
-      m,
-    All2
-      '[A.Replaceable]
-      '[ '(PPeer, TcpEnableTime),
-         '(PPeer, UdpEnableTime),
-         '(PPeer, PeerDisable),
-         '(PPeer, PeerLastBestBlockHash),
-         '(PPeer, T.Text),
-         '((Host, Point), PeerBondingState)
+         '(Host, PPeer)
        ]
       m,
     All2
@@ -482,8 +470,7 @@ type MonadP2P m =
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '(Keccak256, Proxy (Inbound WireMessage)),
-         '((Host, Keccak256), Proxy (Outbound WireMessage)),
-         '((Host, TCPPort), ActivityState)
+         '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
   )
@@ -591,15 +578,15 @@ shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Pro
 
 withActivePeer ::
   ( MonadUnliftIO m,
-    ((Host, TCPPort) `A.Alters` ActivityState) m
+    HasPeerDB m
   ) =>
   PPeer ->
   m a ->
   m a
 withActivePeer p = bracket a b . const
   where
-    a = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Active
-    b _ = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
+    a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
+    b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
 
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const

@@ -86,3 +86,21 @@
 
 - Index preview at current block time (dt = now - lastAccrual): `previewIndex = (borrowIndex * rpow(perSecondFactorRAY, dt, RAY)) / RAY`
 - Debt preview: `debtPreview = (scaledDebt * previewIndex) / RAY` 
+
+## Liquidation
+
+- Close-factor cap based on health:
+  - If `HF < 0.95`: up to 100% of outstanding debt
+  - Else: up to 50% of outstanding debt
+- Coverage cap (selected collateral):
+  - Let `bonus = liquidationBonusBps` and prices be 1e18 scaled
+  - `coverage = ceil((borrowerCollateral * price_coll * 10000) / (price_borrow * bonus))`
+    - where `ceil(x/y) = (x + y - 1) / y`
+- Execution amount:
+  - If caller provides an amount `R`: `repay = min(R, closeFactorCap)` (legacy call).
+  - If caller uses “ALL”: contract computes `repay = min(currentDebt, closeFactorCap, coverage)` at execution time.
+- Seizure:
+  - `collateralToSeize = (repay * price_borrow * bonus) / (price_coll * 10000)`
+  - Then clamped to the borrower’s available collateral for that asset.
+- Dust cleanup:
+  - After reducing scaled debt, if residual owed `<= 1 wei`, loan is zeroed. 
