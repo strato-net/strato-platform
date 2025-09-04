@@ -41,7 +41,7 @@ contract record RewardsChef is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
     // ═════════════════════════════════════════════════════════════════════════
-    // Workaround for `type(uint256).max`
+    // Workaround for the lack of `type(uint256).max`
     uint256 private MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -68,7 +68,10 @@ contract record RewardsChef is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(address initialOwner, address _rewardToken, uint256 _cataPerSecond) Ownable(initialOwner) {
+    constructor(address initialOwner,
+		address _rewardToken,
+		uint256 _cataPerSecond
+	        ) Ownable(initialOwner) {
         rewardToken = Token(_rewardToken);
         cataPerSecond = _cataPerSecond;
         pools = [];
