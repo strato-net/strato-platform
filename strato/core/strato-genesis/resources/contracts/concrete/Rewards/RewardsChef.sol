@@ -14,6 +14,7 @@ contract record RewardsChef is Ownable {
     event AllocationPointsUpdated(uint256 indexed pid, uint256 oldAllocPoint, uint256 newAllocPoint);
     event BonusPeriodAdded(uint256 indexed pid, uint256 startTimestamp, uint256 bonusMultiplier);
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
+    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -63,6 +64,9 @@ contract record RewardsChef is Ownable {
 
     // Info of each of the stake pool.
     PoolInfo[] public pools;
+
+    // Info of each user that stakes LP tokens.
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -205,6 +209,35 @@ contract record RewardsChef is Ownable {
 
         pool.accPerToken += (cataReward * 1e12) / lpSupply;
         pool.lastRewardTimestamp = block.timestamp;
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // USER INTERACTIONS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function deposit(uint256 _pid, uint256 _amount) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        updatePool(_pid);
+
+        if (user.amount > 0) {
+            uint256 pending = ((user.amount * pool.accPerToken) / 1e12) - user.rewardDebt;
+            if (pending > 0) {
+                rewardToken.transfer(msg.sender, pending);
+            }
+        }
+
+        if (_amount > 0) {
+            Token(pool.lpToken).transferFrom(msg.sender, address(this), _amount);
+            user.amount += _amount;
+        }
+
+        user.rewardDebt = (user.amount * pool.accPerToken) / 1e12;
+
+        emit Deposit(msg.sender, _pid, _amount);
     }
 
 }
