@@ -45,11 +45,10 @@ const WithdrawWidget: React.FC = () => {
 
   // State for redeemable tokens (loaded separately)
   const [redeemableTokens, setRedeemableTokens] = useState<any[]>([]);
-  
+
   // Only show USDC / USDT as destinations
   const stableTokens = useMemo(() => {
     const filtered = redeemableTokens.filter((t) => 1 /* already filtered */ );
-    console.log('Stable tokens:', filtered);
     return filtered;
   }, [redeemableTokens]);
 
@@ -74,11 +73,11 @@ const WithdrawWidget: React.FC = () => {
       if (!selectedNetwork) return;
       const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
       if (!networkConfig) return;
-      
+
       const tokens = await fetchRedeemableTokens(networkConfig.chainId);
       setRedeemableTokens(tokens);
     };
-    
+
     loadRedeemableTokens();
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
@@ -173,12 +172,10 @@ const WithdrawWidget: React.FC = () => {
 
       <div className="space-y-1.5">
         <Label>Receive Stablecoin</Label>
-        <Select 
-          value={selectedToken?.stratoToken || ""} 
+        <Select
+          value={selectedToken?.stratoToken || ""}
           onValueChange={(v) => {
-            console.log('Selected value:', v);
             const token = stableTokens.find(t => t.stratoToken === v);
-            console.log('Found token:', token);
             if (token) {
               setSelectedToken(token);
             }

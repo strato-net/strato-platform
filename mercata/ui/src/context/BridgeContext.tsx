@@ -295,7 +295,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         const { data } = await api.get<Token[]>(`/bridge/redeemableTokens/${chainId}`);
         return Array.isArray(data) ? data : [];
       } catch (error) {
-        console.error('Failed to load redeemable tokens:', error);
+        setError("Failed to load tokens for selected network");
         return [];
       }
     },

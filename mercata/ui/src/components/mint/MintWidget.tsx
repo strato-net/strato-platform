@@ -68,7 +68,7 @@ const MintWidget: React.FC = () => {
 
   // State for mintable tokens (loaded separately)
   const [mintableTokens, setMintableTokens] = useState<any[]>([]);
-  
+
   // Only show stablecoins that can mint USDST
   const stableTokens = useMemo(() => {
     return mintableTokens.filter(t => 1 /* already filtered */ );
@@ -96,11 +96,11 @@ const MintWidget: React.FC = () => {
       if (!selectedNetwork) return;
       const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
       if (!networkConfig) return;
-      
+
       const tokens = await fetchRedeemableTokens(networkConfig.chainId);
       setMintableTokens(tokens);
     };
-    
+
     loadMintableTokens();
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
@@ -171,7 +171,7 @@ const MintWidget: React.FC = () => {
   // Derived displays
   const formattedUsdstBalance = useMemo(() => formatBalance(usdstBalance || "0", undefined, 18, 2, 2), [usdstBalance]);
   const formattedSuppliedBalance = useMemo(() => formatBalance(liquidityInfo?.withdrawable?.userBalance || "0", undefined, 18, 2, 2), [liquidityInfo?.withdrawable?.userBalance]);
-  
+
   const afterBalance = useMemo(() => {
     try {
       // Use supplied balance if auto-deposit is enabled, wallet balance otherwise
@@ -180,8 +180,8 @@ const MintWidget: React.FC = () => {
       const add = parseFloat(amount || "0");
       const sum = isNaN(before) || isNaN(add) ? 0 : before + add;
       return sum.toLocaleString(undefined, { maximumFractionDigits: 6 });
-    } catch { 
-      return autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance; 
+    } catch {
+      return autoDeposit ? formattedSuppliedBalance : formattedUsdstBalance;
     }
   }, [formattedUsdstBalance, formattedSuppliedBalance, amount, autoDeposit]);
 
@@ -292,13 +292,9 @@ const MintWidget: React.FC = () => {
 
       toast({ title: "Mint transaction sent", description: `Tx: ${txHash.slice(0,10)}…` });
 
-      console.log("After toast, before autoDeposit check");
-      console.log("autoDeposit value:", autoDeposit, typeof autoDeposit);
-      
       // Auto-deposit: poll for USDST balance increase and deposit (TODO this is a really hacky way to do this)
       if (autoDeposit) {
         const beforeWei = BigInt(usdstBalance || "0");
-        console.log("beforeWei", beforeWei);
         await fetchUsdstBalance(userAddress)
         const targetIncreaseWei = safeParseUnits(amount, 18);
         const start = Date.now();
@@ -313,10 +309,7 @@ const MintWidget: React.FC = () => {
             const nowRes = await api.get(`/tokens/balance?address=eq.${usdstAddress}`);
             const nowBalanceFromAPI = nowRes?.data?.[0]?.balance || "0";
             const nowWei = BigInt(nowBalanceFromAPI);
-            console.log("nowWei from API", nowWei);
-            console.log("difference", nowWei - beforeWei);
-            console.log("target", targetIncreaseWei);
-            
+
             if (nowWei - beforeWei == targetIncreaseWei) {
               // Deposit the minted amount
               const amtDec = safeParseUnits(amount, 18).toString();

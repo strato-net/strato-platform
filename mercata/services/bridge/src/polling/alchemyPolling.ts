@@ -48,14 +48,6 @@ const parseDepositEvents = async (logs: any[], externalChainId: number) => {
     const depositId = "0x" + log.data.substring(66, 130);
     const mintHex = log.data.substring(130, 194);
     const mint = mintHex.substring(62) === "01";
-    
-    console.log("Event parsing:", {
-      externalTokenAmount,
-      depositId: parseInt(depositId, 16),
-      mintHex,
-      mint,
-      txHash: log.transactionHash
-    });
 
     const tokenInfo = tokenMapping.get(externalToken);
     if (!tokenInfo) {
