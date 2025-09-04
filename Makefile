@@ -16,7 +16,6 @@ FAKEROOT=$(shell pwd)/.docker-work
 HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
-IDENTITYDIR=${FAKEROOT}/identity-provider
 
 ifndef VERSION
   ifeq ($(REPO),public)
@@ -108,7 +107,6 @@ build_common:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack install \
 		--test --no-run-tests
 
@@ -117,7 +115,6 @@ build_common_docker:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -127,7 +124,6 @@ build_common_profiled:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
@@ -136,7 +132,6 @@ build_common_fast:
 	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	mkdir -p ${IDENTITYDIR}
 	cd strato && stack build \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
