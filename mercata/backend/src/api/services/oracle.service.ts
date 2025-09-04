@@ -77,7 +77,7 @@ export const getPriceHistory = async (
     const registry = await getPool(accessToken, undefined, {
       select: "priceOracle",
     });
-
+    
     if (!registry.priceOracle) {
       throw new Error("Price oracle not found");
     }
@@ -117,12 +117,12 @@ export const getPriceHistory = async (
       return num.toLocaleString("fullwide", { useGrouping: false });
     }
 
-    const events: PriceHistoryEntry[] = [];
+    const priceEvents: PriceHistoryEntry[] = [];
 
     // --- Normalize single asset events ---
     if (Array.isArray(singleResponse.data)) {
       singleResponse.data.forEach((event: any) => {
-        events.push({
+        priceEvents.push({
           id: event.id.toString(),
           timestamp: new Date(parseInt(event.timestamp) * 1000),
           asset: event.asset,
@@ -137,7 +137,7 @@ export const getPriceHistory = async (
       batchResponse.data.forEach((event: any) => {
         const idx = event.assets.indexOf(assetAddress);
         if (idx !== -1) {
-          events.push({
+          priceEvents.push({
             id: event.id.toString(),
             timestamp: new Date(parseInt(event.timestamp) * 1000),
             asset: assetAddress,
@@ -148,7 +148,7 @@ export const getPriceHistory = async (
       });
     }
 
-    if (events.length === 0) {
+    if (priceEvents.length === 0) {
       console.log(`[getPriceHistory] No data found for ${assetAddress}`);
       return { data: [], totalCount: 0 };
     }
@@ -156,7 +156,7 @@ export const getPriceHistory = async (
     // Process events and create hourly data points
     const hourlyPrices = new Map<string, PriceHistoryEntry>();
 
-    events.forEach((event: any) => {
+    priceEvents.forEach((event: any) => {
       const blockTimestamp = event.blockTimestamp;
 
       // Create hourly bucket (round down to the hour)
