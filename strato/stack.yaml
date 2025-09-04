@@ -75,7 +75,7 @@ packages:
 - tools/convoke
 - tools/debugger-tools
 - tools/process-monitor
-- tools/x509-tools
+#- tools/x509-tools
 
 - vault/api
 - vault/client

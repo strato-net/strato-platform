@@ -14,8 +14,6 @@ module BlockApps.X509.Certificate
   ( X509Certificate (..),
     X509CertificateField (..),
     X509CertInfoState (..),
-    CertificateChain (..),
-    SignedCertificate,
     Issuer (..),
     Subject (..),
     x509CertToCertInfoState,
@@ -24,26 +22,14 @@ module BlockApps.X509.Certificate
     rootCert,
     certToBytes,
     bytesToCert,
-    makeCert,
     verifyCert,
-    verifyCertAgainstCerts,
     verifyCertSignedBy,
-    verifyBlockApps,
-    verifyCertM,
-    verifyBlockAppsM,
-    makeSignedCert,
     makeSignedCertSigF,
     getCertSubject,
-    getCertSubjects,
     getCertValidity,
     getCertIssuer,
-    getCertIssuers,
     getParentUserAddress,
-    findNodeCert,
-    x509ToSigneds,
-    signedsToX509,
     dateTimeToString,
-    getValidity,
     getAddressFromCM,
     getX509FromAddress,
     getChainMemberFromX509,
@@ -73,15 +59,11 @@ import Data.Binary
 import Data.Bits
 import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Short as BSS
 -- as Swag
 
 import Data.Either
-import Data.Functor
 import Data.Hourglass
-import Data.List (find)
 import Data.Maybe
 import Data.PEM
 import qualified Data.Set as S
@@ -390,12 +372,6 @@ bytesToCert bs =
 --------------------------------- CERT GENERATION AND SIGNING ------------------------------
 --------------------------------------------------------------------------------------------
 
-makeSignedCert :: (MonadIO m, HasVault m) => Maybe DateTime -> Maybe X509Certificate -> Issuer -> Subject -> m (X509Certificate)
-makeSignedCert mDateTime parentCert iss sub = makeCert mDateTime iss sub >>= signCert >>= return . X509Certificate . CertificateChain . (: (join . maybeToList $ x509ToSigneds <$> parentCert))
-
-signCert :: (MonadIO m, HasVault m) => Certificate -> m (SignedCertificate)
-signCert cert = objectToSignedExactF (ecdsaWithSHA256) cert
-
 makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
 makeCert mDateTime iss sub = do
   serial' <- liftIO $ getEntropy 16
@@ -420,16 +396,6 @@ makeCert mDateTime iss sub = do
         certPubKey = getCertPub sub,
         certExtensions = Extensions Nothing
       }
-
--- Data.X509's objectToSignedExact function expects a signing function with signature
--- B.ByteString -> f (B.ByteString, SignatureALG), and assumes that you will hash the
--- bytestring message, so hence this function. We partially apply the privkey when we
--- pass it to objectToSignedExact
---
--- yea, I wish we could use Keccak256. Data.X509 hasn't caught up yet. Maybe I'll
--- make a PR for it
-ecdsaWithSHA256 :: (MonadIO m, HasVault m) => B.ByteString -> m (B.ByteString, SignatureALG)
-ecdsaWithSHA256 = ecdsaWithSHA256F sign
 
 makeSignedCertSigF ::
   (MonadIO m) =>
@@ -554,16 +520,6 @@ getCertIssuers certs = for (x509ToSigneds certs) $ \cert -> do
 ------------------------------------- CERT VERIFICATION ------------------------------------
 --------------------------------------------------------------------------------------------
 
--- Verify that a cert was signed by given public key
--- We perform a chain validation and expect pkey to be our trust anchor. The process is
--- combersomly detailed in RFC 5280 section 6
--- The first certificate in X509Certificate is the target cert, and the last one is the
--- the trust anchor (the one signed by the public key)
-verifyCertAgainstCerts :: [X509Certificate] -> X509Certificate -> Bool
-verifyCertAgainstCerts certs cert = any (`verifyCert` cert) pkeys
-  where
-    pkeys = fmap subPub . catMaybes . fmap getCertSubject $ certs
-
 verifyCert :: PublicKey -> X509Certificate -> Bool
 verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
 
@@ -593,34 +549,3 @@ issuerMatchesSubject c c' = fromMaybe False $ issuerEqSubject <$> getCertIssuer 
 -- Verify that c signed by c'
 signedBy :: SignedCertificate -> SignedCertificate -> Bool
 signedBy c c' = fromMaybe False $ (\k -> verifyCertChain k [c]) . subPub <$> getCertSubject (signedsToX509 [c'])
-
-verifyBlockApps :: X509Certificate -> Bool
-verifyBlockApps = verifyCert rootPubKey
-
-verifyBlockAppsM :: MonadIO m => m X509Certificate -> m Bool
-verifyBlockAppsM = fmap verifyBlockApps
-
-verifyCertM :: MonadIO m => PublicKey -> X509Certificate -> m Bool
-verifyCertM pkey (X509Certificate (CertificateChain cs)) = mapM_ printCertDetails cs $> verifyCertChain pkey cs
-  where
-    printCertDetails :: MonadIO m => SignedCertificate -> m ()
-    printCertDetails c = do
-      let signed = getSigned c
-          mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
-          (Signature (SEC.CompactRecSig r s _)) = fromMaybe (error "Could not decode signature from DER format") (importSignature' $ signedSignature signed)
-      liftIO $ putStrLn $ format (getCertIssuer $ signedsToX509 [c])
-      liftIO $ putStrLn $ "Signature:"
-      liftIO $ putStrLn $ "   R: " ++ (show $ B16.encode $ BSS.fromShort r)
-      liftIO $ putStrLn $ "   S: " ++ (show $ B16.encode $ BSS.fromShort s)
-      liftIO $ putStrLn $ "Signature (DER Encoding): " ++ (show $ B16.encode $ signedSignature signed)
-      liftIO $ putStrLn $ "Certificate Hash: " ++ (show $ B16.encode mesgBS)
-
-      case getCertSubject $ signedsToX509 [c] of
-        Nothing -> liftIO $ putStrLn $ "No Subject"
-        Just subject -> do
-          liftIO $ putStrLn $ format subject
-          liftIO $ putStrLn $ "Subject Address: " ++ (format $ fromPublicKey $ subPub subject)
-
--- Find a matching pubkey in a list of signed certs
-findNodeCert :: PublicKey -> [SignedCertificate] -> Maybe SignedCertificate
-findNodeCert pk = find (\x -> unserializeAndUnwrap (certPubKey (signedObject (getSigned x))) == Just pk)

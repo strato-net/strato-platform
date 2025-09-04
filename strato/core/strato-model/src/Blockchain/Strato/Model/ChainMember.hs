@@ -12,14 +12,10 @@
 {-# LANGUAGE NoDeriveAnyClass #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-{-# OPTIONS -fno-warn-unused-top-binds #-}
-
 module Blockchain.Strato.Model.ChainMember
   ( emptyChainMember,
-    chainMemberParsedSetToChainMemberRSet,
     ChainMembers (..),
     ChainMemberRSet (..),
-    --ChainMemberF (..),
     ChainMemberParsedSet (..),
     chainMemberParsedSetToValidator,
     validatorToChainMemberParsedSet
@@ -101,64 +97,6 @@ cmpsSchemaOptions =
 type ChainMemberBounded = ChainMemberF BoundedData
 
 newtype ChainMemberRange = ChainMemberRange {unChainMemberRange :: Range ChainMemberBounded} deriving (Show)
-
-chainMemberParsedSetToChainMemberRSet :: ChainMemberParsedSet -> (Bool, ChainMemberRSet)
-chainMemberParsedSetToChainMemberRSet (Everyone True) =
-  ( True,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound (Middle ())) (ChainMemberF UpperBound UpperBound UpperBound (Middle ()))
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (Everyone False) = (False, ChainMemberRSet rSetEmpty)
-chainMemberParsedSetToChainMemberRSet (Org o True) =
-  ( True,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF (Middle o) LowerBound LowerBound (Middle ())) (ChainMemberF (Middle o) UpperBound UpperBound (Middle ()))
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (Org o False) =
-  ( False,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) LowerBound LowerBound LowerBound),
-          getRangeFromBounds (ChainMemberF (Middle o) UpperBound UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (OrgUnit o u True) =
-  ( True,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) LowerBound (Middle ())) (ChainMemberF (Middle o) (Middle $ Just u) UpperBound (Middle ()))
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (OrgUnit o u False) =
-  ( False,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) LowerBound LowerBound),
-          getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) UpperBound UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (CommonName o u c True) =
-  ( True,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) (Middle ())) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) (Middle ()))
-        ]
-  )
-chainMemberParsedSetToChainMemberRSet (CommonName o u c False) =
-  ( False,
-    ChainMemberRSet $
-      makeRangedSet
-        [ getRangeFromBounds (ChainMemberF LowerBound LowerBound LowerBound LowerBound) (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) LowerBound),
-          getRangeFromBounds (ChainMemberF (Middle o) (Middle $ Just u) (Middle $ Just c) UpperBound) (ChainMemberF UpperBound UpperBound UpperBound UpperBound)
-        ]
-  )
-
-getRangeFromBounds :: ChainMemberBounded -> ChainMemberBounded -> Range ChainMemberBounded
-getRangeFromBounds lb ub = (Range (BoundaryBelow lb) (BoundaryAbove ub))
 
 instance Ord a => Ord (BoundedData a) where
   LowerBound `compare` LowerBound = EQ
