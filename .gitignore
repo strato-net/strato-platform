@@ -21,7 +21,6 @@ docker-compose.vault.yml
 docker-compose.vault.ecr.yml
 strato-platform-manifest.yaml
 eks-vault-deployment.yaml
-eks-identity-deployment.yaml
 stack.yaml.lock
 configurationCache.log
 dryrun.log
