@@ -20,6 +20,7 @@ export const constants = (() => {
   const Pool = `${CONTRACT_PREFIX}Pool`;
   const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
+  const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
   const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
@@ -128,6 +129,7 @@ export const constants = (() => {
     Pool,
     PoolSwap,
     PriceOracleEvents,
+    PriceOracleBatchUpdateEvents,
     OnRamp,
     LendingRegistry,
     PoolConfigurator,
