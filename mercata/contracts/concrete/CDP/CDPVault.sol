@@ -1,3 +1,10 @@
+/*
+ * CDPVault
+ * - Custody contract for CDP collateral balances keyed by (user, asset)
+ * - No pricing or risk logic; only the CDPEngine may move funds
+ * - Emits deposit/withdraw/seize events for auditability
+ */
+
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "./CDPRegistry.sol";
@@ -21,11 +28,18 @@ contract record CDPVault is Ownable {
         _;
     }
 
+    /**
+     * @notice Initialize with registry and owner
+     */
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "CDPVault: Invalid registry");
         registry = CDPRegistry(_registry);
     }
 
+    /**
+     * @notice Move collateral from user into vault custody
+     * @dev Only CDPEngine may call; pulls tokens from borrower
+     */
     function deposit(
         address borrower,
         address asset,
@@ -40,6 +54,10 @@ contract record CDPVault is Ownable {
         emit CollateralDeposited(borrower, asset, amount);
     }
 
+    /**
+     * @notice Return collateral from vault to user
+     * @dev Only CDPEngine may call; reverts on insufficient balance
+     */
     function withdraw(
         address borrower,
         address asset,
@@ -55,6 +73,10 @@ contract record CDPVault is Ownable {
         emit CollateralWithdrawn(borrower, asset, amount);
     }
 
+    /**
+     * @notice Transfer collateral to the liquidator during liquidation
+     * @dev Only CDPEngine may call; reverts on insufficient balance
+     */
     function seize(
         address borrower,
         address asset,
@@ -73,11 +95,16 @@ contract record CDPVault is Ownable {
         emit CollateralSeized(borrower, liquidator, asset, amount);
     }
 
+    /**
+     * @notice View helper
+     */
     function getCollateral(address user, address asset) public view returns (uint) {
         return userCollaterals[user][asset];
     }
 
-    // Setter function for updating the CDPRegistry reference
+    /**
+     * @notice Update the registry reference (owner only)
+     */
     function setRegistry(address _registry) external onlyOwner {
         require(_registry != address(0), "Invalid registry address");
         address oldRegistry = address(registry);
