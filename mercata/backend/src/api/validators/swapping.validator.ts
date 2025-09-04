@@ -48,18 +48,23 @@ export function validateCreatePoolsArgs(args: any) {
   }
 }
 
-export function validateAddLiquidityArgs(args: any) {
+export function validateAddLiquidityDualTokenArgs(args: any) {
   const schema = Joi.object({
-    // Dual token mode parameters
-    tokenBAmount: numericStringField("TokenBAmount").optional(),
-    maxTokenAAmount: numericStringField("MaxTokenAAmount").optional(),
-    
-    // Single token mode parameters
-    singleTokenAmount: numericStringField("SingleTokenAmount").optional(),
-    isAToB: Joi.boolean().optional(),
-    
-    // Ensure at least one mode is specified
-  }).or('tokenBAmount', 'singleTokenAmount');
+    tokenBAmount: numericStringField("TokenBAmount").required(),
+    maxTokenAAmount: numericStringField("MaxTokenAAmount").required(),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("Add Liquidity Dual Token Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateAddLiquiditySingleTokenArgs(args: any) {
+  const schema = Joi.object({
+    singleTokenAmount: numericStringField("SingleTokenAmount").required(),
+    isAToB: Joi.boolean().required(),
+  });
   
   const { error } = schema.validate(args);
   if (error) {

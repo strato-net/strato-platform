@@ -56,7 +56,7 @@ const LiquidityDepositModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
-  const { addLiquidity, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
+  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -160,18 +160,22 @@ const LiquidityDepositModal = ({
       operationInProgressRef.current = true;
       setDepositLoading(true);
       
-      let liquidityParams: any = {
-        poolAddress: selectedPool.address,
-      };
+
 
       if (depositMode === 'A') {
         // Single token mode - Token A
-        liquidityParams.singleTokenAmount = token1AmountWei.toString();
-        liquidityParams.isAToB = true;
+        await addLiquiditySingleToken({
+          poolAddress: selectedPool.address,
+          singleTokenAmount: token1AmountWei.toString(),
+          isAToB: true
+        });
       } else if (depositMode === 'B') {
         // Single token mode - Token B
-        liquidityParams.singleTokenAmount = token2AmountWei.toString();
-        liquidityParams.isAToB = false;
+        await addLiquiditySingleToken({
+          poolAddress: selectedPool.address,
+          singleTokenAmount: token2AmountWei.toString(),
+          isAToB: false
+        });
       } else {
         // Dual token mode
         const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
@@ -180,11 +184,12 @@ const LiquidityDepositModal = ({
           : safeParseUnits((parseFloat(token1Amount) * 1.02).toFixed(18), 18);
         const tokenBAmount = safeParseUnits(token2Amount, 18);
         
-        liquidityParams.maxTokenAAmount = tokenAAmount.toString();
-        liquidityParams.tokenBAmount = tokenBAmount.toString();
+        await addLiquidityDualToken({
+          poolAddress: selectedPool.address,
+          maxTokenAAmount: tokenAAmount.toString(),
+          tokenBAmount: tokenBAmount.toString()
+        });
       }
-
-      await addLiquidity(liquidityParams);
 
       await new Promise(resolve => setTimeout(resolve, 2000));
 

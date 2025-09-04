@@ -34,11 +34,17 @@ type SwapContextType = {
     minAmountOut: string;
   }) => Promise<void>;
   fetchPools: () => Promise<LiquidityPool[]>;
-  addLiquidity: (data: {
+  addLiquidityDualToken: (data: {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
   }) => Promise<void>;
+  addLiquiditySingleToken: (data: {
+    poolAddress: string;
+    singleTokenAmount: string;
+    isAToB: boolean;
+  }) => Promise<void>;
+
   removeLiquidity: (data: {
     poolAddress: string;
     lpTokenAmount: string;
@@ -230,30 +236,49 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const addLiquidity = useCallback(async (data: {
+  const addLiquidityDualToken = useCallback(async (data: {
     poolAddress: string;
-    tokenBAmount?: string;
-    maxTokenAAmount?: string;
-    singleTokenAmount?: string;
-    isAToB?: boolean;
+    tokenBAmount: string;
+    maxTokenAAmount: string;
   }) => {
     setLoading(true);
     setError(null);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
-        ...(data.tokenBAmount && { tokenBAmount: data.tokenBAmount }),
-        ...(data.maxTokenAAmount && { maxTokenAAmount: data.maxTokenAAmount }),
-        ...(data.singleTokenAmount && { singleTokenAmount: data.singleTokenAmount }),
-        ...(data.isAToB !== undefined && { isAToB: data.isAToB })
+        tokenBAmount: data.tokenBAmount,
+        maxTokenAAmount: data.maxTokenAAmount
       });
       return response.data;
     } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to add liquidity');
+      setError(err.response?.data?.message || err.message || 'Failed to add dual token liquidity');
       throw err;
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const addLiquiditySingleToken = useCallback(async (data: {
+    poolAddress: string;
+    singleTokenAmount: string;
+    isAToB: boolean;
+  }) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/single`, {
+        singleTokenAmount: data.singleTokenAmount,
+        isAToB: data.isAToB
+      });
+      return response.data;
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to add single token liquidity');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+
 
   const removeLiquidity = useCallback(async (data: {
     poolAddress: string;
@@ -417,7 +442,8 @@ const refreshSwapHistory = useCallback(
         getPoolByAddress,
         swap,
         fetchPools,
-        addLiquidity,
+        addLiquidityDualToken,
+        addLiquiditySingleToken,
         removeLiquidity,
         fetchTokenBalances,
         getTokenBalance,
