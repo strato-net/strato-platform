@@ -47,10 +47,8 @@ async function main() {
     console.log('\n====== Deployment Successful ======');
     console.log(`Contract: ${deployedContract.name}`);
     console.log(`Address: ${deployedContract.address}`);
-    console.log(`CDP Registry: ${deployedContract.managers.cdpRegistry}`);
-    console.log(`CDP Engine: ${deployedContract.managers.cdpEngine}`);
-    console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
-    console.log(`USDST Token: ${deployedContract.managers.usdst}`);
+    console.log(`Rate Strategy: ${deployedContract.managers.rateStrategy}`);
+    console.log(`Collateral Vault: ${deployedContract.managers.collateralVault}`);
     console.log(`Price Oracle: ${deployedContract.managers.priceOracle}`);
     console.log(`Pool Configurator: ${deployedContract.managers.poolConfigurator}`);
     console.log(`Lending Pool: ${deployedContract.managers.lendingPool}`);
@@ -74,13 +72,8 @@ async function main() {
     console.log('# Paste these into your .env');
     console.log('# ------------------------');
     const envLines = {
-      CDP_REGISTRY: deployedContract.managers.cdpRegistry,
-      CDP_ENGINE: deployedContract.managers.cdpEngine,
-      CDP_VAULT: deployedContract.managers.cdpVault,
-      USDST_TOKEN: deployedContract.managers.usdst,
-      PRICE_ORACLE: deployedContract.managers.priceOracle,
+      POOL_FACTORY: deployedContract.managers.poolFactory,
       TOKEN_FACTORY: deployedContract.managers.tokenFactory,
-      FEE_COLLECTOR: deployedContract.managers.feeCollector,
       ADMIN_REGISTRY: deployedContract.managers.adminRegistry,
       FEE_COLLECTOR: deployedContract.managers.feeCollector,
       PRICE_ORACLE: deployedContract.managers.priceOracle,

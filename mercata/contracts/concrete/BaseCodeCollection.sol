@@ -68,27 +68,27 @@ contract record Mercata {
 
     constructor() public {
         // Create AdminRegistry first
-        // adminRegistry = new AdminRegistry(this);
-        // adminRegistry.addAdmin(msg.sender);
+        adminRegistry = new AdminRegistry(this);
+        adminRegistry.addAdmin(msg.sender);
 
-        // // Create FeeCollector
-        // feeCollector = new FeeCollector(msg.sender);
+        // Create FeeCollector
+        feeCollector = new FeeCollector(msg.sender);
 
-        // // Create Factories
-        // tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        // poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
-        // adminRegistry.addAdmin(address(poolFactory));
-        // adminRegistry.removeAdmin(this);
-        // Ownable(adminRegistry).transferOwnership(msg.sender);
+        // Create Factories
+        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
+        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
+        adminRegistry.addAdmin(address(poolFactory));
+        adminRegistry.removeAdmin(this);
+        Ownable(adminRegistry).transferOwnership(msg.sender);
 
-        // // Create Lending related contracts
-        // lendingRegistry = new LendingRegistry(this);
-        // collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
-        // liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
-        // rateStrategy = new RateStrategy();
-        // priceOracle = new PriceOracle(msg.sender); 
-        // poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        // lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
+        // Create Lending related contracts
+        lendingRegistry = new LendingRegistry(this);
+        collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
+        liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
+        rateStrategy = new RateStrategy();
+        priceOracle = new PriceOracle(msg.sender); 
+        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
