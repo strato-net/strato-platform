@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp } from 'lucide-react';
-import CreateTokenForm from '@/components/admin/CreateTokenForm';
-import CreatePoolForm from '@/components/admin/CreatePoolForm';
-import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
-import TokenConfigTable from '@/components/admin/TokenConfigTable';
-import TokenStatusTable from '@/components/admin/TokenStatusTable';
-import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
-import LendingTab from '@/components/admin/LendingTab';
+
+// Lazy load admin components
+const CreateTokenForm = lazy(() => import('@/components/admin/CreateTokenForm'));
+const CreatePoolForm = lazy(() => import('@/components/admin/CreatePoolForm'));
+const SetAssetPriceForm = lazy(() => import('@/components/admin/SetAssetPriceForm'));
+const TokenConfigTable = lazy(() => import('@/components/admin/TokenConfigTable'));
+const TokenStatusTable = lazy(() => import('@/components/admin/TokenStatusTable'));
+const SwapPoolsTable = lazy(() => import('@/components/admin/SwapPoolsTable'));
+const LendingTab = lazy(() => import('@/components/admin/LendingTab'));
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -93,7 +95,9 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CreateTokenForm />
+                <Suspense fallback={<div className="h-96 bg-gray-200 rounded animate-pulse"></div>}>
+                  <CreateTokenForm />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
@@ -107,14 +111,20 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <CreatePoolForm />
+                <Suspense fallback={<div className="h-64 bg-gray-200 rounded animate-pulse"></div>}>
+                  <CreatePoolForm />
+                </Suspense>
               </CardContent>
             </Card>
-            <SwapPoolsTable />
+            <Suspense fallback={<div className="h-96 bg-gray-200 rounded animate-pulse"></div>}>
+              <SwapPoolsTable />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="lending" className="space-y-6">
-            <LendingTab />
+            <Suspense fallback={<div className="h-96 bg-gray-200 rounded animate-pulse"></div>}>
+              <LendingTab />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="pricing" className="space-y-6">
@@ -126,17 +136,23 @@ const Admin = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <SetAssetPriceForm />
+                <Suspense fallback={<div className="h-64 bg-gray-200 rounded animate-pulse"></div>}>
+                  <SetAssetPriceForm />
+                </Suspense>
               </CardContent>
             </Card>
           </TabsContent>
 
           <TabsContent value="configs" className="space-y-6">
-            <TokenConfigTable />
+            <Suspense fallback={<div className="h-96 bg-gray-200 rounded animate-pulse"></div>}>
+              <TokenConfigTable />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="status" className="space-y-6">
-            <TokenStatusTable />
+            <Suspense fallback={<div className="h-96 bg-gray-200 rounded animate-pulse"></div>}>
+              <TokenStatusTable />
+            </Suspense>
           </TabsContent>
         </Tabs>
       </div>

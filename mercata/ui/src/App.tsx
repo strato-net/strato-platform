@@ -15,20 +15,7 @@ import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
 import { SwapProvider } from "@/context/SwapContext";
 import { OracleProvider } from "@/context/OracleContext";
-import Index from "./pages/Index";
-import Dashboard from "./pages/Dashboard";
-import SwapAsset from "./pages/SwapAsset";
-import Transfer from "./pages/Transfer";
-import DepositsPage from "./pages/DepositsPage";
-import AssetDetail from "./pages/AssetDetail";
-import Pools from "./pages/Pools";
-import ActivityFeed from "./pages/ActivityFeed";
-import NotFound from "./pages/NotFound";
-
-// Import dashboard components
-
-import BridgeTransactionsPage from "./pages/BridgeTransactionsPage";
-import Admin from "./pages/Admin";
+import { Suspense, lazy, useState, useEffect } from "react";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
@@ -36,9 +23,21 @@ import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
-import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
-import { useState, useEffect } from "react";
+
+// Lazy load all pages
+const Index = lazy(() => import("./pages/Index"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const SwapAsset = lazy(() => import("./pages/SwapAsset"));
+const Transfer = lazy(() => import("./pages/Transfer"));
+const DepositsPage = lazy(() => import("./pages/DepositsPage"));
+const AssetDetail = lazy(() => import("./pages/AssetDetail"));
+const Pools = lazy(() => import("./pages/Pools"));
+const ActivityFeed = lazy(() => import("./pages/ActivityFeed"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const BridgeTransactionsPage = lazy(() => import("./pages/BridgeTransactionsPage"));
+const Admin = lazy(() => import("./pages/Admin"));
+const Borrow = lazy(() => import("./pages/Borrow"));
 
 const queryClient = new QueryClient();
 
@@ -109,10 +108,11 @@ const App = () => {
                   <TokenProvider>
                     <LiquidationProvider>
                       <BridgeProvider>
-                          <TooltipProvider>
-                            <Toaster />
-                            <BrowserRouter>
-                              <UsdstBalanceBox />
+                        <TooltipProvider>
+                          <Toaster />
+                          <BrowserRouter>
+                            <UsdstBalanceBox />
+                            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-strato-blue"></div></div>}>
                               <Routes>
                                 <Route path="/" element={<Index />} />
                                 <Route
@@ -202,9 +202,10 @@ const App = () => {
                                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                                 <Route path="*" element={<NotFound />} />
                               </Routes>
-                            </BrowserRouter>
-                          </TooltipProvider>
-                        </BridgeProvider>
+                            </Suspense>
+                          </BrowserRouter>
+                        </TooltipProvider>
+                      </BridgeProvider>
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>

@@ -24,7 +24,7 @@ const BridgeTransactionsPage = () => {
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <BridgeTransactionsComponent isOpen={true} onClose={() => {}} />
+            <BridgeTransactionsComponent />
           </div>
         </div>
       </div>

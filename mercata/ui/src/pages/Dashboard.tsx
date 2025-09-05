@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense, lazy } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import AssetSummary from "../components/dashboard/AssetSummary";
-import AssetsList from "../components/dashboard/AssetsList";
-import DashboardFAQ from "../components/dashboard/DashboardFAQ";
-import BorrowingSection from "../components/dashboard/BorrowingSection";
 import { Wallet, Coins, Shield } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
@@ -13,9 +10,14 @@ import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
-import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+
+// Lazy load heavy dashboard components
+const AssetsList = lazy(() => import("../components/dashboard/AssetsList"));
+const DashboardFAQ = lazy(() => import("../components/dashboard/DashboardFAQ"));
+const BorrowingSection = lazy(() => import("../components/dashboard/BorrowingSection"));
+const MyPoolParticipationSection = lazy(() => import("../components/dashboard/MyPoolParticipationSection"));
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -162,32 +164,40 @@ const Dashboard = () => {
           {isDataInitialized && (
             <>
               <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={tokens} 
-                  inActiveTokens={inactiveTokens} 
-                  shouldPreventFlash={true}
-                />
+                <Suspense fallback={<div className="bg-white rounded-lg p-6 animate-pulse"><div className="h-64 bg-gray-200 rounded"></div></div>}>
+                  <AssetsList 
+                    loading={loading} 
+                    tokens={tokens} 
+                    inActiveTokens={inactiveTokens} 
+                    shouldPreventFlash={true}
+                  />
+                </Suspense>
               </div>
 
               <div className="mb-8">
-                <BorrowingSection 
-                  loanData={loans}
-                />
+                <Suspense fallback={<div className="bg-white rounded-lg p-6 animate-pulse"><div className="h-32 bg-gray-200 rounded"></div></div>}>
+                  <BorrowingSection 
+                    loanData={loans}
+                  />
+                </Suspense>
               </div>
 
               <div className="mb-8">
-                <MyPoolParticipationSection 
-                  loadingLpTokens={loadingLpTokens} 
-                  loadingLiquidity={loadingLiquidity} 
-                  liquidityInfo={liquidityInfo} 
-                  lpTokens={lpTokens}
-                  shouldPreventFlash={true}
-                /> 
+                <Suspense fallback={<div className="bg-white rounded-lg p-6 animate-pulse"><div className="h-48 bg-gray-200 rounded"></div></div>}>
+                  <MyPoolParticipationSection 
+                    loadingLpTokens={loadingLpTokens} 
+                    loadingLiquidity={loadingLiquidity} 
+                    liquidityInfo={liquidityInfo} 
+                    lpTokens={lpTokens}
+                    shouldPreventFlash={true}
+                  /> 
+                </Suspense>
               </div>
 
               <div className="mb-8">
-                <DashboardFAQ />
+                <Suspense fallback={<div className="bg-white rounded-lg p-6 animate-pulse"><div className="h-40 bg-gray-200 rounded"></div></div>}>
+                  <DashboardFAQ />
+                </Suspense>
               </div>
             </>
           )}
