@@ -336,7 +336,7 @@ const MintWidget: React.FC = () => {
         const userToken = activeTokens.find(token => 
           token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
         );
-        const decimals = userToken?.token.customDecimals || depositAsset.collateralAmountDecimals || 18;
+        const decimals = 18;
         
         // Convert from wei to decimal format for display in input
         const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
@@ -356,7 +356,7 @@ const MintWidget: React.FC = () => {
       const userToken = activeTokens.find(token => 
         token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
       );
-      const decimals = userToken?.token.customDecimals || depositAsset.collateralAmountDecimals || 18;
+      const decimals = 18;
       
       // Convert balance to decimal for comparison
       const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
