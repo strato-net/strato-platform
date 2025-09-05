@@ -31,12 +31,14 @@ const WithdrawTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
+        (params as any)["value->>mintUSDST"] = 'eq.false';
+        
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
         }
         
         if (selectedChainId !== null) {
-          (params as any)["value->>destChainId"] = `eq.${selectedChainId}`;
+          (params as any)["value->>externalChainId"] = `eq.${selectedChainId}`;
         }
         
         const result = await fetchWithdrawTransactions(params);
@@ -57,8 +59,8 @@ const WithdrawTransactionDetails = () => {
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = record?.withdrawalInfo?.user
-          ? bridgeContractService.formatAddress(record.withdrawalInfo.user)
+        const addr = record?.WithdrawalInfo?.stratoSender
+          ? bridgeContractService.formatAddress(record.WithdrawalInfo.stratoSender)
           : '';
         return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
       },
@@ -68,13 +70,13 @@ const WithdrawTransactionDetails = () => {
       title: "To",
       key: 'to',
       render: (_: any, record: any) => {
-        const chainName = record?.withdrawalInfo?.destChainId
-          ? getChainName(parseInt(record.withdrawalInfo.destChainId))
+        const chainName = record?.WithdrawalInfo?.externalChainId
+          ? getChainName(parseInt(record.WithdrawalInfo.externalChainId))
           : 'Unknown Chain';
-        const addr = record?.withdrawalInfo?.dest
-          ? bridgeContractService.formatAddress(record.withdrawalInfo.dest)
+        const addr = record?.WithdrawalInfo?.externalRecipient
+          ? bridgeContractService.formatAddress(record.WithdrawalInfo.externalRecipient)
           : '';
-        const chainIdStr = record?.withdrawalInfo?.destChainId ? String(record.withdrawalInfo.destChainId) : '1';
+        const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
         const addressUrl = `${base}/address/${addr}`;
@@ -107,9 +109,8 @@ const WithdrawTransactionDetails = () => {
       key: 'ethTokenSymbol',
       render: (_: any, record: any) => {
         const symbol =
-          record?.extSymbol ||
-          record?.ethTokenSymbol ||
-          (record?.extName === 'Ether' ? 'ETH' : record?.extName) ||
+          record?.externalSymbol ||
+          (record?.externalName === 'Ether' ? 'ETH' : record?.externalName) ||
           '-';
         return (
           <div className="flex flex-col gap-1">
@@ -123,7 +124,7 @@ const WithdrawTransactionDetails = () => {
       title: 'Token (STRATO)',
       key: 'tokenSymbol',
       render: (_: any, record: any) => {
-        const symbol = record?.stratoTokenSymbol || record?.tokenSymbol || '-';
+        const symbol = record?.stratoTokenSymbol || '-';
         return (
           <div className="flex flex-col gap-1">
             <span className="text-sm text-gray-700">{symbol}</span>
@@ -135,14 +136,14 @@ const WithdrawTransactionDetails = () => {
     {
       title: 'Amount',
       key: 'amount',
-      render: (_: any, record: any) => formatWeiAmount(record?.withdrawalInfo?.amount || '0'),
+      render: (_: any, record: any) => formatWeiAmount(record?.WithdrawalInfo?.stratoTokenAmount || '0'),
       width: 80,
     },
     {
       title: 'Status',
       key: 'withdrawalStatus',
       render: (_: any, record: any) => {
-        const statusStr = record?.status || record?.withdrawalInfo?.bridgeStatus || '0';
+        const statusStr = record?.WithdrawalInfo?.bridgeStatus || '0';
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (

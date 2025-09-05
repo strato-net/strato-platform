@@ -67,42 +67,68 @@ export interface SafeTransactionResult {
   safeTxHash: string;
 }
 
+// Clear types for Safe transaction data
+export interface SafeTransactionData {
+  safeAddress: string;
+  safeTransactionData: any;
+  safeTxHash: string;
+  senderAddress: string;
+  senderSignature: any;
+  nonce: number;
+  externalChainId: number;
+}
+
 export interface AssetInfo {
-  extToken: string;
-  extDecimals: number;
-  enabled: boolean;
-  chainId: string;
+  externalToken: string;
+  externalDecimals: number;
+  permissions: number;
+  externalChainId: string;
 }
 
 export interface PreparedWithdrawal {
-  amount: string;
-  toAddress: string;
+  externalTokenAmount: string;
+  externalRecipient: string;
   type: TxType;
-  tokenAddress: string;
-  chainId: number;
+  externalToken: string;
+  externalChainId: number;
+  withdrawalId: string;
 }
 
 export interface Deposit {
-  srcChainId: string | number;
-  srcTxHash: string;
-  token: string;
-  amount: string;
-  user: string;
-  from: string;
-  extToken: string;
-  extDecimals: number;
-  chainId: string;
-  enabled: boolean;
+  externalChainId: string | number;
+  externalTxHash: string;
+  stratoToken: string;
+  stratoRecipient: string;
+  stratoTokenAmount: string;
+  externalSender: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  externalDecimals: number;
+  depositId: string;
+  mintUSDST: boolean;
   depositRouter: string;
 }
 
 export interface Withdrawal {
-  destChainId: string | number;
-  token: string;
-  dest?: string;
-  destAddress?: string;
-  amount: string | bigint;
-  id?: string;
+
   withdrawalId?: string;
   safeTxHash?: string;
+  externalChainId: string | number;
+  externalRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  stratoSender: string;
+  bridgeStatus: string;
+  mintUSDST: boolean;
+  timestamp: string;
+  requestedAt: string;
+}
+
+export interface ChainInfo {
+  externalChainId: number;
+  depositRouter: string;
+  lastProcessedBlock: string;
+  enabled: boolean;
+  custody: string;
+  chainName: string;
 }

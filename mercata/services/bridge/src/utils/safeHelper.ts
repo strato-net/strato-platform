@@ -14,11 +14,11 @@ import {
   convertDecimals,
   ensureHexPrefix,
   safeChecksum,
-  validateAddress,
   safeToBigInt,
 } from "./utils";
-import { logError } from "./logger";
-import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType } from "../types";
+import { logError, logInfo } from "./logger";
+import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType, SafeTransactionData } from "../types";
+import { retry } from "./api";
 
 // Constants
 const NONCE_CONFLICT_CODES = [409, 422];
@@ -48,10 +48,10 @@ export class CallCache {
 
 export async function getAssetInfoForChain(
   stratoToken: string,
-  chainId: number,
+  externalChainId: number,
   callCache: CallCache,
-): Promise<AssetInfo | null> {
-  const cacheKey = `${stratoToken}-${chainId}`;
+): Promise<AssetInfo> {
+  const cacheKey = `${stratoToken}-${externalChainId}`;
   let assetInfo = callCache.get(cacheKey);
 
   if (!assetInfo) {
@@ -59,17 +59,19 @@ export async function getAssetInfoForChain(
 
     if (
       !assetInfo ||
-      assetInfo.chainId !== chainId.toString() ||
-      !assetInfo.enabled
+      assetInfo.externalChainId !== externalChainId.toString() ||
+      assetInfo.permissions === 0
     ) {
-      return null;
+      throw new Error(
+        `getAssetInfoForChain failed: No external mapping found for token ${stratoToken} on chain ${externalChainId}`
+      );
     }
 
     assetInfo = {
-      extToken: ensureHexPrefix(assetInfo.extToken),
-      extDecimals: parseInt(assetInfo.extDecimals) || STRATO_DECIMALS,
-      enabled: assetInfo.enabled,
-      chainId: assetInfo.chainId,
+      externalToken: ensureHexPrefix(assetInfo.externalToken),
+      externalDecimals: parseInt(assetInfo.externalDecimals) || STRATO_DECIMALS,
+      permissions: assetInfo.permissions,
+      externalChainId: assetInfo.externalChainId,
     };
 
     callCache.set(cacheKey, assetInfo);
@@ -79,112 +81,92 @@ export async function getAssetInfoForChain(
 }
 
 export function buildTxDescriptor(params: {
-  kind: "eth" | "erc20";
-  to: string;
-  amount: string;
-  token?: string;
+  type: "eth" | "erc20";
+  externalRecipient: string;
+  externalTokenAmount: string;
+  externalToken?: string;
   nonce: number;
 }): { transactions: MetaTransactionData[]; options: { nonce: number } } {
-  if (params.kind === "eth") {
+  if (params.type === "eth") {
     return {
       transactions: [
         {
-          to: safeChecksum(params.to),
-          value: params.amount,
+          to: safeChecksum(params.externalRecipient),
+          value: params.externalTokenAmount,
           data: "0x",
           operation: OperationType.Call,
         },
       ],
-      options: { nonce: params.nonce },
+      options: { 
+        nonce: params.nonce
+      },
     };
   }
 
-  const token = params.token!;
-  if (token.toLowerCase() === ZERO_ADDRESS) {
+  const externalToken = params.externalToken!;
+  if (externalToken.toLowerCase() === ZERO_ADDRESS) {
     throw new Error(
-      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' kind instead",
+      "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' type instead",
     );
   }
 
   return {
     transactions: [
       {
-        to: safeChecksum(token),
+        to: safeChecksum(externalToken),
         value: "0",
         data: erc20Interface.encodeFunctionData("transfer", [
-          safeChecksum(params.to),
-          params.amount,
+          safeChecksum(params.externalRecipient),
+          params.externalTokenAmount,
         ]),
         operation: OperationType.Call,
       },
     ],
-    options: { nonce: params.nonce },
+    options: { 
+      nonce: params.nonce
+    },
   };
 }
 
-export function validateAndGroupWithdrawals(
-  withdrawals: Withdrawal[],
-): Map<number, Withdrawal[]> {
-  const grouped = new Map<number, Withdrawal[]>();
-
-  for (const withdrawal of withdrawals) {
-    const chainId = Number(withdrawal.destChainId);
-    const toAddress = withdrawal.dest || withdrawal.destAddress;
-    if (!toAddress || !validateAddress(toAddress)) {
-      logError(
-        "SafeService",
-        new Error(`Invalid destination address: ${toAddress}`),
-        {
-          operation: "validateAndGroupWithdrawals",
-          withdrawalId: withdrawal.id || withdrawal.withdrawalId,
-          address: toAddress,
-        },
-      );
-      continue;
+export function groupByChain<T extends { externalChainId: number | string }>(
+  items: T[],
+): Map<number, T[]> {
+  return items.reduce((grouped, item) => {
+    const externalChainId = Number(item.externalChainId);
+    if (!grouped.has(externalChainId)) {
+      grouped.set(externalChainId, []);
     }
-
-    if (!grouped.has(chainId)) {
-      grouped.set(chainId, []);
-    }
-    grouped.get(chainId)!.push(withdrawal);
-  }
-
-  return grouped;
+    grouped.get(externalChainId)!.push(item);
+    return grouped;
+  }, new Map<number, T[]>());
 }
 
 export async function prepareWithdrawals(
-  chainId: number,
+  externalChainId: number,
   withdrawals: Withdrawal[],
   callCache: CallCache,
 ): Promise<PreparedWithdrawal[]> {
   const preparationPromises = withdrawals.map(async (withdrawal) => {
     const assetInfo = await getAssetInfoForChain(
-      withdrawal.token,
-      chainId,
+      withdrawal.stratoToken,
+      externalChainId,
       callCache,
     );
-    if (!assetInfo) {
-      throw new Error(
-        `No external mapping found for token ${withdrawal.token} on chain ${chainId}`,
-      );
-    }
 
-    const isEth = assetInfo.extToken.toLowerCase() === ZERO_ADDRESS;
-    const type: TxType = isEth ? "eth" : "erc20";
-    const tokenAddress = isEth ? ZERO_ADDRESS : assetInfo.extToken;
-
-    const amount = convertDecimals(
-      withdrawal.amount.toString(),
+    const isEth = assetInfo.externalToken.toLowerCase() === ZERO_ADDRESS;
+    const externalTokenAmount = convertDecimals(
+      withdrawal.stratoTokenAmount.toString(),
       STRATO_DECIMALS,
-      assetInfo.extDecimals,
+      assetInfo.externalDecimals,
     ).toString();
 
     return {
-      amount,
-      toAddress: withdrawal.dest || withdrawal.destAddress!,
-      type,
-      tokenAddress,
-      chainId,
+      externalTokenAmount,
+      externalRecipient: withdrawal.externalRecipient,
+      type: (isEth ? "eth" : "erc20") as TxType,
+      externalToken: isEth ? ZERO_ADDRESS : assetInfo.externalToken,
+      externalChainId,
+      withdrawalId: withdrawal.withdrawalId!,
     };
   });
 
@@ -198,9 +180,9 @@ export async function prepareWithdrawals(
       // Log the error but don't fail the entire batch
       logError("SafeService", result.reason as Error, {
         operation: "prepareWithdrawals",
-        withdrawalId: withdrawals[index].id || withdrawals[index].withdrawalId,
-        token: withdrawals[index].token,
-        chainId,
+        withdrawalId: withdrawals[index].withdrawalId,
+        token: withdrawals[index].stratoToken,
+        externalChainId,
       });
     }
   });
@@ -216,53 +198,34 @@ export function isNonceConflict(err: any): boolean {
   );
 }
 
-export async function proposeWithRetry(
-  apiKit: any,
-  protocolKit: any,
-  descriptor: { transactions: any[]; options: { nonce: number } },
-  safeAddress: string,
-  relayer: string,
-): Promise<{ safeTxHash: string }> {
-  try {
-    const safeTransaction = await protocolKit.createTransaction(descriptor);
-    const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
-    const signature = await protocolKit.signHash(safeTxHash);
-
-    await apiKit.proposeTransaction({
-      safeAddress,
-      safeTransactionData: safeTransaction.data,
-      safeTxHash,
-      senderAddress: relayer,
-      senderSignature: signature.data,
-    });
-
-    return { safeTxHash };
-  } catch (e: any) {
-    if (!isNonceConflict(e)) throw e;
-
-    const retryNonce: number = Number(await apiKit.getNextNonce(safeAddress));
-    if (retryNonce === descriptor.options.nonce) throw e;
-
-    const retryDescriptor = {
-      ...descriptor,
-      options: { nonce: retryNonce },
-    };
-
-    const retryTransaction =
-    await protocolKit.createTransaction(retryDescriptor);
-    const retryHash = await protocolKit.getTransactionHash(retryTransaction);
-    const retrySignature = await protocolKit.signHash(retryHash);
-
-    await apiKit.proposeTransaction({
-      safeAddress,
-      safeTransactionData: retryTransaction.data,
-      safeTxHash: retryHash,
-      senderAddress: relayer,
-      senderSignature: retrySignature.data,
-    });
-
-    return { safeTxHash: retryHash };
+export async function proposeTransactions(
+  transactions: SafeTransactionData[],
+  chainId: number,
+): Promise<void> {
+  const { apiKit } = await initializeSafeForChain(chainId);
+  
+  let successful = 0;
+  let failed = 0;
+  
+  for (const tx of transactions) {
+    try {
+      await retry(
+        () => apiKit.proposeTransaction(tx),
+        { logPrefix: "SafeService" }
+      );
+      successful++;
+    } catch (error) {
+      logError("SafeService", error as Error, {
+        operation: "proposeTransaction",
+        safeTxHash: tx.safeTxHash,
+        nonce: tx.nonce,
+        chainId,
+      });
+      failed++;
+    }
   }
+  
+  logInfo("SafeService", `Proposed transactions for chain ${chainId}: ${successful} successful, ${failed} failed out of ${transactions.length} total`);
 }
 
 export async function initializeSafeForChain(chainId: number) {
@@ -277,54 +240,52 @@ export async function initializeSafeForChain(chainId: number) {
   return { protocolKit, apiKit };
 }
 
-export async function processChainWithdrawals(
-  chainId: number,
+export async function createWithdrawalProposals(
+  externalChainId: number,
   withdrawals: Withdrawal[],
   callCache: CallCache,
-): Promise<{ safeTxHash: string; nonce: number }[]> {
-  const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
+): Promise<SafeTransactionData[]> {
+  const { protocolKit, apiKit } = await initializeSafeForChain(externalChainId);
   const preparedWithdrawals = await prepareWithdrawals(
-    chainId,
+    externalChainId,
     withdrawals,
     callCache,
   );
 
-  return await proposeChainTransactions(
-    protocolKit,
-    apiKit,
-    preparedWithdrawals,
-  );
-}
-
-export async function proposeChainTransactions(
-  protocolKit: any,
-  apiKit: any,
-  preparedWithdrawals: PreparedWithdrawal[],
-): Promise<{ safeTxHash: string; nonce: number }[]> {
-  const safeTxs: { safeTxHash: string; nonce: number }[] = [];
+  const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
   const relayer = config.safe.safeOwnerAddress || "";
-  let nonce: number = Number(await apiKit.getNextNonce(safeAddress));
+  let currentNonce = Number(await retry(
+    () => apiKit.getNextNonce(safeAddress),
+    { logPrefix: "SafeService" }
+  ));
 
   for (const prepared of preparedWithdrawals) {
+    const nonce = currentNonce++;
     const descriptor = buildTxDescriptor({
-      kind: prepared.type,
-      to: prepared.toAddress,
-      amount: prepared.amount,
-      token: prepared.type === "erc20" ? prepared.tokenAddress : undefined,
+      type: prepared.type,
+      externalRecipient: prepared.externalRecipient,
+      externalTokenAmount: prepared.externalTokenAmount,
+      externalToken: prepared.type === "erc20" ? prepared.externalToken : undefined,
       nonce,
     });
 
-    const { safeTxHash } = await proposeWithRetry(
-      apiKit,
-      protocolKit,
-      descriptor,
+    const safeTransaction = await protocolKit.createTransaction(descriptor);
+    const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
+    const signature = await protocolKit.signHash(safeTxHash);
+
+    logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${prepared.withdrawalId}`);
+
+    transactionProposals.push({
       safeAddress,
-      relayer,
-    );
-    safeTxs.push({ safeTxHash, nonce });
-    nonce += 1;
+      safeTransactionData: safeTransaction.data,
+      safeTxHash,
+      senderAddress: relayer,
+      senderSignature: signature.data,
+      nonce,
+      externalChainId: prepared.externalChainId,
+    });
   }
 
-  return safeTxs;
+  return transactionProposals;
 }

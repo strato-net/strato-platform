@@ -211,6 +211,7 @@ function generateBatchCalls() {
       args: {
         tokenBAmount: config.tokenBMintAmount,
         maxTokenAAmount: config.tokenAMintAmount,
+        deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
       },
     });
   }

@@ -1,75 +1,55 @@
 import SafeApiKit from "@safe-global/api-kit";
 import { logError, logInfo } from "../utils/logger";
-import { SafeTransactionResult, NonEmptyArray, Withdrawal } from "../types";
+import { NonEmptyArray, Withdrawal, SafeTransactionData } from "../types";
 import {
   CallCache,
-  validateAndGroupWithdrawals,
-  processChainWithdrawals,
-  initializeSafeForChain,
+  groupByChain,
+  createWithdrawalProposals,
+  proposeTransactions,
 } from "../utils/safeHelper";
+import { retry } from "../utils/api";
 import { config } from "../config";
 
-export const createSafeTransactionsForWithdrawals = async (
+export const createSafeTransactions = async (
   withdrawals: NonEmptyArray<Withdrawal>,
-): Promise<{ safeTxHash: string; nonce: number }[]> => {
-  const withdrawalsByChain = validateAndGroupWithdrawals(withdrawals);
+): Promise<SafeTransactionData[]> => {
+  const withdrawalsByChain = groupByChain(withdrawals);
   const callCache = new CallCache();
 
-  const allSafeTxs: { safeTxHash: string; nonce: number }[] = [];
+  const allTransactionProposals: SafeTransactionData[] = [];
 
-  for (const [chainId, chainWithdrawals] of withdrawalsByChain) {
-    const chainSafeTxs = await processChainWithdrawals(
-      chainId,
+  for (const [externalChainId, chainWithdrawals] of withdrawalsByChain) {
+    const chainProposals = await createWithdrawalProposals(
+      externalChainId,
       chainWithdrawals,
       callCache,
     );
-    allSafeTxs.push(...chainSafeTxs);
+    allTransactionProposals.push(...chainProposals);
   }
 
   logInfo(
     "SafeService",
-    `Created ${allSafeTxs.length} Safe transactions for ${withdrawals.length} withdrawals`,
+    `Created ${allTransactionProposals.length} Safe transaction proposals for ${withdrawals.length} withdrawals`,
   );
 
-  return allSafeTxs;
+  return allTransactionProposals;
 };
 
-export const createRejectionTransaction = async (
-  chainId: number,
-  nonce: number,
+export const proposeSafeTransactions = async (
+  transactionProposals: NonEmptyArray<SafeTransactionData>,
 ): Promise<void> => {
-  const { protocolKit, apiKit } = await initializeSafeForChain(chainId);
-  const safeAddress = config.safe.address || "";
-  const relayer = config.safe.safeOwnerAddress || "";
+  const proposalsByChain = groupByChain(transactionProposals);
   
-  const rejectionTransaction = await protocolKit.createRejectionTransaction(nonce);
-  const rejectionHash = await protocolKit.getTransactionHash(rejectionTransaction);
-  const signature = await protocolKit.signHash(rejectionHash);
-  
-  const proposalData = {
-    safeAddress,
-    safeTransactionData: rejectionTransaction.data,
-    safeTxHash: rejectionHash,
-    senderAddress: relayer,
-    senderSignature: signature.data,
-  };
-  
-  // Retry once on failure
-  try {
-    await apiKit.proposeTransaction(proposalData);
-  } catch {
-    await apiKit.proposeTransaction(proposalData);
+  for (const [externalChainId, chainProposals] of proposalsByChain) {
+    await proposeTransactions(chainProposals, externalChainId);
   }
   
-  logInfo(
-    "SafeService",
-    `Created rejection transaction for Safe ${safeAddress} with nonce ${nonce}`,
-  );
+  logInfo("SafeService", `Proposed ${transactionProposals.length} Safe transactions across ${proposalsByChain.size} chains`);
 };
 
-export const monitorSafeTransactionStatus = async (
+export const checkSafeTxStatus = async (
   transactionKey: string,
-  chainId: bigint,
+  apiKit: SafeApiKit,
 ): Promise<"executed" | "rejected" | "pending"> => {
   if (!transactionKey) return "pending";
 
@@ -78,14 +58,19 @@ export const monitorSafeTransactionStatus = async (
     : `0x${transactionKey}`;
 
   try {
-    const apiKit = new SafeApiKit({ chainId });
-    const tx = await apiKit.getTransaction(safeTxHash);
+    const tx = await retry(
+      () => apiKit.getTransaction(safeTxHash),
+      { logPrefix: "SafeService" }
+    );
 
-    if (tx.isExecuted) return "executed";
+    if (tx.isExecuted && tx.isSuccessful) return "executed";
 
-    const allTxs = await apiKit.getMultisigTransactions(tx.safe, {
-      nonce: tx.nonce,
-    } as any);
+    const allTxs = await retry(
+      () => apiKit.getMultisigTransactions(config.safe.address!, {
+        nonce: tx.nonce,
+      } as any),
+      { logPrefix: "SafeService" }
+    );
 
     const executedTx = (allTxs as any)?.results?.find(
       (m: any) => m?.nonce === tx.nonce && m?.isExecuted,
@@ -98,12 +83,40 @@ export const monitorSafeTransactionStatus = async (
     return "pending";
   } catch (e) {
     logError("SafeService", e as Error, {
-      operation: "monitorSafeTransactionStatus",
+      operation: "checkSafeTxStatus",
       safeTxHash,
-      chainId: chainId.toString(),
     });
     return "pending";
   }
 };
 
-export default { createSafeTransactionsForWithdrawals };
+export const monitorSafeTransactionStatusBatch = async (
+  withdrawals: NonEmptyArray<Withdrawal & { safeTxHash: string }>,
+  chainId: bigint
+): Promise<Map<string, "executed" | "rejected" | "pending">> => {
+  const results = new Map<string, "executed" | "rejected" | "pending">();
+  
+  if (!withdrawals.length) return results;
+
+  const apiKit = new SafeApiKit({ chainId });
+
+  // Process all withdrawals for this chain in parallel using the shared API kit
+  const chainResults = await Promise.all(
+    withdrawals.map(async (withdrawal) => {
+      const withdrawalId = String(withdrawal.withdrawalId);
+      const safeTxHash = withdrawal.safeTxHash;
+      
+      const status = await checkSafeTxStatus(safeTxHash, apiKit);
+      return { withdrawalId, status };
+    })
+  );
+
+  // Add results to the main results map
+  chainResults.forEach(({ withdrawalId, status }) => {
+    results.set(withdrawalId, status);
+  });
+
+  return results;
+};
+
+export default { createSafeTransactions, proposeSafeTransactions, monitorSafeTransactionStatusBatch };
