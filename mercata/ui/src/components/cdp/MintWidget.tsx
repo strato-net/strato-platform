@@ -418,10 +418,11 @@ const MintWidget: React.FC = () => {
       return;
     }
 
-    if (borAmount <= 0) {
+    // Minting is now optional - only validate if user entered an amount
+    if (borAmount < 0) {
       toast({
         title: "Invalid Borrow Amount", 
-        description: "Please enter a valid amount to mint",
+        description: "Borrow amount cannot be negative",
         variant: "destructive",
       });
       return;
@@ -436,16 +437,24 @@ const MintWidget: React.FC = () => {
         throw new Error(`Deposit failed with status: ${depositResult.status}`);
       }
 
-      // Then mint USDST
-      const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
-      
-      if (mintResult.status.toLowerCase() !== "success") {
-        throw new Error(`Mint failed with status: ${mintResult.status}`);
+      let finalResult = depositResult;
+      let successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
+
+      // Only mint if user specified an amount > 0
+      if (borAmount > 0) {
+        const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
+        
+        if (mintResult.status.toLowerCase() !== "success") {
+          throw new Error(`Mint failed with status: ${mintResult.status}`);
+        }
+        
+        finalResult = mintResult;
+        successMessage += ` and minted ${formatNumber(parseFloat(borrowAmount))} USDST`;
       }
 
       toast({
         title: "Vault Created Successfully",
-        description: `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol} and minted ${formatNumber(parseFloat(borrowAmount))} USDST. Tx: ${mintResult.hash}`,
+        description: `${successMessage}. Tx: ${finalResult.hash}`,
       });
 
       // Reset form
@@ -544,7 +553,7 @@ const MintWidget: React.FC = () => {
         {/* Mint */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Mint</h3>
+            <h3 className="font-semibold">Mint <span className="text-sm text-gray-500 font-normal">(Optional)</span></h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
                 Max: ${formatNumber(maxBorrowable)} (~{formatNumber(depositAsset.liquidationRatio * 1.01, 0)}% CR)
@@ -561,7 +570,7 @@ const MintWidget: React.FC = () => {
               className={`flex-1 text-right ${isMintMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={borrowAmount}
               onChange={(e) => handleBorrowAmountChange(e.target.value)}
-              placeholder="0.0"
+              placeholder="0.0 (optional)"
               type="number"
               step="any"
               readOnly={isMintMaxEnabled}
