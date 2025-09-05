@@ -329,16 +329,39 @@ const MintWidget: React.FC = () => {
       setIsDepositMaxEnabled(false);
       setDepositAmount("0");
     } else {
-      // Enable MAX and set to user's full balance
+      // Enable MAX and set to user's full balance (formatted for input)
       setIsDepositMaxEnabled(true);
-      setDepositAmount(userDepositBalance);
+      if (depositAsset && userDepositBalance && parseFloat(userDepositBalance) > 0) {
+        // Get token info to determine decimals for proper conversion
+        const userToken = activeTokens.find(token => 
+          token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
+        );
+        const decimals = userToken?.token.customDecimals || depositAsset.collateralAmountDecimals || 18;
+        
+        // Convert from wei to decimal format for display in input
+        const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
+        setDepositAmount(formattedBalance);
+      } else {
+        setDepositAmount("0");
+      }
     }
   };
 
   // Handle manual input change for deposit amount
   const handleDepositAmountChange = (value: string) => {
     // Check if user manually typed the max deposit amount
-    const isTypingMaxAmount = Math.abs(parseFloat(value || "0") - parseFloat(userDepositBalance)) < 0.000001 && parseFloat(userDepositBalance) > 0;
+    let isTypingMaxAmount = false;
+    if (depositAsset && userDepositBalance && parseFloat(userDepositBalance) > 0) {
+      // Get token info to determine decimals for proper conversion
+      const userToken = activeTokens.find(token => 
+        token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
+      );
+      const decimals = userToken?.token.customDecimals || depositAsset.collateralAmountDecimals || 18;
+      
+      // Convert balance to decimal for comparison
+      const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
+      isTypingMaxAmount = Math.abs(parseFloat(value || "0") - parseFloat(formattedBalance)) < 0.000001;
+    }
     
     if (isTypingMaxAmount && !isDepositMaxEnabled) {
       // User typed the max amount, activate MAX styling
