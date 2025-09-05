@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -25,6 +25,9 @@ export const constants = (() => {
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
   const MercataBridge = `${CONTRACT_PREFIX}MercataBridge`;
+  const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
+  const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
+  const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const Event = "event";
   
   const tokenSelectFields = [
@@ -84,6 +87,32 @@ export const constants = (() => {
     "liquidityPool:liquidityPool_fkey(address)",
   ];
 
+  const cdpRegistrySelectFields = [
+    "address",
+    "feeCollector",
+    "tokenFactory", 
+    "usdst",
+    "cdpEngine:cdpEngine_fkey(" +
+      "address," +
+      "registry," +
+      "globalPaused," +
+      "RAY::text," +
+      "WAD::text," +
+      `collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),` +
+      `collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value),` +
+      `vaults:${CDPEngine}-vaults(user:key,asset:key2,Vault:value),` +
+      `isSupportedAsset:${CDPEngine}-isSupportedAsset(asset:key,value)` +
+    ")",
+    "cdpVault:cdpVault_fkey(" +
+      "address," +
+      "registry" +
+    ")",
+    "priceOracle:priceOracle_fkey(" +
+      "address," +
+      `prices:${PriceOracle}-prices(asset:key,value::text)` +
+    ")",
+  ];
+
   const swapHistorySelectFields = [
     "address",
     "id",
@@ -110,6 +139,7 @@ export const constants = (() => {
     lendingRegistry,
     tokenFactory,
     adminRegistry,
+    cdpRegistry,
     Token,
     TokenFactory,
     LendingPool,
@@ -125,12 +155,16 @@ export const constants = (() => {
     PoolConfigurator,
     AdminRegistry,
     MercataBridge,
+    CDPEngine,
+    CDPVault,
+    CDPRegistry,
     mercataBridge,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
     poolSelectFields,
     registrySelectFields,
+    cdpRegistrySelectFields,
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
