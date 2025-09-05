@@ -12,6 +12,7 @@ import swapRoutes from "./routes/swap.routes";
 import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
+import cdpRoutes from "./routes/cdp.routes";
 
 const router = Router();
 
@@ -47,6 +48,9 @@ router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.se
 
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);
+
+// ----- CDP Routes -----
+router.use("/cdp", cdpRoutes);
 
 // ----- Health Check -----
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
