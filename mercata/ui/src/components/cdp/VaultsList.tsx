@@ -184,17 +184,15 @@ const VaultsList: React.FC = () => {
       }
       
       case 'mint': {
-        // Convert wei strings to decimal numbers for calculations
-        const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
-        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-        const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
-        
-        // Maximum mint while maintaining health factor above 1.5
-        const safeHealthFactor = 1.5;
-        const safeCollateralRatio = position.liquidationRatio * safeHealthFactor;
-        const maxDebtUSD = (currentCollateralUSD * 100) / safeCollateralRatio;
-        const maxMint = Math.max(0, maxDebtUSD - currentDebt);
-        return formatNumber(maxMint);
+        try {
+          // Use the backend endpoint that simulates the contract's mintMax logic
+          const result = await cdpService.getMaxMint(position.asset);
+          // Convert from wei to decimal format (USDST is 18 decimals)
+          return formatWeiToDecimal(result.maxAmount, 18);
+        } catch (error) {
+          console.error("Failed to get max mint amount:", error);
+          return "0";
+        }
       }
       
       case 'repay': {
@@ -316,7 +314,12 @@ const VaultsList: React.FC = () => {
           }
           break;
         case 'mint':
-          result = await cdpService.mint(asset, amount);
+          // If user is in max state, use mintMax endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.mintMax(asset);
+          } else {
+            result = await cdpService.mint(asset, amount);
+          }
           break;
         case 'repay':
           // If user is in max state, use repayAll endpoint

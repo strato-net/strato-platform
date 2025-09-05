@@ -8,6 +8,7 @@ import {
   getMaxWithdraw,
   withdrawMax,
   mint,
+  getMaxMint,
   mintMax,
   repay,
   repayAll,
@@ -111,6 +112,21 @@ class CDPController {
       const { accessToken, address: userAddress, body } = req;
       validateWithdrawMaxArgs(body);
       const result = await withdrawMax(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMaxMint(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      validateMintMaxArgs(body);
+      const result = await getMaxMint(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

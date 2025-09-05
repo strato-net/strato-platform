@@ -87,6 +87,12 @@ export const cdpService = {
     return response.data;
   },
 
+  // Get maximum mintable amount (simulation)
+  async getMaxMint(asset: string): Promise<{ maxAmount: string }> {
+    const response = await api.post("/cdp/get-max-mint", { asset });
+    return response.data;
+  },
+
   // Mint USDST
   async mint(asset: string, amount: string): Promise<TransactionResponse> {
     const amountWei = parseUnits(amount, 18).toString(); // USDST is always 18 decimals

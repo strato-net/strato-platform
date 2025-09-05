@@ -483,6 +483,119 @@ export const withdrawMax = async (
   );
 };
 
+export const getMaxMint = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string }
+): Promise<{ maxAmount: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Find the specific vault from registry data
+  const allVaults = registry.cdpEngine.vaults || [];
+  const vaultEntry = allVaults.find(
+    (v: any) => 
+      v.user?.toLowerCase() === userAddress.toLowerCase() &&
+      v.asset?.toLowerCase() === body.asset.toLowerCase()
+  );
+
+  if (!vaultEntry) {
+    return { maxAmount: "0" };
+  }
+
+  const vault = vaultEntry.Vault;
+  if (!vault) {
+    return { maxAmount: "0" };
+  }
+
+  // Get asset config and global state
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralConfig;
+  
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset config or global state not found");
+  }
+
+  // Calculate current debt (simulating _accrue effect)
+  const scaledDebt = BigInt(vault.scaledDebt || "0");
+  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const currentDebt = (scaledDebt * currentRateAccumulator) / RAY;
+
+  // Get price from oracle
+  const priceEntry = registry.priceOracle?.prices?.find(
+    (p: any) => p.asset.toLowerCase() === body.asset.toLowerCase()
+  );
+
+  if (!priceEntry) {
+    throw new Error("Price not found for asset");
+  }
+
+  const price = BigInt(priceEntry.value || "0");
+  
+  if (price <= 0n) {
+    throw new Error("Invalid price");
+  }
+
+  // Compute borrow headroom from collateral value and liquidation ratio
+  const collateralAmount = BigInt(vault.collateral || "0");
+  const liquidationRatio = BigInt(config.liquidationRatio);
+  const unitScale = BigInt(config.unitScale);
+  
+  const collateralValueUSD = (collateralAmount * price) / unitScale;
+  const maxBorrowableUSD = (collateralValueUSD * WAD) / liquidationRatio;
+
+  let maxAmount: bigint;
+
+  if (maxBorrowableUSD <= currentDebt) {
+    // No borrowing power
+    maxAmount = 0n;
+  } else {
+    const available = maxBorrowableUSD - currentDebt;
+    // Apply 1 wei buffer to avoid rounding into liquidation edge
+    maxAmount = available > 1n ? (available - 1n) : 0n;
+  }
+
+  // Check debt ceiling constraint
+  if (maxAmount > 0n && config.debtCeiling && BigInt(config.debtCeiling) > 0n) {
+    const assetDebtUSD = (BigInt(globalState.totalScaledDebt) * currentRateAccumulator) / RAY;
+    const debtCeiling = BigInt(config.debtCeiling);
+    
+    if (assetDebtUSD + maxAmount > debtCeiling) {
+      maxAmount = debtCeiling > assetDebtUSD ? debtCeiling - assetDebtUSD : 0n;
+    }
+  }
+
+  // Check debt floor constraint (if user would have debt after minting)
+  if (maxAmount > 0n && config.debtFloor && BigInt(config.debtFloor) > 0n) {
+    const totalDebtAfter = currentDebt + maxAmount;
+    const debtFloor = BigInt(config.debtFloor);
+    
+    if (totalDebtAfter < debtFloor) {
+      // If adding maxAmount would still be below floor, check if we can mint enough to reach floor
+      if (currentDebt === 0n && maxAmount >= debtFloor) {
+        // No current debt, can mint at least to floor
+        maxAmount = maxAmount; // Keep the calculated max
+      } else if (currentDebt > 0n) {
+        // Already have debt, any amount should be fine
+        maxAmount = maxAmount; // Keep the calculated max
+      } else {
+        // Cannot reach debt floor with available borrowing power
+        maxAmount = 0n;
+      }
+    }
+  }
+
+  return { maxAmount: maxAmount.toString() };
+};
+
 export const mint = async (
   accessToken: string,
   userAddress: string,
