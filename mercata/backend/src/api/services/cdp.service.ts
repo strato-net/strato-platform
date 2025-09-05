@@ -8,7 +8,6 @@ import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
-import { formatUnits, parseUnits } from "ethers";
 
 // Extract constants for consistency with lending service
 const {
@@ -330,12 +329,8 @@ export const deposit = async (
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
-
-  // Get token info to determine decimals for proper conversion
-  const tokenInfo = await getTokenInfo(accessToken, body.asset);
   
-  // Convert decimal amount to wei format (CRITICAL: prevents financial loss)
-  const amountWei = parseUnits(body.amount, tokenInfo.decimals).toString();
+  const amountWei = body.amount;
 
   const tx: FunctionInput[] = [
     {
@@ -368,11 +363,7 @@ export const withdraw = async (
     throw new Error("CDP Engine not found");
   }
 
-  // Get token info to determine decimals for proper conversion
-  const tokenInfo = await getTokenInfo(accessToken, body.asset);
-  
-  // Convert decimal amount to wei format (CRITICAL: prevents financial loss)
-  const amountWei = parseUnits(body.amount, tokenInfo.decimals).toString();
+  const amountWei = body.amount;
 
   return await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
@@ -416,8 +407,7 @@ export const mint = async (
     throw new Error("CDP Engine not found");
   }
 
-  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
-  const amountWei = parseUnits(body.amount, 18).toString();
+  const amountWei = body.amount;
 
 
   return await postAndWaitForTx(accessToken, () =>
@@ -469,8 +459,7 @@ export const repay = async (
     throw new Error("USDST token not found in registry");
   }
 
-  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
-  const amountWei = parseUnits(body.amount, 18).toString();
+  const amountWei = body.amount;
 
   const tx: FunctionInput[] = [
     {
@@ -550,8 +539,7 @@ export const liquidate = async (
     throw new Error("USDST token not found in registry");
   }
 
-  // Convert decimal amount to wei format - USDST is always 18 decimals (CRITICAL: prevents financial loss)
-  const debtToCoverWei = parseUnits(body.debtToCover, 18).toString();
+  const debtToCoverWei = body.debtToCover;
 
   const tx: FunctionInput[] = [
     {

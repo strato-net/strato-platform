@@ -1,4 +1,15 @@
 import { api } from "@/lib/axios";
+import { parseUnits } from "ethers";
+
+// Helper function to get asset decimals
+const getAssetDecimals = async (asset: string): Promise<number> => {
+  try {
+    const assetConfig = await cdpService.getAssetConfig(asset);
+    return 18; // Default to 18 decimals for now, could be enhanced to get actual decimals from token contract
+  } catch {
+    return 18; // Fallback to 18 decimals
+  }
+};
 
 export interface VaultData {
   asset: string;                               // Collateral asset address
@@ -50,13 +61,17 @@ export const cdpService = {
 
   // Deposit collateral
   async deposit(asset: string, amount: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/deposit", { asset, amount });
+    const decimals = await getAssetDecimals(asset);
+    const amountWei = parseUnits(amount, decimals).toString();
+    const response = await api.post("/cdp/deposit", { asset, amount: amountWei });
     return response.data;
   },
 
   // Withdraw collateral
   async withdraw(asset: string, amount: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/withdraw", { asset, amount });
+    const decimals = await getAssetDecimals(asset);
+    const amountWei = parseUnits(amount, decimals).toString();
+    const response = await api.post("/cdp/withdraw", { asset, amount: amountWei });
     return response.data;
   },
 
@@ -68,7 +83,8 @@ export const cdpService = {
 
   // Mint USDST
   async mint(asset: string, amount: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/mint", { asset, amount });
+    const amountWei = parseUnits(amount, 18).toString(); // USDST is always 18 decimals
+    const response = await api.post("/cdp/mint", { asset, amount: amountWei });
     return response.data;
   },
 
@@ -80,7 +96,8 @@ export const cdpService = {
 
   // Repay USDST debt
   async repay(asset: string, amount: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/repay", { asset, amount });
+    const amountWei = parseUnits(amount, 18).toString(); // USDST is always 18 decimals
+    const response = await api.post("/cdp/repay", { asset, amount: amountWei });
     return response.data;
   },
 
@@ -92,7 +109,8 @@ export const cdpService = {
 
   // Execute liquidation
   async liquidate(collateralAsset: string, borrower: string, debtToCover: string): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/liquidate", { collateralAsset, borrower, debtToCover });
+    const debtToCoverWei = parseUnits(debtToCover, 18).toString(); // USDST is always 18 decimals
+    const response = await api.post("/cdp/liquidate", { collateralAsset, borrower, debtToCover: debtToCoverWei });
     return response.data;
   },
 
