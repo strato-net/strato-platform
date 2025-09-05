@@ -169,7 +169,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={onBack}>
-            ← Back to Mint
+            ← Back to Borrow
           </Button>
         </div>
         <Card>

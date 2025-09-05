@@ -88,7 +88,7 @@ const VaultsList: React.FC = () => {
   const { activeTokens } = useUserTokens();
   
   // State for active action and input amounts for each position
-  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
+  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
 
@@ -128,7 +128,7 @@ const VaultsList: React.FC = () => {
   }, [toast]);
 
   // Handle dropdown action selection
-  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
     const currentAction = activeActions[asset];
     
     if (currentAction === action) {
@@ -154,7 +154,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
+  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
         // Find the user's balance for this token
@@ -183,14 +183,14 @@ const VaultsList: React.FC = () => {
         }
       }
       
-      case 'mint': {
+      case 'borrow': {
         try {
           // Use the backend endpoint that simulates the contract's mintMax logic
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
           return formatWeiToDecimal(result.maxAmount, 18);
         } catch (error) {
-          console.error("Failed to get max mint amount:", error);
+          console.error("Failed to get max borrow amount:", error);
           return "0";
         }
       }
@@ -207,7 +207,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Handle MAX button click
-  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
     const position = positions.find(p => p.asset === asset);
     if (!position) return;
 
@@ -235,7 +235,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', inputAmount: string) => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
@@ -262,7 +262,7 @@ const VaultsList: React.FC = () => {
         newCollateral = Math.max(0, currentCollateral - amount);
         newCollateralUSD = newCollateral * pricePerUnit;
         break;
-      case 'mint':
+      case 'borrow':
         newDebt = currentDebt + amount;
         newDebtUSD = newDebt; // Assuming 1:1 USD peg for USDST
         break;
@@ -288,7 +288,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Handle action button clicks
-  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
+  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', amount: string) => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "Invalid Amount",
@@ -313,7 +313,7 @@ const VaultsList: React.FC = () => {
             result = await cdpService.withdraw(asset, amount);
           }
           break;
-        case 'mint':
+        case 'borrow':
           // If user is in max state, use mintMax endpoint
           if (maxStates[asset]) {
             result = await cdpService.mintMax(asset);
@@ -384,7 +384,7 @@ const VaultsList: React.FC = () => {
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="text-gray-500 mb-4">No positions found</div>
-            <div className="text-sm text-gray-400">Create your first position by depositing collateral and minting USDST above</div>
+            <div className="text-sm text-gray-400">Create your first position by depositing collateral and borrowing USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -448,8 +448,8 @@ const VaultsList: React.FC = () => {
                     <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'withdraw')}>
                       Withdraw
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'mint')}>
-                      Mint
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'borrow')}>
+                      Borrow
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'repay')}>
                       Repay

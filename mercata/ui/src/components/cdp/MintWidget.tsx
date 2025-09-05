@@ -10,18 +10,18 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 
-/**
- * CDP Mint flow widget - now connected to backend
+  /**
+   * CDP Borrow flow widget - now connected to backend
  * Mirrors basic UX from Spark.fi Easy Borrow screen.
  * Uses real asset configurations from backend API.
  */
-const MintWidget: React.FC = () => {
+const BorrowWidget: React.FC = () => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [depositAsset, setDepositAsset] = useState<AssetConfig | null>(null);
   const [depositAmount, setDepositAmount] = useState("0");
   const [borrowAmount, setBorrowAmount] = useState("0");
   const [loading, setLoading] = useState(false);
-  const [isMintMaxEnabled, setIsMintMaxEnabled] = useState(false);
+  const [isBorrowMaxEnabled, setIsBorrowMaxEnabled] = useState(false);
   const [isDepositMaxEnabled, setIsDepositMaxEnabled] = useState(false);
   const [isRatioLocked, setIsRatioLocked] = useState(false);
   const [lockedCR, setLockedCR] = useState<number | null>(null);
@@ -239,23 +239,23 @@ const MintWidget: React.FC = () => {
   // Update max borrowable amount display when collateral amount changes
   useEffect(() => {
 
-    // Check if current mint amount equals max borrowable (within tolerance)
-    const currentMintAmount = parseFloat(borrowAmount);
-    const isCurrentlyMaxAmount = Math.abs(currentMintAmount - maxBorrowable) < 0.01 && maxBorrowable > 0;
+    // Check if current borrow amount equals max borrowable (within tolerance)
+    const currentBorrowAmount = parseFloat(borrowAmount);
+    const isCurrentlyMaxAmount = Math.abs(currentBorrowAmount - maxBorrowable) < 0.01 && maxBorrowable > 0;
     
-    if (isCurrentlyMaxAmount && !isMintMaxEnabled) {
+    if (isCurrentlyMaxAmount && !isBorrowMaxEnabled) {
       // Current amount equals max, activate MAX styling
-      setIsMintMaxEnabled(true);
-    } else if (!isCurrentlyMaxAmount && isMintMaxEnabled) {
+      setIsBorrowMaxEnabled(true);
+    } else if (!isCurrentlyMaxAmount && isBorrowMaxEnabled) {
       // Current amount doesn't equal max, but MAX is still enabled from manual typing
       // Don't disable here to avoid flicker - let handleBorrowAmountChange handle it
     }
 
-    // Only auto-update when MAX is enabled - no other automatic mint amount setting
-    if (isMintMaxEnabled && maxBorrowable > 0) {
+    // Only auto-update when MAX is enabled - no other automatic borrow amount setting
+    if (isBorrowMaxEnabled && maxBorrowable > 0) {
       setBorrowAmount(maxBorrowable.toFixed(2));
     }
-  }, [maxBorrowable, isMintMaxEnabled, depositAsset, depositAmount, isRatioLocked, lockedCR, borrowAmount]);
+  }, [maxBorrowable, isBorrowMaxEnabled, depositAsset, depositAmount, isRatioLocked, lockedCR, borrowAmount]);
 
   // Fetch existing vault collateral when asset changes
   useEffect(() => {
@@ -281,9 +281,9 @@ const MintWidget: React.FC = () => {
     fetchExistingVault();
   }, [depositAsset]);
 
-  // Reset mint MAX state and ratio lock when deposit asset changes
+  // Reset borrow MAX state and ratio lock when deposit asset changes
   useEffect(() => {
-    setIsMintMaxEnabled(false);
+    setIsBorrowMaxEnabled(false);
     setIsDepositMaxEnabled(false);
     setBorrowAmount("0");
     setDepositAmount("0");
@@ -291,15 +291,15 @@ const MintWidget: React.FC = () => {
     setLockedCR(null);
   }, [depositAsset]);
 
-  // Handle MAX button click for mint amount
-  const handleMintMaxClick = () => {
-    if (isMintMaxEnabled) {
+  // Handle MAX button click for borrow amount
+  const handleBorrowMaxClick = () => {
+    if (isBorrowMaxEnabled) {
       // Disable MAX and clear amount
-      setIsMintMaxEnabled(false);
+      setIsBorrowMaxEnabled(false);
       setBorrowAmount("0");
     } else {
       // Enable MAX and set to max borrowable
-      setIsMintMaxEnabled(true);
+      setIsBorrowMaxEnabled(true);
       setBorrowAmount(maxBorrowable.toFixed(2));
       // Lock the ratio when MAX is used
       if (maxBorrowable > 0 && depositAsset) {
@@ -318,22 +318,22 @@ const MintWidget: React.FC = () => {
     // Check if user manually typed the max amount
     const isTypingMaxAmount = Math.abs(parseFloat(value) - maxBorrowable) < 0.01 && maxBorrowable > 0;
     
-    if (isTypingMaxAmount && !isMintMaxEnabled) {
+    if (isTypingMaxAmount && !isBorrowMaxEnabled) {
       // User typed the max amount, activate MAX styling
-      setIsMintMaxEnabled(true);
-    } else if (!isTypingMaxAmount && isMintMaxEnabled) {
+      setIsBorrowMaxEnabled(true);
+    } else if (!isTypingMaxAmount && isBorrowMaxEnabled) {
       // User changed away from max amount, disable MAX styling
-      setIsMintMaxEnabled(false);
+      setIsBorrowMaxEnabled(false);
     }
     
-    // Validate mint amount doesn't violate minimum CR requirement
+    // Validate borrow amount doesn't violate minimum CR requirement
     if (parseFloat(value) > 0 && depositAsset) {
       const debtAmount = parseFloat(value);
       const totalCollateralValueUSD = getTotalCollateralValue();
       
       if (totalCollateralValueUSD > 0) {
         const newCR = (totalCollateralValueUSD / debtAmount) * 100;
-        // Prevent mint amount that would result in CR below minimum using dynamic config
+        // Prevent borrow amount that would result in CR below minimum using dynamic config
         if (newCR < sliderConfig.min) {
           const maxAllowedDebt = (totalCollateralValueUSD * 100) / sliderConfig.min;
           setBorrowAmount(maxAllowedDebt.toFixed(2));
@@ -346,8 +346,8 @@ const MintWidget: React.FC = () => {
     
     setBorrowAmount(value);
     
-    // When mint amount changes, update the slider to reflect new CR
-    // Calculate new CR based on total collateral and new mint amount
+    // When borrow amount changes, update the slider to reflect new CR
+    // Calculate new CR based on total collateral and new borrow amount
     if (parseFloat(value) > 0) {
       const debtAmount = parseFloat(value);
       const totalCollateralValueUSD = getTotalCollateralValue();
@@ -422,8 +422,8 @@ const MintWidget: React.FC = () => {
     // Deposit is only affected by user input - never by slider or other inputs
     setDepositAmount(value);
     
-    // Deposit changes don't affect slider or mint amount
-    // Users must manually adjust mint or use slider for ratio control
+    // Deposit changes don't affect slider or borrow amount
+    // Users must manually adjust borrow or use slider for ratio control
   };
 
   // Handle CR slider changes
@@ -442,7 +442,7 @@ const MintWidget: React.FC = () => {
     // Enforce minimum CR constraint using dynamic slider config
     const effectiveTargetCR = Math.max(targetCR, sliderConfig.min);
     
-    // Calculate mint amount based on effective target CR and total collateral
+    // Calculate borrow amount based on effective target CR and total collateral
     // CR = (total collateral value / debt value) * 100
     // So debt value = (total collateral value * 100) / CR
     const newDebtAmount = (totalCollateralValueUSD * 100) / effectiveTargetCR;
@@ -454,8 +454,8 @@ const MintWidget: React.FC = () => {
     setLockedCR(effectiveTargetCR);
     
     // Disable MAX if it was enabled
-    if (isMintMaxEnabled) {
-      setIsMintMaxEnabled(false);
+    if (isBorrowMaxEnabled) {
+      setIsBorrowMaxEnabled(false);
     }
   };
 
@@ -526,13 +526,13 @@ const MintWidget: React.FC = () => {
       }
 
       // Borrowing is required (already validated above)
-      const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
+      const borrowResult = await cdpService.mint(depositAsset.asset, borrowAmount);
       
-      if (mintResult.status.toLowerCase() !== "success") {
-        throw new Error(`Borrow failed with status: ${mintResult.status}`);
+      if (borrowResult.status.toLowerCase() !== "success") {
+        throw new Error(`Borrow failed with status: ${borrowResult.status}`);
       }
 
-      finalResult = mintResult;
+      finalResult = borrowResult;
       if (depAmount > 0) {
         successMessage += ` and borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
       } else {
@@ -654,19 +654,19 @@ const MintWidget: React.FC = () => {
 
           <div className="flex items-center gap-3">
             <Input
-              className={`flex-1 text-right ${isMintMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
+              className={`flex-1 text-right ${isBorrowMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={borrowAmount}
               onChange={(e) => handleBorrowAmountChange(e.target.value)}
               placeholder="0.0"
               type="number"
               step="any"
-              readOnly={isMintMaxEnabled}
+              readOnly={isBorrowMaxEnabled}
             />
             <Button 
-              variant={isMintMaxEnabled ? "default" : "outline"}
+              variant={isBorrowMaxEnabled ? "default" : "outline"}
               size="sm" 
-              className={`min-w-[50px] ${isMintMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-              onClick={handleMintMaxClick}
+              className={`min-w-[50px] ${isBorrowMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+              onClick={handleBorrowMaxClick}
               disabled={maxBorrowable <= 0}
             >
               MAX
@@ -777,4 +777,4 @@ const MintWidget: React.FC = () => {
   );
 };
 
-export default MintWidget;
+export default BorrowWidget;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import CDPMintWidget from '@/components/cdp/MintWidget';
+import CDPBorrowWidget from '@/components/cdp/MintWidget';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
@@ -60,7 +60,7 @@ const ExchangeCart = () => {
               </div>
               
               <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-                <CDPMintWidget />
+                <CDPBorrowWidget />
               </div>
               <VaultsList />
             </div>
