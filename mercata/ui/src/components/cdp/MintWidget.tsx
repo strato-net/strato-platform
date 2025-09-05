@@ -655,6 +655,15 @@ const MintWidget: React.FC = () => {
             .cr-slider-dangerous [data-orientation="horizontal"] {
               background-color: #fecaca !important;
             }
+            /* Hide number input arrows */
+            input[type="number"]::-webkit-outer-spin-button,
+            input[type="number"]::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+            }
+            input[type="number"] {
+              -moz-appearance: textfield;
+            }
           `}</style>
           <div className="flex justify-between text-xs text-gray-500">
             <span className="text-orange-500">Min: {formatPercentage(sliderConfig.min, 0)}</span>

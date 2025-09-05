@@ -367,6 +367,17 @@ const VaultsList: React.FC = () => {
         <CardTitle>Your Vaults</CardTitle>
       </CardHeader>
       <CardContent>
+        <style>{`
+          /* Hide number input arrows */
+          input[type="number"]::-webkit-outer-spin-button,
+          input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          input[type="number"] {
+            -moz-appearance: textfield;
+          }
+        `}</style>
         <div className="space-y-4">
           {positions.map((position, index) => {
             const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
