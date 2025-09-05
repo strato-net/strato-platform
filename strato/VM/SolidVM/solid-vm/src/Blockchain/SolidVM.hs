@@ -2937,6 +2937,7 @@ encodeForReturn' (SStruct _ vs) = do
                      . encodeForReturn' =<< forceLoadVar =<< getVar v
   encodedItems <- mapM (uncurry encodePair) $ M.toList vs
   pure $ "{" ++ intercalate "," encodedItems ++ "}"
+encodeForReturn' SNULL = pure "[]"
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
@@ -3444,12 +3445,11 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
       OrderedVals xs -> length xs
       NamedVals xs -> length xs
     testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
-    testMatch tf = do
-      case mapArgs tf of
-        Nothing -> pure Nothing
-        Just argMapping -> sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
-          Just vals' -> pure . Just $ OrderedVals vals'
-          Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
+    testMatch tf = mapArgs tf >>= \case
+      Nothing -> pure Nothing
+      Just argMapping -> sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
+        Just vals' -> pure . Just $ OrderedVals vals'
+        Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
       case unsnoc (map snd (CC._funcArgs tf)) of
@@ -3481,7 +3481,12 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
           if (Just $ V.length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
             then fmap SArray . sequence <$> traverse (fmap (fmap Constant) . marshalValue . (y,) <=< getVar) vs
             else pure Nothing
+        (SArray vs, SVMType.Variadic) -> Just . SVariadic . V.toList <$> traverse getVar vs
         (SVariadic x, SVMType.Variadic) -> pure . Just $ SVariadic x
+        (SVariadic vs, SVMType.Array y ml) ->
+          if (Just $ length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
+            then fmap (SArray . V.fromList . map Constant) . sequence <$> traverse (marshalValue . (y,)) vs
+            else pure Nothing
         (r@(SReference addressedPath), _) -> do
           refType <- getXabiValueType addressedPath
           if (refType == t)
@@ -3491,15 +3496,16 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
               (SVMType.Array x _, SVMType.Array y _) -> pure . bool Nothing (Just r) $ x == y
               _ -> pure Nothing
         _ -> pure Nothing
-    mapArgs :: CC.FuncF a -> Maybe [(String, (SVMType.Type, Value))]
+    mapArgs :: MonadSM m => CC.FuncF a -> m (Maybe [(String, (SVMType.Type, Value))])
     mapArgs theFunc = case argVals of
       OrderedVals vs ->
-        let go [(n, SVMType.Variadic)] [SVariadic args] = Just [(n, (SVMType.Variadic, SVariadic args))]
-            go [(n, SVMType.Variadic)] args = Just [(n, (SVMType.Variadic, SVariadic args))]
+        let go [(n, SVMType.Variadic)] [SVariadic args] = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
+            go [(n, SVMType.Variadic)] args = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
             go nts [SVariadic args] = go nts args
-            go ((n,t):nts) (v:args) = ((n, (t, v)):) <$> go nts args
-            go [] [] = Just []
-            go _ _ = Nothing
+            go nts@(_:_:_) [SArray args] = go nts . V.toList =<< traverse getVar args
+            go ((n,t):nts) (v:args) = (((n, (t, v)):) <$>) <$> go nts args
+            go [] [] = pure $ Just []
+            go _ _ = pure Nothing
             argMeta =
               map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
@@ -3517,4 +3523,4 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
               map snd . sortWith fst
                 . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
                 $ M.toList typeAndVal
-          in Just sortedArgs
+          in pure $ Just sortedArgs

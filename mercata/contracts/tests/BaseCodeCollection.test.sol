@@ -54,15 +54,15 @@ contract Describe_Mercata {
         // require(p2 != address(0), "Failed to create pool 2");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");
-        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18);
+        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18, 1);
         require(l1 > 0, "Failed to add liquidity to pool 1");
         // uint l2 = Pool(p2).addLiquidity(4000e18, 10000000e18);
         // require(l2 > 0, "Failed to add liquidity to pool 2");
         require(u1.do(t1, "approve", p1, 1e18), "Approval failed for u1");
-        uint o1 = u1.do(p1, "swap", true, 1e18, 2000e18);
+        uint o1 = u1.do(p1, "swap", true, 1e18, 2000e18, 1);
         require(o1 > 2490e18, "Swap 1 returned less money than expected: " + string(o1));
         require(u1.do(t2, "approve", p1, o1), "Approval failed for u1");
-        uint o2 = u1.do(p1, "swap", false, o1, 990e15);
+        uint o2 = u1.do(p1, "swap", false, o1, 990e15, 1);
         require(o2 > 994e15, "Swap returned less money than expected: " + string(o2));
     }
 
@@ -82,10 +82,10 @@ contract Describe_Mercata {
         require(p1 != address(0), "Failed to create pool 1");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");
-        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18);
+        uint l1 = Pool(p1).addLiquidity(10000000e18, 4000e18, 1);
         require(l1 > 0, "Failed to add liquidity to pool 1");
         require(u1.do(t1, "approve", p1, u1t1Amt), "Approval failed for u1");
-        uint o1 = u1.do(p1, "swap", true, u1t1Amt, 2000e18);
+        uint o1 = u1.do(p1, "swap", true, u1t1Amt, 2000e18, 1);
         require(o1 > 0, "Swap 1 returned less money than expected: " + string(o1));
     }
 
@@ -186,7 +186,13 @@ contract Describe_Mercata {
         User adminUser = new User();
         AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
         User u = new User();
-        (bool didExecute, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+        bool didExecute = false;
+        try {
+            (bool didExecute2, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+            didExecute = didExecute2;
+        } catch {
+
+        }
         require(!didExecute, "Why did the issue get executed without votes?");
         admin.castVoteOnIssue(this, "performIssue", 7, true, address(0xdeadbeef), "what");
         require(output == "", "Got unexpected output before vote: " + output);
