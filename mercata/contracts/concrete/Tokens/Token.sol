@@ -1,6 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./TokenMetadata.sol";
-import "./TokenAccess.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../Rewards/RewardsManager.sol";
 import "./TokenFactory.sol";

@@ -2,12 +2,14 @@ contract record AdminRegistry {
     mapping (string => address) public record delegates;
 
     address[] public record admins;
-    mapping (address => uint) adminMap;
+    mapping (address => uint) public record adminMap;
 
     mapping (string => address[]) public record votes;
-    mapping (string => mapping (address => uint)) votesMap;
+    mapping (string => mapping (address => uint)) public record votesMap;
 
-    mapping (address => mapping (string => mapping (address => bool))) public whitelist;
+    mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
+
+    mapping (address => mapping (string => uint)) public record votingThresholds;
 
     event IssueCreated(address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
@@ -69,7 +71,12 @@ contract record AdminRegistry {
             return delegate.delegatecall("_shouldExecute", _issueId, _target, _func, _args);
         } else {
             uint issueVotes = votes[_issueId].length;
-            return 3 * (issueVotes + 1) > 2 * admins.length;
+            uint votingThresholdBps = votingThresholds[_target][_func];
+            if (votingThresholdBps > 0) {
+                return 10000 * (issueVotes + 1) > votingThresholdBps * admins.length;
+            } else {
+                return 3 * (issueVotes + 1) > 2 * admins.length;
+            }
         }
     }
 
@@ -171,6 +178,10 @@ contract record AdminRegistry {
 
     function removeWhitelist(address _target, string _func, address _user) internal {
         whitelist[_target][_func][_user] = false;
+    }
+
+    function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) internal {
+        votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) internal returns (address) {

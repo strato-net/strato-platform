@@ -42,8 +42,6 @@ export const constants = (() => {
     `images:${Token}-images(value)`,
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,
-    `minters:${Token}-minters(user:key,value)`,
-    `burners:${Token}-burners(user:key,value)`,
   ];
   const tokenBalanceSelectFields = [
     "address",
