@@ -136,35 +136,34 @@ class BridgeContractService {
   // ============================================
 
   /**
-   * Gets the balance of a token or native currency
+   * Gets token configuration from the DepositRouter contract
    */
-  async getTokenBalance({ 
+  async getTokenConfig({ 
     tokenAddress, 
-    userAddress, 
     chainId, 
-    decimals 
-  }: TokenParams): Promise<string> {
-    const client = await this.getClient(chainId);
+    depositRouterAddress 
+  }: { 
+    tokenAddress: string; 
+    chainId: number; 
+    depositRouterAddress: string; 
+  }): Promise<{
+    minAmount: string;
+    permissions: number;
+  }> {
+    const client = await this.getClient(chainId.toString());
     const normalizedAddress = this.formatAddress(tokenAddress);
     
-    // Handle native token (ETH)
-    if (normalizedAddress === NATIVE_TOKEN_ADDRESS) {
-      const balance = await client.getBalance({ 
-        address: this.formatAddress(userAddress) 
-      });
-      return formatBalance(balance);
-    }
-    
-    // Handle ERC20 tokens
-    const balance = await client.readContract({
-      address: normalizedAddress,
-      abi: ERC20_ABI,
-      functionName: "balanceOf",
-      args: [this.formatAddress(userAddress)]
+    const [minAmount, permissions] = await client.readContract({
+      address: this.formatAddress(depositRouterAddress),
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "tokenConfig",
+      args: [normalizedAddress]
     });
     
-    const tokenDecimals = decimals ? parseInt(decimals) : 18;
-    return formatBalance(balance, undefined, tokenDecimals);
+    return {
+      minAmount: minAmount.toString(),
+      permissions: Number(permissions)
+    };
   }
 
   // ============================================
@@ -179,42 +178,53 @@ class BridgeContractService {
     amount, 
     decimals, 
     chainId,
-    tokenAddress 
-  }: ValidationParams): Promise<ContractValidationResult> {
+    tokenAddress,
+    mint = false
+  }: ValidationParams & { mint?: boolean }): Promise<ContractValidationResult> {
     try {
       const client = await this.getClient(chainId);
       const normalizedTokenAddress = this.formatAddress(tokenAddress);
       const depositAmount = safeParseUnits(amount, parseInt(decimals) || 18);
       
       // Get token configuration from router
-      const [isAllowed, minAmount] = await client.readContract({
+      const [minAmount, permissions] = await client.readContract({
         address: this.formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
-        functionName: "getTokenConfig",
+        functionName: "tokenConfig",
         args: [normalizedTokenAddress]
+      });
+
+      // Check if deposit is allowed using canDeposit
+      const canDeposit = await client.readContract({
+        address: this.formatAddress(depositRouterAddress),
+        abi: DEPOSIT_ROUTER_ABI,
+        functionName: "canDeposit",
+        args: [normalizedTokenAddress, depositAmount, mint]
       });
 
       // Determine token type for error messages
       const tokenType = normalizedTokenAddress === NATIVE_TOKEN_ADDRESS ? "ETH" : "ERC20";
+      const operationType = mint ? "mint" : "wrap";
       
-      // Check if token is allowed
-      if (!isAllowed) {
+      // Check if operation is permitted
+      if (!canDeposit) {
+        const permissionRequired = mint ? 2 : 1; // PERMISSION_MINT = 2, PERMISSION_WRAP = 1
+        const hasPermission = (permissions & permissionRequired) !== 0;
+        
+        if (!hasPermission) {
+          return {
+            isValid: false,
+            error: `${tokenType} ${operationType} operations are not currently allowed on this router contract`,
+            isAllowed: false,
+            minAmount: minAmount.toString(),
+            depositAmount: depositAmount.toString()
+          };
+        }
+        
         return {
           isValid: false,
-          error: `${tokenType} deposits are not currently allowed on this router contract`,
-          isAllowed,
-          minAmount: minAmount.toString(),
-          depositAmount: depositAmount.toString()
-        };
-      }
-      
-      // Check if amount meets minimum
-      if (depositAmount < minAmount) {
-        const formattedMin = formatBalance(minAmount, undefined, parseInt(decimals) || 18);
-        return {
-          isValid: false,
-          error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formattedMin} ${tokenType}`,
-          isAllowed,
+          error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formatBalance(minAmount, undefined, parseInt(decimals) || 18)} ${tokenType}`,
+          isAllowed: true,
           minAmount: minAmount.toString(),
           depositAmount: depositAmount.toString()
         };
@@ -223,7 +233,7 @@ class BridgeContractService {
       // All validations passed
       return {
         isValid: true,
-        isAllowed,
+        isAllowed: true,
         minAmount: minAmount.toString(),
         depositAmount: depositAmount.toString()
       };

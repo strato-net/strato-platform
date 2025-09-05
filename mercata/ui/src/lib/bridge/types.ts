@@ -1,14 +1,15 @@
 // Bridge Types
 export interface Token {
-  stratoTokenAddress: string;
-  stratoTokenName: string;
-  stratoTokenSymbol: string;
-  chainId: string;
-  enabled: boolean;
-  extName: string;
-  extToken: string;
-  extSymbol: string;
-  extDecimals: string;
+  stratoToken: string;           // Key: address of the STRATO token
+  stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
+  stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
+  externalChainId: string;       // Matches AssetInfo.externalChainId
+  permissions: number;           // Matches AssetInfo.permissions
+  externalName: string;          // Matches AssetInfo.externalName
+  externalToken: string;         // Matches AssetInfo.externalToken
+  externalSymbol: string;        // Matches AssetInfo.externalSymbol
+  externalDecimals: string;      // Matches AssetInfo.externalDecimals
+  maxPerTx: string;              // Matches AssetInfo.maxPerTx
 }
 
 export interface NetworkConfig {
@@ -21,18 +22,15 @@ export interface NetworkConfig {
 
 // Bridge Context Types
 export interface BridgeOutParams {
-  amount: string;
-  destAddress: string;
-  token: string;
-  destChainId: string;
+  stratoTokenAmount: string;
+  externalRecipient: string;
+  stratoToken: string;
+  externalChainId: string;
+  targetStratoToken?: string; // For withdrawals: which asset mapping to use
 }
 
 export interface BalanceResponse {
   balance: string;
-  tokenLimit?: {
-    maxPerTx: string;
-    isUnlimited: boolean;
-  };
 }
 
 export interface BridgeResponse {
@@ -41,7 +39,7 @@ export interface BridgeResponse {
 }
 
 export interface NetworkConfigFromAPI {
-  chainId: string;
+  externalChainId: number;
   chainInfo: {
     custody: string;
     enabled: boolean;
@@ -87,17 +85,16 @@ export type BridgeContextType = {
   error: string | null;
   availableNetworks: NetworkSummary[];
   bridgeableTokens: Token[];
+  redeemableTokens: Token[];
   selectedNetwork: string | null;
   selectedToken: Token | null;
+  selectedMintToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
+  redeemOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
       formatted: string;
-      tokenLimit?: {
-        maxPerTx: string;
-        isUnlimited: boolean;
-      };
     } | null;
     isLoading: boolean;
     isError: boolean;
@@ -106,10 +103,12 @@ export type BridgeContextType = {
   };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: Token | null) => void;
+  setSelectedMintToken: (token: Token | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
+  fetchRedeemableTokens: (chainId: string) => void;
 };
 
 export interface ContractValidationResult {

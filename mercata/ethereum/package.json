@@ -1,0 +1,24 @@
+{
+  "name": "mercata-ethereum",
+  "version": "1.0.0",
+  "description": "Ethereum deployment for Mercata contracts with UUPS proxy support",
+  "scripts": {
+    "compile": "hardhat compile",
+
+    "deployWithProxy:sepolia": "npx hardhat run scripts/deployWithProxy.js --network sepolia",
+    "deployWithProxy:mainnet": "npx hardhat run scripts/deployWithProxy.js --network mainnet",
+
+    "verify:sepolia": "hardhat verify --network sepolia",
+    "verify:mainnet": "hardhat verify --network mainnet"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@openzeppelin/contracts-upgradeable": "^5.0.0",
+    "@openzeppelin/hardhat-upgrades": "^3.9.1",
+    "dotenv": "^17.2.1"
+  }
+} 

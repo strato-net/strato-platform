@@ -1,5 +1,6 @@
 import axios from "axios";
 import simpleOauth2 from "simple-oauth2";
+import { fetch } from "../utils/api";
 
 interface OAuthConfig {
   clientId: string;
@@ -11,6 +12,15 @@ interface OAuthConfig {
 
 interface TokenResponse {
   token: any;
+}
+
+interface OAuthTokenResult {
+  token: {
+    access_token: string;
+    expires_in: number;
+    refresh_expires_in?: number;
+    [key: string]: any;
+  };
 }
 
 class OAuthUtil {
@@ -38,8 +48,7 @@ class OAuthUtil {
       const oauth = new OAuthUtil(config);
 
       // Fetch OpenID configuration
-      const response = await axios.get(oauth.openIdDiscoveryUrl);
-      const openIdConfig = response.data;
+      const openIdConfig = await fetch.get(oauth.openIdDiscoveryUrl);
       oauth.tokenEndpoint = openIdConfig.token_endpoint;
 
       // Initialize OAuth2 client
@@ -79,7 +88,7 @@ class OAuthUtil {
         scope: this.scope,
       };
 
-      const result = await this.oauth2.getToken(tokenParams);
+      const result = await this.oauth2.getToken(tokenParams) as OAuthTokenResult;
 
       // Ensure all numeric values are properly converted
       const tokenData = {
