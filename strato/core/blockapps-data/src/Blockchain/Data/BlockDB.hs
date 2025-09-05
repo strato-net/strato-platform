@@ -111,9 +111,9 @@ putBlocks blockList makeHashOne = do
           forM_ (blockReceiptTransactions b) $ \tx -> do
             txID <- updateBlockNumber b (transactionHash tx)
             SQL.insert $ BlockTransaction blkDataRefId txID
-          forM_ vs $ \(Validator v) -> SQL.insert $ BlockValidatorRef blkDataRefId v
-          forM_ va $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
-          forM_ vr $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
+          forM_ vs $ \v -> SQL.insert $ BlockValidatorRef blkDataRefId v
+          forM_ va $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
+          forM_ vr $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
           forM_ ca $ \c -> do
             let c' = x509CertToCertInfoState c 
             SQL.insert $ CertificateAddedRef blkDataRefId (T.pack $ commonName c') (userAddress c') (T.pack . BC.unpack . certToBytes $ certificate c')

@@ -23,12 +23,12 @@ BlockDataRef
 
 BlockValidatorRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     deriving Eq Read Show
 
 ValidatorDeltaRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     direction Bool
     deriving Eq Read Show
 

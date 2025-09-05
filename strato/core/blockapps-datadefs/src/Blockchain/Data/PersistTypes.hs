@@ -9,6 +9,7 @@ import BlockApps.Solidity.Xabi
 import Blockchain.Data.PubKey
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Validator
 import Crypto.Types.PubKey.ECC
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString as B
@@ -82,3 +83,10 @@ instance PersistField BSS.ShortByteString where
 
 instance PersistFieldSql BSS.ShortByteString where
   sqlType _ = SqlBlob
+
+instance PersistField Validator where
+  toPersistValue (Validator v) = toPersistValue v
+  fromPersistValue v = fmap Validator $ fromPersistValue v
+
+instance PersistFieldSql Validator where
+  sqlType _ = SqlOther "text"

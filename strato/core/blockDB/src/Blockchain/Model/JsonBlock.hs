@@ -488,10 +488,10 @@ bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
 -}
 bvr2v :: BlockValidatorRef -> Validator
-bvr2v (BlockValidatorRef _ cn) = Validator cn
+bvr2v (BlockValidatorRef _ cn) = cn
 
 vdr2v :: Bool -> ValidatorDeltaRef -> Maybe Validator
-vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just $ Validator cn
+vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just cn
 vdr2v _ _ = Nothing
 
 car2x509 :: CertificateAddedRef -> Maybe X509Certificate
