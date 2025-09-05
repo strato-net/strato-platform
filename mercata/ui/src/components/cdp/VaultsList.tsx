@@ -154,13 +154,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
-    // Convert wei strings to decimal numbers for calculations
-    const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
-    const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-    const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
-    const pricePerUnit = currentCollateralUSD / currentCollateral;
-
+  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
         // Find the user's balance for this token
@@ -178,21 +172,23 @@ const VaultsList: React.FC = () => {
       }
       
       case 'withdraw': {
-        // Maximum withdraw is current collateral, but we should consider maintaining health factor
-        // For safety, allow withdrawal that keeps health factor above 1.5
-        if (currentDebt === 0) {
-          return currentCollateral.toString();
+        try {
+          // Use the backend endpoint that simulates the contract's withdrawMax logic
+          const result = await cdpService.getMaxWithdraw(position.asset);
+          // Convert from wei to decimal format
+          return formatWeiToDecimal(result.maxAmount, position.collateralAmountDecimals);
+        } catch (error) {
+          console.error("Failed to get max withdraw amount:", error);
+          return "0";
         }
-        // Calculate max withdrawal while maintaining health factor > 1.5
-        const minHealthFactor = 1.5;
-        const requiredCollateralRatio = position.liquidationRatio * minHealthFactor;
-        const requiredCollateralUSD = (currentDebt * requiredCollateralRatio) / 100;
-        const requiredCollateral = requiredCollateralUSD / pricePerUnit;
-        const maxWithdraw = Math.max(0, currentCollateral - requiredCollateral);
-        return formatNumber(maxWithdraw, 6);
       }
       
       case 'mint': {
+        // Convert wei strings to decimal numbers for calculations
+        const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
+        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+        const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
+        
         // Maximum mint while maintaining health factor above 1.5
         const safeHealthFactor = 1.5;
         const safeCollateralRatio = position.liquidationRatio * safeHealthFactor;
@@ -203,6 +199,7 @@ const VaultsList: React.FC = () => {
       
       case 'repay': {
         // Maximum repay is current debt
+        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
         return formatNumber(currentDebt);
       }
       
@@ -212,7 +209,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Handle MAX button click
-  const handleMaxClick = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
     const position = positions.find(p => p.asset === asset);
     if (!position) return;
 
@@ -223,10 +220,19 @@ const VaultsList: React.FC = () => {
       setMaxStates(prev => ({ ...prev, [asset]: false }));
       setInputAmounts(prev => ({ ...prev, [asset]: "" }));
     } else {
-      // Enable max state and set max value
-      const maxValue = calculateMaxValue(position, action);
-      setMaxStates(prev => ({ ...prev, [asset]: true }));
-      setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+      try {
+        // Enable max state and set max value
+        const maxValue = await calculateMaxValue(position, action);
+        setMaxStates(prev => ({ ...prev, [asset]: true }));
+        setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+      } catch (error) {
+        console.error("Failed to calculate max value:", error);
+        toast({
+          title: "Error",
+          description: "Failed to calculate maximum amount. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -302,7 +308,12 @@ const VaultsList: React.FC = () => {
           result = await cdpService.deposit(asset, amount);
           break;
         case 'withdraw':
-          result = await cdpService.withdraw(asset, amount);
+          // If user is in max state, use withdrawMax endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.withdrawMax(asset);
+          } else {
+            result = await cdpService.withdraw(asset, amount);
+          }
           break;
         case 'mint':
           result = await cdpService.mint(asset, amount);

@@ -375,6 +375,93 @@ export const withdraw = async (
   );
 };
 
+export const getMaxWithdraw = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string }
+): Promise<{ maxAmount: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Find the specific vault from registry data
+  const allVaults = registry.cdpEngine.vaults || [];
+  const vaultEntry = allVaults.find(
+    (v: any) => 
+      v.user?.toLowerCase() === userAddress.toLowerCase() &&
+      v.asset?.toLowerCase() === body.asset.toLowerCase()
+  );
+
+  if (!vaultEntry) {
+    return { maxAmount: "0" };
+  }
+
+  const vault = vaultEntry.Vault;
+  if (!vault) {
+    return { maxAmount: "0" };
+  }
+
+  // Get asset config and global state
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralConfig;
+  
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset config or global state not found");
+  }
+
+  // Calculate current debt (simulating _accrue effect)
+  const scaledDebt = BigInt(vault.scaledDebt || "0");
+  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const debt = (scaledDebt * currentRateAccumulator) / RAY;
+
+  const collateralAmount = BigInt(vault.collateral || "0");
+
+  let maxAmount: bigint;
+
+  if (debt === 0n) {
+    // No debt: user can withdraw all collateral
+    maxAmount = collateralAmount;
+  } else {
+    // Get price from oracle
+    const priceEntry = registry.priceOracle?.prices?.find(
+      (p: any) => p.asset.toLowerCase() === body.asset.toLowerCase()
+    );
+
+    if (!priceEntry) {
+      throw new Error("Price not found for asset");
+    }
+
+    const price = BigInt(priceEntry.value || "0");
+    
+    if (price <= 0n) {
+      throw new Error("Invalid price");
+    }
+
+    // Compute collateral required to keep CR >= LR
+    const liquidationRatio = BigInt(config.liquidationRatio);
+    const unitScale = BigInt(config.unitScale);
+    
+    const requiredCollateralValue = (debt * liquidationRatio) / WAD;
+    const requiredCollateral = (requiredCollateralValue * unitScale) / price;
+
+    // Enforce a 1 wei buffer when debt exists to protect against rounding
+    if (collateralAmount <= requiredCollateral + 1n) {
+      maxAmount = 0n; // exactly at buffer or below => nothing withdrawable
+    } else {
+      maxAmount = collateralAmount - requiredCollateral - 1n;
+    }
+  }
+
+  return { maxAmount: maxAmount.toString() };
+};
+
 export const withdrawMax = async (
   accessToken: string,
   userAddress: string,
