@@ -201,24 +201,30 @@ const BorrowWidget: React.FC = () => {
 
         // Fetch real asset prices for all supported assets
         try {
-          const priceResponse = await api.get('/tokens/balance');
-          const tokensData = priceResponse.data;
-          
           const prices: Record<string, number> = {};
-          assets.forEach(asset => {
-            // Find the token data that matches this asset
-            const tokenData = tokensData.find((token: { address?: string; price?: string }) => 
-              token.address?.toLowerCase() === asset.asset.toLowerCase()
-            );
-            
-            if (tokenData?.price) {
-              // Convert price from wei format (18 decimals) to regular number
-              prices[asset.asset] = parseFloat(formatWeiToDecimal(tokenData.price, 18));
+          
+          // Fetch prices for each asset individually using the oracle endpoint
+          for (const asset of assets) {
+            try {
+              const priceResponse = await api.get(`/oracle/price?asset=${asset.asset}`);
+              if (priceResponse.data?.price) {
+                // Convert price from wei format (18 decimals) to regular number
+                prices[asset.asset] = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
+                console.log(`✅ Price fetched for ${asset.symbol} (${asset.asset}): $${prices[asset.asset]}`);
+              } else {
+                console.warn(`⚠️  No price data for ${asset.symbol} (${asset.asset}):`, priceResponse.data);
+              }
+            } catch (assetPriceError) {
+              console.error(`❌ Failed to fetch price for ${asset.symbol} (${asset.asset}):`, assetPriceError);
+              // If 404, it means the asset is not in the oracle
+              if (assetPriceError.response?.status === 404) {
+                console.warn(`⚠️  Asset ${asset.symbol} (${asset.asset}) not found in price oracle`);
+              }
             }
-            // No fallback prices - only use real data
-          });
+          }
           
           setAssetPrices(prices);
+          console.log("🔍 Final asset prices:", prices);
         } catch (priceError) {
           console.error("Could not fetch real asset prices:", priceError);
           setAssetPrices({}); // Empty object - no prices available
