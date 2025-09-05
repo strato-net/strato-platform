@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
+import { useUserTokens } from "@/context/UserTokensContext";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -84,6 +85,7 @@ const VaultsList: React.FC = () => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { activeTokens } = useUserTokens();
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
@@ -161,9 +163,18 @@ const VaultsList: React.FC = () => {
 
     switch (action) {
       case 'deposit': {
-        // For deposit, we could set a reasonable limit or user's wallet balance
-        // For now, using a placeholder max value
-        return "1000"; // TODO: Replace with actual wallet balance
+        // Find the user's balance for this token
+        const userToken = activeTokens.find(token => 
+          token.address.toLowerCase() === position.asset.toLowerCase()
+        );
+        
+        if (userToken?.balance) {
+          // Convert balance from wei to decimal format
+          return formatWeiToDecimal(userToken.balance, position.collateralAmountDecimals);
+        }
+        
+        // Fallback to 0 if no balance found
+        return "0";
       }
       
       case 'withdraw': {
