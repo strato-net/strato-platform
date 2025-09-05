@@ -26,6 +26,7 @@ const MintWidget: React.FC = () => {
   const [isRatioLocked, setIsRatioLocked] = useState(false);
   const [lockedCR, setLockedCR] = useState<number | null>(null);
   const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
+  const [existingVaultCollateral, setExistingVaultCollateral] = useState<string>("0"); // Wei format
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
 
@@ -39,37 +40,34 @@ const MintWidget: React.FC = () => {
   
   // Calculate current collateralization ratio and related values
   const calculateCurrentCR = (): number => {
-    if (!depositAsset || !depositAmount || !borrowAmount || 
-        parseFloat(depositAmount) <= 0 || parseFloat(borrowAmount) <= 0) {
+    if (!depositAsset || !borrowAmount || parseFloat(borrowAmount) <= 0) {
       return 0;
     }
     
-    const collateralAmount = parseFloat(depositAmount);
     const debtAmount = parseFloat(borrowAmount);
-    const assetPriceUSD = getAssetPrice();
-    const collateralValueUSD = collateralAmount * assetPriceUSD;
+    const totalCollateralValueUSD = getTotalCollateralValue();
     
-    // CR = (collateral value / debt value) * 100
-    return (collateralValueUSD / debtAmount) * 100;
+    if (totalCollateralValueUSD <= 0) return 0;
+    
+    // CR = (total collateral value / debt value) * 100
+    return (totalCollateralValueUSD / debtAmount) * 100;
   };
 
   // Calculate max borrowable amount based on liquidation threshold from backend
   const calculateMaxBorrowable = (): number => {
-    if (!depositAsset || !depositAmount || parseFloat(depositAmount) <= 0) {
-      return 0;
-    }
+    if (!depositAsset) return 0;
     
-    const collateralAmount = parseFloat(depositAmount);
-    const assetPriceUSD = getAssetPrice();
-    const collateralValueUSD = collateralAmount * assetPriceUSD;
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    
+    if (totalCollateralValueUSD <= 0) return 0;
     
     // liquidationRatio from backend is the liquidation threshold (e.g., 150 means 150%)
-    // At liquidation: CR = LT, so maxDebt = collateralValue / (LT / 100)
+    // At liquidation: CR = LT, so maxDebt = totalCollateralValue / (LT / 100)
     // Apply small safety buffer (1%) to avoid exact liquidation threshold
     const liquidationThreshold = depositAsset.liquidationRatio; // Already in percentage
     const safetyBuffer = 1.01; // 1% buffer above LT
     const effectiveLT = liquidationThreshold * safetyBuffer;
-    const maxBorrowableUSD = (collateralValueUSD * 100) / effectiveLT;
+    const maxBorrowableUSD = (totalCollateralValueUSD * 100) / effectiveLT;
     
     return Math.max(0, maxBorrowableUSD);
   };
@@ -83,6 +81,26 @@ const MintWidget: React.FC = () => {
     );
     
     return userToken?.balance || "0";
+  };
+
+  // Calculate total collateral value (existing + new deposit)
+  const getTotalCollateralValue = (): number => {
+    if (!depositAsset) return 0;
+    
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return 0;
+    
+    // Convert existing collateral from wei to decimal
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
+    
+    // Get new deposit amount
+    const newDepositAmount = parseFloat(depositAmount || "0");
+    
+    // Calculate total collateral in tokens
+    const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
+    
+    // Convert to USD
+    return totalCollateralTokens * assetPriceUSD;
   };
 
   // Format large numbers for display
@@ -239,6 +257,30 @@ const MintWidget: React.FC = () => {
     }
   }, [maxBorrowable, isMintMaxEnabled, depositAsset, depositAmount, isRatioLocked, lockedCR, borrowAmount]);
 
+  // Fetch existing vault collateral when asset changes
+  useEffect(() => {
+    const fetchExistingVault = async () => {
+      if (!depositAsset) {
+        setExistingVaultCollateral("0");
+        return;
+      }
+
+      try {
+        const vaultData = await cdpService.getVault(depositAsset.asset);
+        if (vaultData) {
+          setExistingVaultCollateral(vaultData.collateralAmount);
+        } else {
+          setExistingVaultCollateral("0");
+        }
+      } catch (error) {
+        console.log("No existing vault found for asset:", depositAsset.symbol);
+        setExistingVaultCollateral("0");
+      }
+    };
+
+    fetchExistingVault();
+  }, [depositAsset]);
+
   // Reset mint MAX state and ratio lock when deposit asset changes
   useEffect(() => {
     setIsMintMaxEnabled(false);
@@ -260,13 +302,13 @@ const MintWidget: React.FC = () => {
       setIsMintMaxEnabled(true);
       setBorrowAmount(maxBorrowable.toFixed(2));
       // Lock the ratio when MAX is used
-      if (parseFloat(depositAmount) > 0 && maxBorrowable > 0 && depositAsset) {
-        const collateralAmount = parseFloat(depositAmount);
-        const assetPriceUSD = getAssetPrice();
-        const collateralValueUSD = collateralAmount * assetPriceUSD;
-        const newCR = (collateralValueUSD / maxBorrowable) * 100;
-        setIsRatioLocked(true);
-        setLockedCR(newCR);
+      if (maxBorrowable > 0 && depositAsset) {
+        const totalCollateralValueUSD = getTotalCollateralValue();
+        if (totalCollateralValueUSD > 0) {
+          const newCR = (totalCollateralValueUSD / maxBorrowable) * 100;
+          setIsRatioLocked(true);
+          setLockedCR(newCR);
+        }
       }
     }
   };
@@ -285,36 +327,42 @@ const MintWidget: React.FC = () => {
     }
     
     // Validate mint amount doesn't violate minimum CR requirement
-    if (parseFloat(depositAmount) > 0 && parseFloat(value) > 0 && depositAsset) {
-      const collateralAmount = parseFloat(depositAmount);
+    if (parseFloat(value) > 0 && depositAsset) {
       const debtAmount = parseFloat(value);
-      const assetPriceUSD = getAssetPrice();
-      const collateralValueUSD = collateralAmount * assetPriceUSD;
-      const newCR = (collateralValueUSD / debtAmount) * 100;
-      // Prevent mint amount that would result in CR below minimum using dynamic config
-      if (newCR < sliderConfig.min) {
-        const maxAllowedDebt = (collateralValueUSD * 100) / sliderConfig.min;
-        setBorrowAmount(maxAllowedDebt.toFixed(2));
-        setIsRatioLocked(true);
-        setLockedCR(sliderConfig.min);
-        return;
+      const totalCollateralValueUSD = getTotalCollateralValue();
+      
+      if (totalCollateralValueUSD > 0) {
+        const newCR = (totalCollateralValueUSD / debtAmount) * 100;
+        // Prevent mint amount that would result in CR below minimum using dynamic config
+        if (newCR < sliderConfig.min) {
+          const maxAllowedDebt = (totalCollateralValueUSD * 100) / sliderConfig.min;
+          setBorrowAmount(maxAllowedDebt.toFixed(2));
+          setIsRatioLocked(true);
+          setLockedCR(sliderConfig.min);
+          return;
+        }
       }
     }
     
     setBorrowAmount(value);
     
     // When mint amount changes, update the slider to reflect new CR
-    // Calculate new CR based on current deposit and new mint amount
-    if (parseFloat(depositAmount) > 0 && parseFloat(value) > 0) {
-      const collateralAmount = parseFloat(depositAmount);
+    // Calculate new CR based on total collateral and new mint amount
+    if (parseFloat(value) > 0) {
       const debtAmount = parseFloat(value);
-      const assetPriceUSD = getAssetPrice();
-      const collateralValueUSD = collateralAmount * assetPriceUSD;
-      const newCR = (collateralValueUSD / debtAmount) * 100;
+      const totalCollateralValueUSD = getTotalCollateralValue();
       
-      // Update the locked CR to reflect this new ratio
-      setIsRatioLocked(true);
-      setLockedCR(newCR);
+      if (totalCollateralValueUSD > 0) {
+        const newCR = (totalCollateralValueUSD / debtAmount) * 100;
+        
+        // Update the locked CR to reflect this new ratio
+        setIsRatioLocked(true);
+        setLockedCR(newCR);
+      } else {
+        // Clear ratio lock if no collateral value
+        setIsRatioLocked(false);
+        setLockedCR(null);
+      }
     } else {
       // Clear ratio lock if invalid amounts
       setIsRatioLocked(false);
@@ -382,25 +430,22 @@ const MintWidget: React.FC = () => {
   const handleCRSliderChange = (values: number[]) => {
     const targetCR = values[0];
     
-    if (!depositAsset || !depositAmount || parseFloat(depositAmount) <= 0 || targetCR <= 0) {
+    if (!depositAsset || targetCR <= 0) {
       return;
     }
     
-    const assetPriceUSD = getAssetPrice();
-    if (assetPriceUSD <= 0) {
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) {
       return;
     }
     
     // Enforce minimum CR constraint using dynamic slider config
     const effectiveTargetCR = Math.max(targetCR, sliderConfig.min);
     
-    const collateralAmount = parseFloat(depositAmount);
-    const collateralValueUSD = collateralAmount * assetPriceUSD;
-    
-    // Calculate mint amount based on effective target CR and current deposit
-    // CR = (collateral value / debt value) * 100
-    // So debt value = (collateral value * 100) / CR
-    const newDebtAmount = (collateralValueUSD * 100) / effectiveTargetCR;
+    // Calculate mint amount based on effective target CR and total collateral
+    // CR = (total collateral value / debt value) * 100
+    // So debt value = (total collateral value * 100) / CR
+    const newDebtAmount = (totalCollateralValueUSD * 100) / effectiveTargetCR;
     
     setBorrowAmount(newDebtAmount.toFixed(2));
     
@@ -432,20 +477,32 @@ const MintWidget: React.FC = () => {
     const depAmount = parseFloat(depositAmount);
     const borAmount = parseFloat(borrowAmount);
 
-    if (depAmount <= 0) {
+    // Borrowing is now required
+    if (borAmount <= 0) {
       toast({
-        title: "Invalid Deposit Amount",
-        description: "Please enter a valid deposit amount",
+        title: "Invalid Borrow Amount", 
+        description: "Please enter a borrow amount",
         variant: "destructive",
       });
       return;
     }
 
-    // Minting is now optional - only validate if user entered an amount
-    if (borAmount < 0) {
+    // Check if we have sufficient total collateral for the borrow amount
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) {
       toast({
-        title: "Invalid Borrow Amount", 
-        description: "Borrow amount cannot be negative",
+        title: "Insufficient Collateral",
+        description: "You need collateral to borrow. Either deposit now or select an asset with existing vault balance.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Deposit is now optional - only validate if user entered an amount
+    if (depAmount < 0) {
+      toast({
+        title: "Invalid Deposit Amount",
+        description: "Deposit amount cannot be negative",
         variant: "destructive",
       });
       return;
@@ -453,30 +510,37 @@ const MintWidget: React.FC = () => {
 
     setLoading(true);
     try {
-      // First deposit collateral
-      const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
-      
-      if (depositResult.status.toLowerCase() !== "success") {
-        throw new Error(`Deposit failed with status: ${depositResult.status}`);
+      let finalResult;
+      let successMessage = "";
+
+      // First deposit collateral if user entered an amount > 0
+      if (depAmount > 0) {
+        const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
+        
+        if (depositResult.status.toLowerCase() !== "success") {
+          throw new Error(`Deposit failed with status: ${depositResult.status}`);
+        }
+
+        finalResult = depositResult;
+        successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
       }
 
-      let finalResult = depositResult;
-      let successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
+      // Borrowing is required (already validated above)
+      const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
+      
+      if (mintResult.status.toLowerCase() !== "success") {
+        throw new Error(`Borrow failed with status: ${mintResult.status}`);
+      }
 
-      // Only mint if user specified an amount > 0
-      if (borAmount > 0) {
-        const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
-        
-        if (mintResult.status.toLowerCase() !== "success") {
-          throw new Error(`Mint failed with status: ${mintResult.status}`);
-        }
-        
-        finalResult = mintResult;
-        successMessage += ` and minted ${formatNumber(parseFloat(borrowAmount))} USDST`;
+      finalResult = mintResult;
+      if (depAmount > 0) {
+        successMessage += ` and borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
+      } else {
+        successMessage = `Borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
       }
 
       toast({
-        title: "Vault Created Successfully",
+        title: "Transaction Successful",
         description: `${successMessage}. Tx: ${finalResult.hash}`,
       });
 
@@ -512,13 +576,13 @@ const MintWidget: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <h2 className="text-xl font-semibold text-gray-900">Create Vault</h2>
+      <h2 className="text-xl font-semibold text-gray-900">Borrow Against Collateral</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Deposit</h3>
+            <h3 className="font-semibold">Deposit <span className="text-sm text-gray-500 font-normal"></span></h3>
           </div>
 
           <Select 
@@ -550,7 +614,7 @@ const MintWidget: React.FC = () => {
               className={`flex-1 text-right ${isDepositMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={depositAmount}
               onChange={(e) => handleDepositAmountChange(e.target.value)}
-              placeholder="0.0"
+              placeholder="0.0 (optional)"
               type="number"
               step="any"
               readOnly={isDepositMaxEnabled}
@@ -567,16 +631,16 @@ const MintWidget: React.FC = () => {
           </div>
           <p className="text-xs text-gray-500">
             {getAssetPrice() > 0 
-              ? `$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())}`
+              ? `$${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
               : "Price unavailable"
             }
           </p>
         </div>
 
-        {/* Mint */}
+        {/* Borrow */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Mint <span className="text-sm text-gray-500 font-normal">(Optional)</span></h3>
+            <h3 className="font-semibold">Borrow</h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
                 Max: ${formatNumber(maxBorrowable)} (~{formatNumber(depositAsset.liquidationRatio * 1.01, 0)}% CR)
@@ -593,7 +657,7 @@ const MintWidget: React.FC = () => {
               className={`flex-1 text-right ${isMintMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={borrowAmount}
               onChange={(e) => handleBorrowAmountChange(e.target.value)}
-              placeholder="0.0 (optional)"
+              placeholder="0.0"
               type="number"
               step="any"
               readOnly={isMintMaxEnabled}
@@ -631,7 +695,7 @@ const MintWidget: React.FC = () => {
                 min={sliderConfig.min}
                 step={1} 
                 onValueChange={handleCRSliderChange}
-                disabled={!depositAsset || parseFloat(depositAmount) <= 0 || getAssetPrice() <= 0}
+                disabled={!depositAsset || getTotalCollateralValue() <= 0}
                 className="w-full"
               />
             </div>
@@ -654,6 +718,15 @@ const MintWidget: React.FC = () => {
             }
             .cr-slider-dangerous [data-orientation="horizontal"] {
               background-color: #fecaca !important;
+            }
+            /* Hide number input arrows */
+            input[type="number"]::-webkit-outer-spin-button,
+            input[type="number"]::-webkit-inner-spin-button {
+              -webkit-appearance: none;
+              margin: 0;
+            }
+            input[type="number"] {
+              -moz-appearance: textfield;
             }
           `}</style>
           <div className="flex justify-between text-xs text-gray-500">
@@ -687,13 +760,17 @@ const MintWidget: React.FC = () => {
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
-        disabled={loading || !depositAsset || getAssetPrice() <= 0}
+        disabled={loading || !depositAsset || parseFloat(borrowAmount) <= 0 || getAssetPrice() <= 0 || getTotalCollateralValue() <= 0}
       >
         {loading 
-          ? "Creating Vault..." 
+          ? "Processing..." 
           : getAssetPrice() <= 0 
-            ? "Price data required" 
-            : "Create Vault"
+            ? "Price data required"
+            : getTotalCollateralValue() <= 0
+              ? "Need collateral to borrow"
+              : parseFloat(borrowAmount) <= 0
+                ? "Enter borrow amount"
+                : "Borrow"
         }
       </Button>
     </div>
