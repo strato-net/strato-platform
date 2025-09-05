@@ -85,8 +85,6 @@ const WithdrawWidget: React.FC = () => {
       maxAllowed = availableUsdst < tokenMaxBigInt ? availableUsdst : tokenMaxBigInt;
     }
 
-    console.log("maxAllowed", maxAllowed);
-
     return formatBalance(maxAllowed, undefined, 18, 2, 2);
   }, [selectedMintToken, usdstBalance]);
 

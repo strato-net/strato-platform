@@ -26,6 +26,13 @@ const BridgeTransactionsPage = () => {
       key: 'WithdrawalInitiated',
       label: 'Withdrawal',
     },
+    {
+      key: 'RedemptionInitiated',
+      label: 'Redemption',
+    },
+    { key: 'USDSTDeposit',
+      label: 'USDST',
+    },
   ];
 
   return (
@@ -54,9 +61,20 @@ const BridgeTransactionsPage = () => {
               </div>
 
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails />
-              ) : (
-                <WithdrawTransactionDetails />
+                <DepositTransactionDetails mintUSDST={true} />
+              ):
+              transactionType === 'WithdrawalInitiated' ? (
+                <WithdrawTransactionDetails mintUSDST={false} />
+              ):
+              transactionType === 'RedemptionInitiated' ? (
+                <WithdrawTransactionDetails mintUSDST={true} />
+              ):
+              transactionType === 'USDSTDeposit' ? (
+                <DepositTransactionDetails mintUSDST={true} />
+              ):
+              // default to bridge out
+              (
+                <WithdrawTransactionDetails mintUSDST={false} />
               )}
             </div>
           </div>
