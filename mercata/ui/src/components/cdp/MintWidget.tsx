@@ -91,7 +91,7 @@ const MintWidget: React.FC = () => {
     if (assetPriceUSD <= 0) return 0;
     
     // Convert existing collateral from wei to decimal
-    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, depositAsset.collateralAmountDecimals || 18));
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
     
     // Get new deposit amount
     const newDepositAmount = parseFloat(depositAmount || "0");
@@ -477,20 +477,32 @@ const MintWidget: React.FC = () => {
     const depAmount = parseFloat(depositAmount);
     const borAmount = parseFloat(borrowAmount);
 
-    if (depAmount <= 0) {
+    // Borrowing is now required
+    if (borAmount <= 0) {
       toast({
-        title: "Invalid Deposit Amount",
-        description: "Please enter a valid deposit amount",
+        title: "Invalid Borrow Amount", 
+        description: "Please enter a borrow amount",
         variant: "destructive",
       });
       return;
     }
 
-    // Minting is now optional - only validate if user entered an amount
-    if (borAmount < 0) {
+    // Check if we have sufficient total collateral for the borrow amount
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) {
       toast({
-        title: "Invalid Borrow Amount", 
-        description: "Borrow amount cannot be negative",
+        title: "Insufficient Collateral",
+        description: "You need collateral to borrow. Either deposit now or select an asset with existing vault balance.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Deposit is now optional - only validate if user entered an amount
+    if (depAmount < 0) {
+      toast({
+        title: "Invalid Deposit Amount",
+        description: "Deposit amount cannot be negative",
         variant: "destructive",
       });
       return;
@@ -498,30 +510,37 @@ const MintWidget: React.FC = () => {
 
     setLoading(true);
     try {
-      // First deposit collateral
-      const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
-      
-      if (depositResult.status.toLowerCase() !== "success") {
-        throw new Error(`Deposit failed with status: ${depositResult.status}`);
+      let finalResult;
+      let successMessage = "";
+
+      // First deposit collateral if user entered an amount > 0
+      if (depAmount > 0) {
+        const depositResult = await cdpService.deposit(depositAsset.asset, depositAmount);
+        
+        if (depositResult.status.toLowerCase() !== "success") {
+          throw new Error(`Deposit failed with status: ${depositResult.status}`);
+        }
+
+        finalResult = depositResult;
+        successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
       }
 
-      let finalResult = depositResult;
-      let successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
+      // Borrowing is required (already validated above)
+      const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
+      
+      if (mintResult.status.toLowerCase() !== "success") {
+        throw new Error(`Borrow failed with status: ${mintResult.status}`);
+      }
 
-      // Only mint if user specified an amount > 0
-      if (borAmount > 0) {
-        const mintResult = await cdpService.mint(depositAsset.asset, borrowAmount);
-        
-        if (mintResult.status.toLowerCase() !== "success") {
-          throw new Error(`Mint failed with status: ${mintResult.status}`);
-        }
-        
-        finalResult = mintResult;
-        successMessage += ` and minted ${formatNumber(parseFloat(borrowAmount))} USDST`;
+      finalResult = mintResult;
+      if (depAmount > 0) {
+        successMessage += ` and borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
+      } else {
+        successMessage = `Borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
       }
 
       toast({
-        title: "Vault Created Successfully",
+        title: "Transaction Successful",
         description: `${successMessage}. Tx: ${finalResult.hash}`,
       });
 
@@ -557,13 +576,13 @@ const MintWidget: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-6 w-full">
-      <h2 className="text-xl font-semibold text-gray-900">Create Vault</h2>
+      <h2 className="text-xl font-semibold text-gray-900">Borrow Against Collateral</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Deposit */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Deposit</h3>
+            <h3 className="font-semibold">Deposit <span className="text-sm text-gray-500 font-normal"></span></h3>
           </div>
 
           <Select 
@@ -595,7 +614,7 @@ const MintWidget: React.FC = () => {
               className={`flex-1 text-right ${isDepositMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={depositAmount}
               onChange={(e) => handleDepositAmountChange(e.target.value)}
-              placeholder="0.0"
+              placeholder="0.0 (optional)"
               type="number"
               step="any"
               readOnly={isDepositMaxEnabled}
@@ -618,10 +637,10 @@ const MintWidget: React.FC = () => {
           </p>
         </div>
 
-        {/* Mint */}
+        {/* Borrow */}
         <div className="border border-gray-200 rounded-xl p-4 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Mint <span className="text-sm text-gray-500 font-normal">(Optional)</span></h3>
+            <h3 className="font-semibold">Borrow</h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
                 Max: ${formatNumber(maxBorrowable)} (~{formatNumber(depositAsset.liquidationRatio * 1.01, 0)}% CR)
@@ -638,7 +657,7 @@ const MintWidget: React.FC = () => {
               className={`flex-1 text-right ${isMintMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
               value={borrowAmount}
               onChange={(e) => handleBorrowAmountChange(e.target.value)}
-              placeholder="0.0 (optional)"
+              placeholder="0.0"
               type="number"
               step="any"
               readOnly={isMintMaxEnabled}
@@ -741,13 +760,17 @@ const MintWidget: React.FC = () => {
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
-        disabled={loading || !depositAsset || getAssetPrice() <= 0}
+        disabled={loading || !depositAsset || parseFloat(borrowAmount) <= 0 || getAssetPrice() <= 0 || getTotalCollateralValue() <= 0}
       >
         {loading 
-          ? "Creating Vault..." 
+          ? "Processing..." 
           : getAssetPrice() <= 0 
-            ? "Price data required" 
-            : "Create Vault"
+            ? "Price data required"
+            : getTotalCollateralValue() <= 0
+              ? "Need collateral to borrow"
+              : parseFloat(borrowAmount) <= 0
+                ? "Enter borrow amount"
+                : "Borrow"
         }
       </Button>
     </div>
