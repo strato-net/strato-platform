@@ -52,7 +52,6 @@ import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary
-import qualified Data.Set as S
 import Data.Time
 import Data.Time.Clock.POSIX
 import GHC.Generics
@@ -293,11 +292,11 @@ instance RLPSerializable BlockHeader where
 instance HasIstanbulExtra BlockHeader where
   getIstanbulExtra bh = case bh of
     BlockHeader{..} -> _istanbul $ cookRawExtra extraData
-    BlockHeaderV2{..} -> Just $ IstanbulExtra (ChainMembers . S.fromList $ validatorToChainMemberParsedSet <$> currentValidators) proposalSignature signatures
+    BlockHeaderV2{..} -> Just $ IstanbulExtra currentValidators proposalSignature signatures
   putIstanbulExtra mIst bh = case bh of
     BlockHeader{..} -> bh{extraData = uncookRawExtra . set istanbul mIst $ cookRawExtra extraData}
     BlockHeaderV2{} -> bh
-      { currentValidators = maybe [] (map chainMemberParsedSetToValidator . S.toList . unChainMembers . _validatorList) mIst
+      { currentValidators = maybe [] _validatorList mIst
       , proposalSignature = maybe Nothing _proposedSig mIst
       , signatures = maybe [] _commitment mIst
       }

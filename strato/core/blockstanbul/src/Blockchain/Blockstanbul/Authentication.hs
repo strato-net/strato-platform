@@ -116,7 +116,7 @@ replayHistoricBlock realValidators seqNo blk = do
       "proposer " ++ formatAddressWithoutColor prop ++ " (" ++ format propValidator ++ ")  not a validator"
       ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
 
-  let expectedValidatorList = S.map chainMemberParsedSetToValidator $ unChainMembers _validatorList
+  let expectedValidatorList = S.fromList _validatorList
 
   unless (expectedValidatorList == realValidators) $
     blockstanbulError $

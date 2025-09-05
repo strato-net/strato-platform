@@ -311,7 +311,7 @@ eventLoop ctx = execStateC ctx $
           let blk = scrubConsensus blk'
           when flags_test_mode_bypass_blockstanbul $ do
             vs <- use validators
-            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            let blockWithVs = addValidators (S.toList vs) blk
             pseal <- proposerSeal blockWithVs
             commitBlock $ addProposerSeal pseal blockWithVs
             yieldR MakeBlockCommand
@@ -320,7 +320,7 @@ eventLoop ctx = execStateC ctx $
           self <- use selfCert
           when (isNothing ppl && Just leader == fmap chainMemberParsedSetToValidator self) $ do
             vs <- use validators
-            let blockWithVs = addValidators (ChainMembers $ S.map validatorToChainMemberParsedSet vs) blk
+            let blockWithVs = addValidators (S.toList vs) blk
             pseal <- proposerSeal blockWithVs
             let sealedBlk = addProposerSeal pseal blockWithVs
             mLocked <- use blockLock
