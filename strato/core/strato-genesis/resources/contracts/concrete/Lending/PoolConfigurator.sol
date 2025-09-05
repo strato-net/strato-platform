@@ -13,7 +13,7 @@ contract record PoolConfigurator is Ownable {
    
     LendingRegistry public immutable registry;
 
-    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate);
+    event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
 
     constructor(address _registry, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry");
@@ -34,6 +34,7 @@ contract record PoolConfigurator is Ownable {
      * @param liquidationBonuses Array of liquidation bonuses for assets
      * @param interestRates Array of interest rates for assets
      * @param reserveFactors Array of reserve factors for assets
+     * @param perSecondFactorsRAY Array of per-second compound factors in RAY (1e27)
      */
 
     function initializeProtocol(
@@ -49,6 +50,7 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata liquidationBonuses,
         uint[] calldata interestRates,
         uint[] calldata reserveFactors,
+        uint[] calldata perSecondFactorsRAY,
         uint debtCeilingAssetUnits,
         uint debtCeilingUSD
     ) external onlyOwner {
@@ -70,6 +72,7 @@ contract record PoolConfigurator is Ownable {
             require(liquidationBonuses.length == assets.length, "Liquidation bonuses length mismatch");
             require(interestRates.length == assets.length, "Interest rates length mismatch");
             require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
+            require(perSecondFactorsRAY.length == assets.length, "per-second factors length mismatch");
             
             for (uint i = 0; i < assets.length; i++) {
                 pool.configureAsset(
@@ -78,9 +81,10 @@ contract record PoolConfigurator is Ownable {
                     liquidationThresholds[i], 
                     liquidationBonuses[i], 
                     interestRates[i],
-                    reserveFactors[i]
+                    reserveFactors[i],
+                    perSecondFactorsRAY[i]
                 );
-                emit AssetConfigured(assets[i], ltvs[i], liquidationThresholds[i], liquidationBonuses[i], interestRates[i]);
+                emit AssetConfigured(assets[i], ltvs[i], liquidationThresholds[i], liquidationBonuses[i], interestRates[i],reserveFactors[i],perSecondFactorsRAY[i]) ;
             }
         }
     }
@@ -93,6 +97,7 @@ contract record PoolConfigurator is Ownable {
      * @param liquidationBonuses Array of liquidation bonuses in basis points
      * @param interestRates Array of interest rates in basis points
      * @param reserveFactors Array of reserve factors in basis points
+     * @param perSecondFactorsRAY Array of per-second compound factors in RAY (1e27)
      */
     function configureAssets(
         address[] calldata assets,
@@ -100,7 +105,8 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata liquidationThresholds,
         uint[] calldata liquidationBonuses,
         uint[] calldata interestRates,
-        uint[] calldata reserveFactors
+        uint[] calldata reserveFactors,
+        uint[] calldata perSecondFactorsRAY
     ) external onlyOwner {
         // Validate array lengths match
         require(assets.length > 0, "No assets provided");
@@ -109,6 +115,7 @@ contract record PoolConfigurator is Ownable {
         require(liquidationBonuses.length == assets.length, "Liquidation bonuses length mismatch");
         require(interestRates.length == assets.length, "Interest rates length mismatch");
         require(reserveFactors.length == assets.length, "Reserve factors length mismatch");
+        require(perSecondFactorsRAY.length == assets.length, "per-second factors length mismatch");
         
         for (uint i = 0; i < assets.length; i++) {
             LendingPool pool = LendingPool(registry.getLendingPool());
@@ -118,9 +125,10 @@ contract record PoolConfigurator is Ownable {
                 liquidationThresholds[i], 
                 liquidationBonuses[i], 
                 interestRates[i],
-                reserveFactors[i]
+                reserveFactors[i],
+                perSecondFactorsRAY[i]
             );
-            emit AssetConfigured(assets[i], ltvs[i], liquidationThresholds[i], liquidationBonuses[i], interestRates[i]);
+            emit AssetConfigured(assets[i], ltvs[i], liquidationThresholds[i], liquidationBonuses[i], interestRates[i], reserveFactors[i], perSecondFactorsRAY[i]);
         }
     }
 
@@ -132,6 +140,7 @@ contract record PoolConfigurator is Ownable {
      * @param liquidationBonus Liquidation bonus in basis points (e.g., 10500 = 105%)
      * @param interestRate Interest rate in basis points (e.g., 500 = 5%)
      * @param reserveFactor Reserve factor in basis points (e.g., 1000 = 10%)
+     * @param perSecondFactorRAY Per-second compound factor in RAY (1e27)
      */
     function configureAsset(
         address asset,
@@ -139,11 +148,12 @@ contract record PoolConfigurator is Ownable {
         uint liquidationThreshold,
         uint liquidationBonus,
         uint interestRate,
-        uint reserveFactor
+        uint reserveFactor,
+        uint perSecondFactorRAY
     ) external onlyOwner {
         LendingPool pool = LendingPool(registry.getLendingPool());
-        pool.configureAsset(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor);
-        emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate);
+        pool.configureAsset(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY);
+        emit AssetConfigured(asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY);
     }
 
     /**
@@ -151,7 +161,7 @@ contract record PoolConfigurator is Ownable {
      * @param asset The asset address
      * @return ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor
      */
-    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint) {
+    function getAssetConfig(address asset) external view returns (uint, uint, uint, uint, uint, uint) {
         LendingPool pool = LendingPool(registry.getLendingPool());
         return pool.getAssetConfig(asset);
     }

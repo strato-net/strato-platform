@@ -5,7 +5,6 @@ import packageJson from "../../package.json";
 import authHandler from "./middleware/authHandler";
 
 import TokensController from "./controllers/tokens.controller";
-import OnRampController from "./controllers/onramp.controller";
 import OracleController from "./controllers/oracle.controller";
 import ConfigController from "./controllers/config.controller";
 import userRoutes from "./routes/user.routes";
@@ -46,15 +45,6 @@ router.use("/events", eventsRoutes);
 router.get("/oracle/price", authHandler.authorizeRequest(true), OracleController.getPrice);
 router.get("/oracle/price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getPriceHistory);
 router.post("/oracle/price", authHandler.authorizeRequest(), OracleController.setPrice);
-
-// ----- Onramp Routes -----
-router.get("/onramp/", authHandler.authorizeRequest(true), OnRampController.get);
-router.post("/onramp/buy", authHandler.authorizeRequest(), OnRampController.buy);
-router.post("/onramp/sell", authHandler.authorizeRequest(), OnRampController.sell);
-router.post("/onramp/addPaymentProvider", authHandler.authorizeRequest(), OnRampController.addPaymentProvider);
-router.post("/onramp/removePaymentProvider", authHandler.authorizeRequest(), OnRampController.removePaymentProvider);
-router.post("/onramp/cancelListing", authHandler.authorizeRequest(), OnRampController.cancelListing);
-router.post("/onramp/updateListing", authHandler.authorizeRequest(), OnRampController.updateListing);
 
 // ----- Bridge Routes -----
 router.use("/bridge", bridgeRoutes);

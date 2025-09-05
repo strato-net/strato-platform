@@ -1,10 +1,11 @@
 import { cirrus } from "../utils/api";
 import { config } from "../config";
+import { ChainInfo } from "../types";
 
 const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
 
 // Get all enabled chains from the bridge contract
-export const getEnabledChains = async (): Promise<any[]> => {
+export const getEnabledChains = async (): Promise<ChainInfo[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-chains`, {
     params: {
       "value->>enabled": "eq.true",
@@ -15,25 +16,28 @@ export const getEnabledChains = async (): Promise<any[]> => {
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
       ...item.value,
-      chainId: item.key,
+      externalChainId: parseInt(item.key),
     }));
   }
   return [];
 };
 
 // Get all enabled assets from the bridge contract
-export const getEnabledAssets = async (): Promise<any[]> => {
+export const getEnabledAssets = async (externalChainId?: number): Promise<any[]> => {
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
-      "value->>enabled": "eq.true",
+      select: "stratoToken:key,externalChainId:key2,AssetInfo:value",
+      ...(externalChainId ? { key2: `eq.${externalChainId}` } : {}),
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });
 
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
-      ...item.value,
-      stratoToken: item.key,
+      ...item.AssetInfo,
+      stratoToken: item.stratoToken,
+      externalChainId: item.externalChainId,
     }));
   }
   return [];
@@ -49,7 +53,7 @@ export const getAssetInfo = async (
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       key,
-      "value->>enabled": "eq.true",
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });
@@ -78,7 +82,6 @@ export const getWithdrawalsByStatus = async (
   if (Array.isArray(data) && data.length > 0) {
     return data.map((item) => ({
       ...item.value,
-      id: item.key,
       withdrawalId: item.key,
     }));
   }
@@ -91,38 +94,35 @@ export const getDepositsByStatus = async (status: string): Promise<any[]> => {
     params: {
       "value->>bridgeStatus": `eq.${status}`,
       address: `eq.${config.bridge.address}`,
-      order: "value->>requestedAt.asc",
+      order: "value->>timestamp.asc",
     },
   });
 
   if (!Array.isArray(data) || data.length === 0) return [];
 
-  const tokenAddresses = [...new Set(data.map(item => item.value?.token).filter(Boolean))];
+  const tokenAddresses = [...new Set(data.map(item => item.value?.stratoToken).filter(Boolean))];
   const [assetInfos, enabledChains] = await Promise.all([
     getAssetInfo(tokenAddresses) as Promise<any[]>,
     getEnabledChains(),
   ]);
   const assetMapping = new Map(assetInfos.map(asset => [asset.stratoToken, asset]));
-  const chainMapping = new Map(enabledChains.map(chain => [chain.chainId, chain]));
+  const chainMapping = new Map(enabledChains.map(chainInfo => [chainInfo.externalChainId, chainInfo]));
 
-  return data.map(({ value: v, key: srcChainId, key2: srcTxHash }) => {
-    const token = v?.token;
+  return data.map(({ value: v, key: externalChainId, key2: externalTxHash }) => {
+    const token = v?.stratoToken;
     const asset = assetMapping.get(token);
     if (!asset) throw new Error(`Asset info not found for token ${token}`);
   
-    const chainInfo = chainMapping.get(Number(asset.chainId));
-    if (!chainInfo) throw new Error(`Chain info not found for chain ${asset.chainId}`);
+    const chainInfo = chainMapping.get(Number(asset.externalChainId));
+    if (!chainInfo) throw new Error(`Chain info not found for chain ${asset.externalChainId}`);
   
     return {
       ...v,
-      srcChainId,
-      srcTxHash,
-      id: srcChainId,
-      depositId: srcChainId,
-      extToken: asset.extToken,
-      extDecimals: asset.extDecimals,
-      chainId: asset.chainId,
-      enabled: asset.enabled,
+      externalChainId,
+      externalTxHash,
+      externalToken: asset.externalToken,
+      externalDecimals: asset.externalDecimals,
+      permissions: asset.permissions,
       depositRouter: chainInfo.depositRouter,
     };
   });
@@ -135,7 +135,7 @@ export const isTokenEnabled = async (
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
       "value->>stratoToken": `eq.${tokenAddress}`,
-      "value->>enabled": "eq.true",
+      "value->>permissions": "gt.0",
       address: `eq.${config.bridge.address}`,
     },
   });

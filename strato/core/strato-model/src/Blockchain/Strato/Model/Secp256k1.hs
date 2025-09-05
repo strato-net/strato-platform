@@ -189,6 +189,7 @@ exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 importPublicKey :: B.ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
 
+-- We're making hashed be the default, but allow Vault to still call unhashed for backwards compatibility
 -- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
 deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
 deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv

@@ -20,7 +20,7 @@ export const constants = (() => {
   const Pool = `${CONTRACT_PREFIX}Pool`;
   const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
-  const OnRamp = `${CONTRACT_PREFIX}OnRamp`;
+  const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
   const PoolConfigurator = `${CONTRACT_PREFIX}PoolConfigurator`;
   const AdminRegistry = `${CONTRACT_PREFIX}AdminRegistry`;
@@ -144,7 +144,6 @@ export const constants = (() => {
   return {
     poolFactory,
     lendingRegistry,
-    onRamp,
     tokenFactory,
     adminRegistry,
     cdpRegistry,
@@ -158,7 +157,7 @@ export const constants = (() => {
     Pool,
     PoolSwap,
     PriceOracleEvents,
-    OnRamp,
+    PriceOracleBatchUpdateEvents,
     LendingRegistry,
     PoolConfigurator,
     AdminRegistry,
@@ -177,10 +176,8 @@ export const constants = (() => {
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
+    GAS_FEE: 0.01,
+    GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
+    USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
   };
 })();
-
-export const stripeConfig = {
-  confirmUrl: `/api/onRamp/buy`,
-  cancelUrl: `/api/onRamp/cancel`,
-};

@@ -19,9 +19,6 @@ import "./Pools/PoolFactory.sol";
 //Admin
 import "Admin/FeeCollector.sol";
 
-//OnRamp
-import "./OnRamp/OnRamp.sol";
-
 //Redemption
 //import "Redemptions/RedemptionService.sol";
 //import "Redemptions/CryptoRedemptionService.sol"; incomplete
@@ -60,16 +57,14 @@ contract record Mercata {
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
     MercataBridge public mercataBridge;
-    OnRamp public onRamp;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
-
-    CDPRegistry public cdpRegistry;
     CDPEngine public cdpEngine;
-    CDPVault public cdpVault;
+    CDPVault public cdpVault;   
+    CDPRegistry public cdpRegistry;
 
     constructor() public {
         // Create AdminRegistry first
@@ -95,32 +90,17 @@ contract record Mercata {
         // poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         // lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
            
-        // Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        // poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],0,0);
-        // Ownable(poolConfigurator).transferOwnership(msg.sender);
+        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
+        Ownable(poolConfigurator).transferOwnership(msg.sender);
 
-        // // Create Services
-        // mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
-        // onRamp = new OnRamp(address(priceOracle), msg.sender, address(tokenFactory), address(adminRegistry), address(0x000000000000000000000000000000000000100e));
+        // Create Services
+        mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
+        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
 
-        // rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
-
-
-        // Create CDP related contracts
-       
-        address usdst = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
-        address tokenFactory = address(0x000000000000000000000000000000000000100b);
-        address priceOracle = address(0x0000000000000000000000000000000000001002);
-        address feeCollector = address(0x000000000000000000000000000000000000100d);
-        address initialOwner = address(msg.sender);
-        cdpRegistry = new CDPRegistry(address(this));
-        cdpEngine = new CDPEngine(address(cdpRegistry), usdst, tokenFactory, feeCollector, initialOwner);
-        cdpVault = new CDPVault(address(cdpRegistry), initialOwner);
-        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle));
-         Ownable(cdpRegistry).transferOwnership(msg.sender); 
-        // cdpEngine.setTokenFactory(address(tokenFactory));
-        // cdpEngine.setFeeCollector(address(feeCollector));
-
-
+        // Deploy CDP registry, vault, and engine
+        cdpRegistry = new CDPRegistry(msg.sender);
+        cdpVault = new CDPVault(address(cdpRegistry), msg.sender);
+        cdpEngine = new CDPEngine(address(cdpRegistry), msg.sender);
     }
 }

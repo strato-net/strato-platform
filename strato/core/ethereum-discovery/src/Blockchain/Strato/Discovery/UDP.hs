@@ -237,7 +237,7 @@ sendPacket thePeer packet = do
   mPeerAddr <- A.select (A.Proxy @SockAddr) (Just $ pPeerHost thePeer, UDPPort . fromIntegral $ pPeerUdpPort thePeer)
   forM_ mPeerAddr $ \addr -> do
     let ip = addressIP addr
-    A.replace A.Proxy thePeer ip
+    updateIP thePeer ip
     $logInfoS "sendPacket" $ T.pack $ CL.green "sending to" ++ " (" ++ show addr ++ ") " ++ format packet
     let (theType', theRLP) = ndPacketToRLP packet
         theData = rlpSerialize theRLP
@@ -248,13 +248,12 @@ sendPacket thePeer packet = do
         theHash = keccak256ToByteString $ hash $ sigBS <> B.singleton theType' <> theData
 
     A.replace (A.Proxy @B.ByteString) addr $ theHash <> sigBS <> B.singleton theType' <> theData
-  updateLastMessage
-    (case packet of
+  updateLastMessage thePeer $
+    case packet of
        Ping{}          -> "Ping"
        Pong{}          -> "Pong"
        FindNeighbors{} -> "FindNeighbors"
-       Neighbors{}     -> "Neighbors")
-    thePeer
+       Neighbors{}     -> "Neighbors"
 
 processDataStream' :: B.ByteString -> PublicKey
 processDataStream' bs | B.length bs < 98 = error "processDataStream' called with too few bytes"
