@@ -68,16 +68,15 @@ contract record Mercata {
 
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry([this, msg.sender]);
+        adminRegistry = new AdminRegistry([this]);
 
         // Create FeeCollector
         feeCollector = new FeeCollector(address(adminRegistry));
 
         // Create Factories
-        tokenFactory = new TokenFactory(address(adminRegistry), address(address(adminRegistry)));
+        tokenFactory = new TokenFactory(address(adminRegistry));
         poolFactory = new PoolFactory(address(adminRegistry), address(tokenFactory), address(address(adminRegistry)), address(feeCollector));
-        adminRegistry.addAdmin(address(poolFactory));
-        adminRegistry.removeAdmin(this);
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(tokenFactory), "createTokenWithInitialOwner", address(poolFactory));
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
@@ -97,8 +96,12 @@ contract record Mercata {
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
-        cdpRegistry = new CDPRegistry(address(adminRegistry));
+        cdpRegistry = new CDPRegistry(this);
         cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
         cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector));
+        Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
     }
 }

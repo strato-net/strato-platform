@@ -323,7 +323,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
       ]
 
-  void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ pure ()
+  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
   env <- getEnv
   let -- metadata = Env.metadata env
@@ -339,7 +339,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
-  void . withCallInfo newAddress contract' (stringToLabel $ labelToString contractName' ++ " constructor") ch cc M.empty False False $ do
+  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
     setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
@@ -577,7 +577,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                     Nothing -> False
                     Just ci -> readOnly ci
               pure . bool (pushSender from) id (from == to) $
-                runTheCall to contract "fallback" hsh cc fallbackFunc valList ro False
+                runTheCall to contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -600,7 +600,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                 fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
               pure $ pure val
             _ -> do
-              valPath' <- withCallInfo to contract (functionName ++ "()") hsh cc M.empty True False $ do
+              valPath' <- withCallInfo to contract functionName hsh cc M.empty True False $ do
                 pure . Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
               pure $ pure valPath'
         Nothing -> case M.lookup "fallback" functionsIncludingConstructor of
@@ -610,13 +610,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract "fallback" hsh cc fallbackFunc valList ro False
+              runTheCall to contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when
     isRCC
     ( do
-        void . withCallInfo to contract' (stringToLabel $ labelToString (contract' ^. CC.contractName) ++ " constructor") hsh cc M.empty False False $ do
+        void . withCallInfo to contract' "constructor" hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
             setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -736,26 +736,27 @@ argsToVals args = case args of
       _ -> vals
   CC.NamedArgs xs -> NamedVals <$> traverse (\(n,v) -> fmap (n,) . getVar =<< expToVar v Nothing) xs
 
+runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
+runModifiersAndStatements []   stmts = runStatementBlock stmts
+runModifiersAndStatements mods stmts = withLocalVars $ go mods
+  where go [] = pure Nothing
+        go (ss:rest) = do
+          (mv, ss') <- runStatements ss
+          case mv of
+            Just SContinue -> do
+              mv1 <- runModifiersAndStatements rest stmts
+              mv2 <- go $ ss':rest
+              pure $ mv2 <|> mv1
+            _ -> pure mv
+
 runStatementBlock :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatementBlock = withLocalVars . runStatements
+runStatementBlock = fmap fst . runStatementBlock'
 
-runStatementBlock' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatementBlock' = withLocalVars . runStatements'
+runStatementBlock' :: MonadSM m => [CC.Statement] -> m (Maybe Value, [CC.Statement])
+runStatementBlock' = withLocalVars . runStatements
 
-runStatements' :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatements' [] = return Nothing
-runStatements' (s : rest) = do
-  onTraced $ do
-    when False printFullStackTrace -- Too verbose, only turn on by hand when needed
-    funcName <- getCurrentFunctionName
-    liftIO $ putStrLn $ C.green $ labelToString funcName ++ "> " ++ unparseStatement s
-  ret <- runStatement s
-  case ret of
-    Nothing -> runStatements rest
-    _ -> modifierError "you cannot return a value as part of a modifier" (s)
-
-runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value)
-runStatements [] = return Nothing
+runStatements :: MonadSM m => [CC.Statement] -> m (Maybe Value, [CC.Statement])
+runStatements [] = return (Nothing, [])
 runStatements (s : rest) = do
   onTraced $ do
     when False printFullStackTrace -- Too verbose, only turn on by hand when needed
@@ -767,7 +768,7 @@ runStatements (s : rest) = do
 
   case ret of
     Nothing -> runStatements rest
-    v -> return v
+    v -> return (v, rest)
 
 runStatement :: MonadSM m => CC.Statement -> m (Maybe Value)
 runStatement (CC.RevertStatement mString theArgs pos) = do
@@ -1117,7 +1118,7 @@ runStatement (CC.UncheckedStatement code pos) = do
 --runs the "_;" operator in a modifier statement
 runStatement (CC.ModifierExecutor pos) = do
   solidVMBreakpoint pos
-  return Nothing
+  return $ Just SContinue
 runStatement x = unknownStatement "unknown statement in call to runStatement: " (show x)
 
 while :: MonadSM m => m Bool -> m (Maybe Value) -> m (Maybe Value)
@@ -1362,16 +1363,10 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
           localVars = localVariables callInfo
       argVals <- forM argList (\(n, _) -> getVar . snd $ localVars M.! (fromMaybe "" n))
-      argsToStr <- fmap (intercalate ", ") $ forM argVals showSM
-      return . Constant . SString $ "(" ++ argsToStr ++ ")"
+      return . Constant $ SVariadic argVals
     (SBuiltinVariable "msg", "sig") -> do
       functionName <- getCurrentFunctionName
-      contract' <- getCurrentContract
-      let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-          argTypesList = map (\(_, CC.IndexedType _ t) -> t) argList
-          argString = labelToString functionName ++ "(" ++ intercalate "," (map unparseVarType argTypesList) ++ ")"
-          calldataHash = fromMaybe emptyHash $ stringKeccak256 argString
-      return . Constant . SString $ take 8 $ keccak256ToHex calldataHash
+      return . Constant $ SString functionName
     (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v UnspecifiedChain) . Env.origin) <$> getEnv
     (SBuiltinVariable "tx", "username") -> do
       env' <- getEnv
@@ -2675,7 +2670,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  void . withCallInfo to contract' (stringToLabel $ labelToString contractName' ++ " constructor") hsh cc (M.fromList zipped) False False . pushSender from $ do
+  void . withCallInfo to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
@@ -2710,14 +2705,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           Just cms -> pure cms
         -- let modifierArgs = map CC.modifierArgs theModifiers
         let !modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-        let isNotModExec = \case
-              CC.ModifierExecutor _ -> False
-              _ -> True
-        let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
-        logVals lhs rhs
-        _ <- runStatementBlock' lhs
-        _ <- runStatementBlock commands
-        _ <- runStatementBlock' rhs
+        _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
 
@@ -2851,14 +2839,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
     -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
     let !commands = fromMaybe (missingField "Function call: function has been declared but not defined" funcName) $ CC._funcContents theFunction
     let modContentsList = map (\m -> fromMaybe (missingField "Function call: Modifier has been declared but not defined" m) (CC._modifierContents m)) theModifiers
-    let isNotModExec = \case
-          CC.ModifierExecutor _ -> False
-          _ -> True
-    let (lhs, rhs) = foldr (\(a, b) (c, d) -> (a ++ c, b ++ d)) ([], []) (map (span isNotModExec) modContentsList)
-    logVals lhs rhs
-    _ <- runStatementBlock' lhs
-    val <- runStatementBlock commands
-    _ <- runStatementBlock' rhs
+    val <- runModifiersAndStatements modContentsList commands
 
     let findNamedReturns = do
           case returns of

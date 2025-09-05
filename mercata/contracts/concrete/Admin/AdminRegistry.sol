@@ -7,16 +7,11 @@ contract record AdminRegistry {
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) votesMap;
 
-    mapping (address => mapping (string => mapping (address => bool))) whitelist;
+    mapping (address => mapping (string => mapping (address => bool))) public whitelist;
 
     event IssueCreated(address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
-
-    modifier onlyAdmin(string f) {
-        require(adminMap[msg.sender] != 0, "Only an admin can call " + f);
-        _;
-    }
 
     constructor(address[] _initialAdmins) {
         for (uint i = 0; i < _initialAdmins.length; i++) {
@@ -33,13 +28,23 @@ contract record AdminRegistry {
         castVoteOnIssue(this, "_removeAdmin", _admin);
     }
 
+    function swapAdmin(address _admin) external {
+        castVoteOnIssue(this, "_swapAdmin", _admin);
+    }
+
     function isAdminAddress(address _admin) external returns (bool) {
         return adminMap[_admin] > 0;
     }
 
-    function castVoteOnIssue(address _target, string _func, variadic _args) public onlyAdmin("castVoteOnIssue") returns (bool, variadic) {
+    function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        require(adminMap[msg.sender] != 0 || adminMap[_target] != 0, "Only an admin can call castVoteOnIssue");
+        address sender = msg.sender;
+        if (adminMap[msg.sender] == 0) {
+            sender = _target;
+            _target = msg.sender;
+        }
         string issueId = _getIssueId(_target, _func, _args);
-        require(votesMap[issueId][msg.sender] == 0, "Cannot cast multiple votes for the same issue");
+        require(votesMap[issueId][sender] == 0, "Cannot cast multiple votes for the same issue");
 
         try {
             _createIssue(issueId, _target, _func, _args);
@@ -51,9 +56,9 @@ contract record AdminRegistry {
             variadic ret = _executeIssue(issueId, _target, _func, _args);
             return (true, ret);
         } else {
-            votes[issueId].push(msg.sender);
-            votesMap[issueId][msg.sender] = votes[issueId].length;
-            emit IssueVoted(msg.sender, issueId, _target, _func, _args);
+            votes[issueId].push(sender);
+            votesMap[issueId][sender] = votes[issueId].length;
+            emit IssueVoted(sender, issueId, _target, _func, _args);
             return (false, issueId);
         }
     }
@@ -68,15 +73,31 @@ contract record AdminRegistry {
         }
     }
 
-    function createIssue(address _target, string _func, variadic _args) external returns (bool, variadic) {
-        string issueId = _getIssueId(_target, _func, _args);
-        if (whitelist[_target][_func][msg.sender]) {
-            variadic ret = _executeIssue(issueId, _target, _func, _args);
+    function createIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        try {
+            if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
+                string issueId = _getIssueId(_target, _func, _args);
+                variadic ret = _executeIssue(issueId, _target, _func, _args);
+                return (true, ret);
+            }
+        } catch {
+
+        }
+        address sender = msg.sender;
+        address target = _target;
+        require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only a whitelisted account can call createIssue");
+        if (!whitelist[target][_func][sender]) {
+            sender = _target;
+            target = msg.sender;
+        }
+        string issueId = _getIssueId(target, _func, _args);
+        if (whitelist[target][_func][sender]) {
+            variadic ret = _executeIssue(issueId, target, _func, _args);
             return (true, ret);
         } else {
-            _createIssue(issueId, _target, _func, _args);
-            return (false, issueId);
+            _createIssue(issueId, target, _func, _args);
         }
+        return (false, issueId);
     }
 
     function _createIssue(string _issueId, address _target, string _func, variadic _args) internal {
@@ -131,6 +152,17 @@ contract record AdminRegistry {
         adminMap[_admin] = 0;
         admins[admins.length - 1] = address(0);
         admins.length -= 1;
+    }
+
+    function _swapAdmin(address _admin) internal {
+        uint index = adminMap[_admin];
+        require(index == 0, "Account is already an admin");
+        index = adminMap[msg.sender];
+        require(index > 0, "Caller is not an admin");
+        address swap = admins[admins.length - 1];
+        admins[index - 1] = _admin;
+        adminMap[_admin] = index;
+        adminMap[msg.sender] = 0;
     }
 
     function addWhitelist(address _target, string _func, address _user) internal {

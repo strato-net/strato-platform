@@ -742,6 +742,8 @@ typecheckIndex (Bottom es) _ = pure $ Bottom es
 typecheckIndex _ (Bottom es) = pure $ Bottom es
 typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pure (Static t x)
 typecheckIndex (Product [(Static (SVMType.Array t _) x)] _) i = i ~> (pure $ intType' x) !> pure (Static t x)
+typecheckIndex (Static SVMType.Variadic x) i = i ~> (pure $ intType' x) !> pure (topType' x)
+typecheckIndex (Product [(Static SVMType.Variadic x)] _) i = i ~> (pure $ intType' x) !> pure (topType' x)
 typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (SVMType.Bytes Nothing (Just 1)) x)
 typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
   t <- typecheck (Static k x) i
@@ -1775,10 +1777,7 @@ statementHelper (Return mExpr x) = do
         Just (Sum _) -> (Just t', locals) :| rest
         _ -> (ret, locals) :| rest
       pure t'
-    (Just _,Nothing) ->
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x       
-    (Just _,Just _)  -> 
-      pure . bottom $ "Cannot use keyword 'return' inside of a modifier." <$ x
+    (Just _, _) -> maybe (pure $ Product [] x) tcExpr mExpr
 
 statementHelper (Throw e x) = do
   et <- tcExpr e
