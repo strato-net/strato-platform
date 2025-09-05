@@ -7,9 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 const ExchangeCart = () => {
   return (
     <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
-      <Tabs defaultValue="buy" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="buy">Buy</TabsTrigger>
+      <Tabs defaultValue="bridge" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="bridge">Bridge</TabsTrigger>
           <TabsTrigger value="swap">Swap</TabsTrigger>
           <TabsTrigger value="mint">Deposit</TabsTrigger>

@@ -26,10 +26,11 @@ const WithdrawWidget: React.FC = () => {
   const {
     redeemOut,
     availableNetworks,
+    redeemableTokens,
     selectedNetwork,
     setSelectedNetwork,
-    selectedToken,
-    setSelectedToken,
+    selectedMintToken,
+    setSelectedMintToken,
     loadNetworksAndTokens,
     fetchRedeemableTokens,
   } = useBridgeContext();
@@ -43,20 +44,12 @@ const WithdrawWidget: React.FC = () => {
   // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
   const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
 
-  // State for redeemable tokens (loaded separately)
-  const [redeemableTokens, setRedeemableTokens] = useState<any[]>([]);
-
-  // Only show USDC / USDT as destinations
-  const stableTokens = useMemo(() => {
-    const filtered = redeemableTokens.filter((t) => 1 /* already filtered */ );
-    return filtered;
-  }, [redeemableTokens]);
 
   useEffect(() => {
-    if (!selectedToken && stableTokens.length) {
-      setSelectedToken(stableTokens[0]);
+    if (!selectedMintToken && redeemableTokens.length > 0) {
+      setSelectedMintToken(redeemableTokens[0]);
     }
-  }, [selectedToken, stableTokens, setSelectedToken]);
+  }, [selectedMintToken, redeemableTokens, setSelectedMintToken]);
 
   // Load networks and redeemable tokens on mount
   useEffect(() => {
@@ -69,16 +62,11 @@ const WithdrawWidget: React.FC = () => {
 
   // Load redeemable tokens when network changes
   useEffect(() => {
-    const loadRedeemableTokens = async () => {
-      if (!selectedNetwork) return;
-      const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
-      if (!networkConfig) return;
+    if (!selectedNetwork) return;
+    const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
+    if (!networkConfig) return;
 
-      const tokens = await fetchRedeemableTokens(networkConfig.chainId);
-      setRedeemableTokens(tokens);
-    };
-
-    loadRedeemableTokens();
+    fetchRedeemableTokens(networkConfig.chainId);
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
   const validateAmount = (value: string) => {
@@ -101,7 +89,7 @@ const WithdrawWidget: React.FC = () => {
   };
 
   const handleWithdraw = async () => {
-    if (!selectedToken || !selectedNetwork || !address) return;
+    if (!selectedMintToken || !selectedNetwork || !address) return;
     if (!validateAmount(amount)) return;
     setIsLoading(true);
     try {
@@ -111,13 +99,13 @@ const WithdrawWidget: React.FC = () => {
       const res = await redeemOut({
         stratoTokenAmount,
         externalRecipient: address,
-        stratoToken: selectedToken.stratoToken,
+        stratoToken: selectedMintToken.stratoToken,
         externalChainId: String(externalChainId)
       });
       if (res?.success) {
         toast({
           title: "Withdrawal requested",
-          description: `Burned ${amount} USDST; ${selectedToken.externalSymbol} will be sent to your ${selectedNetwork} address after review.`,
+          description: `Burned ${amount} USDST; ${selectedMintToken.externalSymbol} will be sent to your ${selectedNetwork} address after review.`,
         });
         setAmount("");
       } else {
@@ -151,8 +139,8 @@ const WithdrawWidget: React.FC = () => {
       <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
-          <Label>From</Label>
-          <Input value="STRATO (USDST)" disabled className="bg-gray-50" />
+          <Label>From Network</Label>
+          <Input value="STRATO" disabled className="bg-gray-50" />
         </div>
         <div className="flex-1 space-y-1.5">
           <Label>To Network</Label>
@@ -172,11 +160,11 @@ const WithdrawWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Receive Stablecoin</Label>
         <Select
-          value={selectedToken?.stratoToken || ""}
+          value={selectedMintToken?.stratoToken || ""}
           onValueChange={(v) => {
-            const token = stableTokens.find(t => t.stratoToken === v);
+            const token = redeemableTokens.find(t => t.stratoToken === v);
             if (token) {
-              setSelectedToken(token);
+              setSelectedMintToken(token);
             }
           }}
         >
@@ -184,7 +172,7 @@ const WithdrawWidget: React.FC = () => {
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
-            {stableTokens.map(t => (
+            {redeemableTokens.map(t => (
               <SelectItem key={t.stratoToken} value={t.stratoToken}>{t.externalName} ({t.externalSymbol})</SelectItem>
             ))}
           </SelectContent>
@@ -212,12 +200,12 @@ const WithdrawWidget: React.FC = () => {
         </div>
         <div className="flex items-center justify-between">
           <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} {selectedToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "externalal network"}</span>
+          <span className="font-medium">{amount || "0.00"} {selectedMintToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "externalal network"}</span>
         </div>
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedToken || !amount || !!amountError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
+        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedMintToken || !amount || !!amountError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
           {isLoading ? "Processing..." : "Withdraw"}
         </Button>
       </div>

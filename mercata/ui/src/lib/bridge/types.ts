@@ -85,8 +85,10 @@ export type BridgeContextType = {
   error: string | null;
   availableNetworks: NetworkSummary[];
   bridgeableTokens: Token[];
+  redeemableTokens: Token[];
   selectedNetwork: string | null;
   selectedToken: Token | null;
+  selectedMintToken: Token | null;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   redeemOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
@@ -101,11 +103,12 @@ export type BridgeContextType = {
   };
   setSelectedNetwork: (networkName: string) => void;
   setSelectedToken: (token: Token | null) => void;
+  setSelectedMintToken: (token: Token | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
   fetchWithdrawTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
-  fetchRedeemableTokens: (chainId: string) => Promise<Token[]>;
+  fetchRedeemableTokens: (chainId: string) => void;
 };
 
 export interface ContractValidationResult {

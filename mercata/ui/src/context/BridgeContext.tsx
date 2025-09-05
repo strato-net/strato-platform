@@ -29,8 +29,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
   const [bridgeableTokens, setBridgeableTokens] = useState<Token[]>([]);
+  const [redeemableTokens, setRedeemableTokens] = useState<Token[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
+  const [selectedMintToken, setSelectedMintToken] = useState<Token | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
 
   const fetchTokensForChain = useCallback(
@@ -282,16 +284,22 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const fetchRedeemableTokens = useCallback(
-    async (chainId: string): Promise<Token[]> => {
+    async (chainId: string) => {
       try {
         const { data } = await api.get<Token[]>(`/bridge/redeemableTokens/${chainId}`);
-        return Array.isArray(data) ? data : [];
-      } catch (error) {
+        const tokens = Array.isArray(data) ? data : [];
+        setRedeemableTokens(tokens);
+
+        // Set initial token if none is selected
+        if (tokens.length > 0 && !selectedMintToken) {
+          setSelectedMintToken(tokens[0]);
+        }
+      } catch (e) {
+        setRedeemableTokens([]);
         setError("Failed to load tokens for selected network");
-        return [];
       }
     },
-    []
+    [selectedMintToken]
   );
 
   return (
@@ -301,13 +309,16 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         error,
         availableNetworks,
         bridgeableTokens,
+        redeemableTokens,
         selectedNetwork,
         selectedToken,
+        selectedMintToken,
         bridgeOut,
         redeemOut,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,
+        setSelectedMintToken,
         loadNetworksAndTokens,
         fetchDepositTransactions,
         fetchWithdrawTransactions,
