@@ -1,4 +1,4 @@
-import { lendingRegistry, onRamp, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -113,12 +113,12 @@ export const constants = (() => {
     ")",
   ];
 
-  const onRampSelectFields = [
-    "address",
-    `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`,
-    `listings:${OnRamp}-listings(key,value)`,
-    `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
-  ];
+  // const onRampSelectFields = [
+  //   "address",
+  //   `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`,
+  //   `listings:${OnRamp}-listings(key,value)`,
+  //   `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
+  // ];
 
   const swapHistorySelectFields = [
     "address",
@@ -172,7 +172,7 @@ export const constants = (() => {
     poolSelectFields,
     registrySelectFields,
     cdpRegistrySelectFields,
-    onRampSelectFields,
+    // onRampSelectFields,
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
