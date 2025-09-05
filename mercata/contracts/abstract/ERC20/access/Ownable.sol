@@ -1,4 +1,5 @@
 import "../utils/Context.sol";
+import "../../../concrete/Admin/AdminRegistry.sol";
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
@@ -41,8 +42,24 @@ abstract contract Ownable is Context {
      * @dev Throws if called by any account other than the owner.
      */
     modifier onlyOwner() {
-        _checkOwner();
-        _;
+        try {
+            _checkOwner();
+            _;
+        } catch {
+            AdminRegistry admin = AdminRegistry(owner());
+            address sender = _msgSender();
+            if (admin.isAdminAddress(sender)) {
+                (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
+                if (didExecute) {
+                    return ret;
+                }
+            } else {
+                (bool didExecute, variadic ret) = admin.createIssue(sender, msg.sig, msg.data);
+                if (didExecute) {
+                    return ret;
+                }
+            }
+        }
     }
 
     /**
@@ -51,7 +68,11 @@ abstract contract Ownable is Context {
     bool internal _ownershipGranted;
     modifier onlyOwnerExternal() {
         if(!_ownershipGranted) {
-            _checkOwner();
+            try {
+                _checkOwner();
+            } catch {
+                require(AdminRegistry(owner()).whitelist(this, msg.sig, msg.sender), string(msg.sender) + " is not authorized to call " + msg.sig);
+            }
         }
         _ownershipGranted = true;
         _;
