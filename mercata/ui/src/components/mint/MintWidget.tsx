@@ -280,6 +280,11 @@ const MintWidget: React.FC = () => {
       });
 
       toast({ title: "Mint transaction sent", description: `Tx: ${txHash.slice(0,10)}…` });
+      // Clear input early to reflect submitted state
+      setAmount("");
+
+      // Kick a quick balance refresh for immediate UI update
+      await fetchUsdstBalance(userAddress);
 
       // Auto-deposit: poll for USDST balance increase and deposit (TODO this is a really hacky way to do this)
       if (autoDeposit) {
@@ -458,5 +463,4 @@ const MintWidget: React.FC = () => {
 };
 
 export default MintWidget;
-
 

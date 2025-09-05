@@ -13,6 +13,7 @@ import {
 import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useUser } from "@/context/UserContext";
 import { safeParseUnits } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
@@ -35,7 +36,8 @@ const WithdrawWidget: React.FC = () => {
     fetchRedeemableTokens,
   } = useBridgeContext();
 
-  const { usdstBalance } = useUserTokens();
+  const { userAddress } = useUser();
+  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
 
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
@@ -108,6 +110,10 @@ const WithdrawWidget: React.FC = () => {
           description: `Burned ${amount} USDST; ${selectedMintToken.externalSymbol} will be sent to your ${selectedNetwork} address after review.`,
         });
         setAmount("");
+        // Refresh USDST balance to reflect burn
+        if (userAddress) {
+          await fetchUsdstBalance(userAddress);
+        }
       } else {
         throw new Error("Failed to request withdrawal");
       }
@@ -214,7 +220,6 @@ const WithdrawWidget: React.FC = () => {
 };
 
 export default WithdrawWidget;
-
 
 
 
