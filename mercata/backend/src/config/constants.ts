@@ -113,13 +113,6 @@ export const constants = (() => {
     ")",
   ];
 
-  // const onRampSelectFields = [
-  //   "address",
-  //   `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))`,
-  //   `listings:${OnRamp}-listings(key,value)`,
-  //   `paymentProviders:${OnRamp}-paymentProviders(key,value)`,
-  // ];
-
   const swapHistorySelectFields = [
     "address",
     "id",
@@ -172,7 +165,6 @@ export const constants = (() => {
     poolSelectFields,
     registrySelectFields,
     cdpRegistrySelectFields,
-    // onRampSelectFields,
     swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
