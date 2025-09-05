@@ -319,7 +319,12 @@ const VaultsList: React.FC = () => {
           result = await cdpService.mint(asset, amount);
           break;
         case 'repay':
-          result = await cdpService.repay(asset, amount);
+          // If user is in max state, use repayAll endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.repayAll(asset);
+          } else {
+            result = await cdpService.repay(asset, amount);
+          }
           break;
         default:
           throw new Error(`Unknown action: ${action}`);
