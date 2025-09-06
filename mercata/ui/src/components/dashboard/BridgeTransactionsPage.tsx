@@ -7,7 +7,7 @@ import DepositTransactionDetails from './DepositTransactionDetails';
 import WithdrawTransactionDetails from './WithdrawTransactionDetails';
 import { useBridgeContext } from '@/context/BridgeContext';
 
-type TransactionType = 'DepositRecorded' | 'WithdrawalInitiated';
+type TransactionType = 'DepositRecorded' | 'WithdrawalInitiated' | 'RedemptionInitiated' | 'USDSTDeposit';
 
 const BridgeTransactionsPage = () => {
   const [transactionType, setTransactionType] = useState<TransactionType>('DepositRecorded');
@@ -61,20 +61,20 @@ const BridgeTransactionsPage = () => {
               </div>
 
               {transactionType === 'DepositRecorded' ? (
-                <DepositTransactionDetails mintUSDST={true} />
+                <DepositTransactionDetails key="deposit" mintUSDST={false} />
               ):
               transactionType === 'WithdrawalInitiated' ? (
-                <WithdrawTransactionDetails mintUSDST={false} />
+                <WithdrawTransactionDetails key="withdrawal" mintUSDST={false} />
               ):
               transactionType === 'RedemptionInitiated' ? (
-                <WithdrawTransactionDetails mintUSDST={true} />
+                <WithdrawTransactionDetails key="redemption" mintUSDST={true} />
               ):
               transactionType === 'USDSTDeposit' ? (
-                <DepositTransactionDetails mintUSDST={true} />
+                <DepositTransactionDetails key="usdst" mintUSDST={true} />
               ):
               // default to bridge out
               (
-                <WithdrawTransactionDetails mintUSDST={false} />
+                <WithdrawTransactionDetails key="default" mintUSDST={false} />
               )}
             </div>
           </div>
