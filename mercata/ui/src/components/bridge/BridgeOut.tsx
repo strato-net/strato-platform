@@ -20,7 +20,7 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import { DECIMAL_PATTERN } from "@/lib/constants";
+import { DECIMAL_PATTERN, BRIDGE_OUT_FEE } from "@/lib/constants";
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -300,6 +300,12 @@ const BridgeOut: React.FC = () => {
         ].map((text, i) => (
           <p key={i}>• {text}</p>
         ))}
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Transaction Fee</span>
+          <span className="font-medium">{BRIDGE_OUT_FEE} USDST</span>
+        </div>
       </div>
 
       <div className="flex justify-end gap-4">

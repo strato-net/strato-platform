@@ -63,7 +63,7 @@ const MintWidget: React.FC = () => {
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
-  const [autoDeposit, setAutoDeposit] = useState<boolean>(true);
+  const [autoDeposit, setAutoDeposit] = useState<boolean>(false);
   const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ amount: "", loading: false });
   const inFlightRef = useRef(false);
 
@@ -423,10 +423,10 @@ const MintWidget: React.FC = () => {
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700">
+      {/* <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
         Automatically deposit minted USDST into lending pool
-      </label>
+      </label> */}
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
         {autoDeposit && (

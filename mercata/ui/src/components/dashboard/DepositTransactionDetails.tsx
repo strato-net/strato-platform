@@ -10,7 +10,7 @@ import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiAmount } from "@/utils/numberUtils";
 import { bridgeContractService } from "@/lib/bridge/contractService";
 
-const DepositTransactionDetails = () => {
+const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
@@ -33,7 +33,7 @@ const DepositTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = 'eq.false';
+        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
