@@ -12,8 +12,6 @@ export interface Token {
   images?: Array<{ value: string }>;
   attributes?: Array<{ key: string; value: string }>;
   balances?: Array<{ user: string; balance: string; collateralBalance?: string }>;
-  minters?: Array<{ user: string; value: boolean }>;
-  burners?: Array<{ user: string; value: boolean }>;
   price?: number | string;
   
   // Legacy fields for backward compatibility

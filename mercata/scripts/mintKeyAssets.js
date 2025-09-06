@@ -49,7 +49,7 @@ require("dotenv").config();
   const addrs = {
     WBTCST: (process.env.WBTCST || "7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9").toLowerCase(),
     ETHST : (process.env.ETHST  || "93fb7295859b2d70199e0a4883b7c320cf874e6c").toLowerCase(),
-    GOLDST: (process.env.GOLDST || "491cdfe98470bfe69b662ab368826dca0fc2f24d").toLowerCase(),
+    GOLDST: (process.env.GOLDST || "cdc93d30182125e05eec985b631c7c61b3f63ff0").toLowerCase(),
     SILVST: (process.env.SILVST || "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94").toLowerCase(),
   };
 

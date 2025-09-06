@@ -119,8 +119,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     return `$${formatNumber(profit)}`;
   };
 
-  const handleLiquidate = async (vault: VaultData) => {
-    const vaultKey = `${vault.asset}-${vault.symbol}`;
+  const handleLiquidate = async (vault: VaultData, vaultKey: string) => {
     const liquidationAmount = liquidationAmounts[vaultKey];
     
     if (!liquidationAmount || parseFloat(liquidationAmount) <= 0) {
@@ -170,7 +169,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={onBack}>
-            ← Back to Mint
+            ← Back to Borrow
           </Button>
         </div>
         <Card>
@@ -184,6 +183,17 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
 
   return (
     <div className="space-y-4">
+      <style>{`
+        /* Hide number input arrows */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>
@@ -204,8 +214,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
               No liquidatable positions found
             </div>
           ) : (
-            liquidatableVaults.map((vault) => {
-              const vaultKey = `${vault.asset}-${vault.symbol}`;
+            liquidatableVaults.map((vault, index) => {
+              const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${index}`;
               const isExpanded = expandedVaults[vaultKey];
               const liquidationAmount = liquidationAmounts[vaultKey] || "";
               const isLiquidating = liquidatingVaults[vaultKey];
@@ -221,12 +231,9 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       <div className="flex items-center space-x-2">
                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         <span className="font-medium">Borrower</span>
-                        <span className="text-gray-600 font-mono">
+                        <span className="text-gray-600 font-mono text-sm">
                           {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "88c86a...7cff"}
                         </span>
-                        <Button variant="outline" size="sm" className="text-xs">
-                          📋
-                        </Button>
                       </div>
                     </div>
                     <div className="flex items-center space-x-8">
@@ -236,7 +243,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       </div>
                       <div>
                         <span className="text-gray-500">Health Factor</span>
-                        <div className="font-medium text-red-600">{formatNumber(vault.healthFactor)}%</div>
+                        <div className="font-medium text-red-600">{formatNumber(vault.healthFactor)}</div>
                       </div>
                     </div>
                   </div>
@@ -284,7 +291,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                           />
                           <Button 
                             className="bg-red-600 hover:bg-red-700 text-white"
-                            onClick={() => handleLiquidate(vault)}
+                            onClick={() => handleLiquidate(vault, vaultKey)}
                             disabled={isLiquidating || !liquidationAmount}
                           >
                             {isLiquidating ? "Liquidating..." : "Liquidate"}

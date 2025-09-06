@@ -18,6 +18,9 @@ router.post("/deposit", authHandler.authorizeRequest(), CDPController.deposit);
 // Withdraw collateral  
 router.post("/withdraw", authHandler.authorizeRequest(), CDPController.withdraw);
 
+// Get maximum mintable amount (simulation)
+router.post("/get-max-mint", authHandler.authorizeRequest(), CDPController.getMaxMint);
+
 // Mint USDST
 router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
 
@@ -25,6 +28,9 @@ router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
 router.post("/repay", authHandler.authorizeRequest(), CDPController.repay);
 
 // ----- Helper Functions -----
+// Get maximum withdrawable amount (simulation)
+router.post("/get-max-withdraw", authHandler.authorizeRequest(), CDPController.getMaxWithdraw);
+
 // Withdraw maximum safe collateral
 router.post("/withdraw-max", authHandler.authorizeRequest(), CDPController.withdrawMax);
 

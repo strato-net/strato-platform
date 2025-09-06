@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
+import { useUserTokens } from "@/context/UserTokensContext";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -75,18 +76,23 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
   return `${quotient}.${trimmedDecimal}`;
 };
 
+interface VaultsListProps {
+  refreshTrigger?: number; // Increment this to trigger a refresh
+}
+
 /**
  * VaultsList component displays user's CDP vaults
  * Each vault represents a collateral position with corresponding debt
  * Connected to backend API for real-time data
  */
-const VaultsList: React.FC = () => {
+const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { activeTokens } = useUserTokens();
   
   // State for active action and input amounts for each position
-  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'mint' | 'repay' | null>>({});
+  const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
 
@@ -123,10 +129,10 @@ const VaultsList: React.FC = () => {
     };
 
     fetchPositions();
-  }, [toast]);
+  }, [toast, refreshTrigger]);
 
   // Handle dropdown action selection
-  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+  const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
     const currentAction = activeActions[asset];
     
     if (currentAction === action) {
@@ -152,46 +158,50 @@ const VaultsList: React.FC = () => {
   };
 
   // Calculate maximum allowed value for each action
-  const calculateMaxValue = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay'): string => {
-    // Convert wei strings to decimal numbers for calculations
-    const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
-    const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-    const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
-    const pricePerUnit = currentCollateralUSD / currentCollateral;
-
+  const calculateMaxValue = async (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay'): Promise<string> => {
     switch (action) {
       case 'deposit': {
-        // For deposit, we could set a reasonable limit or user's wallet balance
-        // For now, using a placeholder max value
-        return "1000"; // TODO: Replace with actual wallet balance
+        // Find the user's balance for this token
+        const userToken = activeTokens.find(token => 
+          token.address.toLowerCase() === position.asset.toLowerCase()
+        );
+        
+        if (userToken?.balance) {
+          // Convert balance from wei to decimal format
+          return formatWeiToDecimal(userToken.balance, position.collateralAmountDecimals);
+        }
+        
+        // Fallback to 0 if no balance found
+        return "0";
       }
       
       case 'withdraw': {
-        // Maximum withdraw is current collateral, but we should consider maintaining health factor
-        // For safety, allow withdrawal that keeps health factor above 1.5
-        if (currentDebt === 0) {
-          return currentCollateral.toString();
+        try {
+          // Use the backend endpoint that simulates the contract's withdrawMax logic
+          const result = await cdpService.getMaxWithdraw(position.asset);
+          // Convert from wei to decimal format
+          return formatWeiToDecimal(result.maxAmount, position.collateralAmountDecimals);
+        } catch (error) {
+          console.error("Failed to get max withdraw amount:", error);
+          return "0";
         }
-        // Calculate max withdrawal while maintaining health factor > 1.5
-        const minHealthFactor = 1.5;
-        const requiredCollateralRatio = position.liquidationRatio * minHealthFactor;
-        const requiredCollateralUSD = (currentDebt * requiredCollateralRatio) / 100;
-        const requiredCollateral = requiredCollateralUSD / pricePerUnit;
-        const maxWithdraw = Math.max(0, currentCollateral - requiredCollateral);
-        return formatNumber(maxWithdraw, 6);
       }
       
-      case 'mint': {
-        // Maximum mint while maintaining health factor above 1.5
-        const safeHealthFactor = 1.5;
-        const safeCollateralRatio = position.liquidationRatio * safeHealthFactor;
-        const maxDebtUSD = (currentCollateralUSD * 100) / safeCollateralRatio;
-        const maxMint = Math.max(0, maxDebtUSD - currentDebt);
-        return formatNumber(maxMint);
+      case 'borrow': {
+        try {
+          // Use the backend endpoint that simulates the contract's mintMax logic
+          const result = await cdpService.getMaxMint(position.asset);
+          // Convert from wei to decimal format (USDST is 18 decimals)
+          return formatWeiToDecimal(result.maxAmount, 18);
+        } catch (error) {
+          console.error("Failed to get max borrow amount:", error);
+          return "0";
+        }
       }
       
       case 'repay': {
         // Maximum repay is current debt
+        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
         return formatNumber(currentDebt);
       }
       
@@ -201,7 +211,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Handle MAX button click
-  const handleMaxClick = (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay') => {
+  const handleMaxClick = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {
     const position = positions.find(p => p.asset === asset);
     if (!position) return;
 
@@ -212,15 +222,24 @@ const VaultsList: React.FC = () => {
       setMaxStates(prev => ({ ...prev, [asset]: false }));
       setInputAmounts(prev => ({ ...prev, [asset]: "" }));
     } else {
-      // Enable max state and set max value
-      const maxValue = calculateMaxValue(position, action);
-      setMaxStates(prev => ({ ...prev, [asset]: true }));
-      setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+      try {
+        // Enable max state and set max value
+        const maxValue = await calculateMaxValue(position, action);
+        setMaxStates(prev => ({ ...prev, [asset]: true }));
+        setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
+      } catch (error) {
+        console.error("Failed to calculate max value:", error);
+        toast({
+          title: "Error",
+          description: "Failed to calculate maximum amount. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
   // Calculate preview values based on input
-  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'mint' | 'repay', inputAmount: string) => {
+  const calculatePreviewValues = (position: VaultData, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', inputAmount: string) => {
     const amount = parseFloat(inputAmount);
     if (isNaN(amount) || amount <= 0) return null;
 
@@ -247,7 +266,7 @@ const VaultsList: React.FC = () => {
         newCollateral = Math.max(0, currentCollateral - amount);
         newCollateralUSD = newCollateral * pricePerUnit;
         break;
-      case 'mint':
+      case 'borrow':
         newDebt = currentDebt + amount;
         newDebtUSD = newDebt; // Assuming 1:1 USD peg for USDST
         break;
@@ -273,7 +292,7 @@ const VaultsList: React.FC = () => {
   };
 
   // Handle action button clicks
-  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'mint' | 'repay', amount: string) => {
+  const handleAction = async (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay', amount: string) => {
     if (!amount || parseFloat(amount) <= 0) {
       toast({
         title: "Invalid Amount",
@@ -291,13 +310,28 @@ const VaultsList: React.FC = () => {
           result = await cdpService.deposit(asset, amount);
           break;
         case 'withdraw':
-          result = await cdpService.withdraw(asset, amount);
+          // If user is in max state, use withdrawMax endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.withdrawMax(asset);
+          } else {
+            result = await cdpService.withdraw(asset, amount);
+          }
           break;
-        case 'mint':
-          result = await cdpService.mint(asset, amount);
+        case 'borrow':
+          // If user is in max state, use mintMax endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.mintMax(asset);
+          } else {
+            result = await cdpService.mint(asset, amount);
+          }
           break;
         case 'repay':
-          result = await cdpService.repay(asset, amount);
+          // If user is in max state, use repayAll endpoint
+          if (maxStates[asset]) {
+            result = await cdpService.repayAll(asset);
+          } else {
+            result = await cdpService.repay(asset, amount);
+          }
           break;
         default:
           throw new Error(`Unknown action: ${action}`);
@@ -354,7 +388,7 @@ const VaultsList: React.FC = () => {
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="text-gray-500 mb-4">No positions found</div>
-            <div className="text-sm text-gray-400">Create your first position by depositing collateral and minting USDST above</div>
+            <div className="text-sm text-gray-400">Create your first position by depositing collateral and borrowing USDST above</div>
           </div>
         </CardContent>
       </Card>
@@ -367,6 +401,17 @@ const VaultsList: React.FC = () => {
         <CardTitle>Your Vaults</CardTitle>
       </CardHeader>
       <CardContent>
+        <style>{`
+          /* Hide number input arrows */
+          input[type="number"]::-webkit-outer-spin-button,
+          input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+          }
+          input[type="number"] {
+            -moz-appearance: textfield;
+          }
+        `}</style>
         <div className="space-y-4">
           {positions.map((position, index) => {
             const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
@@ -407,8 +452,8 @@ const VaultsList: React.FC = () => {
                     <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'withdraw')}>
                       Withdraw
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'mint')}>
-                      Mint
+                    <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'borrow')}>
+                      Borrow
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => handleActionSelect(position.asset, 'repay')}>
                       Repay

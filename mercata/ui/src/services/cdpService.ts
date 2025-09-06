@@ -75,9 +75,21 @@ export const cdpService = {
     return response.data;
   },
 
+  // Get maximum withdrawable amount (simulation)
+  async getMaxWithdraw(asset: string): Promise<{ maxAmount: string }> {
+    const response = await api.post("/cdp/get-max-withdraw", { asset });
+    return response.data;
+  },
+
   // Withdraw maximum safe collateral
   async withdrawMax(asset: string): Promise<TransactionResponse> {
     const response = await api.post("/cdp/withdraw-max", { asset });
+    return response.data;
+  },
+
+  // Get maximum mintable amount (simulation)
+  async getMaxMint(asset: string): Promise<{ maxAmount: string }> {
+    const response = await api.post("/cdp/get-max-mint", { asset });
     return response.data;
   },
 
