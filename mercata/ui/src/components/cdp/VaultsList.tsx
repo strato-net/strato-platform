@@ -76,12 +76,16 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
   return `${quotient}.${trimmedDecimal}`;
 };
 
+interface VaultsListProps {
+  refreshTrigger?: number; // Increment this to trigger a refresh
+}
+
 /**
  * VaultsList component displays user's CDP vaults
  * Each vault represents a collateral position with corresponding debt
  * Connected to backend API for real-time data
  */
-const VaultsList: React.FC = () => {
+const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -125,7 +129,7 @@ const VaultsList: React.FC = () => {
     };
 
     fetchPositions();
-  }, [toast]);
+  }, [toast, refreshTrigger]);
 
   // Handle dropdown action selection
   const handleActionSelect = (asset: string, action: 'deposit' | 'withdraw' | 'borrow' | 'repay') => {

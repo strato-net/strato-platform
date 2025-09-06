@@ -10,12 +10,16 @@ import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 
+interface BorrowWidgetProps {
+  onSuccess?: () => void; // Callback fired when borrow operation succeeds
+}
+
   /**
    * CDP Borrow flow widget - now connected to backend
  * Mirrors basic UX from Spark.fi Easy Borrow screen.
  * Uses real asset configurations from backend API.
  */
-const BorrowWidget: React.FC = () => {
+const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [depositAsset, setDepositAsset] = useState<AssetConfig | null>(null);
   const [depositAmount, setDepositAmount] = useState("0");
@@ -549,6 +553,11 @@ const BorrowWidget: React.FC = () => {
         title: "Transaction Successful",
         description: `${successMessage}. Tx: ${finalResult.hash}`,
       });
+
+      // Call success callback to refresh other components
+      if (onSuccess) {
+        onSuccess();
+      }
 
       // Reset form
       setDepositAmount("0");

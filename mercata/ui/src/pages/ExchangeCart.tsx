@@ -14,6 +14,12 @@ import { ChevronDown } from "lucide-react";
 const ExchangeCart = () => {
   const [showLiquidations, setShowLiquidations] = useState(false);
   const [convertAction, setConvertAction] = useState<'deposit' | 'withdraw' | null>(null);
+  const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
+
+  // Callback to refresh vaults when borrow operation succeeds
+  const handleBorrowSuccess = () => {
+    setVaultsRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
@@ -60,9 +66,9 @@ const ExchangeCart = () => {
               </div>
               
               <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-                <CDPBorrowWidget />
+                <CDPBorrowWidget onSuccess={handleBorrowSuccess} />
               </div>
-              <VaultsList />
+              <VaultsList refreshTrigger={vaultsRefreshTrigger} />
             </div>
           )}
         </TabsContent>
