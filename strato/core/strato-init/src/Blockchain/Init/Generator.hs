@@ -10,8 +10,6 @@ module Blockchain.Init.Generator (
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
-import Blockchain.Data.GenesisInfo
-import qualified Blockchain.Data.GenesisInfoOld as OLD
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
@@ -58,13 +56,6 @@ createGenesisInfo network = do
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
 
-convertGenesisFromOld :: MonadIO m => m ()
-convertGenesisFromOld = do
-  oldGenesis <- OLD.getGenesisInfo
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode $ convertFromOld oldGenesis
-  liftIO $ putStrLn $ "Done. Output genesis block info was written"
-
-
 createCommandsFile :: IO ()
 createCommandsFile = 
   writeFile "commands.txt" [r|ethereum-discover +RTS -T -RTS
@@ -99,19 +90,14 @@ mkAll network = do
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
 
   genesisExists <- doesFileExist "genesis.json"
-  genesisOldExists <- doesFileExist "genesisOld.json"
 
-  case (genesisExists, genesisOldExists) of
-    (False, False) -> do
-      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
-      createGenesisInfo network
-    (False, True) -> do
-      $logInfoS "mkAll" "Converting 'genesis.json' from old format 'genesisOld.json'"
-      convertGenesisFromOld
-    (True, _) -> do
+  if genesisExists
+    then do
       $logInfoS "mkAll" "Using provided 'genesis.json'"
       return ()
-
+    else do
+      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
+      createGenesisInfo network
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}
