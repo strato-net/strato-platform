@@ -163,7 +163,11 @@ combinedEscrows = M.elems
           Just GA.Asset{..} -> e{ GE.collateralQuantity = correctQuantity decimals name (GE.collateralQuantity e) }
 
 supportedCollaterals :: [Address]
-supportedCollaterals = Set.toList . Set.fromList $ GE.assetRootAddress <$> combinedEscrows
+supportedCollaterals = Set.toList
+                     . Set.delete 0xd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a -- BETHTEMP
+                     . Set.delete 0x04d68c24ff359ab457c7b96810f85c51989fe8ed -- USDTEMP
+                     . Set.fromList
+                     $ GE.assetRootAddress <$> combinedEscrows
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
@@ -264,7 +268,7 @@ ray :: Integer
 ray = 1_000_000_000 * oneE18
 
 lastAccrual :: Integer
-lastAccrual = 1757044800 -- September 5th, 2025, 12:00:00 AM
+lastAccrual = 1757304000 -- September 8th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
@@ -320,7 +324,7 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
+            ++ [(maybe (".status", if root == usdstAddress || root == cataAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
