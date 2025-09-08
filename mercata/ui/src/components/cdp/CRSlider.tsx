@@ -61,7 +61,13 @@ const CRSlider: React.FC<CRSliderProps> = ({
       {/* CR Display */}
       <div className="flex justify-between items-center text-sm font-medium">
         <span>Collateralization Ratio (CR)</span>
-        <span className={isPositionDangerous ? 'text-red-500 font-bold' : ''}>
+        <span className={
+          projectedCR >= 999999 
+            ? 'text-green-600' 
+            : isPositionDangerous 
+              ? 'text-red-500 font-bold' 
+              : ''
+        }>
           {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
         </span>
       </div>
