@@ -16,6 +16,7 @@ import {
   getLiquidatable,
   getAssetConfig,
   getSupportedAssets,
+  getAssetDebtInfo,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -246,6 +247,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const assets = await getSupportedAssets(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(assets);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAssetDebtInfo(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await getAssetDebtInfo(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }

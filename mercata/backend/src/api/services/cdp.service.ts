@@ -208,6 +208,9 @@ interface VaultData {
   stabilityFeeRate: number;
   health: "healthy" | "warning" | "danger";
   borrower?: string; // Optional for liquidatable positions
+  // Raw data for precision calculations
+  scaledDebt: string;
+  rateAccumulator: string;
 }
 
 interface AssetConfig {
@@ -307,6 +310,9 @@ export const getVaults = async (
       healthFactor,
       stabilityFeeRate,
       health: getHealthStatus(healthFactor),
+      // Raw data for precision calculations
+      scaledDebt: scaledDebt.toString(),
+      rateAccumulator: currentRateAccumulator,
     };
   });
 
@@ -402,6 +408,9 @@ export const getVault = async (
       healthFactor,
       stabilityFeeRate,
       health: getHealthStatus(healthFactor),
+      // Raw data for precision calculations
+      scaledDebt: scaledDebt.toString(),
+      rateAccumulator: currentRateAccumulator,
     };
 };
 
@@ -701,6 +710,41 @@ export const getMaxMint = async (
   }
 
   return { maxAmount: maxAmount.toString() };
+};
+
+export const getAssetDebtInfo = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string }
+): Promise<{ currentTotalDebt: string; debtFloor: string; debtCeiling: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Get asset config and global state
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralConfig;
+  
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset config or global state not found");
+  }
+
+  // Calculate current total debt for this asset
+  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const currentTotalDebt = (BigInt(globalState.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
+
+  return {
+    currentTotalDebt: currentTotalDebt.toString(),
+    debtFloor: config.debtFloor || "0",
+    debtCeiling: config.debtCeiling || "0"
+  };
 };
 
 export const mint = async (

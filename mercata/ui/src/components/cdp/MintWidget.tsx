@@ -459,6 +459,94 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     }
   };
 
+  // Validate debt floor and ceiling constraints
+  const validateDebtConstraints = async (borrowAmountDecimal: number): Promise<boolean> => {
+    if (!depositAsset || borrowAmountDecimal <= 0) return true;
+
+
+    try {
+      // Get current asset debt info
+      const debtInfo = await cdpService.getAssetDebtInfo(depositAsset.asset);
+      
+      // Keep everything in wei for accurate comparison (like blockchain)
+      const currentAssetTotalDebtWei = BigInt(debtInfo.currentTotalDebt);
+      const debtFloorWei = BigInt(debtInfo.debtFloor);
+      const debtCeilingWei = BigInt(debtInfo.debtCeiling);
+      
+      // Convert borrow amount to wei (18 decimals)
+      const borrowAmountWei = BigInt(Math.floor(borrowAmountDecimal * 1e18));
+      
+
+      // Check debt ceiling constraint (total debt for this asset across all users)
+      if (debtCeilingWei > 0n) {
+        const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
+        if (newAssetTotalDebtWei > debtCeilingWei) {
+          const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
+          const availableRoom = parseFloat(formatWeiToDecimal(availableRoomWei.toString(), 18));
+          const debtCeilingDecimal = parseFloat(formatWeiToDecimal(debtCeilingWei.toString(), 18));
+          
+          toast({
+            title: "Debt Ceiling Exceeded",
+            description: `Cannot borrow ${borrowAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      // Check debt floor constraint (per-user minimum debt)
+      // We need to simulate the exact contract calculation to avoid precision gaps
+      if (debtFloorWei > 0n) {
+        // Get current vault data to access scaledDebt and rateAccumulator
+        const vaultData = await cdpService.getVault(depositAsset.asset);
+        if (!vaultData) {
+          return true;
+        }
+
+        // Simulate the exact contract calculation:
+        // 1. Convert borrow amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
+        // 2. Add to existing scaled debt: newScaledDebt = scaledDebt + scaledAdd  
+        // 3. Convert back to debt: totalDebtAfter = (newScaledDebt * rateAccumulator) / RAY
+        
+        const RAY = BigInt("1000000000000000000000000000"); // 1e27
+        const existingScaledDebtWei = BigInt(vaultData.scaledDebt || "0");
+        const rateAccumulatorWei = BigInt(vaultData.rateAccumulator || "1000000000000000000000000000");
+        
+        // Step 1: Convert borrow amount to scaled debt (same as contract)
+        const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
+        
+        // Step 2: Add to existing scaled debt (same as contract)
+        const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
+        
+        // Step 3: Convert back to debt for floor check (same as contract)
+        const totalDebtAfterWei = (newScaledDebtWei * rateAccumulatorWei) / RAY;
+        
+
+        if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
+          // Calculate how much more is needed to reach debt floor
+          const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
+          const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
+          const minRequired = parseFloat(formatWeiToDecimal(minRequiredWei.toString(), 18));
+          const debtFloorDecimal = parseFloat(formatWeiToDecimal(debtFloorWei.toString(), 18));
+          const currentDebt = parseFloat(formatWeiToDecimal(currentDebtWei.toString(), 18));
+          
+          toast({
+            title: "Below Debt Floor",
+            description: `Borrow more USDST to reach the minimum debt floor`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("🔍 [MintWidget] Failed to validate debt constraints:", error);
+      // Don't block the transaction if validation fails
+      return true;
+    }
+  };
+
   // Handle vault creation
   const handleCreateVault = async () => {
     if (!depositAsset) {
@@ -493,6 +581,12 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           variant: "destructive",
         });
         return;
+      }
+
+      // Validate debt floor and ceiling constraints
+      const isValid = await validateDebtConstraints(borAmount);
+      if (!isValid) {
+        return; // Validation failed, error already shown
       }
     }
 
@@ -573,8 +667,20 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null) {
         // Handle API errors
-        const apiError = error as { response?: { data?: { message?: string } }; message?: string };
-        if (apiError.response?.data?.message) {
+        const apiError = error as { 
+          response?: { 
+            data?: { 
+              error?: { message?: string }; 
+              message?: string 
+            } 
+          }; 
+          message?: string 
+        };
+        if (apiError.response?.data?.error?.message) {
+          // Backend sends errors in { error: { message, status, type } } format
+          errorMessage = apiError.response.data.error.message;
+        } else if (apiError.response?.data?.message) {
+          // Fallback for direct message format
           errorMessage = apiError.response.data.message;
         } else if (apiError.message) {
           errorMessage = apiError.message;
