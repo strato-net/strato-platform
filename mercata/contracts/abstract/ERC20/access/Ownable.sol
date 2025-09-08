@@ -48,35 +48,9 @@ abstract contract Ownable is Context {
         } catch {
             AdminRegistry admin = AdminRegistry(owner());
             address sender = _msgSender();
-            if (admin.isAdminAddress(sender)) {
-                (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
-                if (didExecute) {
-                    return ret;
-                }
-            } else {
-                (bool didExecute, variadic ret) = admin.createIssue(sender, msg.sig, msg.data);
-                if (didExecute) {
-                    return ret;
-                }
-            }
+            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
+            return ret;
         }
-    }
-
-    /**
-     * @dev Throws if called by any account other than the owner, but allows ownership check to be bypassed internally
-     */
-    bool internal _ownershipGranted;
-    modifier onlyOwnerExternal() {
-        if(!_ownershipGranted) {
-            try {
-                _checkOwner();
-            } catch {
-                require(AdminRegistry(owner()).whitelist(this, msg.sig, msg.sender), string(msg.sender) + " is not authorized to call " + msg.sig);
-            }
-        }
-        _ownershipGranted = true;
-        _;
-        _ownershipGranted = false;
     }
 
     /**

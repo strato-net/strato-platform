@@ -188,7 +188,7 @@ contract Describe_Mercata {
         User u = new User();
         bool didExecute = false;
         try {
-            (bool didExecute2, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+            (bool didExecute2, string issueId) = u.do(address(admin), "castVoteOnIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
             didExecute = didExecute2;
         } catch {
 
