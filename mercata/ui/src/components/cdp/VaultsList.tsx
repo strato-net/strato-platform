@@ -8,6 +8,7 @@ import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -200,8 +201,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       }
       
       case 'repay': {
-        // Maximum repay is current debt (return full precision, not formatted)
-        return formatWeiToDecimal(position.debtAmount, 18);
+        // Maximum repay is min(current debt, available USDST balance)
+        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+        const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
+          token.address.toLowerCase() === usdstAddress.toLowerCase()
+        )?.balance || "0", 18));
+        
+        const maxRepayAmount = Math.min(currentDebt, availableUSDST);
+        return maxRepayAmount.toString();
       }
       
       default:
@@ -325,9 +332,25 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
           }
           break;
         case 'repay':
-          // If user is in max state, use repayAll endpoint
+          // If user is in max state, check if they can repay all debt or just partial
           if (maxStates[asset]) {
-            result = await cdpService.repayAll(asset);
+            const position = positions.find(p => p.asset === asset);
+            if (position) {
+              const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+              const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
+                token.address.toLowerCase() === usdstAddress.toLowerCase()
+              )?.balance || "0", 18));
+              
+              // Use repayAll only if user has enough USDST to cover full debt
+              if (availableUSDST >= currentDebt) {
+                result = await cdpService.repayAll(asset);
+              } else {
+                // Use regular repay with the limited amount they can afford
+                result = await cdpService.repay(asset, amount);
+              }
+            } else {
+              result = await cdpService.repay(asset, amount);
+            }
           } else {
             result = await cdpService.repay(asset, amount);
           }
