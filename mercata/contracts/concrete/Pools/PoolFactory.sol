@@ -172,6 +172,35 @@ contract record PoolFactory is Ownable {
         emit PoolFeeParametersUpdated(poolAddress, newSwapFeeRate, newLpSharePercent);
     }
 
+    /// @notice Call sync on all pools or select pools
+    /// @param pools Array of pool addresses to sync
+    /// @dev If no pools are provided, sync all pools
+    /// @dev This function is used to sync the pools after a token transfer
+    function syncPools(address[] pools) external onlyOwner {
+        address[] memory targetPools = pools;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint256 i = 0; i < targetPools.length; i++) {
+            Pool(targetPools[i]).sync();
+        }
+    }
+
+    /// @notice Call skim on all pools or select pools
+    /// @param pools Array of pool addresses to skim
+    /// @param to Address to skim the pools to
+    /// @dev If no pools are provided, skim all pools
+    /// @dev This function is used to skim the pools after a token transfer
+    function skimPools(address[] pools, address to) external onlyOwner {
+        address[] memory targetPools = pools;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint256 i = 0; i < targetPools.length; i++) {
+            Pool(targetPools[i]).skim(to);
+        }
+    }
+
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
