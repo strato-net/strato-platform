@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -20,13 +20,24 @@ import ExchangeCart from './ExchangeCart';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens } = useUserTokens();
+  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
   const { loans } = useLendingContext();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Add visibility state to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
+
+  // Handle vault action success with debounced refresh
+  const handleVaultActionSuccess = () => {
+    // Use a longer delay to ensure transaction is processed and tab state is preserved
+    setTimeout(() => {
+      fetchTokens();
+      if (userAddress) {
+        fetchUsdstBalance(userAddress);
+      }
+    }, 1000); // Longer delay to ensure smooth UX
+  };
 
   useEffect(() => {
     // Set mounted state immediately to prevent flash
@@ -115,7 +126,7 @@ const DepositsPage = () => {
                   color="bg-blue-500"
                 />
               </div>
-              <ExchangeCart />
+              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
               {/* Render AssetsList when data is loaded */}
