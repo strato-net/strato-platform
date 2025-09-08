@@ -34,6 +34,10 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => 
   // Callback to refresh vaults when borrow operation succeeds
   const handleBorrowSuccess = () => {
     setVaultsRefreshTrigger(prev => prev + 1);
+    // Also refresh deposits when borrowing succeeds
+    if (onVaultActionSuccess) {
+      onVaultActionSuccess();
+    }
   };
 
   // Update tab state in localStorage when it changes
