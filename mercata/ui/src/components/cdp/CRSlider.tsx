@@ -6,13 +6,15 @@ interface CRSliderProps {
   liquidationThreshold: number;
   onCRChange: (cr: number) => void;
   disabled?: boolean;
+  hasCollateral?: boolean; // Whether there's existing collateral or deposit input
 }
 
 const CRSlider: React.FC<CRSliderProps> = ({
   projectedCR,
   liquidationThreshold,
   onCRChange,
-  disabled = false
+  disabled = false,
+  hasCollateral = false
 }) => {
   const sliderMin = liquidationThreshold;
   const sliderMax = 750;
@@ -20,7 +22,10 @@ const CRSlider: React.FC<CRSliderProps> = ({
   // Determine if CR is out of slider range
   const isInfinite = projectedCR >= 999999;
   const isOutOfBounds = projectedCR < sliderMin || projectedCR > sliderMax;
-  const isSliderDisabled = disabled || projectedCR <= 0 || isInfinite;
+  
+  // Enable slider if there's collateral (existing or being deposited), even with no debt
+  const shouldEnableForCollateral = hasCollateral && isInfinite;
+  const isSliderDisabled = disabled || (projectedCR <= 0 && !shouldEnableForCollateral) || (isInfinite && !shouldEnableForCollateral);
   
   // Format percentage for display
   const formatPercentage = (num: number, decimals: number = 0): string => {

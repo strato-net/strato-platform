@@ -838,6 +838,10 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             liquidationThreshold={liquidationRatio}
             onCRChange={handleCRChange}
             disabled={!depositAsset}
+            hasCollateral={
+              parseFloat(formatWeiToDecimal(existingVaultCollateral, 18)) > 0 || 
+              parseFloat(depositAmount || "0") > 0
+            }
           />
         </div>
 
