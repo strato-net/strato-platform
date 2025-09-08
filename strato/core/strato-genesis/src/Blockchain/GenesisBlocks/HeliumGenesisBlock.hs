@@ -275,7 +275,7 @@ assetBalances GA.Asset{..} =
                          <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
          in case mEscrowBalance of
               Nothing -> [(o, q)]
-              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
+              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
@@ -473,6 +473,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
