@@ -30,6 +30,10 @@ const config = {
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
   },
+  usdst: {
+    address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
+    minBalance: BigInt(20) * BigInt(1e18),
+  },
   safe: {
     address: process.env.SAFE_ADDRESS,
     safeOwnerAddress: process.env.SAFE_OWNER_ADDRESS,

@@ -16,11 +16,15 @@ import { monitorSafeTransactionStatusBatch } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
+import { checkUSDSTBalance } from "../services/cirrusService";
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
   const poll = async () => {
     try {
+      // Check USDST balance regularly
+      await checkUSDSTBalance();
+      
       const initiatedWithdrawals = await getWithdrawalsByStatus("1");
 
       if (initiatedWithdrawals.length > 0) {
