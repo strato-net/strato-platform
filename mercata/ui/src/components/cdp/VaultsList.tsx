@@ -8,6 +8,7 @@ import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useOracleContext } from "@/context/OracleContext";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -79,6 +80,7 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
 
 interface VaultsListProps {
   refreshTrigger?: number; // Increment this to trigger a refresh
+  onVaultActionSuccess?: () => void; // Callback when vault actions succeed
 }
 
 /**
@@ -86,11 +88,12 @@ interface VaultsListProps {
  * Each vault represents a collateral position with corresponding debt
  * Connected to backend API for real-time data
  */
-const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
+const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSuccess }) => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
+  const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
@@ -255,8 +258,19 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
     const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
     const currentDebtUSD = parseFloat(formatWeiToDecimal(position.debtValueUSD, 18));
     
-    // Assume price per unit of collateral
-    const pricePerUnit = currentCollateralUSD / currentCollateral;
+    // Get the actual token price from oracle
+    const priceWei = getPrice(position.asset);
+    let pricePerUnit = 0;
+    
+    if (priceWei) {
+      // Convert price from wei (18 decimals) to decimal
+      pricePerUnit = parseFloat(formatWeiToDecimal(priceWei, 18));
+    } else {
+      // Fallback: calculate from current values if oracle price is not available
+      if (currentCollateral > 0 && currentCollateralUSD > 0) {
+        pricePerUnit = currentCollateralUSD / currentCollateral;
+      }
+    }
     
     let newCollateral = currentCollateral;
     let newCollateralUSD = currentCollateralUSD;
@@ -282,11 +296,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
         break;
     }
 
-    // Calculate new health factor
-    const newCR = newDebt > 0 ? (newCollateralUSD / newDebtUSD) * 100 : 999999;
-    const newHealthFactor = newDebt > 0 
-      ? calculateHealthFactor(newCR, position.liquidationRatio)
-      : Infinity;
+    // Calculate new health factor with safety checks
+    let newCR = 999999;
+    let newHealthFactor = Infinity;
+    
+    if (newDebt > 0 && newDebtUSD > 0) {
+      newCR = (newCollateralUSD / newDebtUSD) * 100;
+      newHealthFactor = calculateHealthFactor(newCR, position.liquidationRatio);
+    }
 
     return {
       collateralAmount: formatNumber(newCollateral),
@@ -373,6 +390,11 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
         // Refresh positions data
         const updatedPositions = await cdpService.getVaults();
         setPositions(updatedPositions);
+        
+        // Call the callback to refresh other components (like deposits)
+        if (onVaultActionSuccess) {
+          onVaultActionSuccess();
+        }
       } else {
         throw new Error(`${action} failed`);
       }
@@ -518,7 +540,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
                       <p className="text-xs text-blue-500">${previewValues.collateralValueUSD}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Borrowed</p>
+                      <p className="text-xs text-blue-600 mb-1">Debt</p>
                       <p className="font-semibold text-blue-900">{previewValues.debtAmount} USDST</p>
                       <p className="text-xs text-blue-500">${previewValues.debtValueUSD}</p>
                     </div>
