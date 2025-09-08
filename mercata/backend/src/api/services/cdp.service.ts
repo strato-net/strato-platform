@@ -33,6 +33,11 @@ export const getCDPRegistry = async (
   options: Record<string, string> = {},
   callerId?: string
 ): Promise<Record<string, any>> => {
+  console.log(`🔍 [CDP] getCDPRegistry called at ${new Date().toISOString()}`, {
+    userAddress,
+    options,
+    callerId
+  });
   const { select, ...filters } = options;
 
   // Filter out undefined values
@@ -127,6 +132,9 @@ export const getUserVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<any[]> => {
+  console.log(`🔍 [CDP] getUserVaults called at ${new Date().toISOString()}`, {
+    userAddress
+  });
   try {
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
     
@@ -220,6 +228,9 @@ export const getVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
+  console.log(`🔍 [CDP] getVaults called at ${new Date().toISOString()}`, {
+    userAddress
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVaults");
   
   if (!registry?.cdpEngine) {
@@ -308,6 +319,10 @@ export const getVault = async (
   userAddress: string,
   asset: string
 ): Promise<VaultData | null> => {
+  console.log(`🔍 [CDP] getVault called at ${new Date().toISOString()}`, {
+    userAddress,
+    asset
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVault");
   
   if (!registry?.cdpEngine) {
@@ -395,6 +410,10 @@ export const deposit = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] deposit called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "deposit");
   
   if (!registry?.cdpEngine) {
@@ -428,6 +447,10 @@ export const withdraw = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] withdraw called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "withdraw");
   
   if (!registry?.cdpEngine) {
@@ -451,6 +474,10 @@ export const getMaxWithdraw = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
+  console.log(`🔍 [CDP] getMaxWithdraw called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -537,6 +564,10 @@ export const withdrawMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] withdrawMax called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -558,6 +589,10 @@ export const getMaxMint = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
+  console.log(`🔍 [CDP] getMaxMint called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -673,6 +708,10 @@ export const mint = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] mint called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "mint");
   
   if (!registry?.cdpEngine) {
@@ -697,6 +736,10 @@ export const mintMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] mintMax called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -718,6 +761,10 @@ export const repay = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] repay called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -758,6 +805,10 @@ export const repayAll = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] repayAll called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -798,6 +849,10 @@ export const liquidate = async (
   userAddress: string,
   body: { collateralAsset: string; borrower: string; debtToCover: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] liquidate called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -841,6 +896,9 @@ export const getLiquidatable = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
+  console.log(`🔍 [CDP] getLiquidatable called at ${new Date().toISOString()}`, {
+    userAddress
+  });
   // Get registry info
   const registry = await getCDPRegistry(accessToken, userAddress);
   
@@ -890,6 +948,10 @@ export const getAssetConfig = async (
   userAddress: string,
   asset: string
 ): Promise<AssetConfig | null> => {
+  console.log(`🔍 [CDP] getAssetConfig called at ${new Date().toISOString()}`, {
+    userAddress,
+    asset
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -929,6 +991,9 @@ export const getSupportedAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
+  console.log(`🔍 [CDP] getSupportedAssets called at ${new Date().toISOString()}`, {
+    userAddress
+  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
   
   if (!registry?.cdpEngine) {
