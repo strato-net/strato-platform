@@ -200,9 +200,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       }
       
       case 'repay': {
-        // Maximum repay is current debt
-        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-        return formatNumber(currentDebt);
+        // Maximum repay is current debt (return full precision, not formatted)
+        return formatWeiToDecimal(position.debtAmount, 18);
       }
       
       default:
