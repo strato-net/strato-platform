@@ -550,7 +550,13 @@ export const getMaxMint = async (
   const unitScale = BigInt(config.unitScale);
   
   const collateralValueUSD = (collateralAmount * price) / unitScale;
-  const maxBorrowableUSD = (collateralValueUSD * WAD) / liquidationRatio;
+  
+  // Apply safety buffer: use 105% of liquidation ratio to ensure position stays well above liquidation threshold
+  // This means if LR is 150%, we target a minimum CR of ~157.5% (150% * 1.05)
+  const safetyBufferBps = 500n; // 5% buffer in basis points
+  const safeLiquidationRatio = (liquidationRatio * (10000n + safetyBufferBps)) / 10000n;
+  
+  const maxBorrowableUSD = (collateralValueUSD * WAD) / safeLiquidationRatio;
 
   let maxAmount: bigint;
 

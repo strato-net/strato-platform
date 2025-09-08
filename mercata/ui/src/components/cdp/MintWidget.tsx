@@ -57,23 +57,11 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     return (totalCollateralValueUSD / debtAmount) * 100;
   };
 
-  // Calculate max borrowable amount based on liquidation threshold from backend
+  // Calculate max borrowable amount using backend endpoint for consistency
+  const [maxBorrowableAmount, setMaxBorrowableAmount] = useState<number>(0);
+  
   const calculateMaxBorrowable = (): number => {
-    if (!depositAsset) return 0;
-    
-    const totalCollateralValueUSD = getTotalCollateralValue();
-    
-    if (totalCollateralValueUSD <= 0) return 0;
-    
-    // liquidationRatio from backend is the liquidation threshold (e.g., 150 means 150%)
-    // At liquidation: CR = LT, so maxDebt = totalCollateralValue / (LT / 100)
-    // Apply small safety buffer (1%) to avoid exact liquidation threshold
-    const liquidationThreshold = depositAsset.liquidationRatio; // Already in percentage
-    const safetyBuffer = 1.01; // 1% buffer above LT
-    const effectiveLT = liquidationThreshold * safetyBuffer;
-    const maxBorrowableUSD = (totalCollateralValueUSD * 100) / effectiveLT;
-    
-    return Math.max(0, maxBorrowableUSD);
+    return maxBorrowableAmount;
   };
 
   // Get user's balance for the selected deposit asset
@@ -246,8 +234,29 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     fetchAssetsAndPrices();
   }, [toast]);
 
-  // Update max borrowable amount display when collateral amount changes
+  // Update max borrowable amount when collateral amount changes
   useEffect(() => {
+    const updateMaxBorrowable = async () => {
+      if (!depositAsset) {
+        setMaxBorrowableAmount(0);
+        return;
+      }
+
+      // Refetch max borrowable amount when deposit amount changes
+      try {
+        const maxMintResult = await cdpService.getMaxMint(depositAsset.asset);
+        const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxMintResult.maxAmount, 18));
+        setMaxBorrowableAmount(maxAmountDecimal);
+      } catch (error) {
+        console.log("No borrowing power available for asset:", depositAsset.symbol);
+        setMaxBorrowableAmount(0);
+      }
+    };
+
+    // Only update if deposit amount has actually changed
+    if (depositAsset && depositAmount !== "0") {
+      updateMaxBorrowable();
+    }
 
     // Check if current borrow amount equals max borrowable (within tolerance)
     const currentBorrowAmount = parseFloat(borrowAmount);
@@ -267,28 +276,41 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     }
   }, [maxBorrowable, isBorrowMaxEnabled, depositAsset, depositAmount, isRatioLocked, lockedCR, borrowAmount]);
 
-  // Fetch existing vault collateral when asset changes
+  // Fetch existing vault collateral and max borrowable amount when asset changes
   useEffect(() => {
-    const fetchExistingVault = async () => {
+    const fetchVaultData = async () => {
       if (!depositAsset) {
         setExistingVaultCollateral("0");
+        setMaxBorrowableAmount(0);
         return;
       }
 
       try {
+        // Fetch existing vault data
         const vaultData = await cdpService.getVault(depositAsset.asset);
         if (vaultData) {
           setExistingVaultCollateral(vaultData.collateralAmount);
         } else {
           setExistingVaultCollateral("0");
         }
+
+        // Fetch max borrowable amount from backend
+        try {
+          const maxMintResult = await cdpService.getMaxMint(depositAsset.asset);
+          const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxMintResult.maxAmount, 18));
+          setMaxBorrowableAmount(maxAmountDecimal);
+        } catch (error) {
+          console.log("No borrowing power available for asset:", depositAsset.symbol);
+          setMaxBorrowableAmount(0);
+        }
       } catch (error) {
         console.log("No existing vault found for asset:", depositAsset.symbol);
         setExistingVaultCollateral("0");
+        setMaxBorrowableAmount(0);
       }
     };
 
-    fetchExistingVault();
+    fetchVaultData();
   }, [depositAsset]);
 
   // Reset borrow MAX state and ratio lock when deposit asset changes
@@ -536,17 +558,24 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       }
 
       // Borrowing is required (already validated above)
-      const borrowResult = await cdpService.mint(depositAsset.asset, borrowAmount);
+      // Use mintMax if MAX is enabled, otherwise use regular mint
+      const borrowResult = isBorrowMaxEnabled 
+        ? await cdpService.mintMax(depositAsset.asset)
+        : await cdpService.mint(depositAsset.asset, borrowAmount);
       
       if (borrowResult.status.toLowerCase() !== "success") {
         throw new Error(`Borrow failed with status: ${borrowResult.status}`);
       }
 
       finalResult = borrowResult;
+      
+      // For display, use the actual max amount when MAX is enabled
+      const displayAmount = isBorrowMaxEnabled ? maxBorrowableAmount : parseFloat(borrowAmount);
+      
       if (depAmount > 0) {
-        successMessage += ` and borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
+        successMessage += ` and borrowed ${formatNumber(displayAmount)} USDST`;
       } else {
-        successMessage = `Borrowed ${formatNumber(parseFloat(borrowAmount))} USDST`;
+        successMessage = `Borrowed ${formatNumber(displayAmount)} USDST`;
       }
 
       toast({
@@ -658,7 +687,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             <h3 className="font-semibold">Borrow</h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
-                Max: ${formatNumber(maxBorrowable)} (~{formatNumber(depositAsset.liquidationRatio * 1.01, 0)}% CR)
+                Max: ${formatNumber(maxBorrowable)} (safe above {formatNumber(depositAsset.liquidationRatio, 0)}% LT)
               </span>
             )}
           </div>
