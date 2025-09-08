@@ -300,8 +300,6 @@ eventLoop ctx = execStateC ctx $
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
-              network' <- use network
-              lift . validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo
               commitBlock blk
@@ -552,83 +550,3 @@ recordOutEvent eev =
         GapFound {} -> inc "gap_found"
         LeadFound {} -> inc "lead_found"
         RunPreprepare {} -> inc "run_preprepare"
-
-validatorTimingHack :: (MonadState BlockstanbulContext m)  =>
-                       String -> Integer -> m ()
-validatorTimingHack "mercata" blockNumber = validatorTimingHackMercata blockNumber
-validatorTimingHack "mercata-hydrogen" blockNumber = validatorTimingHackMercataHydrogen blockNumber
-validatorTimingHack "mercata-uranium" blockNumber = validatorTimingHackMercataUranium blockNumber
-validatorTimingHack _ _ = do
-  return ()
-
-
-validatorTimingHackMercata :: (MonadState BlockstanbulContext m)  =>
-                              Integer -> m ()
-validatorTimingHackMercata = \case
-  5255 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dnorwood"
-  5256 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-witmk"
-  5257 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jpowell"
-  5258 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-ChessGM9"
-  5259 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-aaa"
-  5260 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-trouble"
-  5261 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dsnallapu"
-  5271 -> modify' $ validators %~ S.insert "dustin-node"
-  5276 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
-  5277 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
-  5288 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dnorwood"
-  6099 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-tyson"
-  7369 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-neel"
-  7589 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drewbaby"
-  7673 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-michael"
-  7683 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-drebbel"
-  7893 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-keepeth"
-  7915 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dgs"
-  7976 -> modify' $ validators %~ S.insert "service-account-io-mercata-dgs"
-  7977 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldberg"
-  8171 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-hasanthevalidator"
-  8172 -> modify' $ validators %~ S.insert "service-account-Io-stratomercata-numbatwopencil"
-  8315 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jgonzo"
-  8317 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-jacoguzo"
-  8320 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-zeek"
-  8323 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-mecmo4mopm"
-  8324 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-goldbacktoken"
-  8325 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-itaugmentation"
-  8575 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-vinfra"
-  8576 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-bible"
-  8743 -> modify' $ validators %~ S.insert "jamrose.stratomercata.io"
-  8914 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr1"
-  8921 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-dttr2"
-  11265 -> modify' $ validators %~ S.delete "service-account-Io-stratomercata-hasanthevalidator"
-  11266 -> modify' $ validators %~ S.delete "service-account-Io-stratomercata-numbatwopencil"
-  11271 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-jacoguzo"
-  11275 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-dgs"
-  11714 -> modify' $ validators %~ S.insert "illerchiller.com"
-  11800 -> modify' $ validators %~ S.insert "greenrubric.openwealthfi.com"
-  11801 -> modify' $ validators %~ S.insert "events34.openwealthfi.com"
-  11804 -> modify' $ validators %~ S.insert "coach.instanodes.io"
-  11805 -> modify' $ validators %~ S.insert "joyz.openwealthfi.com"
-  _ -> return ()
-  
-
-validatorTimingHackMercataHydrogen :: (MonadState BlockstanbulContext m)  =>
-                               Integer -> m ()
-validatorTimingHackMercataHydrogen = \case
-  32424 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-wongway"
-  32444 -> modify' $ validators %~ S.insert "service-account-io-stratomercata-kierensnode"
-  32644 -> modify' $ validators %~ S.insert "dustin-node"
-  32705 -> modify' $ validators %~ S.delete "dustin-node"
-  32706 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-kierensnode"
-  32707 -> modify' $ validators %~ S.delete "service-account-io-stratomercata-wongway"
-  33128 -> modify' $ validators %~ S.insert "Multinode302"
-  33179 -> modify' $ validators %~ S.delete "Multinode302"
-  37598 -> modify' $ validators %~ S.insert "dmoney-testnet2"
-  43711 -> modify' $ validators %~ S.delete "dmoney-testnet2"
-  _ -> return ()
-
-validatorTimingHackMercataUranium :: (MonadState BlockstanbulContext m)  => Integer -> m ()
-validatorTimingHackMercataUranium = \case
-  5 -> modify' $ validators %~ S.insert "mercata-devnet-node5"
-  6 -> modify' $ validators %~ S.delete "mercata-devnet-node5"
-  145 -> modify' $ validators %~ S.insert "mercata-devnet-node6"
-  205 -> modify' $ validators %~ S.delete "mercata-devnet-node6"
-  _ -> return ()
