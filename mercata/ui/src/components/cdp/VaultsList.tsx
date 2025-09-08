@@ -190,7 +190,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       
       case 'borrow': {
         try {
-          // Use the backend endpoint that simulates the contract's mintMax logic
+          // Use the backend endpoint that calculates max borrowable amount (now without safety buffer)
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
           return formatWeiToDecimal(result.maxAmount, 18);

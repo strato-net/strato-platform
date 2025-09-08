@@ -99,7 +99,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       {isOutOfBounds && !isSliderDisabled && (
         <div className="text-center text-sm text-blue-600">
           {projectedCR < sliderMin 
-            ? `CR below range - Click slider to set new CR`
+            ? `CR below liquidation threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
             : projectedCR > sliderMax 
               ? `CR above range - Click slider to set new CR`
               : ""
