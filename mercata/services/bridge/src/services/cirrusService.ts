@@ -1,6 +1,8 @@
 import { cirrus } from "../utils/api";
 import { config } from "../config";
 import { ChainInfo } from "../types";
+import { logError } from "../utils/logger";
+import { getBAUserAddress } from "../auth";
 
 const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
 
@@ -169,4 +171,36 @@ export const getSafeTxHashFromEvents = async (
   }
 
   return result;
+};
+
+// Check USDST balance and record health status
+export const checkUSDSTBalance = async (): Promise<void> => {
+  try {
+    const userAddress = await getBAUserAddress();
+    const response = await cirrus.get(
+      '/BlockApps-Mercata-Token-_balances',
+      {
+        params: {
+          address: `eq.${config.usdst.address}`,
+          key: `eq.${userAddress}`,
+          select: 'balance:value::text'
+        }
+      }
+    );
+
+    if (!response || !Array.isArray(response) || response.length === 0) {
+      logError('BalanceChecker', new Error('No balance data found for USDST token'));
+      return;
+    }
+
+    const balance = BigInt(response[0]?.balance || '0');
+    const balanceUSD = Number(balance) / 1e18;
+    
+    if (balance < config.usdst.minBalance) {
+      const error = `Low USDST balance: ${balanceUSD} USDST (minimum: 20 USDST)`;
+      logError('BalanceChecker', new Error(error));
+    }
+  } catch (error) {
+    logError('BalanceChecker', error as Error);
+  }
 };

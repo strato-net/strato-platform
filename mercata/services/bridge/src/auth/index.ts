@@ -1,6 +1,7 @@
 import OAuthUtil from "./oauth";
 import { config } from "../config";
 import { logError } from "../utils/logger";
+import { strato } from "../utils/api";
 
 // Validation function to check config at runtime
 const validateConfig = () => {
@@ -36,6 +37,8 @@ const CACHED_DATA: {
 } = {
   serviceToken: null,
 };
+
+let cachedUserAddress: string | null = null;
 
 const TOKEN_LIFETIME_RESERVE_SECONDS = 120; // Reserve 2 minutes for token expiration check
 
@@ -104,6 +107,22 @@ export const getBAUserToken = async (): Promise<string> => {
   } catch (error: any) {
     throw new Error(
       `Failed to fetch user OAuth token: ${error?.message || "Unknown error"}`,
+    );
+  }
+};
+
+export const getBAUserAddress = async (): Promise<string> => {
+  if (cachedUserAddress) {
+    return cachedUserAddress;
+  }
+
+  try {
+    const response = await strato.get('/key');
+    cachedUserAddress = response.address;
+    return cachedUserAddress!;
+  } catch (error: any) {
+    throw new Error(
+      `Failed to fetch user address: ${error?.message || "Unknown error"}`,
     );
   }
 };
