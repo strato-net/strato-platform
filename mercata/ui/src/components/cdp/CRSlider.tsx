@@ -18,8 +18,9 @@ const CRSlider: React.FC<CRSliderProps> = ({
   const sliderMax = 750;
   
   // Determine if CR is out of slider range
+  const isInfinite = projectedCR >= 999999;
   const isOutOfBounds = projectedCR < sliderMin || projectedCR > sliderMax;
-  const isSliderDisabled = disabled || projectedCR <= 0;
+  const isSliderDisabled = disabled || projectedCR <= 0 || isInfinite;
   
   // Format percentage for display
   const formatPercentage = (num: number, decimals: number = 0): string => {
@@ -60,8 +61,14 @@ const CRSlider: React.FC<CRSliderProps> = ({
       {/* CR Display */}
       <div className="flex justify-between items-center text-sm font-medium">
         <span>Collateralization Ratio (CR)</span>
-        <span className={isPositionDangerous ? 'text-red-500 font-bold' : ''}>
-          {projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
+        <span className={
+          projectedCR >= 999999 
+            ? 'text-green-600' 
+            : isPositionDangerous 
+              ? 'text-red-500 font-bold' 
+              : ''
+        }>
+          {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
         </span>
       </div>
       
@@ -109,7 +116,10 @@ const CRSlider: React.FC<CRSliderProps> = ({
       
       {isSliderDisabled && (
         <div className="text-center text-sm text-gray-500">
-          Slider disabled
+          {isInfinite 
+            ? "No debt - CR is infinite"
+            : "Slider disabled"
+          }
         </div>
       )}
     </div>
