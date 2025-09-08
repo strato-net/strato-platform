@@ -166,7 +166,7 @@ contract record Pool is Ownable {
     function sync() external onlyOwner {
         tokenABalance = ERC20(tokenA).balanceOf(address(this));
         tokenBBalance = ERC20(tokenB).balanceOf(address(this));
-        _updateStateVars();
+        _updateRatios();
         emit Sync(tokenABalance, tokenBBalance);
     }
 
@@ -186,10 +186,9 @@ contract record Pool is Ownable {
 
         emit Skim(to, excessA, excessB);
     }
-
-    /// @notice Update the pool's state variables (ratios only)
+    /// @notice Update the pool's ratios
     /// @dev Called after operations that change token balances
-    function _updateStateVars() internal {
+    function _updateRatios() internal {
         aToBRatio = _getCurrentTokenRatio(true);
         bToARatio = _getCurrentTokenRatio(false);
     }
@@ -200,8 +199,7 @@ contract record Pool is Ownable {
     function _updateStateVars(uint256 newTokenABalance, uint256 newTokenBBalance) internal {
         tokenABalance = newTokenABalance;
         tokenBBalance = newTokenBBalance;
-        aToBRatio = _getCurrentTokenRatio(true);
-        bToARatio = _getCurrentTokenRatio(false);
+        _updateRatios();
     }
 
     /// @notice Calculate the current exchange ratio between tokens
