@@ -374,7 +374,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".lastAccrual", BInteger lastAccrual)
   , (".totalScaledDebt", BInteger 0)
   , (".reservesAccrued", BInteger 0)
-  , (".debtCeilingAsset", BInteger 0)
+  , (".debtCeilingAsset", BInteger $ 1_000_000 * oneE18)
   , (".debtCeilingUSD", BInteger 0)
   ] ++
   [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
@@ -547,7 +547,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 (CodeAtAccount mercata
   ++ concatMap (\a ->
     [ (".collateralConfigs<a:" <> addrBS a <> ">.debtFloor", BInteger oneE18)
     , (".collateralConfigs<a:" <> addrBS a <> ">.unitScale", BInteger oneE18)
-    , (".collateralConfigs<a:" <> addrBS a <> ">.debtCeiling", BInteger $ 1_000_000 * oneE18)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.debtCeiling", BInteger $ 10_000_000 * oneE18)
     , (".collateralConfigs<a:" <> addrBS a <> ">.closeFactorBps", BInteger 5_000)
     , (".collateralConfigs<a:" <> addrBS a <> ">.liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
     , (".collateralConfigs<a:" <> addrBS a <> ">.stabilityFeeRate", BInteger $ ray + oneE18 + 547_000_000_000_000_000)
@@ -576,7 +576,7 @@ cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockAp
       , ("closeFactorBps", "5000")
       , ("stabilityFeeRate", show $ ray + oneE18 + 547_000_000_000_000_000)
       , ("debtFloor", show oneE18)
-      , ("debtCeiling", show $ 1_000_000 * oneE18)
+      , ("debtCeiling", show $ 10_000_000 * oneE18)
       , ("unitScale", show oneE18)
       , ("pause", show False)
       ]
