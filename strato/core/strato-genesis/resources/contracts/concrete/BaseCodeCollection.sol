@@ -39,9 +39,6 @@ import "Lending/RateStrategy.sol";
 //Bridging
 import "./Bridge/MercataBridge.sol";
 
-//Fee Collector
-import "Admin/FeeCollector.sol";
-
 //CDP
 import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";

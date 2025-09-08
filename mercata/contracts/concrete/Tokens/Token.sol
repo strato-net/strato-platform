@@ -95,7 +95,7 @@ contract record Token is ERC20, Ownable, TokenMetadata {
     }
 
     function addWhitelist(address _admin, string _func, address _accountToWhitelsit) external onlyOwner {
-        AdminRegistry(_admin).createIssue(_admin, "addWhitelist", this, _func, _accountToWhitelsit);
+        AdminRegistry(_admin).castVoteOnIssue(_admin, "addWhitelist", this, _func, _accountToWhitelsit);
     }
 
     function setMetadata (

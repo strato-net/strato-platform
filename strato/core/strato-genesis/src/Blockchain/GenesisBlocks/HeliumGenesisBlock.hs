@@ -163,7 +163,11 @@ combinedEscrows = M.elems
           Just GA.Asset{..} -> e{ GE.collateralQuantity = correctQuantity decimals name (GE.collateralQuantity e) }
 
 supportedCollaterals :: [Address]
-supportedCollaterals = Set.toList . Set.fromList $ GE.assetRootAddress <$> combinedEscrows
+supportedCollaterals = Set.toList
+                     . Set.delete 0xd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a -- BETHTEMP
+                     . Set.delete 0x04d68c24ff359ab457c7b96810f85c51989fe8ed -- USDTEMP
+                     . Set.fromList
+                     $ GE.assetRootAddress <$> combinedEscrows
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
@@ -264,7 +268,7 @@ ray :: Integer
 ray = 1_000_000_000 * oneE18
 
 lastAccrual :: Integer
-lastAccrual = 1757044800 -- September 5th, 2025, 12:00:00 AM
+lastAccrual = 1757304000 -- September 8th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
@@ -275,7 +279,7 @@ assetBalances GA.Asset{..} =
                          <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
          in case mEscrowBalance of
               Nothing -> [(o, q)]
-              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
+              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
@@ -320,7 +324,7 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
+            ++ [(maybe (".status", if root == usdstAddress || root == cataAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
@@ -370,7 +374,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".lastAccrual", BInteger lastAccrual)
   , (".totalScaledDebt", BInteger 0)
   , (".reservesAccrued", BInteger 0)
-  , (".debtCeilingAsset", BInteger 0)
+  , (".debtCeilingAsset", BInteger $ 1_000_000 * oneE18)
   , (".debtCeilingUSD", BInteger 0)
   ] ++
   [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
@@ -378,6 +382,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.reserveFactor", BInteger 1000)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationBonus", BInteger 10500)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationThreshold", BInteger 8000)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.perSecondFactorRAY", BInteger $ ray + 1_547_125_956_666_413_085)
   , (".configuredAssets[0]", BAccount $ unspecifiedChain usdstAddress)
   , (".configuredAssets.length", BInteger . fromIntegral $ 1 + length supportedCollaterals)
   ] ++ concatMap (\(i, a) ->
@@ -386,7 +391,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetConfigs<a:" <> addrBS a <> ">.reserveFactor", BInteger 1000)
   , (".assetConfigs<a:" <> addrBS a <> ">.liquidationBonus", BInteger 10500)
   , (".assetConfigs<a:" <> addrBS a <> ">.liquidationThreshold", BInteger 8000)
-  , (".assetConfigs<a:" <> addrBS a <> ">.perSecondFactorRAY", BInteger ray)
+  , (".assetConfigs<a:" <> addrBS a <> ">.perSecondFactorRAY", BInteger $ ray + 1_547_125_956_666_413_085)
   , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain a)
   ]
   ) (zip [1 :: Integer ..] supportedCollaterals)
@@ -473,6 +478,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
@@ -538,14 +544,24 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 (CodeAtAccount mercata
      , (".globalPaused", BBool False)
      , (".RAY", BInteger ray)
      , (".WAD", BInteger oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.unitScale", BInteger oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.debtCeiling", BInteger $ 10_000_000 * oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.closeFactorBps", BInteger 5_000)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.liquidationPenaltyBps", BInteger 1_000)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.rateAccumulator", BInteger ray)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.lastAccrual", BInteger lastAccrual)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.totalScaledDebt", BInteger 0)
+     , (".isSupportedAsset<a:" <> addrBS usdstAddress <> ">", BBool True)
      ]
   ++ concatMap (\a ->
     [ (".collateralConfigs<a:" <> addrBS a <> ">.debtFloor", BInteger oneE18)
     , (".collateralConfigs<a:" <> addrBS a <> ">.unitScale", BInteger oneE18)
-    , (".collateralConfigs<a:" <> addrBS a <> ">.debtCeiling", BInteger $ 1_000_000 * oneE18)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.debtCeiling", BInteger $ 10_000_000 * oneE18)
     , (".collateralConfigs<a:" <> addrBS a <> ">.closeFactorBps", BInteger 5_000)
     , (".collateralConfigs<a:" <> addrBS a <> ">.liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
-    , (".collateralConfigs<a:" <> addrBS a <> ">.stabilityFeeRate", BInteger $ ray + oneE18 + 547_000_000_000_000_000)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
     , (".collateralConfigs<a:" <> addrBS a <> ">.liquidationPenaltyBps", BInteger 1_000)
     , (".collateralGlobalStates<a:" <> addrBS a <> ">.rateAccumulator", BInteger ray)
     , (".collateralGlobalStates<a:" <> addrBS a <> ">.lastAccrual", BInteger lastAccrual)
@@ -571,7 +587,7 @@ cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockAp
       , ("closeFactorBps", "5000")
       , ("stabilityFeeRate", show $ ray + oneE18 + 547_000_000_000_000_000)
       , ("debtFloor", show oneE18)
-      , ("debtCeiling", show $ 1_000_000 * oneE18)
+      , ("debtCeiling", show $ 10_000_000 * oneE18)
       , ("unitScale", show oneE18)
       , ("pause", show False)
       ]

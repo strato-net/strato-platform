@@ -50,7 +50,6 @@ contract record RewardsManager is Ownable {
         RewardsManagerArgs _args,
         address _rewardsCreator
     ) Ownable(_rewardsCreator) {
-        _ownershipGranted = true;
         for (uint i = 0; i < _args.initialRewardTokens.length; i++) {
             addRewardToken(address(_args.initialRewardTokens[i]));
         }
@@ -67,22 +66,21 @@ contract record RewardsManager is Ownable {
         }
 
         setRewardDelegate(address(_args.initialRewardDelegate));
-        _ownershipGranted = false;
     }
 
-    function addRewardToken(address _token) public onlyOwnerExternal {
+    function addRewardToken(address _token) public onlyOwner {
         require(rewardTokenMap[_token] == 0, "Token " + string(_token) + " is already registered as a reward token");
         rewardTokens.push(Token(_token));
         rewardTokenMap[_token] = rewardTokens.length;
     }
 
-    function addRewardTokens(address[] _tokens) public onlyOwnerExternal {
+    function addRewardTokens(address[] _tokens) public onlyOwner {
         for (uint i = 0; i < _tokens.length; i++) {
             addRewardToken(_tokens[i]);
         }
     }
 
-    function removeRewardToken(address _token) public onlyOwnerExternal {
+    function removeRewardToken(address _token) public onlyOwner {
         uint index = rewardTokenMap[_token];
         require(index != 0, "Token " + string(_token) + " is not registered as a reward token");
         Token lastRewardToken = rewardTokens[rewardTokens.length - 1];
@@ -93,13 +91,13 @@ contract record RewardsManager is Ownable {
         rewardTokens.length -= 1;
     }
 
-    function removeRewardTokens(address[] _tokens) public onlyOwnerExternal {
+    function removeRewardTokens(address[] _tokens) public onlyOwner {
         for (uint i = 0; i < _tokens.length; i++) {
             removeRewardToken(_tokens[i]);
         }
     }
 
-    function addEligibleToken(address _token) public onlyOwnerExternal {
+    function addEligibleToken(address _token) public onlyOwner {
         require(eligibleTokenMap[_token] == 0, "Token " + string(_token) + " is already registered as a token eligible to receive rewards");
         eligibleTokens.push(Token(_token));
         eligibleTokenMap[_token] = eligibleTokens.length;
@@ -107,13 +105,13 @@ contract record RewardsManager is Ownable {
         rewardBalances[_token][_token].timestamp = block.timestamp;
     }
 
-    function addEligibleTokens(address[] _tokens) public onlyOwnerExternal {
+    function addEligibleTokens(address[] _tokens) public onlyOwner {
         for (uint i = 0; i < _tokens.length; i++) {
             addEligibleToken(_tokens[i]);
         }
     }
 
-    function removeEligibleToken(address _token) public onlyOwnerExternal {
+    function removeEligibleToken(address _token) public onlyOwner {
         uint index = eligibleTokenMap[_token];
         require(index != 0, "Token " + string(_token) + " is not registered as a Eligible token");
         Token lastEligibleToken = eligibleTokens[eligibleTokens.length - 1];
@@ -124,23 +122,23 @@ contract record RewardsManager is Ownable {
         eligibleTokens.length -= 1;
     }
 
-    function removeEligibleTokens(address[] _tokens) public onlyOwnerExternal {
+    function removeEligibleTokens(address[] _tokens) public onlyOwner {
         for (uint i = 0; i < _tokens.length; i++) {
             removeEligibleToken(_tokens[i]);
         }
     }
 
-    function setRewardFactor(address _rewardToken, address _eligibleToken, uint _factor) public onlyOwnerExternal {
+    function setRewardFactor(address _rewardToken, address _eligibleToken, uint _factor) public onlyOwner {
         rewardFactors[_rewardToken][_eligibleToken] = _factor;
     }
 
-    function setRewardFactors(InitialRewardFactor[] _rewardFactors) onlyOwnerExternal {
+    function setRewardFactors(InitialRewardFactor[] _rewardFactors) onlyOwner {
         for (uint i = 0; i < _rewardFactors.length; i++) {
             setRewardFactor(address(_rewardFactors[i].rewardToken), address(_rewardFactors[i].eligibleToken), _rewardFactors[i].factor);
         }
     }
 
-    function setRewardDelegate(address _rewardDelegate) public onlyOwnerExternal {
+    function setRewardDelegate(address _rewardDelegate) public onlyOwner {
         rewardDelegate = _rewardDelegate;
     }
 

@@ -695,7 +695,16 @@ contract record LendingPool is Ownable {
         require(reserveFactor <= 5000, "Reserve factor too high"); // Max 50%
         require(perSecondFactorRAY >= RAY, "Invalid per-second factor");
 
-        _accrue();
+        bool isBorrowAsset = (asset == borrowableAsset);
+        bool canAccrue =
+            isBorrowAsset &&
+            assetConfigs[asset].perSecondFactorRAY > 0 &&
+            borrowIndex != 0 &&
+            lastAccrual != 0;
+
+        if (canAccrue) {
+            _accrue();
+        }
         
         // If this is a new asset, add it to configuredAssets array
         if (assetConfigs[asset].ltv == 0 && assetConfigs[asset].liquidationThreshold == 0) {
