@@ -89,8 +89,15 @@ transactions.
 ### On-Chain Parameter Contract
 
 A smart contract will be deployed to manage blockchain parameters, specifically
-transaction size limits. This contract will emit a `TransactionSizeLimitChanged`
+transaction size limits. This contract will be **admin-owned** (specific admin 
+mechanism to be clarified later) and will emit a `TransactionSizeLimitChanged`
 event whenever the limit is updated.
+
+The contract will be deployed as part of the **genesis block** to ensure it's 
+available from block zero. During genesis initialization, the contract 
+constructor will emit an initial `TransactionSizeLimitChanged` event with the 
+default transaction size limit value, establishing the baseline configuration 
+for the network.
 
 ### Event Processing Pipeline
 
@@ -145,8 +152,20 @@ the current limit with:
 getCurrentTxSizeLimit :: (HasRedisBlockDB m) => m Int
 getCurrentTxSizeLimit = do
   mLimit <- RBDB.withRedisBlockDB getTransactionSizeLimit
-  return $ fromMaybe defaultTxSizeLimit mLimit
+  case mLimit of
+    Just limit -> return limit
+    Nothing -> do
+      logWarn "Using default transaction size limit - Redis cache may not be populated yet"
+      return defaultTxSizeLimit
 ```
 
-This leverages existing patterns and ensures all services have fast, consistent
-access to the current transaction size limit.
+#### Default Value Fallback
+
+The `defaultTxSizeLimit` fallback is necessary to handle edge cases during node startup. Although the genesis block will emit an initial `TransactionSizeLimitChanged` event, there may be a brief window during genesis processing where:
+
+1. The node has started accepting transactions to the mempool
+2. The genesis event has not yet been processed and cached in Redis
+
+This situation should be rare under normal operation. When the system falls back to the default value, it logs a **warning message** as an indicator that the event processing pipeline may not be functioning correctly or that there's an unexpected timing issue during startup.
+
+This leverages existing patterns and ensures all services have fast, consistent access to the current transaction size limit while providing graceful degradation during edge cases.
