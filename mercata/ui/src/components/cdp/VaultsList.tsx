@@ -735,21 +735,27 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
 
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
-                <div className="mt-4 flex gap-2">
-                  <Input
-                    placeholder="Amount"
-                    value={inputAmounts[position.asset] || ""}
-                    onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
-                    className={`flex-1 ${
-                      maxStates[position.asset] 
-                        ? 'text-blue-600 bg-blue-50 border-blue-300' 
-                        : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
-                          ? 'text-red-600 bg-red-50 border-red-300'
-                          : ''
-                    }`}
-                    type="number"
-                    step="any"
-                  />
+                <div className="mt-4">
+                  <div className="mb-2">
+                    <p className="text-xs text-gray-500">
+                      Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Amount"
+                      value={inputAmounts[position.asset] || ""}
+                      onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
+                      className={`flex-1 ${
+                        maxStates[position.asset] 
+                          ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                          : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
+                            ? 'text-red-600 bg-red-50 border-red-300'
+                            : ''
+                      }`}
+                      type="number"
+                      step="any"
+                    />
                   <Button 
                     variant={maxStates[position.asset] ? "default" : "outline"}
                     size="sm" 
@@ -770,6 +776,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
                     }
                   </Button>
+                  </div>
                 </div>
               )}
             </div>
