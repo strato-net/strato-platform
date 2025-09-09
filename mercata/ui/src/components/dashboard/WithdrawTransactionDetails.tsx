@@ -127,7 +127,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
         const symbol = record?.stratoTokenSymbol || '-';
         return (
           <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700">{symbol}</span>
+            <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : symbol}</span>
           </div>
         );
       },
