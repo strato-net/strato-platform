@@ -33,11 +33,6 @@ export const getCDPRegistry = async (
   options: Record<string, string> = {},
   callerId?: string
 ): Promise<Record<string, any>> => {
-  console.log(`🔍 [CDP] getCDPRegistry called at ${new Date().toISOString()}`, {
-    userAddress,
-    options,
-    callerId
-  });
   const { select, ...filters } = options;
 
   // Filter out undefined values
@@ -132,9 +127,6 @@ export const getUserVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<any[]> => {
-  console.log(`🔍 [CDP] getUserVaults called at ${new Date().toISOString()}`, {
-    userAddress
-  });
   try {
     const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
     
@@ -231,9 +223,6 @@ export const getVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
-  console.log(`🔍 [CDP] getVaults called at ${new Date().toISOString()}`, {
-    userAddress
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVaults");
   
   if (!registry?.cdpEngine) {
@@ -325,10 +314,6 @@ export const getVault = async (
   userAddress: string,
   asset: string
 ): Promise<VaultData | null> => {
-  console.log(`🔍 [CDP] getVault called at ${new Date().toISOString()}`, {
-    userAddress,
-    asset
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVault");
   
   if (!registry?.cdpEngine) {
@@ -717,6 +702,10 @@ export const getAssetDebtInfo = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ currentTotalDebt: string; debtFloor: string; debtCeiling: string }> => {
+  console.log(`🔍 [CDP] getAssetDebtInfo called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -996,10 +985,6 @@ export const getAssetConfig = async (
   userAddress: string,
   asset: string
 ): Promise<AssetConfig | null> => {
-  console.log(`🔍 [CDP] getAssetConfig called at ${new Date().toISOString()}`, {
-    userAddress,
-    asset
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -1039,9 +1024,6 @@ export const getSupportedAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  console.log(`🔍 [CDP] getSupportedAssets called at ${new Date().toISOString()}`, {
-    userAddress
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
   
   if (!registry?.cdpEngine) {
