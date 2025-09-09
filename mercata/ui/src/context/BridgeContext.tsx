@@ -18,6 +18,7 @@ import {
   NetworkSummary,
   BridgeContextType,
   BridgeTransactionResponse,
+  BridgeTransactionTab,
 } from "@/lib/bridge/types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
@@ -34,6 +35,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [selectedToken, setSelectedToken] = useState<Token | null>(null);
   const [selectedMintToken, setSelectedMintToken] = useState<Token | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
+  const [targetTransactionTab, setTargetTransactionTab] = useState<BridgeTransactionTab | null>(null);
 
   const fetchTokensForChain = useCallback(
     async (chainId: string) => {
@@ -313,6 +315,8 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         selectedNetwork,
         selectedToken,
         selectedMintToken,
+        targetTransactionTab,
+        setTargetTransactionTab,
         bridgeOut,
         redeemOut,
         useBalance,
