@@ -101,10 +101,10 @@ const VoteTab = () => {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-[80px]">Issue ID</TableHead>
-                    <TableHead className="w-[80px]">Contract</TableHead>
+                    <TableHead className="w-[120px]">Issue ID</TableHead>
+                    <TableHead className="w-[120px]">Contract</TableHead>
                     <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[260px]">Arguments</TableHead>
+                    <TableHead className="w-[180px]">Arguments</TableHead>
                     <TableHead className="w-[60px]">Votes Cast</TableHead>
                     <TableHead className="w-[60px]">Votes Needed</TableHead>
                     <TableHead className="w-[60px]">Voting Threshold</TableHead>
@@ -121,7 +121,7 @@ const VoteTab = () => {
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
-                        <TableCell className="font-medium text-sm max-w-[80px] truncate">
+                        <TableCell className="font-medium text-sm max-w-[120px] truncate">
                           <div className="flex items-center space-x-2">
                             <span>
                               {issueId && issueId !== 'Unknown' 
@@ -150,7 +150,7 @@ const VoteTab = () => {
                         <TableCell className="text-sm max-w-[90px]">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[260px] truncate">
+                        <TableCell className="font-mono text-xs max-w-[180px] truncate">
                           {issue.args.join(', ')}
                         </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
