@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -22,47 +22,90 @@ interface BorrowWidgetProps {
 const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [supportedAssets, setSupportedAssets] = useState<AssetConfig[]>([]);
   const [depositAsset, setDepositAsset] = useState<AssetConfig | null>(null);
-  const [depositAmount, setDepositAmount] = useState("0");
-  const [borrowAmount, setBorrowAmount] = useState("0");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [borrowAmount, setBorrowAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [isBorrowMaxEnabled, setIsBorrowMaxEnabled] = useState(false);
   const [isDepositMaxEnabled, setIsDepositMaxEnabled] = useState(false);
-  const [isRatioLocked, setIsRatioLocked] = useState(false);
-  const [lockedCR, setLockedCR] = useState<number | null>(null);
   const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
   const [existingVaultCollateral, setExistingVaultCollateral] = useState<string>("0"); // Wei format
+  const [existingVaultDebt, setExistingVaultDebt] = useState<string>("0"); // Wei format
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
   
   // Get real asset price from dynamic data only
-  const getAssetPrice = (): number => {
+  const getAssetPrice = useCallback((): number => {
     if (!depositAsset) return 0;
     return assetPrices[depositAsset.asset] || 0;
-  };
-  
-  // Calculate current collateralization ratio and related values
-  const calculateCurrentCR = (): number => {
-    if (!depositAsset || !borrowAmount || parseFloat(borrowAmount) <= 0) {
-      return 0;
-    }
+  }, [depositAsset, assetPrices]);
+
+  // Calculate total collateral value (existing + new deposit)
+  const getTotalCollateralValue = useCallback((): number => {
+    if (!depositAsset) return 0;
     
-    const debtAmount = parseFloat(borrowAmount);
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return 0;
+    
+    // Get existing vault data (converted from wei to decimal)
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
+    const newDepositAmount = parseFloat(depositAmount || "0");
+    
+    // Calculate total collateral in tokens
+    const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
+    
+    // Convert to USD
+    return totalCollateralTokens * assetPriceUSD;
+  }, [depositAsset, getAssetPrice, existingVaultCollateral, depositAmount]);
+
+  // Calculate projected CR based on current inputs
+  const calculateProjectedCR = useCallback((): number => {
+    if (!depositAsset) return 0;
+    
     const totalCollateralValueUSD = getTotalCollateralValue();
-    
     if (totalCollateralValueUSD <= 0) return 0;
     
-    // CR = (total collateral value / debt value) * 100
-    return (totalCollateralValueUSD / debtAmount) * 100;
-  };
+    // Get existing debt and new borrow amount
+    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    const newBorrowAmount = parseFloat(borrowAmount || "0");
+    const totalDebt = existingDebtDecimal + newBorrowAmount;
+    
+    // Handle case of no debt
+    if (totalDebt <= 0) return 999999; // Infinite CR when no debt
+    
+    // CR = (total collateral value / total debt value) * 100
+    const projectedCR = (totalCollateralValueUSD / totalDebt) * 100;
+    
+    return isFinite(projectedCR) ? projectedCR : 0;
+  }, [depositAsset, getTotalCollateralValue, existingVaultDebt, borrowAmount]);
 
-  // Calculate max borrowable amount using backend endpoint for consistency
-  const [maxBorrowableAmount, setMaxBorrowableAmount] = useState<number>(0);
+  // Calculate max borrowable amount dynamically based on total collateral
   
-  const calculateMaxBorrowable = (): number => {
-    return maxBorrowableAmount;
-  };
+  const calculateMaxBorrowable = useCallback((): number => {
+    if (!depositAsset) return 0;
+    
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return 0;
+    
+    // Get total collateral value (existing + new deposit input)
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) return 0;
+    
+    // Get existing debt
+    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    
+    // Calculate max borrowable USD based on total collateral and liquidation ratio
+    const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100; // Convert percentage to decimal
+    const maxBorrowableUSD = totalCollateralValueUSD / liquidationRatioDecimal;
+    
+    // Subtract existing debt to get available borrowing power
+    const availableBorrowingPower = maxBorrowableUSD - existingDebtDecimal;
+    
+    const maxAmount = Math.max(0, availableBorrowingPower);
+    
+    return maxAmount;
+  }, [depositAsset, getAssetPrice, getTotalCollateralValue, existingVaultDebt]);
 
   // Get user's balance for the selected deposit asset
   const getUserDepositBalance = (): string => {
@@ -73,26 +116,6 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     );
     
     return userToken?.balance || "0";
-  };
-
-  // Calculate total collateral value (existing + new deposit)
-  const getTotalCollateralValue = (): number => {
-    if (!depositAsset) return 0;
-    
-    const assetPriceUSD = getAssetPrice();
-    if (assetPriceUSD <= 0) return 0;
-    
-    // Convert existing collateral from wei to decimal
-    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
-    
-    // Get new deposit amount
-    const newDepositAmount = parseFloat(depositAmount || "0");
-    
-    // Calculate total collateral in tokens
-    const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
-    
-    // Convert to USD
-    return totalCollateralTokens * assetPriceUSD;
   };
 
   // Format large numbers for display
@@ -152,34 +175,27 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   };
 
   const maxBorrowable = calculateMaxBorrowable();
-  const currentCR = calculateCurrentCR();
+  const projectedCR = calculateProjectedCR();
   const liquidationRatio = depositAsset?.liquidationRatio || 150;
   const userDepositBalance = getUserDepositBalance();
 
-  // Dynamic slider configuration based on LT
-  const getSliderConfig = () => {
-    if (!depositAsset) {
-      return { min: 100, max: 500, safeDefault: 200 };
-    }
-    
-    const lt = depositAsset.liquidationRatio;
-    const minCR = Math.ceil(lt * 1.01); // LT + 1% minimum
-    const safeDefault = Math.ceil(lt * 1.5); // 1.5x LT as safe starting point
-    
-    // Dynamic max based on LT for better scale
-    let maxCR;
-    if (lt <= 110) {
-      maxCR = 300; // For low LT assets, show up to 300%
-    } else if (lt <= 150) {
-      maxCR = Math.max(400, lt * 2.5); // For medium LT, show 2.5x or 400%
-    } else {
-      maxCR = Math.max(500, lt * 2); // For high LT, show 2x or 500%
-    }
-    
-    return { min: minCR, max: maxCR, safeDefault };
+  // Check if current amounts are above their respective max values
+  const isDepositAmountAboveMax = (): boolean => {
+    if (!depositAsset || !userDepositBalance) return false;
+    const maxDepositAmount = parseFloat(formatWeiToDecimal(userDepositBalance, 18));
+    const currentDepositAmount = parseFloat(depositAmount || "0");
+    return currentDepositAmount > maxDepositAmount;
   };
 
-  const sliderConfig = getSliderConfig();
+  const isBorrowAmountAboveMax = (): boolean => {
+    // If MAX borrow is enabled, never consider the amount as above max
+    if (isBorrowMaxEnabled) {
+      return false;
+    }
+    
+    const currentBorrowAmount = parseFloat(borrowAmount || "0");
+    return currentBorrowAmount > maxBorrowable;
+  };
 
   // Fetch supported assets and prices on component mount
   useEffect(() => {
@@ -202,21 +218,16 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               if (priceResponse.data?.price) {
                 // Convert price from wei format (18 decimals) to regular number
                 prices[asset.asset] = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
-                console.log(`✅ Price fetched for ${asset.symbol} (${asset.asset}): $${prices[asset.asset]}`);
-              } else {
-                console.warn(`⚠️  No price data for ${asset.symbol} (${asset.asset}):`, priceResponse.data);
               }
             } catch (assetPriceError) {
-              console.error(`❌ Failed to fetch price for ${asset.symbol} (${asset.asset}):`, assetPriceError);
               // If 404, it means the asset is not in the oracle
               if (assetPriceError.response?.status === 404) {
-                console.warn(`⚠️  Asset ${asset.symbol} (${asset.asset}) not found in price oracle`);
+                console.warn(`Asset ${asset.symbol} not found in price oracle`);
               }
             }
           }
           
           setAssetPrices(prices);
-          console.log("🔍 Final asset prices:", prices);
         } catch (priceError) {
           console.error("Could not fetch real asset prices:", priceError);
           setAssetPrices({}); // Empty object - no prices available
@@ -234,30 +245,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     fetchAssetsAndPrices();
   }, [toast]);
 
-  // Update max borrowable amount when collateral amount changes
+  // Update MAX borrow state and amount when needed
   useEffect(() => {
-    const updateMaxBorrowable = async () => {
-      if (!depositAsset) {
-        setMaxBorrowableAmount(0);
-        return;
-      }
-
-      // Refetch max borrowable amount when deposit amount changes
-      try {
-        const maxMintResult = await cdpService.getMaxMint(depositAsset.asset);
-        const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxMintResult.maxAmount, 18));
-        setMaxBorrowableAmount(maxAmountDecimal);
-      } catch (error) {
-        console.log("No borrowing power available for asset:", depositAsset.symbol);
-        setMaxBorrowableAmount(0);
-      }
-    };
-
-    // Only update if deposit amount has actually changed
-    if (depositAsset && depositAmount !== "0") {
-      updateMaxBorrowable();
-    }
-
     // Check if current borrow amount equals max borrowable (within tolerance)
     const currentBorrowAmount = parseFloat(borrowAmount);
     const isCurrentlyMaxAmount = Math.abs(currentBorrowAmount - maxBorrowable) < 0.01 && maxBorrowable > 0;
@@ -270,18 +259,19 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       // Don't disable here to avoid flicker - let handleBorrowAmountChange handle it
     }
 
-    // Only auto-update when MAX is enabled - no other automatic borrow amount setting
+    // Only auto-update when MAX is enabled - uses frontend calculation that includes deposit input
     if (isBorrowMaxEnabled && maxBorrowable > 0) {
-      setBorrowAmount(maxBorrowable.toFixed(2));
+      const maxAmountToSet = maxBorrowable.toFixed(2);
+      setBorrowAmount(maxAmountToSet);
     }
-  }, [maxBorrowable, isBorrowMaxEnabled, depositAsset, depositAmount, isRatioLocked, lockedCR, borrowAmount]);
+  }, [maxBorrowable, isBorrowMaxEnabled, borrowAmount]);
 
-  // Fetch existing vault collateral and max borrowable amount when asset changes
+  // Fetch existing vault collateral when asset changes
   useEffect(() => {
     const fetchVaultData = async () => {
       if (!depositAsset) {
         setExistingVaultCollateral("0");
-        setMaxBorrowableAmount(0);
+        setExistingVaultDebt("0");
         return;
       }
 
@@ -290,37 +280,28 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const vaultData = await cdpService.getVault(depositAsset.asset);
         if (vaultData) {
           setExistingVaultCollateral(vaultData.collateralAmount);
+          setExistingVaultDebt(vaultData.debtAmount);
         } else {
           setExistingVaultCollateral("0");
-        }
-
-        // Fetch max borrowable amount from backend
-        try {
-          const maxMintResult = await cdpService.getMaxMint(depositAsset.asset);
-          const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxMintResult.maxAmount, 18));
-          setMaxBorrowableAmount(maxAmountDecimal);
-        } catch (error) {
-          console.log("No borrowing power available for asset:", depositAsset.symbol);
-          setMaxBorrowableAmount(0);
+          setExistingVaultDebt("0");
         }
       } catch (error) {
         console.log("No existing vault found for asset:", depositAsset.symbol);
         setExistingVaultCollateral("0");
-        setMaxBorrowableAmount(0);
+        setExistingVaultDebt("0");
       }
     };
 
     fetchVaultData();
   }, [depositAsset]);
 
-  // Reset borrow MAX state and ratio lock when deposit asset changes
+
+  // Reset borrow MAX state when deposit asset changes
   useEffect(() => {
     setIsBorrowMaxEnabled(false);
     setIsDepositMaxEnabled(false);
-    setBorrowAmount("0");
-    setDepositAmount("0");
-    setIsRatioLocked(false);
-    setLockedCR(null);
+    setBorrowAmount("");
+    setDepositAmount("");
   }, [depositAsset]);
 
   // Handle MAX button click for borrow amount
@@ -328,78 +309,40 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (isBorrowMaxEnabled) {
       // Disable MAX and clear amount
       setIsBorrowMaxEnabled(false);
-      setBorrowAmount("0");
+      setBorrowAmount("");
     } else {
-      // Enable MAX and set to max borrowable
+      // Enable MAX and set to max borrowable (includes current collateral + deposit input)
+      const maxAmountToSet = maxBorrowable.toFixed(2);
+      
+      
       setIsBorrowMaxEnabled(true);
-      setBorrowAmount(maxBorrowable.toFixed(2));
-      // Lock the ratio when MAX is used
-      if (maxBorrowable > 0 && depositAsset) {
-        const totalCollateralValueUSD = getTotalCollateralValue();
-        if (totalCollateralValueUSD > 0) {
-          const newCR = (totalCollateralValueUSD / maxBorrowable) * 100;
-          setIsRatioLocked(true);
-          setLockedCR(newCR);
-        }
-      }
+      setBorrowAmount(maxAmountToSet);
     }
   };
 
   // Handle manual input change for borrow amount
   const handleBorrowAmountChange = (value: string) => {
+    const currentAmount = parseFloat(value || "0");
+    
     // Check if user manually typed the max amount
-    const isTypingMaxAmount = Math.abs(parseFloat(value) - maxBorrowable) < 0.01 && maxBorrowable > 0;
+    const isTypingMaxAmount = Math.abs(currentAmount - maxBorrowable) < 0.01 && maxBorrowable > 0;
     
     if (isTypingMaxAmount && !isBorrowMaxEnabled) {
       // User typed the max amount, activate MAX styling
       setIsBorrowMaxEnabled(true);
-    } else if (!isTypingMaxAmount && isBorrowMaxEnabled) {
-      // User changed away from max amount, disable MAX styling
+    } else if (isBorrowMaxEnabled) {
+      // If MAX is currently enabled, check if user changed the value
+      if (currentAmount < maxBorrowable) {
+        // User reduced the amount below max, disable MAX mode
       setIsBorrowMaxEnabled(false);
-    }
-    
-    // Validate borrow amount doesn't violate minimum CR requirement
-    if (parseFloat(value) > 0 && depositAsset) {
-      const debtAmount = parseFloat(value);
-      const totalCollateralValueUSD = getTotalCollateralValue();
-      
-      if (totalCollateralValueUSD > 0) {
-        const newCR = (totalCollateralValueUSD / debtAmount) * 100;
-        // Prevent borrow amount that would result in CR below minimum using dynamic config
-        if (newCR < sliderConfig.min) {
-          const maxAllowedDebt = (totalCollateralValueUSD * 100) / sliderConfig.min;
-          setBorrowAmount(maxAllowedDebt.toFixed(2));
-          setIsRatioLocked(true);
-          setLockedCR(sliderConfig.min);
-          return;
-        }
+      } else if (currentAmount > maxBorrowable) {
+        // User increased above max, disable MAX mode so red styling shows
+        setIsBorrowMaxEnabled(false);
       }
     }
     
+    // Always update the borrow amount
     setBorrowAmount(value);
-    
-    // When borrow amount changes, update the slider to reflect new CR
-    // Calculate new CR based on total collateral and new borrow amount
-    if (parseFloat(value) > 0) {
-      const debtAmount = parseFloat(value);
-      const totalCollateralValueUSD = getTotalCollateralValue();
-      
-      if (totalCollateralValueUSD > 0) {
-        const newCR = (totalCollateralValueUSD / debtAmount) * 100;
-        
-        // Update the locked CR to reflect this new ratio
-        setIsRatioLocked(true);
-        setLockedCR(newCR);
-      } else {
-        // Clear ratio lock if no collateral value
-        setIsRatioLocked(false);
-        setLockedCR(null);
-      }
-    } else {
-      // Clear ratio lock if invalid amounts
-      setIsRatioLocked(false);
-      setLockedCR(null);
-    }
   };
 
   // Handle deposit MAX button click
@@ -407,7 +350,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (isDepositMaxEnabled) {
       // Disable MAX and clear amount
       setIsDepositMaxEnabled(false);
-      setDepositAmount("0");
+      setDepositAmount("");
     } else {
       // Enable MAX and set to user's full balance (formatted for input)
       setIsDepositMaxEnabled(true);
@@ -422,68 +365,73 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
         setDepositAmount(formattedBalance);
       } else {
-        setDepositAmount("0");
+        setDepositAmount("");
       }
     }
   };
 
   // Handle manual input change for deposit amount
   const handleDepositAmountChange = (value: string) => {
+    const currentAmount = parseFloat(value || "0");
+    
     // Check if user manually typed the max deposit amount
     let isTypingMaxAmount = false;
+    let maxDepositAmount = 0;
+    
     if (depositAsset && userDepositBalance && parseFloat(userDepositBalance) > 0) {
-      // Get token info to determine decimals for proper conversion
-      const userToken = activeTokens.find(token => 
-        token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
-      );
-      const decimals = 18;
-      
       // Convert balance to decimal for comparison
-      const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
-      isTypingMaxAmount = Math.abs(parseFloat(value || "0") - parseFloat(formattedBalance)) < 0.000001;
+      const formattedBalance = formatWeiToDecimal(userDepositBalance, 18);
+      maxDepositAmount = parseFloat(formattedBalance);
+      isTypingMaxAmount = Math.abs(currentAmount - maxDepositAmount) < 0.000001;
     }
     
     if (isTypingMaxAmount && !isDepositMaxEnabled) {
       // User typed the max amount, activate MAX styling
       setIsDepositMaxEnabled(true);
-    } else if (!isTypingMaxAmount && isDepositMaxEnabled) {
-      // User changed away from max amount, disable MAX styling
+    } else if (isDepositMaxEnabled) {
+      // If MAX is currently enabled, check if user changed the value
+      if (currentAmount < maxDepositAmount) {
+        // User reduced the amount below max, disable MAX mode
       setIsDepositMaxEnabled(false);
+      } else if (currentAmount > maxDepositAmount) {
+        // User increased above max, disable MAX mode so red styling shows
+        setIsDepositMaxEnabled(false);
+      }
     }
     
-    // Deposit is only affected by user input - never by slider or other inputs
+    // Always update the deposit amount
     setDepositAmount(value);
-    
-    // Deposit changes don't affect slider or borrow amount
-    // Users must manually adjust borrow or use slider for ratio control
   };
 
   // Handle CR slider changes
-  const handleCRSliderChange = (values: number[]) => {
-    const targetCR = values[0];
-    
+  const handleCRChange = (targetCR: number) => {
     if (!depositAsset || targetCR <= 0) {
       return;
     }
     
-    const totalCollateralValueUSD = getTotalCollateralValue();
-    if (totalCollateralValueUSD <= 0) {
-      return;
-    }
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return;
     
-    // Enforce minimum CR constraint using dynamic slider config
-    const effectiveTargetCR = Math.max(targetCR, sliderConfig.min);
+    // Get existing vault data and new deposit
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
+    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    const newDepositAmount = parseFloat(depositAmount || "0");
     
-    // Calculate borrow amount based on effective target CR and total collateral
-    // CR = (total collateral value / debt value) * 100
-    // So debt value = (total collateral value * 100) / CR
-    const newDebtAmount = (totalCollateralValueUSD * 100) / effectiveTargetCR;
+    // Calculate total collateral value
+    const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
+    const totalCollateralValueUSD = totalCollateralTokens * assetPriceUSD;
     
-    setBorrowAmount(newDebtAmount.toFixed(2));
+    if (totalCollateralValueUSD <= 0) return;
     
-    // Set the locked CR to the effective slider value
-    setIsRatioLocked(true);
-    setLockedCR(effectiveTargetCR);
+    // Calculate required total debt for target CR
+    // CR = (collateral value / debt value) * 100
+    // So debt value = (collateral value * 100) / CR
+    const requiredTotalDebt = (totalCollateralValueUSD * 100) / targetCR;
+    
+    // Calculate new borrow amount needed
+    const newBorrowAmount = Math.max(0, requiredTotalDebt - existingDebtDecimal);
+    
+    setBorrowAmount(newBorrowAmount.toFixed(2));
     
     // Disable MAX if it was enabled
     if (isBorrowMaxEnabled) {
@@ -491,9 +439,141 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     }
   };
 
-  // Check if current CR is below liquidation threshold (dangerous)
-  const effectiveCR = isRatioLocked && lockedCR ? lockedCR : currentCR;
-  const isPositionDangerous = effectiveCR > 0 && effectiveCR < liquidationRatio;
+  // Check if projected CR is below liquidation threshold (dangerous)
+  const isPositionDangerous = projectedCR > 0 && projectedCR < liquidationRatio;
+  
+  // Check if there's no more borrowing room due to being at liquidation threshold
+  // This should trigger when user has collateral (existing or being deposited) but no borrowing power
+  const isAtLiquidationThreshold = useCallback((): boolean => {
+    const hasExistingCollateral = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18)) > 0;
+    const hasDepositInput = parseFloat(depositAmount || "0") > 0;
+    const hasAnyCollateral = hasExistingCollateral || hasDepositInput;
+    return maxBorrowable <= 0 && hasAnyCollateral;
+  }, [existingVaultCollateral, depositAmount, maxBorrowable])();
+
+
+  // Function to refresh all widget data after successful transaction
+  const refreshWidgetData = async () => {
+    if (!depositAsset) return;
+
+    try {
+      // Refresh existing vault data
+      const vaultData = await cdpService.getVault(depositAsset.asset);
+      if (vaultData) {
+        setExistingVaultCollateral(vaultData.collateralAmount);
+        setExistingVaultDebt(vaultData.debtAmount);
+      } else {
+        setExistingVaultCollateral("0");
+        setExistingVaultDebt("0");
+      }
+
+      // Max borrowable amount is now calculated dynamically, no need to refresh
+
+      // Refresh asset prices (in case they changed)
+      try {
+        const priceResponse = await api.get(`/oracle/price?asset=${depositAsset.asset}`);
+        if (priceResponse.data?.price) {
+          const newPrice = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
+          setAssetPrices(prev => ({
+            ...prev,
+            [depositAsset.asset]: newPrice
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to refresh asset price:", error);
+      }
+    } catch (error) {
+      console.error("Failed to refresh widget data:", error);
+    }
+  };
+
+  // Validate debt floor and ceiling constraints
+  const validateDebtConstraints = async (borrowAmountDecimal: number): Promise<boolean> => {
+    if (!depositAsset || borrowAmountDecimal <= 0) return true;
+
+
+    try {
+      // Get current asset debt info
+      const debtInfo = await cdpService.getAssetDebtInfo(depositAsset.asset);
+      
+      // Keep everything in wei for accurate comparison (like blockchain)
+      const currentAssetTotalDebtWei = BigInt(debtInfo.currentTotalDebt);
+      const debtFloorWei = BigInt(debtInfo.debtFloor);
+      const debtCeilingWei = BigInt(debtInfo.debtCeiling);
+      
+      // Convert borrow amount to wei (18 decimals)
+      const borrowAmountWei = BigInt(Math.floor(borrowAmountDecimal * 1e18));
+      
+
+      // Check debt ceiling constraint (total debt for this asset across all users)
+      if (debtCeilingWei > 0n) {
+        const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
+        if (newAssetTotalDebtWei > debtCeilingWei) {
+          const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
+          const availableRoom = parseFloat(formatWeiToDecimal(availableRoomWei.toString(), 18));
+          const debtCeilingDecimal = parseFloat(formatWeiToDecimal(debtCeilingWei.toString(), 18));
+          
+          toast({
+            title: "Debt Ceiling Exceeded",
+            description: `Cannot borrow ${borrowAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      // Check debt floor constraint (per-user minimum debt)
+      // We need to simulate the exact contract calculation to avoid precision gaps
+      if (debtFloorWei > 0n) {
+        // Get current vault data to access scaledDebt and rateAccumulator
+        const vaultData = await cdpService.getVault(depositAsset.asset);
+        if (!vaultData) {
+          return true;
+        }
+
+        // Simulate the exact contract calculation:
+        // 1. Convert borrow amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
+        // 2. Add to existing scaled debt: newScaledDebt = scaledDebt + scaledAdd  
+        // 3. Convert back to debt: totalDebtAfter = (newScaledDebt * rateAccumulator) / RAY
+        
+        const RAY = BigInt("1000000000000000000000000000"); // 1e27
+        const existingScaledDebtWei = BigInt(vaultData.scaledDebt || "0");
+        const rateAccumulatorWei = BigInt(vaultData.rateAccumulator || "1000000000000000000000000000");
+        
+        // Step 1: Convert borrow amount to scaled debt (same as contract)
+        const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
+        
+        // Step 2: Add to existing scaled debt (same as contract)
+        const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
+        
+        // Step 3: Convert back to debt for floor check (same as contract)
+        const totalDebtAfterWei = (newScaledDebtWei * rateAccumulatorWei) / RAY;
+        
+
+        if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
+          // Calculate how much more is needed to reach debt floor
+          const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
+          const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
+          const minRequired = parseFloat(formatWeiToDecimal(minRequiredWei.toString(), 18));
+          const debtFloorDecimal = parseFloat(formatWeiToDecimal(debtFloorWei.toString(), 18));
+          const currentDebt = parseFloat(formatWeiToDecimal(currentDebtWei.toString(), 18));
+          
+          toast({
+            title: "Below Debt Floor",
+            description: `Borrow more USDST to reach the minimum debt floor`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("🔍 [MintWidget] Failed to validate debt constraints:", error);
+      // Don't block the transaction if validation fails
+      return true;
+    }
+  };
 
   // Handle vault creation
   const handleCreateVault = async () => {
@@ -509,17 +589,18 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     const depAmount = parseFloat(depositAmount);
     const borAmount = parseFloat(borrowAmount);
 
-    // Borrowing is now required
-    if (borAmount <= 0) {
+    // At least one amount must be provided
+    if (depAmount <= 0 && borAmount <= 0) {
       toast({
-        title: "Invalid Borrow Amount", 
-        description: "Please enter a borrow amount",
+        title: "Invalid Amount", 
+        description: "Please enter a deposit amount, borrow amount, or both",
         variant: "destructive",
       });
       return;
     }
 
-    // Check if we have sufficient total collateral for the borrow amount
+    // If borrowing, check if we have sufficient total collateral
+    if (borAmount > 0) {
     const totalCollateralValueUSD = getTotalCollateralValue();
     if (totalCollateralValueUSD <= 0) {
       toast({
@@ -528,6 +609,13 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         variant: "destructive",
       });
       return;
+      }
+
+      // Validate debt floor and ceiling constraints
+      const isValid = await validateDebtConstraints(borAmount);
+      if (!isValid) {
+        return; // Validation failed, error already shown
+      }
     }
 
     // Deposit is now optional - only validate if user entered an amount
@@ -557,25 +645,27 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         successMessage = `Deposited ${formatNumber(parseFloat(depositAmount))} ${depositAsset.symbol}`;
       }
 
-      // Borrowing is required (already validated above)
-      // Use mintMax if MAX is enabled, otherwise use regular mint
-      const borrowResult = isBorrowMaxEnabled 
-        ? await cdpService.mintMax(depositAsset.asset)
-        : await cdpService.mint(depositAsset.asset, borrowAmount);
+      // Borrow if user entered a borrow amount
+      if (borAmount > 0) {
+        // Use mintMax if MAX is enabled, otherwise use regular mint
+        const borrowResult = isBorrowMaxEnabled 
+          ? await cdpService.mintMax(depositAsset.asset)
+          : await cdpService.mint(depositAsset.asset, borrowAmount);
       
       if (borrowResult.status.toLowerCase() !== "success") {
         throw new Error(`Borrow failed with status: ${borrowResult.status}`);
       }
 
       finalResult = borrowResult;
-      
-      // For display, use the actual max amount when MAX is enabled
-      const displayAmount = isBorrowMaxEnabled ? maxBorrowableAmount : parseFloat(borrowAmount);
-      
+        
+        // For display, use the actual max amount when MAX is enabled
+        const displayAmount = isBorrowMaxEnabled ? maxBorrowable : parseFloat(borrowAmount);
+        
       if (depAmount > 0) {
-        successMessage += ` and borrowed ${formatNumber(displayAmount)} USDST`;
+          successMessage += ` and borrowed ${formatNumber(displayAmount)} USDST`;
       } else {
-        successMessage = `Borrowed ${formatNumber(displayAmount)} USDST`;
+          successMessage = `Borrowed ${formatNumber(displayAmount)} USDST`;
+        }
       }
 
       toast({
@@ -588,9 +678,14 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         onSuccess();
       }
 
+      // Refresh widget data after successful transaction
+      await refreshWidgetData();
+
       // Reset form
-      setDepositAmount("0");
-      setBorrowAmount("0");
+      setDepositAmount("");
+      setBorrowAmount("");
+      setIsBorrowMaxEnabled(false);
+      setIsDepositMaxEnabled(false);
     } catch (error) {
       console.error("Failed to create vault:", error);
       
@@ -600,8 +695,20 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         errorMessage = error.message;
       } else if (typeof error === 'object' && error !== null) {
         // Handle API errors
-        const apiError = error as { response?: { data?: { message?: string } }; message?: string };
-        if (apiError.response?.data?.message) {
+        const apiError = error as { 
+          response?: { 
+            data?: { 
+              error?: { message?: string }; 
+              message?: string 
+            } 
+          }; 
+          message?: string 
+        };
+        if (apiError.response?.data?.error?.message) {
+          // Backend sends errors in { error: { message, status, type } } format
+          errorMessage = apiError.response.data.error.message;
+        } else if (apiError.response?.data?.message) {
+          // Fallback for direct message format
           errorMessage = apiError.response.data.message;
         } else if (apiError.message) {
           errorMessage = apiError.message;
@@ -620,6 +727,17 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
   return (
     <div className="flex flex-col gap-6 w-full">
+      <style>{`
+        /* Hide number input arrows */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
       <h2 className="text-xl font-semibold text-gray-900">Borrow Against Collateral</h2>
       {/* Deposit / Borrow Panels */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -647,24 +765,32 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           </Select>
 
           {/* Balance display under asset selector */}
-          {depositAsset && parseFloat(userDepositBalance) > 0 && (
-            <div className="text-xs text-gray-500 text-center">
-              {formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4)} {depositAsset.symbol}
+          {depositAsset && (
+            <div className="text-xs text-gray-500 text-left">
+              Available: {userDepositBalance && parseFloat(userDepositBalance) > 0 
+                ? formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4) 
+                : "0"
+              } {depositAsset.symbol}
             </div>
           )}
 
           <div className="flex items-center gap-3">
             <Input
-              className={`flex-1 text-right ${isDepositMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
+                className={`flex-1 text-right ${
+                  isDepositMaxEnabled 
+                    ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                    : isDepositAmountAboveMax() 
+                      ? 'text-red-600 bg-red-50 border-red-300' 
+                      : ''
+                }`}
               value={depositAmount}
               onChange={(e) => handleDepositAmountChange(e.target.value)}
-              placeholder="0.0 (optional)"
+                placeholder="0.0"
               type="number"
               step="any"
-              readOnly={isDepositMaxEnabled}
             />
             <Button 
-              variant={isDepositMaxEnabled ? "default" : "ghost"}
+              variant={isDepositMaxEnabled ? "default" : "outline"}
               size="sm" 
               className={`min-w-[50px] ${isDepositMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
               onClick={handleDepositMaxClick}
@@ -675,7 +801,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           </div>
           <p className="text-xs text-gray-500">
             {getAssetPrice() > 0 
-              ? `$${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
+              ? `Collateral: $${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
               : "Price unavailable"
             }
           </p>
@@ -687,7 +813,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             <h3 className="font-semibold">Borrow</h3>
             {maxBorrowable > 0 && depositAsset && (
               <span className="text-xs text-gray-500">
-                Max: ${formatNumber(maxBorrowable)} (safe above {formatNumber(depositAsset.liquidationRatio, 0)}% LT)
+                Max: ${formatNumber(maxBorrowable)}
               </span>
             )}
           </div>
@@ -696,15 +822,30 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             <span className="text-sm font-medium text-gray-700">USDST</span>
           </div>
 
+          {/* Spacer to align with deposit side's balance display */}
+          <div className="text-xs text-gray-500 text-left" style={{ height: "5px" }}>
+            {/* Empty spacer for vertical alignment */}
+          </div>
+
+          <div className="relative">
           <div className="flex items-center gap-3">
             <Input
-              className={`flex-1 text-right ${isBorrowMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
+                className={`flex-1 text-right ${
+                  isBorrowMaxEnabled 
+                    ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                    : isAtLiquidationThreshold 
+                      ? 'bg-gray-100 text-gray-400 border-gray-300' 
+                      : isBorrowAmountAboveMax()
+                        ? 'text-red-600 bg-red-50 border-red-300'
+                        : ''
+                }`}
               value={borrowAmount}
               onChange={(e) => handleBorrowAmountChange(e.target.value)}
               placeholder="0.0"
               type="number"
               step="any"
-              readOnly={isBorrowMaxEnabled}
+                readOnly={isAtLiquidationThreshold}
+                disabled={isAtLiquidationThreshold}
             />
             <Button 
               variant={isBorrowMaxEnabled ? "default" : "outline"}
@@ -715,6 +856,16 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             >
               MAX
             </Button>
+            </div>
+            
+            {/* Overlay when at liquidation threshold */}
+            {isAtLiquidationThreshold && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-200 bg-opacity-90 rounded pointer-events-none">
+                <span className="text-gray-600 font-medium text-sm text-center px-2">
+                  Liquidation Threshold reached — Add more collateral to borrow.
+                </span>
+              </div>
+            )}
           </div>
           <p className="text-xs text-gray-500">
             ${formatNumber(parseFloat(borrowAmount || "0"))}
@@ -724,61 +875,17 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
       {/* CR Slider & Borrow Rate */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-center">
-        <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4 space-y-3">
-          <div className="flex justify-between items-center text-sm font-medium">
-            <span>Collateralization Ratio (CR)</span>
-            <span className={isPositionDangerous ? 'text-red-500 font-bold' : ''}>
-              {isRatioLocked && lockedCR ? formatPercentage(lockedCR, 1) : (currentCR > 0 ? formatPercentage(currentCR, 1) : '0.0%')}
-            </span>
-          </div>
-          <div className="relative">
-            <div className={isPositionDangerous ? 'cr-slider-dangerous' : ''}>
-              <Slider 
-                value={isRatioLocked && lockedCR ? [lockedCR] : (currentCR > 0 ? [currentCR] : [sliderConfig.safeDefault])} 
-                max={sliderConfig.max} 
-                min={sliderConfig.min}
-                step={1} 
-                onValueChange={handleCRSliderChange}
-                disabled={!depositAsset || getTotalCollateralValue() <= 0}
-                className="w-full"
-              />
-            </div>
-            {/* Liquidation threshold marker */}
-            {depositAsset && (
-              <div 
-                className="absolute top-0 w-px h-4 bg-red-500 z-10"
-                style={{ 
-                  left: `${((liquidationRatio - sliderConfig.min) / (sliderConfig.max - sliderConfig.min)) * 100}%` 
-                }}
-              >
-                <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-red-500 rounded-full"></div>
-              </div>
-            )}
-          </div>
-          <style>{`
-            .cr-slider-dangerous [data-radix-collection-item] {
-              background-color: #ef4444 !important;
-              border-color: #ef4444 !important;
+        <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4">
+          <CRSlider
+            projectedCR={projectedCR}
+            liquidationThreshold={liquidationRatio}
+            onCRChange={handleCRChange}
+            disabled={!depositAsset}
+            hasCollateral={
+              parseFloat(formatWeiToDecimal(existingVaultCollateral, 18)) > 0 || 
+              parseFloat(depositAmount || "0") > 0
             }
-            .cr-slider-dangerous [data-orientation="horizontal"] {
-              background-color: #fecaca !important;
-            }
-            /* Hide number input arrows */
-            input[type="number"]::-webkit-outer-spin-button,
-            input[type="number"]::-webkit-inner-spin-button {
-              -webkit-appearance: none;
-              margin: 0;
-            }
-            input[type="number"] {
-              -moz-appearance: textfield;
-            }
-          `}</style>
-          <div className="flex justify-between text-xs text-gray-500">
-            <span className="text-orange-500">Min: {formatPercentage(sliderConfig.min, 0)}</span>
-            <span className="text-red-500">LT: {formatPercentage(liquidationRatio, 0)}</span>
-            <span className="text-green-600">Safe: {formatPercentage(sliderConfig.safeDefault, 0)}+</span>
-            <span>{formatPercentage(sliderConfig.max, 0)}</span>
-          </div>
+          />
         </div>
 
         <div className="border border-gray-200 rounded-xl p-6 bg-gray-50 text-center">
@@ -795,27 +902,59 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               <span className="text-white text-xs font-bold">!</span>
             </div>
             <span className="text-sm text-red-700 font-medium">
-              Warning: Position below liquidation threshold ({formatPercentage(liquidationRatio, 0)}). This position can be liquidated.
+              Warning: Position is at liquidation threshold ({formatPercentage(liquidationRatio, 0)}). 
+              This position can be liquidated. Consider increasing collateral or reducing borrow amount.
             </span>
           </div>
+        </div>
+      )}
+
+      {/* Transaction Fee Display */}
+      {depositAsset && (parseFloat(depositAmount || "0") > 0 || parseFloat(borrowAmount || "0") > 0) && (
+        <div className="text-center">
+          <p className="text-xs text-gray-500">
+            Transaction Fee: {(() => {
+              const hasDeposit = parseFloat(depositAmount || "0") > 0;
+              const hasBorrow = parseFloat(borrowAmount || "0") > 0;
+              
+              if (hasDeposit && hasBorrow) return "0.03";
+              if (hasDeposit && !hasBorrow) return "0.02";
+              if (!hasDeposit && hasBorrow) return "0.01";
+              
+              return "0.01";
+            })()} USDST
+          </p>
         </div>
       )}
 
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
-        disabled={loading || !depositAsset || parseFloat(borrowAmount) <= 0 || getAssetPrice() <= 0 || getTotalCollateralValue() <= 0}
-      >
-        {loading 
-          ? "Processing..." 
-          : getAssetPrice() <= 0 
-            ? "Price data required"
-            : getTotalCollateralValue() <= 0
-              ? "Need collateral to borrow"
-              : parseFloat(borrowAmount) <= 0
-                ? "Enter borrow amount"
-                : "Borrow"
+        disabled={
+          loading || 
+          !depositAsset || 
+          (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
+          getAssetPrice() <= 0 ||
+          isDepositAmountAboveMax() ||
+          isBorrowAmountAboveMax()
         }
+      >
+        {(() => {
+          if (loading) return "Processing...";
+          if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
+          if (getAssetPrice() <= 0) return "Price data required";
+          if (!depositAsset) return "Select asset";
+          
+          const hasDeposit = parseFloat(depositAmount || "0") > 0;
+          const hasBorrow = parseFloat(borrowAmount || "0") > 0;
+          
+          if (!hasDeposit && !hasBorrow) return "Enter amount";
+          if (hasDeposit && hasBorrow) return "Deposit + Borrow";
+          if (hasDeposit && !hasBorrow) return "Deposit";
+          if (!hasDeposit && hasBorrow) return "Borrow";
+          
+          return "Submit";
+        })()}
       </Button>
     </div>
   );

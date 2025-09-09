@@ -8,6 +8,7 @@ import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useOracleContext } from "@/context/OracleContext";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -79,6 +80,7 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
 
 interface VaultsListProps {
   refreshTrigger?: number; // Increment this to trigger a refresh
+  onVaultActionSuccess?: () => void; // Callback when vault actions succeed
 }
 
 /**
@@ -86,16 +88,18 @@ interface VaultsListProps {
  * Each vault represents a collateral position with corresponding debt
  * Connected to backend API for real-time data
  */
-const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
+const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSuccess }) => {
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
+  const { getPrice } = useOracleContext();
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
+  const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
 
   // Fetch positions from backend
   useEffect(() => {
@@ -149,13 +153,64 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
     }
   };
 
+  // Check if amount is above maximum for the given action (synchronous)
+  const isAmountAboveMax = (asset: string, inputAmount: string): boolean => {
+    const currentAmount = parseFloat(inputAmount || "0");
+    if (currentAmount <= 0) return false;
+    
+    const maxAmount = maxValues[asset] || 0;
+    return currentAmount > maxAmount;
+  };
+
   // Handle input amount changes
-  const handleInputChange = (asset: string, value: string) => {
-    // If user manually types, disable max state
-    if (maxStates[asset]) {
-      setMaxStates(prev => ({ ...prev, [asset]: false }));
-    }
+  const handleInputChange = async (asset: string, value: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Store cursor position before any state updates
+    const cursorPosition = event?.target.selectionStart || 0;
+    const inputElement = event?.target;
+    
+    const currentAmount = parseFloat(value || "0");
+    const position = positions.find(p => p.asset === asset);
+    const currentAction = activeActions[asset];
+    
+    // Always update the input amount first to prevent cursor jumping
     setInputAmounts(prev => ({ ...prev, [asset]: value }));
+    
+    // Restore cursor position after state update
+    if (inputElement) {
+      setTimeout(() => {
+        inputElement.setSelectionRange(cursorPosition, cursorPosition);
+      }, 0);
+    }
+    
+    if (!position || !currentAction) {
+      return;
+    }
+
+    try {
+      const maxValue = await calculateMaxValue(position, currentAction);
+      const maxAmount = parseFloat(maxValue);
+      
+      // Store the max value for comparison
+      setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
+      
+      const isTypingMaxAmount = Math.abs(currentAmount - maxAmount) < 0.000001 && maxAmount > 0;
+      
+      if (isTypingMaxAmount && !maxStates[asset]) {
+        // User typed the max amount, activate MAX styling
+        setMaxStates(prev => ({ ...prev, [asset]: true }));
+      } else if (maxStates[asset]) {
+        // If MAX is currently enabled, check if user changed the value
+        if (currentAmount < maxAmount) {
+          // User reduced the amount below max, disable MAX mode
+          setMaxStates(prev => ({ ...prev, [asset]: false }));
+        } else if (currentAmount > maxAmount) {
+          // User increased above max, disable MAX mode so red styling shows
+          setMaxStates(prev => ({ ...prev, [asset]: false }));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to calculate max value during input change:", error);
+    }
   };
 
   // Calculate maximum allowed value for each action
@@ -190,7 +245,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       
       case 'borrow': {
         try {
-          // Use the backend endpoint that simulates the contract's mintMax logic
+          // Use the backend endpoint that calculates max borrowable amount (now without safety buffer)
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
           return formatWeiToDecimal(result.maxAmount, 18);
@@ -231,6 +286,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       try {
         // Enable max state and set max value
         const maxValue = await calculateMaxValue(position, action);
+        const maxAmount = parseFloat(maxValue);
+        
+        // Store the max value for comparison
+        setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
         setMaxStates(prev => ({ ...prev, [asset]: true }));
         setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
       } catch (error) {
@@ -255,8 +314,19 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
     const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
     const currentDebtUSD = parseFloat(formatWeiToDecimal(position.debtValueUSD, 18));
     
-    // Assume price per unit of collateral
-    const pricePerUnit = currentCollateralUSD / currentCollateral;
+    // Get the actual token price from oracle
+    const priceWei = getPrice(position.asset);
+    let pricePerUnit = 0;
+    
+    if (priceWei) {
+      // Convert price from wei (18 decimals) to decimal
+      pricePerUnit = parseFloat(formatWeiToDecimal(priceWei, 18));
+    } else {
+      // Fallback: calculate from current values if oracle price is not available
+      if (currentCollateral > 0 && currentCollateralUSD > 0) {
+        pricePerUnit = currentCollateralUSD / currentCollateral;
+      }
+    }
     
     let newCollateral = currentCollateral;
     let newCollateralUSD = currentCollateralUSD;
@@ -282,11 +352,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
         break;
     }
 
-    // Calculate new health factor
-    const newCR = newDebt > 0 ? (newCollateralUSD / newDebtUSD) * 100 : 999999;
-    const newHealthFactor = newDebt > 0 
-      ? calculateHealthFactor(newCR, position.liquidationRatio)
-      : Infinity;
+    // Calculate new health factor with safety checks
+    let newCR = 999999;
+    let newHealthFactor = Infinity;
+    
+    if (newDebt > 0 && newDebtUSD > 0) {
+      newCR = (newCollateralUSD / newDebtUSD) * 100;
+      newHealthFactor = calculateHealthFactor(newCR, position.liquidationRatio);
+    }
 
     return {
       collateralAmount: formatNumber(newCollateral),
@@ -295,6 +368,89 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
       debtValueUSD: formatNumber(newDebtUSD),
       healthFactor: newHealthFactor
     };
+  };
+
+  // Validate debt floor and ceiling constraints for borrow actions
+  const validateDebtConstraints = async (asset: string, borrowAmountDecimal: number): Promise<boolean> => {
+    if (borrowAmountDecimal <= 0) return true;
+
+    try {
+      // Get current asset debt info
+      const debtInfo = await cdpService.getAssetDebtInfo(asset);
+      
+      // Keep everything in wei for accurate comparison (like blockchain)
+      const currentAssetTotalDebtWei = BigInt(debtInfo.currentTotalDebt);
+      const debtFloorWei = BigInt(debtInfo.debtFloor);
+      const debtCeilingWei = BigInt(debtInfo.debtCeiling);
+      
+      // Convert borrow amount to wei (18 decimals)
+      const borrowAmountWei = BigInt(Math.floor(borrowAmountDecimal * 1e18));
+
+      // Check debt ceiling constraint (total debt for this asset across all users)
+      if (debtCeilingWei > 0n) {
+        const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
+        if (newAssetTotalDebtWei > debtCeilingWei) {
+          const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
+          const availableRoom = parseFloat(formatWeiToDecimal(availableRoomWei.toString(), 18));
+          const debtCeilingDecimal = parseFloat(formatWeiToDecimal(debtCeilingWei.toString(), 18));
+          
+          toast({
+            title: "Debt Ceiling Exceeded",
+            description: `Cannot borrow ${borrowAmountDecimal.toFixed(2)} USDST. Maximum available: ${availableRoom.toFixed(2)} USDST (asset debt ceiling: ${debtCeilingDecimal.toFixed(2)} USDST)`,
+            variant: "destructive",
+          });
+          return false;
+        }
+      }
+
+      // Check debt floor constraint (per-user minimum debt)
+      // We need to simulate the exact contract calculation to avoid precision gaps
+      if (debtFloorWei > 0n) {
+        const position = positions.find(p => p.asset === asset);
+        if (position) {
+          // Simulate the exact contract calculation:
+          // 1. Convert borrow amount to scaled debt: scaledAdd = (amountUSD * RAY) / rateAccumulator
+          // 2. Add to existing scaled debt: newScaledDebt = scaledDebt + scaledAdd  
+          // 3. Convert back to debt: totalDebtAfter = (newScaledDebt * rateAccumulator) / RAY
+          
+          const RAY = BigInt("1000000000000000000000000000"); // 1e27
+          const existingScaledDebtWei = BigInt(position.scaledDebt || "0");
+          const rateAccumulatorWei = BigInt(position.rateAccumulator || "1000000000000000000000000000");
+          
+          // Step 1: Convert borrow amount to scaled debt (same as contract)
+          const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
+          
+          // Step 2: Add to existing scaled debt (same as contract)
+          const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
+          
+          // Step 3: Convert back to debt for floor check (same as contract)
+          const totalDebtAfterWei = (newScaledDebtWei * rateAccumulatorWei) / RAY;
+          
+
+          if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
+            // Calculate how much more is needed to reach debt floor
+            const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
+            const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
+            const minRequired = parseFloat(formatWeiToDecimal(minRequiredWei.toString(), 18));
+            const debtFloorDecimal = parseFloat(formatWeiToDecimal(debtFloorWei.toString(), 18));
+            const currentDebt = parseFloat(formatWeiToDecimal(currentDebtWei.toString(), 18));
+            
+            toast({
+              title: "Below Debt Floor",
+              description: `Borrow more USDST to reach the minimum debt floor`,
+              variant: "destructive",
+            });
+            return false;
+          }
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.error("Failed to validate debt constraints:", error);
+      // Don't block the transaction if validation fails
+      return true;
+    }
   };
 
   // Handle action button clicks
@@ -306,6 +462,15 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
         variant: "destructive",
       });
       return;
+    }
+
+    // Validate debt constraints for borrow actions
+    if (action === 'borrow') {
+      const borrowAmountDecimal = parseFloat(amount);
+      const isValid = await validateDebtConstraints(asset, borrowAmountDecimal);
+      if (!isValid) {
+        return; // Validation failed, error already shown
+      }
     }
 
     try {
@@ -373,14 +538,46 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
         // Refresh positions data
         const updatedPositions = await cdpService.getVaults();
         setPositions(updatedPositions);
+        
+        // Call the callback to refresh other components (like deposits)
+        if (onVaultActionSuccess) {
+          onVaultActionSuccess();
+        }
       } else {
         throw new Error(`${action} failed`);
       }
     } catch (error) {
       console.error(`Failed to ${action}:`, error);
+      
+      // Extract detailed error information
+      let errorMessage = `Failed to ${action}. Please try again.`;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null) {
+        // Handle API errors
+        const apiError = error as { 
+          response?: { 
+            data?: { 
+              error?: { message?: string }; 
+              message?: string 
+            } 
+          }; 
+          message?: string 
+        };
+        if (apiError.response?.data?.error?.message) {
+          // Backend sends errors in { error: { message, status, type } } format
+          errorMessage = apiError.response.data.error.message;
+        } else if (apiError.response?.data?.message) {
+          // Fallback for direct message format
+          errorMessage = apiError.response.data.message;
+        } else if (apiError.message) {
+          errorMessage = apiError.message;
+        }
+      }
+      
       toast({
         title: "Transaction Failed",
-        description: `Failed to ${action}. Please try again.`,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -518,7 +715,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
                       <p className="text-xs text-blue-500">${previewValues.collateralValueUSD}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-blue-600 mb-1">Borrowed</p>
+                      <p className="text-xs text-blue-600 mb-1">Debt</p>
                       <p className="font-semibold text-blue-900">{previewValues.debtAmount} USDST</p>
                       <p className="text-xs text-blue-500">${previewValues.debtValueUSD}</p>
                     </div>
@@ -538,16 +735,27 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
 
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
-                <div className="mt-4 flex gap-2">
-                  <Input
-                    placeholder="Amount"
-                    value={inputAmounts[position.asset] || ""}
-                    onChange={(e) => handleInputChange(position.asset, e.target.value)}
-                    className={`flex-1 ${maxStates[position.asset] ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
-                    type="number"
-                    step="any"
-                    readOnly={maxStates[position.asset]}
-                  />
+                <div className="mt-4">
+                  <div className="mb-2">
+                    <p className="text-xs text-gray-500">
+                      Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Amount"
+                      value={inputAmounts[position.asset] || ""}
+                      onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
+                      className={`flex-1 ${
+                        maxStates[position.asset] 
+                          ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                          : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
+                            ? 'text-red-600 bg-red-50 border-red-300'
+                            : ''
+                      }`}
+                      type="number"
+                      step="any"
+                    />
                   <Button 
                     variant={maxStates[position.asset] ? "default" : "outline"}
                     size="sm" 
@@ -561,9 +769,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger }) => {
                     size="sm" 
                     className="min-w-[80px]"
                     onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
+                    disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
                   >
-                    {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)}
+                    {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                      ? "Amount exceeds maximum"
+                      : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                    }
                   </Button>
+                  </div>
                 </div>
               )}
             </div>

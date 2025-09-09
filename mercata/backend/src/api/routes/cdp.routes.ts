@@ -54,4 +54,7 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
 // Get all supported assets
 router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSupportedAssets);
 
+// Get asset debt information for validation
+router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.getAssetDebtInfo);
+
 export default router;

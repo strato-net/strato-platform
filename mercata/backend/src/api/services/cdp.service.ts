@@ -29,8 +29,9 @@ const WAD = BigInt(10) ** BigInt(18);
  */
 export const getCDPRegistry = async (
   accessToken: string,
-  _userAddress: string | undefined,
-  options: Record<string, string> = {}
+  userAddress: string | undefined,
+  options: Record<string, string> = {},
+  callerId?: string
 ): Promise<Record<string, any>> => {
   const { select, ...filters } = options;
 
@@ -39,9 +40,38 @@ export const getCDPRegistry = async (
     Object.entries(filters).filter(([, value]) => value !== undefined)
   );
 
+  // Create efficient select query based on whether we need user-specific data
+  let selectQuery;
+  if (userAddress && !select) {
+    // User-specific query - only get vaults for this user
+    selectQuery = [
+      "address",
+      "feeCollector", 
+      "tokenFactory",
+      "usdst",
+      "cdpEngine:cdpEngine_fkey(" +
+        "address," +
+        "registry," +
+        "globalPaused," +
+        "RAY::text," +
+        "WAD::text," +
+        `collateralConfigs:${CDPEngine}-collateralConfigs(asset:key,CollateralConfig:value),` +
+        `collateralGlobalStates:${CDPEngine}-collateralGlobalStates(asset:key,CollateralGlobalState:value),` +
+        `isSupportedAsset:${CDPEngine}-isSupportedAsset(asset:key,value)` +
+      ")",
+      "cdpVault:cdpVault_fkey(address,registry)",
+      "priceOracle:priceOracle_fkey(address," +
+        `prices:${PriceOracle}-prices(asset:key,value::text)` +
+      ")"
+    ].join(",");
+  } else {
+    // Use provided select or default (potentially large) query
+    selectQuery = select ?? cdpRegistrySelectFields.join(",");
+  }
+
   const params = {
     ...cleanedFilters,
-    select: select ?? cdpRegistrySelectFields.join(","),
+    select: selectQuery,
     address: `eq.${cdpRegistry}`,
   };
 
@@ -56,12 +86,27 @@ export const getCDPRegistry = async (
       throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
     }
 
-    // Validate required components
-    if (!registryData.cdpEngine?.address) {
-      console.error('CDP Engine address missing from registry');
+    // Registry found successfully
+    const caller = callerId || 'unknown';
+    console.log(`✅ [${caller}] CDP Registry found with engine and vault addresses`);
+
+    // Validate required components - handle both direct address and object formats
+    const engineAddress = registryData.cdpEngine?.address || registryData.cdpEngine;
+    const vaultAddress = registryData.cdpVault?.address || registryData.cdpVault;
+    
+    if (!engineAddress) {
+      console.error(`❌ [${caller}] CDP Engine address missing from registry. Data structure:`, {
+        hasEngineKey: 'cdpEngine' in registryData,
+        engineValue: registryData.cdpEngine,
+        engineType: typeof registryData.cdpEngine
+      });
     }
-    if (!registryData.cdpVault?.address) {
-      console.error('CDP Vault address missing from registry');
+    if (!vaultAddress) {
+      console.error(`❌ [${caller}] CDP Vault address missing from registry. Data structure:`, {
+        hasVaultKey: 'cdpVault' in registryData,
+        vaultValue: registryData.cdpVault,
+        vaultType: typeof registryData.cdpVault
+      });
     }
 
     return registryData;
@@ -72,6 +117,39 @@ export const getCDPRegistry = async (
       error: error.response?.data || error.message
     });
     throw new Error(`Error fetching ${extractContractName(CDPRegistry)} data from Cirrus`);
+  }
+};
+
+/**
+ * Fetch user-specific vault data efficiently
+ */
+export const getUserVaults = async (
+  accessToken: string,
+  userAddress: string
+): Promise<any[]> => {
+  try {
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getUserVaults");
+    
+    if (!registry?.cdpEngine) {
+      return [];
+    }
+
+    // Query vaults directly with user filter to avoid pulling all vaults
+    const { data: userVaults } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-vaults`,
+      {
+        params: {
+          select: "user:key,asset:key2,Vault:value",
+          key: `eq.${userAddress.toLowerCase()}`
+        }
+      }
+    );
+
+    return userVaults || [];
+  } catch (error) {
+    console.warn(`❌ [CDP] Failed to fetch user vaults for ${userAddress}:`, error);
+    return [];
   }
 };
 
@@ -122,6 +200,9 @@ interface VaultData {
   stabilityFeeRate: number;
   health: "healthy" | "warning" | "danger";
   borrower?: string; // Optional for liquidatable positions
+  // Raw data for precision calculations
+  scaledDebt: string;
+  rateAccumulator: string;
 }
 
 interface AssetConfig {
@@ -142,19 +223,14 @@ export const getVaults = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVaults");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
-  // Use vaults directly from the registry data
-  const allVaults = registry.cdpEngine.vaults || [];
-  
-  // Filter for user's vaults
-  const userVaults = allVaults.filter(
-    (v: any) => v.user?.toLowerCase() === userAddress.toLowerCase()
-  );
+  // Use efficient user-specific vault query
+  const userVaults = await getUserVaults(accessToken, userAddress);
 
   const vaultPromises = userVaults.map(async (vaultEntry: any) => {
     const asset = vaultEntry.asset;
@@ -223,6 +299,9 @@ export const getVaults = async (
       healthFactor,
       stabilityFeeRate,
       health: getHealthStatus(healthFactor),
+      // Raw data for precision calculations
+      scaledDebt: scaledDebt.toString(),
+      rateAccumulator: currentRateAccumulator,
     };
   });
 
@@ -235,18 +314,16 @@ export const getVault = async (
   userAddress: string,
   asset: string
 ): Promise<VaultData | null> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getVault");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
-  // Find the specific vault from registry data
-  const allVaults = registry.cdpEngine.vaults || [];
-  const vaultEntry = allVaults.find(
-    (v: any) => 
-      v.user?.toLowerCase() === userAddress.toLowerCase() &&
-      v.asset?.toLowerCase() === asset.toLowerCase()
+  // Find the specific vault using efficient user query
+  const userVaults = await getUserVaults(accessToken, userAddress);
+  const vaultEntry = userVaults.find(
+    (v: any) => v.asset?.toLowerCase() === asset.toLowerCase()
   );
   
   if (!vaultEntry) {
@@ -316,6 +393,9 @@ export const getVault = async (
       healthFactor,
       stabilityFeeRate,
       health: getHealthStatus(healthFactor),
+      // Raw data for precision calculations
+      scaledDebt: scaledDebt.toString(),
+      rateAccumulator: currentRateAccumulator,
     };
 };
 
@@ -324,7 +404,11 @@ export const deposit = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  console.log(`🔍 [CDP] deposit called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "deposit");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -357,7 +441,11 @@ export const withdraw = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  console.log(`🔍 [CDP] withdraw called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "withdraw");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -380,6 +468,10 @@ export const getMaxWithdraw = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
+  console.log(`🔍 [CDP] getMaxWithdraw called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -387,10 +479,9 @@ export const getMaxWithdraw = async (
   }
 
   // Find the specific vault from registry data
-  const allVaults = registry.cdpEngine.vaults || [];
+  const allVaults = await getUserVaults(accessToken, userAddress);
   const vaultEntry = allVaults.find(
     (v: any) => 
-      v.user?.toLowerCase() === userAddress.toLowerCase() &&
       v.asset?.toLowerCase() === body.asset.toLowerCase()
   );
 
@@ -467,6 +558,10 @@ export const withdrawMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] withdrawMax called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -488,6 +583,10 @@ export const getMaxMint = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
+  console.log(`🔍 [CDP] getMaxMint called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -495,10 +594,9 @@ export const getMaxMint = async (
   }
 
   // Find the specific vault from registry data
-  const allVaults = registry.cdpEngine.vaults || [];
+  const allVaults = await getUserVaults(accessToken, userAddress);
   const vaultEntry = allVaults.find(
     (v: any) => 
-      v.user?.toLowerCase() === userAddress.toLowerCase() &&
       v.asset?.toLowerCase() === body.asset.toLowerCase()
   );
 
@@ -551,12 +649,9 @@ export const getMaxMint = async (
   
   const collateralValueUSD = (collateralAmount * price) / unitScale;
   
-  // Apply safety buffer: use 105% of liquidation ratio to ensure position stays well above liquidation threshold
-  // This means if LR is 150%, we target a minimum CR of ~157.5% (150% * 1.05)
-  const safetyBufferBps = 500n; // 5% buffer in basis points
-  const safeLiquidationRatio = (liquidationRatio * (10000n + safetyBufferBps)) / 10000n;
-  
-  const maxBorrowableUSD = (collateralValueUSD * WAD) / safeLiquidationRatio;
+  // Calculate max borrowable amount without safety buffer (matches contract's mintMax behavior)
+  // This results in CR exactly at liquidation threshold
+  const maxBorrowableUSD = (collateralValueUSD * WAD) / liquidationRatio;
 
   let maxAmount: bigint;
 
@@ -602,12 +697,55 @@ export const getMaxMint = async (
   return { maxAmount: maxAmount.toString() };
 };
 
+export const getAssetDebtInfo = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string }
+): Promise<{ currentTotalDebt: string; debtFloor: string; debtCeiling: string }> => {
+  console.log(`🔍 [CDP] getAssetDebtInfo called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Get asset config and global state
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralConfig;
+  
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset config or global state not found");
+  }
+
+  // Calculate current total debt for this asset
+  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const currentTotalDebt = (BigInt(globalState.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
+
+  return {
+    currentTotalDebt: currentTotalDebt.toString(),
+    debtFloor: config.debtFloor || "0",
+    debtCeiling: config.debtCeiling || "0"
+  };
+};
+
 export const mint = async (
   accessToken: string,
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  console.log(`🔍 [CDP] mint called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "mint");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
@@ -631,6 +769,10 @@ export const mintMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] mintMax called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -652,6 +794,10 @@ export const repay = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] repay called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -692,6 +838,10 @@ export const repayAll = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] repayAll called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -732,6 +882,10 @@ export const liquidate = async (
   userAddress: string,
   body: { collateralAsset: string; borrower: string; debtToCover: string }
 ): Promise<{ status: string; hash: string }> => {
+  console.log(`🔍 [CDP] liquidate called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -775,14 +929,27 @@ export const getLiquidatable = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
-  // Get all vaults from the registry
+  console.log(`🔍 [CDP] getLiquidatable called at ${new Date().toISOString()}`, {
+    userAddress
+  });
+  // Get registry info
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
 
-  const allVaultEntries = registry.cdpEngine.vaults || [];
+  // For liquidation, we need ALL vaults, not just user-specific ones
+  // Query all vaults directly to avoid the massive registry response
+  const { data: allVaultEntries } = await cirrus.get(
+    accessToken,
+    `/${CDPEngine}-vaults`,
+    {
+      params: {
+        select: "user:key,asset:key2,Vault:value"
+      }
+    }
+  ).catch(() => ({ data: [] })); // Graceful fallback
   
   const vaultPromises = allVaultEntries.map(async (vaultEntry: any) => {
     const vaultOwner = vaultEntry.user;
@@ -799,7 +966,11 @@ export const getLiquidatable = async (
     
     // Return only if liquidatable (health factor < 1.0)
     if (vaultData && vaultData.healthFactor < 1.0) {
-      return vaultData;
+      // Add the borrower address to the vault data for liquidation
+      return {
+        ...vaultData,
+        borrower: vaultOwner
+      };
     }
     
     return null;
@@ -853,7 +1024,7 @@ export const getSupportedAssets = async (
   accessToken: string,
   userAddress: string
 ): Promise<AssetConfig[]> => {
-  const registry = await getCDPRegistry(accessToken, userAddress);
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getSupportedAssets");
   
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");

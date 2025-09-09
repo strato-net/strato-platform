@@ -25,6 +25,9 @@ export interface VaultData {
   stabilityFeeRate: number;                    // Annual interest rate (percentage)
   health: "healthy" | "warning" | "danger";    // Health status indicator
   borrower?: string;                           // Borrower address (for liquidatable positions)
+  // Raw data for precision calculations
+  scaledDebt: string;                          // Raw scaled debt (wei format)
+  rateAccumulator: string;                     // Current rate accumulator (RAY format)
 }
 
 export interface AssetConfig {
@@ -141,6 +144,15 @@ export const cdpService = {
   // Get all supported assets
   async getSupportedAssets(): Promise<AssetConfig[]> {
     const response = await api.get("/cdp/assets");
+    return response.data;
+  },
+
+  async getAssetDebtInfo(asset: string): Promise<{
+    currentTotalDebt: string;
+    debtFloor: string;
+    debtCeiling: string;
+  }> {
+    const response = await api.post("/cdp/asset-debt-info", { asset });
     return response.data;
   }
 };

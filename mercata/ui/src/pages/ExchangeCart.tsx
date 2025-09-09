@@ -12,9 +12,21 @@ import { Tabs as AntdTabs } from 'antd';
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const ExchangeCart = () => {
+interface ExchangeCartProps {
+  onVaultActionSuccess?: () => void; // Callback passed from parent
+}
+
+const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => {
   const [showLiquidations, setShowLiquidations] = useState(false);
   const [usdcActiveTab, setUsdcActiveTab] = useState('deposit');
+  // Use localStorage to persist tab state across re-renders
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      return localStorage.getItem('exchangeCart-activeTab') || 'bridge';
+    } catch {
+      return 'bridge';
+    }
+  });
   const navigate = useNavigate();
   const [convertAction, setConvertAction] = useState<'deposit' | 'withdraw' | null>(null);
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
@@ -22,11 +34,32 @@ const ExchangeCart = () => {
   // Callback to refresh vaults when borrow operation succeeds
   const handleBorrowSuccess = () => {
     setVaultsRefreshTrigger(prev => prev + 1);
+    // Also refresh deposits when borrowing succeeds
+    if (onVaultActionSuccess) {
+      onVaultActionSuccess();
+    }
+  };
+
+  // Update tab state in localStorage when it changes
+  const handleTabChange = (newTab: string) => {
+    setActiveTab(newTab);
+    try {
+      localStorage.setItem('exchangeCart-activeTab', newTab);
+    } catch {
+      // Ignore localStorage errors
+    }
+  };
+
+  // Pass the callback from parent to VaultsList - no local refresh logic
+  const handleVaultActionSuccess = () => {
+    if (onVaultActionSuccess) {
+      onVaultActionSuccess();
+    }
   };
 
   return (
     <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
-      <Tabs defaultValue="bridge" className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="cdp">Borrow</TabsTrigger>
           <TabsTrigger value="bridge">Bridge</TabsTrigger>
@@ -54,7 +87,10 @@ const ExchangeCart = () => {
               <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
                 <CDPBorrowWidget onSuccess={handleBorrowSuccess} />
               </div>
-              <VaultsList refreshTrigger={vaultsRefreshTrigger} />
+              <VaultsList 
+                refreshTrigger={vaultsRefreshTrigger} 
+                onVaultActionSuccess={handleVaultActionSuccess}
+              />
             </div>
           )}
         </TabsContent>
