@@ -102,8 +102,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     // Subtract existing debt to get available borrowing power
     const availableBorrowingPower = maxBorrowableUSD - existingDebtDecimal;
     
-    // Apply minimal buffer to avoid rounding into liquidation (like contract)
-    const maxAmount = Math.max(0, availableBorrowingPower - 0.000000000000000001);
+    const maxAmount = Math.max(0, availableBorrowingPower);
     
     return maxAmount;
   }, [depositAsset, getAssetPrice, getTotalCollateralValue, existingVaultDebt]);
@@ -180,6 +179,24 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const liquidationRatio = depositAsset?.liquidationRatio || 150;
   const userDepositBalance = getUserDepositBalance();
 
+  // Check if current amounts are above their respective max values
+  const isDepositAmountAboveMax = (): boolean => {
+    if (!depositAsset || !userDepositBalance) return false;
+    const maxDepositAmount = parseFloat(formatWeiToDecimal(userDepositBalance, 18));
+    const currentDepositAmount = parseFloat(depositAmount || "0");
+    return currentDepositAmount > maxDepositAmount;
+  };
+
+  const isBorrowAmountAboveMax = (): boolean => {
+    // If MAX borrow is enabled, never consider the amount as above max
+    if (isBorrowMaxEnabled) {
+      return false;
+    }
+    
+    const currentBorrowAmount = parseFloat(borrowAmount || "0");
+    return currentBorrowAmount > maxBorrowable;
+  };
+
   // Fetch supported assets and prices on component mount
   useEffect(() => {
     const fetchAssetsAndPrices = async () => {
@@ -201,21 +218,16 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               if (priceResponse.data?.price) {
                 // Convert price from wei format (18 decimals) to regular number
                 prices[asset.asset] = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
-                console.log(`✅ Price fetched for ${asset.symbol} (${asset.asset}): $${prices[asset.asset]}`);
-              } else {
-                console.warn(`⚠️  No price data for ${asset.symbol} (${asset.asset}):`, priceResponse.data);
               }
             } catch (assetPriceError) {
-              console.error(`❌ Failed to fetch price for ${asset.symbol} (${asset.asset}):`, assetPriceError);
               // If 404, it means the asset is not in the oracle
               if (assetPriceError.response?.status === 404) {
-                console.warn(`⚠️  Asset ${asset.symbol} (${asset.asset}) not found in price oracle`);
+                console.warn(`Asset ${asset.symbol} not found in price oracle`);
               }
             }
           }
           
           setAssetPrices(prices);
-          console.log("🔍 Final asset prices:", prices);
         } catch (priceError) {
           console.error("Could not fetch real asset prices:", priceError);
           setAssetPrices({}); // Empty object - no prices available
@@ -247,9 +259,10 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       // Don't disable here to avoid flicker - let handleBorrowAmountChange handle it
     }
 
-    // Only auto-update when MAX is enabled - no other automatic borrow amount setting
+    // Only auto-update when MAX is enabled - uses frontend calculation that includes deposit input
     if (isBorrowMaxEnabled && maxBorrowable > 0) {
-      setBorrowAmount(maxBorrowable.toFixed(2));
+      const maxAmountToSet = maxBorrowable.toFixed(2);
+      setBorrowAmount(maxAmountToSet);
     }
   }, [maxBorrowable, isBorrowMaxEnabled, borrowAmount]);
 
@@ -298,25 +311,37 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       setIsBorrowMaxEnabled(false);
       setBorrowAmount("");
     } else {
-      // Enable MAX and set to max borrowable
+      // Enable MAX and set to max borrowable (includes current collateral + deposit input)
+      const maxAmountToSet = maxBorrowable.toFixed(2);
+      
+      
       setIsBorrowMaxEnabled(true);
-      setBorrowAmount(maxBorrowable.toFixed(2));
+      setBorrowAmount(maxAmountToSet);
     }
   };
 
   // Handle manual input change for borrow amount
   const handleBorrowAmountChange = (value: string) => {
+    const currentAmount = parseFloat(value || "0");
+    
     // Check if user manually typed the max amount
-    const isTypingMaxAmount = Math.abs(parseFloat(value) - maxBorrowable) < 0.01 && maxBorrowable > 0;
+    const isTypingMaxAmount = Math.abs(currentAmount - maxBorrowable) < 0.01 && maxBorrowable > 0;
     
     if (isTypingMaxAmount && !isBorrowMaxEnabled) {
       // User typed the max amount, activate MAX styling
       setIsBorrowMaxEnabled(true);
-    } else if (!isTypingMaxAmount && isBorrowMaxEnabled) {
-      // User changed away from max amount, disable MAX styling
+    } else if (isBorrowMaxEnabled) {
+      // If MAX is currently enabled, check if user changed the value
+      if (currentAmount < maxBorrowable) {
+        // User reduced the amount below max, disable MAX mode
       setIsBorrowMaxEnabled(false);
+      } else if (currentAmount > maxBorrowable) {
+        // User increased above max, keep MAX enabled but input will show red
+        // The red styling is handled by isBorrowAmountAboveMax()
+      }
     }
     
+    // Always update the borrow amount
     setBorrowAmount(value);
   };
 
@@ -347,33 +372,35 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
   // Handle manual input change for deposit amount
   const handleDepositAmountChange = (value: string) => {
+    const currentAmount = parseFloat(value || "0");
+    
     // Check if user manually typed the max deposit amount
     let isTypingMaxAmount = false;
+    let maxDepositAmount = 0;
+    
     if (depositAsset && userDepositBalance && parseFloat(userDepositBalance) > 0) {
-      // Get token info to determine decimals for proper conversion
-      const userToken = activeTokens.find(token => 
-        token.token.address.toLowerCase() === depositAsset.asset.toLowerCase()
-      );
-      const decimals = 18;
-      
       // Convert balance to decimal for comparison
-      const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
-      isTypingMaxAmount = Math.abs(parseFloat(value || "0") - parseFloat(formattedBalance)) < 0.000001;
+      const formattedBalance = formatWeiToDecimal(userDepositBalance, 18);
+      maxDepositAmount = parseFloat(formattedBalance);
+      isTypingMaxAmount = Math.abs(currentAmount - maxDepositAmount) < 0.000001;
     }
     
     if (isTypingMaxAmount && !isDepositMaxEnabled) {
       // User typed the max amount, activate MAX styling
       setIsDepositMaxEnabled(true);
-    } else if (!isTypingMaxAmount && isDepositMaxEnabled) {
-      // User changed away from max amount, disable MAX styling
+    } else if (isDepositMaxEnabled) {
+      // If MAX is currently enabled, check if user changed the value
+      if (currentAmount < maxDepositAmount) {
+        // User reduced the amount below max, disable MAX mode
       setIsDepositMaxEnabled(false);
+      } else if (currentAmount > maxDepositAmount) {
+        // User increased above max, keep MAX enabled but input will show red
+        // The red styling is handled by isDepositAmountAboveMax()
+      }
     }
     
-    // Deposit is only affected by user input - never by slider or other inputs
+    // Always update the deposit amount
     setDepositAmount(value);
-    
-    // Deposit changes don't affect slider or borrow amount
-    // Users must manually adjust borrow or use slider for ratio control
   };
 
   // Handle CR slider changes
@@ -423,6 +450,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     const hasAnyCollateral = hasExistingCollateral || hasDepositInput;
     return maxBorrowable <= 0 && hasAnyCollateral;
   }, [existingVaultCollateral, depositAmount, maxBorrowable])();
+
 
   // Function to refresh all widget data after successful transaction
   const refreshWidgetData = async () => {
@@ -573,14 +601,14 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
     // If borrowing, check if we have sufficient total collateral
     if (borAmount > 0) {
-      const totalCollateralValueUSD = getTotalCollateralValue();
-      if (totalCollateralValueUSD <= 0) {
-        toast({
-          title: "Insufficient Collateral",
-          description: "You need collateral to borrow. Either deposit now or select an asset with existing vault balance.",
-          variant: "destructive",
-        });
-        return;
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) {
+      toast({
+        title: "Insufficient Collateral",
+        description: "You need collateral to borrow. Either deposit now or select an asset with existing vault balance.",
+        variant: "destructive",
+      });
+      return;
       }
 
       // Validate debt floor and ceiling constraints
@@ -623,19 +651,19 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const borrowResult = isBorrowMaxEnabled 
           ? await cdpService.mintMax(depositAsset.asset)
           : await cdpService.mint(depositAsset.asset, borrowAmount);
-        
-        if (borrowResult.status.toLowerCase() !== "success") {
-          throw new Error(`Borrow failed with status: ${borrowResult.status}`);
-        }
+      
+      if (borrowResult.status.toLowerCase() !== "success") {
+        throw new Error(`Borrow failed with status: ${borrowResult.status}`);
+      }
 
-        finalResult = borrowResult;
+      finalResult = borrowResult;
         
         // For display, use the actual max amount when MAX is enabled
         const displayAmount = isBorrowMaxEnabled ? maxBorrowable : parseFloat(borrowAmount);
         
-        if (depAmount > 0) {
+      if (depAmount > 0) {
           successMessage += ` and borrowed ${formatNumber(displayAmount)} USDST`;
-        } else {
+      } else {
           successMessage = `Borrowed ${formatNumber(displayAmount)} USDST`;
         }
       }
@@ -737,24 +765,32 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           </Select>
 
           {/* Balance display under asset selector */}
-          {depositAsset && parseFloat(userDepositBalance) > 0 && (
-            <div className="text-xs text-gray-500 text-center">
-              {formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4)} {depositAsset.symbol}
+          {depositAsset && (
+            <div className="text-xs text-gray-500 text-left">
+              Available: {userDepositBalance && parseFloat(userDepositBalance) > 0 
+                ? formatBalanceUtil(userDepositBalance, undefined, 18, 1, 4) 
+                : "0"
+              } {depositAsset.symbol}
             </div>
           )}
 
           <div className="flex items-center gap-3">
             <Input
-              className={`flex-1 text-right ${isDepositMaxEnabled ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
+                className={`flex-1 text-right ${
+                  isDepositMaxEnabled 
+                    ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                    : isDepositAmountAboveMax() 
+                      ? 'text-red-600 bg-red-50 border-red-300' 
+                      : ''
+                }`}
               value={depositAmount}
               onChange={(e) => handleDepositAmountChange(e.target.value)}
-              placeholder="0.0"
+                placeholder="0.0"
               type="number"
               step="any"
-              readOnly={isDepositMaxEnabled}
             />
             <Button 
-              variant={isDepositMaxEnabled ? "default" : "ghost"}
+              variant={isDepositMaxEnabled ? "default" : "outline"}
               size="sm" 
               className={`min-w-[50px] ${isDepositMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
               onClick={handleDepositMaxClick}
@@ -765,7 +801,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           </div>
           <p className="text-xs text-gray-500">
             {getAssetPrice() > 0 
-              ? `$${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
+              ? `Collateral: $${formatNumber(getTotalCollateralValue())} total ${parseFloat(existingVaultCollateral) > 0 ? `(+$${formatNumber(parseFloat(depositAmount || "0") * getAssetPrice())} new)` : ""}`
               : "Price unavailable"
             }
           </p>
@@ -786,33 +822,40 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             <span className="text-sm font-medium text-gray-700">USDST</span>
           </div>
 
+          {/* Spacer to align with deposit side's balance display */}
+          <div className="text-xs text-gray-500 text-left" style={{ height: "5px" }}>
+            {/* Empty spacer for vertical alignment */}
+          </div>
+
           <div className="relative">
-            <div className="flex items-center gap-3">
-              <Input
+          <div className="flex items-center gap-3">
+            <Input
                 className={`flex-1 text-right ${
                   isBorrowMaxEnabled 
                     ? 'text-blue-600 bg-blue-50 border-blue-300' 
                     : isAtLiquidationThreshold 
                       ? 'bg-gray-100 text-gray-400 border-gray-300' 
-                      : ''
+                      : isBorrowAmountAboveMax()
+                        ? 'text-red-600 bg-red-50 border-red-300'
+                        : ''
                 }`}
-                value={borrowAmount}
-                onChange={(e) => handleBorrowAmountChange(e.target.value)}
-                placeholder="0.0"
-                type="number"
-                step="any"
-                readOnly={isBorrowMaxEnabled || isAtLiquidationThreshold}
+              value={borrowAmount}
+              onChange={(e) => handleBorrowAmountChange(e.target.value)}
+              placeholder="0.0"
+              type="number"
+              step="any"
+                readOnly={isAtLiquidationThreshold}
                 disabled={isAtLiquidationThreshold}
-              />
-              <Button 
-                variant={isBorrowMaxEnabled ? "default" : "outline"}
-                size="sm" 
-                className={`min-w-[50px] ${isBorrowMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                onClick={handleBorrowMaxClick}
-                disabled={maxBorrowable <= 0}
-              >
-                MAX
-              </Button>
+            />
+            <Button 
+              variant={isBorrowMaxEnabled ? "default" : "outline"}
+              size="sm" 
+              className={`min-w-[50px] ${isBorrowMaxEnabled ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+              onClick={handleBorrowMaxClick}
+              disabled={maxBorrowable <= 0}
+            >
+              MAX
+            </Button>
             </div>
             
             {/* Overlay when at liquidation threshold */}
@@ -869,10 +912,18 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
-        disabled={loading || !depositAsset || (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || getAssetPrice() <= 0}
+        disabled={
+          loading || 
+          !depositAsset || 
+          (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
+          getAssetPrice() <= 0 ||
+          isDepositAmountAboveMax() ||
+          isBorrowAmountAboveMax()
+        }
       >
         {(() => {
           if (loading) return "Processing...";
+          if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
           if (getAssetPrice() <= 0) return "Price data required";
           if (!depositAsset) return "Select asset";
           

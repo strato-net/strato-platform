@@ -99,6 +99,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
+  const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
 
   // Fetch positions from backend
   useEffect(() => {
@@ -152,12 +153,53 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     }
   };
 
+  // Check if amount is above maximum for the given action (synchronous)
+  const isAmountAboveMax = (asset: string, inputAmount: string): boolean => {
+    const currentAmount = parseFloat(inputAmount || "0");
+    if (currentAmount <= 0) return false;
+    
+    const maxAmount = maxValues[asset] || 0;
+    return currentAmount > maxAmount;
+  };
+
   // Handle input amount changes
-  const handleInputChange = (asset: string, value: string) => {
-    // If user manually types, disable max state
-    if (maxStates[asset]) {
-      setMaxStates(prev => ({ ...prev, [asset]: false }));
+  const handleInputChange = async (asset: string, value: string) => {
+    const currentAmount = parseFloat(value || "0");
+    const position = positions.find(p => p.asset === asset);
+    const currentAction = activeActions[asset];
+    
+    if (!position || !currentAction) {
+      setInputAmounts(prev => ({ ...prev, [asset]: value }));
+      return;
     }
+
+    try {
+      const maxValue = await calculateMaxValue(position, currentAction);
+      const maxAmount = parseFloat(maxValue);
+      
+      // Store the max value for comparison
+      setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
+      
+      const isTypingMaxAmount = Math.abs(currentAmount - maxAmount) < 0.000001 && maxAmount > 0;
+      
+      if (isTypingMaxAmount && !maxStates[asset]) {
+        // User typed the max amount, activate MAX styling
+        setMaxStates(prev => ({ ...prev, [asset]: true }));
+      } else if (maxStates[asset]) {
+        // If MAX is currently enabled, check if user changed the value
+        if (currentAmount < maxAmount) {
+          // User reduced the amount below max, disable MAX mode
+          setMaxStates(prev => ({ ...prev, [asset]: false }));
+        } else if (currentAmount > maxAmount) {
+          // User increased above max, keep MAX enabled but input will show red
+          // The red styling is handled by isAmountAboveMax()
+        }
+      }
+    } catch (error) {
+      console.error("Failed to calculate max value during input change:", error);
+    }
+    
+    // Always update the input amount
     setInputAmounts(prev => ({ ...prev, [asset]: value }));
   };
 
@@ -234,6 +276,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       try {
         // Enable max state and set max value
         const maxValue = await calculateMaxValue(position, action);
+        const maxAmount = parseFloat(maxValue);
+        
+        // Store the max value for comparison
+        setMaxValues(prev => ({ ...prev, [asset]: maxAmount }));
         setMaxStates(prev => ({ ...prev, [asset]: true }));
         setInputAmounts(prev => ({ ...prev, [asset]: maxValue }));
       } catch (error) {
@@ -684,10 +730,15 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     placeholder="Amount"
                     value={inputAmounts[position.asset] || ""}
                     onChange={(e) => handleInputChange(position.asset, e.target.value)}
-                    className={`flex-1 ${maxStates[position.asset] ? 'text-blue-600 bg-blue-50 border-blue-300' : ''}`}
+                    className={`flex-1 ${
+                      maxStates[position.asset] 
+                        ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                        : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
+                          ? 'text-red-600 bg-red-50 border-red-300'
+                          : ''
+                    }`}
                     type="number"
                     step="any"
-                    readOnly={maxStates[position.asset]}
                   />
                   <Button 
                     variant={maxStates[position.asset] ? "default" : "outline"}
@@ -702,8 +753,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     size="sm" 
                     className="min-w-[80px]"
                     onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
+                    disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
                   >
-                    {activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)}
+                    {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                      ? "Amount exceeds maximum"
+                      : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                    }
                   </Button>
                 </div>
               )}
