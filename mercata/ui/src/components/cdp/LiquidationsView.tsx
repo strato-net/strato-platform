@@ -357,11 +357,11 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       
                       {/* Table Row - Position Values */}
                       <div className="grid grid-cols-4 gap-4 p-4 items-center border-b">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        <div className="flex items-center space-x-1.5 min-w-0">
+                          <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {vault.symbol.charAt(0)}
                           </div>
-                          <span className="font-medium">{vault.symbol}</span>
+                          <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
                         </div>
                         <div>{formatNumber(parseFloat(formatWeiToDecimal(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
                         <div>${formatNumber(parseFloat(formatWeiToDecimal(vault.collateralValueUSD, 18)))}</div>
