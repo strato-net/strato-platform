@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
+import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 
 interface LiquidationsViewProps {
@@ -67,19 +67,42 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
 
 const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
+  const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
   const [expandedVaults, setExpandedVaults] = useState<Record<string, boolean>>({});
   const [liquidationAmounts, setLiquidationAmounts] = useState<Record<string, string>>({});
   const [liquidatingVaults, setLiquidatingVaults] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
-  // Fetch liquidatable positions
+  // Fetch liquidatable positions and asset configs
   useEffect(() => {
     const fetchLiquidatable = async () => {
       setLoading(true);
       try {
         const liquidatable = await cdpService.getLiquidatable();
         setLiquidatableVaults(liquidatable);
+        
+        // Fetch asset configs for each unique asset
+        const uniqueAssets = [...new Set(liquidatable.map(vault => vault.asset))];
+        const configPromises = uniqueAssets.map(async (asset) => {
+          try {
+            const config = await cdpService.getAssetConfig(asset);
+            return { asset, config };
+          } catch (error) {
+            console.error(`Error fetching config for asset ${asset}:`, error);
+            return { asset, config: null };
+          }
+        });
+        
+        const configResults = await Promise.all(configPromises);
+        const configsMap: Record<string, AssetConfig> = {};
+        configResults.forEach(({ asset, config }) => {
+          if (config) {
+            configsMap[asset] = config;
+          }
+        });
+        setAssetConfigs(configsMap);
+        
       } catch (error) {
         console.error("Error fetching liquidatable vaults:", error);
         toast({
@@ -113,8 +136,17 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     const amount = parseFloat(liquidationAmount);
     if (isNaN(amount) || amount <= 0) return "$0.00";
     
-    // Simplified calculation: assuming 5% liquidation bonus
-    const liquidationBonus = 0.05;
+    // Get the actual liquidation penalty from asset config
+    const assetConfig = assetConfigs[vault.asset];
+    if (!assetConfig) {
+      console.warn(`No asset config found for ${vault.asset}, using fallback 5% penalty`);
+      const fallbackBonus = 0.05;
+      const profit = amount * fallbackBonus;
+      return `$${formatNumber(profit)}`;
+    }
+    
+    // Convert basis points to decimal (e.g., 500 bps = 5% = 0.05)
+    const liquidationBonus = assetConfig.liquidationPenaltyBps / 10000;
     const profit = amount * liquidationBonus;
     return `$${formatNumber(profit)}`;
   };
