@@ -977,7 +977,11 @@ export const getLiquidatable = async (
     
     // Return only if liquidatable (health factor < 1.0)
     if (vaultData && vaultData.healthFactor < 1.0) {
-      return vaultData;
+      // Add the borrower address to the vault data for liquidation
+      return {
+        ...vaultData,
+        borrower: vaultOwner
+      };
     }
     
     return null;

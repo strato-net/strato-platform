@@ -135,7 +135,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     
     try {
       // Use the borrower address from vault data
-      const borrowerAddress = vault.borrower || "0x1234567890123456789012345678901234567890";
+      if (!vault.borrower) {
+        toast({
+          title: "Error",
+          description: "Borrower address not available for this vault",
+          variant: "destructive",
+        });
+        return;
+      }
+      const borrowerAddress = vault.borrower;
       
       const result = await cdpService.liquidate(vault.asset, borrowerAddress, liquidationAmount);
       
@@ -232,7 +240,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                         <span className="font-medium">Borrower</span>
                         <span className="text-gray-600 font-mono text-sm">
-                          {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "88c86a...7cff"}
+                          {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
                         </span>
                       </div>
                     </div>
