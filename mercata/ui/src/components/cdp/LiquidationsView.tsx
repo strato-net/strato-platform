@@ -205,9 +205,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <Button variant="outline" onClick={onBack}>
-          ← Back to Mint
+          ← Back to Borrow
         </Button>
-        <h2 className="text-xl font-semibold">Liquidatable Positions</h2>
         <div /> {/* Spacer for center alignment */}
       </div>
 
