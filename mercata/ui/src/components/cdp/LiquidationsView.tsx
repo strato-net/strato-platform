@@ -315,6 +315,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       
                       {/* Action Row - Input and Button */}
                       <div className="p-4">
+                        {/* Transaction Fee Display */}
+                        <div className="text-center mb-3">
+                          <p className="text-xs text-gray-500">
+                            Transaction Fee: 0.02 USDST
+                          </p>
+                        </div>
+                        
                         <div className="flex items-center space-x-3 justify-center">
                           <label className="text-sm font-medium text-gray-700">
                             Liquidation Amount:
