@@ -135,6 +135,15 @@ export const cdpService = {
     return response.data;
   },
 
+  // Get maximum liquidatable amount for a position
+  async getMaxLiquidatable(collateralAsset: string, borrower: string): Promise<{ maxAmount: string }> {
+    const response = await api.post("/cdp/max-liquidatable", {
+      collateralAsset,
+      borrower
+    });
+    return response.data;
+  },
+
   // Get asset configuration
   async getAssetConfig(asset: string): Promise<AssetConfig | null> {
     const response = await api.get(`/cdp/config/${asset}`);

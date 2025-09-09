@@ -72,6 +72,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [expandedVaults, setExpandedVaults] = useState<Record<string, boolean>>({});
   const [liquidationAmounts, setLiquidationAmounts] = useState<Record<string, string>>({});
   const [liquidatingVaults, setLiquidatingVaults] = useState<Record<string, boolean>>({});
+  const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
+  const [maxValues, setMaxValues] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
   // Fetch liquidatable positions and asset configs
@@ -130,6 +132,61 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       ...prev,
       [vaultKey]: value
     }));
+    
+    // Check if the entered amount equals the max amount
+    const enteredAmount = parseFloat(value);
+    const maxAmount = maxValues[vaultKey];
+    
+    if (!isNaN(enteredAmount) && maxAmount && Math.abs(enteredAmount - maxAmount) < 0.000001) {
+      // Re-enter max state if amount equals max
+      setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
+    } else if (maxStates[vaultKey]) {
+      // Clear max state when user manually changes the amount to something different
+      setMaxStates(prev => ({ ...prev, [vaultKey]: false }));
+    }
+  };
+
+  // Check if current amount exceeds maximum
+  const isAmountExceedsMax = (vaultKey: string): boolean => {
+    const currentAmount = parseFloat(liquidationAmounts[vaultKey] || "0");
+    const maxAmount = maxValues[vaultKey];
+    return maxAmount && currentAmount > maxAmount;
+  };
+
+  // Handle MAX button click
+  const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
+    const isCurrentlyMax = maxStates[vaultKey];
+    
+    if (isCurrentlyMax) {
+      // Clear max state and amount
+      setMaxStates(prev => ({ ...prev, [vaultKey]: false }));
+      setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
+    } else {
+      try {
+        // Fetch max liquidatable amount
+        const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
+        const maxAmountWei = result.maxAmount;
+        
+        // Convert from wei to decimal (18 decimals for USDST)
+        const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxAmountWei, 18));
+        
+        // Store the max value and set max state
+        setMaxValues(prev => ({ ...prev, [vaultKey]: maxAmountDecimal }));
+        setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
+        setLiquidationAmounts(prev => ({ 
+          ...prev, 
+          [vaultKey]: maxAmountDecimal.toString() 
+        }));
+        
+      } catch (error) {
+        console.error("Error fetching max liquidatable amount:", error);
+        toast({
+          title: "Error",
+          description: "Failed to calculate maximum liquidation amount",
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const calculateExpectedProfit = (vault: VaultData, liquidationAmount: string): string => {
@@ -322,26 +379,45 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                           </p>
                         </div>
                         
-                        <div className="flex items-center space-x-3 justify-center">
-                          <label className="text-sm font-medium text-gray-700">
-                            Liquidation Amount:
-                          </label>
-                          <Input
-                            type="number"
-                            placeholder="Amount to liquidate"
-                            value={liquidationAmount}
-                            onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
-                            className="w-40"
-                            min="0"
-                            step="0.01"
-                          />
-                          <Button 
-                            className="bg-red-600 hover:bg-red-700 text-white"
-                            onClick={() => handleLiquidate(vault, vaultKey)}
-                            disabled={isLiquidating || !liquidationAmount}
-                          >
-                            {isLiquidating ? "Liquidating..." : "Liquidate"}
-                          </Button>
+                        <div className="flex flex-col items-center space-y-2">
+                          <div className="flex items-center space-x-3">
+                            <label className="text-sm font-medium text-gray-700">
+                              Liquidation Amount:
+                            </label>
+                            <Input
+                              type="number"
+                              placeholder="Amount to liquidate"
+                              value={liquidationAmount}
+                              onChange={(e) => handleLiquidationAmountChange(vaultKey, e.target.value)}
+                              className={`w-40 ${isAmountExceedsMax(vaultKey) ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+                              min="0"
+                              step="0.01"
+                            />
+                            <Button 
+                              variant={maxStates[vaultKey] ? "default" : "outline"}
+                              size="sm" 
+                              className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                              onClick={() => handleMaxClick(vault, vaultKey)}
+                            >
+                              MAX
+                            </Button>
+                            <Button 
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                              onClick={() => handleLiquidate(vault, vaultKey)}
+                              disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey)}
+                            >
+                              {isLiquidating ? "Liquidating..." : "Liquidate"}
+                            </Button>
+                          </div>
+                          
+                          {/* Error message when amount exceeds max */}
+                          {isAmountExceedsMax(vaultKey) && (
+                            <div className="text-center">
+                              <p className="text-xs text-red-500">
+                                Maximum liquidation amount reached
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

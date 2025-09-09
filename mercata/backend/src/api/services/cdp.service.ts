@@ -1038,3 +1038,80 @@ export const getSupportedAssets = async (
   const configs = await Promise.all(configPromises);
   return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null);
 };
+
+export const getMaxLiquidatable = async (
+  accessToken: string,
+  userAddress: string,
+  body: { collateralAsset: string; borrower: string }
+): Promise<{ maxAmount: string }> => {
+  console.log(`🔍 [CDP] getMaxLiquidatable called at ${new Date().toISOString()}`, {
+    userAddress,
+    body
+  });
+  
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Get vault data for the borrower
+  const vaultData = await getVault(accessToken, body.borrower, body.collateralAsset);
+  if (!vaultData || vaultData.healthFactor >= 1.0) {
+    return { maxAmount: "0" };
+  }
+
+  // Get asset config
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  )?.CollateralConfig;
+
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset configuration not found");
+  }
+
+  // Get price
+  const priceEntry = registry.priceOracle?.prices?.find(
+    (p: any) => p.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  );
+  const price = BigInt(priceEntry?.value || "0");
+  
+  if (price <= 0n) {
+    throw new Error("Invalid asset price");
+  }
+
+  // Calculate max liquidation amount based on contract constraints
+  // This simulates the liquidate function logic from CDPEngine.sol
+  
+  const rateAccumulator = BigInt(globalState.rateAccumulator);
+  const scaledDebt = BigInt(vaultData.scaledDebt);
+  const collateralAmount = BigInt(vaultData.collateralAmount);
+  const unitScale = BigInt(config.unitScale);
+  
+  // Calculate total debt in USD
+  const totalDebtUSD = (scaledDebt * rateAccumulator) / RAY;
+  
+  // Calculate close factor cap (max % of debt that can be liquidated)
+  const closeFactorCap = (totalDebtUSD * BigInt(config.closeFactorBps)) / 10000n;
+  
+  // Calculate collateral value in USD
+  const collateralUSD = (collateralAmount * price) / unitScale;
+  
+  // Calculate coverage cap (ensure collateral can cover repay + penalty)
+  const coverageCap = (collateralUSD * 10000n) / (10000n + BigInt(config.liquidationPenaltyBps));
+  
+  // Max liquidation amount is the minimum of all constraints
+  let maxAmount = totalDebtUSD;
+  if (maxAmount > closeFactorCap) maxAmount = closeFactorCap;
+  if (maxAmount > coverageCap) maxAmount = coverageCap;
+  
+  // Ensure we don't return more than available
+  if (maxAmount > totalDebtUSD) maxAmount = totalDebtUSD;
+  if (maxAmount < 0n) maxAmount = 0n;
+  
+  return { maxAmount: maxAmount.toString() };
+};
