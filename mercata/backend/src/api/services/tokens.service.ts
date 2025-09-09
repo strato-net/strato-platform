@@ -219,18 +219,23 @@ export const createToken = async (
 
 export const transferToken = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | undefined>,
+  userAddress?: string
 ) => {
   try {
-    const tx = buildFunctionTx({
-      contractName: extractContractName(Token),
-      contractAddress: body.address || "",
-      method: "transfer",
-      args: {
-        to: body.to,
-        value: body.value,
+    const tx = await buildFunctionTx(
+      {
+        contractName: extractContractName(Token),
+        contractAddress: body.address || "",
+        method: "transfer",
+        args: {
+          to: body.to,
+          value: body.value,
+        },
       },
-    });
+      userAddress,
+      accessToken
+    );
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

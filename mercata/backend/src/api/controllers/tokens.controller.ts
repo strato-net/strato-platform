@@ -121,7 +121,7 @@ class TokensController {
       const { accessToken, body } = req;
       validateTransferItemArgs(body);
 
-      const result = await transferToken(accessToken, body);
+      const result = await transferToken(accessToken, body, req.address);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
