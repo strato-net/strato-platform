@@ -336,8 +336,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         // User reduced the amount below max, disable MAX mode
       setIsBorrowMaxEnabled(false);
       } else if (currentAmount > maxBorrowable) {
-        // User increased above max, keep MAX enabled but input will show red
-        // The red styling is handled by isBorrowAmountAboveMax()
+        // User increased above max, disable MAX mode so red styling shows
+        setIsBorrowMaxEnabled(false);
       }
     }
     
@@ -394,8 +394,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         // User reduced the amount below max, disable MAX mode
       setIsDepositMaxEnabled(false);
       } else if (currentAmount > maxDepositAmount) {
-        // User increased above max, keep MAX enabled but input will show red
-        // The red styling is handled by isDepositAmountAboveMax()
+        // User increased above max, disable MAX mode so red styling shows
+        setIsDepositMaxEnabled(false);
       }
     }
     
