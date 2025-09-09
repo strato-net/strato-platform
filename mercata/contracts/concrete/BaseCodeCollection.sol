@@ -39,9 +39,6 @@ import "Lending/RateStrategy.sol";
 //Bridging
 import "./Bridge/MercataBridge.sol";
 
-//Fee Collector
-import "Admin/FeeCollector.sol";
-
 //CDP
 import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";
@@ -68,39 +65,40 @@ contract record Mercata {
 
     constructor() public {
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry(this);
-        adminRegistry.addAdmin(msg.sender);
+        adminRegistry = new AdminRegistry([this]);
 
         // Create FeeCollector
-        feeCollector = new FeeCollector(msg.sender);
+        feeCollector = new FeeCollector(address(adminRegistry));
 
         // Create Factories
-        tokenFactory = new TokenFactory(msg.sender, address(adminRegistry));
-        poolFactory = new PoolFactory(msg.sender, address(tokenFactory), address(adminRegistry), address(feeCollector));
-        adminRegistry.addAdmin(address(poolFactory));
-        adminRegistry.removeAdmin(this);
-        Ownable(adminRegistry).transferOwnership(msg.sender);
+        tokenFactory = new TokenFactory(address(adminRegistry));
+        poolFactory = new PoolFactory(address(adminRegistry), address(tokenFactory), address(address(adminRegistry)), address(feeCollector));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(tokenFactory), "createTokenWithInitialOwner", address(poolFactory));
 
         // Create Lending related contracts
         lendingRegistry = new LendingRegistry(this);
-        collateralVault = new CollateralVault(address(lendingRegistry), msg.sender);
-        liquidityPool = new LiquidityPool(address(lendingRegistry), msg.sender);
+        collateralVault = new CollateralVault(address(lendingRegistry), address(adminRegistry));
+        liquidityPool = new LiquidityPool(address(lendingRegistry), address(adminRegistry));
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(msg.sender); 
+        priceOracle = new PriceOracle(address(adminRegistry)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), msg.sender, address(tokenFactory), address(feeCollector));
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector));
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
-        Ownable(poolConfigurator).transferOwnership(msg.sender);
+        Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services
-        mercataBridge = new MercataBridge(address(tokenFactory), msg.sender, msg.sender);
-        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), msg.sender);
+        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry));
+        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
-        cdpRegistry = new CDPRegistry(msg.sender);
-        cdpVault = new CDPVault(address(cdpRegistry), msg.sender);
-        cdpEngine = new CDPEngine(address(cdpRegistry), msg.sender);
+        cdpRegistry = new CDPRegistry(this);
+        cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
+        cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector));
+        Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
+
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
     }
 }

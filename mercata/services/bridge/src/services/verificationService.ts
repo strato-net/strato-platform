@@ -28,28 +28,28 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
   });
 
 const validateDeposit = (deposit: Deposit, chainId: number, safe: string) => {
-  if (deposit.chainId !== chainId.toString()) {
-    return new Error(`Chain mismatch for token ${normalizeAddress(deposit.token)}. Expected: ${chainId}, Got: ${deposit.chainId}`);
+  if (deposit.externalChainId !== chainId.toString()) {
+    return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
 
-  const extTokenNorm = normalizeAddress(ensureHexPrefix(deposit.extToken));
-  const routerNorm = normalizeAddress(deposit.depositRouter);
+  const externalToken = normalizeAddress(ensureHexPrefix(deposit.externalToken));
+  const depositRouter = normalizeAddress(deposit.depositRouter);
   
   return {
     safe,
-    isETH: extTokenNorm === ZERO_ADDRESS,
-    expectedAmount: safeToBigInt(deposit.amount),
-    extTokenNorm,
-    routerNorm,
-    extDecimals: deposit.extDecimals
+    isETH: externalToken === ZERO_ADDRESS,
+    expectedAmount: safeToBigInt(deposit.externalTokenAmount),
+    externalToken,
+    depositRouter,
+    externalDecimals: deposit.externalDecimals
   };
 };
 
 const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null => {
   const to = receipt.to ? normalizeAddress(receipt.to) : "";
   
-  if (to !== ctx.routerNorm) {
-    return new Error(`ETH receiver mismatch. Expected: ${ctx.routerNorm}, Got: ${to || "null"}`);
+  if (to !== ctx.depositRouter) {
+    return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }
   
   if (!findInternalEthTransfer(traces, ctx.safe, ctx.expectedAmount)) {
@@ -65,19 +65,19 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
   
   const validTransfer = logs.some(log => {
     const decoded = decodeTransferLog(log, sig);
-    if (!decoded || decoded.tokenAddr !== ctx.extTokenNorm || decoded.toAddr !== ctx.safe) {
+    if (!decoded || decoded.tokenAddr !== ctx.externalToken || decoded.toAddr !== ctx.safe) {
       return false;
     }
     
-    const convertedAmount = ctx.extDecimals 
-      ? convertToStratoDecimals(decoded.amount, ctx.extDecimals)
+    const convertedAmount = ctx.externalDecimals 
+      ? convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
       : ctx.expectedAmount.toString();
     
     return convertedAmount === ctx.expectedAmount.toString();
   });
   
   if (!validTransfer) {
-    return new Error(`No ERC20 Transfer to Safe ${ctx.safe} for token ${ctx.extTokenNorm}`);
+    return new Error(`No ERC20 Transfer to Safe ${ctx.safe} for token ${ctx.externalToken}`);
   }
   
   return null;
@@ -92,28 +92,28 @@ export const verifyDepositsBatch = async (deposits: Deposit[]): Promise<Map<stri
   // Group deposits by chain for batch processing
   const depositsByChain = new Map<number, Deposit[]>();
   deposits.forEach(deposit => {
-    const chainId = typeof deposit.srcChainId === "number" 
-      ? deposit.srcChainId 
-      : Number(deposit.srcChainId);
+    const externalChainId = typeof deposit.externalChainId === "number" 
+      ? deposit.externalChainId 
+      : Number(deposit.externalChainId);
     
-    if (!depositsByChain.has(chainId)) {
-      depositsByChain.set(chainId, []);
+    if (!depositsByChain.has(externalChainId)) {
+      depositsByChain.set(externalChainId, []);
     }
-    depositsByChain.get(chainId)!.push(deposit);
+    depositsByChain.get(externalChainId)!.push(deposit);
   });
 
   // Normalize once, reuse everywhere
   const safe = normalizeAddress(config?.safe?.address ?? "");
   if (!safe) {
     const error = new Error("Gnosis Safe address not configured");
-    deposits.forEach(d => results.set(d.srcTxHash, error));
+    deposits.forEach(d => results.set(d.externalTxHash, error));
     return results;
   }
 
   // Process each chain's deposits in batches
   for (const [chainId, chainDeposits] of depositsByChain) {
     // Dedupe txHashes
-    const txHashes = [...new Set(chainDeposits.map(d => d.srcTxHash))];
+    const txHashes = [...new Set(chainDeposits.map(d => d.externalTxHash))];
     if (txHashes.length === 0) continue;
     
     // Batch fetch receipts and internal transactions
@@ -125,32 +125,32 @@ export const verifyDepositsBatch = async (deposits: Deposit[]): Promise<Map<stri
     // Verify each deposit using the batched data
     for (const deposit of chainDeposits) {
       try {
-        const receipt = receipts.get(deposit.srcTxHash);
+        const receipt = receipts.get(deposit.externalTxHash);
         if (!receipt) {
-          results.set(deposit.srcTxHash, fail(deposit.srcTxHash, "No receipt found"));
+          results.set(deposit.externalTxHash, fail(deposit.externalTxHash, "No receipt found"));
           continue;
         }
 
         if (!isOkStatus(receipt)) {
-          results.set(deposit.srcTxHash, fail(deposit.srcTxHash, "Deposit transaction failed"));
+          results.set(deposit.externalTxHash, fail(deposit.externalTxHash, "Deposit transaction failed"));
           continue;
         }
 
         // Early guard + context object
         const ctx = validateDeposit(deposit, chainId, safe);
         if (ctx instanceof Error) {
-          results.set(deposit.srcTxHash, ctx);
+          results.set(deposit.externalTxHash, ctx);
           continue;
         }
 
         // Branch to appropriate verifier
         const error = ctx.isETH 
-          ? verifyEthDeposit(receipt, internalTxsMap.get(deposit.srcTxHash) || [], ctx)
+          ? verifyEthDeposit(receipt, internalTxsMap.get(deposit.externalTxHash) || [], ctx)
           : verifyErc20Deposit(receipt, ctx);
 
-        results.set(deposit.srcTxHash, error);
+        results.set(deposit.externalTxHash, error);
       } catch (error) {
-        results.set(deposit.srcTxHash, error as Error);
+        results.set(deposit.externalTxHash, error as Error);
       }
     }
   }

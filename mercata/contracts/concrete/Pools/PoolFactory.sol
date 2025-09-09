@@ -19,15 +19,6 @@ import "../Admin/AdminRegistry.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
-/// @dev minimal interface exposing addMinter used during pool creation
-interface ITokenAccess {
-    function addMinter(address accountAddress) external;
-    function removeMinter(address accountAddress) external;
-    function addBurner(address accountAddress) external;
-    function removeBurner(address accountAddress) external;
-    function transferAdmin(address accountAddress) external;
-}
-
 /// @notice Pool factory contract
 contract record PoolFactory is Ownable {
     
@@ -103,12 +94,6 @@ contract record PoolFactory is Ownable {
 
     // ============ MODIFIERS ============
     
-    /// @notice Modifier to check if the caller is the owner or an admin
-    modifier onlyOwnerOrAdmin() { 
-        require(msg.sender == owner() || AdminRegistry(adminRegistry).isAdminAddress(msg.sender), "PoolFactory: caller is not owner or admin");
-        _;
-    }
-    
     /// @notice Modifier to check if tokens are active
     /// @param tokenA First token address
     /// @param tokenB Second token address
@@ -128,7 +113,7 @@ contract record PoolFactory is Ownable {
     }
 
     /// @notice Update the token factory address (owner or admin)
-    function setTokenFactory(address _tokenFactory) external onlyOwnerOrAdmin {
+    function setTokenFactory(address _tokenFactory) external onlyOwner {
         require(_tokenFactory != address(0), "Zero token factory address");
         address oldFactory = address(tokenFactory);
         tokenFactory = _tokenFactory;
@@ -137,7 +122,7 @@ contract record PoolFactory is Ownable {
 
     /// @notice Update the fee collector address (owner or admin)
     /// @dev This updates the factory's fee collector - pools read from factory
-    function setFeeCollector(address newFeeCollector) external onlyOwnerOrAdmin {
+    function setFeeCollector(address newFeeCollector) external onlyOwner {
         require(newFeeCollector != address(0), "Zero fee collector address");
         address oldFeeCollector = feeCollector;
         feeCollector = newFeeCollector;
@@ -151,7 +136,7 @@ contract record PoolFactory is Ownable {
     function setFeeParameters(
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
-    ) external onlyOwnerOrAdmin {
+    ) external onlyOwner {
         require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
         require(newLpSharePercent > 0, "LP share must be greater than 0");
@@ -172,7 +157,7 @@ contract record PoolFactory is Ownable {
         address poolAddress,
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
-    ) external onlyOwnerOrAdmin {
+    ) external onlyOwner {
         require(poolAddress != address(0), "Zero pool address");
         require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
@@ -187,20 +172,48 @@ contract record PoolFactory is Ownable {
         emit PoolFeeParametersUpdated(poolAddress, newSwapFeeRate, newLpSharePercent);
     }
 
+    /// @notice Call sync on all pools or select pools
+    /// @param pools Array of pool addresses to sync
+    /// @dev If no pools are provided, sync all pools
+    /// @dev This function is used to sync the pools after a token transfer
+    function syncPools(address[] pools) external onlyOwner {
+        address[] memory targetPools = pools;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint256 i = 0; i < targetPools.length; i++) {
+            Pool(targetPools[i]).sync();
+        }
+    }
+
+    /// @notice Call skim on all pools or select pools
+    /// @param pools Array of pool addresses to skim
+    /// @param to Address to skim the pools to
+    /// @dev If no pools are provided, skim all pools
+    /// @dev This function is used to skim the pools after a token transfer
+    function skimPools(address[] pools, address to) external onlyOwner {
+        address[] memory targetPools = pools;
+        if (targetPools.length == 0) {
+            targetPools = allPools;
+        }
+        for (uint256 i = 0; i < targetPools.length; i++) {
+            Pool(targetPools[i]).skim(to);
+        }
+    }
+
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
-    function createPool(address tokenA, address tokenB) external onlyOwnerOrAdmin tokensActive(tokenA, tokenB) returns (address pool) {
+    function createPool(address tokenA, address tokenB) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
         require(pools[tokenA][tokenB] == address(0) && pools[tokenB][tokenA] == address(0), "Pool exists");
-        require(AdminRegistry(adminRegistry).isAdminAddress(address(this)), "PoolFactory is not admin");
         
         // deploy new lp token
         string lpName = ERC20(tokenA).name() + "-" + ERC20(tokenB).name() + " LP Token";
         string lpSymbol = ERC20(tokenA).symbol() + "-" + ERC20(tokenB).symbol() + "-LP";
         
-        address lpTokenAddress = TokenFactory(tokenFactory).createToken(
+        address lpTokenAddress = TokenFactory(tokenFactory).createTokenWithInitialOwner(
             lpName,
             "Liquidity Provider Token",
             [],
@@ -208,19 +221,16 @@ contract record PoolFactory is Ownable {
             [],
             lpSymbol,
             0,
-            18
+            18,
+            this
         );
 
         // deploy new pool first
         pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
-
-        // NEW: allow the pool to mint its own LP tokens
-        ITokenAccess(lpTokenAddress).addMinter(pool);
-        ITokenAccess(lpTokenAddress).removeMinter(address(this));
-        ITokenAccess(lpTokenAddress).addBurner(pool);
-        ITokenAccess(lpTokenAddress).removeBurner(address(this));
-        ITokenAccess(lpTokenAddress).transferAdmin(pool);
-        Ownable(lpTokenAddress).transferOwnership(pool);
+        address thisOwner = owner();
+        Token(lpTokenAddress).addWhitelist(thisOwner, "mint", pool);
+        Token(lpTokenAddress).addWhitelist(thisOwner, "burn", pool);
+        Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
         // update pool registry
         pools[tokenA][tokenB] = pool;
@@ -234,7 +244,7 @@ contract record PoolFactory is Ownable {
     
     /// @notice Transfer all pools to a new factory
     /// @param newFactory Address of the new factory
-    function transferPoolsToFactory(address newFactory) external onlyOwnerOrAdmin {
+    function transferPoolsToFactory(address newFactory) external onlyOwner {
         for (uint256 i = 0; i < allPools.length; i++) {
             address pool = allPools[i];
             if (pool != address(0)) {
@@ -247,7 +257,7 @@ contract record PoolFactory is Ownable {
 
     /// @notice Register pools received from another factory
     /// @param poolAddresses Array of pool addresses to register
-    function registerPoolsFromFactory(address[] poolAddresses) external onlyOwnerOrAdmin {
+    function registerPoolsFromFactory(address[] poolAddresses) external onlyOwner {
         for (uint256 i = 0; i < poolAddresses.length; i++) {
             address pool = poolAddresses[i];
             

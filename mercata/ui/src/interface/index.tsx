@@ -12,8 +12,6 @@ export interface Token {
   images?: Array<{ value: string }>;
   attributes?: Array<{ key: string; value: string }>;
   balances?: Array<{ user: string; balance: string; collateralBalance?: string }>;
-  minters?: Array<{ user: string; value: boolean }>;
-  burners?: Array<{ user: string; value: boolean }>;
   price?: number | string;
   
   // Legacy fields for backward compatibility
@@ -159,56 +157,54 @@ export interface PoolFormValues {
 
 /*-------- Withdraw Interfaces --------*/
 export interface RawWithdrawData {
-  extToken: string;
   withdrawalId: number;
-  withdrawalInfo: {
-    dest: string;
-    user: string;
-    token: string;
-    amount: string;
-    destChainId: string;
-    requestedAt: string;
+  WithdrawalInfo: {
+    externalChainId: string;
+    externalRecipient: string;
+    stratoToken: string;
+    stratoTokenAmount: string;
+    stratoSender: string;
     bridgeStatus: string;
+    mintUSDST: boolean;
+    timestamp: string;
+    requestedAt: string;
   };
-  // Legacy fields for backward compatibility (will be mapped from withdrawalInfo)
-  transaction_hash?: string;
-  block_timestamp?: string;
-  from?: string;
-  to?: string;
-  ethTokenSymbol?: string;
-  ethTokenAddress?: string;
-  tokenDecimal?: number;
-  txHash?: string;
-  withdrawalStatus?: string;
-  tokenSymbol?: string;
+  // Backend enriched fields
+  status: string;
+  stratoToken: string;
+  stratoTokenName: string;
+  stratoTokenSymbol: string;
+  externalName: string;
+  externalSymbol: string;
+  externalToken: string;
+  // Database fields
+  block_timestamp: string;
+  transaction_hash: string;
 }
 
 export interface RawDepositData {
-  stratoTokenSymbol: string;
-  stratoToken: string;
-  extToken: string;
-  chainId: any;
-  transaction_hash: string;
-  block_timestamp: string;
-  from: string;
-  to: string;
-  tokenSymbol?: string;
-  ethTokenSymbol?: string;
-  ethTokenAddress?: string;
-  amount?: string;
-  tokenDecimal?: number;
-  txHash?: string;
-  token?: string;
-  key?: string;
-  depositStatus?: string;
-  // New fields for updated API response
-  depositId?: number;
-  depositInfo?: {
-    user: string;
-    token: string;
-    amount: string;
+  externalChainId: string;
+  externalTxHash: string;
+  DepositInfo: {
+    stratoToken: string;
+    stratoRecipient: string;
+    stratoTokenAmount: string;
+    externalSender: string;
     bridgeStatus: string;
+    mintUSDST: boolean;
+    timestamp: string;
   };
+  // Backend enriched fields
+  status: string;
+  stratoToken: string;
+  stratoTokenName: string;
+  stratoTokenSymbol: string;
+  externalName: string;
+  externalSymbol: string;
+  externalToken: string;
+  // Database fields
+  block_timestamp: string;
+  transaction_hash: string;
 }
 
 export interface CollateralData {

@@ -10,7 +10,7 @@ import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiAmount } from "@/utils/numberUtils";
 import { bridgeContractService } from "@/lib/bridge/contractService";
 
-const DepositTransactionDetails = () => {
+const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
@@ -32,6 +32,8 @@ const DepositTransactionDetails = () => {
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
+        
+        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
@@ -61,11 +63,11 @@ const DepositTransactionDetails = () => {
       title: "From",
       key: "from",
       render: (_: any, record: any) => {
-        const chainName = record.chainId ? getChainName(record.chainId) : "Unknown Chain";
-        const addr = record?.depositInfo?.from
-          ? bridgeContractService.formatAddress(record.depositInfo.from)
+        const chainName = record.externalChainId ? getChainName(record.externalChainId) : "Unknown Chain";
+        const addr = record?.DepositInfo?.externalSender
+          ? bridgeContractService.formatAddress(record.DepositInfo.externalSender)
           : "";
-        const chainIdStr = record?.chainId ? String(record.chainId) : '1';
+        const chainIdStr = record?.externalChainId ? String(record.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
         const addressUrl = addr ? `${base}/address/${addr}` : '';
@@ -98,8 +100,8 @@ const DepositTransactionDetails = () => {
       key: "to",
       render: (_: any, record: any) =>
         renderTruncatedAddressWithCopy(
-          record?.depositInfo?.user
-            ? bridgeContractService.formatAddress(record.depositInfo.user)
+          record?.DepositInfo?.stratoRecipient
+            ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
             : "",
           handleCopyToClipboard
         ),
@@ -111,9 +113,8 @@ const DepositTransactionDetails = () => {
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
           <span className="text-sm text-gray-700">{
-            record.extSymbol ||
-            record.ethTokenSymbol ||
-            (record.extName === 'Ether' ? 'ETH' : record.extName) ||
+            record.externalSymbol ||
+            (record.externalName === 'Ether' ? 'ETH' : record.externalName) ||
             '-'
           }</span>
         </div>
@@ -125,7 +126,7 @@ const DepositTransactionDetails = () => {
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{record.tokenSymbol || record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,
@@ -134,14 +135,14 @@ const DepositTransactionDetails = () => {
       title: "Amount",
       key: "amount",
       render: (_: any, record: any) =>
-        formatWeiAmount(record?.depositInfo?.amount || '0'),
+        formatWeiAmount(record?.DepositInfo?.stratoTokenAmount || '0'),
       width: 80,
     },
     {
       title: "Status",
       key: "depositStatus",
       render: (_: any, record: any) => {
-        const statusStr = record?.depositStatus || record?.status || record?.depositInfo?.bridgeStatus || "0";
+        const statusStr = record?.DepositInfo?.bridgeStatus || "0";
         const statusNum = parseInt(statusStr);
         if (statusNum === 1) {
           return (

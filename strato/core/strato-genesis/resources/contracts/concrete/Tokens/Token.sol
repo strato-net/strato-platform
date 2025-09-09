@@ -1,8 +1,6 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "./TokenMetadata.sol";
-import "./TokenAccess.sol";
-import "../../abstract/ERC20.sol";
-import "../Admin/AdminRegistry.sol";
+import "../../abstract/ERC20/ERC20.sol";
 import "../Rewards/RewardsManager.sol";
 import "./TokenFactory.sol";
 
@@ -38,7 +36,7 @@ import "./TokenFactory.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
-contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
+contract record Token is ERC20, Ownable, TokenMetadata {
     uint8 public customDecimals;
     TokenStatus public status;
     TokenFactory public tokenFactory;
@@ -48,11 +46,6 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
 
     modifier onlyTokenFactory() {
         require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
-        _;
-    }
-
-    modifier onlyAdmin() {
-        require(AdminRegistry(tokenFactory.adminRegistry()).isAdminAddress(msg.sender), "Token: caller is not admin");
         _;
     }
 
@@ -66,7 +59,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         uint256 _initialSupply,
         uint8 _customDecimals,
         address _tokenCreator
-    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) TokenAccess(_tokenCreator) Ownable(_tokenCreator) {
+    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) Ownable(_tokenCreator) {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
@@ -76,7 +69,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         emit StatusChanged(status);
     }
 
-    function setStatus(uint newStatus) external onlyAdmin {
+    function setStatus(uint newStatus) external onlyOwner {
         require(newStatus != uint(status), "Token: New status is the same as the current status");
         require(newStatus != uint(TokenStatus.NULL), "Token: New status is NULL");
         TokenStatus _newStatus = TokenStatus(newStatus);
@@ -93,20 +86,16 @@ contract record Token is ERC20, Ownable, TokenMetadata, TokenAccess {
         rewardsManager = RewardsManager(_rewardsManager);
     }
 
-    function mint(address to, uint256 amount) external {
-        require(
-            TokenAccess(this).isMinter(msg.sender),
-            "Token: Caller is not a minter"
-        );
+    function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 
-    function burn(address from, uint256 amount) external {
-        require(
-            TokenAccess(this).isBurner(msg.sender),
-            "Token: Caller is not a burner"
-        );
+    function burn(address from, uint256 amount) external onlyOwner {
         _burn(from, amount);
+    }
+
+    function addWhitelist(address _admin, string _func, address _accountToWhitelsit) external onlyOwner {
+        AdminRegistry(_admin).castVoteOnIssue(_admin, "addWhitelist", this, _func, _accountToWhitelsit);
     }
 
     function setMetadata (

@@ -33,6 +33,7 @@ import           Data.List                                       (find)
 import qualified Data.Map.Strict                                 as M
 import           Data.Maybe                                      (fromMaybe, mapMaybe)
 import qualified Data.Sequence                                   as S
+import qualified Data.Set                                        as Set
 import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
@@ -110,9 +111,6 @@ lendingRegistryAddress = 0x1007
 mercataBridgeAddress :: Address
 mercataBridgeAddress = 0x1008
 
-onRampAddress :: Address
-onRampAddress = 0x1009
-
 poolFactoryAddress :: Address
 poolFactoryAddress = 0x100a
 
@@ -134,6 +132,15 @@ mTokenAddress = 0x100f
 rewardsManagerAddress :: Address
 rewardsManagerAddress = 0x1010
 
+cdpEngineAddress :: Address
+cdpEngineAddress = 0x1011
+
+cdpRegistryAddress :: Address
+cdpRegistryAddress = 0x1012
+
+cdpVaultAddress :: Address
+cdpVaultAddress = 0x1013
+
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
@@ -154,6 +161,13 @@ combinedEscrows = M.elems
         correctQ e = case M.lookup (GE.assetRootAddress e) assetMap of
           Nothing -> e
           Just GA.Asset{..} -> e{ GE.collateralQuantity = correctQuantity decimals name (GE.collateralQuantity e) }
+
+supportedCollaterals :: [Address]
+supportedCollaterals = Set.toList
+                     . Set.delete 0xd6e292f2c9486ada24f6d5cf2e67f44c5f7f677a -- BETHTEMP
+                     . Set.delete 0x04d68c24ff359ab457c7b96810f85c51989fe8ed -- USDTEMP
+                     . Set.fromList
+                     $ GE.assetRootAddress <$> combinedEscrows
 
 genesisBlock :: GenesisInfo
 genesisBlock  =
@@ -182,12 +196,14 @@ genesisBlock  =
               , (".poolConfigurator", BContract "PoolConfigurator" $ unspecifiedChain poolConfiguratorAddress)
               , (".lendingRegistry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
               , (".mercataBridge", BContract "MercataBridge" $ unspecifiedChain mercataBridgeAddress)
-              , (".onRamp", BContract "OnRamp" $ unspecifiedChain onRampAddress)
               , (".poolFactory", BContract "PoolFactory" $ unspecifiedChain poolFactoryAddress)
               , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
               , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
               , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
               , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
+              , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
+              , (".cdpRegistry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
+              , (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
               ]
             ] ++ mapMaybe assetToAccountInfos GA.assets ++
             [ rateStrategy
@@ -198,7 +214,6 @@ genesisBlock  =
             , poolConfigurator
             , lendingRegistry
             , mercataBridge
-            , onRamp
             , poolFactory
             , tokenFactory
             , adminRegistry
@@ -206,15 +221,19 @@ genesisBlock  =
             , voucher
             , mToken
             , rewardsManager
+            , cdpEngine
+            , cdpRegistry
+            , cdpVault
             ],
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")],
         genesisInfoEvents = M.fromList $
           (assetToEvents <$> GA.assets)
           ++ [ adminEvents
-             , collateralVaultEvents
              , lendingPoolEvents
-             , liquidityPoolEvents
              , poolConfiguratorEvents
+             , cdpEngineEvents
+             , cdpRegistryEvents
+             , cdpVaultEvents
              ]
         }
 
@@ -226,7 +245,7 @@ createdByBlockApps originAddress =
   ]
 
 ownedByBlockApps :: Address -> [(B.ByteString, BasicValue)]
-ownedByBlockApps originAddress = ("._owner", BAccount $ unspecifiedChain blockappsAddress) : createdByBlockApps originAddress
+ownedByBlockApps originAddress = ("._owner", BAccount $ unspecifiedChain adminRegistryAddress) : createdByBlockApps originAddress
 
 getDecimals :: Integer -> Text -> Integer
 getDecimals d n =
@@ -242,14 +261,14 @@ correctQuantity d n q =
       decs = getDecimals d n
    in q `times10ToThe` (fromIntegral $ 18 - decs)
 
-sigma :: Integer
-sigma = sum $ GE.borrowedAmount <$> combinedEscrows -- https://blockappsdev.slack.com/archives/G5E7K3ETX/p1752167719353369
-
 oneE18 :: Integer
 oneE18 = 1_000_000_000_000_000_000
 
-omega :: Integer
-omega = 2_000_000 * oneE18
+ray :: Integer
+ray = 1_000_000_000 * oneE18
+
+lastAccrual :: Integer
+lastAccrual = 1757304000 -- September 8th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
@@ -260,7 +279,7 @@ assetBalances GA.Asset{..} =
                          <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
          in case mEscrowBalance of
               Nothing -> [(o, q)]
-              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (collateralVaultAddress, escrowBalance)])
+              Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
@@ -297,9 +316,6 @@ assetToAccountInfos asset@GA.Asset{..} =
           , (".description", BString $ encodeUtf8 description')
           , (".customDecimals", BInteger 18)
           , ("._totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
-          , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
-          , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
-          , (".admin", BAccount $ unspecifiedChain blockappsAddress)
           , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
           , (".images.length", BInteger . fromIntegral $ length images)
           , (".files.length", BInteger . fromIntegral $ length files)
@@ -308,16 +324,9 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find ((== root) . GR.assetRootAddress) GR.reserves)]
-            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find ((== root) . GR.assetRootAddress) GR.reserves))]
+            ++ [(maybe (".status", if root == usdstAddress || root == cataAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
+            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
-            ++ if name `elem` ["ETHST", "USDCST"] then [(".minters<a:" <> addrBS mercataBridgeAddress <> ">", BBool True), (".burners<a:" <> addrBS mercataBridgeAddress <> ">", BBool True)] else []
-            ++ (if root == usdstAddress
-                  then [ ("._balances<a:" <> addrBS liquidityPoolAddress <> ">", BInteger $ omega - sigma)
-                       , ("._balances<a:c7f483b3ddb99d510570a8b7760aebda941c766d>", BInteger $ 1000 * oneE18) -- bob
-                       , ("._balances<a:a0ad0dc4c754d507ca7964246fa9590d6a3df8d4>", BInteger $ 100_000 * oneE18) -- jaime and victor
-                       ]
-                  else [])
 
 assetToEvents :: GA.Asset -> (Address, S.Seq Event)
 assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "Token" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
@@ -343,32 +352,13 @@ priceOracle = SolidVMContractWithStorage priceOracleAddress 0 (CodeAtAccount mer
 collateralVault :: AccountInfo
 collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 (CodeAtAccount mercataAddress "CollateralVault") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
-  ] ++ concatMap (\GE.Escrow{..} ->
-      [ (".userCollaterals<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">", BInteger collateralQuantity)
-      ]
-  ) combinedEscrows
-
-collateralVaultEvents :: (Address, S.Seq Event)
-collateralVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CollateralVault" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (collateralVaultAddress, S.fromList $
-  map (\GE.Escrow{..} ->
-      ("CollateralAdded", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
-  ) combinedEscrows
-  )
+  ]
 
 liquidityPool :: AccountInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 (CodeAtAccount mercataAddress "LiquidityPool") $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" $ unspecifiedChain lendingRegistryAddress)
   , (".mToken", BContract "Token" $ unspecifiedChain mTokenAddress)
   ]
-
-liquidityPoolEvents :: (Address, S.Seq Event)
-liquidityPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "LiquidityPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (liquidityPoolAddress, S.fromList $
-  [("Deposited", [("user", show blockappsAddress),("amount", show omega),("mTokenMinted", show omega)])]
-  ++ concatMap (\(bwr, amt) -> (if amt > 0
-    then [("Borrowed", [("user", show bwr),("amount", show amt)])]
-    else [])
-  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
-  )
 
 lendingPool :: AccountInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mercataAddress "LendingPool") $ ownedByBlockApps mercataAddress ++
@@ -378,13 +368,13 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
   , (".borrowableAsset", BAccount $ unspecifiedChain usdstAddress)
   , (".mToken", BAccount $ unspecifiedChain mTokenAddress)
-  , (".RAY", BInteger 1_000_000_000_000_000_000_000_000_000)
+  , (".RAY", BInteger ray)
   , (".SECONDS_PER_YEAR", BInteger 31536000)
-  , (".borrowIndex", BInteger 1_000_000_000_000_000_000_000_000_000)
-  , (".lastAccrual", BInteger 1755144000) -- August 14th, 2025, 12:00:00 AM
-  , (".totalScaledDebt", BInteger . sum $ M.elems $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  , (".borrowIndex", BInteger ray)
+  , (".lastAccrual", BInteger lastAccrual)
+  , (".totalScaledDebt", BInteger 0)
   , (".reservesAccrued", BInteger 0)
-  , (".debtCeilingAsset", BInteger 0)
+  , (".debtCeilingAsset", BInteger $ 1_000_000 * oneE18)
   , (".debtCeilingUSD", BInteger 0)
   ] ++
   [ (".assetConfigs<a:" <> addrBS usdstAddress <> ">.ltv", BInteger 7500)
@@ -392,42 +382,31 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 (CodeAtAccount mer
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.reserveFactor", BInteger 1000)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationBonus", BInteger 10500)
   , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.liquidationThreshold", BInteger 8000)
+  , (".assetConfigs<a:" <> addrBS usdstAddress <> ">.perSecondFactorRAY", BInteger $ ray + 1_547_125_956_666_413_085)
   , (".configuredAssets[0]", BAccount $ unspecifiedChain usdstAddress)
-  , (".configuredAssets.length", BInteger . fromIntegral $ 1 + length GR.reserves)
-  ] ++ concatMap (\(i, GR.Reserve{..}) ->
-  [ (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.ltv", BInteger 7500)
-  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.interestRate", BInteger 500)
-  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.reserveFactor", BInteger 1000)
-  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationBonus", BInteger 10500)
-  , (".assetConfigs<a:" <> addrBS assetRootAddress <> ">.liquidationThreshold", BInteger 8000)
-  , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain assetRootAddress)
+  , (".configuredAssets.length", BInteger . fromIntegral $ 1 + length supportedCollaterals)
+  ] ++ concatMap (\(i, a) ->
+  [ (".assetConfigs<a:" <> addrBS a <> ">.ltv", BInteger 7500)
+  , (".assetConfigs<a:" <> addrBS a <> ">.interestRate", BInteger 500)
+  , (".assetConfigs<a:" <> addrBS a <> ">.reserveFactor", BInteger 1000)
+  , (".assetConfigs<a:" <> addrBS a <> ">.liquidationBonus", BInteger 10500)
+  , (".assetConfigs<a:" <> addrBS a <> ">.liquidationThreshold", BInteger 8000)
+  , (".assetConfigs<a:" <> addrBS a <> ">.perSecondFactorRAY", BInteger $ ray + 1_547_125_956_666_413_085)
+  , (".configuredAssets[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain a)
   ]
-  ) (zip [1 :: Integer ..] GR.reserves)
-    ++ concatMap (\(bwr, amt) -> (if amt > 0 then
-  [ (".userLoan<a:" <> addrBS bwr <> ">.scaledDebt", BInteger amt)
-  , (".userLoan<a:" <> addrBS bwr <> ">.lastUpdated", BInteger 1755144000) -- August 14th, 2025, 12:00:00 AM
-  ] else [])
-  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  ) (zip [1 :: Integer ..] supportedCollaterals)
 
 lendingPoolEvents :: (Address, S.Seq Event)
 lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "LendingPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
-  map (\GR.Reserve{..} -> ("AssetConfigured",
-    [("asset", show assetRootAddress),
+  map (\a -> ("AssetConfigured",
+    [("asset", show a),
      ("ltv", "7500"),
      ("liquidationThreshold", "8000"),
      ("liquidationBonus", "10500"),
      ("interestRate", "500"),
      ("reserveFactor", "1000")
     ])
-  ) GR.reserves
-  ++ [("Deposited", [("user", show blockappsAddress),("asset", show usdstAddress),("amount", show omega)])]
-  ++ map (\GE.Escrow{..} ->
-      ("SuppliedCollateral", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
-  ) combinedEscrows
-  ++ concatMap (\(bwr, amt) -> (if amt > 0
-    then [("Borrowed", [("user", show bwr),("asset", show usdstAddress),("amount", show amt)])]
-    else [])
-  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  ) supportedCollaterals
   )
 
 poolConfigurator :: AccountInfo
@@ -437,14 +416,14 @@ poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 (CodeAtA
 
 poolConfiguratorEvents :: (Address, S.Seq Event)
 poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "PoolConfigurator" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
-  map (\GR.Reserve{..} -> ("AssetConfigured",
-    [("asset", show assetRootAddress),
+  map (\a -> ("AssetConfigured",
+    [("asset", show a),
      ("ltv", "7500"),
      ("liquidationThreshold", "8000"),
      ("liquidationBonus", "10500"),
      ("interestRate", "500")
     ])
-  ) GR.reserves
+  ) supportedCollaterals
   )
 
 lendingRegistry :: AccountInfo
@@ -464,15 +443,10 @@ mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount
   , (".withdrawalCounter", BInteger 0)
   , (".withdrawalsPaused", BBool False)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
-  ]
-
-onRamp :: AccountInfo
-onRamp = SolidVMContractWithStorage onRampAddress 0 (CodeAtAccount mercataAddress "OnRamp") $ createdByBlockApps mercataAddress ++
-  [ (".listingIdCounter", BInteger 0)
-  , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
-  , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
-  , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
-  , (".voucher", BContract "Voucher" $ unspecifiedChain voucherAddress)
+  , (".PERMISSION_WRAP", BInteger 1)
+  , (".PERMISSION_MINT", BInteger 2)
+  , (".PERMISSION_MASK", BInteger 3)
+  , (".USDST_ADDRESS", BAccount $ unspecifiedChain usdstAddress)
   ]
 
 poolFactory :: AccountInfo
@@ -496,8 +470,32 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount m
 
 adminRegistry :: AccountInfo
 adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ ownedByBlockApps mercataAddress
-  ++ [(".isAdmin<a:" <> addrBS blockappsAddress <> ">", BBool True)]
-  ++ [(".isAdmin<a:" <> addrBS poolFactoryAddress <> ">", BBool True)]
+  ++ [ (".adminMap<a:" <> addrBS blockappsAddress <> ">", BInteger 1)
+     , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
+     , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
+     ]
+  ++ concatMap (\GA.Asset{..} ->
+      [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+      , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+      ] ++
+       if name `elem` ["ETHST", "USDCST"]
+         then [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+              , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+              ]
+         else if root == usdstAddress
+                then [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+                     , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+                     , (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS cdpEngineAddress <> ">", BBool True)
+                     , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS cdpEngineAddress <> ">", BBool True)
+                     ]
+                else []
+     ) GA.assets
 
 adminEvents :: (Address, S.Seq Event)
 adminEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "AdminRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
@@ -512,10 +510,6 @@ voucher = SolidVMContractWithStorage voucherAddress 0 (CodeAtAccount mercataAddr
   ++ [ ("._name", BString "Voucher")
      , ("._symbol", BString "VOUCHER")
      , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
-     , (".admin", BAccount $ unspecifiedChain blockappsAddress)
-     , ("._owner", BAccount $ unspecifiedChain blockappsAddress)
-     , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
-     , (".minters<a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
      , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 1_000_000 * oneE18)
      ]
 
@@ -525,13 +519,7 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , ("._symbol", BString "MUSDST")
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger omega)
-     , (".minters<a:" <> addrBS blockappsAddress <> ">", BBool True)
-     , (".burners<a:" <> addrBS blockappsAddress <> ">", BBool True)
-     , (".minters<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
-     , (".burners<a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger omega)
-     , (".admin", BAccount $ unspecifiedChain blockappsAddress)
+     , ("._totalSupply", BInteger 0)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
      ]
@@ -542,13 +530,112 @@ rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 (CodeAtAccou
      , (".rewardTokens.length", BInteger 1)
      , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
      , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
-     , (".eligibleTokens.length", BInteger . fromIntegral $ length GR.reserves)
+     , (".eligibleTokens.length", BInteger . fromIntegral $ length supportedCollaterals)
      ]
-  ++ concatMap (\(i, GR.Reserve{..}) ->
-    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain assetRootAddress)
-    , (".eligibleTokenMap<a:" <> addrBS assetRootAddress <> ">", BInteger $ i + 1)
+  ++ concatMap (\(i, a) ->
+    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain a)
+    , (".eligibleTokenMap<a:" <> addrBS a <> ">", BInteger $ i + 1)
     ]
-  ) (zip [0..] GR.reserves)
+  ) (zip [0..] supportedCollaterals)
+
+cdpEngine :: AccountInfo
+cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 (CodeAtAccount mercataAddress "CDPEngine") $ ownedByBlockApps mercataAddress
+  ++ [ (".registry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
+     , (".globalPaused", BBool False)
+     , (".RAY", BInteger ray)
+     , (".WAD", BInteger oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.unitScale", BInteger oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.debtCeiling", BInteger $ 10_000_000 * oneE18)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.closeFactorBps", BInteger 5_000)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
+     , (".collateralConfigs<a:" <> addrBS usdstAddress <> ">.liquidationPenaltyBps", BInteger 1_000)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.rateAccumulator", BInteger ray)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.lastAccrual", BInteger lastAccrual)
+     , (".collateralGlobalStates<a:" <> addrBS usdstAddress <> ">.totalScaledDebt", BInteger 0)
+     , (".isSupportedAsset<a:" <> addrBS usdstAddress <> ">", BBool True)
+     ]
+  ++ concatMap (\a ->
+    [ (".collateralConfigs<a:" <> addrBS a <> ">.debtFloor", BInteger oneE18)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.unitScale", BInteger oneE18)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.debtCeiling", BInteger $ 10_000_000 * oneE18)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.closeFactorBps", BInteger 5_000)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
+    , (".collateralConfigs<a:" <> addrBS a <> ">.liquidationPenaltyBps", BInteger 1_000)
+    , (".collateralGlobalStates<a:" <> addrBS a <> ">.rateAccumulator", BInteger ray)
+    , (".collateralGlobalStates<a:" <> addrBS a <> ">.lastAccrual", BInteger lastAccrual)
+    , (".collateralGlobalStates<a:" <> addrBS a <> ">.totalScaledDebt", BInteger . sum . map GE.borrowedAmount $ filter ((== a) . GE.assetRootAddress) combinedEscrows)
+    , (".isSupportedAsset<a:" <> addrBS a <> ">", BBool True)
+    ]
+  ) supportedCollaterals
+  ++ concatMap (\GE.Escrow{..} ->
+    [ (".vaults<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">.scaledDebt", BInteger borrowedAmount)
+    , (".vaults<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">.collateral", BInteger collateralQuantity)
+    ]) combinedEscrows
+
+cdpEngineEvents :: (Address, S.Seq Event)
+cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPEngine" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpEngineAddress, S.fromList $
+  map (\GE.Escrow{..} ->
+    ("Deposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
+  ) combinedEscrows
+  ++ map (\a ->
+    ("Deposited",
+      [ ("asset", show a)
+      , ("liquidationRatio", show $ 3 * oneE18 `div` 2)
+      , ("liquidationPenaltyBps", "1000")
+      , ("closeFactorBps", "5000")
+      , ("stabilityFeeRate", show $ ray + oneE18 + 547_000_000_000_000_000)
+      , ("debtFloor", show oneE18)
+      , ("debtCeiling", show $ 10_000_000 * oneE18)
+      , ("unitScale", show oneE18)
+      , ("pause", show False)
+      ]
+    )
+  ) supportedCollaterals
+  )
+
+cdpRegistry :: AccountInfo
+cdpRegistry = SolidVMContractWithStorage cdpRegistryAddress 0 (CodeAtAccount mercataAddress "CDPRegistry") $ ownedByBlockApps mercataAddress
+  ++ [ (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
+     , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
+     , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
+     , (".usdst", BContract "Token" $ unspecifiedChain usdstAddress)
+     , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+     , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
+     ]
+
+cdpRegistryEvents :: (Address, S.Seq Event)
+cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpRegistryAddress, S.fromList $
+  [ ("ComponentsUpdated",
+      [ ("cdpVault", show cdpVaultAddress)
+      , ("cdpEngine", show cdpEngineAddress)
+      , ("priceOracle", show priceOracleAddress)
+      , ("usdst", show usdstAddress)
+      , ("tokenFactory", show tokenFactoryAddress)
+      , ("feeCollector", show feeCollectorAddress)
+      ]
+    )
+  ])
+
+cdpVault :: AccountInfo
+cdpVault = SolidVMContractWithStorage cdpVaultAddress 0 (CodeAtAccount mercataAddress "CDPVault") $ ownedByBlockApps mercataAddress
+  ++ [ (".registry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
+     ]
+  ++ concatMap (\GE.Escrow{..} ->
+    [ (".userCollaterals<a:" <> addrBS borrower <> "><a:" <> addrBS assetRootAddress <> ">", BInteger collateralQuantity)
+    ]) combinedEscrows
+
+cdpVaultEvents :: (Address, S.Seq Event)
+cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPVault" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpVaultAddress, S.fromList $
+  map (\GE.Escrow{..} ->
+      ("CollateralDeposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
+  ) combinedEscrows
+  ++ concatMap (\(bwr, amt) -> (if amt > 0
+    then [("Borrowed", [("user", show bwr),("asset", show usdstAddress),("amount", show amt)])]
+    else [])
+  ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
+  )
 
 certStrings :: [String]
 certStrings =

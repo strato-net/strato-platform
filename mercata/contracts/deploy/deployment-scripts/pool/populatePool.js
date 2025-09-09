@@ -148,7 +148,7 @@ const POOL_CONFIGS = [
     tokenB: USDST_ADDRESS,
     poolAddress: POOL_ADDRESSES.ETHST,
     tokenAMintAmount: toWei("100"), // 100 ETHST
-    tokenBMintAmount: toWei("3000000") // 3,000,000 USDST
+    tokenBMintAmount: toWei("300000") // 300,000 USDST
   },
 ];
 
@@ -211,6 +211,7 @@ function generateBatchCalls() {
       args: {
         tokenBAmount: config.tokenBMintAmount,
         maxTokenAAmount: config.tokenAMintAmount,
+        deadline: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
       },
     });
   }

@@ -56,6 +56,11 @@ contract record Pool is Ownable {
     /// @param tokenBAmount The amount of excess tokenB skimmed
     event Skim(address to, uint256 tokenAAmount, uint256 tokenBAmount);
 
+    /// @notice Emitted when the pool's reserves are synced with current balances
+    /// @param tokenABalance The new balance of tokenA
+    /// @param tokenBBalance The new balance of tokenB
+    event Sync(uint256 tokenABalance, uint256 tokenBBalance);
+
     // ============ STATE VARIABLES ============
     
     /// @notice The first token in the trading pair
@@ -156,14 +161,45 @@ contract record Pool is Ownable {
     }
 
     // ============ UTILITY FUNCTIONS ============
-    
-    /// @notice Update the pool's state variables (balances and ratios)
-    /// @dev Called after operations that change token balances
-    function _updateStateVars() internal {
+    /// @notice Sync the pool's reserves with current balances (external version)
+    /// @dev Updates reserves to match current token balances
+    function sync() external onlyOwner {
         tokenABalance = ERC20(tokenA).balanceOf(address(this));
         tokenBBalance = ERC20(tokenB).balanceOf(address(this));
+        _updateRatios();
+        emit Sync(tokenABalance, tokenBBalance);
+    }
+
+    /// @notice Force balances to match reserves
+    /// @param to Address to send the excess tokens to
+    function skim(address to) external onlyOwner {
+        require(to != address(0), "Invalid recipient");
+        uint256 excessA = ERC20(tokenA).balanceOf(address(this)) - tokenABalance;
+        uint256 excessB = ERC20(tokenB).balanceOf(address(this)) - tokenBBalance;
+
+        if (excessA > 0) {
+            require(ERC20(tokenA).transfer(to, excessA), "TokenA skim failed");
+        }
+        if (excessB > 0) {
+            require(ERC20(tokenB).transfer(to, excessB), "TokenB skim failed");
+        }
+
+        emit Skim(to, excessA, excessB);
+    }
+    /// @notice Update the pool's ratios
+    /// @dev Called after operations that change token balances
+    function _updateRatios() internal {
         aToBRatio = _getCurrentTokenRatio(true);
         bToARatio = _getCurrentTokenRatio(false);
+    }
+
+    /// @notice Update the pool's state variables with new balances
+    /// @param newTokenABalance The new tokenA balance
+    /// @param newTokenBBalance The new tokenB balance
+    function _updateStateVars(uint256 newTokenABalance, uint256 newTokenBBalance) internal {
+        tokenABalance = newTokenABalance;
+        tokenBBalance = newTokenBBalance;
+        _updateRatios();
     }
 
     /// @notice Calculate the current exchange ratio between tokens
@@ -186,22 +222,6 @@ contract record Pool is Ownable {
         return 0.000000000000000000;
     }
 
-    /// @notice Force balances to match reserves
-    /// @param to Address to send the excess tokens to
-    function skim(address to) public nonReentrant {
-        _skim(to);
-    }
-
-    function _skim(address to) internal {
-        uint256 excessA = ERC20(tokenA).balanceOf(address(this)) - tokenABalance;
-        uint256 excessB = ERC20(tokenB).balanceOf(address(this)) - tokenBBalance;
-
-        require(ERC20(tokenA).transfer(to, excessA), "TokenA skim failed");
-        require(ERC20(tokenB).transfer(to, excessB), "TokenB skim failed");
-
-        emit Skim(to, excessA, excessB);
-    }
-
     // ============ CORE FUNCTIONS ============
     
     /// @notice Add liquidity to the pool and receive LP tokens
@@ -218,40 +238,27 @@ contract record Pool is Ownable {
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
+        
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        uint256 tokenAAmount;
+        uint256 mintAmount;
         
         if (totalLiquidity > 0) {
-            uint256 tokenBReserve = tokenBBalance;
-            uint256 tokenAReserve = tokenABalance;
-            uint256 tokenAAmount = (tokenBAmount * tokenAReserve / tokenBReserve) + 1;
-            uint256 liquidityMinted = tokenBAmount * totalLiquidity / tokenBReserve;
-
+            tokenAAmount = (tokenBAmount * tokenABalance / tokenBBalance) + 1;
+            mintAmount = tokenBAmount * totalLiquidity / tokenBBalance;
             require(maxTokenAAmount >= tokenAAmount, "Insufficient tokenA amount");
-            lpToken.mint(msg.sender, liquidityMinted);
-
-            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
-            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
-
-            emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
-
-            _updateStateVars();
-
-            return liquidityMinted;
         } else {
-            uint256 tokenAAmount = maxTokenAAmount;
-            uint256 initialLiquidity = tokenBAmount;
-            lpToken.mint(msg.sender, initialLiquidity);
-
-            require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
-            require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
-
-            emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
-
-            _updateStateVars();
-
-            return initialLiquidity;
+            tokenAAmount = maxTokenAAmount;
+            mintAmount = tokenBAmount;
         }
+
+        lpToken.mint(msg.sender, mintAmount);
+        require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
+        require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
+
+        _updateStateVars(tokenABalance + tokenAAmount, tokenBBalance + tokenBAmount);
+        emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
+        return mintAmount;
     }
 
     /// @notice Remove liquidity from the pool by burning LP tokens
@@ -272,7 +279,6 @@ contract record Pool is Ownable {
         require(block.timestamp <= deadline, "EXPIRED");
         uint256 totalLiquidity = ERC20(lpToken).totalSupply();
         require(totalLiquidity > 0, "No liquidity");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
         uint256 tokenAReserve = tokenABalance;
         uint256 tokenBReserve = tokenBBalance;
         uint256 tokenBAmount = lpTokenAmount * tokenBReserve / totalLiquidity;
@@ -283,11 +289,9 @@ contract record Pool is Ownable {
         require(ERC20(tokenB).transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
         require(ERC20(tokenA).transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
 
-        emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
-
         lpToken.burn(msg.sender, lpTokenAmount);
-
-        _updateStateVars();
+        _updateStateVars(tokenABalance - tokenAAmount, tokenBBalance - tokenBAmount);
+        emit RemoveLiquidity(msg.sender, tokenBAmount, tokenAAmount);
 
         return (tokenBAmount, tokenAAmount);
     }
@@ -327,7 +331,6 @@ contract record Pool is Ownable {
     ) external nonReentrant returns (uint256 amountOut) {
         require(amountIn > 0 && minAmountOut > 0, "Invalid input");
         require(block.timestamp <= deadline, "EXPIRED");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
 
         Token inputToken = isAToB ? tokenA : tokenB;
         Token outputToken = isAToB ? tokenB : tokenA;
@@ -352,7 +355,12 @@ contract record Pool is Ownable {
 
         require(ERC20(outputToken).transfer(msg.sender, amountOut), "Output xfer failed");
 
-        _updateStateVars();
+        // Update balances: net input stays in pool, output is sent out
+        if (isAToB) {
+            _updateStateVars(tokenABalance + netInput, tokenBBalance - amountOut);
+        } else {
+            _updateStateVars(tokenABalance - amountOut, tokenBBalance + netInput);
+        }
 
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
     }
@@ -424,8 +432,6 @@ contract record Pool is Ownable {
         bool isAToB,
         uint256 amountIn
     ) internal returns (uint256 amountOut) {
-        
-
         uint256 inputReserve = isAToB ? tokenABalance : tokenBBalance;
         uint256 outputReserve = isAToB ? tokenBBalance : tokenABalance;
 
@@ -445,9 +451,8 @@ contract record Pool is Ownable {
 
         amountOut = getInputPrice(netInput, inputReserve, outputReserve);
 
-        // Note: For internal zap swaps, tokens don't actually move since they're all in the same pool
-        // The swap calculation determines how to split the deposited tokens optimally
-        // Actual balance updates happen when _updateStateVars() is called at the end
+        // Note: For internal zap swaps, we don't update balances here since all tokens
+        // stay in the pool. The balance updates happen in the calling function.
     }
 
     function _mintLiquidityAfterZap(
@@ -460,7 +465,6 @@ contract record Pool is Ownable {
         
         lpToken.mint(msg.sender, liquidityMinted);
         emit AddLiquidity(msg.sender, tokenBContribution, tokenAContribution);
-        _updateStateVars();
     }
 
     /// @notice Add liquidity with a single token (zap-in)
@@ -476,15 +480,12 @@ contract record Pool is Ownable {
         require(amountIn > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
-        _skim(address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce));
 
         // Transfer full amount from user to pool
         Token depositToken = isAToB ? tokenA : tokenB;
         uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
         require(ERC20(depositToken).transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
         
-        // Sync balances after transfer to account for the new tokens
-        _updateStateVars();
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
         uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);
 
@@ -501,5 +502,6 @@ contract record Pool is Ownable {
         }
 
         liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
+        _updateStateVars(tokenABalance + tokenAContribution, tokenBBalance + tokenBContribution);
     }
 }

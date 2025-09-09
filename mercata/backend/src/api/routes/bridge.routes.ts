@@ -6,9 +6,11 @@ const router = Router();
 
 // ----- Bridge Operations -----
 router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridgeOut);
+router.post("/redeemOut", authHandler.authorizeRequest(), BridgeController.redeemOut);
 
 // ----- Bridge Configuration -----
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
+router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 
 

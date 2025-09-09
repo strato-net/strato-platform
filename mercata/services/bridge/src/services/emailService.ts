@@ -1,6 +1,7 @@
 import sgMail from "@sendgrid/mail";
 import { MailDataRequired } from "@sendgrid/mail";
 import { config } from "../config";
+import { retry } from "../utils/api";
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY || "");
 
@@ -19,7 +20,10 @@ const sendEmail = async (txHash: string) => {
     text: `Please review and approve the transaction: ${safeTxLink}`,
   };
 
-  await sgMail.send(msg);
+  await retry(
+    () => sgMail.send(msg),
+    { logPrefix: "EmailService" }
+  );
 };
 
 export default sendEmail;

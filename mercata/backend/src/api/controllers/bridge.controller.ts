@@ -1,11 +1,12 @@
 import { Request, Response, NextFunction } from "express";
 import { 
-  bridgeOut, 
+  requestWithdrawal, 
   getBridgeableTokens,
+  getRedeemableTokens,
   getNetworkConfigs,
   getBridgeTransactions
 } from "../services/bridge.service";
-import { validateBridgeOut, validateTransactionType } from "../validators/bridge.validators";
+import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
 
 class BridgeController {
@@ -15,10 +16,30 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
-      validateBridgeOut(body);
+      const { accessToken, body, address } = req;
+      validateRequestWithdrawal(body);
       
-      const result = await bridgeOut(accessToken, body);
+      const result = await requestWithdrawal(accessToken, body, address, false);
+
+      res.json({
+        success: true,
+        data: result,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async redeemOut(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, body, address } = req;
+      validateRequestWithdrawal(body);
+      
+      const result = await requestWithdrawal(accessToken, body, address, true);
 
       res.json({
         success: true,
@@ -44,6 +65,27 @@ class BridgeController {
       }
       
       const result = await getBridgeableTokens(accessToken, chainId);
+      res.json(result);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
+  static async getRedeemableTokens(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { chainId } = req.params;
+      
+      if (!chainId) {
+        res.status(400).json({ error: "chainId parameter is required" });
+        return;
+      }
+      
+      const result = await getRedeemableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);

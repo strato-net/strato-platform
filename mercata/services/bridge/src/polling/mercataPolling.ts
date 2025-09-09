@@ -12,15 +12,19 @@ import {
   getDepositsByStatus,
   getSafeTxHashFromEvents,
 } from "../services/cirrusService";
-import { monitorSafeTransactionStatus } from "../services/safeService";
+import { monitorSafeTransactionStatusBatch } from "../services/safeService";
 import { logInfo, logError } from "../utils/logger";
 import { safeToBigInt } from "../utils/utils";
 import { verifyDepositsBatch } from "../services/verificationService";
+import { checkUSDSTBalance } from "../services/cirrusService";
 
 export const startWithdrawalRequestPolling = (): void => {
   const pollingInterval = config.polling.withdrawalInterval || 5 * 60 * 1000;
   const poll = async () => {
     try {
+      // Check USDST balance regularly
+      await checkUSDSTBalance();
+      
       const initiatedWithdrawals = await getWithdrawalsByStatus("1");
 
       if (initiatedWithdrawals.length > 0) {
@@ -100,43 +104,46 @@ export const startWithdrawalTxPolling = (): void => {
       const pending = await getWithdrawalsByStatus("2");
       if (!Array.isArray(pending) || pending.length === 0) return;
 
-      const idOf = (t: any) => String(t.id ?? t.withdrawalId);
-      const ids = pending.map(idOf);
+      // ids -> safeTxHash
+      const ids = pending.map(w => String(w.withdrawalId));
       const hashMap = await getSafeTxHashFromEvents(ids);
 
-      const toFinalize: any[] = [];
-      const toReject: any[] = [];
+      const toFinalize: Array<Withdrawal & { safeTxHash: string }> = [];
+      const toReject: Withdrawal[] = [];
 
-      await Promise.all(
-        pending.map(async (tx) => {
-          const safeTxHash = hashMap[idOf(tx)];
-          if (!safeTxHash) {
-            toReject.push(tx);
-            return;
-          }
+      // Group ONLY items with hashes; collect no-hash separately
+      const byChain = new Map<bigint, Array<Withdrawal & { safeTxHash: string }>>();
+      for (const w of pending) {
+        const id = String(w.withdrawalId);
+        const h = hashMap[id];
+        if (!h) {
+          toReject.push(w); // or keep pending per your policy
+          continue;
+        }
+        const cid = safeToBigInt(w.externalChainId);
+        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({ ...w, safeTxHash: h });
+      }
 
-          try {
-            const status = await monitorSafeTransactionStatus(
-              safeTxHash,
-              safeToBigInt(tx.destChainId),
-            );
-            if (status === "executed") toFinalize.push({ ...tx, safeTxHash });
-            else if (status === "rejected") toReject.push(tx);
-          } catch (_) {
-            toReject.push(tx);
-          }
-        }),
-      );
+      // Monitor per chain only the with-hash subset
+      for (const [chainId, ws] of byChain) {
+        const statuses = await monitorSafeTransactionStatusBatch(ws as NonEmptyArray<Withdrawal & { safeTxHash: string }>, chainId);
+        for (const w of ws) {
+          const id = String(w.withdrawalId);
+          const st = statuses.get(id);
+          if (st === "executed") toFinalize.push(w);
+          else if (st === "rejected") toReject.push(w);
+        }
+      }
 
       if (toFinalize.length)
         await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Withdrawal>);
       if (toReject.length)
-        await handleRejectedWithdrawalBatch(
-          toReject as NonEmptyArray<Withdrawal>,
-        );
+        await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Withdrawal>);
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalTxPolling",
+        error: e.message,
+        errorStack: e.stack,
       });
     }
   };

@@ -20,6 +20,7 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
+import { DECIMAL_PATTERN, BRIDGE_OUT_FEE } from "@/lib/constants";
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -46,18 +47,9 @@ const BridgeOut: React.FC = () => {
     data: balanceData,
     isLoading: isBalanceLoading,
     refetch: refetchBalance,
-  } = useBalance(selectedToken?.stratoTokenAddress || null);
+  } = useBalance(selectedToken?.stratoToken || null);
 
   const tokenBalance = balanceData?.formatted || "0";
-  const tokenLimitInfo = balanceData?.tokenLimit ? {
-    maxPerTx: balanceData.tokenLimit.maxPerTx,
-    isUnlimited: balanceData.tokenLimit.isUnlimited,
-    loading: false,
-  } : {
-    maxPerTx: "0",
-    isUnlimited: false,
-    loading: false,
-  };
 
   // Set initial network selection
   useEffect(() => {
@@ -94,7 +86,7 @@ const BridgeOut: React.FC = () => {
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (/^\d*\.?\d*$/.test(value)) {
+    if (DECIMAL_PATTERN.test(value)) {
       setAmount(value);
       validateAmount(value);
     }
@@ -106,7 +98,7 @@ const BridgeOut: React.FC = () => {
   };
 
   const showConfirmModal = () => {
-    if (!selectedToken?.stratoTokenAddress || !address) {
+    if (!selectedToken?.stratoToken || !address) {
       toast({
         title: "Error",
         description: "Invalid configuration",
@@ -142,13 +134,13 @@ const BridgeOut: React.FC = () => {
       const selectedNetworkConfig = availableNetworks.find(
         (n) => n.chainName === selectedNetwork,
       );
-      const destChainId = selectedNetworkConfig?.chainId || "";
+      const externalChainId = selectedNetworkConfig?.chainId || "";
 
       const response = await bridgeOutAPI({
-        amount: amountInSmallestUnit,
-        destAddress: address,
-        token: selectedToken.stratoTokenAddress,
-        destChainId: String(destChainId),
+        stratoTokenAmount: amountInSmallestUnit,
+        externalRecipient: address,
+        stratoToken: selectedToken.stratoToken,
+        externalChainId: String(externalChainId),
       });
 
       if (response?.success) {
@@ -206,9 +198,9 @@ const BridgeOut: React.FC = () => {
       <div className="space-y-1.5">
         <Label htmlFor="asset">Select Asset</Label>
         <Select
-          value={selectedToken?.extSymbol || ""}
+          value={selectedToken?.externalSymbol || ""}
           onValueChange={(v) => {
-            const newToken = bridgeableTokens.find((t) => t.extSymbol === v) || null;
+            const newToken = bridgeableTokens.find((t) => t.externalSymbol === v) || null;
             setSelectedToken(newToken);
           }}
           disabled={bridgeableTokens.length === 0}
@@ -222,7 +214,7 @@ const BridgeOut: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.extSymbol} value={t.extSymbol}>
+              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
                 {t.stratoTokenName} ({t.stratoTokenSymbol})
               </SelectItem>
             ))}
@@ -254,8 +246,7 @@ const BridgeOut: React.FC = () => {
         )}
         {amount && selectedToken && (
           <p className="text-sm text-gray-500">
-            Amount will be rounded down to {selectedToken.extDecimals} decimal
-            places
+            Amount will be rounded down to {selectedToken.externalDecimals} decimal places
           </p>
         )}
         
@@ -278,22 +269,20 @@ const BridgeOut: React.FC = () => {
                           <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
                           <span className="text-xs text-gray-500">
-                            { !(tokenLimitInfo.isUnlimited) &&
-                             `Max: ${tokenLimitInfo.maxPerTx} ${selectedToken.stratoTokenSymbol}`
-                            }
+                            { `Max: ${selectedToken.maxPerTx} ${selectedToken.stratoTokenSymbol}`}
                           </span>
                         )}
                       </div>
                     )}
                   </div>
-                  {selectedToken?.extSymbol && (
+                  {selectedToken?.externalSymbol && (
                     <div className="text-sm">
                       <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
                         You will receive{" "}
                         {amount
-                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount} `
+                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount} `
                           : ""}
-                        {selectedToken?.extName} ({selectedToken?.extSymbol}) on{" "}
+                        {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
                         {selectedNetwork || "selected"} network
                       </p>
                     </div>
@@ -305,22 +294,18 @@ const BridgeOut: React.FC = () => {
         
       </div>
 
-      {/* <div className="bg-gray-50 p-4 rounded-md space-y-2">
+      <div className="text-sm text-gray-500 space-y-1">
+        {[
+          "Transaction time varies by network congestion",
+        ].map((text, i) => (
+          <p key={i}>• {text}</p>
+        ))}
+      </div>
+      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Bridge Fee:</span>
-          <span>0.1%</span>
+          <span className="text-gray-600">Transaction Fee</span>
+          <span className="font-medium">{BRIDGE_OUT_FEE} USDST</span>
         </div>
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-500">Estimated Time:</span>
-          <span>2-5 minutes</span>
-        </div>
-      </div> */}
-
-      <div className="text-sm text-gray-500">
-        <p>• Bridge assets between STRATO and external networks</p>
-        <p>• Small bridge fee applies</p>
-        <p>• Transaction time varies by network congestion</p>
-        <p>• Maximum transfer limits apply per token</p>
       </div>
 
       <div className="flex justify-end gap-4">
@@ -365,25 +350,25 @@ const BridgeOut: React.FC = () => {
               <p>From: STRATO</p>
               <p>To: {selectedNetwork || "Not selected"}</p>
               <p>
-                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.extDecimals)) : amount}{" "}
+                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount}{" "}
                 {selectedToken?.stratoTokenSymbol}
               </p>
-              {selectedToken?.extSymbol && (
+              {selectedToken?.externalSymbol && (
                 <p className="text-blue-600">
                   You will receive{" "}
                   {selectedToken
                     ? roundToDecimals(
                         amount,
-                        parseInt(selectedToken.extDecimals),
+                        parseInt(selectedToken.externalDecimals),
                       )
                     : amount}{" "}
-                  {selectedToken?.extName} ({selectedToken?.extSymbol}) on{" "}
+                  {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
                   {selectedNetwork || "selected"} network
                 </p>
               )}
-              {!tokenLimitInfo.isUnlimited &&  (
+              {!selectedToken?.maxPerTx &&  (
                 <p className="text-orange-600 text-sm">
-                  Transfer limit: {tokenLimitInfo.maxPerTx} {selectedToken?.extSymbol}
+                  Transfer limit: {selectedToken?.maxPerTx} {selectedToken?.externalSymbol}
                 </p>
               )}
             </div>

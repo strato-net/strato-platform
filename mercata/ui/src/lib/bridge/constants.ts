@@ -63,7 +63,8 @@ export const DEPOSIT_ROUTER_ABI = [
       { name: 'stratoAddress', type: 'address' },
       { name: 'nonce', type: 'uint256' },
       { name: 'deadline', type: 'uint256' },
-      { name: 'signature', type: 'bytes' }
+      { name: 'signature', type: 'bytes' },
+      { name: 'mint', type: 'bool' }
     ],
     name: 'deposit',
     outputs: [],
@@ -71,11 +72,22 @@ export const DEPOSIT_ROUTER_ABI = [
     type: 'function'
   },
   {
+    inputs: [
+      { name: 'token', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+      { name: 'mint', type: 'bool' }
+    ],
+    name: 'canDeposit',
+    outputs: [{ name: '', type: 'bool' }],
+    stateMutability: 'view',
+    type: 'function'
+  },
+  {
     inputs: [{ name: 'token', type: 'address' }],
-    name: 'getTokenConfig',
+    name: 'tokenConfig',
     outputs: [
-      { name: 'allowed', type: 'bool' },
-      { name: 'minAmount', type: 'uint256' }
+      { name: 'min', type: 'uint96' },
+      { name: 'permissions', type: 'uint8' }
     ],
     stateMutability: 'view',
     type: 'function'
@@ -83,37 +95,17 @@ export const DEPOSIT_ROUTER_ABI = [
   // Errors
   {
     inputs: [],
-    name: 'TokenNotAllowed',
-    type: 'error'
-  },
-  {
-    inputs: [],
-    name: 'UseDepositETH',
-    type: 'error'
-  },
-  {
-    inputs: [],
     name: 'BelowMinimum',
     type: 'error'
   },
   {
     inputs: [],
-    name: 'InvalidAddress',
+    name: 'ZeroAmount',
     type: 'error'
   },
   {
     inputs: [],
-    name: 'ETHTransferFailed',
-    type: 'error'
-  },
-  {
-    inputs: [],
-    name: 'ArrayLengthMismatch',
-    type: 'error'
-  },
-  {
-    inputs: [],
-    name: 'SameAddressProposed',
+    name: 'NotPermitted',
     type: 'error'
   }
 ] as const;

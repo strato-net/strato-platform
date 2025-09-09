@@ -8,9 +8,9 @@ export const ERC20_ABI = [
   "function transfer(address to, uint256 amount) public returns (bool)",
 ];
 
-// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint256 depositId)
+// DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId, bool mint)
 export const DEPOSIT_EVENT_SIGNATURE =
-  "0x54be02576a033a5f787fa89ef361ba5f91f3ab4c626914fb739efc3a559ea207";
+  "0x68f47eab267a6fd1abbf749504fa687981eb8c975b8b517363b6ec86f55f57d5";
 
 // Transfer(address,address,uint256)
 export const TRANSFER_EVENT_SIGNATURE =
@@ -29,6 +29,10 @@ const config = {
   },
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
+  },
+  usdst: {
+    address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
+    minBalance: BigInt(20) * BigInt(1e18),
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
