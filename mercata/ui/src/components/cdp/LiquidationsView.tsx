@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
+import { useUser } from "@/context/UserContext";
+import { useUserTokens } from "@/context/UserTokensContext";
 
 interface LiquidationsViewProps {
   onBack: () => void;
@@ -75,6 +77,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});
   const { toast } = useToast();
+  const { userAddress } = useUser();
+  const { fetchTokens, fetchUsdstBalance } = useUserTokens();
 
   // Fetch liquidatable positions and asset configs
   useEffect(() => {
@@ -248,6 +252,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         
         // Clear the input
         setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
+        
+        // Refresh user token balances (they spent USDST and received collateral)
+        if (userAddress) {
+          await Promise.all([
+            fetchTokens(), // Refresh all token balances (including received collateral)
+            fetchUsdstBalance(userAddress) // Refresh USDST balance (spent during liquidation)
+          ]);
+        }
       }
     } catch (error) {
       console.error("Liquidation failed:", error);
