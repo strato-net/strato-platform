@@ -14,6 +14,10 @@ interface UserContextType {
   logout: () => void;
   refreshAuth: () => void;
   loading: boolean;
+  openIssues: object;
+  openIssuesLoading: boolean;
+  getOpenIssues: () => Promise<void>;
+  castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -24,6 +28,8 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [userName, setUserName] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(true);
+  const [openIssues, setOpenIssues] = useState<object>({})
+  const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(true);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
@@ -79,6 +85,28 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const castVoteOnIssue = async (target: string, func: string, args: string[]) => {
+    try {
+      await api.post('/user/admin/vote', {target, func, args});
+    } catch (error) {
+    } finally {
+      const response = await getOpenIssues();
+      return response;
+    }
+  };
+
+  const getOpenIssues = async () => {
+    try {
+      setOpenIssuesLoading(true);
+      try {
+        const response = await api.get('/user/admin/issues');
+        setOpenIssues(response?.data || {});
+      } catch (error) {
+      }
+    } finally {
+      setOpenIssuesLoading(false);
+    }
+  };
 
   const refreshAuth = () => {
     checkAuthenticationStatus();
@@ -105,7 +133,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     logout,
     refreshAuth,
     loading,
-  }), [userAddress, isLoggedIn, isAdmin, loading, userName]);
+    openIssuesLoading,
+    openIssues,
+    getOpenIssues,
+    castVoteOnIssue,
+  }), [userAddress, isLoggedIn, isAdmin, loading, userName, openIssues, getOpenIssues, castVoteOnIssue]);
 
   return (
     <UserContext.Provider value={contextValue}>
