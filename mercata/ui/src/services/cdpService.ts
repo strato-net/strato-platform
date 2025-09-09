@@ -240,54 +240,5 @@ export const cdpService = {
     return response.data;
   },
 
-  // ----- Registry Management APIs (Admin Only) -----
-  
-  // Set registry address
-  async setRegistry(registryData: {
-    cdpVault: string;
-    cdpEngine: string;
-    priceOracle: string;
-    usdst: string;
-    tokenFactory: string;
-    feeCollector: string;
-  }): Promise<TransactionResponse> {
-    const response = await api.post("/cdp/admin/set-registry", registryData);
-    return response.data;
-  },
-
-  // Get current registry configuration
-  async getRegistryConfig(): Promise<{
-    cdpVault: string;
-    cdpEngine: string;
-    priceOracle: string;
-    usdst: string;
-    tokenFactory: string;
-    feeCollector: string;
-  }> {
-    const response = await api.get("/cdp/admin/registry-config");
-    return response.data;
-  },
-
-  // Get asset global state (rateAccumulator, lastAccrual, totalScaledDebt)
-  async getAssetGlobalState(asset: string): Promise<{
-    rateAccumulator: string;
-    lastAccrual: number;
-    totalScaledDebt: string;
-  }> {
-    const response = await api.get(`/cdp/admin/asset-global-state/${asset}`);
-    return response.data;
-  },
-
-  // Get system health metrics
-  async getSystemHealth(): Promise<{
-    globalPaused: boolean;
-    totalAssets: number;
-    totalDebt: string;
-    totalCollateral: string;
-    systemHealth: 'healthy' | 'warning' | 'critical';
-  }> {
-    const response = await api.get("/cdp/admin/system-health");
-    return response.data;
-  },
 
 };

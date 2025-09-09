@@ -12,7 +12,6 @@ import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
-import CDPRegistryManager from '@/components/admin/CDPRegistryManager';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -52,7 +51,7 @@ const Admin = () => {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="w-full overflow-x-auto">
-            <TabsList className="grid grid-cols-9 w-full max-w-9xl min-w-[1100px] md:min-w-0">
+            <TabsList className="grid grid-cols-8 w-full max-w-8xl min-w-[1000px] md:min-w-0">
               <TabsTrigger value="tokens" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Coins className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">Create Tokens</span>
@@ -87,11 +86,6 @@ const Admin = () => {
                 <Database className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">CDP Config</span>
                 <span className="sm:hidden">CDP</span>
-              </TabsTrigger>
-              <TabsTrigger value="registry" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <Settings className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Registry</span>
-                <span className="sm:hidden">Registry</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -155,9 +149,6 @@ const Admin = () => {
             <CollateralConfigManager />
           </TabsContent>
 
-          <TabsContent value="registry" className="space-y-6">
-            <CDPRegistryManager />
-          </TabsContent>
         </Tabs>
       </div>
     </div>
