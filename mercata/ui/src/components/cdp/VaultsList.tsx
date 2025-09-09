@@ -163,13 +163,26 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   };
 
   // Handle input amount changes
-  const handleInputChange = async (asset: string, value: string) => {
+  const handleInputChange = async (asset: string, value: string, event?: React.ChangeEvent<HTMLInputElement>) => {
+    // Store cursor position before any state updates
+    const cursorPosition = event?.target.selectionStart || 0;
+    const inputElement = event?.target;
+    
     const currentAmount = parseFloat(value || "0");
     const position = positions.find(p => p.asset === asset);
     const currentAction = activeActions[asset];
     
+    // Always update the input amount first to prevent cursor jumping
+    setInputAmounts(prev => ({ ...prev, [asset]: value }));
+    
+    // Restore cursor position after state update
+    if (inputElement) {
+      setTimeout(() => {
+        inputElement.setSelectionRange(cursorPosition, cursorPosition);
+      }, 0);
+    }
+    
     if (!position || !currentAction) {
-      setInputAmounts(prev => ({ ...prev, [asset]: value }));
       return;
     }
 
@@ -191,16 +204,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           // User reduced the amount below max, disable MAX mode
           setMaxStates(prev => ({ ...prev, [asset]: false }));
         } else if (currentAmount > maxAmount) {
-          // User increased above max, keep MAX enabled but input will show red
-          // The red styling is handled by isAmountAboveMax()
+          // User increased above max, disable MAX mode so red styling shows
+          setMaxStates(prev => ({ ...prev, [asset]: false }));
         }
       }
     } catch (error) {
       console.error("Failed to calculate max value during input change:", error);
     }
-    
-    // Always update the input amount
-    setInputAmounts(prev => ({ ...prev, [asset]: value }));
   };
 
   // Calculate maximum allowed value for each action
@@ -729,7 +739,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                   <Input
                     placeholder="Amount"
                     value={inputAmounts[position.asset] || ""}
-                    onChange={(e) => handleInputChange(position.asset, e.target.value)}
+                    onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
                     className={`flex-1 ${
                       maxStates[position.asset] 
                         ? 'text-blue-600 bg-blue-50 border-blue-300' 
