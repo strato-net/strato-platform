@@ -909,6 +909,24 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         </div>
       )}
 
+      {/* Transaction Fee Display */}
+      {depositAsset && (parseFloat(depositAmount || "0") > 0 || parseFloat(borrowAmount || "0") > 0) && (
+        <div className="text-center">
+          <p className="text-xs text-gray-500">
+            Transaction Fee: {(() => {
+              const hasDeposit = parseFloat(depositAmount || "0") > 0;
+              const hasBorrow = parseFloat(borrowAmount || "0") > 0;
+              
+              if (hasDeposit && hasBorrow) return "0.03";
+              if (hasDeposit && !hasBorrow) return "0.02";
+              if (!hasDeposit && hasBorrow) return "0.01";
+              
+              return "0.01";
+            })()} USDST
+          </p>
+        </div>
+      )}
+
       <Button 
         className="w-full" 
         onClick={handleCreateVault}
