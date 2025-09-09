@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -169,5 +169,6 @@ export const constants = (() => {
     GAS_FEE: 0.01,
     GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    voucher,
   };
 })();
