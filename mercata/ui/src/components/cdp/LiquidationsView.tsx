@@ -323,16 +323,16 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                     className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
                     onClick={() => toggleExpanded(vaultKey)}
                   >
-                                          <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        <span className="font-medium">Borrower</span>
-                        <span className="text-gray-600 font-mono text-sm">
-                          {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
-                        </span>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
                     <div className="flex items-center space-x-8">
+                      <div>
+                        <span className="text-gray-500">Borrower</span>
+                        <div className="font-medium font-mono text-sm">
+                          {vault.borrower ? `${vault.borrower.slice(0, 6)}...${vault.borrower.slice(-4)}` : "Unknown"}
+                        </div>
+                      </div>
                       <div>
                         <span className="text-gray-500">Borrowed</span>
                         <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimal(vault.debtAmount, 18)))} USDST</div>
@@ -365,7 +365,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                         </div>
                         <div>{formatNumber(parseFloat(formatWeiToDecimal(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
                         <div>${formatNumber(parseFloat(formatWeiToDecimal(vault.collateralValueUSD, 18)))}</div>
-                        <div className="text-red-600 font-medium">
+                        <div className="text-green-600 font-medium">
                           {calculateExpectedProfit(vault, liquidationAmount)}
                         </div>
                       </div>
@@ -381,9 +381,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                         
                         <div className="flex flex-col items-center space-y-2">
                           <div className="flex items-center space-x-3">
-                            <label className="text-sm font-medium text-gray-700">
-                              Liquidation Amount:
-                            </label>
                             <Input
                               type="number"
                               placeholder="Amount to liquidate"
