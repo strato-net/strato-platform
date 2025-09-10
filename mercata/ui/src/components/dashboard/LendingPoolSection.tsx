@@ -91,7 +91,7 @@ const LendingPoolSection = () => {
       toast({
         title:
           type === "deposit" ? "Deposit Successful" : "Withdrawal Successful",
-        description: `You have successfully ${type}ed ${amount} USDST.`,
+        description: `You have successfully ${type === "deposit" ? "deposited" : "withdrawn"} ${amount} USDST.`,
         variant: "success",
       });
 
