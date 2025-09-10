@@ -83,7 +83,7 @@ valueToSolidityValue = \case
     ValueAccount a -> fromShowable a
     ValueString s -> fromText s
   ValueEnum _ ev _ -> fromText ev
-  ValueArraySentinel {} -> Right Nothing
+  ValueArraySentinel {} -> fromText ""
   ValueContract c -> fromShowable c
   ValueStruct fs -> Just . SolidityObject <$> mapMaybeM (bimapValue Right) (M.toList fs)
   ValueMapping kvs -> Just . SolidityObject <$> mapMaybeM (bimapValue tshowIdx) (M.toList kvs)

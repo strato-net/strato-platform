@@ -150,6 +150,7 @@ export const getOpenIssues = async (
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
         select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value),executed:${AdminRegistry}-IssueExecuted(*)`,
+        ['votes.value']: 'neq.',
         ['executed.limit']: 10,
         ['executed.order']: 'block_timestamp.desc',
       },

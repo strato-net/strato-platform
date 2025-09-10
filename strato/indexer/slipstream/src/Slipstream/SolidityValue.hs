@@ -103,7 +103,7 @@ valueToSolidityValue = \case
   -- TODO(tim): What if struct declaration order is needed here?
   ValueStruct namedItems -> Just . SolidityObject . M.toList $ M.mapMaybe valueToSolidityValue namedItems
   ValueMapping ms -> Just . SolidityObject $ mapMaybe convertBoth (M.toList ms)
-  ValueArraySentinel {} -> Nothing
+  ValueArraySentinel {} -> Just $ SolidityValueAsString ""
   ValueVariadic values -> Just . SolidityArray . mapMaybe valueToSolidityValue $ values
   where
     convertBoth :: (SimpleValue, Value) -> Maybe (Text, SolidityValue)
