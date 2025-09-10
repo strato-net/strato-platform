@@ -115,7 +115,7 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
+                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6667)/100;
                     const votesNeeded = Math.floor((admins.length * threshold)/100) + 1;
                     const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
 
