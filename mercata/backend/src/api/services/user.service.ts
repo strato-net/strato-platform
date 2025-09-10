@@ -67,7 +67,7 @@ export const addAdmin = async (
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "addAdmin",
@@ -93,7 +93,7 @@ export const removeAdmin = async (
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "removeAdmin",

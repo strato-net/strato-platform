@@ -46,7 +46,7 @@ export const requestWithdrawal = async (
   ]);
 
   ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled for wrapping");
-  const tx = buildFunctionTx(actions, userAddress, accessToken, mintUSDST ? amount: 0n);
+  const tx = await buildFunctionTx(actions, userAddress, accessToken, mintUSDST ? amount: 0n);
   ensure((balances.get(approveToken) ?? 0n) >= amount, "Insufficient token balance");
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>

@@ -45,7 +45,7 @@ export const setPrice = async (
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(PriceOracle),
       contractAddress: priceOracle,
       method: "setAssetPrice",

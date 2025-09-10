@@ -200,13 +200,7 @@ const LiquidityDepositModal = ({
         variant: "success",
       });
     } catch (error: any) {
-      const errorMessage = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Something went wrong';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: 8000,
-      });
+      // Error handling is done by global axios interceptor
     } finally {
       setDepositLoading(false);
       operationInProgressRef.current = false;

@@ -434,8 +434,9 @@ export const deposit = async (
   // If depositing USDST as collateral, include the deposit amount in the fee check
   const requiredUSDST = body.asset === constants.USDST ? BigInt(amountWei) : undefined;
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken, requiredUSDST);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -456,13 +457,14 @@ export const withdraw = async (
 
   const amountWei = body.amount;
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "withdraw",
+    args: { asset: body.asset, amount: amountWei },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "withdraw",
-      args: { asset: body.asset, amount: amountWei },
-    }, userAddress, accessToken))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -571,13 +573,14 @@ export const withdrawMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "withdrawMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "withdrawMax",
-      args: { asset: body.asset },
-    }, userAddress, accessToken))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -756,14 +759,15 @@ export const mint = async (
 
   const amountWei = body.amount;
 
-
+  
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mint",
+    args: { asset: body.asset, amountUSD: amountWei },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mint",
-      args: { asset: body.asset, amountUSD: amountWei },
-    }, userAddress, accessToken))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -782,13 +786,14 @@ export const mintMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mintMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mintMax",
-      args: { asset: body.asset },
-    }, userAddress, accessToken))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -834,8 +839,9 @@ export const repay = async (
   // If repaying USDST debt, include the repay amount in the fee check
   const requiredUSDST = usdstAddress === constants.USDST ? BigInt(amountWei) : undefined;
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken, requiredUSDST);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -882,8 +888,9 @@ export const repayAll = async (
   // The user needs to have enough USDST for their debt + gas, but we can't check the debt amount here
   const requiredUSDST = usdstAddress === constants.USDST ? 0n : undefined;
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken, requiredUSDST);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -933,8 +940,9 @@ export const liquidate = async (
   // If liquidating USDST debt, include the debt amount in the fee check
   const requiredUSDST = usdstAddress === constants.USDST ? BigInt(debtToCoverWei) : undefined;
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken, requiredUSDST);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
