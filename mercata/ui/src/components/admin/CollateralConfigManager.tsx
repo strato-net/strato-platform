@@ -8,15 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
-  Plus, 
-  Settings, 
-  AlertTriangle, 
-  Pause, 
-  Play,
-  Edit,
-  Save,
-  X,
-  Loader2
+  Plus, Settings, AlertTriangle, Pause, Play, Edit, Save, X, Loader2
 } from 'lucide-react';
 import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
@@ -33,18 +25,21 @@ interface CollateralConfigFormData {
   isPaused: boolean;
 }
 
-// Empty form data - no hardcoded defaults
 const EMPTY_FORM_DATA: CollateralConfigFormData = {
-  asset: '',
-  liquidationRatio: '',
-  liquidationPenaltyBps: '',
-  closeFactorBps: '',
-  stabilityFeeRate: '',
-  debtFloor: '',
-  debtCeiling: '',
-  unitScale: '',
-  isPaused: false,
+  asset: '', liquidationRatio: '', liquidationPenaltyBps: '', closeFactorBps: '',
+  stabilityFeeRate: '', debtFloor: '', debtCeiling: '', unitScale: '', isPaused: false,
 };
+
+const FIELD_CONFIG = {
+  asset: { name: 'Asset address', required: true, min: undefined, max: undefined },
+  liquidationRatio: { name: 'Liquidation ratio', required: true, min: 0, max: undefined },
+  liquidationPenaltyBps: { name: 'Liquidation penalty', required: true, min: 500, max: 3000 },
+  closeFactorBps: { name: 'Close factor', required: true, min: 5000, max: 10000 },
+  stabilityFeeRate: { name: 'Stability fee rate', required: true, min: 1.0, max: undefined },
+  debtFloor: { name: 'Debt floor', required: true, min: 0, max: undefined },
+  debtCeiling: { name: 'Debt ceiling', required: true, min: 0, max: undefined },
+  unitScale: { name: 'Unit scale', required: true, min: 0, max: undefined },
+} as const;
 
 const CollateralConfigManager = () => {
   const [activeTab, setActiveTab] = useState('add');
@@ -52,10 +47,21 @@ const CollateralConfigManager = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<CollateralConfigFormData>(EMPTY_FORM_DATA);
   const [editingAsset, setEditingAsset] = useState<string | null>(null);
+  const [globalPaused, setGlobalPaused] = useState<boolean>(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
-  // Load existing assets on component mount
+  // Load data on mount
   useEffect(() => {
-    loadAssets();
+    Promise.all([loadAssets(), loadGlobalPaused()]);
+  }, []);
+
+  const loadGlobalPaused = useCallback(async () => {
+    try {
+      const result = await cdpService.getGlobalPaused();
+      setGlobalPaused(result.isPaused);
+    } catch (error) {
+      console.error('Failed to load global pause status:', error);
+    }
   }, []);
 
   const loadAssets = useCallback(async () => {
@@ -72,87 +78,78 @@ const CollateralConfigManager = () => {
   }, []);
 
   const handleInputChange = useCallback((field: keyof CollateralConfigFormData, value: string | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  }, []);
-
-  // Helper function to check for scientific notation
-  const hasScientificNotation = useCallback((value: string): boolean => {
-    return value.includes('e+') || value.includes('e-') || value.includes('E+') || value.includes('E-');
+    setHasUserInteracted(true);
+    setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
 
   const validateForm = useCallback((): string[] => {
     const errors: string[] = [];
-    const requiredFields = [
-      { field: 'asset', name: 'Asset address' },
-      { field: 'liquidationRatio', name: 'Liquidation ratio' },
-      { field: 'liquidationPenaltyBps', name: 'Liquidation penalty' },
-      { field: 'closeFactorBps', name: 'Close factor' },
-      { field: 'stabilityFeeRate', name: 'Stability fee rate' },
-      { field: 'debtFloor', name: 'Debt floor' },
-      { field: 'debtCeiling', name: 'Debt ceiling' },
-      { field: 'unitScale', name: 'Unit scale' }
-    ];
 
     // Required field validation
-    requiredFields.forEach(({ field, name }) => {
-      if (!formData[field as keyof CollateralConfigFormData]) {
-        errors.push(`${name} is required`);
+    Object.entries(FIELD_CONFIG).forEach(([field, config]) => {
+      const value = formData[field as keyof CollateralConfigFormData];
+      if (config.required && (!value && value !== false)) {
+        errors.push(`${config.name} is required`);
       }
     });
 
-    // Scientific notation validation
-    if (formData.debtCeiling && hasScientificNotation(formData.debtCeiling)) {
-      errors.push('Debt ceiling cannot use scientific notation');
-    }
-    if (formData.unitScale && hasScientificNotation(formData.unitScale)) {
-      errors.push('Unit scale cannot use scientific notation');
-    }
-
     // Numeric validation
-    const liquidationRatio = parseFloat(formData.liquidationRatio);
-    if (formData.liquidationRatio && (isNaN(liquidationRatio) || liquidationRatio <= 0)) {
-      errors.push('Liquidation ratio must be a positive number');
-    }
+    Object.entries(FIELD_CONFIG).forEach(([field, config]) => {
+      const value = formData[field as keyof CollateralConfigFormData];
+      if (typeof value === 'string' && value && config.min !== undefined) {
+        const num = parseFloat(value);
+        if (isNaN(num) || num < config.min || (config.max && num > config.max)) {
+          const range = config.max ? `between ${config.min} and ${config.max}` : `at least ${config.min}`;
+          errors.push(`${config.name} must be ${range}`);
+        }
+      }
+    });
 
-    const stabilityFeeRate = parseFloat(formData.stabilityFeeRate);
-    if (formData.stabilityFeeRate && (isNaN(stabilityFeeRate) || stabilityFeeRate < 1.0)) {
-      errors.push('Stability fee rate must be at least 1.0');
-    }
-
+    // Cross-field validation
     const debtFloor = parseFloat(formData.debtFloor);
     const debtCeiling = parseFloat(formData.debtCeiling);
-    if (debtCeiling > 0 && debtFloor > debtCeiling) {
+    if (debtCeiling > 0 && debtFloor > 0 && debtFloor > debtCeiling) {
       errors.push('Debt floor cannot be greater than debt ceiling');
     }
 
     return errors;
-  }, [formData, hasScientificNotation]);
+  }, [formData]);
+
+  const isFormValid = useMemo(() => validateForm().length === 0, [validateForm]);
+  const isFormEmpty = useMemo(() => Object.values(formData).some(v => !v && v !== false), [formData]);
+
+  const getFieldError = useCallback((field: keyof CollateralConfigFormData): string | null => {
+    if (!hasUserInteracted) return null;
+    const errors = validateForm();
+    return errors.find(error => 
+      error.toLowerCase().includes(field.toLowerCase()) || 
+      error.toLowerCase().includes(FIELD_CONFIG[field].name.toLowerCase())
+    ) || null;
+  }, [validateForm, hasUserInteracted]);
 
   const resetForm = useCallback(() => {
     setFormData(EMPTY_FORM_DATA);
     setEditingAsset(null);
+    setHasUserInteracted(false);
   }, []);
 
-  // Helper function to convert scientific notation to full integer string
-  const convertScientificNotation = useCallback((value: string): string => {
-    if (!value) return '';
-    
-    // Check if it's scientific notation
-    if (value.includes('e+') || value.includes('e-') || value.includes('E+') || value.includes('E-')) {
-      // Use BigInt to avoid scientific notation for large numbers
-      const num = parseFloat(value);
-      if (Number.isInteger(num)) {
-        return BigInt(Math.floor(num)).toString();
-      } else {
-        // For non-integers, use toFixed(0) to avoid scientific notation
-        return num.toFixed(0);
-      }
-    }
-    
-    return value;
+  const convertToContractFormat = useCallback((data: CollateralConfigFormData) => {
+    const RAY = BigInt(10) ** BigInt(27);
+    const annualRate = parseFloat(data.stabilityFeeRate);
+    const perSecondRate = annualRate / (365 * 24 * 60 * 60) / 100;
+    const stabilityFeeRateRAY = (RAY + BigInt(Math.floor(perSecondRate * Number(RAY)))).toString();
+
+    return {
+      asset: data.asset,
+      liquidationRatio: (BigInt(Math.floor(parseFloat(data.liquidationRatio) * 1e18))).toString(),
+      liquidationPenaltyBps: data.liquidationPenaltyBps,
+      closeFactorBps: data.closeFactorBps,
+      stabilityFeeRate: stabilityFeeRateRAY,
+      debtFloor: (BigInt(Math.floor(parseFloat(data.debtFloor) * 1e18))).toString(),
+      debtCeiling: (BigInt(Math.floor(parseFloat(data.debtCeiling) * 1e18))).toString(),
+      unitScale: (BigInt(Math.floor(parseFloat(data.unitScale) * 1e18))).toString(),
+      isPaused: data.isPaused,
+    };
   }, []);
 
   const handleSubmit = useCallback(async () => {
@@ -164,48 +161,22 @@ const CollateralConfigManager = () => {
 
     try {
       setLoading(true);
-      
-      // Convert stabilityFeeRate from annual percentage back to RAY format
-      // The backend converts RAY to annual percentage using:
-      // (RAY_value - RAY) * 365 * 24 * 60 * 60 / RAY * 100
-      // So we need to reverse this formula
-      const RAY = BigInt(10) ** BigInt(27); // 10^27
-      const annualRate = parseFloat(formData.stabilityFeeRate); // e.g., 1.9802625581975757
-      
-      // Convert annual percentage to per-second decimal rate
-      const perSecondRate = annualRate / (365 * 24 * 60 * 60) / 100; // Convert to decimal per second
-      
-      // Convert to RAY format: RAY + (perSecondRate * RAY)
-      const stabilityFeeRateRAY = (RAY + BigInt(Math.floor(perSecondRate * Number(RAY)))).toString();
-      
-      const configData = {
-        asset: formData.asset,
-        liquidationRatio: (BigInt(Math.floor(parseFloat(formData.liquidationRatio) * 1e18))).toString(),
-        liquidationPenaltyBps: formData.liquidationPenaltyBps,
-        closeFactorBps: formData.closeFactorBps,
-        stabilityFeeRate: stabilityFeeRateRAY,
-        debtFloor: (BigInt(Math.floor(parseFloat(formData.debtFloor) * 1e18))).toString(),
-        debtCeiling: (BigInt(Math.floor(parseFloat(formData.debtCeiling) * 1e18))).toString(),
-        unitScale: convertScientificNotation(formData.unitScale),
-        isPaused: formData.isPaused,
-      };
-
+      const configData = convertToContractFormat(formData);
       await cdpService.setCollateralConfig(configData);
       toast.success('Collateral configuration updated successfully');
-      
       resetForm();
       await loadAssets();
-      
     } catch (error) {
       console.error('Failed to set collateral config:', error);
       toast.error('Failed to update collateral configuration');
     } finally {
       setLoading(false);
     }
-  }, [formData, validateForm, resetForm, loadAssets, convertScientificNotation]);
+  }, [formData, validateForm, convertToContractFormat, resetForm, loadAssets]);
 
   const handleEditAsset = useCallback((asset: AssetConfig) => {
     setEditingAsset(asset.asset);
+    setHasUserInteracted(true);
     setFormData({
       asset: asset.asset,
       liquidationRatio: (asset.liquidationRatio / 100).toString(),
@@ -214,7 +185,7 @@ const CollateralConfigManager = () => {
       stabilityFeeRate: asset.stabilityFeeRate.toString(),
       debtFloor: (parseFloat(asset.debtFloor) / 1e18).toString(),
       debtCeiling: (parseFloat(asset.debtCeiling) / 1e18).toString(),
-      unitScale: asset.unitScale,
+      unitScale: (parseFloat(asset.unitScale) / 1e18).toString(),
       isPaused: asset.isPaused,
     });
     setActiveTab('add');
@@ -234,24 +205,93 @@ const CollateralConfigManager = () => {
     }
   }, [loadAssets]);
 
+  const handleToggleGlobalPause = useCallback(async () => {
+    try {
+      setLoading(true);
+      const newPausedState = !globalPaused;
+      await cdpService.setGlobalPaused(newPausedState);
+      setGlobalPaused(newPausedState);
+      toast.success(`CDP system ${newPausedState ? 'paused' : 'unpaused'} successfully`);
+    } catch (error) {
+      console.error('Failed to toggle global pause:', error);
+      toast.error('Failed to toggle global pause');
+    } finally {
+      setLoading(false);
+    }
+  }, [globalPaused]);
+
   const formatValue = useCallback((value: string, type: 'percentage' | 'usd' | 'bps' | 'raw') => {
+    const num = parseFloat(value);
     switch (type) {
-      case 'percentage':
-        return `${(parseFloat(value) / 100).toFixed(2)}%`;
-      case 'usd':
-        return `$${(parseFloat(value) / 1e18).toFixed(2)}`;
-      case 'bps':
-        return `${(parseFloat(value) / 100).toFixed(2)}%`;
-      case 'raw':
-        return value;
-      default:
-        return value;
+      case 'percentage': return `${(num / 100).toFixed(2)}%`;
+      case 'usd': return `$${(num / 1e18).toFixed(2)}`;
+      case 'bps': return `${(num / 100).toFixed(2)}%`;
+      default: return value;
     }
   }, []);
 
+  const FormField = ({ field, label, type = "text", placeholder, min, max, step, helpText, ...props }: any) => (
+    <div className="space-y-2">
+      <Label htmlFor={field}>{label}</Label>
+      <Input
+        id={field}
+        type={type}
+        placeholder={placeholder}
+        value={formData[field]}
+        onChange={(e) => handleInputChange(field, e.target.value)}
+        className={getFieldError(field) ? 'border-red-500' : ''}
+        min={min}
+        max={max}
+        step={step}
+        {...props}
+      />
+      {getFieldError(field) && (
+        <p className="text-xs text-red-500">{getFieldError(field)}</p>
+      )}
+      {helpText && <p className="text-sm text-gray-500">{helpText}</p>}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
+      {/* Global Pause Control */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5" />
+              <span>System Control</span>
+            </span>
+            <Button
+              onClick={handleToggleGlobalPause}
+              disabled={loading}
+              variant={globalPaused ? "destructive" : "default"}
+              className="flex items-center space-x-2"
+            >
+              {loading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : globalPaused ? (
+                <Play className="h-4 w-4" />
+              ) : (
+                <Pause className="h-4 w-4" />
+              )}
+              <span>{globalPaused ? 'Unpause System' : 'Pause System'}</span>
+            </Button>
+          </CardTitle>
+          <CardDescription>
+            {globalPaused ? (
+              <span className="text-red-600 font-medium">
+                ⚠️ CDP system is paused - All operations are blocked
+              </span>
+            ) : (
+              <span className="text-green-600 font-medium">
+                ✅ CDP system is active - All operations are allowed
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="add" className="flex items-center space-x-2">
@@ -277,116 +317,70 @@ const CollateralConfigManager = () => {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Asset Address */}
-                <div className="space-y-2">
-                  <Label htmlFor="asset">Asset Address</Label>
-                  <Input
-                    id="asset"
-                    placeholder="0x..."
-                    value={formData.asset}
-                    onChange={(e) => handleInputChange('asset', e.target.value)}
-                    disabled={editingAsset !== null}
-                  />
-                </div>
+                <FormField
+                  field="asset"
+                  label="Asset Address"
+                  placeholder="0x..."
+                  disabled={editingAsset !== null}
+                />
 
-                {/* Liquidation Ratio */}
-                <div className="space-y-2">
-                  <Label htmlFor="liquidationRatio">Liquidation Ratio (e.g., 1.5 = 150%)</Label>
-                  <Input
-                    id="liquidationRatio"
-                    type="number"
-                    step="0.1"
-                    min="1.0"
-                    placeholder="1.5"
-                    value={formData.liquidationRatio}
-                    onChange={(e) => handleInputChange('liquidationRatio', e.target.value)}
-                  />
-                </div>
+                <FormField
+                  field="liquidationRatio"
+                  label="Liquidation Ratio (e.g., 1.5 = 150%)"
+                  type="number"
+                  step="0.1"
+                  min="1.0"
+                  placeholder="1.5"
+                />
 
-                {/* Liquidation Penalty */}
-                <div className="space-y-2">
-                  <Label htmlFor="liquidationPenaltyBps">Liquidation Penalty (Basis Points)</Label>
-                  <Input
-                    id="liquidationPenaltyBps"
-                    type="number"
-                    min="500"
-                    max="3000"
-                    placeholder="1000"
-                    value={formData.liquidationPenaltyBps}
-                    onChange={(e) => handleInputChange('liquidationPenaltyBps', e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500">500-3000 bps (5%-30%)</p>
-                </div>
+                <FormField
+                  field="liquidationPenaltyBps"
+                  label="Liquidation Penalty (Basis Points)"
+                  type="number"
+                  min="500"
+                  max="3000"
+                  placeholder="1000"
+                  helpText="500-3000 bps (5%-30%)"
+                />
 
-                {/* Close Factor */}
-                <div className="space-y-2">
-                  <Label htmlFor="closeFactorBps">Close Factor (Basis Points)</Label>
-                  <Input
-                    id="closeFactorBps"
-                    type="number"
-                    min="5000"
-                    max="10000"
-                    placeholder="5000"
-                    value={formData.closeFactorBps}
-                    onChange={(e) => handleInputChange('closeFactorBps', e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500">5000-10000 bps (50%-100%)</p>
-                </div>
+                <FormField
+                  field="closeFactorBps"
+                  label="Close Factor (Basis Points)"
+                  type="number"
+                  min="5000"
+                  max="10000"
+                  placeholder="5000"
+                  helpText="5000-10000 bps (50%-100%)"
+                />
 
-                {/* Stability Fee Rate */}
-                <div className="space-y-2">
-                  <Label htmlFor="stabilityFeeRate">Stability Fee Rate (RAY)</Label>
-                  <Input
-                    id="stabilityFeeRate"
-                    placeholder="1.0"
-                    value={formData.stabilityFeeRate}
-                    onChange={(e) => handleInputChange('stabilityFeeRate', e.target.value)}
-                  />
-                  <p className="text-sm text-gray-500">Per-second interest rate (minimum 1.0 = 0% interest)</p>
-                </div>
+                <FormField
+                  field="stabilityFeeRate"
+                  label="Stability Fee Rate (RAY)"
+                  placeholder="1.0"
+                  helpText="Per-second interest rate (minimum 1.0 = 0% interest)"
+                />
 
-                {/* Debt Floor */}
-                <div className="space-y-2">
-                  <Label htmlFor="debtFloor">Debt Floor (USD)</Label>
-                  <Input
-                    id="debtFloor"
-                    type="number"
-                    min="0"
-                    placeholder="100"
-                    value={formData.debtFloor}
-                    onChange={(e) => handleInputChange('debtFloor', e.target.value)}
-                  />
-                </div>
+                <FormField
+                  field="debtFloor"
+                  label="Debt Floor (USD)"
+                  type="number"
+                  min="0"
+                  placeholder="100"
+                />
 
-                {/* Debt Ceiling */}
-                <div className="space-y-2">
-                  <Label htmlFor="debtCeiling">Debt Ceiling (USD)</Label>
-                  <Input
-                    id="debtCeiling"
-                    type="text"
-                    placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
-                    value={formData.debtCeiling}
-                    onChange={(e) => handleInputChange('debtCeiling', e.target.value)}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Enter the full number (e.g., 1000000 not 1e+6)
-                  </p>
-                </div>
+                <FormField
+                  field="debtCeiling"
+                  label="Debt Ceiling (USD)"
+                  placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
+                  helpText="Enter the full number (e.g., 1000000 not 1e+6)"
+                />
 
-                {/* Unit Scale */}
-                <div className="space-y-2">
-                  <Label htmlFor="unitScale">Unit Scale</Label>
-                  <Input
-                    id="unitScale"
-                    type="text"
-                    placeholder="Enter unit scale (e.g., 1000000000000000000 for 18 decimals)"
-                    value={formData.unitScale}
-                    onChange={(e) => handleInputChange('unitScale', e.target.value)}
-                  />
-                  <p className="text-xs text-gray-500">
-                    Enter the full number (e.g., 1000000000000000000 not 1e+18)
-                  </p>
-                </div>
+                <FormField
+                  field="unitScale"
+                  label="Unit Scale"
+                  placeholder="Enter unit scale (e.g., 1 for 18 decimals)"
+                  helpText="Enter decimal value (e.g., 1 for 18 decimals, 0.001 for 15 decimals)"
+                />
 
                 {/* Pause Status */}
                 <div className="space-y-2">
@@ -407,7 +401,7 @@ const CollateralConfigManager = () => {
               <div className="flex items-center space-x-4">
                 <Button 
                   onClick={handleSubmit} 
-                  disabled={loading}
+                  disabled={loading || isFormEmpty || !isFormValid}
                   className="flex items-center space-x-2"
                 >
                   {loading ? (
