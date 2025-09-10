@@ -199,11 +199,13 @@ const LiquidityDepositModal = ({
         description: `${selectedPool._name} deposited successfully.`,
         variant: "success",
       });
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = error?.response?.data?.error?.message || error?.response?.data?.message || error?.message || 'Something went wrong';
       toast({
         title: "Error",
-        description: `Something went wrong - ${error}`,
+        description: errorMessage,
         variant: "destructive",
+        duration: 8000,
       });
     } finally {
       setDepositLoading(false);

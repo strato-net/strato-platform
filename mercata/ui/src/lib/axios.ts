@@ -10,7 +10,6 @@ const api = axios.create({
 
 // Helper: Extract error message from backend response
 function extractApiErrorMessage(error: any): string {
-  console.log(" catching error in extractApiErrorMessage",error.response.data.error);
   return (
     error?.response?.data?.error?.message ||
     error?.response?.data?.message ||

@@ -8,17 +8,14 @@ const DEFAULT_GAS_PARAMS = {
   gasPrice: 1,
 };
 
-type Balances = Record<string, bigint>;
-
-function formatFeeError(feeWei: bigint, voucherUnits: bigint, requiredUSDST?: bigint) {
+function formatFeeError(feeWei: bigint, requiredUSDST?: bigint) {
   const usd = Number(feeWei) / Number(constants.DECIMALS);
-  const vouchers = Number(voucherUnits) / Number(constants.DECIMALS);
   const requiredUsd = requiredUSDST ? Number(requiredUSDST) / Number(constants.DECIMALS) : 0;
   
   if (requiredUSDST) {
-    return `Insufficient balance (required: ${vouchers} vouchers OR ${requiredUsd + usd} USDST total: ${requiredUsd} for transaction + ${usd} for gas)`;
+    return `Insufficient balance for gas fees (required: ${usd} USDST for gas. Total needed: ${requiredUsd + usd} USDST - ${requiredUsd} for transaction + ${usd} for gas)`;
   }
-  return `Insufficient balance for transaction fees (required: ${vouchers} vouchers OR ${usd} USDST)`;
+  return `Insufficient balance for gas fees (required: ${usd} USDST for gas)`;
 }
 
 async function ensureFeeCoverage(
@@ -30,35 +27,37 @@ async function ensureFeeCoverage(
   const requiredFeeWei = constants.GAS_FEE_WEI * BigInt(n);
   const requiredVoucherUnits = constants.DECIMALS * BigInt(n);
 
-  const { data } = await cirrus.get(
-    accessToken,
-    `/${constants.Voucher}-_balances`,
-    {
-      params: {
-        address: `in.(${constants.voucher},${constants.USDST})`,
-        key: `eq.${userAddress}`,
-        select: "address,balance:value::text",
-      },
-    }
-  );
-
-  if (!Array.isArray(data)) throw new Error(formatFeeError(requiredFeeWei, requiredVoucherUnits, requiredUSDST));
-
-  const balances: Balances = data.reduce((m: Balances, r: any) => {
-    m[r.address] = BigInt(r.balance ?? "0");
-    return m;
-  }, {});
-
-  const hasVoucher = (balances[constants.voucher] ?? 0n) >= requiredVoucherUnits;
-  
-  // If user has vouchers, they're good to go
-  if (hasVoucher) return;
-  
-  // If no vouchers, check if they have enough USDST for both transaction amount + gas
+  // Calculate total required USDST
   const totalRequiredUSDST = requiredUSDST ? requiredUSDST + requiredFeeWei : requiredFeeWei;
-  const hasUSD = (balances[constants.USDST] ?? 0n) >= totalRequiredUSDST;
-  
-  if (!hasUSD) throw new Error(formatFeeError(requiredFeeWei, requiredVoucherUnits, requiredUSDST));
+
+  // Check both voucher and USDST balances in parallel
+  const [voucherResponse, usdstResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.Voucher}-_balances`, {
+      params: {
+        address: `eq.${constants.voucher}`,
+        key: `eq.${userAddress}`,
+        value: `gte.${requiredVoucherUnits.toString()}`,
+      },
+    }),
+    cirrus.get(accessToken, `/${constants.Token}-_balances`, {
+      params: {
+        address: `eq.${constants.USDST}`,
+        key: `eq.${userAddress}`,
+        value: `gte.${totalRequiredUSDST.toString()}`,
+      },
+    })
+  ]);
+
+  // If user has enough vouchers OR enough USDST, they're good to go
+  const hasVoucher = voucherResponse.data && voucherResponse.data.length > 0;
+  const hasUSD = usdstResponse.data && usdstResponse.data.length > 0;
+
+  if (hasVoucher || hasUSD) {
+    return;
+  }
+
+  // If user doesn't have enough of either, throw error
+  throw new Error(formatFeeError(requiredFeeWei, requiredUSDST));
 }
 
 export function buildDeployTx({
