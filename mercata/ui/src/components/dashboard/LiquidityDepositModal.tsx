@@ -217,29 +217,81 @@ const LiquidityDepositModal = ({
   };
 
   const handleMaxClick = (isFirstToken: boolean) => {
-    const balance = isFirstToken ? tokenABalance : tokenBBalance;
-    const token = isFirstToken ? selectedPool?.tokenA : selectedPool?.tokenB;
-    const isUSDST = token?.address.toLowerCase() === usdstAddress.toLowerCase();
-
-    let maxBigInt = BigInt(balance || "0");
-
-    if (isUSDST) {
-      const fee = safeParseUnits(DEPOSIT_FEE, 18);
-      if (maxBigInt > fee) {
-        maxBigInt = maxBigInt - fee;
-      } else {
-        maxBigInt = BigInt(0);
+    if (depositMode === 'A&B' && selectedPool?.aToBRatio && selectedPool?.bToARatio) {
+      // Dual token mode: calculate maximum possible deposit based on both balances
+      const tokenABalanceWei = BigInt(tokenABalance || "0");
+      const tokenBBalanceWei = BigInt(tokenBBalance || "0");
+      
+      // Check if either token is USDST and account for fees
+      const tokenAIsUSDST = selectedPool.tokenA?.address.toLowerCase() === usdstAddress.toLowerCase();
+      const tokenBIsUSDST = selectedPool.tokenB?.address.toLowerCase() === usdstAddress.toLowerCase();
+      
+      let availableTokenA = tokenABalanceWei;
+      let availableTokenB = tokenBBalanceWei;
+      
+      if (tokenAIsUSDST) {
+        const fee = safeParseUnits(DEPOSIT_FEE, 18);
+        availableTokenA = tokenABalanceWei > fee ? tokenABalanceWei - fee : BigInt(0);
       }
-    }
-
-    const maxVal = formatUnits(maxBigInt, 18);
-
-    if (isFirstToken) {
-      setToken1Amount(maxVal);
-      handleInputChange(maxVal, 'token1');
+      
+      if (tokenBIsUSDST) {
+        const fee = safeParseUnits(DEPOSIT_FEE, 18);
+        availableTokenB = tokenBBalanceWei > fee ? tokenBBalanceWei - fee : BigInt(0);
+      }
+      
+      // Calculate maximum possible deposit based on current pool ratio
+      const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
+      const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
+      
+      // Calculate what Token A amount would be needed for full Token B balance
+      const tokenAAmountForFullB = (availableTokenB * aToBRatioWei) / BigInt(10 ** 18);
+      
+      // Calculate what Token B amount would be needed for full Token A balance  
+      const tokenBAmountForFullA = (availableTokenA * bToARatioWei) / BigInt(10 ** 18);
+      
+      let finalTokenAAmount: bigint;
+      let finalTokenBAmount: bigint;
+      
+      if (tokenAAmountForFullB <= availableTokenA) {
+        // Token B is the limiting factor
+        finalTokenBAmount = availableTokenB;
+        finalTokenAAmount = tokenAAmountForFullB;
+      } else {
+        // Token A is the limiting factor
+        finalTokenAAmount = availableTokenA;
+        finalTokenBAmount = tokenBAmountForFullA;
+      }
+      
+      // Set both amounts
+      setToken1Amount(formatUnits(finalTokenAAmount, 18));
+      setToken2Amount(formatUnits(finalTokenBAmount, 18));
+      
     } else {
-      setToken2Amount(maxVal);
-      handleInputChange(maxVal, 'token2');
+      // Single token mode: original logic
+      const balance = isFirstToken ? tokenABalance : tokenBBalance;
+      const token = isFirstToken ? selectedPool?.tokenA : selectedPool?.tokenB;
+      const isUSDST = token?.address.toLowerCase() === usdstAddress.toLowerCase();
+
+      let maxBigInt = BigInt(balance || "0");
+
+      if (isUSDST) {
+        const fee = safeParseUnits(DEPOSIT_FEE, 18);
+        if (maxBigInt > fee) {
+          maxBigInt = maxBigInt - fee;
+        } else {
+          maxBigInt = BigInt(0);
+        }
+      }
+
+      const maxVal = formatUnits(maxBigInt, 18);
+
+      if (isFirstToken) {
+        setToken1Amount(maxVal);
+        handleInputChange(maxVal, 'token1');
+      } else {
+        setToken2Amount(maxVal);
+        handleInputChange(maxVal, 'token2');
+      }
     }
   };
 
