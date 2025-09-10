@@ -63,6 +63,7 @@ export const getAdmin = async (
 // Add a new admin to the registry
 export const addAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
@@ -73,7 +74,7 @@ export const addAdmin = async (
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -88,6 +89,7 @@ export const addAdmin = async (
 // Remove an admin from the registry
 export const removeAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
@@ -98,7 +100,7 @@ export const removeAdmin = async (
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

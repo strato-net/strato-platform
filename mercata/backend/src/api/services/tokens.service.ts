@@ -5,7 +5,6 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
-import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine } = constants;
@@ -194,15 +193,16 @@ export const getBalance = async (
 
 export const createToken = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | undefined>,
+  userAddress: string
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(TokenFactory),
       contractAddress: tokenFactory,
       method: "createToken",
       args: usc(body),
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -220,9 +220,12 @@ export const createToken = async (
 export const transferToken = async (
   accessToken: string,
   body: Record<string, string | undefined>,
-  userAddress?: string
+  userAddress: string
 ) => {
   try {
+    // If transferring USDST, include the transfer amount in the fee check
+    const requiredUSDST = body.address === constants.USDST ? BigInt(body.value || "0") : undefined;
+    
     const tx = await buildFunctionTx(
       {
         contractName: extractContractName(Token),
@@ -234,7 +237,8 @@ export const transferToken = async (
         },
       },
       userAddress,
-      accessToken
+      accessToken,
+      requiredUSDST
     );
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -253,10 +257,11 @@ export const transferToken = async (
 // Approve an allowance for a spender
 export const approveToken = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | undefined>,
+  userAddress: string
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "approve",
@@ -264,7 +269,7 @@ export const approveToken = async (
         spender: body.spender,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -279,10 +284,14 @@ export const approveToken = async (
 // Transfer tokens on behalf of another address
 export const transferFromToken = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | undefined>,
+  userAddress: string
 ) => {
   try {
-    const tx = buildFunctionTx({
+    // If transferring USDST, include the transfer amount in the fee check
+    const requiredUSDST = body.address === constants.USDST ? BigInt(body.value || "0") : undefined;
+    
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transferFrom",
@@ -291,7 +300,7 @@ export const transferFromToken = async (
         to: body.to,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken, requiredUSDST);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -305,17 +314,18 @@ export const transferFromToken = async (
 
 export const setTokenStatus = async (
   accessToken: string,
-  body: Record<string, string | number>
+  body: Record<string, string | number>,
+  userAddress: string
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address as string,
       method: "setStatus",
       args: {
         newStatus: body.status,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

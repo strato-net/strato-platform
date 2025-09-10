@@ -431,8 +431,11 @@ export const deposit = async (
     },
   ];
 
+  // If depositing USDST as collateral, include the deposit amount in the fee check
+  const requiredUSDST = body.asset === constants.USDST ? BigInt(amountWei) : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 
@@ -459,7 +462,7 @@ export const withdraw = async (
       contractAddress: registry.cdpEngine.address,
       method: "withdraw",
       args: { asset: body.asset, amount: amountWei },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
@@ -574,7 +577,7 @@ export const withdrawMax = async (
       contractAddress: registry.cdpEngine.address,
       method: "withdrawMax",
       args: { asset: body.asset },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
@@ -760,7 +763,7 @@ export const mint = async (
       contractAddress: registry.cdpEngine.address,
       method: "mint",
       args: { asset: body.asset, amountUSD: amountWei },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
@@ -785,7 +788,7 @@ export const mintMax = async (
       contractAddress: registry.cdpEngine.address,
       method: "mintMax",
       args: { asset: body.asset },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
@@ -828,8 +831,11 @@ export const repay = async (
     },
   ];
 
+  // If repaying USDST debt, include the repay amount in the fee check
+  const requiredUSDST = usdstAddress === constants.USDST ? BigInt(amountWei) : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 
@@ -872,8 +878,12 @@ export const repayAll = async (
     },
   ];
 
+  // For repayAll, we can't predict the exact debt amount, so we only check gas fees
+  // The user needs to have enough USDST for their debt + gas, but we can't check the debt amount here
+  const requiredUSDST = usdstAddress === constants.USDST ? 0n : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 
@@ -920,8 +930,11 @@ export const liquidate = async (
     },
   ];
 
+  // If liquidating USDST debt, include the debt amount in the fee check
+  const requiredUSDST = usdstAddress === constants.USDST ? BigInt(debtToCoverWei) : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 

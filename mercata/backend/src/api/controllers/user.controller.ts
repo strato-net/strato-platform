@@ -41,15 +41,15 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const { userAddress } = req.body;
+      const { accessToken, address: userAddress } = req;
+      const { userAddress: adminAddress } = req.body;
 
-      validateUserAddress(userAddress);
+      validateUserAddress(adminAddress);
 
-      const result = await addAdmin(accessToken, userAddress);
+      const result = await addAdmin(accessToken, userAddress as string, adminAddress);
       res.status(RestStatus.CREATED).json({ 
         message: "Admin added successfully", 
-        userAddress,
+        userAddress: adminAddress,
         status: result.status,
         hash: result.hash
       });
@@ -65,15 +65,15 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const { userAddress } = req.body;
+      const { accessToken, address: userAddress } = req;
+      const { userAddress: adminAddress } = req.body;
 
-      validateUserAddress(userAddress);
+      validateUserAddress(adminAddress);
 
-      const result = await removeAdmin(accessToken, userAddress);
+      const result = await removeAdmin(accessToken, userAddress as string, adminAddress);
       res.status(RestStatus.OK).json({ 
         message: "Admin removed successfully", 
-        userAddress,
+        userAddress: adminAddress,
         status: result.status,
         hash: result.hash
       });

@@ -35,11 +35,8 @@ export const requestWithdrawal = async (
     { contractName: extractContractName(Token), contractAddress: approveToken, method: "approve", args: { spender: constants.mercataBridge, value: stratoTokenAmount } },
     { contractName: extractContractName(MercataBridge), contractAddress: constants.mercataBridge, method: "requestWithdrawal", args: { externalChainId, externalRecipient, stratoToken, stratoTokenAmount, mintUSDST } },
   ];
-  const txFeeWei = BigInt(actions.length) * constants.GAS_FEE_WEI;
 
   const amount = BigInt(stratoTokenAmount);
-  const requiredApprove = amount + (mintUSDST ? txFeeWei : 0n);
-  const requiredUSDST = mintUSDST ? 0n : txFeeWei;
 
   const addresses = mintUSDST ? [constants.USDST] : [approveToken, constants.USDST];
 
@@ -48,11 +45,9 @@ export const requestWithdrawal = async (
     cirrus.get(accessToken, `/${MercataBridge}-assets`, { params: assetParams(mintUSDST, externalChainId, stratoToken) }).then(r => r.data?.[0]?.count || 0)
   ]);
 
-  ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");
-  ensure(requiredUSDST === 0n || (balances.get(constants.USDST) ?? 0n) >= requiredUSDST, "Insufficient USDST for gas");
   ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled for wrapping");
-
-  const tx = buildFunctionTx(actions);
+  const tx = buildFunctionTx(actions, userAddress, accessToken, mintUSDST ? amount: 0n);
+  ensure((balances.get(approveToken) ?? 0n) >= amount, "Insufficient token balance");
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)

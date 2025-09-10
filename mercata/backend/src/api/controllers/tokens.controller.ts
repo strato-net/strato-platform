@@ -98,7 +98,7 @@ class TokensController {
 
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
 
       const args = {
         ...body,
@@ -108,7 +108,7 @@ class TokensController {
       };
       validateCreateTokensArgs(args);
 
-      const result = await createToken(accessToken, args);
+      const result = await createToken(accessToken, args, address);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -131,10 +131,10 @@ class TokensController {
 
   static async approve(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
       validateApproveArgs(body);
 
-      const result = await approveToken(accessToken, body);
+      const result = await approveToken(accessToken, body, address);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -144,10 +144,10 @@ class TokensController {
 
   static async transferFrom(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
       validateTransferFromArgs(body);
 
-      const result = await transferFromToken(accessToken, body);
+      const result = await transferFromToken(accessToken, body, address);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -157,10 +157,10 @@ class TokensController {
 
   static async setStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
       validateSetStatusArgs(body);
 
-      const result = await setTokenStatus(accessToken, body);
+      const result = await setTokenStatus(accessToken, body, address);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {

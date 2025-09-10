@@ -66,6 +66,7 @@ export const getPool = async (
 
 export const depositLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
@@ -95,13 +96,17 @@ export const depositLiquidity = async (
     },
   ];
 
+  // If depositing USDST liquidity, include the deposit amount in the fee check
+  const requiredUSDST = borrowableAsset === constants.USDST ? BigInt(amount) : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
@@ -115,12 +120,13 @@ export const withdrawLiquidity = async (
       contractAddress: lendingPool,
       method: "withdrawLiquidity",
       args: { amount },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
 export const withdrawLiquidityAll = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
@@ -132,12 +138,13 @@ export const withdrawLiquidityAll = async (
       contractAddress: lendingPool,
       method: "withdrawLiquidityAll",
       args: {},
-    }))
+    }, userAddress, accessToken))
   );
 };
 
 export const supplyCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -161,13 +168,17 @@ export const supplyCollateral = async (
     },
   ];
 
+  // If supplying USDST as collateral, include the supply amount in the fee check
+  const requiredUSDST = asset === constants.USDST ? BigInt(amount) : undefined;
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 };
 
 export const withdrawCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -182,12 +193,13 @@ export const withdrawCollateral = async (
       contractAddress: lendingPool,
       method: "withdrawCollateral",
       args: { asset, amount },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
 export const borrow = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
@@ -202,12 +214,13 @@ export const borrow = async (
       contractAddress: lendingPool,
       method: "borrow",
       args: { amount },
-    }))
+    }, userAddress, accessToken))
   );
 };
 
 export const borrowMax = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
@@ -219,12 +232,13 @@ export const borrowMax = async (
       contractAddress: lendingPool,
       method: "borrowMax",
       args: {},
-    }))
+    }, userAddress, accessToken))
   );
 };
 
 export const repay = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
@@ -254,8 +268,11 @@ export const repay = async (
     },
   ];
 
+  // If repaying USDST debt, include the repay amount in the fee check
+  const requiredUSDST = borrowableAsset === constants.USDST ? BigInt(amount) : undefined;
+
   const result = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
   return { ...result, amountSent: amount };
 };
@@ -627,8 +644,11 @@ export const repayAll = async (
     },
   ];
 
+  // If repaying all USDST debt, include the calculated debt amount in the fee check
+  const requiredUSDST = borrowableAsset === constants.USDST ? exactDebtWei : undefined;
+
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx, userAddress, accessToken, requiredUSDST))
   );
 
   return {
@@ -642,6 +662,7 @@ export const repayAll = async (
 export const executeLiquidation = async (
   accessToken: string,
   loanId: string,
+  userAddress: string,
   options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
   // LiquidityPool address
@@ -752,6 +773,9 @@ export const executeLiquidation = async (
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
+  // If liquidating USDST debt, include the repay amount in the fee check
+  const requiredUSDST = borrowableAsset === constants.USDST ? repayAmount : undefined;
+
   const tx = buildFunctionTx([
     {
       contractName: extractContractName(Token),
@@ -772,7 +796,7 @@ export const executeLiquidation = async (
         debtToCover: repayAmount.toString(),
       },
     },
-  ]);
+  ], userAddress, accessToken, requiredUSDST);
 
   try {
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -792,6 +816,7 @@ export const executeLiquidation = async (
 
 export const configureAsset = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
@@ -829,7 +854,7 @@ export const configureAsset = async (
       interestRate,
       reserveFactor,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -840,6 +865,7 @@ export const configureAsset = async (
 
 export const sweepReserves = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.amount) {
@@ -864,7 +890,7 @@ export const sweepReserves = async (
     args: {
       amount,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -875,6 +901,7 @@ export const sweepReserves = async (
 
 export const setDebtCeilings = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.assetUnits || !body.usdValue) {
@@ -904,7 +931,7 @@ export const setDebtCeilings = async (
       assetUnits,
       usdValue,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1100,6 +1127,7 @@ export const listNearUnhealthyLoans = async (accessToken: string, margin: number
 
 export const withdrawCollateralMax = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
@@ -1112,6 +1140,6 @@ export const withdrawCollateralMax = async (
       contractAddress: lendingPool,
       method: "withdrawCollateralMax",
       args: { asset },
-    }))
+    }, userAddress, accessToken))
   );
 };

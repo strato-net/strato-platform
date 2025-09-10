@@ -30,9 +30,9 @@ class OracleController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateSetPriceInput(body);
-      const result = await setPrice(accessToken, body);
+      const result = await setPrice(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

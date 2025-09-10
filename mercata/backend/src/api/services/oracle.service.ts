@@ -37,6 +37,7 @@ export const getPrice = async (
 
 export const setPrice = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
@@ -52,7 +53,7 @@ export const setPrice = async (
         asset: body.token,
         price: body.price,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

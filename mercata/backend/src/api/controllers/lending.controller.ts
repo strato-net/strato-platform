@@ -57,10 +57,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateDepositLiquidityArgs(body);
 
-      const result = await depositLiquidity(accessToken, body.amount);
+      const result = await depositLiquidity(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -74,10 +74,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateWithdrawLiquidityArgs(body);
 
-      const result = await withdrawLiquidity(accessToken, body.amount);
+      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -91,9 +91,9 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
+      const { accessToken, address: userAddress } = req;
       const { withdrawLiquidityAll } = await import("../services/lending.service");
-      const result = await withdrawLiquidityAll(accessToken);
+      const result = await withdrawLiquidityAll(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -107,10 +107,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateBorrowArgs(body);
 
-      const result = await borrow(accessToken, body.amount);
+      const result = await borrow(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -124,8 +124,8 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
-      const result = await borrowMax(accessToken);
+      const { accessToken, address: userAddress } = req;
+      const result = await borrowMax(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -139,10 +139,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateRepayArgs(body);
 
-      const result = await repay(accessToken, body.amount);
+      const result = await repay(accessToken, userAddress as string, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -158,10 +158,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateSupplyCollateralArgs(body);
 
-      const result = await supplyCollateral(accessToken, body.asset, body.amount);
+      const result = await supplyCollateral(accessToken, userAddress as string, body.asset, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -175,10 +175,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateWithdrawCollateralArgs(body);
 
-      const result = await withdrawCollateral(accessToken, body.asset, body.amount);
+      const result = await withdrawCollateral(accessToken, userAddress as string, body.asset, body.amount);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -192,9 +192,9 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateWithdrawCollateralMaxArgs(body);
-      const result = await withdrawCollateralMax(accessToken, body.asset);
+      const result = await withdrawCollateralMax(accessToken, userAddress as string, body.asset);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -252,11 +252,11 @@ class LendingController {
 
   static async executeLiquidation(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken } = req;
+      const { accessToken, address: userAddress } = req;
       const id = req.params.id;
       validateLiquidationArgs({id, ...req.body});
 
-      const result = await executeLiquidationService(accessToken, id, req.body || {});
+      const result = await executeLiquidationService(accessToken, id, userAddress as string, req.body || {});
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -283,10 +283,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateConfigureAssetArgs(body);
 
-      const result = await configureAssetService(accessToken, body);
+      const result = await configureAssetService(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -300,10 +300,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateSweepReservesArgs(body);
 
-      const result = await sweepReservesService(accessToken, body);
+      const result = await sweepReservesService(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -317,10 +317,10 @@ class LendingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, address: userAddress, body } = req;
       validateSetDebtCeilingsArgs(body);
 
-      const result = await setDebtCeilingsService(accessToken, body);
+      const result = await setDebtCeilingsService(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {

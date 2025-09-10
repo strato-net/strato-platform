@@ -95,15 +95,16 @@ export const getPools = async (
 
 export const createPool = async (
   accessToken: string,
-  body: Record<string, string | undefined>
+  body: Record<string, string | undefined>,
+  userAddress: string
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(PoolFactory),
       contractAddress: constants.poolFactory,
       method: "createPool",
       args: body,
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -125,7 +126,8 @@ export const addLiquidityDualToken = async (
     tokenBAmount: string;
     maxTokenAAmount: string;
     deadline: number;
-  }
+  },
+  userAddress: string
 ) => {
   try {
     const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
@@ -139,7 +141,11 @@ export const addLiquidityDualToken = async (
     }
     const pool = pools[0];
 
-    const tx = buildFunctionTx([
+    // If adding liquidity with USDST, include the USDST amount in the fee check
+    const requiredUSDST = pool.tokenAAddress === constants.USDST ? BigInt(maxTokenAAmount || "0") :
+                         pool.tokenBAddress === constants.USDST ? BigInt(tokenBAmount || "0") : undefined;
+
+    const tx = await buildFunctionTx([
       {
         contractName: extractContractName(Token),
         contractAddress: pool.tokenAAddress || "",
@@ -162,7 +168,7 @@ export const addLiquidityDualToken = async (
           deadline
         },
       }
-    ]);
+    ], userAddress, accessToken, requiredUSDST);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -181,7 +187,8 @@ export const addLiquiditySingleToken = async (
     singleTokenAmount: string;
     isAToB: boolean;
     deadline: number;
-  }
+  },
+  userAddress: string
 ) => {
   try {
     const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
@@ -197,7 +204,10 @@ export const addLiquiditySingleToken = async (
 
     const depositTokenAddress = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
     
-    const tx = buildFunctionTx([
+    // If adding liquidity with USDST, include the USDST amount in the fee check
+    const requiredUSDST = depositTokenAddress === constants.USDST ? BigInt(singleTokenAmount || "0") : undefined;
+    
+    const tx = await buildFunctionTx([
       {
         contractName: extractContractName(Token),
         contractAddress: depositTokenAddress || "",
@@ -214,7 +224,7 @@ export const addLiquiditySingleToken = async (
           deadline
         },
       }
-    ]);
+    ], userAddress, accessToken, requiredUSDST);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -232,7 +242,8 @@ export const removeLiquidity = async (
     poolAddress: string;
     lpTokenAmount: string;
     deadline: number;
-  }
+  },
+  userAddress: string
 ) => {
   try {
     const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
@@ -261,7 +272,7 @@ export const removeLiquidity = async (
       (tokenBAmount * slippageFactor) /
       BigInt(100)
     ).toString();
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Pool),
       contractAddress: poolAddress || "",
       method: "removeLiquidity",
@@ -271,7 +282,7 @@ export const removeLiquidity = async (
         minTokenAAmount,
         deadline
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -294,7 +305,8 @@ export const swap = async (
     amountIn: string;
     minAmountOut: string;
     deadline: number;
-  }
+  },
+  userAddress: string
 ) => {
   try {
     const { poolAddress, isAToB, amountIn, minAmountOut, deadline } = swapParams;
@@ -309,8 +321,11 @@ export const swap = async (
     const pool = pools[0];
 
     const token = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+    
+    // If swapping USDST, include the swap amount in the fee check
+    const requiredUSDST = token === constants.USDST ? BigInt(amountIn || "0") : undefined;
 
-    const tx = buildFunctionTx([
+    const tx = await buildFunctionTx([
       {
         contractName: extractContractName(Token),
         contractAddress: token || "",
@@ -328,7 +343,7 @@ export const swap = async (
           deadline,
         },
       }
-    ]);
+    ], userAddress, accessToken, requiredUSDST);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -502,7 +517,8 @@ export const setPoolRates = async (
     poolAddress: string;
     swapFeeRate: number;
     lpSharePercent: number;
-  }
+  },
+  userAddress: string
 ) => {
   try {
     const { poolAddress, swapFeeRate, lpSharePercent } = setPoolRatesParams;
@@ -517,7 +533,7 @@ export const setPoolRates = async (
     }
 
     // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(PoolFactory),
       contractAddress: poolFactory,
       method: "setPoolFeeParameters",
@@ -526,7 +542,7 @@ export const setPoolRates = async (
         newSwapFeeRate: swapFeeRate.toString(),
         newLpSharePercent: lpSharePercent.toString(),
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

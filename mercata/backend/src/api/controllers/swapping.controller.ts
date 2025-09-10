@@ -76,10 +76,10 @@ class SwappingController {
   // Creators
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
       validateCreatePoolsArgs(body);
 
-      const result = await createPool(accessToken, body);
+      const result = await createPool(accessToken, body, address);
       res.status(200).json(result);
       return next();
     } catch (e) {
@@ -89,7 +89,7 @@ class SwappingController {
 
   // Liquidity
   static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
+    const { accessToken, body, params, address } = req;
     validateAddLiquidityDualTokenArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
@@ -99,13 +99,13 @@ class SwappingController {
       deadline
     };
 
-    const result = await addLiquidityDualToken(accessToken, liquidityParams);
+    const result = await addLiquidityDualToken(accessToken, liquidityParams, address);
     res.status(200).json(result);
     return next();
   }
 
   static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
+    const { accessToken, body, params, address } = req;
     validateAddLiquiditySingleTokenArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
@@ -115,13 +115,13 @@ class SwappingController {
       deadline
     };
 
-    const result = await addLiquiditySingleToken(accessToken, liquidityParams);
+    const result = await addLiquiditySingleToken(accessToken, liquidityParams, address);
     res.status(200).json(result);
     return next();
   }
 
   static async removeLiquidity(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
+    const { accessToken, body, params, address } = req;
     validateRemoveLiquidityArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
@@ -131,18 +131,18 @@ class SwappingController {
       deadline
     };
 
-    const result = await removeLiquidity(accessToken, removeLiquidityParams);
+    const result = await removeLiquidity(accessToken, removeLiquidityParams, address);
     res.status(200).json(result);
     return next();
   }
 
   // Swaps
   static async swap(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body } = req;
+    const { accessToken, body, address } = req;
     validateSwapArgs(body);
 
     const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const result = await swap(accessToken, { ...body, deadline });
+    const result = await swap(accessToken, { ...body, deadline }, address);
     res.status(200).json(result);
     return next();
   }
@@ -301,10 +301,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address } = req;
       validateSetPoolRatesArgs(body);
 
-      const result = await setPoolRates(accessToken, body);
+      const result = await setPoolRates(accessToken, body, address);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
