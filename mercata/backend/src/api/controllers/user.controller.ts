@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin } from "../services/user.service";
-import { validateUserAddress } from "../validators/common.validators";
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, getOpenIssues } from "../services/user.service";
+import { validateUserAddress, validateAddressField } from "../validators/common.validators";
 
 class UserController {
   static async me(
@@ -77,6 +77,47 @@ class UserController {
         status: result.status,
         hash: result.hash
       });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async castVoteOnIssue(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { target, func, args } = req.body;
+
+      validateAddressField(target);
+
+      const result = await castVoteOnIssue(accessToken, target, func, args);
+      res.status(RestStatus.OK).json({ 
+        message: "Admin removed successfully", 
+        target,
+        func,
+        args,
+        status: result.status,
+        hash: result.hash,
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async getOpenIssues(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const issues = await getOpenIssues(accessToken);
+      res.status(RestStatus.OK).json(issues);
       next();
     } catch (e) {
       next(e);

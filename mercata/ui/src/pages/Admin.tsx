@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote } from 'lucide-react';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
@@ -11,6 +11,7 @@ import TokenConfigTable from '@/components/admin/TokenConfigTable';
 import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import LendingTab from '@/components/admin/LendingTab';
+import VoteTab from '@/components/admin/VoteTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -81,6 +82,11 @@ const Admin = () => {
                 <span className="hidden sm:inline">Token Status</span>
                 <span className="sm:hidden">Status</span>
               </TabsTrigger>
+              <TabsTrigger value="vote" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Vote className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Vote on Issues</span>
+                <span className="sm:hidden">Vote</span>
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -137,6 +143,10 @@ const Admin = () => {
 
           <TabsContent value="status" className="space-y-6">
             <TokenStatusTable />
+          </TabsContent>
+
+          <TabsContent value="vote" className="space-y-6">
+            <VoteTab />
           </TabsContent>
         </Tabs>
       </div>
