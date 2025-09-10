@@ -223,15 +223,6 @@ const LiquidityDepositModal = ({
 
     let maxBigInt = BigInt(balance || "0");
 
-    if (isUSDST) {
-      const fee = safeParseUnits(DEPOSIT_FEE, 18);
-      if (maxBigInt > fee) {
-        maxBigInt = maxBigInt - fee;
-      } else {
-        maxBigInt = BigInt(0);
-      }
-    }
-
     const maxVal = formatUnits(maxBigInt, 18);
 
     if (isFirstToken) {
@@ -292,11 +283,7 @@ const LiquidityDepositModal = ({
 
   const isConfirmButtonDisabled = () => {
     if (depositLoading) return true;
-    
-    // Check USDST balance for transaction fee
-    if (BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)) return true;
-    
-    // Check based on deposit mode
+
     switch (depositMode) {
       case 'A':
         return !token1Amount || safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0");
@@ -391,36 +378,6 @@ const LiquidityDepositModal = ({
               {safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") && (
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
-              {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
-               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
-               safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {selectedPool?.tokenA.address !== usdstAddress && 
-               selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {(() => {
-                if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
-                  const inputAmountWei = safeParseUnits(token1Amount, 18);
-                  const balanceWei = BigInt(tokenABalance || "0");
-                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                  const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n &&
-                    remainingBalance >= 0n &&
-                    remainingBalance <= lowBalanceThreshold &&
-                    inputAmountWei <= balanceWei - feeWei;
-
-                  return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                    </p>
-                  ) : null;
-                }
-                return null;
-              })()}
             </div>
 
             {/* Deposit Mode Toggle */}
@@ -506,36 +463,6 @@ const LiquidityDepositModal = ({
               {safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") && (
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
-              {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
-               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
-               safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {selectedPool?.tokenA.address !== usdstAddress && 
-               selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
-              )}
-              {(() => {
-                if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
-                  const inputAmountWei = safeParseUnits(token2Amount, 18);
-                  const balanceWei = BigInt(tokenBBalance || "0");
-                  const feeWei = safeParseUnits(DEPOSIT_FEE, 18);
-                  const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                  const remainingBalance = balanceWei - inputAmountWei - feeWei;
-                  const isLowBalanceWarning = inputAmountWei > 0n &&
-                    remainingBalance >= 0n &&
-                    remainingBalance <= lowBalanceThreshold &&
-                    inputAmountWei <= balanceWei - feeWei;
-
-                  return isLowBalanceWarning ? (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                    </p>
-                  ) : null;
-                }
-                return null;
-              })()}
             </div>
           </div>
 

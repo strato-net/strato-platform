@@ -199,18 +199,11 @@ const CollateralModal = ({
     return amountWei > 0n && amountWei <= maxAmount;
   };
 
-  const isFeeSufficient = () => {
-    const feeAmount = safeParseUnits(transactionFee, 18);
-    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-    return usdstBalanceBigInt >= feeAmount;
-  };
-
   const isDisabled = () => {
     return (
       safeParseUnits(amount || "0", 18) === 0n ||
       loading ||
       !isAmountValid() ||
-      !isFeeSufficient() ||
       (!isSupply && !healthImpact.isHealthy)
     );
   };
@@ -353,37 +346,6 @@ const CollateralModal = ({
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">{transactionFee} USDST</span>
             </div>
-            {(() => {
-              const feeAmount = safeParseUnits(transactionFee, 18);
-              const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-
-              // Check if insufficient USDST for fee
-              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-
-              // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = safeParseUnits("0.10", 18);
-              const remainingBalance = usdstBalanceBigInt - feeAmount;
-              const isLowBalanceWarning =
-                remainingBalance >= 0n &&
-                remainingBalance <= lowBalanceThreshold;
-
-              return (
-                <>
-                  {isInsufficientUsdstForFee && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee (
-                      {transactionFee} USDST)
-                    </p>
-                  )}
-                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
-                    <p className="text-yellow-600 text-sm mt-1">
-                      Warning: Your USDST balance is running low. Add more funds
-                      now to avoid issues with future transactions.
-                    </p>
-                  )}
-                </>
-              );
-            })()}
           </div>
         </div>
 

@@ -72,17 +72,14 @@ const WithdrawWidget: React.FC = () => {
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
   const maxAmount = useMemo(() => {
-    // Calculate max available USDST (balance minus fee)
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-    const feeBigInt = safeParseUnits(WITHDRAW_USDST_FEE, 18);
-    const availableUsdst = usdstBalanceBigInt > feeBigInt ? usdstBalanceBigInt - feeBigInt : 0n;
-    var maxAllowed = availableUsdst;
+    var maxAllowed = usdstBalanceBigInt;
     
     // Zero maxPerTx means no limit
     if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx != "0") {
       // Compare with token's max per transaction limit
       const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerTx, 18);
-      maxAllowed = availableUsdst < tokenMaxBigInt ? availableUsdst : tokenMaxBigInt;
+      maxAllowed = maxAllowed < tokenMaxBigInt ? maxAllowed : tokenMaxBigInt;
     }
 
     return formatBalance(maxAllowed, undefined, 18, 2, 2);
@@ -147,7 +144,7 @@ const WithdrawWidget: React.FC = () => {
       const beforeWei = BigInt(currentUsdst || "0");
       const before = Number((beforeWei / 10n ** 18n).toString());
       const v = Number(amount || "0");
-      const after = Math.max(0, before - v - Number(WITHDRAW_USDST_FEE));
+      const after = Math.max(0, before - v);
       return { before, after };
     } catch {
       return { before: 0, after: 0 };

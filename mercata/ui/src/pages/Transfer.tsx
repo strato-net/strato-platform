@@ -209,15 +209,7 @@ const Transfer = () => {
                       type="button"
                       onClick={() => {
                         try {
-                          let max = maxAmount;
-                          const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-
-                          // If transferring USDST, subtract the fee
-                          if (fromAsset?.address === usdstAddress) {
-                            max = max > feeAmount ? max - feeAmount : 0n;
-                          }
-
-                          const raw = formatUnits(max, 18);
+                          const raw = formatUnits(maxAmount, 18);
                           // clamp to 18 decimals using utility function
                           const clampedAmount = roundToDecimals(raw, 18);
                           setFromAmount(clampedAmount);
@@ -276,49 +268,6 @@ const Transfer = () => {
                   available balance.
                 </p>
               )}
-              {/* Fee validation warnings */}
-              {(() => {
-                const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                const inputAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
-
-                // Check if transferring USDST and leaving enough for fee
-                const isUsdstMaxIssue = !loadingUsdstBalance && fromAsset?.address === usdstAddress &&
-                  inputAmountWei > usdstBalanceBigInt - feeAmount &&
-                  inputAmountWei <= usdstBalanceBigInt;
-
-                // Check if insufficient USDST for fee
-                const isInsufficientUsdstForFee = !loadingUsdstBalance && fromAsset?.address !== usdstAddress &&
-                  usdstBalanceBigInt < feeAmount;
-                
-                // Check if input amount is within 0.10 of USDST balance (low balance warning)
-                const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
-                const isLowBalanceWarning = fromAsset?.address === usdstAddress &&
-                  inputAmountWei > 0n &&
-                  remainingBalance >= 0n &&
-                  remainingBalance <= lowBalanceThreshold;
-
-                return (
-                  <>
-                    {isUsdstMaxIssue && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Insufficient balance for transaction fee ({TRANSFER_FEE} USDST)
-                      </p>
-                    )}
-                    {isInsufficientUsdstForFee && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Insufficient USDST balance for transaction fee ({TRANSFER_FEE} USDST)
-                      </p>
-                    )}
-                    {isLowBalanceWarning && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
             </div>
 
             {/* Transaction Fee Display */}
@@ -339,29 +288,7 @@ const Transfer = () => {
                 wrongAmount ||
                 swapLoading ||
                 !!errorMessage ||
-                // Check if amount is invalid (just ".", or not a valid number, or 0)
-                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0) ||
-                (() => {
-                  const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-                  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-
-                  // Check if user has enough USDST for fee
-                  if (usdstBalanceBigInt < feeAmount) {
-                    return true;
-                  }
-
-                  // Check if transferring USDST and leaving enough for fee
-                  if (fromAsset?.address === usdstAddress) {
-                    const fromAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
-                    const balance = BigInt(fromAsset.balance || "0");
-
-                    if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
-                      return true;
-                    }
-                  }
-
-                  return false;
-                })()
+                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0)
               }
             >
               {swapLoading ? <span>Processing…</span> : "Transfer"}

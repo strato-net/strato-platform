@@ -249,22 +249,6 @@ const LiquidityWithdrawModal = ({
               <span>Transaction fee</span>
               <span>{WITHDRAW_FEE} USDST</span>
             </div>
-            {!balanceLoading && BigInt(usdstBalance || "0") < safeParseUnits(WITHDRAW_FEE, 18) && (
-              <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({WITHDRAW_FEE} USDST)</p>
-            )}
-            {(() => {
-              const usdstBalanceWei = BigInt(usdstBalance || "0");
-              const feeWei = safeParseUnits(WITHDRAW_FEE, 18);
-              const lowBalanceThreshold = safeParseUnits("0.10", 18);
-              const remainingBalance = usdstBalanceWei - feeWei;
-              const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-              
-              return isLowBalanceWarning && usdstBalanceWei >= feeWei ? (
-                <p className="text-yellow-600 text-sm mt-1">
-                  Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                </p>
-              ) : null;
-            })()}
             {selectedPool && withdrawPercent && selectedPool.lpToken._totalSupply !== "0" && (
               <>
                 <div className="w-full flex justify-between">
@@ -293,8 +277,7 @@ const LiquidityWithdrawModal = ({
                 withdrawLoading || 
                 !withdrawPercent || 
                 parseFloat(withdrawPercent) <= 0 || 
-                parseFloat(withdrawPercent) > 100 || 
-                BigInt(usdstBalance || "0") < safeParseUnits(WITHDRAW_FEE, 18)
+                parseFloat(withdrawPercent) > 100
               } 
               type="submit" 
               className="w-full bg-strato-blue hover:bg-strato-blue/90"

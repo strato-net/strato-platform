@@ -84,11 +84,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
       setRepayAmount(""); setRepayDisplayAmount("");
       return;
     }
-    const feeWei = safeParseUnits(REPAY_FEE, 18);
-    const balWei = BigInt(usdstBalance || "0");
-    const availableWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-    const safeAvailableWei = availableWei > 1n ? (availableWei - 1n) : 0n; // 1-wei safety
-    const repayWei = inputWei > owed ? owed : (inputWei > safeAvailableWei ? safeAvailableWei : inputWei);
+    const repayWei = inputWei > owed ? owed : inputWei;
     onRepay(formatUnits(repayWei, 18));
     setRepayAmount(""); setRepayDisplayAmount("");
   };
@@ -102,10 +98,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     );
   }
 
-  const feeWei = safeParseUnits(REPAY_FEE, 18);           // bigint
-  const balWei = BigInt(usdstBalance || "0");             // bigint
-  const availWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-  const safeAvailWei = availWei > 1n ? (availWei - 1n) : 0n; // 1-wei safety for display and validation
+  const balWei = BigInt(usdstBalance || "0");
 
   return (
     <div className="space-y-4 pt-4">
@@ -178,7 +171,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             </button>
             <span>{(() => {
               const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
+              const maxWalletSafe = balWei;
               const max = maxWalletSafe < totalOwed ? maxWalletSafe : totalOwed;
               return max <= 0n ? '-' : formatCurrency(formatUnits(max, 18));
             })()} USDST</span>
@@ -190,7 +183,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             className={`pr-16 ${(() => { 
               const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
               const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
+              const maxWalletSafe = balWei;
               return repayAmountWei > totalOwed || repayAmountWei > maxWalletSafe ? 'text-red-600' : ''; 
             })()}`}
             value={repayDisplayAmount}
@@ -202,7 +195,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           value={repayAmount}
           maxValue={(() => {
             const maxAvailable = BigInt(loans?.totalAmountOwed || 0);
-            const maxWalletSafe = safeAvailWei;
+            const maxWalletSafe = balWei;
             const maxAmount = maxWalletSafe > 0n && maxWalletSafe < maxAvailable ? maxWalletSafe : maxAvailable;
             return maxAmount.toString();
           })()}
@@ -210,16 +203,6 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
             handleRepayPercentage(val);
           }}
           className="pt-2"
-          renderLabel={(p) => {
-            try {
-              const owed = BigInt(loans?.totalAmountOwed || 0);
-              const walletSafe = safeAvailWei;
-              const isWalletLimited = walletSafe < owed;
-              return p === 1 ? (isWalletLimited ? 'Max' : '100%') : `${Math.round(p*100)}%`;
-            } catch {
-              return p === 1 ? 'Max' : `${Math.round(p*100)}%`;
-            }
-          }}
         />
       </div>
 
@@ -261,17 +244,6 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{REPAY_FEE} USDST</span>
         </div>
-        {(() => {
-          const feeAmount = safeParseUnits(REPAY_FEE, 18);
-          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-          
-          return isInsufficientUsdstForFee ? (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({REPAY_FEE} USDST)
-            </p>
-          ) : null;
-        })()}
       </div>
 
       {/* Repay Button */}
@@ -281,16 +253,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
           repayLoading ||
           !repayAmount ||
           (() => { try { return safeParseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
-          (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loans?.totalAmountOwed || 0); } catch { return true; } })() ||
-          (() => {
-            try {
-              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-              const totalNeeded = repayAmountWei + feeWei;
-              return balWei < totalNeeded || repayAmountWei > safeAvailWei;
-            } catch {
-              return true;
-            }
-          })()
+          (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loans?.totalAmountOwed || 0); } catch { return true; } })()
         }
         className="w-full"
       >

@@ -194,17 +194,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{BORROW_FEE} USDST</span>
         </div>
-        {(() => {
-          const feeAmount = safeParseUnits(BORROW_FEE, 18);
-          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-
-          return isInsufficientUsdstForFee ? (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
-            </p>
-          ) : null;
-        })()}
       </div>
 
       {/* Borrow Button */}
@@ -214,12 +203,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           !borrowAmount ||
           safeParseUnits(borrowAmount, 18) <= 0n ||
           borrowLoading ||
-          safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
-          (() => {
-            const feeAmount = safeParseUnits(BORROW_FEE, 18);
-            const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-            return usdstBalanceBigInt < feeAmount;
-          })()
+          safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0)
         }
         className="w-full"
       >

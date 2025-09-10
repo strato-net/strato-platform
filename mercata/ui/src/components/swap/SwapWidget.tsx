@@ -437,22 +437,8 @@ const SwapWidget = () => {
     }
   }, [fromAsset?.address, toAsset?.address]);
 
-  // Fee warning logic
-  const feeAmount = useMemo(() => safeParseUnits(SWAP_FEE, DECIMALS), [SWAP_FEE]);
-  const usdstBalanceBigInt = useMemo(() => BigInt(usdstBalance || "0"), [usdstBalance]);
-  
   // Safely parse input amounts
   const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
-
-  // Fee warning checks
-  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-
-  const isLowBalanceWarning = useMemo(() => {
-    if (fromAsset?.address !== usdstAddress || fromAmountWei <= 0n) return false;
-    const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
-    const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
-    return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-  }, [fromAsset, fromAmountWei, usdstBalanceBigInt, feeAmount]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -844,32 +830,9 @@ const SwapWidget = () => {
 
   // Validation helpers
   const isSwapDisabled = () => {
-    const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
-    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-
-    // Basic validations
+    // Basic validations only - fee validation handled by backend
     if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount || insufficientPoolBalance) {
       return true;
-    }
-
-    // Check if user has enough USDST for fee
-    if (usdstBalanceBigInt < feeAmount) {
-      return true;
-    }
-
-    // Check if swapping USDST and leaving enough for fee
-    if (fromAsset.address === usdstAddress) {
-      // Validate fromAmount before parsing
-      if (!fromAmount || isNaN(Number(fromAmount))) {
-        return true;
-      }
-      
-      const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
-      const balance = BigInt(fromAsset.balance || "0");
-
-      if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
-        return true;
-      }
     }
 
     return false;
@@ -893,16 +856,6 @@ const handleMaxClick = useCallback((isFrom: boolean) => {
   if (!asset) return;
 
   let balance = BigInt(asset.balance) || 0n;
-
-
-   if (asset?.address === usdstAddress) {
-    const fee = safeParseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
-    if (balance > fee) {
-      balance -= fee;
-    } else {
-      balance = 0n;
-    }
-  }
 
   const formatted = formatUnits(balance.toString() || 0,18);
   
@@ -989,19 +942,7 @@ const handleMaxClick = useCallback((isFrom: boolean) => {
           <span className="text-gray-600">Transaction Fee</span>
           <span className="font-medium">{SWAP_FEE} USDST</span>
         </div>
-        
-        {/* Fee Warnings */}
-        {hasInsufficientUsdstForFee && (
-          <p className="text-yellow-600 text-sm mt-1">
-            Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
-          </p>
-        )}
-        {isLowBalanceWarning && (
-          <p className="text-yellow-600 text-sm mt-1">
-            Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-          </p>
-        )}
-        
+
         <SlippageControl
           slippage={slippage}
           autoSlippage={autoSlippage}
