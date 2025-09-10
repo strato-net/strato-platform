@@ -126,7 +126,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,

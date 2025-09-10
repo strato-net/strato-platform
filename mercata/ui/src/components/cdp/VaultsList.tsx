@@ -19,7 +19,7 @@ const calculateHealthFactor = (cr: number, lt: number): number => {
 // Get health factor color based on value
 const getHealthFactorColor = (healthFactor: number): string => {
   if (healthFactor >= 1.5) return "text-black"; // Healthy - black
-  if (healthFactor >= 1.1) return "text-yellow-600"; // Warning - yellow
+  if (healthFactor >= 1.0) return "text-yellow-600"; // Warning - yellow
   return "text-red-600"; // Danger - red
 };
 

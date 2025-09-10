@@ -47,6 +47,9 @@ router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidat
 // Get liquidatable positions
 router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiquidatable);
 
+// Get maximum liquidatable amount for a position
+router.post("/max-liquidatable", authHandler.authorizeRequest(), CDPController.getMaxLiquidatable);
+
 // ----- Configuration -----
 // Get collateral asset configuration
 router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.getAssetConfig);

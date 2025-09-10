@@ -6,16 +6,24 @@ import './BridgeTransactionsPage.css';
 import DepositTransactionDetails from './DepositTransactionDetails';
 import WithdrawTransactionDetails from './WithdrawTransactionDetails';
 import { useBridgeContext } from '@/context/BridgeContext';
-
-type TransactionType = 'DepositRecorded' | 'WithdrawalInitiated' | 'RedemptionInitiated' | 'USDSTDeposit';
+import { BridgeTransactionTab } from '@/lib/bridge/types';
 
 const BridgeTransactionsPage = () => {
-  const [transactionType, setTransactionType] = useState<TransactionType>('DepositRecorded');
-  const { loadNetworksAndTokens } = useBridgeContext();
+  const { loadNetworksAndTokens, targetTransactionTab, setTargetTransactionTab } = useBridgeContext();
+  const [transactionType, setTransactionType] = useState<BridgeTransactionTab>('DepositRecorded');
 
   useEffect(() => {
     loadNetworksAndTokens();
   }, [loadNetworksAndTokens]);
+
+  // Check for target tab from context and set it
+  useEffect(() => {
+    if (targetTransactionTab) {
+      setTransactionType(targetTransactionTab);
+      // Clear the target tab after setting it
+      setTargetTransactionTab(null);
+    }
+  }, [targetTransactionTab, setTargetTransactionTab]);
 
   const mainItems = [
     {
@@ -50,7 +58,7 @@ const BridgeTransactionsPage = () => {
                   <Tabs
                     activeKey={transactionType}
                     items={mainItems}
-                    onChange={(value) => setTransactionType(value as TransactionType)}
+                    onChange={(value) => setTransactionType(value as BridgeTransactionTab)}
                     className="custom-tabs"
                     style={{
                       '--ant-primary-color': '#3b82f6',

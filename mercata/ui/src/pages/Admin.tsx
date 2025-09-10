@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Database } from 'lucide-react';
+import { Shield, Coins, DollarSign, Droplets, Settings, ArrowLeft, ToggleLeft, Cog, CreditCard, TrendingUp, Vote, Database } from 'lucide-react';
 import CreateTokenForm from '@/components/admin/CreateTokenForm';
 import CreatePoolForm from '@/components/admin/CreatePoolForm';
 import SetAssetPriceForm from '@/components/admin/SetAssetPriceForm';
@@ -12,6 +12,7 @@ import TokenStatusTable from '@/components/admin/TokenStatusTable';
 import SwapPoolsTable from '@/components/admin/SwapPoolsTable';
 import LendingTab from '@/components/admin/LendingTab';
 import CollateralConfigManager from '@/components/admin/CollateralConfigManager';
+import VoteTab from '@/components/admin/VoteTab';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -85,7 +86,12 @@ const Admin = () => {
               <TabsTrigger value="cdp" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
                 <Database className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">CDP Config</span>
-                <span className="sm:hidden">CDP</span>
+                <span className="sm:hidden">CDP</span>  
+              </TabsTrigger>
+              <TabsTrigger value="vote" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
+                <Vote className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">Vote on Issues</span>
+                <span className="sm:hidden">Vote</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -149,6 +155,9 @@ const Admin = () => {
             <CollateralConfigManager />
           </TabsContent>
 
+          <TabsContent value="vote" className="space-y-6">
+            <VoteTab />
+          </TabsContent>
         </Tabs>
       </div>
     </div>

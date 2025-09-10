@@ -129,10 +129,11 @@ export const simulateLoan = (
   loan: LoanInfo | null,
   collaterals: CollateralInfo[],
   assetConfigs: Map<string, AssetConfig>,
-  borrowIndex: string
+  borrowIndex: string,
+  borrowableAsset: string
 ) => {
   // 1) Borrowable asset config (single borrowable asset model)
-  const borrowableAssetConfig = Array.from(assetConfigs.values())[0];
+  const borrowableAssetConfig = assetConfigs.get(borrowableAsset);
   if (!borrowableAssetConfig) {
     throw new Error("No borrowable asset configuration found");
   }

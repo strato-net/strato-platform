@@ -11,16 +11,22 @@ import { Button } from "@/components/ui/button";
 import { Tabs as AntdTabs } from 'antd';
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useBridgeContext } from '@/context/BridgeContext';
 
 interface ExchangeCartProps {
   onVaultActionSuccess?: () => void; // Callback passed from parent
+  initialTab?: string; // Initial tab to open
 }
 
-const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => {
+const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initialTab }) => {
   const [showLiquidations, setShowLiquidations] = useState(false);
   const [usdcActiveTab, setUsdcActiveTab] = useState('deposit');
-  // Use localStorage to persist tab state across re-renders
+  // Use localStorage to persist tab state across re-renders, but prioritize initialTab if provided
   const [activeTab, setActiveTab] = useState(() => {
+    // If initialTab is provided, use it instead of localStorage
+    if (initialTab) {
+      return initialTab;
+    }
     try {
       return localStorage.getItem('exchangeCart-activeTab') || 'bridge';
     } catch {
@@ -28,6 +34,7 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => 
     }
   });
   const navigate = useNavigate();
+  const { setTargetTransactionTab } = useBridgeContext();
   const [convertAction, setConvertAction] = useState<'deposit' | 'withdraw' | null>(null);
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
 
@@ -108,12 +115,17 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => 
         <TabsContent value="usdc">
           <div className="w-full">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-900">USDC/USDT Bridge</h2>
+              <h2 className="text-lg font-semibold text-gray-900">USDST</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 className="flex items-center gap-2"
-                onClick={() => navigate("/dashboard/bridge-transactions")}
+                onClick={() => {
+                  // Set the target tab based on the current USDC active tab
+                  const targetTab = usdcActiveTab === 'deposit' ? 'USDSTDeposit' : 'RedemptionInitiated';
+                  setTargetTransactionTab(targetTab);
+                  navigate("/dashboard/bridge-transactions");
+                }}
               >
                 <History className="h-4 w-4" />
                 View Transactions
@@ -143,16 +155,16 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => 
                 {usdcActiveTab === 'deposit' ? (
                   <div>
                     <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-center">Convert to USDST</h3>
-                      <p className="text-sm text-gray-600 text-center">Bridge USDC/USDT and mint USDST</p>
+                      <h3 className="text-lg font-semibold text-center">Get USDST</h3>
+                      <p className="text-sm text-gray-600 text-center">Bridge stablecoins and get USDST</p>
                     </div>
                     <MintWidget />
                   </div>
                 ) : (
                   <div>
                     <div className="mb-4">
-                      <h3 className="text-lg font-semibold text-center">Redeem to USDC/USDT</h3>
-                      <p className="text-sm text-gray-600 text-center">Redeem USDST back to USDC/USDT</p>
+                      <h3 className="text-lg font-semibold text-center">Redeem to Stablecoins</h3>
+                      <p className="text-sm text-gray-600 text-center">Redeem USDST back to external stablecoins</p>
                     </div>
                     <WithdrawWidget />
                   </div>
