@@ -14,6 +14,7 @@ import {
   repayAll,
   liquidate,
   getLiquidatable,
+  getMaxLiquidatable,
   getAssetConfig,
   getSupportedAssets,
   getAssetDebtInfo,
@@ -218,6 +219,20 @@ class CDPController {
       const { accessToken, address: userAddress } = req;
       const liquidatable = await getLiquidatable(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(liquidatable);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getMaxLiquidatable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await getMaxLiquidatable(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
     }
