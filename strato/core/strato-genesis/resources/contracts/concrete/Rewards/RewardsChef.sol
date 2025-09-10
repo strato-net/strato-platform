@@ -4,6 +4,25 @@ pragma solidity ^0.8.0;
 import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
 
+/**
+ * PRECISION LOSS PREVENTION:
+ *
+ * Issue: The reward calculation `(multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint`
+ * can result in precision loss due to Solidity's integer division, causing rewards to be
+ * rounded down to zero.
+ *
+ * Example:
+ * - multiplier = 1 (1 second passed)
+ * - cataPerSecond = 100 (base units)
+ * - pool.allocPoint = 1 (small pool)
+ * - totalAllocPoint = 200 (total across all pools)
+ * - Result: (1 * 100 * 1) / 200 = 100 / 200 = 0 (rounded down)
+ *
+ * Solution: Enforce the invariant `cataPerSecond >= totalAllocPoint` to ensure that even
+ * the smallest reward calculation (multiplier=1, allocPoint=1) produces a non-zero result.
+ * This prevents active pools from having their rewards rounded down to zero while still
+ * allowing disabled pools (allocPoint=0) to correctly receive zero rewards.
+ */
 contract record RewardsChef is Ownable {
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -104,6 +123,8 @@ contract record RewardsChef is Ownable {
 
         totalAllocPoint += _allocPoint;
         require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
+        // See 'PRECISION LOSS PREVENTION' section in top comment
+        require(cataPerSecond >= totalAllocPoint, "cataPerSecond must be >= totalAllocPoint to prevent precision loss");
 
         // Create new pool info with first bonus period
         PoolInfo memory poolInfo;
@@ -128,6 +149,8 @@ contract record RewardsChef is Ownable {
         uint256 oldAllocPoint = pools[_pid].allocPoint;
         totalAllocPoint = totalAllocPoint - oldAllocPoint + _allocPoint;
         require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
+        // See 'PRECISION LOSS PREVENTION' section in top comment
+        require(cataPerSecond >= totalAllocPoint, "cataPerSecond must be >= totalAllocPoint to prevent precision loss");
         pools[_pid].allocPoint = _allocPoint;
 
         emit AllocationPointsUpdated(_pid, oldAllocPoint, _allocPoint);
