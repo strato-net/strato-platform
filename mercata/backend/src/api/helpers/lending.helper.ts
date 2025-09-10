@@ -352,8 +352,7 @@ export const calculateTotalCollateralValue = (
     if (totalAssetCollateral > 0n) {
       const collateralValue = (
         totalAssetCollateral * 
-        toBig(price) * 
-        BigInt(config.AssetConfig.liquidationThreshold)
+        toBig(price)
       ) / (DECIMALS * 10000n);
       totalValue += collateralValue;
     }
