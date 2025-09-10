@@ -17,6 +17,7 @@ import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
+import { useSearchParams } from 'react-router-dom';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
@@ -24,6 +25,9 @@ const DepositsPage = () => {
   const { loans } = useLendingContext();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
 
   // Add visibility state to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -126,7 +130,7 @@ const DepositsPage = () => {
                   color="bg-blue-500"
                 />
               </div>
-              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} />
+              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} initialTab={initialTab} />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
               {/* Render AssetsList when data is loaded */}
