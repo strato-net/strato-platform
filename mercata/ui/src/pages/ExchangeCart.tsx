@@ -15,13 +15,18 @@ import { useBridgeContext } from '@/context/BridgeContext';
 
 interface ExchangeCartProps {
   onVaultActionSuccess?: () => void; // Callback passed from parent
+  initialTab?: string; // Initial tab to open
 }
 
-const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess }) => {
+const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initialTab }) => {
   const [showLiquidations, setShowLiquidations] = useState(false);
   const [usdcActiveTab, setUsdcActiveTab] = useState('deposit');
-  // Use localStorage to persist tab state across re-renders
+  // Use localStorage to persist tab state across re-renders, but prioritize initialTab if provided
   const [activeTab, setActiveTab] = useState(() => {
+    // If initialTab is provided, use it instead of localStorage
+    if (initialTab) {
+      return initialTab;
+    }
     try {
       return localStorage.getItem('exchangeCart-activeTab') || 'bridge';
     } catch {
