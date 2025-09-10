@@ -1,13 +1,27 @@
 import { api } from "@/lib/axios";
 import { parseUnits } from "ethers";
 
-// Helper function to get asset decimals
+// Constants for better maintainability
+const USDST_DECIMALS = 18;
+const DEFAULT_DECIMALS = 18;
+
+// Helper function to get asset decimals with caching
+const assetDecimalsCache = new Map<string, number>();
+
+
 const getAssetDecimals = async (asset: string): Promise<number> => {
+  if (assetDecimalsCache.has(asset)) {
+    return assetDecimalsCache.get(asset)!;
+  }
+  
   try {
     const assetConfig = await cdpService.getAssetConfig(asset);
-    return 18; // Default to 18 decimals for now, could be enhanced to get actual decimals from token contract
+    const decimals = DEFAULT_DECIMALS; // Default to 18 decimals for now, could be enhanced to get actual decimals from token contract
+    assetDecimalsCache.set(asset, decimals);
+    return decimals;
   } catch {
-    return 18; // Fallback to 18 decimals
+    assetDecimalsCache.set(asset, DEFAULT_DECIMALS);
+    return DEFAULT_DECIMALS; // Fallback to 18 decimals
   }
 };
 
@@ -98,7 +112,7 @@ export const cdpService = {
 
   // Mint USDST
   async mint(asset: string, amount: string): Promise<TransactionResponse> {
-    const amountWei = parseUnits(amount, 18).toString(); // USDST is always 18 decimals
+    const amountWei = parseUnits(amount, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/mint", { asset, amount: amountWei });
     return response.data;
   },
@@ -111,7 +125,7 @@ export const cdpService = {
 
   // Repay USDST debt
   async repay(asset: string, amount: string): Promise<TransactionResponse> {
-    const amountWei = parseUnits(amount, 18).toString(); // USDST is always 18 decimals
+    const amountWei = parseUnits(amount, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/repay", { asset, amount: amountWei });
     return response.data;
   },
@@ -124,7 +138,7 @@ export const cdpService = {
 
   // Execute liquidation
   async liquidate(collateralAsset: string, borrower: string, debtToCover: string): Promise<TransactionResponse> {
-    const debtToCoverWei = parseUnits(debtToCover, 18).toString(); // USDST is always 18 decimals
+    const debtToCoverWei = parseUnits(debtToCover, USDST_DECIMALS).toString();
     const response = await api.post("/cdp/liquidate", { collateralAsset, borrower, debtToCover: debtToCoverWei });
     return response.data;
   },
@@ -163,5 +177,65 @@ export const cdpService = {
   }> {
     const response = await api.post("/cdp/asset-debt-info", { asset });
     return response.data;
-  }
+  },
+
+  // ----- CDP Management APIs (Admin Only) -----
+  
+  // Set collateral asset configuration
+  async setCollateralConfig(configData: {
+    asset: string;
+    liquidationRatio: string;
+    liquidationPenaltyBps: string;
+    closeFactorBps: string;
+    stabilityFeeRate: string;
+    debtFloor: string;
+    debtCeiling: string;
+    unitScale: string;
+    isPaused: boolean;
+  }): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-collateral-config", configData);
+    return response.data;
+  },
+
+  // Set multiple collateral configurations in batch
+  async setCollateralConfigBatch(configs: {
+    assets: string[];
+    liquidationRatios: string[];
+    liquidationPenaltyBpsArr: string[];
+    closeFactorBpsArr: string[];
+    stabilityFeeRates: string[];
+    debtFloors: string[];
+    debtCeilings: string[];
+    unitScales: string[];
+    pauses: boolean[];
+  }): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-collateral-config-batch", configs);
+    return response.data;
+  },
+
+  // Toggle asset pause status
+  async setAssetPaused(asset: string, isPaused: boolean): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-asset-paused", { asset, isPaused });
+    return response.data;
+  },
+
+  // Set global pause status
+  async setGlobalPaused(isPaused: boolean): Promise<TransactionResponse> {
+    const response = await api.post("/cdp/admin/set-global-paused", { isPaused });
+    return response.data;
+  },
+
+  // Get global pause status
+  async getGlobalPaused(): Promise<{ isPaused: boolean }> {
+    const response = await api.get("/cdp/admin/global-paused");
+    return response.data;
+  },
+
+  // Get all collateral configurations (admin view)
+  async getAllCollateralConfigs(): Promise<AssetConfig[]> {
+    const response = await api.get("/cdp/admin/all-configs");
+    return response.data;
+  },
+
+
 };

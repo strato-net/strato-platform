@@ -1063,3 +1063,120 @@ export const getMaxLiquidatable = async (
   
   return { maxAmount: maxAmount.toString() };
 };
+
+// ----- Admin Service Methods (Owner Only) -----
+
+export const setCollateralConfig = async (
+  accessToken: string,
+  userAddress: string,
+  configData: {
+    asset: string;
+    liquidationRatio: string;
+    liquidationPenaltyBps: string;
+    closeFactorBps: string;
+    stabilityFeeRate: string;
+    debtFloor: string;
+    debtCeiling: string;
+    unitScale: string;
+    isPaused: boolean;
+  }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setCollateralConfig");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setCollateralAssetParams",
+    args: {
+      asset: configData.asset,
+      liquidationRatio: configData.liquidationRatio,
+      liquidationPenaltyBps: configData.liquidationPenaltyBps,
+      closeFactorBps: configData.closeFactorBps,
+      stabilityFeeRate: configData.stabilityFeeRate,
+      debtFloor: configData.debtFloor,
+      debtCeiling: configData.debtCeiling,
+      unitScale: configData.unitScale,
+      pause: configData.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const setAssetPaused = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; isPaused: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setPaused",
+    args: {
+      asset: body.asset,
+      isPaused: body.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const setGlobalPaused = async (
+  accessToken: string,
+  userAddress: string,
+  body: { isPaused: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setGlobalPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setPausedGlobal",
+    args: {
+      isPaused: body.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const getGlobalPaused = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ isPaused: boolean }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getGlobalPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  return { isPaused: registry.cdpEngine.globalPaused || false };
+};
+
+export const getAllCollateralConfigs = async (
+  accessToken: string,
+  userAddress: string
+): Promise<AssetConfig[]> => {
+  // This is the same as getSupportedAssets but with a different name for clarity
+  return getSupportedAssets(accessToken, userAddress);
+};
