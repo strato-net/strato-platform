@@ -103,6 +103,7 @@ contract record RewardsChef is Ownable {
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
 
         totalAllocPoint += _allocPoint;
+        require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
 
         // Create new pool info with first bonus period
         PoolInfo memory poolInfo;
@@ -126,6 +127,7 @@ contract record RewardsChef is Ownable {
 
         uint256 oldAllocPoint = pools[_pid].allocPoint;
         totalAllocPoint = totalAllocPoint - oldAllocPoint + _allocPoint;
+        require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
         pools[_pid].allocPoint = _allocPoint;
 
         emit AllocationPointsUpdated(_pid, oldAllocPoint, _allocPoint);
@@ -205,6 +207,7 @@ contract record RewardsChef is Ownable {
         }
 
         uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        // totalAllocPoint is always greater than zero OR there are no pools yet added
         uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
 
         rewardToken.mint(address(this), cataReward);
