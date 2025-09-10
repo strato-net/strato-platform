@@ -688,38 +688,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       setIsDepositMaxEnabled(false);
     } catch (error) {
       console.error("Failed to create vault:", error);
-      
-      // Extract more detailed error information
-      let errorMessage = "Please try again";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      } else if (typeof error === 'object' && error !== null) {
-        // Handle API errors
-        const apiError = error as { 
-          response?: { 
-            data?: { 
-              error?: { message?: string }; 
-              message?: string 
-            } 
-          }; 
-          message?: string 
-        };
-        if (apiError.response?.data?.error?.message) {
-          // Backend sends errors in { error: { message, status, type } } format
-          errorMessage = apiError.response.data.error.message;
-        } else if (apiError.response?.data?.message) {
-          // Fallback for direct message format
-          errorMessage = apiError.response.data.message;
-        } else if (apiError.message) {
-          errorMessage = apiError.message;
-        }
-      }
-      
-      toast({
-        title: "Vault Creation Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      // Error handling is done by global axios interceptor
     } finally {
       setLoading(false);
     }

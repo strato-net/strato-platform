@@ -61,11 +61,7 @@ const LiquidityWithdrawModal = ({
           setBalanceLoading(false);
         } catch (error) {
           setBalanceLoading(false);
-          toast({
-            title: "Error",
-            description: "Failed to fetch token balances",
-            variant: "destructive",
-          });
+          // Error handling is done by global axios interceptor
         }
       };
 
@@ -111,11 +107,7 @@ const LiquidityWithdrawModal = ({
         variant: "success",
       });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Something went wrong - ${error}`,
-        variant: "destructive",
-      });
+      // Error handling is done by global axios interceptor
     } finally {
       setWithdrawLoading(false);
       operationInProgressRef.current = false;

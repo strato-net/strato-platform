@@ -324,8 +324,7 @@ const MintWidget: React.FC = () => {
         }
       }
     } catch (err: any) {
-      const msg = err?.message || "Transaction failed";
-      toast({ title: "Mint failed", description: msg, variant: "destructive" });
+      // Error handling is done by global axios interceptor
     } finally {
       setIsLoading(false);
       inFlightRef.current = false;

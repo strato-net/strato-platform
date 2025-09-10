@@ -132,7 +132,7 @@ const WithdrawWidget: React.FC = () => {
         throw new Error("Failed to request withdrawal");
       }
     } catch (e: any) {
-      toast({ title: "Withdraw failed", description: e?.message || String(e), variant: "destructive" });
+      // Error handling is done by global axios interceptor
     } finally {
       setIsLoading(false);
     }

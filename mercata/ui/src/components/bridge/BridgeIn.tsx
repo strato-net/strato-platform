@@ -570,12 +570,7 @@ const BridgeIn: React.FC = () => {
         refetchToken();
       }
     } catch (error: any) {
-      const bridgeError = normalizeError(error);
-      toast({
-        title: "Transaction Failed",
-        description: bridgeError.userMessage,
-        variant: "destructive",
-      });
+      // Error handling is done by global axios interceptor
     } finally {
       inFlightRef.current = false;
       setIsLoading(false);

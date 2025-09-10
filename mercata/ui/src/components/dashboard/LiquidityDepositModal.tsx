@@ -78,12 +78,8 @@ const LiquidityDepositModal = ({
         setUsdstBalance(balances.usdstBalance);
         setBalanceLoading(false);
       } catch (error) {
-        toast({
-          title: "Error",
-          description: "Failed to fetch token balances",
-          variant: "destructive",
-        });
         setBalanceLoading(false);
+        // Error handling is done by global axios interceptor
       }
     };
 
