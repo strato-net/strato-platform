@@ -38,7 +38,7 @@ import BlockApps.X509.Certificate
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Blockstanbul.Model.Authentication
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -65,7 +65,7 @@ data BlockHeader =
   BlockHeader {
     parentHash :: Keccak256,
     ommersHash :: Keccak256,
-    beneficiary :: ChainMemberParsedSet,
+    beneficiary :: Address,
     stateRoot :: MP.StateRoot,
     transactionsRoot :: MP.StateRoot,
     receiptsRoot :: MP.StateRoot,
@@ -127,9 +127,9 @@ getBlockOmmersHash :: BlockHeader -> Keccak256
 getBlockOmmersHash BlockHeader { ommersHash } = ommersHash
 getBlockOmmersHash BlockHeaderV2 {} = (hash . rlpSerialize . RLPArray) []
 
-getBlockBeneficiary :: BlockHeader -> ChainMemberParsedSet
+getBlockBeneficiary :: BlockHeader -> Address
 getBlockBeneficiary BlockHeader { beneficiary } = beneficiary
-getBlockBeneficiary BlockHeaderV2 {} = Everyone False
+getBlockBeneficiary BlockHeaderV2 {} = 0x0
 
 getBlockMixHash :: BlockHeader -> Keccak256
 getBlockMixHash BlockHeader { mixHash } = mixHash

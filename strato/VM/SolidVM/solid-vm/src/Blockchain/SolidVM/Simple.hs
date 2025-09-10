@@ -45,7 +45,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -63,7 +62,7 @@ defaultBlockData =
   BlockHeader
     emptyHash
     emptyHash
-    emptyChainMember
+    0x0
     MP.emptyTriePtr
     MP.emptyTriePtr
     MP.emptyTriePtr

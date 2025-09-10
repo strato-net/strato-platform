@@ -42,7 +42,6 @@ import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -271,7 +270,7 @@ generateGBlock gi = do
         BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
-            beneficiary = genesisInfoCoinbase gi,
+            beneficiary = 0x0,
             stateRoot = sr,
             transactionsRoot = genesisInfoTransactionRoot gi,
             receiptsRoot = genesisInfoReceiptsRoot gi,
@@ -385,7 +384,7 @@ runArgsWithSenderBeef acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -426,7 +425,7 @@ runArgsWithSender acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -468,7 +467,7 @@ runArgsWithOrigin orig acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -575,7 +574,7 @@ runCall funcName callArgs bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -635,7 +634,7 @@ runCall' funcName callArgs bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -697,7 +696,7 @@ call2 funcName callArgs contractAddress = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",

@@ -26,7 +26,6 @@ import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Class        (DummyCertRevocation (..),
                                                        blockHeaderHash)
 import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
@@ -339,7 +338,7 @@ blockDataRefToBlock bdr vs vd ca cr ps sigs txs = case vs of
           BlockHeader
             { parentHash = blockDataRefParentHash bdr,
               ommersHash = blockDataRefUnclesHash bdr,
-              beneficiary = CommonName "" "" (blockDataRefCoinbase bdr) True,
+              beneficiary = blockDataRefCoinbase bdr,
               stateRoot = blockDataRefStateRoot bdr,
               transactionsRoot = blockDataRefTransactionsRoot bdr,
               receiptsRoot = blockDataRefReceiptsRoot bdr,

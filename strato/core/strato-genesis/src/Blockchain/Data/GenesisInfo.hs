@@ -22,7 +22,6 @@ import Blockchain.Data.CodeInfo
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Address
 import Blockchain.Database.MerklePatricia
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad.IO.Class
@@ -43,7 +42,6 @@ import qualified Data.Sequence as S
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
     genesisInfoUnclesHash :: Keccak256,
-    genesisInfoCoinbase :: ChainMemberParsedSet,
     genesisInfoAccountInfo :: [AccountInfo],
     genesisInfoCodeInfo :: [CodeInfo],
     genesisInfoTransactionRoot :: StateRoot, -- Misspelled to match the existing parser
@@ -68,7 +66,6 @@ instance Format GenesisInfo where
     "GenesisInfo\n" ++ tab (
     "genesisInfoParentHash: " ++ format genesisInfoParentHash ++ "\n"
     ++ "genesisInfoUnclesHash: " ++ format genesisInfoUnclesHash ++ "\n"
-    ++ "genesisInfoCoinbase: " ++ format genesisInfoCoinbase ++ "\n"
     ++ "genesisInfoAccountInfo:\n"
     ++  tab (unlines $ map format genesisInfoAccountInfo) ++ "\n"
     ++ "genesisInfoCodeInfo:\n"
@@ -98,7 +95,6 @@ defaultGenesisInfo =
   GenesisInfo
     { genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
       genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
-      genesisInfoCoinbase = emptyChainMember,
       genesisInfoAccountInfo = [],
       genesisInfoCodeInfo = [],
       genesisInfoTransactionRoot = nullStateRoot,
@@ -120,7 +116,6 @@ instance FromJSON GenesisInfo where
     GenesisInfo
       <$> o .: "parentHash"
       <*> o .: "unclesHash"
-      <*> o .: "coinbase"
       <*> o .: "accountInfo"
       <*> o .:? "codeInfo" .!= []
       <*> o .: "transactionRoot" -- This is manual to account for GenesisInfos missing codeInfo
@@ -146,7 +141,6 @@ genesisParser =
   GenesisInfo
     <$> "parentHash" JS..: JS.value
     <*> "unclesHash" JS..: JS.value
-    <*> "coinbase" JS..: JS.value
     <*> accountExtractor
     <*> ("codeInfo" JS..: JS.value JS..| [])
     <*> "transactionRoot" JS..: JS.value

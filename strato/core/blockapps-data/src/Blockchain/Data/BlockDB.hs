@@ -21,7 +21,6 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -47,9 +46,7 @@ blk2BlkDataRef b hash' makeHashOne =
    in (bdr, vs, va, vr, ca, cr, ps, sigs)
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
-    cC = case cB of
-      CommonName _ _ c _ -> c
-      _ -> ""
+    cC = getBlockBeneficiary bd
     bd = blockBlockData b
     pH = parentHash bd
     sR = stateRoot bd
@@ -64,7 +61,6 @@ blk2BlkDataRef b hash' makeHashOne =
     gL = getBlockGasLimit bd
     gU = getBlockGasUsed bd
     uH = getBlockOmmersHash bd
-    cB = getBlockBeneficiary bd
     mH = getBlockMixHash bd
     v = blockHeaderVersion bd
     vs = blockHeaderValidators bd

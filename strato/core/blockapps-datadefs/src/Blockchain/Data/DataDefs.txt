@@ -2,7 +2,7 @@
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Text
+    coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot

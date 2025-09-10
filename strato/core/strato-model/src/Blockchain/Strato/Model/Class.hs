@@ -7,7 +7,6 @@ import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -49,7 +48,7 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer
   blockHeaderParentHash :: h -> Keccak256
   blockHeaderOmmersHash :: h -> Keccak256
-  blockHeaderBeneficiary :: h -> ChainMemberParsedSet
+  blockHeaderBeneficiary :: h -> Address
   blockHeaderStateRoot :: h -> B.ByteString -- todo: "StateRoot" thats not the MPDB StateRoot
   blockHeaderTransactionsRoot :: h -> B.ByteString -- todo: ditto
   blockHeaderReceiptsRoot :: h -> B.ByteString -- todo: ditto

@@ -198,7 +198,7 @@ genesisInfoToGenesisBlock gi = do
         BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
-            beneficiary = genesisInfoCoinbase gi,
+            beneficiary = 0x0,
             stateRoot = sr,
             transactionsRoot = genesisInfoTransactionRoot gi,
             receiptsRoot = genesisInfoReceiptsRoot gi,

@@ -46,7 +46,7 @@ import UnliftIO
 
 type API =
   "block" :> QueryParam "txaddress" Address
-    :> QueryParam "coinbase" Text
+    :> QueryParam "coinbase" Address
     :> QueryParam "address" Address
     :> QueryParam "blockid" Text
     :> QueryParam "hash" Keccak256
@@ -69,7 +69,7 @@ type API =
 
 data BlocksFilterParams = BlocksFilterParams
   { qbTxAddress :: Maybe Address,
-    qbCoinbase :: Maybe Text,
+    qbCoinbase :: Maybe Address,
     qbAddress :: Maybe Address,
     qbBlockId :: Maybe Text,
     qbHash :: Maybe Keccak256,
@@ -227,7 +227,7 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
 getBlockInfo ::
   Selectable BlocksFilterParams [Block] m =>
   Maybe Address ->
-  Maybe Text ->
+  Maybe Address ->
   Maybe Address ->
   Maybe Text ->
   Maybe Keccak256 ->
