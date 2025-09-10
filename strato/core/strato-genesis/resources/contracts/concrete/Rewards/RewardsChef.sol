@@ -43,7 +43,8 @@ contract record RewardsChef is Ownable {
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
     // ═════════════════════════════════════════════════════════════════════════
-    // Workaround for the lack of `type(uint256).max`
+    // Workaround for the lack of `type(uint256).max`, addressed in the
+    // https://github.com/blockapps/strato-platform/issues/4672
     uint256 private MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
     // ═════════════════════════════════════════════════════════════════════════
