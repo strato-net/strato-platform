@@ -78,7 +78,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchTokens, fetchUsdstBalance } = useUserTokens();
+  const { fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
 
   // Fetch liquidatable positions and asset configs
   useEffect(() => {
@@ -160,26 +160,35 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   // Handle MAX button click
   const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
     const isCurrentlyMax = maxStates[vaultKey];
-    
     if (isCurrentlyMax) {
       // Clear max state and amount
       setMaxStates(prev => ({ ...prev, [vaultKey]: false }));
       setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
     } else {
       try {
-        // Fetch max liquidatable amount
+        // Fetch max liquidatable amount from backend
         const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
-        const maxAmountWei = result.maxAmount;
+        const backendMaxWei = result.maxAmount;
         
-        // Convert from wei to decimal (18 decimals for USDST)
-        const maxAmountDecimal = parseFloat(formatWeiToDecimal(maxAmountWei, 18));
+        // Convert backend max from wei to decimal (18 decimals for USDST)
+        const backendMaxDecimal = parseFloat(formatWeiToDecimal(backendMaxWei, 18));
+        
+        // Get user's available USDST balance (already in wei format)
+        if (userAddress) {
+          await fetchUsdstBalance(userAddress);
+        }
+        const availableUsdstWei = BigInt(usdstBalance || "0");
+        const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
+        
+        // Calculate actual max as minimum of backend max and available USDST balance
+        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstDecimal);
         
         // Store the max value and set max state
-        setMaxValues(prev => ({ ...prev, [vaultKey]: maxAmountDecimal }));
+        setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
         setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
         setLiquidationAmounts(prev => ({ 
           ...prev, 
-          [vaultKey]: maxAmountDecimal.toString() 
+          [vaultKey]: actualMaxDecimal.toString() 
         }));
         
       } catch (error) {
