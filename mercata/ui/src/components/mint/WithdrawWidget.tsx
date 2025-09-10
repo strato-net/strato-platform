@@ -156,9 +156,6 @@ const WithdrawWidget: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Withdraw USDST</h2>
-      </div>
       <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">

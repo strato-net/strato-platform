@@ -141,7 +141,7 @@ const MintWidget: React.FC = () => {
   const validateAmount = (value: string) => {
     if (!value) { setErrors(e => ({ ...e, amount: "" })); return true; }
     const num = parseFloat(value);
-    if (isNaN(num) || num <= 0) {
+    if (isNaN(num) || num <= 0 || num > Number(externalTokenBalance?.formatted)) {
       setErrors(e => ({ ...e, amount: "Enter a valid amount" }));
       return false;
     }
@@ -334,9 +334,6 @@ const MintWidget: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Get USDST</h2>
-      </div>
       <BridgeWalletStatus />
 
       <div className="flex items-center gap-4">
@@ -453,7 +450,7 @@ const MintWidget: React.FC = () => {
           disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading ? "Processing..." : "Mint USDST"}
+          {isLoading ? "Processing..." : "Get USDST"}
         </Button>
       </div>
 
