@@ -8,18 +8,6 @@ const DEFAULT_DECIMALS = 18;
 // Helper function to get asset decimals with caching
 const assetDecimalsCache = new Map<string, number>();
 
-// Helper function to convert scientific notation to full integer string
-export const convertScientificNotation = (value: string): string => {
-  if (!value) return '';
-  
-  // Check if it's scientific notation
-  if (value.includes('e+') || value.includes('e-') || value.includes('E+') || value.includes('E-')) {
-    const num = parseFloat(value);
-    return num.toString();
-  }
-  
-  return value;
-};
 
 const getAssetDecimals = async (asset: string): Promise<number> => {
   if (assetDecimalsCache.has(asset)) {

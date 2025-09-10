@@ -61,9 +61,6 @@ router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.ge
 // Set collateral asset configuration
 router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), CDPController.setCollateralConfig);
 
-// Set multiple collateral configurations in batch
-router.post("/admin/set-collateral-config-batch", authHandler.authorizeRequest(true), CDPController.setCollateralConfigBatch);
-
 // Toggle asset pause status
 router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
 

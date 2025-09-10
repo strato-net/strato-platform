@@ -1084,49 +1084,6 @@ export const setCollateralConfig = async (
   );
 };
 
-export const setCollateralConfigBatch = async (
-  accessToken: string,
-  userAddress: string,
-  configs: {
-    assets: string[];
-    liquidationRatios: string[];
-    liquidationPenaltyBpsArr: string[];
-    closeFactorBpsArr: string[];
-    stabilityFeeRates: string[];
-    debtFloors: string[];
-    debtCeilings: string[];
-    unitScales: string[];
-    pauses: boolean[];
-  }
-): Promise<{ status: string; hash: string }> => {
-  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setCollateralConfigBatch");
-  
-  if (!registry?.cdpEngine) {
-    throw new Error("CDP Engine not found");
-  }
-
-  const tx: FunctionInput = {
-    contractName: extractContractName(CDPEngine),
-    contractAddress: registry.cdpEngine.address,
-    method: "setCollateralAssetParamsBatch",
-    args: {
-      assets: configs.assets,
-      liquidationRatios: configs.liquidationRatios,
-      liquidationPenaltyBpsArr: configs.liquidationPenaltyBpsArr,
-      closeFactorBpsArr: configs.closeFactorBpsArr,
-      stabilityFeeRates: configs.stabilityFeeRates,
-      debtFloors: configs.debtFloors,
-      debtCeilings: configs.debtCeilings,
-      unitScales: configs.unitScales,
-      pauses: configs.pauses,
-    },
-  };
-
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
-  );
-};
-
 export const setAssetPaused = async (
   accessToken: string,
   userAddress: string,

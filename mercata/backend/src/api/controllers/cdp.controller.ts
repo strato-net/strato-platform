@@ -18,7 +18,6 @@ import {
   getSupportedAssets,
   getAssetDebtInfo,
   setCollateralConfig,
-  setCollateralConfigBatch,
   setAssetPaused,
   setGlobalPaused,
   getGlobalPaused,
@@ -282,20 +281,6 @@ class CDPController {
     try {
       const { accessToken, address: userAddress, body } = req;
       const result = await setCollateralConfig(accessToken, userAddress as string, body);
-      res.status(RestStatus.OK).json(result);
-    } catch (error) {
-      next(error);
-    }
-  }
-
-  static async setCollateralConfigBatch(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ): Promise<void> {
-    try {
-      const { accessToken, address: userAddress, body } = req;
-      const result = await setCollateralConfigBatch(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
