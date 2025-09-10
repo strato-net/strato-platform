@@ -94,5 +94,6 @@ executables:
       - strato-genesis
       - strato-init
       - strato-model
+      - text
     other-modules: []
 
