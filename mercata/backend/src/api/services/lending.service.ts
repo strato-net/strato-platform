@@ -565,6 +565,7 @@ export const getLoan = async (
   });
 
   const borrowIndex = registry.lendingPool?.borrowIndex || "0";
+  const borrowableAsset = registry.lendingPool?.borrowableAsset;
 
   // Build asset configs map (with prices) for health/limits
   const assetConfigs = new Map<string, AssetConfig>();
@@ -585,7 +586,7 @@ export const getLoan = async (
       .filter((c: any) => c.user === userAddress)
       .map((c: any) => ({ asset: c.asset, amount: c.amount }));
 
-    return simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex);
+    return simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex, borrowableAsset);
   }
 
   // All users
@@ -600,7 +601,7 @@ export const getLoan = async (
       .filter((c: any) => c.user === userAddr)
       .map((c: any) => ({ asset: c.asset, amount: c.amount }));
 
-    const simulatedLoan = simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex);
+    const simulatedLoan = simulateLoan(userLoan || null, userCollaterals, assetConfigs, borrowIndex, borrowableAsset);
     allLoans.push({ user: userAddr, ...simulatedLoan });
   }
 

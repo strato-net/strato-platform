@@ -20,6 +20,7 @@ const LendingPoolSection = () => {
     refreshLiquidity,
     depositLiquidity,
     withdrawLiquidity,
+    withdrawLiquidityAll,
   } = useLendingContext();
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
@@ -77,16 +78,31 @@ const LendingPoolSection = () => {
   const handleLiquidityAction = async (type: "deposit" | "withdraw") => {
     try {
       setIsProcessing(true);
+
+      const isMaxSelected = (): boolean => {
+        try {
+          const rhs = safeParseUnits(withdrawAmount || "0", 18);
+          const lhs = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+          return rhs === lhs;
+        } catch {
+          return false;
+        }
+      };
+
       const amount = type === "deposit" ? depositAmount : withdrawAmount;
       const amountWei = safeParseUnits(amount, 18).toString();
-      await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
-        amount: amountWei,
-      });
+      if (type === "withdraw" && isMaxSelected()) {
+        await withdrawLiquidityAll();
+      } else {
+        await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
+          amount: amountWei,
+        });
+      }
 
       toast({
         title:
           type === "deposit" ? "Deposit Successful" : "Withdrawal Successful",
-        description: `You have successfully ${type}ed ${amount} USDST.`,
+        description: `You have successfully ${type === "deposit" ? "deposited" : "withdrawn"} ${amount} USDST.`,
         variant: "success",
       });
 

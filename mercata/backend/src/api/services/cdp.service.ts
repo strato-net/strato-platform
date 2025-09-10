@@ -88,7 +88,6 @@ export const getCDPRegistry = async (
 
     // Registry found successfully
     const caller = callerId || 'unknown';
-    console.log(`✅ [${caller}] CDP Registry found with engine and vault addresses`);
 
     // Validate required components - handle both direct address and object formats
     const engineAddress = registryData.cdpEngine?.address || registryData.cdpEngine;
@@ -404,10 +403,6 @@ export const deposit = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] deposit called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "deposit");
   
   if (!registry?.cdpEngine) {
@@ -445,10 +440,6 @@ export const withdraw = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] withdraw called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "withdraw");
   
   if (!registry?.cdpEngine) {
@@ -473,10 +464,6 @@ export const getMaxWithdraw = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
-  console.log(`🔍 [CDP] getMaxWithdraw called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -563,10 +550,6 @@ export const withdrawMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] withdrawMax called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -589,10 +572,6 @@ export const getMaxMint = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ maxAmount: string }> => {
-  console.log(`🔍 [CDP] getMaxMint called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -708,10 +687,6 @@ export const getAssetDebtInfo = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ currentTotalDebt: string; debtFloor: string; debtCeiling: string }> => {
-  console.log(`🔍 [CDP] getAssetDebtInfo called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -747,10 +722,6 @@ export const mint = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] mint called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress, {}, "mint");
   
   if (!registry?.cdpEngine) {
@@ -776,10 +747,6 @@ export const mintMax = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] mintMax called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -802,10 +769,6 @@ export const repay = async (
   userAddress: string,
   body: { asset: string; amount: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] repay called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -850,10 +813,6 @@ export const repayAll = async (
   userAddress: string,
   body: { asset: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] repayAll called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -899,10 +858,6 @@ export const liquidate = async (
   userAddress: string,
   body: { collateralAsset: string; borrower: string; debtToCover: string }
 ): Promise<{ status: string; hash: string }> => {
-  console.log(`🔍 [CDP] liquidate called at ${new Date().toISOString()}`, {
-    userAddress,
-    body
-  });
   const registry = await getCDPRegistry(accessToken, userAddress);
   
   if (!registry?.cdpEngine) {
@@ -950,9 +905,6 @@ export const getLiquidatable = async (
   accessToken: string,
   userAddress: string
 ): Promise<VaultData[]> => {
-  console.log(`🔍 [CDP] getLiquidatable called at ${new Date().toISOString()}`, {
-    userAddress
-  });
   // Get registry info
   const registry = await getCDPRegistry(accessToken, userAddress);
   
@@ -1058,4 +1010,194 @@ export const getSupportedAssets = async (
   
   const configs = await Promise.all(configPromises);
   return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null && !c.isPaused);
+};
+
+export const getMaxLiquidatable = async (
+  accessToken: string,
+  userAddress: string,
+  body: { collateralAsset: string; borrower: string }
+): Promise<{ maxAmount: string }> => {
+  
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Get vault data for the borrower
+  const vaultData = await getVault(accessToken, body.borrower, body.collateralAsset);
+  if (!vaultData || vaultData.healthFactor >= 1.0) {
+    return { maxAmount: "0" };
+  }
+
+  // Get asset config
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  )?.CollateralConfig;
+
+  const globalState = registry.cdpEngine.collateralGlobalStates?.find(
+    (s: any) => s.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  )?.CollateralGlobalState;
+
+  if (!config || !globalState) {
+    throw new Error("Asset configuration not found");
+  }
+
+  // Get price
+  const priceEntry = registry.priceOracle?.prices?.find(
+    (p: any) => p.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  );
+  const price = BigInt(priceEntry?.value || "0");
+  
+  if (price <= 0n) {
+    throw new Error("Invalid asset price");
+  }
+
+  // Calculate max liquidation amount based on contract constraints
+  // This simulates the liquidate function logic from CDPEngine.sol
+  
+  const rateAccumulator = BigInt(globalState.rateAccumulator);
+  const scaledDebt = BigInt(vaultData.scaledDebt);
+  const collateralAmount = BigInt(vaultData.collateralAmount);
+  const unitScale = BigInt(config.unitScale);
+  
+  // Calculate total debt in USD
+  const totalDebtUSD = (scaledDebt * rateAccumulator) / RAY;
+  
+  // Calculate close factor cap (max % of debt that can be liquidated)
+  const closeFactorCap = (totalDebtUSD * BigInt(config.closeFactorBps)) / 10000n;
+  
+  // Calculate collateral value in USD
+  const collateralUSD = (collateralAmount * price) / unitScale;
+  
+  // Calculate coverage cap (ensure collateral can cover repay + penalty)
+  const coverageCap = (collateralUSD * 10000n) / (10000n + BigInt(config.liquidationPenaltyBps));
+  
+  // Max liquidation amount is the minimum of all constraints
+  let maxAmount = totalDebtUSD;
+  if (maxAmount > closeFactorCap) maxAmount = closeFactorCap;
+  if (maxAmount > coverageCap) maxAmount = coverageCap;
+  
+  // Ensure we don't return more than available
+  if (maxAmount > totalDebtUSD) maxAmount = totalDebtUSD;
+  if (maxAmount < 0n) maxAmount = 0n;
+  
+  return { maxAmount: maxAmount.toString() };
+};
+
+// ----- Admin Service Methods (Owner Only) -----
+
+export const setCollateralConfig = async (
+  accessToken: string,
+  userAddress: string,
+  configData: {
+    asset: string;
+    liquidationRatio: string;
+    liquidationPenaltyBps: string;
+    closeFactorBps: string;
+    stabilityFeeRate: string;
+    debtFloor: string;
+    debtCeiling: string;
+    unitScale: string;
+    isPaused: boolean;
+  }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setCollateralConfig");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setCollateralAssetParams",
+    args: {
+      asset: configData.asset,
+      liquidationRatio: configData.liquidationRatio,
+      liquidationPenaltyBps: configData.liquidationPenaltyBps,
+      closeFactorBps: configData.closeFactorBps,
+      stabilityFeeRate: configData.stabilityFeeRate,
+      debtFloor: configData.debtFloor,
+      debtCeiling: configData.debtCeiling,
+      unitScale: configData.unitScale,
+      pause: configData.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const setAssetPaused = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; isPaused: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setAssetPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setPaused",
+    args: {
+      asset: body.asset,
+      isPaused: body.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const setGlobalPaused = async (
+  accessToken: string,
+  userAddress: string,
+  body: { isPaused: boolean }
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "setGlobalPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const tx: FunctionInput = {
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "setPausedGlobal",
+    args: {
+      isPaused: body.isPaused,
+    },
+  };
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  );
+};
+
+export const getGlobalPaused = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ isPaused: boolean }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "getGlobalPaused");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  return { isPaused: registry.cdpEngine.globalPaused || false };
+};
+
+export const getAllCollateralConfigs = async (
+  accessToken: string,
+  userAddress: string
+): Promise<AssetConfig[]> => {
+  // This is the same as getSupportedAssets but with a different name for clarity
+  return getSupportedAssets(accessToken, userAddress);
 };

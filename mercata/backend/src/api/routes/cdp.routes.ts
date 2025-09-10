@@ -47,6 +47,9 @@ router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidat
 // Get liquidatable positions
 router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiquidatable);
 
+// Get maximum liquidatable amount for a position
+router.post("/max-liquidatable", authHandler.authorizeRequest(), CDPController.getMaxLiquidatable);
+
 // ----- Configuration -----
 // Get collateral asset configuration
 router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.getAssetConfig);
@@ -56,5 +59,21 @@ router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSuppo
 
 // Get asset debt information for validation
 router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.getAssetDebtInfo);
+
+// ----- Admin Routes (Owner Only) -----
+// Set collateral asset configuration
+router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), CDPController.setCollateralConfig);
+
+// Toggle asset pause status
+router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
+
+// Set global pause status
+router.post("/admin/set-global-paused", authHandler.authorizeRequest(true), CDPController.setGlobalPaused);
+
+// Get global pause status
+router.get("/admin/global-paused", authHandler.authorizeRequest(true), CDPController.getGlobalPaused);
+
+// Get all collateral configurations (admin view)
+router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPController.getAllCollateralConfigs);
 
 export default router;

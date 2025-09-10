@@ -14,9 +14,15 @@ import {
   repayAll,
   liquidate,
   getLiquidatable,
+  getMaxLiquidatable,
   getAssetConfig,
   getSupportedAssets,
   getAssetDebtInfo,
+  setCollateralConfig,
+  setAssetPaused,
+  setGlobalPaused,
+  getGlobalPaused,
+  getAllCollateralConfigs,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -223,6 +229,20 @@ class CDPController {
     }
   }
 
+  static async getMaxLiquidatable(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await getMaxLiquidatable(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async getAssetConfig(
     req: Request,
     res: Response,
@@ -260,6 +280,78 @@ class CDPController {
     try {
       const { accessToken, address: userAddress, body } = req;
       const result = await getAssetDebtInfo(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // ----- Admin Methods (Owner Only) -----
+
+  static async setCollateralConfig(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await setCollateralConfig(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setAssetPaused(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await setAssetPaused(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async setGlobalPaused(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      const result = await setGlobalPaused(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getGlobalPaused(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getGlobalPaused(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getAllCollateralConfigs(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getAllCollateralConfigs(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

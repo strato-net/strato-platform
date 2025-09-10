@@ -209,20 +209,53 @@ const LiquidityDepositModal = ({
   };
 
   const handleMaxClick = (isFirstToken: boolean) => {
-    const balance = isFirstToken ? tokenABalance : tokenBBalance;
-    const token = isFirstToken ? selectedPool?.tokenA : selectedPool?.tokenB;
-    const isUSDST = token?.address.toLowerCase() === usdstAddress.toLowerCase();
-
-    let maxBigInt = BigInt(balance || "0");
-
-    const maxVal = formatUnits(maxBigInt, 18);
-
-    if (isFirstToken) {
-      setToken1Amount(maxVal);
-      handleInputChange(maxVal, 'token1');
+    if (depositMode === 'A&B' && selectedPool?.aToBRatio && selectedPool?.bToARatio) {
+      // Dual token mode: calculate maximum possible deposit based on both balances
+      const tokenABalanceWei = BigInt(tokenABalance || "0");
+      const tokenBBalanceWei = BigInt(tokenBBalance || "0");
+      
+      // Calculate maximum possible deposit based on current pool ratio
+      const aToBRatioWei = safeParseUnits(selectedPool.aToBRatio, 18);
+      const bToARatioWei = safeParseUnits(selectedPool.bToARatio, 18);
+      
+      // Calculate what Token A amount would be needed for full Token B balance
+      const tokenAAmountForFullB = (tokenBBalanceWei * aToBRatioWei) / BigInt(10 ** 18);
+      
+      // Calculate what Token B amount would be needed for full Token A balance  
+      const tokenBAmountForFullA = (tokenABalanceWei * bToARatioWei) / BigInt(10 ** 18);
+      
+      let finalTokenAAmount: bigint;
+      let finalTokenBAmount: bigint;
+      
+      if (tokenAAmountForFullB <= tokenABalanceWei) {
+        // Token B is the limiting factor
+        finalTokenBAmount = tokenBBalanceWei;
+        finalTokenAAmount = tokenAAmountForFullB;
+      } else {
+        // Token A is the limiting factor
+        finalTokenAAmount = tokenABalanceWei;
+        finalTokenBAmount = tokenBAmountForFullA;
+      }
+      
+      // Set both amounts
+      setToken1Amount(formatUnits(finalTokenAAmount, 18));
+      setToken2Amount(formatUnits(finalTokenBAmount, 18));
+      
     } else {
-      setToken2Amount(maxVal);
-      handleInputChange(maxVal, 'token2');
+      // Single token mode: original logic
+      const balance = isFirstToken ? tokenABalance : tokenBBalance;
+
+      let maxBigInt = BigInt(balance || "0");
+
+      const maxVal = formatUnits(maxBigInt, 18);
+
+      if (isFirstToken) {
+        setToken1Amount(maxVal);
+        handleInputChange(maxVal, 'token1');
+      } else {
+        setToken2Amount(maxVal);
+        handleInputChange(maxVal, 'token2');
+      }
     }
   };
 

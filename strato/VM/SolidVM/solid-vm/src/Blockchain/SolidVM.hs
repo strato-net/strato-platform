@@ -473,17 +473,15 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
         CC.RawCall -> (to', to')
         CC.DelegateCall -> (from, to')
   (contract', hsh, cc) <- getCodeAndCollection ccToGet
-  parentName <-
-    fromMaybeM (return "") $
-      runMaybeT $
-        pure ccToGet -- Contract's address
-          >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
-          >>= pure . addressStateCodeHash -- state's codehash/CodePtr
-          >>= MaybeT . resolveCodePtrParent -- CodePtr's parent
-          >>= ( \case
-                  SolidVMCode name _ -> pure $ stringToLabel name -- Name of the parent
-                  _ -> pure ""
-              )
+  (toName, parentName) <- do
+    ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to
+    let n = case ch of
+              SolidVMCode n' _ -> n' 
+              CodeAtAccount _ n' -> n' 
+              _ -> ""
+    resolveCodePtrParent ch >>= \case -- CodePtr's parent
+      Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
+      _ -> pure (n, "")
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
@@ -501,9 +499,9 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
           _ -> pure from
       else pure to
   (ctr, oAddr, ctrName) <- getCreator cnAccount
-  !abstracts <- M.fromList <$> traverse (resolveNameParts to' (T.pack ctrName) (T.pack parentName')) abstracts'
+  !abstracts <- M.fromList <$> traverse (resolveNameParts to (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction to (labelToString $ CC._contractName contract) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to
