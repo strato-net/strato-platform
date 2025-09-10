@@ -11,10 +11,8 @@ import {
   Plus, 
   Settings, 
   AlertTriangle, 
-  CheckCircle, 
   Pause, 
   Play,
-  Trash2,
   Edit,
   Save,
   X,
@@ -80,71 +78,58 @@ const CollateralConfigManager = () => {
     }));
   }, []);
 
+  // Helper function to check for scientific notation
+  const hasScientificNotation = useCallback((value: string): boolean => {
+    return value.includes('e+') || value.includes('e-') || value.includes('E+') || value.includes('E-');
+  }, []);
+
   const validateForm = useCallback((): string[] => {
     const errors: string[] = [];
-    
-    // Basic required field validation
-    if (!formData.asset) errors.push('Asset address is required');
-    if (!formData.liquidationRatio) errors.push('Liquidation ratio is required');
-    if (!formData.liquidationPenaltyBps) errors.push('Liquidation penalty is required');
-    if (!formData.closeFactorBps) errors.push('Close factor is required');
-    if (!formData.stabilityFeeRate) errors.push('Stability fee rate is required');
-    if (!formData.debtFloor) errors.push('Debt floor is required');
-    if (!formData.debtCeiling) errors.push('Debt ceiling is required');
-    if (!formData.unitScale) errors.push('Unit scale is required');
-    
-    // Check for scientific notation
-    if (formData.debtCeiling && (formData.debtCeiling.includes('e+') || formData.debtCeiling.includes('e-') || formData.debtCeiling.includes('E+') || formData.debtCeiling.includes('E-'))) {
-      errors.push('Debt ceiling cannot use scientific notation (e.g., use 1000000 instead of 1e+6)');
+    const requiredFields = [
+      { field: 'asset', name: 'Asset address' },
+      { field: 'liquidationRatio', name: 'Liquidation ratio' },
+      { field: 'liquidationPenaltyBps', name: 'Liquidation penalty' },
+      { field: 'closeFactorBps', name: 'Close factor' },
+      { field: 'stabilityFeeRate', name: 'Stability fee rate' },
+      { field: 'debtFloor', name: 'Debt floor' },
+      { field: 'debtCeiling', name: 'Debt ceiling' },
+      { field: 'unitScale', name: 'Unit scale' }
+    ];
+
+    // Required field validation
+    requiredFields.forEach(({ field, name }) => {
+      if (!formData[field as keyof CollateralConfigFormData]) {
+        errors.push(`${name} is required`);
+      }
+    });
+
+    // Scientific notation validation
+    if (formData.debtCeiling && hasScientificNotation(formData.debtCeiling)) {
+      errors.push('Debt ceiling cannot use scientific notation');
     }
-    
-    if (formData.unitScale && (formData.unitScale.includes('e+') || formData.unitScale.includes('e-') || formData.unitScale.includes('E+') || formData.unitScale.includes('E-'))) {
-      errors.push('Unit scale cannot use scientific notation (e.g., use 1000000000000000000 instead of 1e+18)');
+    if (formData.unitScale && hasScientificNotation(formData.unitScale)) {
+      errors.push('Unit scale cannot use scientific notation');
     }
-    
-    // Basic numeric validation
+
+    // Numeric validation
     const liquidationRatio = parseFloat(formData.liquidationRatio);
     if (formData.liquidationRatio && (isNaN(liquidationRatio) || liquidationRatio <= 0)) {
       errors.push('Liquidation ratio must be a positive number');
     }
-    
-    const liquidationPenaltyBps = parseInt(formData.liquidationPenaltyBps);
-    if (formData.liquidationPenaltyBps && (isNaN(liquidationPenaltyBps) || liquidationPenaltyBps < 0)) {
-      errors.push('Liquidation penalty must be a non-negative integer');
-    }
-    
-    const closeFactorBps = parseInt(formData.closeFactorBps);
-    if (formData.closeFactorBps && (isNaN(closeFactorBps) || closeFactorBps < 0)) {
-      errors.push('Close factor must be a non-negative integer');
-    }
-    
+
     const stabilityFeeRate = parseFloat(formData.stabilityFeeRate);
-    if (formData.stabilityFeeRate && (isNaN(stabilityFeeRate) || stabilityFeeRate <= 0)) {
-      errors.push('Stability fee rate must be a positive number');
+    if (formData.stabilityFeeRate && (isNaN(stabilityFeeRate) || stabilityFeeRate < 1.0)) {
+      errors.push('Stability fee rate must be at least 1.0');
     }
-    
+
     const debtFloor = parseFloat(formData.debtFloor);
-    if (formData.debtFloor && (isNaN(debtFloor) || debtFloor < 0)) {
-      errors.push('Debt floor must be a non-negative number');
-    }
-    
     const debtCeiling = parseFloat(formData.debtCeiling);
-    if (formData.debtCeiling && (isNaN(debtCeiling) || debtCeiling < 0)) {
-      errors.push('Debt ceiling must be a non-negative number');
-    }
-    
-    // Validate debt floor vs ceiling
     if (debtCeiling > 0 && debtFloor > debtCeiling) {
       errors.push('Debt floor cannot be greater than debt ceiling');
     }
-    
-    const unitScale = parseFloat(formData.unitScale);
-    if (formData.unitScale && (isNaN(unitScale) || unitScale <= 0)) {
-      errors.push('Unit scale must be a positive number');
-    }
 
     return errors;
-  }, [formData]);
+  }, [formData, hasScientificNotation]);
 
   const resetForm = useCallback(() => {
     setFormData(EMPTY_FORM_DATA);
@@ -157,8 +142,14 @@ const CollateralConfigManager = () => {
     
     // Check if it's scientific notation
     if (value.includes('e+') || value.includes('e-') || value.includes('E+') || value.includes('E-')) {
+      // Use BigInt to avoid scientific notation for large numbers
       const num = parseFloat(value);
-      return num.toString();
+      if (Number.isInteger(num)) {
+        return BigInt(Math.floor(num)).toString();
+      } else {
+        // For non-integers, use toFixed(0) to avoid scientific notation
+        return num.toFixed(0);
+      }
     }
     
     return value;
@@ -174,14 +165,27 @@ const CollateralConfigManager = () => {
     try {
       setLoading(true);
       
+      // Convert stabilityFeeRate from annual percentage back to RAY format
+      // The backend converts RAY to annual percentage using:
+      // (RAY_value - RAY) * 365 * 24 * 60 * 60 / RAY * 100
+      // So we need to reverse this formula
+      const RAY = BigInt(10) ** BigInt(27); // 10^27
+      const annualRate = parseFloat(formData.stabilityFeeRate); // e.g., 1.9802625581975757
+      
+      // Convert annual percentage to per-second decimal rate
+      const perSecondRate = annualRate / (365 * 24 * 60 * 60) / 100; // Convert to decimal per second
+      
+      // Convert to RAY format: RAY + (perSecondRate * RAY)
+      const stabilityFeeRateRAY = (RAY + BigInt(Math.floor(perSecondRate * Number(RAY)))).toString();
+      
       const configData = {
         asset: formData.asset,
-        liquidationRatio: (parseFloat(formData.liquidationRatio) * 1e18).toString(),
+        liquidationRatio: (BigInt(Math.floor(parseFloat(formData.liquidationRatio) * 1e18))).toString(),
         liquidationPenaltyBps: formData.liquidationPenaltyBps,
         closeFactorBps: formData.closeFactorBps,
-        stabilityFeeRate: formData.stabilityFeeRate,
-        debtFloor: (parseFloat(formData.debtFloor) * 1e18).toString(),
-        debtCeiling: convertScientificNotation(formData.debtCeiling),
+        stabilityFeeRate: stabilityFeeRateRAY,
+        debtFloor: (BigInt(Math.floor(parseFloat(formData.debtFloor) * 1e18))).toString(),
+        debtCeiling: (BigInt(Math.floor(parseFloat(formData.debtCeiling) * 1e18))).toString(),
         unitScale: convertScientificNotation(formData.unitScale),
         isPaused: formData.isPaused,
       };
@@ -245,9 +249,6 @@ const CollateralConfigManager = () => {
     }
   }, []);
 
-  const isLoading = useMemo(() => loading, [loading]);
-  const hasAssets = useMemo(() => assets.length > 0, [assets.length]);
-  const isEditing = useMemo(() => editingAsset !== null, [editingAsset]);
 
   return (
     <div className="space-y-6">
@@ -337,11 +338,11 @@ const CollateralConfigManager = () => {
                   <Label htmlFor="stabilityFeeRate">Stability Fee Rate (RAY)</Label>
                   <Input
                     id="stabilityFeeRate"
-                    placeholder="1000000000315522921573374129"
+                    placeholder="1.0"
                     value={formData.stabilityFeeRate}
                     onChange={(e) => handleInputChange('stabilityFeeRate', e.target.value)}
                   />
-                  <p className="text-sm text-gray-500">Per-second interest rate (RAY format)</p>
+                  <p className="text-sm text-gray-500">Per-second interest rate (minimum 1.0 = 0% interest)</p>
                 </div>
 
                 {/* Debt Floor */}
@@ -406,22 +407,22 @@ const CollateralConfigManager = () => {
               <div className="flex items-center space-x-4">
                 <Button 
                   onClick={handleSubmit} 
-                  disabled={isLoading}
+                  disabled={loading}
                   className="flex items-center space-x-2"
                 >
-                  {isLoading ? (
+                  {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <Save className="h-4 w-4" />
                   )}
-                  <span>{isEditing ? 'Update Config' : 'Add Config'}</span>
+                  <span>{editingAsset ? 'Update Config' : 'Add Config'}</span>
                 </Button>
                 
-                {isEditing && (
+                {editingAsset && (
                   <Button 
                     variant="outline" 
                     onClick={resetForm}
-                    disabled={isLoading}
+                    disabled={loading}
                   >
                     <X className="h-4 w-4 mr-2" />
                     Cancel Edit
@@ -444,11 +445,11 @@ const CollateralConfigManager = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {loading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-strato-blue" />
                 </div>
-              ) : !hasAssets ? (
+              ) : !assets.length ? (
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
@@ -479,7 +480,7 @@ const CollateralConfigManager = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleEditAsset(asset)}
-                              disabled={isLoading}
+                              disabled={loading}
                             >
                               <Edit className="h-4 w-4 mr-1" />
                               Edit
@@ -489,7 +490,7 @@ const CollateralConfigManager = () => {
                               variant="outline"
                               size="sm"
                               onClick={() => handleTogglePause(asset.asset, !asset.isPaused)}
-                              disabled={isLoading}
+                              disabled={loading}
                             >
                               {asset.isPaused ? (
                                 <>
