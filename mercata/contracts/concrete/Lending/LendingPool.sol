@@ -86,6 +86,9 @@ contract record LendingPool is Ownable {
     address public poolConfigurator;
     FeeCollector public feeCollector;
 
+    // Bad Debt Handling
+    uint public badDebt; // total bad debt in underlying units
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
     // ═══════════════════════════════════════════════════════════════════════════════
