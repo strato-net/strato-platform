@@ -1392,7 +1392,7 @@ updateFkeysQueryArray rows = concatMap createUpdateQuery rows
               Nothing -> collectionTableName (creator c) (application c) (contractname c) (collectionname c)
         value_fkey = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value_fkey"]
         value = wrapAndEscapeDouble . map escapeQuotes $ [T.pack "value"]
-        value' = wrapAndEscape [fromMaybe T.empty (valueToSQLText $ collectionDataValue c)]
+        value' = wrapAndEscape [fromMaybe "''" (valueToSQLText $ collectionDataValue c)]
       in
         [T.concat [ "UPDATE "
         , tableNameToDoubleQuoteText tableName
