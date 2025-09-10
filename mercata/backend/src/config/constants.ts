@@ -28,6 +28,7 @@ export const constants = (() => {
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
+  const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Event = "event";
   
   const tokenSelectFields = [
@@ -156,6 +157,7 @@ export const constants = (() => {
     CDPEngine,
     CDPVault,
     CDPRegistry,
+    Voucher,
     mercataBridge,
     Event,
     tokenSelectFields,

@@ -32,7 +32,7 @@ async function ensureFeeCoverage(
 
   const { data } = await cirrus.get(
     accessToken,
-    `/${constants.Token}-_balances`,
+    `/${constants.Voucher}-_balances`,
     {
       params: {
         address: `in.(${constants.voucher},${constants.USDST})`,
