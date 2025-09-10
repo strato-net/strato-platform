@@ -169,3 +169,21 @@ The `defaultTxSizeLimit` fallback is necessary to handle edge cases during node 
 This situation should be rare under normal operation. When the system falls back to the default value, it logs a **warning message** as an indicator that the event processing pipeline may not be functioning correctly or that there's an unexpected timing issue during startup.
 
 This leverages existing patterns and ensures all services have fast, consistent access to the current transaction size limit while providing graceful degradation during edge cases.
+
+## Open Questions
+
+### Event Processing Race Condition During Startup
+
+There's a potential race condition during startup where the mempool might accept transactions before the genesis `TransactionSizeLimitChanged` event is processed and cached in Redis. The current design mentions logging a warning and falling back to the default limit, but should we also consider rejecting transactions during this window instead of using the fallback? This would be more conservative but could impact system availability during brief startup periods.
+
+### Network Coordination During Limit Changes
+
+While this design solves the consensus issue, there's still a coordination challenge when the transaction size limit is increased. Nodes that haven't yet processed the limit change event will reject larger transactions from their API/mempool layers, even though the new limit is valid network-wide. Should there be a grace period, staged rollout mechanism, or other coordination strategy to handle this transition period?
+
+### Contract Extensibility for Future Parameters
+
+Should the parameter contract be designed to support adding new configurable blockchain parameters in the future (gas limits, block sizes, etc.), or should it remain focused only on transaction size limits? A more extensible design could provide a foundation for other governance needs but adds complexity to the initial implementation.
+
+### Redis Dependency vs LevelDB Alternative
+
+Should we continue to rely on Redis for caching the transaction size limit, or explore reading directly from LevelDB which the VM is already writing to? There are concerns about increasing Redis dependency given past challenges with its integration in the codebase. Reading from LevelDB could reduce external dependencies but may have different performance characteristics and require additional implementation work to ensure consistency across the three validation services.
