@@ -1,4 +1,5 @@
 import { formatBalance } from "@/utils/numberUtils";
+import { useUser } from "@/context/UserContext";
 
 interface LPTokenDropdownProps {
   lpToken: any;
@@ -7,13 +8,24 @@ interface LPTokenDropdownProps {
 }
 
 export default function LPTokenDropdown({ lpToken, className = "", isExpanded }: LPTokenDropdownProps) {
-  const userShare = lpToken?.lpToken?._totalSupply && lpToken?.lpToken?.balances?.[0]?.balance
-    ? Number((BigInt(lpToken.lpToken.balances[0].balance) * 10000n) / BigInt(lpToken.lpToken._totalSupply)) / 100
+  const { userAddress } = useUser();
+  
+  // Get user's actual LP token balance
+  const getUserLPBalance = (): string => {
+    if (!lpToken?.lpToken?.balances || !userAddress) return "0";
+    const userBalance = lpToken.lpToken.balances.find((b: any) => b.user === userAddress);
+    return userBalance?.balance || "0";
+  };
+
+  const userLPBalance = getUserLPBalance();
+  
+  const userShare = lpToken?.lpToken?._totalSupply && userLPBalance !== "0"
+    ? Number((BigInt(userLPBalance) * 10000n) / BigInt(lpToken.lpToken._totalSupply)) / 100
     : 0;
 
-  const tokenQuantities = lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpToken?._totalSupply ? {
-    tokenA: ((BigInt(lpToken.lpToken.balances[0].balance) * BigInt(lpToken.tokenABalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString(),
-    tokenB: ((BigInt(lpToken.lpToken.balances[0].balance) * BigInt(lpToken.tokenBBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString()
+  const tokenQuantities = userLPBalance !== "0" && lpToken?.lpToken?._totalSupply ? {
+    tokenA: ((BigInt(userLPBalance) * BigInt(lpToken.tokenABalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString(),
+    tokenB: ((BigInt(userLPBalance) * BigInt(lpToken.tokenBBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString()
   } : { tokenA: "0", tokenB: "0" };
 
   return (

@@ -9,6 +9,7 @@ import { formatUnits } from "ethers";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
+import { useUser } from "@/context/UserContext";
 
 interface PoolParticipationProps {
   liquidityInfo: any;
@@ -27,15 +28,36 @@ export default function MyPoolParticipationSection({
 }: PoolParticipationProps) {
   
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
+  const { userAddress } = useUser();
   
-  const formatValue = (rawBalance: string, price: string): string => {
-    if (!rawBalance || !price) return "0.00";
+  // Helper function to get user's LP token balance
+  const getUserLPBalance = (lpToken: any): string => {
+    if (!lpToken?.lpToken?.balances || !userAddress) return "0";
+    const userBalance = lpToken.lpToken.balances.find((b: any) => b.user === userAddress);
+    return userBalance?.balance || "0";
+  };
 
-    const balance = parseFloat(formatUnits(rawBalance, 18));
-    const priceValue = parseFloat(formatUnits(price, 18));
-    const value = balance * priceValue;
+  // Calculate mark-to-market value using user's actual token quantities
+  const calculateMarkToMarketValue = (lpToken: any): string => {
+    const userLPBalance = getUserLPBalance(lpToken);
+    if (!userLPBalance || userLPBalance === "0") return "0.00";
 
-    return value.toFixed(2);
+    const totalSupply = lpToken?.lpToken?._totalSupply || "0";
+    if (totalSupply === "0") return "0.00";
+
+    // Calculate user's share
+    const userShare = BigInt(userLPBalance) / BigInt(totalSupply);
+    
+    // Calculate user's token quantities
+    const userTokenA = (BigInt(lpToken.tokenABalance || "0") * userShare).toString();
+    const userTokenB = (BigInt(lpToken.tokenBBalance || "0") * userShare).toString();
+    
+    // Calculate USD values
+    const tokenAValue = (BigInt(userTokenA) * BigInt(lpToken.tokenAPrice || "0")) / BigInt(10 ** 18);
+    const tokenBValue = (BigInt(userTokenB) * BigInt(lpToken.tokenBPrice || "0")) / BigInt(10 ** 18);
+    
+    const totalValue = tokenAValue + tokenBValue;
+    return (Number(totalValue) / 10 ** 18).toFixed(2);
   };
 
   const toggleTokenExpansion = (tokenAddress: string) => {
@@ -118,16 +140,16 @@ export default function MyPoolParticipationSection({
                           )}
                         </div>
                         <div className="text-center font-semibold text-gray-900">
-                          {lpToken?.lpToken?.balances[0]?.balance
-                            ? formatBalance(lpToken?.lpToken?.balances[0]?.balance,undefined,18,2,2)
+                          {getUserLPBalance(lpToken) !== "0"
+                            ? formatBalance(getUserLPBalance(lpToken), undefined, 18, 6, 12)
                             : "0.00"}
                         </div>
                         <div className="text-center font-semibold text-gray-900">
                           {lpToken?.apy ? `${lpToken.apy}%` : "N/A"}
                         </div>
                         <div className="text-right font-medium text-gray-900">
-                          {lpToken?.lpToken?._totalSupply
-                            ? `$${formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)}`
+                          {getUserLPBalance(lpToken) !== "0"
+                            ? `$${calculateMarkToMarketValue(lpToken)}`
                             : "$0.00"}
                         </div>
                       </div>
