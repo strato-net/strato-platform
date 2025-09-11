@@ -43,6 +43,7 @@ const config = {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||
       "000000000000000000000000000000000000100e",
+    mintCount: 10,
   },
   polling: {
     bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)

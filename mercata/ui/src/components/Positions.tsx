@@ -120,7 +120,7 @@ const PositionSection = ({ loanData }: BorrowingSectionProps) => {
                       return "No Loan";
                     }
                     // Check if health factor is valid
-                    if (loanData?.healthFactor && !isNaN((loanData.healthFactor))) {
+                    if (loanData?.healthFactor !== undefined && !isNaN((loanData.healthFactor))) {
                       return (loanData.healthFactor).toFixed(2);
                     }
                     return "N/A";

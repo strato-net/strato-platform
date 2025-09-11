@@ -4,6 +4,7 @@ import sendEmail from "./emailService";
 import { NonEmptyArray, Withdrawal, Deposit, SafeTransactionData } from "../types";
 import { createSafeTransactions, proposeSafeTransactions } from "./safeService";
 import { logInfo, logError } from "../utils/logger";
+import { mintVouchersForDeposits } from "./voucherService";
 
 export const depositBatch = async (deposits: NonEmptyArray<Deposit>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
@@ -70,6 +71,8 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<Deposit>) => {
       "BridgeService",
       `Successfully confirmed ${deposits.length} deposits`,
     );
+
+    await mintVouchersForDeposits(deposits);
   } catch (error) {
     const errorMessage = (error as Error).message;
     
