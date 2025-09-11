@@ -1087,20 +1087,24 @@ export const setCollateralConfig = async (
     throw new Error("CDP Engine not found");
   }
 
+  // Convert UI values back to contract format
+  const liquidationRatioContract = (Number(configData.liquidationRatio) * Number(WAD)) / 100;
+  const stabilityFeeRateContract = (Number(configData.stabilityFeeRate) / 100) * Number(RAY) / (365 * 24 * 60 * 60) + Number(RAY);
+
   const tx: FunctionInput = {
     contractName: extractContractName(CDPEngine),
     contractAddress: registry.cdpEngine.address,
     method: "setCollateralAssetParams",
     args: {
-      asset: configData.asset,
-      liquidationRatio: configData.liquidationRatio,
+       asset: configData.asset,
+      liquidationRatio: liquidationRatioContract.toString(),
       liquidationPenaltyBps: configData.liquidationPenaltyBps,
       closeFactorBps: configData.closeFactorBps,
-      stabilityFeeRate: configData.stabilityFeeRate,
+      stabilityFeeRate: stabilityFeeRateContract.toString(),
       debtFloor: configData.debtFloor,
       debtCeiling: configData.debtCeiling,
       unitScale: configData.unitScale,
-      pause: configData.isPaused,
+      pause: configData.isPaused || false,
     },
   };
 
