@@ -62,12 +62,7 @@ newtype TrueOrgNameChains = TrueOrgNameChains (S.Set Word256) deriving (Eq)
 
 newtype FalseOrgNameChains = FalseOrgNameChains (S.Set Word256) deriving (Eq)
 
-data ChainMemberParsedSet
-  = Everyone
-  | Org Text
-  | OrgUnit Text Text
-  | CommonName Text Text Text
-  deriving (Generic, Eq, Data, Show, Ord, Read)
+data ChainMemberParsedSet = CommonName Text deriving (Generic, Eq, Data, Show, Ord, Read)
 {-
 instance ToSchema ChainMemberParsedSet where
   declareNamedSchema proxy =
@@ -115,10 +110,7 @@ instance (DiscreteOrdered (Range ChainMemberBounded)) where
 
 instance NFData ChainMemberParsedSet where
   -- rnf (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cn))) = on `seq` ou `seq` cn `seq` ()
-  rnf Everyone = ()
-  rnf (Org a) = a `seq` ()
-  rnf (OrgUnit a b) = b `seq` a `seq` ()
-  rnf (CommonName a b c) = c `seq` b `seq` a `seq` ()
+  rnf (CommonName c) = c `seq` ()
   
 instance Eq (ChainMemberF BoundedData) where
   (==) (ChainMemberF cm1) (ChainMemberF cm2) = (cm1 == cm2)
@@ -132,7 +124,7 @@ instance Show (ChainMemberF BoundedData) where
 deriving instance Show (ChainMemberF DFI.Identity)
 
 emptyChainMember :: ChainMemberParsedSet
-emptyChainMember = Everyone --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
+emptyChainMember = CommonName "" --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
 
 instance Binary ChainMembers
 
@@ -210,14 +202,8 @@ instance RLPSerializable ChainMemberRange where
       putBoundary BoundaryBelowAll = RLPArray [RLPScalar 3]
 
 instance RLPSerializable ChainMemberParsedSet where
-  rlpEncode Everyone = RLPArray []
-  rlpEncode (Org a) = RLPArray [rlpEncode a]
-  rlpEncode (OrgUnit a b) = RLPArray [rlpEncode a, rlpEncode b]
-  rlpEncode (CommonName a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpDecode (RLPArray []) = Everyone
-  rlpDecode (RLPArray [a]) = Org (rlpDecode a)
-  rlpDecode (RLPArray [a, b]) = OrgUnit (rlpDecode a) (rlpDecode b)
-  rlpDecode (RLPArray [a, b, c]) = CommonName (rlpDecode a) (rlpDecode b) (rlpDecode c)
+  rlpEncode (CommonName c) = RLPArray [rlpEncode c]
+  rlpDecode (RLPArray [c]) = CommonName (rlpDecode c)
   rlpDecode v = error $ "Error in rlpDecode for ChainMemberParsedSet: bad RLPObject: " ++ show v
   
 instance Arbitrary ChainMembers where
@@ -239,27 +225,16 @@ instance ToJSON ChainMembers where
   toJSON (ChainMembers xs) = toJSON (S.toList xs)
   
 instance FromJSON ChainMemberParsedSet where
-  parseJSON (A.String s) = pure $ Org s
+  parseJSON (A.String s) = pure $ CommonName s
   parseJSON (Object o) = do
-    o' <- o .:? "orgName"
-    case o' of
-      Nothing -> pure $ Everyone
-      Just org -> do
-        u <- o .:? "orgUnit"
-        case u of
-          Nothing -> pure $ Org org
-          Just unit -> do
-            c <- o .:? "commonName"
-            case c of
-              Nothing -> pure $ OrgUnit org unit
-              Just name -> pure $ CommonName org unit name
+    c <- o .:? "commonName"
+    case c of
+      Nothing -> error "no commonName"
+      Just name -> pure $ CommonName name
   parseJSON o = fail $ "parseJSON ChainMembersParsedSet failed: expected object, got: " ++ show o
 
 instance ToJSON ChainMemberParsedSet where
-  toJSON Everyone = object []
-  toJSON (Org o) = object ["orgName" .= o]
-  toJSON (OrgUnit o u) = object ["orgName" .= o, "orgUnit" .= u]
-  toJSON (CommonName o u c) = object ["orgName" .= o, "orgUnit" .= u, "commonName" .= c]
+  toJSON (CommonName c) = object ["commonName" .= c]
 
 instance DPS.PersistField ChainMemberParsedSet where
   toPersistValue = DPS.PersistText . T.pack . show
@@ -272,7 +247,4 @@ instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
 
 chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
-chainMemberParsedSetToValidator Everyone = ""
-chainMemberParsedSetToValidator (Org _) = ""
-chainMemberParsedSetToValidator (OrgUnit _ _) = ""
-chainMemberParsedSetToValidator (CommonName _ _ c) = Validator c
+chainMemberParsedSetToValidator (CommonName c) = Validator c

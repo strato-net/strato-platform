@@ -344,7 +344,7 @@ run AddBlocksFromFile {..} = addBlocksFromFile fileName
 run AddGenesisFromFile {} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
 run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
-  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName)
+  let i = CommonName (T.pack qCommonName)
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
@@ -364,7 +364,7 @@ run RLP {..} = RLP.doit filename
 run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/RawMP" $ BC.pack stateRoot)
 run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/FRawMP" $ BC.pack stateRoot)
 run PushBlocks {..} =
-  let i = CommonName (T.pack qOrg) (T.pack qOrgUnit) (T.pack qCommonName)
+  let i = CommonName (T.pack qCommonName)
    in insertP2P (P2pPushBlocks startBlock endBlock i)
 run SetParticipationMode {..} = remoteSetParticipationMode mode
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr

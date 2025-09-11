@@ -12,7 +12,7 @@ data PeerParams = NetworkParams
   }
 
 blockAppsIdentity :: ChainMemberParsedSet
-blockAppsIdentity = CommonName "BlockApps" "Engineering" "Admin"
+blockAppsIdentity = CommonName "Admin"
 
 getParams :: String -> IO (Maybe [PeerParams])
 getParams "oldblockappsnet" =
