@@ -21,7 +21,6 @@ module Blockchain.Strato.Model.ChainMember
 where
 
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
 --import Control.Lens hiding ((.=))
@@ -49,41 +48,15 @@ import Text.Format
 
 data BoundedData a = LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
 
-data ChainMemberF f = ChainMemberF
-  { commonName :: f (Maybe T.Text)
-  }
+data ChainMemberF f = ChainMemberF { commonName :: f (Maybe T.Text) }
   deriving (Generic)
 
 newtype ChainMemberRSet = ChainMemberRSet {getChainMemberRSet :: (RSet ChainMemberBounded)} deriving (Eq, Show)
 
 newtype ChainMembers = ChainMembers {unChainMembers :: S.Set ChainMemberParsedSet} deriving (Generic, Eq, Data, Show, Ord)
 
-newtype TrueOrgNameChains = TrueOrgNameChains (S.Set Word256) deriving (Eq)
-
-newtype FalseOrgNameChains = FalseOrgNameChains (S.Set Word256) deriving (Eq)
-
 data ChainMemberParsedSet = CommonName Text deriving (Generic, Eq, Data, Show, Ord, Read)
-{-
-instance ToSchema ChainMemberParsedSet where
-  declareNamedSchema proxy =
-    genericDeclareNamedSchema cmpsSchemaOptions proxy
-      & mapped . schema . description ?~ "ChainMemberParsedSet"
-      & mapped . schema . example ?~ toJSON exCMPSRespone
 
-exCMPSRespone :: ChainMemberParsedSet
-exCMPSRespone = CommonName "BlockApps" "Engineering" "Admin"
-
--- | The model's field modifiers will match the JSON instances
-cmpsSchemaOptions :: SchemaOptions
-cmpsSchemaOptions =
-  SchemaOptions
-    { fieldLabelModifier = camelCase . dropFPrefix,
-      constructorTagModifier = id,
-      datatypeNameModifier = id,
-      allNullaryToStringTag = True,
-      unwrapUnaryRecords = True
-    }
--}
 type ChainMemberBounded = ChainMemberF BoundedData
 
 newtype ChainMemberRange = ChainMemberRange {unChainMemberRange :: Range ChainMemberBounded} deriving (Show)
@@ -101,10 +74,6 @@ instance Ord (ChainMemberF BoundedData) where
   compare (ChainMemberF cm1) (ChainMemberF cm2) = compare cm1 cm2
 
 instance (DiscreteOrdered (ChainMemberF BoundedData)) where
-  adjacent _ _ = False
-  adjacentBelow = const Nothing
-
-instance (DiscreteOrdered (Range ChainMemberBounded)) where
   adjacent _ _ = False
   adjacentBelow = const Nothing
 
