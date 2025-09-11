@@ -469,7 +469,7 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount m
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(1 :: Integer)..] GA.assets)
 
 adminRegistry :: AccountInfo
-adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ ownedByBlockApps mercataAddress
+adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount mercataAddress "AdminRegistry") $ createdByBlockApps mercataAddress
   ++ [ (".adminMap<a:" <> addrBS blockappsAddress <> ">", BInteger 1)
      , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
      , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
