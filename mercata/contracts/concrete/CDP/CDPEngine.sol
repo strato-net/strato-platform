@@ -46,6 +46,7 @@ contract record CDPEngine is Ownable {
     mapping(address => CollateralConfig) public record collateralConfigs;
     mapping(address => CollateralGlobalState) public record collateralGlobalStates;
     mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
+    mapping(address => uint) public badDebtUSD; // 1e18, bad debt (per-asset), non-accruing
 
     bool public globalPaused;
     uint public RAY = 1e27;
@@ -494,8 +495,22 @@ contract record CDPEngine is Ownable {
             remainingDebtUSD,
             assetState.rateAccumulator
         );
-        emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
 
+        // Realize bad debt if no collateral remains but debt still > 1 wei
+        if (borrowerVault.collateral == 0) {
+            uint rem = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+            if (rem > 1) {
+                // remove from books
+                assetState.totalScaledDebt -= borrowerVault.scaledDebt;
+                borrowerVault.scaledDebt = 0;
+                // make explicit, non-accruing
+                badDebtUSD[collateralAsset] += rem;
+                emit BadDebtRealized(collateralAsset, borrower, rem);
+            }
+        } else {
+          emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
+        }
+        
         // If ≤ 1 wei debt remains, zero it out in normalized units
         if (remainingDebtUSD <= 1) {
             if (borrowerVault.scaledDebt > 0) {
