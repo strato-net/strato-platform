@@ -262,6 +262,7 @@ contract record MercataBridge is Ownable {
         uint256 maxPerTx,
         uint8 permissions
     ) external onlyOwner {
+        require(tokenFactory.isFactoryToken(stratoToken), "MB: token not from factory");
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
         require((permissions & PERMISSION_MASK) == permissions, "MB: invalid permissions");
 
@@ -314,7 +315,6 @@ contract record MercataBridge is Ownable {
         onlyRelayer
         whenDepositsOpen
     {
-        require(tokenFactory.isFactoryToken(stratoToken), "MB: token not from factory");
         AssetInfo memory a = assets[stratoToken][externalChainId];
         require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
@@ -476,7 +476,6 @@ contract record MercataBridge is Ownable {
         whenWithdrawalsOpen
         returns (uint256 id)
     {
-        require(tokenFactory.isFactoryToken(stratoToken),"MB: token not from factory");
         AssetInfo memory a = assets[stratoToken][externalChainId];
         require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
