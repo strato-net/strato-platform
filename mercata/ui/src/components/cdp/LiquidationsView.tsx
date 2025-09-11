@@ -76,15 +76,17 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [liquidatingVaults, setLiquidatingVaults] = useState<Record<string, boolean>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});
+  const [availableUsdstBalance, setAvailableUsdstBalance] = useState<number>(0);
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
 
-  // Fetch liquidatable positions and asset configs
+  // Fetch liquidatable positions, asset configs, and USDST balance
   useEffect(() => {
-    const fetchLiquidatable = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch liquidatable vaults
         const liquidatable = await cdpService.getLiquidatable();
         setLiquidatableVaults(liquidatable);
         
@@ -109,8 +111,16 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         });
         setAssetConfigs(configsMap);
         
+        // Fetch USDST balance once for the entire component
+        if (userAddress) {
+          await fetchUsdstBalance(userAddress);
+          const availableUsdstWei = BigInt(usdstBalance || "0");
+          const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
+          setAvailableUsdstBalance(availableUsdstDecimal);
+        }
+        
       } catch (error) {
-        console.error("Error fetching liquidatable vaults:", error);
+        console.error("Error fetching data:", error);
         toast({
           title: "Error",
           description: "Failed to fetch liquidatable positions",
@@ -121,8 +131,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       }
     };
 
-    fetchLiquidatable();
-  }, [toast]);
+    fetchData();
+  }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
 
   const toggleExpanded = (vaultKey: string) => {
     setExpandedVaults(prev => ({
@@ -157,6 +167,11 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     return maxAmount && currentAmount > maxAmount;
   };
 
+  // Check if USDST balance is insufficient (less than 0.02)
+  const isUsdstBalanceInsufficient = (): boolean => {
+    return availableUsdstBalance < 0.02;
+  };
+
   // Handle MAX button click
   const handleMaxClick = async (vault: VaultData, vaultKey: string) => {
     const isCurrentlyMax = maxStates[vaultKey];
@@ -173,15 +188,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         // Convert backend max from wei to decimal (18 decimals for USDST)
         const backendMaxDecimal = parseFloat(formatWeiToDecimal(backendMaxWei, 18));
         
-        // Get user's available USDST balance (already in wei format)
-        if (userAddress) {
-          await fetchUsdstBalance(userAddress);
+        
+        // Check if balance is insufficient
+        if (availableUsdstBalance < 0.02) {
+          return;
         }
-        const availableUsdstWei = BigInt(usdstBalance || "0");
-        const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
         
         // Calculate actual max as minimum of backend max and available USDST balance
-        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstDecimal);
+        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
         
         // Store the max value and set max state
         setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
@@ -233,6 +247,11 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       return;
     }
 
+    // Check if USDST balance is insufficient
+    if (isUsdstBalanceInsufficient()) {
+      return;
+    }
+
     setLiquidatingVaults(prev => ({ ...prev, [vaultKey]: true }));
     
     try {
@@ -264,10 +283,13 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         
         // Refresh user token balances (they spent USDST and received collateral)
         if (userAddress) {
-          await Promise.all([
-            fetchTokens(), // Refresh all token balances (including received collateral)
-            fetchUsdstBalance(userAddress) // Refresh USDST balance (spent during liquidation)
-          ]);
+          await fetchTokens(); // Refresh all token balances (including received collateral)
+          await fetchUsdstBalance(userAddress); // Refresh USDST balance (spent during liquidation)
+          
+          // Update the global USDST balance after fetching
+          const updatedUsdstWei = BigInt(usdstBalance || "0");
+          const updatedUsdstDecimal = parseFloat(formatWeiToDecimal(updatedUsdstWei.toString(), 18));
+          setAvailableUsdstBalance(updatedUsdstDecimal);
         }
       }
     } catch (error) {
@@ -412,13 +434,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                               size="sm" 
                               className={`min-w-[50px] ${maxStates[vaultKey] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
                               onClick={() => handleMaxClick(vault, vaultKey)}
+                              disabled={isUsdstBalanceInsufficient()}
                             >
                               MAX
                             </Button>
                             <Button 
                               className="bg-red-600 hover:bg-red-700 text-white"
                               onClick={() => handleLiquidate(vault, vaultKey)}
-                              disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey)}
+                              disabled={isLiquidating || !liquidationAmount || isAmountExceedsMax(vaultKey) || isUsdstBalanceInsufficient()}
                             >
                               {isLiquidating ? "Liquidating..." : "Liquidate"}
                             </Button>
@@ -429,6 +452,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                             <div className="text-center">
                               <p className="text-xs text-red-500">
                                 Maximum liquidation amount reached
+                              </p>
+                            </div>
+                          )}
+                          
+                          {/* Error message when USDST balance is insufficient */}
+                          {isUsdstBalanceInsufficient() && (
+                            <div className="text-center">
+                              <p className="text-xs text-red-500">
+                                Insufficient USDST Balance
                               </p>
                             </div>
                           )}

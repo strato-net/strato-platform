@@ -166,7 +166,7 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { votes, thresholds, executed } = response.data[0];
+    const { admins, votes, thresholds, executed } = response.data[0];
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
@@ -176,7 +176,7 @@ export const getOpenIssues = async (
       },
     });
 
-    return { votes, thresholds, executed, issues: issuesResponse?.data };
+    return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
   } catch (error) {
     return [];
   }
