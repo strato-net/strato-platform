@@ -29,10 +29,11 @@ contract record LendingPool is Ownable {
     event ExchangeRateUpdated(address indexed asset, uint newRate);
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
-    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
+    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter, uint recapAccruedAfter);
     event ReservesSwept(uint amount, address to);
     event RecapNoteUpdated(uint capBps, uint sliceBps);
     event BadDebtWrittenOff(address indexed borrower, address indexed asset, uint amount);
+    event BadDebtCoveredFromReserves(uint amount);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -592,6 +593,12 @@ contract record LendingPool is Ownable {
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
+
+        // Handle newly created bad debt
+        if (userLoan[borrower].scaledDebt != 0
+            && _isCollateralZero(borrower)) {
+            _handleBadDebt(borrower);
+        }
     }
 
     /**
@@ -820,9 +827,13 @@ contract record LendingPool is Ownable {
             uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
             uint rf = assetConfigs[borrowableAsset].reserveFactor; // bps
             if (rf > 0 && interestDelta > 0) {
-                reservesAccrued += (interestDelta * rf) / 10000;
+                // TODO correct this
+                uint newReservesAccrued = (interestDelta * rf) / 10000;
+                uint newRecapAccrued = (interestDelta * recapNote.sliceBps) / 10000;
+                reservesAccrued += newReservesAccrued - newRecapAccrued;
+                recapNote.accrued += newRecapAccrued;
             }
-            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued);
+            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued, recapNote.accrued);
         }
     }
 
@@ -933,6 +944,17 @@ contract record LendingPool is Ownable {
         }
         return totalValue;
     }
+
+    function _isCollateralZero(address user) internal view returns (bool) {
+        for (uint i = 0; i < configuredAssets.length; i++) {
+            address asset = configuredAssets[i];
+            if (CollateralVault(_collateralVault()).userCollaterals(user, asset) > 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 
     /**
      * @notice Calculate total borrow value for a user (single loan)
@@ -1082,11 +1104,27 @@ contract record LendingPool is Ownable {
     }
 
     /**
-     * @notice Cover bad debt in exchange for a recapitalization note
+     * @notice Cover bad debt in exchange for a recapitalization note share
      * @param amount The amount of bad debt to cover in underlying units
      */
     function recap(uint amount) external {
-        return;
+        require(amount > 0, "Invalid amount");
+        _accrue();
+        uint cover = amount > badDebt ? badDebt : amount; // cover up to the bad debt amount
+        uint note_increase = cover * recapNote.capBps / 10000;
+        recapNote.outstanding += note_increase;
+        recapShares[msg.sender] += note_increase / recapNote.outstanding; // TODO wrong
+        emit RecapNoteIssued(msg.sender, note_increase);
+        emit BadDebtCoveredWithRecap(cover);
+    }
+
+    function claimRecapNote() external {
+        _accrue(); 
+        uint amount = recapShares[msg.sender] * recapNote.accrued;
+        recapNote.accrued -= amount; // TODO wrong
+        recapNote.outstanding -= amount;
+        recapShares[msg.sender] -= amount;
+        emit RecapNoteClaimed(msg.sender, amount);
     }
 
     /**
@@ -1096,8 +1134,10 @@ contract record LendingPool is Ownable {
      */
     function _coverBadDebtFromReserves(uint amount) internal {
         require(amount > 0, "Invalid amount");
-        require(reservesAccrued >= amount, "Insufficient reserves");
-        reservesAccrued -= amount;
+        uint cover = amount > badDebt ? badDebt : amount; // cover up to the bad debt amount
+        reservesAccrued -= cover;
+        badDebt -= cover;
+        emit BadDebtCoveredFromReserves(cover);
     }
 
     /**
@@ -1108,9 +1148,5 @@ contract record LendingPool is Ownable {
      */
     function coverBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
         _coverBadDebtFromReserves(amount);
-    }
-
-    function closeJuniorWindow() external onlyPoolConfiguration {
-        return;
     }
 } 

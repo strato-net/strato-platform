@@ -52,7 +52,10 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata reserveFactors,
         uint[] calldata perSecondFactorsRAY,
         uint debtCeilingAssetUnits,
-        uint debtCeilingUSD
+        uint debtCeilingUSD,
+        uint recapCapBps,
+        uint recapSliceBps
+        bool doAutoCoverFromReserves,
     ) external onlyOwner {
         // Set all registry components
         registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
@@ -63,6 +66,10 @@ contract record PoolConfigurator is Ownable {
 
         // Set initial debt ceilings
         pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
+
+        // Set bad debt handling parameters
+        pool.setRecapParams(recapCapBps, recapSliceBps);
+        pool.setDoAutoCoverFromReserves(doAutoCoverFromReserves);
         
         // Configure all assets if provided
         if (assets.length > 0) {
