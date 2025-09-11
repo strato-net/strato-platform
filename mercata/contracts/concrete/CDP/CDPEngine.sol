@@ -1,8 +1,9 @@
 // CDPEngine
-// - Core CDP logic for multi‑collateral USDST mint/burn
-// - Tracks per‑asset risk configs and per‑vault state (collateral, scaledDebt)
+// - Core CDP logic for multi-collateral USDST mint/burn
 // - Accrues stability fee via rateAccumulator (RAY); all debt reads use scaledDebt * rate / RAY
-// - Single liquidation entrypoint caps repay to min(requested, debt, close-factor, coverage incl. penalty)
+// - Liquidation with direct seize (no auctions)
+// - Fees: split between FeeCollector and CDPReserve (feeToReserveBps)
+// - FIFO juniors queue lives in Engine; owner pays them out using funds held in CDPReserve
 
 import "./CDPVault.sol";
 import "../Tokens/Token.sol";
@@ -10,6 +11,8 @@ import "../Tokens/TokenFactory.sol";
 import "../Lending/PriceOracle.sol";
 import "./CDPRegistry.sol";
 import "../Admin/FeeCollector.sol";
+import "./CDPReserve.sol";
+import {DoubleEndedQueue} from "../../abstract/ERC20/utils/DoubleEndedQueue.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -46,14 +49,39 @@ contract record CDPEngine is Ownable {
     mapping(address => CollateralConfig) public record collateralConfigs;
     mapping(address => CollateralGlobalState) public record collateralGlobalStates;
     mapping(address => mapping(address => Vault)) public record vaults; // user => asset => vault
-    mapping(address => uint) public badDebtUSD; // 1e18, bad debt (per-asset), non-accruing
+    mapping(address => uint) public record badDebtUSD; // 1e18, bad debt (per-asset), non-accruing
 
     bool public globalPaused;
     uint public RAY = 1e27;
     uint public WAD = 1e18;
     mapping(address => bool) public record isSupportedAsset;
 
-    // Events (post‑state metrics where relevant)
+    // ─────────────── Fee split to Reserve & Juniors ───────────────
+    uint256 public feeToReserveBps; // portion of feeUSD minted to CDPReserve (0..10000)
+    uint256 public juniorPremiumBps;   // e.g., 1000 = +10% payout premium over principal burned
+    bool public juniorWindowOpen;      // gate for users to open junior notes
+
+    event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
+    event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
+
+    // ─────────────── FIFO Juniors ───────────────
+    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+
+    struct JuniorNote { 
+      address owner; 
+      uint128 capUSD; 
+      uint128 repaidUSD; 
+    }
+
+    DoubleEndedQueue.Bytes32Deque private _jQueue;
+    mapping(uint256 => JuniorNote) record private _jNotes;
+    uint256 private _jNextId;
+
+    event JuniorEnqueued(uint indexed id, address indexed owner, uint capUSD);
+    event JuniorPaid(uint indexed id, address indexed owner, uint paidUSD, uint remainingUSD);
+    event JuniorClosed(uint indexed id);
+
+    // ─────────────── Events ───────────────
     event CollateralConfigured(
         address indexed asset,
         uint liquidationRatio,
@@ -114,9 +142,12 @@ contract record CDPEngine is Ownable {
         uint remainingDebtUSD,
         uint rateAccumulator
     );
-
+    event BadDebtRealized(address indexed asset, address indexed borrower, uint amountUSD);
     event Paused(address indexed asset, bool isPaused);
     event PausedGlobal(bool isPaused);
+    event JuniorWindowToggled(bool open);
+    event JuniorParamsSet(uint premiumBps);
+    event BadDebtRepaid(address indexed asset, uint amountUSD, uint badDebtRemaining);
     
     event VaultUpdated(
         address indexed user,
@@ -133,6 +164,7 @@ contract record CDPEngine is Ownable {
     function _usdst() internal view returns (Token) { return Token(address(registry.usdst())); }
     function _tokenFactory() internal view returns (TokenFactory) { return TokenFactory(address(registry.tokenFactory())); }
     function _feeCollector() internal view returns (FeeCollector) { return FeeCollector(address(registry.feeCollector())); }
+    function _cdpReserve() internal view returns (CDPReserve) { return CDPReserve(address(registry.cdpReserve())); }
 
    // ─────────────────────────── Access Modifiers ───────────────────────────
     modifier whenNotPaused(address asset) {
@@ -171,11 +203,74 @@ contract record CDPEngine is Ownable {
         emit RegistryUpdated(old, _registry);
     }
 
-    // ───────────────────────────── User Actions ──────────────────────────────
-    /**
-     * @notice Deposit collateral from msg.sender into their vault
-     * @dev Pulls tokens via transferFrom into CDPVault custody; emits Deposited and VaultUpdated
-     */
+    // ─────────────── Admin: fee split & juniors ───────────────
+
+    function setFeeToReserveBps(uint256 newBps) external onlyOwner {
+        require(newBps <= 10000, "fee bps > 10000");
+        uint256 old = feeToReserveBps;
+        feeToReserveBps = newBps;
+        emit FeeToReserveBpsSet(old, newBps);
+    }
+
+    function setJuniorParams(uint256 newPremiumBps) external onlyOwner {
+        require(newPremiumBps <= 10000, "junior: premium > 100%");
+        juniorPremiumBps = newPremiumBps;
+        emit JuniorParamsSet(newPremiumBps);
+    }
+
+    function setJuniorWindow(bool open) external onlyOwner {
+        juniorWindowOpen = open;
+        emit JuniorWindowToggled(open);
+    }
+
+    /// @notice Owner pays juniors FIFO using funds held in CDPReserve.
+    /// @param budgetUSD Max USDST to spend from reserve this call.
+    function payJuniors(uint256 budgetUSD) external onlyOwner returns (uint256 spentUSD) {
+        if (budgetUSD == 0) return 0;
+
+        // Limit by actual reserve balance
+        uint256 bal = registry.cdpReserve().balance();
+        if (bal == 0) return 0;
+        if (budgetUSD > bal) budgetUSD = bal;
+
+        uint256 budget = budgetUSD;
+
+        while (budget > 0 && !_jQueue.empty()) {
+            uint256 id = uint256(_jQueue.front());
+            JuniorNote storage n = _jNotes[id];
+
+            // Defensive cleanup
+            if (n.capUSD <= n.repaidUSD) {
+                _jQueue.popFront();
+                delete _jNotes[id];
+                emit JuniorClosed(id);
+                continue;
+            }
+
+            uint256 outstanding = uint256(n.capUSD) - uint256(n.repaidUSD);
+            uint256 pay = budget < outstanding ? budget : outstanding;
+
+            // Pull directly from Reserve to recipient
+            _cdpReserve().transferTo(n.owner, pay);
+
+            n.repaidUSD = uint128(uint256(n.repaidUSD) + pay);
+            budget -= pay;
+            spentUSD += pay;
+
+            emit JuniorPaid(id, n.owner, pay, uint256(n.capUSD) - uint256(n.repaidUSD));
+
+            if (n.repaidUSD >= n.capUSD) {
+                _jQueue.popFront();
+                delete _jNotes[id];
+                emit JuniorClosed(id);
+            } else {
+                break; // keep FIFO head for next call
+            }
+        }
+    }
+
+    // ─────────────── User Actions (unchanged except fee routing) ───────────────
+
     function deposit(address asset, uint amount) external whenNotPaused(asset) onlyActiveAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
         // Move collateral into vault custody and update in-memory vault balance
@@ -354,7 +449,14 @@ contract record CDPEngine is Ownable {
         uint feeUSD  = owedForDelta > baseUSD ? (owedForDelta - baseUSD) : 0;
 
         Token(_usdst()).burn(msg.sender, owedForDelta);
-        if (feeUSD > 0) Token(_usdst()).mint(address(_feeCollector()), feeUSD);
+
+        if (feeUSD > 0) {
+            uint toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint toCollector = feeUSD - toReserve;
+            if (toReserve > 0)   Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
+            emit FeesRouted(asset, toReserve, toCollector);
+        }
 
         userVault.scaledDebt = newScaledDebt;
         assetState.totalScaledDebt -= scaledDelta;
@@ -389,11 +491,18 @@ contract record CDPEngine is Ownable {
         // Split owed into base principal and fee components
         uint baseUSD = scaledDebtToRemove; // normalized principal (scaled units)
         uint feeUSD = owed > baseUSD ? (owed - baseUSD) : 0;
-        // Route fee to FeeCollector in USDST; principal reduction reflected in books below
-        if (feeUSD > 0) { Token(_usdst()).mint(address(_feeCollector()), feeUSD); }
-        // Zero vault scaled debt and update global totals/books
+
+        if (feeUSD > 0) {
+            uint toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint toCollector = feeUSD - toReserve;
+            if (toReserve > 0)   Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
+            emit FeesRouted(asset, toReserve, toCollector);
+        }
+
         userVault.scaledDebt = 0;
         assetState.totalScaledDebt -= scaledDebtToRemove;
+
         emit USDSTBurned(msg.sender, asset, owed, assetState.totalScaledDebt, assetState.rateAccumulator);
         emit VaultUpdated(msg.sender, asset, userVault.collateral, userVault.scaledDebt);
     }
@@ -465,9 +574,15 @@ contract record CDPEngine is Ownable {
 
         // Burn exact, route fee, update books
         Token(_usdst()).burn(msg.sender, owedForDelta);
+
         if (feeUSD > 0) {
-            Token(_usdst()).mint(address(_feeCollector()), feeUSD);
+            uint toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint toCollector = feeUSD - toReserve;
+            if (toReserve > 0)   Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
+            emit FeesRouted(collateralAsset, toReserve, toCollector);
         }
+
         borrowerVault.scaledDebt -= scaledDebtToLiquidate;
         assetState.totalScaledDebt -= scaledDebtToLiquidate;
 
@@ -520,6 +635,53 @@ contract record CDPEngine is Ownable {
         }
     }
 
+    /**
+     * @notice Burn USDST to reduce bad debt for a specific asset and receive a FIFO junior note.
+     * @dev - Requires junior window to be open.
+     *      - Burns up to the remaining bad debt for `asset`.
+     *      - Enqueues a note with cap = burned * (1 + juniorPremiumBps/10000).
+     * @param asset The asset whose bad debt will be reduced.
+     * @param amountUSD Desired USDST to burn (will be clamped to remaining bad debt).
+     * @return id         The newly created junior note id.
+     * @return burnedUSD  The actual USDST burned.
+     * @return capUSD     The note’s payout cap (principal+premium).
+     */
+    function openJuniorNote(address asset, uint256 amountUSD)
+        external
+        onlyKnownAsset(asset)
+        returns (uint256 id, uint256 burnedUSD, uint256 capUSD)
+    {
+        require(juniorWindowOpen, "junior: closed");
+        require(amountUSD > 0, "junior: zero amount");
+
+        uint256 bad = badDebtUSD[asset];
+        require(bad > 0, "junior: no bad debt");
+
+        // Clamp burn to remaining bad debt for this asset
+        burnedUSD = amountUSD > bad ? bad : amountUSD;
+
+        // Burn user's USDST directly (token must allow burn-from pattern used elsewhere)
+        Token(_usdst()).burn(msg.sender, burnedUSD);
+
+        // Reduce bad debt
+        badDebtUSD[asset] = bad - burnedUSD;
+        emit BadDebtRepaid(asset, burnedUSD, badDebtUSD[asset]);
+
+        // Compute payout cap with premium; bound into uint128 for storage
+        capUSD = (burnedUSD * (10000 + juniorPremiumBps)) / 10000;
+        require(capUSD <= type(uint128).max, "junior: cap overflow");
+
+        // Create note owned by the burner; enqueue FIFO
+        id = ++_jNextId;
+        _jNotes[id] = JuniorNote({
+            owner: msg.sender,
+            capUSD: uint128(capUSD),
+            repaidUSD: 0
+        });
+        _jQueue.pushBack(bytes32(id));
+        emit JuniorEnqueued(id, msg.sender, capUSD);
+    }
+
     // ───────────────────────── Accrual & Views ──────────────────────────────
     /**
      * @notice Accrue stability fees for an asset by advancing the rateAccumulator
@@ -529,9 +691,11 @@ contract record CDPEngine is Ownable {
         // Load config/state for the collateral asset
         CollateralConfig memory assetConfig = collateralConfigs[asset];
         CollateralGlobalState storage assetState = collateralGlobalStates[asset];
-        // First-time init: set baseline index and lastAccrual
-        if (assetState.lastAccrual == 0) { assetState.lastAccrual = block.timestamp; assetState.rateAccumulator = RAY; return; }
-        // If no time elapsed since last accrual, skip
+        if (assetState.lastAccrual == 0) {
+            assetState.lastAccrual = block.timestamp;
+            assetState.rateAccumulator = RAY;
+            return;
+        }
         uint dt = block.timestamp - assetState.lastAccrual; if (dt == 0) return;
         uint oldRate = assetState.rateAccumulator;
         // Compute per-period factor via fixed-point exponentiation (RAY scale)
