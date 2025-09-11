@@ -324,7 +324,9 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
+            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3)
+                (const (".status", if not (name `elem` ["USDCST", "USDTST"]) then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3))
+                $ find (== root) supportedCollaterals)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
@@ -452,7 +454,6 @@ mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount
 poolFactory :: AccountInfo
 poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mercataAddress "PoolFactory") $ ownedByBlockApps mercataAddress ++
   [ (".tokenFactory", BAccount $ unspecifiedChain tokenFactoryAddress)
-  , (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
   , (".feeCollector", BAccount $ unspecifiedChain feeCollectorAddress)
   , (".swapFeeRate", BInteger 30)
   , (".lpSharePercent", BInteger 7000)
@@ -460,8 +461,7 @@ poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 (CodeAtAccount mer
 
 tokenFactory :: AccountInfo
 tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount mercataAddress "TokenFactory") $ ownedByBlockApps mercataAddress
-  ++ [ (".adminRegistry", BAccount $ unspecifiedChain adminRegistryAddress)
-     , (".isFactoryToken<a:" <> addrBS mTokenAddress <> ">", BBool True)
+  ++ [ (".isFactoryToken<a:" <> addrBS mTokenAddress <> ">", BBool True)
      , (".allTokens[0]", BAccount $ unspecifiedChain mTokenAddress)
      , (".allTokens.length", BInteger . fromIntegral $ 1 + length GA.assets)
      ]
@@ -485,7 +485,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
-      if name `elem` ["ETHST", "USDCST", "WBTCST", "USDTST", "PAXGST"]
+      if name `elem` ["ETHST", "WBTCST", "PAXGST"]
          then [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
               , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
               ]
