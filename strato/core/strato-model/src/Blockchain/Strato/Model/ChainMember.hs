@@ -50,9 +50,7 @@ import Text.Format
 data BoundedData a = LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
 
 data ChainMemberF f = ChainMemberF
-  { orgName :: f T.Text,
-    orgUnit :: f (Maybe T.Text),
-    commonName :: f (Maybe T.Text),
+  { commonName :: f (Maybe T.Text),
     sentinel :: f ()
   }
   deriving (Generic)
@@ -106,13 +104,10 @@ instance Ord a => Ord (BoundedData a) where
   (Middle _) `compare` UpperBound = LT
 
 instance Ord (ChainMemberF BoundedData) where
-  compare (ChainMemberF on1 ou1 cm1 s1) (ChainMemberF on2 ou2 cm2 s2) = case (compare on1 on2) of
-    EQ -> case (compare ou1 ou2) of
-      EQ -> case (compare cm1 cm2) of
+  compare (ChainMemberF cm1 s1) (ChainMemberF cm2 s2) =
+    case (compare cm1 cm2) of
         EQ -> compare s1 s2
         x -> x
-      y -> y
-    z -> z
 
 instance (DiscreteOrdered (ChainMemberF BoundedData)) where
   adjacent _ _ = False
@@ -130,13 +125,13 @@ instance NFData ChainMemberParsedSet where
   rnf (CommonName a b c d) = d `seq` c `seq` b `seq` a `seq` ()
   
 instance Eq (ChainMemberF BoundedData) where
-  (==) (ChainMemberF on1 ou1 cm1 s1) (ChainMemberF on2 ou2 cm2 s2) = (on1 == on2 && ou1 == ou2 && cm1 == cm2 && s1 == s2)
+  (==) (ChainMemberF cm1 s1) (ChainMemberF cm2 s2) = (cm1 == cm2 && s1 == s2)
 
 instance Format ChainMemberParsedSet where
   format = show
 
 instance Show (ChainMemberF BoundedData) where
-  show (ChainMemberF on' ou cm s) = (show on') ++ " " ++ (show ou) ++ " " ++ (show cm) ++ " " ++ show s
+  show (ChainMemberF cm s) = (show cm) ++ " " ++ show s
 
 deriving instance Show (ChainMemberF DFI.Identity)
 
@@ -181,17 +176,13 @@ instance RLPSerializable (BoundedData ()) where
   rlpDecode _ = error ("Error in rlpDecode for BoundedData (): bad RLPObject")
 
 instance RLPSerializable ChainMemberBounded where
-  rlpEncode (ChainMemberF on' ou cmn s) =
+  rlpEncode (ChainMemberF cmn s) =
     RLPArray
-      [ rlpEncode on',
-        rlpEncode ou,
-        rlpEncode cmn,
+      [ rlpEncode cmn,
         rlpEncode s
       ]
-  rlpDecode (RLPArray [on', ou, cmn, s]) =
+  rlpDecode (RLPArray [cmn, s]) =
     ChainMemberF
-      (rlpDecode on')
-      (rlpDecode ou)
       (rlpDecode cmn)
       (rlpDecode s)
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 4 element RLPArray, got " ++ show o
