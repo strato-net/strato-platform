@@ -324,7 +324,7 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ map (\(k,v) -> (".files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
             ++ map (\(k,v) -> (".fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
             ++ map (\(k,v) -> (".attributes<" <> encodeUtf8 (T.pack $ show k) <> ">", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe (".status", if root == usdstAddress || root == cataAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
+            ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3) (const (".status", BEnumVal "TokenStatus" "ACTIVE" 2)) $ find (== root) supportedCollaterals)]
             ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
@@ -474,17 +474,18 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
      , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS cataAddress <> "><\"mint\"><a:" <> addrBS rewardsManagerAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS cataAddress <> "><\"burn\"><a:" <> addrBS rewardsManagerAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
-      [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
-      , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
-      ] ++
-       if name `elem` ["ETHST", "USDCST"]
+      if name `elem` ["ETHST", "USDCST", "WBTCST", "USDTST", "PAXGST"]
          then [ (".whitelist<a:" <> addrBS root <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
               , (".whitelist<a:" <> addrBS root <> "><\"burn\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
               ]

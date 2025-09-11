@@ -11,30 +11,21 @@ import "../../abstract/ERC20/access/Ownable.sol";
     mapping(address => uint256) public record prices;
     mapping(address => uint256) public record lastUpdated;
     
-    // Authorized oracle addresses
-    mapping(address => bool) public record authorizedOracles;
-    
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
     event OracleAuthorized(address indexed oracle);
     event OracleRevoked(address indexed oracle);
     
-    modifier onlyAuthorizedOracle() {
-        require(authorizedOracles[msg.sender] || msg.sender == owner(), "Not authorized oracle");
-        _;
-    }
-    
     constructor(address _authorizedOracle) {
         // Owner is automatically authorized
         require(_authorizedOracle != address(0), "Invalid oracle address");
-        authorizedOracles[_authorizedOracle] = true;
     }
     
     /**
      * @dev Set price for a single asset
      */
-    function setAssetPrice(address asset, uint256 price) external onlyAuthorizedOracle {
+    function setAssetPrice(address asset, uint256 price) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
         require(price > 0, "Price must be greater than 0");
         
@@ -47,7 +38,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
     /**
      * @dev Set prices for multiple assets in batch (main function for oracle service)
      */
-    function setAssetPrices(address[] calldata assets, uint256[] calldata priceValues) external onlyAuthorizedOracle {
+    function setAssetPrices(address[] calldata assets, uint256[] calldata priceValues) external onlyOwner {
         require(assets.length == priceValues.length, "Arrays length mismatch");
         require(assets.length > 0, "Empty arrays");
         
@@ -89,31 +80,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
     function isPriceFresh(address asset, uint256 maxAge) external view returns (bool) {
         if (prices[asset] == 0) return false;
         return (block.timestamp - lastUpdated[asset]) <= maxAge;
-    }
-    
-    /**
-     * @dev Authorize an oracle address
-     */
-    function authorizeOracle(address oracle) external onlyOwner {
-        require(oracle != address(0), "Invalid oracle address");
-        authorizedOracles[oracle] = true;
-        emit OracleAuthorized(oracle);
-    }
-    
-    /**
-     * @dev Revoke oracle authorization
-     */
-    function revokeOracle(address oracle) external onlyOwner {
-        require(oracle != address(0), "Invalid oracle address");
-        authorizedOracles[oracle] = false;
-        emit OracleRevoked(oracle);
-    }
-    
-    /**
-     * @dev Check if address is authorized oracle
-     */
-    function isAuthorizedOracle(address oracle) external view returns (bool) {
-        return authorizedOracles[oracle];
     }
 }
 
