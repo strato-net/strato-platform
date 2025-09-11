@@ -20,15 +20,15 @@ import "../Tokens/Token.sol";
  * proportional rewards based on what that pool has earned relative to their
  * stake.
  *
- * INSPIRATION: MasterChef V1
+ * I. INSPIRATION: MasterChef V1
  *
  * RewardsChef is heavily inspired by MasterChef V1 with some modifications.
  * Understanding how MasterChef V1 works first will greatly simplify the
  * learning process of understanding the RewardsChef code.
  *
- * USAGE
+ * II. USAGE
  *
- * Pool Management:
+ * 2.1 Pool Management:
  *
  * The contract owner can create pools using addPool(), specifying allocation
  * points which determine the pool's importance and reward share. Allocation
@@ -41,7 +41,7 @@ import "../Tokens/Token.sol";
  * (controlled by minFutureTime) to prevent gaming - they cannot be added
  * last-minute before they begin.
  *
- * Rewards Calculation Per Pool:
+ * 2.2 Rewards Calculation Per Pool:
  *
  * The updatePool() function calculates rewards for the entire pool, not
  * individual users yet. It determines how much reward has accrued since the
@@ -53,7 +53,58 @@ import "../Tokens/Token.sol";
  * calculates how much of that accrued reward will be available per share
  * (per LP token) for distribution to individual users.
  *
- * PRECISION LOSS PREVENTION:
+ * 2.3 Staking:
+ *
+ * Users interact with pools through deposit() and withdraw() functions, which
+ * are symmetric operations. Both functions first update the pool's rewards,
+ * then calculate and transfer any pending rewards to the user before
+ * processing the deposit/withdrawal. The key concept here is rewardDebt,
+ * which tracks how much reward the user has already "claimed" based on their
+ * current stake to prevent double-counting of rewards.
+ *
+ * III. IMPLEMENTATION EXPLAINED
+ *
+ * 3.1 accPerToken
+ *
+ * accPerToken represents the cumulative amount of reward tokens earned per LP
+ * token since the pool was created. It's a global accumulator that grows over
+ * time as rewards are distributed to the pool. This value is multiplied by
+ * PRECISION_MULTIPLIER to avoid rounding errors in calculations.
+ *
+ * Key properties:
+ * - Always increases (never decreases) as new rewards are added
+ * - Represents total historical rewards per LP token, not current rate
+ * - Used to calculate individual user rewards by multiplying with user's stake
+ *
+ * Example progression:
+ * - Pool created: accPerToken = 0
+ * - After 1 hour: 1000 CATA earned, 100 LP tokens staked →
+ *                                       accPerToken = 10 * PRECISION_MULTIPLIER
+ * - After 2 hours: 2000 CATA total earned →
+ *                                       accPerToken = 20 * PRECISION_MULTIPLIER
+ * - A user with 5 LP tokens would
+ *   earn: (5 * 20 * PRECISION_MULTIPLIER) / PRECISION_MULTIPLIER = 100 CATA total
+ *
+ * The accPerToken mechanism allows the contract to efficiently track rewards
+ * for all users without iterating through each user individually - it's
+ * calculated once per pool update and applied to all users on-demand.
+ *
+ * 3.2 REWARD DEBT MECHANISM:
+ *
+ * The rewardDebt system prevents users from claiming rewards that accrued
+ * before they joined the pool. When a user deposits, their rewardDebt is set
+ * to their potential rewards at that moment. When calculating pending rewards,
+ * we subtract this debt to get only the rewards earned since their deposit.
+ *
+ * Example: Pool has accPerToken = 100 (meaning 100 CATA per LP token earned so
+ * far)
+ *
+ * - User deposits 10 LP tokens → rewardDebt = 10 × 100 = 1000
+ * - Pool earns more rewards, accPerToken becomes 150
+ * - User's pending reward = (10 × 150) - 1000 = 500 CATA
+ * - This 500 CATA represents only rewards earned after their deposit
+ *
+ * 3.3 PRECISION LOSS PREVENTION:
  *
  * Issue: The reward calculation `(multiplier * cataPerSecond * pool.allocPoint)
  * / totalAllocPoint` can result in precision loss due to Solidity's integer
