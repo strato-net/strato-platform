@@ -92,6 +92,7 @@ contract record LendingPool is Ownable {
 
     // Bad Debt Handling
     uint public badDebt; // total bad debt in underlying units
+    bool public doAutoCoverFromReserves; // whether to automatically cover bad debt from reserves
     
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -877,6 +878,10 @@ contract record LendingPool is Ownable {
         emit DebtCeilingsUpdated(assetUnits, usdValue);
     }
 
+    function setDoAutoCoverFromReserves(bool _doAutoCoverFromReserves) external onlyPoolConfigurator {
+        doAutoCoverFromReserves = _doAutoCoverFromReserves;
+    }
+
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
     function sweepReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0 || reservesAccrued == 0) return;
@@ -892,6 +897,7 @@ contract record LendingPool is Ownable {
             emit ReservesSwept(toSend, address(feeCollector));
         }
     }
+
     
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
@@ -1057,7 +1063,9 @@ contract record LendingPool is Ownable {
  
         emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-        
+
+        if (doAutoCoverFromReserves) _coverBadDebtFromReserves(owed);
+
         return;
     }
 

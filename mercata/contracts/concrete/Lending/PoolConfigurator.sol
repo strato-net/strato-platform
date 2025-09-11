@@ -204,6 +204,11 @@ contract record PoolConfigurator is Ownable {
         pool.setDebtCeilings(assetUnits, usdValue);
     }
 
+    function setDoAutoCoverFromReserves(bool _doAutoCoverFromReserves) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setDoAutoCoverFromReserves(_doAutoCoverFromReserves);
+    }
+
     /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
@@ -211,5 +216,10 @@ contract record PoolConfigurator is Ownable {
     function sweepReserves(uint amount) external onlyOwner {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.sweepReserves(amount);
+    }
+
+    function coverBadDebtFromReserves(uint amount) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.coverBadDebtFromReserves(amount);
     }
 } 
