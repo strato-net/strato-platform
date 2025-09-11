@@ -37,6 +37,31 @@ Modular Hardhat setup for deploying Mercata contracts to Ethereum networks with 
 | `npm run deployWithProxy:mainnet` | Deploy contract with proxy to Ethereum mainnet |
 | `npm run verify:sepolia`          | Verify contract on Sepolia Etherscan           |
 | `npm run verify:mainnet`          | Verify contract on Mainnet Etherscan           |
+| `npm run scan:sepolia`            | Scan token configurations on Sepolia testnet   |
+| `npm run scan:mainnet`            | Scan token configurations on Ethereum mainnet  |
+
+## Utility Scripts
+
+### Token Configuration Scanner
+
+The `scanTokenConfig.js` script allows you to view all configured tokens in a DepositRouter contract:
+
+```bash
+# Using npm script (recommended)
+npm run scan:sepolia
+
+# Or manually with environment variable
+DEPOSIT_ROUTER_ADDRESS=0x1234567890123456789012345678901234567890 npx hardhat run scripts/scanTokenConfig.js --network sepolia
+```
+
+**Prerequisites:**
+- Run `npm run compile` first to generate the contract ABI
+- Set `DEPOSIT_ROUTER_ADDRESS` in your `.env` file
+
+**Permission values:**
+- `1` = WRAP only (0b01)
+- `2` = MINT only (0b10)  
+- `3` = Both WRAP and MINT (0b11)
 
 ## Environment Setup
 
@@ -52,6 +77,9 @@ PRIVATE_KEY=0x1234567890abcdef...
 
 # Etherscan API key for verification
 ETHERSCAN_API_KEY=YOUR_ETHERSCAN_API_KEY
+
+# DepositRouter contract address (for utility scripts)
+DEPOSIT_ROUTER_ADDRESS=0x1234567890123456789012345678901234567890
 ```
 
 ## Deployment

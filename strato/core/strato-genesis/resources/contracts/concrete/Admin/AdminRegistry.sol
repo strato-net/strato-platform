@@ -99,9 +99,9 @@ contract record AdminRegistry {
             uint issueVotes = votes[_issueId].length;
             uint votingThresholdBps = votingThresholds[_target][_func];
             if (votingThresholdBps > 0) {
-                return 10000 * (issueVotes + 1) > votingThresholdBps * admins.length;
+                return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
             } else {
-                return 3 * (issueVotes + 1) > 2 * admins.length;
+                return 3 * (issueVotes + 1) >= 2 * admins.length;
             }
         }
     }
