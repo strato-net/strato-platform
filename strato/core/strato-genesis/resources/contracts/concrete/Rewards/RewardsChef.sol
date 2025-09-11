@@ -5,11 +5,59 @@ import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
 
 /**
+ * RewardsChef - A staking contract that allows creating pools for various LP
+ * tokens, where users earn CATA token rewards over time for staking their LP
+ * tokens.
+ *
+ * The contract owner can create dedicated pools for individual LP tokens. All
+ * pools together earn a configurable number of CATA tokens per second (set upon
+ * contract creation). This total reward is distributed among all pools
+ * proportionally based on their allocation points, which represent the
+ * importance of each pool. Some pools can earn extra bonus rewards during
+ * special time periods where bonus multipliers apply.
+ *
+ * Users can deposit their LP tokens into any created pool and receive
+ * proportional rewards based on what that pool has earned relative to their
+ * stake.
+ *
+ * INSPIRATION: MasterChef V1
+ *
+ * RewardsChef is heavily inspired by MasterChef V1 with some modifications.
+ * Understanding how MasterChef V1 works first will greatly simplify the
+ * learning process of understanding the RewardsChef code.
+ *
+ * USAGE
+ *
+ * Pool Management:
+ *
+ * The contract owner can create pools using addPool(), specifying allocation
+ * points which determine the pool's importance and reward share. Allocation
+ * points can be updated later with updateAllocationPoints() to rebalance
+ * reward distribution among pools.
+ *
+ * Each pool supports bonus periods that multiply rewards during specific time
+ * ranges. Bonus periods are added using addBonusPeriod() but cannot be removed
+ * once created. New bonus periods must start sufficiently far in the future
+ * (controlled by minFutureTime) to prevent gaming - they cannot be added
+ * last-minute before they begin.
+ *
+ * Rewards Calculation Per Pool:
+ *
+ * The updatePool() function calculates rewards for the entire pool, not
+ * individual users yet. It determines how much reward has accrued since the
+ * last time this function was called (tracked by lastRewardTimestamp). The
+ * calculation is straightforward: CATA per second multiplied by the number of
+ * seconds that have passed (with bonus multipliers applied if applicable),
+ * scaled to the pool's importance (allocPoints / totalAllocPoints). This
+ * calculated amount is minted and sent to the contract address. Finally, it
+ * calculates how much of that accrued reward will be available per share
+ * (per LP token) for distribution to individual users.
+ *
  * PRECISION LOSS PREVENTION:
  *
- * Issue: The reward calculation `(multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint`
- * can result in precision loss due to Solidity's integer division, causing rewards to be
- * rounded down to zero.
+ * Issue: The reward calculation `(multiplier * cataPerSecond * pool.allocPoint)
+ * / totalAllocPoint` can result in precision loss due to Solidity's integer
+ * division, causing rewards to be rounded down to zero.
  *
  * Example:
  * - multiplier = 1 (1 second passed)
@@ -18,10 +66,11 @@ import "../Tokens/Token.sol";
  * - totalAllocPoint = 200 (total across all pools)
  * - Result: (1 * 100 * 1) / 200 = 100 / 200 = 0 (rounded down)
  *
- * Solution: Enforce the invariant `cataPerSecond >= totalAllocPoint` to ensure that even
- * the smallest reward calculation (multiplier=1, allocPoint=1) produces a non-zero result.
- * This prevents active pools from having their rewards rounded down to zero while still
- * allowing disabled pools (allocPoint=0) to correctly receive zero rewards.
+ * Solution: Enforce the invariant `cataPerSecond >= totalAllocPoint` to ensure
+ * that even the smallest reward calculation (multiplier=1, allocPoint=1)
+ * produces a non-zero result.  This prevents active pools from having their
+ * rewards rounded down to zero while still allowing disabled pools
+ * (allocPoint=0) to correctly receive zero rewards.
  */
 contract record RewardsChef is Ownable {
 
