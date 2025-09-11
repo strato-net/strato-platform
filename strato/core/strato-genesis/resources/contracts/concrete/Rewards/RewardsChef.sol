@@ -115,6 +115,13 @@ contract record RewardsChef is Ownable {
     // https://github.com/blockapps/strato-platform/issues/4672
     uint256 private MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
+    // Precision multiplier for reward per LP token calculations. Since Solidity doesn't
+    // support floating point numbers, we multiply accPerToken by this value to maintain
+    // precision. We multiply when storing rewards per token (accPerToken calculation) and
+    // divide when calculating individual user rewards to get the actual reward amount.
+    // This multiplier also propagates to rewardDebt calculations to maintain consistency.
+    uint256 private PRECISION_MULTIPLIER = 1e12;
+
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═════════════════════════════════════════════════════════════════════════
@@ -284,7 +291,7 @@ contract record RewardsChef is Ownable {
 
         rewardToken.mint(address(this), cataReward);
 
-        pool.accPerToken += (cataReward * 1e12) / lpSupply;
+        pool.accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
         pool.lastRewardTimestamp = block.timestamp;
     }
 
@@ -301,7 +308,7 @@ contract record RewardsChef is Ownable {
         updatePool(_pid);
 
         if (user.amount > 0) {
-            uint256 pending = ((user.amount * pool.accPerToken) / 1e12) - user.rewardDebt;
+            uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
                 rewardToken.transfer(msg.sender, pending);
             }
@@ -312,7 +319,7 @@ contract record RewardsChef is Ownable {
             user.amount += _amount;
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / 1e12;
+        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
 
         emit Deposit(msg.sender, _pid, _amount);
     }
@@ -327,7 +334,7 @@ contract record RewardsChef is Ownable {
 
         updatePool(_pid);
 
-        uint256 pending = ((user.amount * pool.accPerToken) / 1e12) - user.rewardDebt;
+        uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
         if (pending > 0) {
             rewardToken.transfer(msg.sender, pending);
         }
@@ -337,7 +344,7 @@ contract record RewardsChef is Ownable {
             Token(pool.lpToken).transfer(msg.sender, _amount);
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / 1e12;
+        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
 
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -354,10 +361,10 @@ contract record RewardsChef is Ownable {
         if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
             uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
             uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
-            accPerToken += (cataReward * 1e12) / lpSupply;
+            accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
         }
 
-        return ((user.amount * accPerToken) / 1e12) - user.rewardDebt;
+        return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
     }
 
 }
