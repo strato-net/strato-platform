@@ -45,7 +45,7 @@ oneTX size =
 --benchPrivateKey = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "benchPrivateKey" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
 benchChainMember :: ChainMemberParsedSet
-benchChainMember = CommonName "BlockApps" "Engineering" "Admin" True
+benchChainMember = CommonName "BlockApps" "Engineering" "Admin"
 
 benchContext :: BlockstanbulContext
 benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True (Just benchChainMember)

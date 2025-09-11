@@ -24,14 +24,14 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
-import Control.Lens hiding ((.=))
+--import Control.Lens hiding ((.=))
 import Data.Aeson hiding (Array, String)
 import qualified Data.Aeson as A (Value (..))
-import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
+--import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Binary
 import Data.Data
 import qualified Data.Functor.Identity as DFI
-import Data.Maybe (fromMaybe)
+--import Data.Maybe (fromMaybe)
 import Data.Ranged
 import qualified Data.Set as S
 import Data.Swagger hiding (Format, get, name, put, url)
@@ -50,8 +50,7 @@ import Text.Format
 data BoundedData a = LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
 
 data ChainMemberF f = ChainMemberF
-  { commonName :: f (Maybe T.Text),
-    sentinel :: f ()
+  { commonName :: f (Maybe T.Text)
   }
   deriving (Generic)
 
@@ -64,12 +63,12 @@ newtype TrueOrgNameChains = TrueOrgNameChains (S.Set Word256) deriving (Eq)
 newtype FalseOrgNameChains = FalseOrgNameChains (S.Set Word256) deriving (Eq)
 
 data ChainMemberParsedSet
-  = Everyone Bool
-  | Org Text Bool
-  | OrgUnit Text Text Bool
-  | CommonName Text Text Text Bool
+  = Everyone
+  | Org Text
+  | OrgUnit Text Text
+  | CommonName Text Text Text
   deriving (Generic, Eq, Data, Show, Ord, Read)
-
+{-
 instance ToSchema ChainMemberParsedSet where
   declareNamedSchema proxy =
     genericDeclareNamedSchema cmpsSchemaOptions proxy
@@ -77,7 +76,7 @@ instance ToSchema ChainMemberParsedSet where
       & mapped . schema . example ?~ toJSON exCMPSRespone
 
 exCMPSRespone :: ChainMemberParsedSet
-exCMPSRespone = CommonName "BlockApps" "Engineering" "Admin" True
+exCMPSRespone = CommonName "BlockApps" "Engineering" "Admin"
 
 -- | The model's field modifiers will match the JSON instances
 cmpsSchemaOptions :: SchemaOptions
@@ -89,7 +88,7 @@ cmpsSchemaOptions =
       allNullaryToStringTag = True,
       unwrapUnaryRecords = True
     }
-
+-}
 type ChainMemberBounded = ChainMemberF BoundedData
 
 newtype ChainMemberRange = ChainMemberRange {unChainMemberRange :: Range ChainMemberBounded} deriving (Show)
@@ -104,10 +103,7 @@ instance Ord a => Ord (BoundedData a) where
   (Middle _) `compare` UpperBound = LT
 
 instance Ord (ChainMemberF BoundedData) where
-  compare (ChainMemberF cm1 s1) (ChainMemberF cm2 s2) =
-    case (compare cm1 cm2) of
-        EQ -> compare s1 s2
-        x -> x
+  compare (ChainMemberF cm1) (ChainMemberF cm2) = compare cm1 cm2
 
 instance (DiscreteOrdered (ChainMemberF BoundedData)) where
   adjacent _ _ = False
@@ -119,24 +115,24 @@ instance (DiscreteOrdered (Range ChainMemberBounded)) where
 
 instance NFData ChainMemberParsedSet where
   -- rnf (ChainMember (ChainMemberF (DFI.Identity on) (DFI.Identity ou) (DFI.Identity cn))) = on `seq` ou `seq` cn `seq` ()
-  rnf (Everyone a) = a `seq` ()
-  rnf (Org a b) = b `seq` a `seq` ()
-  rnf (OrgUnit a b c) = c `seq` b `seq` a `seq` ()
-  rnf (CommonName a b c d) = d `seq` c `seq` b `seq` a `seq` ()
+  rnf Everyone = ()
+  rnf (Org a) = a `seq` ()
+  rnf (OrgUnit a b) = b `seq` a `seq` ()
+  rnf (CommonName a b c) = c `seq` b `seq` a `seq` ()
   
 instance Eq (ChainMemberF BoundedData) where
-  (==) (ChainMemberF cm1 s1) (ChainMemberF cm2 s2) = (cm1 == cm2 && s1 == s2)
+  (==) (ChainMemberF cm1) (ChainMemberF cm2) = (cm1 == cm2)
 
 instance Format ChainMemberParsedSet where
   format = show
 
 instance Show (ChainMemberF BoundedData) where
-  show (ChainMemberF cm s) = (show cm) ++ " " ++ show s
+  show (ChainMemberF cm) = show cm
 
 deriving instance Show (ChainMemberF DFI.Identity)
 
 emptyChainMember :: ChainMemberParsedSet
-emptyChainMember = (Everyone False) --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
+emptyChainMember = Everyone --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
 
 instance Binary ChainMembers
 
@@ -176,15 +172,13 @@ instance RLPSerializable (BoundedData ()) where
   rlpDecode _ = error ("Error in rlpDecode for BoundedData (): bad RLPObject")
 
 instance RLPSerializable ChainMemberBounded where
-  rlpEncode (ChainMemberF cmn s) =
+  rlpEncode (ChainMemberF cmn) =
     RLPArray
-      [ rlpEncode cmn,
-        rlpEncode s
+      [ rlpEncode cmn
       ]
-  rlpDecode (RLPArray [cmn, s]) =
+  rlpDecode (RLPArray [cmn]) =
     ChainMemberF
       (rlpDecode cmn)
-      (rlpDecode s)
   rlpDecode o = error $ "rlpDecode ChainMember: Expected 4 element RLPArray, got " ++ show o
 
 instance RLPSerializable ChainMemberRSet where
@@ -216,14 +210,14 @@ instance RLPSerializable ChainMemberRange where
       putBoundary BoundaryBelowAll = RLPArray [RLPScalar 3]
 
 instance RLPSerializable ChainMemberParsedSet where
-  rlpEncode (Everyone a) = RLPArray [rlpEncode a]
-  rlpEncode (Org a b) = RLPArray [rlpEncode a, rlpEncode b]
-  rlpEncode (OrgUnit a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpEncode (CommonName a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, rlpEncode d]
-  rlpDecode (RLPArray [a]) = Everyone (rlpDecode a)
-  rlpDecode (RLPArray [a, b]) = Org (rlpDecode a) (rlpDecode b)
-  rlpDecode (RLPArray [a, b, c]) = OrgUnit (rlpDecode a) (rlpDecode b) (rlpDecode c)
-  rlpDecode (RLPArray [a, b, c, d]) = CommonName (rlpDecode a) (rlpDecode b) (rlpDecode c) (rlpDecode d)
+  rlpEncode Everyone = RLPArray []
+  rlpEncode (Org a) = RLPArray [rlpEncode a]
+  rlpEncode (OrgUnit a b) = RLPArray [rlpEncode a, rlpEncode b]
+  rlpEncode (CommonName a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
+  rlpDecode (RLPArray []) = Everyone
+  rlpDecode (RLPArray [a]) = Org (rlpDecode a)
+  rlpDecode (RLPArray [a, b]) = OrgUnit (rlpDecode a) (rlpDecode b)
+  rlpDecode (RLPArray [a, b, c]) = CommonName (rlpDecode a) (rlpDecode b) (rlpDecode c)
   rlpDecode v = error $ "Error in rlpDecode for ChainMemberParsedSet: bad RLPObject: " ++ show v
   
 instance Arbitrary ChainMembers where
@@ -245,28 +239,27 @@ instance ToJSON ChainMembers where
   toJSON (ChainMembers xs) = toJSON (S.toList xs)
   
 instance FromJSON ChainMemberParsedSet where
-  parseJSON (A.String s) = pure $ Org s True
+  parseJSON (A.String s) = pure $ Org s
   parseJSON (Object o) = do
-    a <- fromMaybe True <$> (o .:? "access")
     o' <- o .:? "orgName"
     case o' of
-      Nothing -> pure $ Everyone a
+      Nothing -> pure $ Everyone
       Just org -> do
         u <- o .:? "orgUnit"
         case u of
-          Nothing -> pure $ Org org a
+          Nothing -> pure $ Org org
           Just unit -> do
             c <- o .:? "commonName"
             case c of
-              Nothing -> pure $ OrgUnit org unit a
-              Just name -> pure $ CommonName org unit name a
+              Nothing -> pure $ OrgUnit org unit
+              Just name -> pure $ CommonName org unit name
   parseJSON o = fail $ "parseJSON ChainMembersParsedSet failed: expected object, got: " ++ show o
 
 instance ToJSON ChainMemberParsedSet where
-  toJSON (Everyone a) = object ["access" .= a]
-  toJSON (Org o a) = object ["orgName" .= o, "access" .= a]
-  toJSON (OrgUnit o u a) = object ["orgName" .= o, "orgUnit" .= u, "access" .= a]
-  toJSON (CommonName o u c a) = object ["orgName" .= o, "orgUnit" .= u, "commonName" .= c, "access" .= a]
+  toJSON Everyone = object []
+  toJSON (Org o) = object ["orgName" .= o]
+  toJSON (OrgUnit o u) = object ["orgName" .= o, "orgUnit" .= u]
+  toJSON (CommonName o u c) = object ["orgName" .= o, "orgUnit" .= u, "commonName" .= c]
 
 instance DPS.PersistField ChainMemberParsedSet where
   toPersistValue = DPS.PersistText . T.pack . show
@@ -279,7 +272,7 @@ instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
 
 chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
-chainMemberParsedSetToValidator (Everyone _) = ""
-chainMemberParsedSetToValidator (Org _ _) = ""
-chainMemberParsedSetToValidator (OrgUnit _ _ _) = ""
-chainMemberParsedSetToValidator (CommonName _ _ c _) = Validator c
+chainMemberParsedSetToValidator Everyone = ""
+chainMemberParsedSetToValidator (Org _) = ""
+chainMemberParsedSetToValidator (OrgUnit _ _) = ""
+chainMemberParsedSetToValidator (CommonName _ _ c) = Validator c

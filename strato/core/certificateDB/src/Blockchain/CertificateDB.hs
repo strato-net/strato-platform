@@ -142,9 +142,9 @@ insertRootCertificate = do
 
 addParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
 addParsedSet (X509CertInfoState _ _ _ _ o u c) = do
-  let setOrg = CM.Org (T.pack o) True
-      setOrgUnit = CM.OrgUnit (T.pack o) (T.pack $ fromMaybe "" u) True
-      setCommonName = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
+  let setOrg = CM.Org (T.pack o)
+      setOrgUnit = CM.OrgUnit (T.pack o) (T.pack $ fromMaybe "" u)
+      setCommonName = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c)
   currentUnits <-
     getInNamespace ParsedSetWhitePage setOrg >>= \case
       Right (Just runits) ->
@@ -180,7 +180,7 @@ addParsedSet (X509CertInfoState _ _ _ _ o u c) = do
 
 modifyParsedSetFromCert :: X509CertInfoState -> Redis (Either Reply Status)
 modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ o u c) = do
-  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c) True
+  let parsedSet = CM.CommonName (T.pack o) (T.pack $ fromMaybe "" u) (T.pack c)
   res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) (toValue certInfo)
   case res of
     TxSuccess _ -> pure $ Right Ok

@@ -186,16 +186,16 @@ x509CertToCertInfoState cert =
         }
 
 getAddressFromCM :: ChainMemberParsedSet -> X509CertInfoState -> Maybe Address
-getAddressFromCM (Everyone _) (X509CertInfoState ua _ _ _ _ _ _) = Just ua
-getAddressFromCM (Org on _) (X509CertInfoState ua _ _ _ onx _ _) =
+getAddressFromCM Everyone (X509CertInfoState ua _ _ _ _ _ _) = Just ua
+getAddressFromCM (Org on) (X509CertInfoState ua _ _ _ onx _ _) =
   if on == T.pack onx then Just ua else Nothing
-getAddressFromCM (OrgUnit on ou _) (X509CertInfoState ua _ _ _ onx oux _) =
+getAddressFromCM (OrgUnit on ou) (X509CertInfoState ua _ _ _ onx oux _) =
   if on == T.pack onx && ou == T.pack (fromMaybe "" oux) then Just ua else Nothing
-getAddressFromCM (CommonName on ou cmn _) (X509CertInfoState ua _ _ _ onx oux cnmx) =
+getAddressFromCM (CommonName on ou cmn) (X509CertInfoState ua _ _ _ onx oux cnmx) =
   if on == T.pack onx && ou == T.pack (fromMaybe "" oux) && cmn == T.pack cnmx then Just ua else Nothing
 
 getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
-getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe "" ou)) (T.pack $ cname) True)
+getChainMemberFromX509 (X509CertInfoState _ _ _ _ on ou cname) = (CommonName (T.pack $ on) (T.pack (fromMaybe "" ou)) (T.pack $ cname))
 
 getX509FromAddress ::
   A.Selectable Address X509CertInfoState m =>
