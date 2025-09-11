@@ -124,7 +124,11 @@ const Dashboard = () => {
       });
     }
 
-    const netBalance = total;
+    const usdstBorrowed = loans?.totalAmountOwed 
+    ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
+    : 0;
+
+    const netBalance = total - usdstBorrowed;
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
   }, [tokens, loans, liquidityInfo, lpTokens]);
