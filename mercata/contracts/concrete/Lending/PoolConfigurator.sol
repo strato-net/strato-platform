@@ -209,6 +209,11 @@ contract record PoolConfigurator is Ownable {
         pool.setDoAutoCoverFromReserves(_doAutoCoverFromReserves);
     }
 
+    function setRecapParams(uint capBps, uint sliceBps) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setRecapParams(capBps, sliceBps);
+    }
+
     /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.

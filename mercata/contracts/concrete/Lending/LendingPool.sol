@@ -31,6 +31,8 @@ contract record LendingPool is Ownable {
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
     event ReservesSwept(uint amount, address to);
+    event RecapNoteUpdated(uint capBps, uint sliceBps);
+    event BadDebtWrittenOff(address indexed borrower, address indexed asset, uint amount);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -50,10 +52,13 @@ contract record LendingPool is Ownable {
         uint perSecondFactorRAY;    // Optional per-second compound factor in RAY (1e27). 0 = disabled
     }
 
-    struct JuniorNote {
-        uint cap;
+    struct RecapNote {
+        uint capBps;
+        uint sliceBps;
         uint outstanding;
+        uint accrued;
     }
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -93,7 +98,8 @@ contract record LendingPool is Ownable {
     // Bad Debt Handling
     uint public badDebt; // total bad debt in underlying units
     bool public doAutoCoverFromReserves; // whether to automatically cover bad debt from reserves
-    
+    struct RecapNote public recapNote;
+    mapping(address => uint) public record recapShares;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
@@ -882,6 +888,12 @@ contract record LendingPool is Ownable {
         doAutoCoverFromReserves = _doAutoCoverFromReserves;
     }
 
+    function setRecapParams(uint capBps, uint sliceBps) external onlyPoolConfigurator {
+        recapNote.capBps = capBps;
+        recapNote.sliceBps = sliceBps;
+        emit RecapNoteUpdated(capBps, sliceBps);
+    }
+
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
     function sweepReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0 || reservesAccrued == 0) return;
@@ -1070,10 +1082,10 @@ contract record LendingPool is Ownable {
     }
 
     /**
-     * @notice Cover bad debt in exchange for a junior note
+     * @notice Cover bad debt in exchange for a recapitalization note
      * @param amount The amount of bad debt to cover in underlying units
      */
-    function coverBadDebt(uint amount) external {
+    function recap(uint amount) external {
         return;
     }
 
