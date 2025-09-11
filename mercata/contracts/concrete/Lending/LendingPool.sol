@@ -50,6 +50,10 @@ contract record LendingPool is Ownable {
         uint perSecondFactorRAY;    // Optional per-second compound factor in RAY (1e27). 0 = disabled
     }
 
+    struct JuniorNote {
+        uint cap;
+        uint outstanding;
+    }
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -88,6 +92,7 @@ contract record LendingPool is Ownable {
 
     // Bad Debt Handling
     uint public badDebt; // total bad debt in underlying units
+    
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
@@ -1029,5 +1034,63 @@ contract record LendingPool is Ownable {
         uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
         if (price == 0) return 0;
         return (debt * price) / 1e18;
+    }
+
+    // Bad Debt Handling
+
+    function _handleBadDebt(address borrower) internal {
+        _accrue();
+
+        LoanInfo storage loan = userLoan[borrower];
+        require(loan.scaledDebt > 0, "No active loan");
+ 
+        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
+        require(owed > 0, "Nothing to write off");
+
+        badDebt += owed;
+ 
+        // Write off the new bad debt
+        uint scaledDelta = (owed * RAY) / borrowIndex;
+        totalScaledDebt -= scaledDelta;
+        loan.scaledDebt = 0;
+        delete userLoan[borrower];
+ 
+        emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+        
+        return;
+    }
+
+    /**
+     * @notice Cover bad debt in exchange for a junior note
+     * @param amount The amount of bad debt to cover in underlying units
+     */
+    function coverBadDebt(uint amount) external {
+        return;
+    }
+
+    /**
+     * @notice Cover bad debt from reserves
+     * @param amount The amount of bad debt to cover in underlying units
+     * Triggered automatically when bad debt first encountered, or manually by governance
+     */
+    function _coverBadDebtFromReserves(uint amount) internal {
+        require(amount > 0, "Invalid amount");
+        require(reservesAccrued >= amount, "Insufficient reserves");
+        reservesAccrued -= amount;
+    }
+
+    /**
+     * @notice Cover bad debt from reserves
+     * @param amount The amount of bad debt to cover in underlying units
+     * 
+     * Allows governance to call this function at any time, in addition to the initial trigger
+     */
+    function coverBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
+        _coverBadDebtFromReserves(amount);
+    }
+
+    function closeJuniorWindow() external onlyPoolConfiguration {
+        return;
     }
 } 
