@@ -58,7 +58,6 @@ contract record LendingPool is Ownable {
     uint public recapCapBps;          // +X% cap on principal (bps)
     uint public recapSliceBps;        // % of reserves slice diverted (bps)
 
-    uint public recapPrincipal;       // Σ raised
     uint public recapTarget;          // Σ principal * (1 + capBps)
     uint public recapAccrued;         // Σ diverted so far (liability)
     uint public recapPaid;            // Σ actually paid out
@@ -66,6 +65,7 @@ contract record LendingPool is Ownable {
     uint public recapIndex;           // per-share cumulative (RAY)
     uint public recapTotalShares;     // Σ shares (1:1 to principal by default)
     mapping(address=>uint) public record recapUserIndex;  // user => last index
+    mapping(address=>uint) public record recapCredit;     // user => banked claimable to support partial claims
     bool public recapActive;
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -783,7 +783,7 @@ contract record LendingPool is Ownable {
         uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
         uint debt = _totalDebt(); // index-based system debt
 
-        // Suppliers' claimable underlying excludes protocol reserves and recap liabilities
+        // Suppliers' claimable underlying excludes protocol reserves and outstanding recap liability
         uint underlying = cash + debt;
         if (reservesAccrued < underlying) {
             underlying -= reservesAccrued;
@@ -791,10 +791,9 @@ contract record LendingPool is Ownable {
             // Extreme guard: if reserves exceed assets (shouldn't happen), floor at cash
             underlying = cash;
         }
-        // Exclude outstanding recap liability so supplier exchange rate is not impacted by recap payouts
-        uint outstandingRecap = recapAccrued > recapPaid ? (recapAccrued - recapPaid) : 0;
-        if (outstandingRecap < underlying) {
-            underlying -= outstandingRecap;
+        uint recapHeld = recapAccrued > recapPaid ? (recapAccrued - recapPaid) : 0;
+        if (recapHeld < underlying) {
+            underlying -= recapHeld;
         } else {
             underlying = cash;
         }
@@ -1153,14 +1152,20 @@ contract record LendingPool is Ownable {
 
         // accounting
         badDebt        -= amount;
-        recapPrincipal += amount;
         // recapCapBps represents +X% bps; recapTarget increases by principal * (1 + cap)
         recapTarget    += (amount * (10000 + recapCapBps)) / 10000;
 
-        // 1 share per unit; sync user index so they don't claim past distributions
+        // 1 share per unit; before increasing shares, bank any pending distribution as credit
+        uint idx = recapIndex;
+        uint uidx = recapUserIndex[msg.sender];
+        if (uidx == 0) uidx = idx; // first-time minter: sync to current
+        if (idx > uidx) {
+            uint pending = (recapShares[msg.sender] * (idx - uidx)) / RAY;
+            if (pending > 0) recapCredit[msg.sender] += pending;
+        }
         recapShares[msg.sender]       += amount;
         recapTotalShares              += amount;
-        recapUserIndex[msg.sender] = recapIndex;
+        recapUserIndex[msg.sender] = idx;
     }
 
     function recapClaimable(address u) public view returns (uint) {
@@ -1168,22 +1173,35 @@ contract record LendingPool is Ownable {
         if (sh == 0) return 0;
         uint idx = recapIndex;
         uint uidx = recapUserIndex[u];
-        if (idx <= uidx) return 0;
-        return (sh * (idx - uidx)) / RAY;
+        uint delta = idx > uidx ? (idx - uidx) : 0;
+        uint accrued = (sh * delta) / RAY;
+        return accrued + recapCredit[u];
     }
 
     function claimRecap(uint maxAmount) external {
         _accrue();
-        uint amt = recapClaimable(msg.sender);
-        require(amt > 0, "nothing");
+        uint claimable = recapClaimable(msg.sender);
+        require(claimable > 0, "nothing");
+        uint amt = claimable;
         if (maxAmount > 0 && amt > maxAmount) amt = maxAmount;
 
         // pay from the LiquidityPool (it holds the cash)
-        // Reuse existing helper to transfer underlying out of the pool
         LiquidityPool(_liquidityPool()).transferReserve(amt, msg.sender);
 
         recapPaid += amt;
-        recapUserIndex[msg.sender] = recapIndex; // consume distribution; shares unchanged
+        // consume distribution by moving index and leaving leftover in credit if partial
+        uint idx = recapIndex;
+        uint uidx = recapUserIndex[msg.sender];
+        uint delta = idx > uidx ? (idx - uidx) : 0;
+        uint newlyAccrued = (recapShares[msg.sender] * delta) / RAY;
+        // total owed = credit + newlyAccrued; we paid amt; remainder stays as credit
+        uint totalOwed = recapCredit[msg.sender] + newlyAccrued;
+        recapUserIndex[msg.sender] = idx;
+        if (amt < totalOwed) {
+            recapCredit[msg.sender] = totalOwed - amt;
+        } else {
+            recapCredit[msg.sender] = 0;
+        }
     }
 
     /**
