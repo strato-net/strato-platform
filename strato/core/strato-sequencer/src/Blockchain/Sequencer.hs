@@ -33,9 +33,9 @@ import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Concurrent hiding (yield)
 import Control.Monad (forever, forM, when)
@@ -99,11 +99,11 @@ sequencer = do
       Just cert -> do
         let chainm = getChainMemberFromX509 cert
         logF $ "Node identity verified: " ++ show chainm
-        case chainMemberParsedSetToValidator chainm `S.member` _validators ctx of
+        case Validator selfAddr `S.member` _validators ctx of
           True -> do
             logF "You are a validator in this network!"
-            return ctx { _selfCert = Just chainm, _isValidator = True }
-          False -> return ctx { _selfCert = Just chainm }
+            return ctx { _isValidator = True }
+          False -> return ctx
       Nothing -> do
         logF "Awaiting node identity verification..."
         return ctx

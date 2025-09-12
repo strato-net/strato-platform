@@ -24,7 +24,6 @@ import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import qualified Data.ByteString.Char8 as BC
 import qualified LabeledError
 import System.Console.CmdArgs
@@ -343,9 +342,7 @@ run AddTx {..} = addTx txJson
 run AddBlocksFromFile {..} = addBlocksFromFile fileName
 run AddGenesisFromFile {} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
 run AddTxsFromFile {..} = addTxsFromFile fileName
-run AskForBlocks {..} =
-  let i = CommonName qAddr
-   in insertP2P (P2pAskForBlocks startBlock endBlock i)
+run AskForBlocks {..} = insertP2P (P2pAskForBlocks startBlock endBlock qAddr)
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
 run DumpKafkaSequencer {..} = dumpKafkaSequencer (fromIntegral startingBlock)
@@ -363,9 +360,7 @@ run RedisMatch {..} = redisMatch $ BC.pack pattern
 run RLP {..} = RLP.doit filename
 run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/RawMP" $ BC.pack stateRoot)
 run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/FRawMP" $ BC.pack stateRoot)
-run PushBlocks {..} =
-  let i = CommonName qAddr
-   in insertP2P (P2pPushBlocks startBlock endBlock i)
+run PushBlocks {..} = insertP2P (P2pPushBlocks startBlock endBlock qAddr)
 run SetParticipationMode {..} = remoteSetParticipationMode mode
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
 run ValidatorBehavior {..} = validatorBehavior valB

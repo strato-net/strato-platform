@@ -1,20 +1,11 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE NoDeriveAnyClass #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Blockchain.Strato.Model.ChainMember
-  ( emptyChainMember,
-    ChainMemberRSet (..),
+  ( ChainMemberRSet (..),
     ChainMemberParsedSet (..),
     chainMemberParsedSetToValidator,
   )
@@ -24,14 +15,11 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
---import Control.Lens hiding ((.=))
 import Data.Aeson hiding (Array, String)
 import qualified Data.Aeson as A (Value (..))
---import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Binary
 import Data.Data
 import qualified Data.Functor.Identity as DFI
---import Data.Maybe (fromMaybe)
 import Data.Ranged
 import qualified Data.Set as S
 import Data.Swagger hiding (Format, get, name, put, url)
@@ -91,9 +79,6 @@ instance Show (ChainMemberF BoundedData) where
   show (ChainMemberF cm) = show cm
 
 deriving instance Show (ChainMemberF DFI.Identity)
-
-emptyChainMember :: ChainMemberParsedSet
-emptyChainMember = CommonName 0x0 --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
 
 instance Binary ChainMembers
 

@@ -48,7 +48,7 @@ benchChainMember :: ChainMemberParsedSet
 benchChainMember = CommonName 0x0
 
 benchContext :: BlockstanbulContext
-benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True (Just benchChainMember)
+benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True
     where benchValidator = chainMemberParsedSetToValidator benchChainMember
 
 makeBlock :: Int -> Int -> Block

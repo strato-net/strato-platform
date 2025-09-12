@@ -61,7 +61,7 @@ commitmentSeal sha =
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
 signMessage tm = do
   let mesg = getHash tm
-  addr <- use selfCert
+  addr <- use selfAddr
   sig <- sign mesg
   return $ OMsg (MsgAuth (fromJust addr) sig) $ tm
 
@@ -73,11 +73,7 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash --recover pub key
       mAddress = fromPublicKey <$> mKey --getting the address of sender
-  res <- case mAddress of
-    Nothing -> error "Nothing"
-    Just a -> A.select (A.Proxy @X509CertInfoState) a
-  let cmAddress = getAddressFromCM cm =<< res
-  return (mAddress == cmAddress)
+  return (mAddress == Just cm)
 authenticate _ = return True
 
 replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
