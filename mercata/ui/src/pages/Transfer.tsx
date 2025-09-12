@@ -1,128 +1,121 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Token } from "@/interface";
+import TransferConfirmationModal from "../components/TransferConfirmationModal";
 
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatUnits, isAddress } from "ethers";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
-import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
-import TransferConfirmationModal from "../components/TransferConfirmationModal";
-import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput, formatBalance } from "@/utils/numberUtils";
 
-import {
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-} from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
-import { validateRecipientAddress } from "@/utils/validationUtils";
+import { Token } from "@/interface";
+import { TRANSFER_FEE } from "@/lib/constants";
+import { safeParseUnits, addCommasToInput, formatBalance, formatWeiAmount } from "@/utils/numberUtils";
+import { handleRecipientAddress, useAmountValidation } from "@/utils/validationUtils";
 
 const Transfer = () => {
+  // Hooks
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
-  const { getUserTokensWithBalance, transferToken } = useTokenContext();
+  const { fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
+  const { getUserTokensWithBalance, transferToken, loading: tokenLoading } = useTokenContext();
+  const { handleInput, getMaxTransferable } = useAmountValidation();
   const { toast } = useToast();
+
+  // State
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [selectedToken, setSelectedToken] = useState<Token>();
+  const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState<string>("");
+  const [recipientError, setRecipientError] = useState("");
+  const [amountError, setAmountError] = useState("");
+  const [transferLoading, setTransferLoading] = useState<boolean>(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
+
+  // Computed values
+  const maxAmount = selectedToken ? BigInt(selectedToken.balance) : 0n;
+  const maxTransferable = useMemo(() => {
+    return selectedToken ? getMaxTransferable(maxAmount, selectedToken.address, TRANSFER_FEE) : 0n;
+  }, [selectedToken, maxAmount, getMaxTransferable]);
+  const isLoading = loadingUsdstBalance || tokenLoading;
+  const isDisabled = 
+    isLoading ||
+    !selectedToken ||
+    !recipient ||
+    !amount ||
+    transferLoading ||
+    !!recipientError ||
+    !!amountError;
+
+  // Functions
+  const fetchAllData = useCallback(async () => {
+    if (!userAddress) return [];
+    
+    const [tokens] = await Promise.all([
+      getUserTokensWithBalance(),
+      fetchUsdstBalance(userAddress)
+    ]);
+    
+    setTokens(tokens);
+    return tokens;
+  }, [userAddress, getUserTokensWithBalance, fetchUsdstBalance]);
+
+  // Effects
   useEffect(() => {
     document.title = "Transfer Assets | STRATO Mercata";
   }, []);
-  const [tokens, setTokens] = useState<Token[]>([]);
-  const [recipient, setRecipient] = useState<string>("");
 
-  const [fromAsset, setFromAsset] = useState<Token>();
-  const [fromAmount, setFromAmount] = useState("");
-  const [swapLoading, setSwapLoading] = useState<boolean>(false);
-  const [wrongAmount, setWrongAmount] = useState(false);
-  const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("")
-
-  const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
-
-  const fetchUserTokens = useCallback(async () => {
-    try {
-      const tokens = await getUserTokensWithBalance();
-      setTokens(tokens);
-      return tokens;
-    } catch (err) {
-      console.error("Failed to fetch tokens:", err);
-      return [];
-    }
-  }, [getUserTokensWithBalance]);
-
-  // Fetch USDST balance when user changes
   useEffect(() => {
-    if (userAddress) {
-      fetchUserTokens();
-      fetchUsdstBalance(userAddress);
-    }
-  }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
-
-  const handleTransferClick = () => {
-    if (!fromAsset || !recipient || !fromAmount || wrongAmount) return;
-    
-    // Check if amount is valid (not 0, not just ".", and is a valid number)
-    const isValidAmount = fromAmount && 
-                         fromAmount !== "." && 
-                         /^\d*\.?\d+$/.test(fromAmount) && 
-                         safeParseFloat(fromAmount) > 0;
-    
-    if (!isValidAmount) return;
-    
-    setShowConfirmModal(true);
-  };
+    fetchAllData();
+  }, [fetchAllData]);
 
   const handleConfirmTransfer = async () => {
-    if (!fromAsset || !recipient || !fromAmount) return;
-    try {
-      setSwapLoading(true);
-      setShowConfirmModal(false);
-      await transferToken({
-        address: fromAsset.address,
-        to: recipient,
-        value: safeParseUnits(fromAmount, 18).toString(),
-      });
-      toast({
-        title: "Success",
-        description: `Transferred ${fromAmount} ${
-          fromAsset?.token?._symbol ||
-          fromAsset?.token?._name
-          } to ${recipient}`,
-      });
-      setFromAmount("");
-      setRecipient("");
-      const updatedTokens = await fetchUserTokens();
-      const updatedToken = updatedTokens.find((t: Token) => t.address === fromAsset?.address);      
-      if (updatedToken) {
-        setFromAsset(updatedToken); // triggers re-render with updated balance
-      } else {
-        setFromAsset(null)
-      }
-      // Refresh USDST balance since gas fees were paid
-      if (userAddress) {
-        await fetchUsdstBalance(userAddress);
-      }
-    } catch (error) {
-      // Error handling is now done globally by axios interceptor
-      console.error("Transfer error:", error);
-    } finally {
-      setSwapLoading(false);
+    if (isDisabled) return;
+    
+    setTransferLoading(true);
+    setShowConfirmModal(false);
+    
+    await transferToken({
+      address: selectedToken.address,
+      to: recipient,
+      value: safeParseUnits(amount, 18).toString(),
+    });
+    
+    toast({
+      title: "Success",
+      description: `Transferred ${amount} ${
+        selectedToken?.token?._symbol ||
+        selectedToken?.token?._name
+        } to ${recipient}`,
+    });
+    
+    setAmount("");
+    setRecipient("");
+    setRecipientError("");
+    setAmountError("");
+    
+    const updatedTokens = await fetchAllData();
+    const updatedToken = updatedTokens.find((t: Token) => t.address === selectedToken?.address);      
+    if (updatedToken && BigInt(updatedToken.balance) > 0n) {
+      setSelectedToken(updatedToken);
+    } else {
+      setSelectedToken(null);
     }
+    
+    setTransferLoading(false);
   };
-
-  const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.trim();
-    setRecipient(value);
-    setErrorMessage(validateRecipientAddress(value, userAddress));
-  };
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -140,50 +133,29 @@ const Transfer = () => {
             {/* Token selector */}
             <div className="space-y-2">
               <label className="text-sm text-gray-600">Token</label>
-              <Popover
-                open={tokenPopoverOpen}
-                onOpenChange={setTokenPopoverOpen}
+              <Select
+                value={selectedToken?.address || ""}
+                onValueChange={(value) => {
+                  const token = tokens.find(t => t.address === value);
+                  if (token) {
+                    setSelectedToken(token);
+                    setAmount("");
+                    setRecipientError("");
+                    setAmountError("");
+                  }
+                }}
               >
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full flex justify-between items-center"
-                  >
-                    <span>
-                      {fromAsset
-                        ? fromAsset?.token?._symbol ||
-                        fromAsset?.token?._name
-                        : "Select Token"}
-                    </span>
-                    <ChevronDown className="h-4 w-4" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <div className="flex flex-col max-h-72 overflow-y-auto">
-                    {tokens.length > 0 ? (
-                      tokens.map((token) => (
-                        <Button
-                          key={token.address}
-                          variant="ghost"
-                          className="justify-start"
-                          onClick={() => {
-                            setFromAsset(token);
-                            setFromAmount("");
-                            setTokenPopoverOpen(false);
-                          }}
-                        >
-                          {token?.token?._symbol ||
-                            fromAsset?.token?._name}
-                        </Button>
-                      ))
-                    ) : (
-                      <span className="p-2 text-sm text-gray-500">
-                        No tokens available
-                      </span>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select Token" />
+                </SelectTrigger>
+                <SelectContent>
+                  {tokens.map((token) => (
+                    <SelectItem key={token.address} value={token.address}>
+                      {token?.token?._symbol || token?.token?._name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Recipient Address */}
@@ -192,34 +164,29 @@ const Transfer = () => {
               <Input
                 type="text"
                 value={recipient}
-                onChange={handleRecipientAddress}
+                onChange={(e) => handleRecipientAddress(e, setRecipient, setRecipientError, userAddress)}
                 placeholder="..."
                 className="w-full p-2 border rounded"
               />
-              {errorMessage && <span className="text-red-600 text-sm">{errorMessage}</span>}
+              {recipientError && <span className="text-red-600 text-sm">{recipientError}</span>}
             </div>
 
             {/* Amount */}
             <div className="space-y-2">
               <label className="text-sm text-gray-600">
                 Amount
-                {fromAsset && (
+                {selectedToken && (
                   <>{" ("}
                     <button
                       type="button"
                       onClick={() => {
-                        try {
-                          const raw = formatUnits(maxAmount, 18);
-                          // clamp to 18 decimals using utility function
-                          const clampedAmount = roundToDecimals(raw, 18);
-                          setFromAmount(clampedAmount);
-                        } catch (error) {
-                          console.error("Error setting max amount:", error);
-                        }
+                        const maxFormatted = formatWeiAmount(maxTransferable.toString());
+                        setAmount(maxFormatted);
+                        setAmountError("");
                       }}
                       className="font-medium text-blue-600 hover:underline focus:outline-none"
                     >
-                      Max: {formatBalance(maxAmount, undefined, 18, 0, 4)}
+                      Max: {formatBalance(maxTransferable, undefined, 18, 0, 4)}
                     </button>
                     {")"}</>
                 )}
@@ -227,45 +194,28 @@ const Transfer = () => {
               <Input
                 type="text"
                 inputMode="decimal"
-                value={addCommasToInput(fromAmount)}
+                value={addCommasToInput(amount)}
                 onChange={(e) => {
                   const value = e.target.value;
-                  // Strip commas for validation
-                  const v = value.replace(/,/g, "");
-                  
-                  // Only allow valid decimal input
-                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                    // Handle the case where user types just "."
-                    if (v === '.') {
-                      setFromAmount('0.');
-                      setWrongAmount(false);
-                    } else {
-                      // Preserve trailing decimal point if user just typed it
-                      let processedValue = v;
-                      if (!v.endsWith('.')) {
-                        // Only use roundToDecimals if there's no trailing decimal
-                        processedValue = roundToDecimals(v, 18);
-                      }
-                      setFromAmount(processedValue);
-                      
-                      // Only parse if we have a valid number (not just "." or empty)
-                      if (processedValue && processedValue !== "." && /^\d*\.?\d+$/.test(processedValue)) {
-                        const inputWei = safeParseUnits(processedValue, 18);
-                        setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
-                      } else {
-                        setWrongAmount(false);
-                      }
+                  handleInput(
+                    value,
+                    setAmount,
+                    setAmountError,
+                    {
+                      maxAmount,
+                      symbol: selectedToken?.token?._symbol || "",
+                      tokenAddress: selectedToken?.address,
+                      transactionFee: TRANSFER_FEE
                     }
-                  }
+                  );
                 }}
                 placeholder="0.00"
-                className={`w-full p-2 border rounded ${wrongAmount ? "border-red-500" : ""
+                className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""
                   }`}
               />
-              {wrongAmount && (
+              {amountError && (
                 <p className="text-red-600 text-sm">
-                  Amount must be greater than zero and no more than your
-                  available balance.
+                  {amountError}
                 </p>
               )}
             </div>
@@ -274,34 +224,26 @@ const Transfer = () => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Transaction Fee</span>
-                <span className="font-medium">{TRANSFER_FEE} USDST</span>
+                <span className="font-medium">{TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} vouchers)</span>
               </div>
             </div>
 
             <Button
               className="w-full"
-              onClick={handleTransferClick}
-              disabled={
-                !fromAsset ||
-                !recipient ||
-                !fromAmount ||
-                wrongAmount ||
-                swapLoading ||
-                !!errorMessage ||
-                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0)
-              }
+              onClick={() => setShowConfirmModal(true)}
+              disabled={isDisabled}
             >
-              {swapLoading ? <span>Processing…</span> : "Transfer"}
+              {isLoading ? <span>Loading…</span> : transferLoading ? <span>Processing…</span> : "Transfer"}
             </Button>
           </div>
 
           <TransferConfirmationModal
             open={showConfirmModal}
             onOpenChange={setShowConfirmModal}
-            fromAsset={fromAsset}
-            fromAmount={fromAmount}
+            selectedToken={selectedToken}
+            amount={amount}
             recipient={recipient}
-            swapLoading={swapLoading}
+            transferLoading={transferLoading}
             onConfirm={handleConfirmTransfer}
           />
         </main>

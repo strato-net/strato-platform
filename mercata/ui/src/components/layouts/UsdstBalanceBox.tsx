@@ -52,7 +52,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } =
+  const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance, voucherBalance } =
     useUserTokens();
   const { getToken } = useTokenContext();
   const location = useLocation();
@@ -181,8 +181,8 @@ const UsdstBalanceBox: React.FC = () => {
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1">
-              <p className="text-xs font-medium text-gray-600">USDST Balance</p>
-              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network">
+              <p className="text-xs font-medium text-gray-600">Balances</p>
+              <InfoTooltip content="USDST is used to pay for gas fees on the STRATO Mercata network. Vouchers can also be used for gas fees.">
                 <HelpCircle className="h-3 w-3 text-gray-400 hover:text-gray-600 cursor-help" />
               </InfoTooltip>
             </div>
@@ -191,6 +191,13 @@ const UsdstBalanceBox: React.FC = () => {
                 <span className="animate-pulse">Loading...</span>
               ) : (
                 `${formatCurrency(formatWeiAmount(usdstBalance))} USDST`
+              )}
+            </p>
+            <p className="text-xs text-gray-500 truncate">
+              {loadingUsdstBalance ? (
+                <span className="animate-pulse">Loading...</span>
+              ) : (
+                `${formatCurrency(formatWeiAmount(voucherBalance, 16))} Vouchers`
               )}
             </p>
           </div>

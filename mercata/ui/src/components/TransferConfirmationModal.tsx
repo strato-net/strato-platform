@@ -13,20 +13,20 @@ import {
 interface TransferConfirmationModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  fromAsset: Token | undefined;
-  fromAmount: string;
+  selectedToken: Token | undefined;
+  amount: string;
   recipient: string;
-  swapLoading: boolean;
+  transferLoading: boolean;
   onConfirm: () => void;
 }
 
 const TransferConfirmationModal = ({
   open,
   onOpenChange,
-  fromAsset,
-  fromAmount,
+  selectedToken,
+  amount,
   recipient,
-  swapLoading,
+  transferLoading,
   onConfirm,
 }: TransferConfirmationModalProps) => {
   return (
@@ -42,12 +42,12 @@ const TransferConfirmationModal = ({
           <div className="space-y-2">
             <p className="text-sm text-gray-600">Token</p>
             <p className="font-medium">
-              {fromAsset?.token?._symbol || fromAsset?.token?._name}
+              {selectedToken?.token?._symbol || selectedToken?.token?._name}
             </p>
           </div>
           <div className="space-y-2">
             <p className="text-sm text-gray-600">Amount</p>
-            <p className="font-medium">{fromAmount}</p>
+            <p className="font-medium">{amount}</p>
           </div>
           <div className="space-y-2">
             <p className="text-sm text-gray-600">Recipient</p>
@@ -56,12 +56,12 @@ const TransferConfirmationModal = ({
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{TRANSFER_FEE} USDST</span>
+              <span className="font-medium">{TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} vouchers)</span>
             </div>
             <div className="flex justify-between text-sm font-medium border-t pt-2">
               <span>Total</span>
               <span>
-                {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST fee
+                {amount} {selectedToken?.token?._symbol || selectedToken?.token?._name} + {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} vouchers) fee
               </span>
             </div>
           </div>
@@ -76,9 +76,9 @@ const TransferConfirmationModal = ({
           <Button
             className="bg-blue-600 hover:bg-blue-700"
             onClick={onConfirm}
-            disabled={swapLoading}
+            disabled={transferLoading}
           >
-            {swapLoading ? "Processing..." : "Confirm Transfer"}
+            {transferLoading ? "Processing..." : "Confirm Transfer"}
           </Button>
         </DialogFooter>
       </DialogContent>

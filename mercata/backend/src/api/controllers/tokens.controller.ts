@@ -3,6 +3,7 @@ import RestStatus from "http-status-codes";
 import {
   getTokens,
   getBalance,
+  getVoucherBalance,
   createToken,
   transferToken,
   approveToken,
@@ -91,6 +92,21 @@ class TokensController {
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(balances);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getVoucherBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address } = req;
+
+      const balance = await getVoucherBalance(accessToken, address);
+      res.status(RestStatus.OK).json({ balance });
     } catch (error) {
       next(error);
     }

@@ -19,6 +19,9 @@ type UserTokensContextType = {
   usdstBalance: string;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<void>;
+  
+  // Voucher balance (converted to USDST equivalent: 1e18 voucher = 0.01 USDST)
+  voucherBalance: string;
 };
 
 const UserTokensContext = createContext<UserTokensContextType | undefined>(
@@ -38,27 +41,28 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
+  
+  // Voucher balance state
+  const [voucherBalance, setVoucherBalance] = useState("0");
 
   const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal) => {
     if (!userAddress) return;
     
     setLoadingUsdstBalance(true);
-    try {
-      const res = await api.get(
-        `/tokens/balance?address=eq.${usdstAddress}`,
-        { signal }
-      );
-      
-      if (signal?.aborted) return;
-      
-      setUsdstBalance(res?.data?.[0]?.balance || "0");
-    } catch (err) {
-      return;
-    } finally {
-      if (!signal?.aborted) {
-        setLoadingUsdstBalance(false);
-      }
-    }
+    const [usdstRes, voucherRes] = await Promise.all([
+      api.get(`/tokens/balance?address=eq.${usdstAddress}`, { signal }),
+      api.get(`/vouchers/balance`, { signal })
+    ]);
+    
+    if (signal?.aborted) return;
+
+    setUsdstBalance(usdstRes?.data?.[0]?.balance || "0");
+    
+    const rawVoucherBalance = voucherRes?.data?.balance || "0";
+    const voucherBalanceUsdst = (BigInt(rawVoucherBalance) / 100n).toString();
+    setVoucherBalance(voucherBalanceUsdst);
+    
+    setLoadingUsdstBalance(false);
   }, []);
 
   const fetchTokens = useCallback(async (signal?: AbortSignal) => {
@@ -139,8 +143,11 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       usdstBalance,
       loadingUsdstBalance,
       fetchUsdstBalance,
+      
+      // Voucher balance
+      voucherBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, loadingUsdstBalance, fetchUsdstBalance]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, loadingUsdstBalance, fetchUsdstBalance, voucherBalance]
   );
 
   return (

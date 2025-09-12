@@ -11,6 +11,8 @@ export const usdstAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
  */
 export const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
+export const DECIMALS = 18;
+
 // ============================================
 // Transaction fees (display only - validation handled by backend)
 // ============================================
