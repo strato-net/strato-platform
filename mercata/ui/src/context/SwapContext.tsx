@@ -57,7 +57,7 @@ type SwapContextType = {
   getTokenBalance: (tokenAddress: string) => Promise<string>;
   enrichPools: (pools: LiquidityPool[]) => LiquidityPool[];
   lpTokens: LiquidityPool[]
-  fetchLpTokensPositions: () => Promise<void>;
+  fetchLpTokensPositions: () => Promise<LiquidityPool[]>;
   fetchSwapHistory: (poolAddress: string, params?: Record<string, string>) => Promise<{ data: SwapHistoryEntry[]; totalCount: number }>;
   refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
   swapHistory: SwapHistoryEntry[];
@@ -319,14 +319,16 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const fetchLpTokensPositions = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      const res = await api.get('/swap-pools/positions')
-      setLpTokens(res?.data || [])
+      const res = await api.get('/swap-pools/positions');
+      const data: LiquidityPool[] = res?.data || [];
+      setLpTokens(data);
+      return data;
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  },[]);
+  }, []);
 
   const enrichPools = useCallback((pools: LiquidityPool[]) => {
     return pools.map((pool: LiquidityPool) => ({

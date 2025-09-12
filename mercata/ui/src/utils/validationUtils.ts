@@ -5,7 +5,7 @@ import { DECIMAL_PATTERN, DECIMALS, usdstAddress } from "@/lib/constants";
 import { useUserTokens } from "@/context/UserTokensContext";
 
 export const toWei = (s: string) => safeParseUnits(s, DECIMALS);
-export const fmt = (wei: bigint, sym: string) => `${(Number(wei) / 10 ** DECIMALS).toFixed(18)} ${sym}`;
+export const fmt = (wei: bigint, sym: string, decimals: number = DECIMALS) => `${(Number(wei) / 10 ** decimals).toFixed(decimals)} ${sym}`;
 export const isDecimal = (s: string) => s === "" || s === "." || DECIMAL_PATTERN.test(s);
 
 export const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>, setRecipient: (value: string) => void, setError: (error: string) => void, userAddress: string): void => {
@@ -55,15 +55,15 @@ export const validateAmount = (value: string, o: AmountValidationOptions): Amoun
   if (amt === 0n && !o.allowZero && value !== "0" && value !== "0.") {
     return { isValid: false, error: "Amount must be greater than 0" };
   }
-  if (o.minAmount && amt < o.minAmount) return { isValid: false, error: `Amount must be at least ${fmt(o.minAmount, o.symbol)}` };
+  if (o.minAmount && amt < o.minAmount) return { isValid: false, error: `Amount must be at least ${fmt(o.minAmount, o.symbol, decimals)}` };
 
   const feeCover = o.usdstBalance + o.voucherBalance;
   if (feeWei > 0n && feeCover < feeWei)
-    return { isValid: false, error: `Insufficient USDST + vouchers for transaction fee (${fmt(feeWei, "USDST")} required)` };
+    return { isValid: false, error: `Insufficient USDST + vouchers for transaction fee (${fmt(feeWei, "USDST", DECIMALS)} required)` };
 
   const maxNet = o.maxAmount; // Always use the raw balance, vouchers only pay fees
   if (amt > maxNet)
-    return { isValid: false, error: `Insufficient balance. Maximum: ${fmt(maxNet, o.symbol)}` };
+    return { isValid: false, error: `Insufficient balance. Maximum: ${fmt(maxNet, o.symbol, decimals)}` };
 
   return { isValid: true, amountWei: amt };
 };

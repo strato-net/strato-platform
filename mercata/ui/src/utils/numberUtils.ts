@@ -8,7 +8,7 @@ import { parseUnits, formatUnits } from "ethers";
  * @param decimals - The number of decimals to use for parsing
  * @returns BigInt representation of the value, or 0n if invalid
  */
-export const safeParseUnits = (value: string, decimals: number): bigint => {
+export const safeParseUnits = (value: string, decimals: number = 18): bigint => {
   try {
     // Handle edge cases that parseUnits can't handle
     if (!value || value === '.') {
@@ -165,9 +165,9 @@ export const formatBalance = (
 /**
  * Formats a Wei amount to human readable format with decimal cleanup
  */
-export const formatWeiAmount = (weiAmount: string, decimals: number = 18): string => {
+export const formatWeiAmount = (weiAmount: string | bigint, decimals: number = 18): string => {
   try {
-    const formatted = formatUnits(BigInt(weiAmount), decimals);
+    const formatted = formatUnits(typeof weiAmount === 'string' ? BigInt(weiAmount) : weiAmount, decimals);
     // Remove trailing zeros after decimal point and limit to 6 decimal places
     if (formatted.includes('.')) {
       const cleaned = formatted.replace(/(\.\d*?[1-9])0+$/g, '$1').replace(/\.0+$/, '');
@@ -181,7 +181,7 @@ export const formatWeiAmount = (weiAmount: string, decimals: number = 18): strin
     return formatted;
   } catch (error) {
     console.error('Error formatting wei amount:', error);
-    return weiAmount; // Return original if formatting fails
+    return '0'; // Return 0 if formatting fails
   }
 };
 
@@ -206,3 +206,36 @@ export const formatCurrency = (value: string | number): string => {
  * @returns Formatted string
  */
 export const fmt = (v: bigint, dec = 18, min = 2, max = 6) => formatBalance(v, undefined, dec, min, max);
+
+/**
+ * Formats max amount display with proper decimal handling and approximation symbol
+ * @param maxTransferable - The max transferable amount in wei
+ * @param tokenSymbol - The token symbol (e.g., "USDST", "GOLDST")
+ * @param decimals - Number of decimals for the token
+ * @returns Formatted display string
+ */
+export const formatMaxDisplay = (maxTransferable: bigint, tokenSymbol: string, decimals: number): string => {
+  if (maxTransferable === 0n) return `0 ${tokenSymbol}`;
+  
+  const formatted = fmt(maxTransferable, decimals);
+  const numericPart = formatted.split(' ')[0];
+  const numericValue = parseFloat(numericPart);
+  
+  // If very small (less than 0.0000001), show ⪆0
+  if (numericValue < 0.0000001) {
+    return `⪆0 ${tokenSymbol}`;
+  }
+  
+  // For amounts >= 0.0000001, show up to 7 decimals without trailing zeros
+  const parts = numericPart.split('.');
+  if (parts.length === 2) {
+    const decimalPart = parts[1].substring(0, 7).replace(/0+$/, '');
+    const cleanAmount = decimalPart ? `${parts[0]}.${decimalPart}` : parts[0];
+    return `${cleanAmount} ${tokenSymbol}`;
+  }
+  
+  return `${numericPart} ${tokenSymbol}`;
+};
+
+// Re-export formatUnits for convenience
+export { formatUnits, parseUnits } from "ethers";
