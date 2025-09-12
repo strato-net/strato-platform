@@ -319,12 +319,11 @@ contract record MercataBridge is Ownable {
         whenDepositsOpen
     {
         AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
         uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require((a.permissions & need) != 0, "MB: not permitted");
+        require(_has(a.permissions, need), "MB: not permitted");
 
         // Allow inactive tokens only when minting USDST and asset has MINT permission
         require(
@@ -487,12 +486,11 @@ contract record MercataBridge is Ownable {
         returns (uint256 id)
     {
         AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
         uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require((a.permissions & need) != 0, "MB: not permitted");
+        require(_has(a.permissions, need), "MB: not permitted");
 
         uint256 cap = a.maxPerTx;
         require(cap == 0 || stratoTokenAmount<=cap,"MB: per-tx cap");
