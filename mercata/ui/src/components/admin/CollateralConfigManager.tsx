@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
-import { Form, Input, Switch, InputNumber, Button as AntButton } from 'antd';
+import { Form, Input, Switch, Button as AntButton } from 'antd';
+import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
 
 const CollateralConfigManager = () => {
@@ -47,59 +48,6 @@ const CollateralConfigManager = () => {
     }
   }, []);
 
-  // // Form validation rules for Ant Design
-  // const formRules = {
-  //   asset: editingAsset ? [] : [
-  //     { required: true, message: 'Asset address is required' },
-  //     { pattern: /^0x[a-fA-F0-9]{40}$/, message: 'Please enter a valid Ethereum address' }
-  //   ],
-  //   liquidationRatio: [
-  //     { required: true, message: 'Liquidation ratio is required' },
-  //     { type: 'number' as const, min: 1.0, message: 'Liquidation ratio must be at least 1.0' }
-  //   ],
-  //   liquidationPenaltyBps: [
-  //     { required: true, message: 'Liquidation penalty is required' },
-  //     { type: 'number' as const, min: 500, max: 3000, message: 'Liquidation penalty must be between 500 and 3000 bps' }
-  //   ],
-  //   closeFactorBps: [
-  //     { required: true, message: 'Close factor is required' },
-  //     { type: 'number' as const, min: 5000, max: 10000, message: 'Close factor must be between 5000 and 10000 bps' }
-  //   ],
-  //   stabilityFeeRate: [
-  //     { required: true, message: 'Stability fee rate is required' },
-  //     { type: 'number' as const, min: 1.0, message: 'Stability fee rate must be at least 1.0' }
-  //   ],
-  //   debtFloor: [
-  //     { required: true, message: 'Debt floor is required' },
-  //     { type: 'number' as const, min: 0, message: 'Debt floor must be at least 0' }
-  //   ],
-  //   debtCeiling: [
-  //     { required: true, message: 'Debt ceiling is required' },
-  //     { type: 'number' as const, min: 0, message: 'Debt ceiling must be at least 0' }
-  //   ],
-  //   unitScale: [
-  //     { required: true, message: 'Unit scale is required' },
-  //     { type: 'number' as const, min: 0, message: 'Unit scale must be at least 0' }
-  //   ]
-  // };
-
-  // Custom validator for debt floor vs ceiling comparison
-  const validateDebtFloor = useCallback((_: any, value: number) => {
-    const debtCeiling = form.getFieldValue('debtCeiling');
-    if (debtCeiling && value && value > debtCeiling) {
-      return Promise.reject(new Error('Debt floor cannot be greater than debt ceiling'));
-    }
-    return Promise.resolve();
-  }, [form]);
-
-  const validateDebtCeiling = useCallback((_: any, value: number) => {
-    const debtFloor = form.getFieldValue('debtFloor');
-    if (debtFloor && value && debtFloor > value) {
-      return Promise.reject(new Error('Debt floor cannot be greater than debt ceiling'));
-    }
-    return Promise.resolve();
-  }, [form]);
-
   const resetForm = useCallback(() => {
     form.resetFields();
     setEditingAsset(null);
@@ -110,7 +58,10 @@ const CollateralConfigManager = () => {
   const handleSubmit = useCallback(async (values: any) => {
     try {
       setLoading(true);
-      const configData =values;
+      const configData = {
+        ...values,
+        isPaused: values.isPaused ?? false  // Default to false if undefined
+      };     
       console.log("configData CDPPPP", configData);
       await cdpService.setCollateralConfig(configData);
       toast.success('Collateral configuration updated successfully');
@@ -186,7 +137,6 @@ const CollateralConfigManager = () => {
 
   return (
     <div className="space-y-6">
-      {/* Global Pause Control */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -212,12 +162,14 @@ const CollateralConfigManager = () => {
           </CardTitle>
           <CardDescription>
             {globalPaused ? (
-              <span className="text-red-600 font-medium">
-                ⚠️ CDP system is paused - All operations are blocked
+              <span className="text-red-600 font-medium flex items-center space-x-2">
+                <ExclamationCircleOutlined />
+                <span>CDP system is paused - All operations are blocked</span>
               </span>
             ) : (
-              <span className="text-green-600 font-medium">
-                ✅ CDP system is active - All operations are allowed
+              <span className="text-green-600 font-medium flex items-center space-x-2">
+                <CheckCircleOutlined />
+                <span>CDP system is active - All operations are allowed</span>
               </span>
             )}
           </CardDescription>
