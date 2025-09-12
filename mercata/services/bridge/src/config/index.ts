@@ -36,8 +36,8 @@ const config = {
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
-    safeOwnerAddress: process.env.SAFE_OWNER_ADDRESS,
-    safeOwnerPrivateKey: process.env.SAFE_OWNER_PRIVATE_KEY,
+    safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
+    safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
   },
   voucher: {
     contractAddress:
@@ -102,8 +102,8 @@ const requiredEnvVars = [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "SAFE_ADDRESS",
-  "SAFE_OWNER_ADDRESS",
-  "SAFE_OWNER_PRIVATE_KEY",
+  "SAFE_PROPOSER_ADDRESS",
+  "SAFE_PROPOSER_PRIVATE_KEY",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);

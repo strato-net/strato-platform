@@ -64,8 +64,8 @@ The service automatically validates that RPC URLs are configured for all enabled
 
 #### Safe Wallet
 - `SAFE_ADDRESS` - Gnosis Safe wallet address
-- `SAFE_OWNER_ADDRESS` - Safe owner address
-- `SAFE_OWNER_PRIVATE_KEY` - Safe owner private key
+- `SAFE_PROPOSER_ADDRESS` - Safe Proposer address
+- `SAFE_PROPOSER_PRIVATE_KEY` - Safe Proposer private key
 
 #### Optional
 - `VOUCHER_CONTRACT_ADDRESS` - Voucher contract address (defaults to `0x000000000000000000000000000000000000100e`)
