@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
 
 import "../abstract/ERC20/access/Ownable.sol";
 import "../Tokens/Token.sol";
@@ -10,7 +9,7 @@ import "../Tokens/Token.sol";
  *         can move funds out, and only to specified recipients, preserving
  *         single-entry accounting for fee flows.
  */
-contract CDPReserve is Ownable {
+contract record CDPReserve is Ownable {
   Token public immutable usdst;
   address public engine;
 
