@@ -78,8 +78,13 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const allTokens = response.data || [];
   
-      const active = allTokens.filter((token: Token) => token.token.status === '2');
-      const inactive = allTokens.filter((token: Token) => token.token.status !== '2');
+      const active = allTokens.filter((token: Token) => 
+        // filtering  musdst token out
+        token.token.status === '2' && token.address !== '000000000000000000000000000000000000100f'     
+      );
+      const inactive = allTokens.filter((token: Token) => 
+        token.token.status !== '2' || token.address === '000000000000000000000000000000000000100f'
+      );
 
       setActiveTokens(prev => (isEqual(prev, active) ? prev : active));
       setInactiveTokens(prev => (isEqual(prev, inactive) ? prev : inactive));
