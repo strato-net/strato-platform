@@ -1,9 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -12,43 +9,17 @@ import {
 } from 'lucide-react';
 import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
+import { Form, Input, Switch, Button as AntButton } from 'antd';
+import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 
-interface CollateralConfigFormData {
-  asset: string;
-  liquidationRatio: string;
-  liquidationPenaltyBps: string;
-  closeFactorBps: string;
-  stabilityFeeRate: string;
-  debtFloor: string;
-  debtCeiling: string;
-  unitScale: string;
-  isPaused: boolean;
-}
-
-const EMPTY_FORM_DATA: CollateralConfigFormData = {
-  asset: '', liquidationRatio: '', liquidationPenaltyBps: '', closeFactorBps: '',
-  stabilityFeeRate: '', debtFloor: '', debtCeiling: '', unitScale: '', isPaused: false,
-};
-
-const FIELD_CONFIG = {
-  asset: { name: 'Asset address', required: true, min: undefined, max: undefined },
-  liquidationRatio: { name: 'Liquidation ratio', required: true, min: 0, max: undefined },
-  liquidationPenaltyBps: { name: 'Liquidation penalty', required: true, min: 500, max: 3000 },
-  closeFactorBps: { name: 'Close factor', required: true, min: 5000, max: 10000 },
-  stabilityFeeRate: { name: 'Stability fee rate', required: true, min: 1.0, max: undefined },
-  debtFloor: { name: 'Debt floor', required: true, min: 0, max: undefined },
-  debtCeiling: { name: 'Debt ceiling', required: true, min: 0, max: undefined },
-  unitScale: { name: 'Unit scale', required: true, min: 0, max: undefined },
-} as const;
 
 const CollateralConfigManager = () => {
+  const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('add');
   const [assets, setAssets] = useState<AssetConfig[]>([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState<CollateralConfigFormData>(EMPTY_FORM_DATA);
   const [editingAsset, setEditingAsset] = useState<string | null>(null);
   const [globalPaused, setGlobalPaused] = useState<boolean>(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
   // Load data on mount
   useEffect(() => {
@@ -77,91 +48,21 @@ const CollateralConfigManager = () => {
     }
   }, []);
 
-  const handleInputChange = useCallback((field: keyof CollateralConfigFormData, value: string | boolean) => {
-    setHasUserInteracted(true);
-    setFormData(prev => ({ ...prev, [field]: value }));
-  }, []);
-
-  const validateForm = useCallback((): string[] => {
-    const errors: string[] = [];
-
-    // Required field validation
-    Object.entries(FIELD_CONFIG).forEach(([field, config]) => {
-      const value = formData[field as keyof CollateralConfigFormData];
-      if (config.required && (!value && value !== false)) {
-        errors.push(`${config.name} is required`);
-      }
-    });
-
-    // Numeric validation
-    Object.entries(FIELD_CONFIG).forEach(([field, config]) => {
-      const value = formData[field as keyof CollateralConfigFormData];
-      if (typeof value === 'string' && value && config.min !== undefined) {
-        const num = parseFloat(value);
-        if (isNaN(num) || num < config.min || (config.max && num > config.max)) {
-          const range = config.max ? `between ${config.min} and ${config.max}` : `at least ${config.min}`;
-          errors.push(`${config.name} must be ${range}`);
-        }
-      }
-    });
-
-    // Cross-field validation
-    const debtFloor = parseFloat(formData.debtFloor);
-    const debtCeiling = parseFloat(formData.debtCeiling);
-    if (debtCeiling > 0 && debtFloor > 0 && debtFloor > debtCeiling) {
-      errors.push('Debt floor cannot be greater than debt ceiling');
-    }
-
-    return errors;
-  }, [formData]);
-
-  const isFormValid = useMemo(() => validateForm().length === 0, [validateForm]);
-  const isFormEmpty = useMemo(() => Object.values(formData).some(v => !v && v !== false), [formData]);
-
-  const getFieldError = useCallback((field: keyof CollateralConfigFormData): string | null => {
-    if (!hasUserInteracted) return null;
-    const errors = validateForm();
-    return errors.find(error => 
-      error.toLowerCase().includes(field.toLowerCase()) || 
-      error.toLowerCase().includes(FIELD_CONFIG[field].name.toLowerCase())
-    ) || null;
-  }, [validateForm, hasUserInteracted]);
-
   const resetForm = useCallback(() => {
-    setFormData(EMPTY_FORM_DATA);
+    form.resetFields();
     setEditingAsset(null);
-    setHasUserInteracted(false);
-  }, []);
+  }, [form]);
 
-  const convertToContractFormat = useCallback((data: CollateralConfigFormData) => {
-    const RAY = BigInt(10) ** BigInt(27);
-    const annualRate = parseFloat(data.stabilityFeeRate);
-    const perSecondRate = annualRate / (365 * 24 * 60 * 60) / 100;
-    const stabilityFeeRateRAY = (RAY + BigInt(Math.floor(perSecondRate * Number(RAY)))).toString();
+ 
 
-    return {
-      asset: data.asset,
-      liquidationRatio: (BigInt(Math.floor(parseFloat(data.liquidationRatio) * 1e18))).toString(),
-      liquidationPenaltyBps: data.liquidationPenaltyBps,
-      closeFactorBps: data.closeFactorBps,
-      stabilityFeeRate: stabilityFeeRateRAY,
-      debtFloor: (BigInt(Math.floor(parseFloat(data.debtFloor) * 1e18))).toString(),
-      debtCeiling: (BigInt(Math.floor(parseFloat(data.debtCeiling) * 1e18))).toString(),
-      unitScale: (BigInt(Math.floor(parseFloat(data.unitScale) * 1e18))).toString(),
-      isPaused: data.isPaused,
-    };
-  }, []);
-
-  const handleSubmit = useCallback(async () => {
-    const errors = validateForm();
-    if (errors.length > 0) {
-      toast.error(`Validation errors: ${errors.join(', ')}`);
-      return;
-    }
-
+  const handleSubmit = useCallback(async (values: any) => {
     try {
       setLoading(true);
-      const configData = convertToContractFormat(formData);
+      const configData = {
+        ...values,
+        isPaused: values.isPaused ?? false  // Default to false if undefined
+      };     
+      console.log("configData CDPPPP", configData);
       await cdpService.setCollateralConfig(configData);
       toast.success('Collateral configuration updated successfully');
       resetForm();
@@ -172,24 +73,27 @@ const CollateralConfigManager = () => {
     } finally {
       setLoading(false);
     }
-  }, [formData, validateForm, convertToContractFormat, resetForm, loadAssets]);
+  }, [ resetForm, loadAssets]);
 
   const handleEditAsset = useCallback((asset: AssetConfig) => {
     setEditingAsset(asset.asset);
-    setHasUserInteracted(true);
-    setFormData({
-      asset: asset.asset,
-      liquidationRatio: (asset.liquidationRatio / 100).toString(),
-      liquidationPenaltyBps: asset.liquidationPenaltyBps.toString(),
-      closeFactorBps: asset.closeFactorBps.toString(),
-      stabilityFeeRate: asset.stabilityFeeRate.toString(),
-      debtFloor: (parseFloat(asset.debtFloor) / 1e18).toString(),
-      debtCeiling: (parseFloat(asset.debtCeiling) / 1e18).toString(),
-      unitScale: (parseFloat(asset.unitScale) / 1e18).toString(),
+    form.setFieldsValue({
+      asset: asset.asset.trim(),
+      // Convert liquidation ratio from percentage back to decimal format
+      liquidationRatio: asset.liquidationRatio,
+      liquidationPenaltyBps: asset.liquidationPenaltyBps,
+      closeFactorBps: asset.closeFactorBps,
+      // Convert stability fee rate from RAY back to annual percentage
+      stabilityFeeRate: asset.stabilityFeeRate,
+      // Convert USD amounts from wei back to decimal format
+      debtFloor:asset.debtFloor ,
+      debtCeiling:asset.debtCeiling,
+      // Convert unit scale from wei back to decimal format
+      unitScale:asset.unitScale,
       isPaused: asset.isPaused,
     });
     setActiveTab('add');
-  }, []);
+  }, [form]);
 
   const handleTogglePause = useCallback(async (asset: string, isPaused: boolean) => {
     try {
@@ -230,31 +134,9 @@ const CollateralConfigManager = () => {
     }
   }, []);
 
-  const FormField = ({ field, label, type = "text", placeholder, min, max, step, helpText, ...props }: any) => (
-    <div className="space-y-2">
-      <Label htmlFor={field}>{label}</Label>
-      <Input
-        id={field}
-        type={type}
-        placeholder={placeholder}
-        value={formData[field]}
-        onChange={(e) => handleInputChange(field, e.target.value)}
-        className={getFieldError(field) ? 'border-red-500' : ''}
-        min={min}
-        max={max}
-        step={step}
-        {...props}
-      />
-      {getFieldError(field) && (
-        <p className="text-xs text-red-500">{getFieldError(field)}</p>
-      )}
-      {helpText && <p className="text-sm text-gray-500">{helpText}</p>}
-    </div>
-  );
 
   return (
     <div className="space-y-6">
-      {/* Global Pause Control */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
@@ -280,12 +162,14 @@ const CollateralConfigManager = () => {
           </CardTitle>
           <CardDescription>
             {globalPaused ? (
-              <span className="text-red-600 font-medium">
-                ⚠️ CDP system is paused - All operations are blocked
+              <span className="text-red-600 font-medium flex items-center space-x-2">
+                <ExclamationCircleOutlined />
+                <span>CDP system is paused - All operations are blocked</span>
               </span>
             ) : (
-              <span className="text-green-600 font-medium">
-                ✅ CDP system is active - All operations are allowed
+              <span className="text-green-600 font-medium flex items-center space-x-2">
+                <CheckCircleOutlined />
+                <span>CDP system is active - All operations are allowed</span>
               </span>
             )}
           </CardDescription>
@@ -316,113 +200,144 @@ const CollateralConfigManager = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  field="asset"
-                  label="Asset Address"
-                  placeholder="0x..."
-                  disabled={editingAsset !== null}
-                />
-
-                <FormField
-                  field="liquidationRatio"
-                  label="Liquidation Ratio (e.g., 1.5 = 150%)"
-                  type="number"
-                  step="0.1"
-                  min="1.0"
-                  placeholder="1.5"
-                />
-
-                <FormField
-                  field="liquidationPenaltyBps"
-                  label="Liquidation Penalty (Basis Points)"
-                  type="number"
-                  min="500"
-                  max="3000"
-                  placeholder="1000"
-                  helpText="500-3000 bps (5%-30%)"
-                />
-
-                <FormField
-                  field="closeFactorBps"
-                  label="Close Factor (Basis Points)"
-                  type="number"
-                  min="5000"
-                  max="10000"
-                  placeholder="5000"
-                  helpText="5000-10000 bps (50%-100%)"
-                />
-
-                <FormField
-                  field="stabilityFeeRate"
-                  label="Stability Fee Rate (RAY)"
-                  placeholder="1.0"
-                  helpText="Per-second interest rate (minimum 1.0 = 0% interest)"
-                />
-
-                <FormField
-                  field="debtFloor"
-                  label="Debt Floor (USD)"
-                  type="number"
-                  min="0"
-                  placeholder="100"
-                />
-
-                <FormField
-                  field="debtCeiling"
-                  label="Debt Ceiling (USD)"
-                  placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
-                  helpText="Enter the full number (e.g., 1000000 not 1e+6)"
-                />
-
-                <FormField
-                  field="unitScale"
-                  label="Unit Scale"
-                  placeholder="Enter unit scale (e.g., 1 for 18 decimals)"
-                  helpText="Enter decimal value (e.g., 1 for 18 decimals, 0.001 for 15 decimals)"
-                />
-
-                {/* Pause Status */}
-                <div className="space-y-2">
-                  <Label htmlFor="isPaused">Pause Asset</Label>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="isPaused"
-                      checked={formData.isPaused}
-                      onCheckedChange={(checked) => handleInputChange('isPaused', checked)}
-                    />
-                    <Label htmlFor="isPaused">
-                      {formData.isPaused ? 'Paused' : 'Active'}
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={loading || isFormEmpty || !isFormValid}
-                  className="flex items-center space-x-2"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  <span>{editingAsset ? 'Update Config' : 'Add Config'}</span>
-                </Button>
-                
-                {editingAsset && (
-                  <Button 
-                    variant="outline" 
-                    onClick={resetForm}
-                    disabled={loading}
+              <Form
+                form={form}
+                layout="vertical"
+                onFinish={handleSubmit}
+                className="space-y-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <Form.Item
+                    name="asset"
+                    label="Asset Address"
+                    // rules={formRules.asset}
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    Cancel Edit
-                  </Button>
-                )}
-              </div>
+                    <Input 
+                      placeholder="0x..." 
+                      disabled={editingAsset !== null}
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="liquidationRatio"
+                    label="Liquidation Ratio (e.g., 1.5 = 150%)"
+                    // rules={formRules.liquidationRatio}
+                  >
+                    <Input 
+                      placeholder="1.5"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="liquidationPenaltyBps"
+                    label="Liquidation Penalty (Basis Points)"
+                    // rules={formRules.liquidationPenaltyBps}
+                    extra="500-3000 bps (5%-30%)"
+                  >
+                    <Input 
+                      placeholder="1000"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="closeFactorBps"
+                    label="Close Factor (Basis Points)"
+                    // rules={formRules.closeFactorBps}
+                    extra="5000-10000 bps (50%-100%)"
+                  >
+                    <Input 
+                      placeholder="5000"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="stabilityFeeRate"
+                    label="Stability Fee Rate (RAY)"
+                    // rules={formRules.stabilityFeeRate}
+                    extra="Per-second interest rate (minimum 1.0 = 0% interest)"
+                  >
+                    <Input 
+                      placeholder="1.0"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="debtFloor"
+                    label="Debt Floor (USD)"
+                    // rules={[...formRules.debtFloor, { validator: validateDebtFloor }]}
+                  >
+                    <Input 
+                      placeholder="100"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="debtCeiling"
+                    label="Debt Ceiling (USD)"
+                    // rules={[...formRules.debtCeiling, { validator: validateDebtCeiling }]}
+                    extra="Enter the full number (e.g., 1000000 not 1e+6)"
+                  >
+                    <Input 
+                      placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="unitScale"
+                    label="Unit Scale"
+                    // rules={formRules.unitScale}
+                    extra="Enter decimal value (e.g., 1 for 18 decimals, 0.001 for 15 decimals)"
+                  >
+                    <Input 
+                      placeholder="Enter unit scale (e.g., 1 for 18 decimals)"
+                      className="w-full"
+                    />
+                  </Form.Item>
+
+                  {/* Pause Status */}
+                  <Form.Item
+                    name="isPaused"
+                    label="Pause Asset"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                </div>
+
+                <div className="flex items-center space-x-4">
+                  <AntButton 
+                    htmlType="submit"
+                    disabled={loading}
+                    className="flex items-center space-x-2"
+                    type="primary"
+                  >
+                    {loading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    <span>{editingAsset ? 'Update Config' : 'Add Config'}</span>
+                  </AntButton>
+                  
+                  {editingAsset && (
+                    <Button 
+                      variant="outline" 
+                      onClick={resetForm}
+                      disabled={loading}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel Edit
+                    </Button>
+                  )}
+                </div>
+              </Form>
             </CardContent>
           </Card>
         </TabsContent>

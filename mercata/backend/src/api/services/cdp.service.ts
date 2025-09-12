@@ -1087,20 +1087,30 @@ export const setCollateralConfig = async (
     throw new Error("CDP Engine not found");
   }
 
+  // Convert UI values back to contract format
+  const liquidationRatioContract = Math.floor((Number(configData.liquidationRatio) * Number(WAD)) / 100);
+  
+  // Convert annual rate to per-second rate in RAY units (avoiding scientific notation)
+  const [intPart, decPart = ''] = configData.stabilityFeeRate.toString().split('.');
+  const scale = BigInt(10) ** BigInt(decPart.length);
+  const secondsPerYear = BigInt(365 * 24 * 60 * 60);
+  const stabilityFeeRateContract = (BigInt(intPart + decPart) * RAY) / (BigInt(100) * scale * secondsPerYear) + RAY;
+   
+
   const tx: FunctionInput = {
     contractName: extractContractName(CDPEngine),
     contractAddress: registry.cdpEngine.address,
     method: "setCollateralAssetParams",
     args: {
       asset: configData.asset,
-      liquidationRatio: configData.liquidationRatio,
-      liquidationPenaltyBps: configData.liquidationPenaltyBps,
-      closeFactorBps: configData.closeFactorBps,
-      stabilityFeeRate: configData.stabilityFeeRate,
-      debtFloor: configData.debtFloor,
-      debtCeiling: configData.debtCeiling,
-      unitScale: configData.unitScale,
-      pause: configData.isPaused,
+      liquidationRatio: liquidationRatioContract.toString(),
+      liquidationPenaltyBps: configData.liquidationPenaltyBps.toString(),
+      closeFactorBps: configData.closeFactorBps.toString(),
+      stabilityFeeRate: stabilityFeeRateContract.toString(),
+      debtFloor: configData.debtFloor.toString(),
+      debtCeiling: configData.debtCeiling.toString(),
+      unitScale: configData.unitScale.toString(),
+      pause: Boolean(configData.isPaused),
     },
   };
 
