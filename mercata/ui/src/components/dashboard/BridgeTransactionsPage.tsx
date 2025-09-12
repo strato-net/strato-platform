@@ -28,18 +28,18 @@ const BridgeTransactionsPage = () => {
   const mainItems = [
     {
       key: 'DepositRecorded',
-      label: 'Deposit',
+      label: 'Bridge In',
     },
     {
       key: 'WithdrawalInitiated',
-      label: 'Withdrawal',
+      label: 'Bridge Out',
     },
     {
       key: 'RedemptionInitiated',
-      label: 'Redemption',
+      label: 'Withdrawal',
     },
     { key: 'USDSTDeposit',
-      label: 'USDST',
+      label: 'Deposit',
     },
   ];
 

@@ -318,6 +318,177 @@ class BridgeContractService {
     });
     return !!code && code !== '0x';
   }
+
+  // ============================================
+  // High-Level Transaction Methods
+  // ============================================
+
+  /**
+   * Executes a complete deposit transaction (for both BridgeIn and MintWidget)
+   */
+  async executeDepositTransaction({
+    web3Context,
+    tokenInfo,
+    amount,
+    stratoAddress,
+    depositRouter,
+    chainId,
+    mintUSDST = false,
+  }: {
+    web3Context: {
+      address: `0x${string}`;
+      signTypedDataAsync: (args: any) => Promise<`0x${string}`>;
+      writeContractAsync: (args: any) => Promise<`0x${string}`>;
+    };
+    tokenInfo: {
+      externalToken: string;
+      externalDecimals: string;
+    };
+    amount: string;
+    stratoAddress: string;
+    depositRouter: string;
+    chainId: string;
+    mintUSDST?: boolean;
+  }): Promise<`0x${string}`> {
+    const depositAmount = safeParseUnits(amount, parseInt(tokenInfo.externalDecimals || "18"));
+    
+    // Validate router contract
+    const validation = await this.validateRouterContract({
+      depositRouterAddress: depositRouter,
+      amount,
+      decimals: tokenInfo.externalDecimals,
+      chainId,
+      tokenAddress: tokenInfo.externalToken,
+      mint: mintUSDST,
+    });
+    
+    if (!validation.isValid) {
+      throw new Error(validation.error || "Validation failed");
+    }
+
+    // Check and ensure Permit2 approval
+    const approval = await this.checkPermit2Approval({
+      token: tokenInfo.externalToken,
+      owner: web3Context.address,
+      amount: depositAmount,
+      chainId,
+    });
+
+    if (!approval.isApproved) {
+      // Approve Permit2
+      const approveTx = await web3Context.writeContractAsync({
+        address: tokenInfo.externalToken as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
+        chain: await resolveViemChain(chainId),
+        account: web3Context.address,
+      });
+
+      await this.waitForTransaction(approveTx, chainId);
+    }
+
+    // Build permit signature
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 900); // 15 minutes
+    const nonce = this.getPermit2Nonce();
+    const permitMessage = this.createPermit2Message({
+      token: tokenInfo.externalToken,
+      amount: depositAmount,
+      spender: depositRouter,
+      nonce,
+      deadline,
+    });
+
+    const signature = await web3Context.signTypedDataAsync({
+      domain: this.getPermit2Domain(chainId),
+      types: this.getPermit2Types(),
+      primaryType: "PermitTransferFrom",
+      message: permitMessage,
+      account: web3Context.address,
+    });
+
+    // Simulate and send transaction
+    const client = await this.getClient(chainId);
+    await client.simulateContract({
+      address: depositRouter as `0x${string}`,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "deposit",
+      args: [
+        this.formatAddress(tokenInfo.externalToken),
+        depositAmount,
+        this.formatAddress(stratoAddress),
+        nonce,
+        deadline,
+        signature,
+        mintUSDST,
+      ],
+      account: web3Context.address,
+    });
+
+    const txHash = await web3Context.writeContractAsync({
+      address: depositRouter as `0x${string}`,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "deposit",
+      args: [
+        this.formatAddress(tokenInfo.externalToken),
+        depositAmount,
+        this.formatAddress(stratoAddress),
+        nonce,
+        deadline,
+        signature,
+        mintUSDST,
+      ],
+      chain: await resolveViemChain(chainId),
+      account: web3Context.address,
+    });
+
+    return txHash;
+  }
+
+  /**
+   * Executes a complete ETH deposit transaction
+   */
+  async executeETHDepositTransaction({
+    web3Context,
+    amount,
+    stratoAddress,
+    depositRouter,
+    chainId,
+  }: {
+    web3Context: {
+      address: `0x${string}`;
+      writeContractAsync: (args: any) => Promise<`0x${string}`>;
+    };
+    amount: string;
+    stratoAddress: string;
+    depositRouter: string;
+    chainId: string;
+  }): Promise<`0x${string}`> {
+    const depositAmount = safeParseUnits(amount, 18);
+
+    // Simulate and send ETH deposit
+    const client = await this.getClient(chainId);
+    await client.simulateContract({
+      address: depositRouter as `0x${string}`,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "depositETH",
+      args: [this.formatAddress(stratoAddress)],
+      value: depositAmount,
+      account: web3Context.address,
+    });
+
+    const txHash = await web3Context.writeContractAsync({
+      address: depositRouter as `0x${string}`,
+      abi: DEPOSIT_ROUTER_ABI,
+      functionName: "depositETH",
+      args: [this.formatAddress(stratoAddress)],
+      chain: await resolveViemChain(chainId),
+      account: web3Context.address,
+      value: depositAmount,
+    });
+
+    return txHash;
+  }
 }
 
 // Export singleton instance

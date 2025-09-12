@@ -56,13 +56,18 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
 
   const columns = [
     {
-      title: 'From (STRATO)',
+      title: 'From',
       key: 'from',
       render: (_: any, record: any) => {
         const addr = record?.WithdrawalInfo?.stratoSender
           ? bridgeContractService.formatAddress(record.WithdrawalInfo.stratoSender)
           : '';
-        return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
+        return (
+          <div>
+            <div className="text-xs text-gray-500 mb-1">STRATO</div>
+            {addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-'}
+          </div>
+        );
       },
       width: 100,
     },

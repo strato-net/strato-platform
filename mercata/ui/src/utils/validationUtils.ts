@@ -40,8 +40,16 @@ export const validateAmount = (value: string, o: AmountValidationOptions): Amoun
   if (value.trim() === "") return { isValid: true };
   if (!DECIMAL_PATTERN.test(value)) return { isValid: false, error: "Please enter a valid number" };
 
+  // Check if the decimal part is too long
+  const decimalPart = value.includes('.') ? value.split('.')[1] : '';
+  if (decimalPart.length > DECIMALS) {
+    return { isValid: false, error: `Maximum ${DECIMALS} decimal places allowed` };
+  }
+
   const amt = toWei(value);
-  if (amt === 0n && !o.allowZero) return { isValid: false, error: "Amount must be greater than 0" };
+  if (amt === 0n && !o.allowZero && value !== "0" && value !== "0.") {
+    return { isValid: false, error: "Amount must be greater than 0" };
+  }
   if (o.minAmount && amt < o.minAmount) return { isValid: false, error: `Amount must be at least ${fmt(o.minAmount, o.symbol)}` };
 
   const feeCover = o.usdstBalance + o.voucherBalance;

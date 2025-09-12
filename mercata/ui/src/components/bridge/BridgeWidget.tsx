@@ -4,11 +4,24 @@ import { Button } from "@/components/ui/button";
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBridgeContext } from "@/context/BridgeContext";
-import BridgeIn from './BridgeIn';
-import BridgeOut from './BridgeOut';
+import BridgeOperation from './BridgeOperation';
 
-const BridgeWidget = () => {
-  const [activeTab, setActiveTab] = useState('bridgeIn');
+interface BridgeWidgetProps {
+  operation?: 'wrap' | 'mint';
+}
+
+const BridgeWidget: React.FC<BridgeWidgetProps> = ({ 
+  operation = 'wrap'
+}) => {
+  // Determine initial tab and operation based on props
+  const getInitialTab = () => {
+    switch (operation) {
+      case 'mint': return 'bridgeMint';
+      default: return 'bridgeIn';
+    }
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
@@ -37,18 +50,59 @@ const BridgeWidget = () => {
     );
   }
 
+  // Get dynamic tab configuration based on operation
+  const getTabConfig = () => {
+    switch (operation) {
+      case 'mint':
+        return [
+          { key: 'bridgeMint', label: 'Deposit' },
+          { key: 'bridgeBurn', label: 'Withdraw' }
+        ];
+      default:
+        return [
+          { key: 'bridgeIn', label: 'Bridge In' },
+          { key: 'bridgeOut', label: 'Bridge Out' }
+        ];
+    }
+  };
+
+  // Get the bridge operation based on active tab
+  const getBridgeOperation = () => {
+    switch (activeTab) {
+      case 'bridgeIn': return 'bridgeWrap';
+      case 'bridgeOut': return 'bridgeUnwrap';
+      case 'bridgeMint': return 'bridgeMint';
+      case 'bridgeBurn': return 'bridgeBurn';
+      default: return 'bridgeWrap';
+    }
+  };
+
+  // Get target transaction tab for navigation
+  const getTargetTransactionTab = () => {
+    switch (activeTab) {
+      case 'bridgeIn': return 'DepositRecorded';
+      case 'bridgeOut': return 'WithdrawalInitiated';
+      case 'bridgeMint': return 'USDSTDeposit';
+      case 'bridgeBurn': return 'RedemptionInitiated';
+      default: return 'DepositRecorded';
+    }
+  };
+
+  const tabConfig = getTabConfig();
+  const showTabs = tabConfig.length > 1;
+
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Bridge Assets</h2>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Bridge Assets</h2>
+        </div>
         <Button
           variant="ghost"
           size="sm"
           className="flex items-center gap-2"
           onClick={() => {
-            // Set the target tab based on the current active tab
-            const targetTab = activeTab === 'bridgeIn' ? 'DepositRecorded' : 'WithdrawalInitiated';
-            setTargetTransactionTab(targetTab);
+            setTargetTransactionTab(getTargetTransactionTab());
             navigate("/dashboard/bridge-transactions");
           }}
         >
@@ -56,34 +110,28 @@ const BridgeWidget = () => {
           View Transactions
         </Button>
       </div>
-      <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
-        <Tabs
-          activeKey={activeTab}
-          items={[
-            {
-              key: 'bridgeIn',
-              label: 'Bridge In',
-            },
-            {
-              key: 'bridgeOut',
-              label: 'Bridge Out',
-            },
-          ]}
-          onChange={(value) => setActiveTab(value)}
-          className="custom-tabs"
-          style={{
-            '--ant-primary-color': '#3b82f6',
-            '--ant-primary-color-hover': '#2563eb',
-          } as React.CSSProperties}
-        />
-        <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
-          {activeTab === 'bridgeIn' ? (
-            <BridgeIn />
-          ) : (
-            <BridgeOut />
-          )}
+      
+      {showTabs ? (
+        <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
+          <Tabs
+            activeKey={activeTab}
+            items={tabConfig}
+            onChange={(value) => setActiveTab(value)}
+            className="custom-tabs"
+            style={{
+              '--ant-primary-color': '#3b82f6',
+              '--ant-primary-color-hover': '#2563eb',
+            } as React.CSSProperties}
+          />
+          <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
+            <BridgeOperation operation={getBridgeOperation()} />
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-xl p-4 shadow-sm">
+          <BridgeOperation operation={getBridgeOperation()} />
+        </div>
+      )}
     </div>
   );
 };

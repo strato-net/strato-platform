@@ -96,15 +96,19 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       width: 120,
     },
     {
-      title: "To (STRATO)",
+      title: "To",
       key: "to",
-      render: (_: any, record: any) =>
-        renderTruncatedAddressWithCopy(
-          record?.DepositInfo?.stratoRecipient
-            ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
-            : "",
-          handleCopyToClipboard
-        ),
+      render: (_: any, record: any) => {
+        const addr = record?.DepositInfo?.stratoRecipient
+          ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
+          : "";
+        return (
+          <div>
+            <div className="text-xs text-gray-500 mb-1">STRATO</div>
+            {addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-'}
+          </div>
+        );
+      },
       width: 100,
     },
     {
