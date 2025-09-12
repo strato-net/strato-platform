@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,41 +24,235 @@ import {
   useSwitchChain,
   useSignTypedData,
 } from "wagmi";
+import { Modal } from "antd";
+
+// Internal imports
 import { bridgeContractService } from "@/lib/bridge/contractService";
 import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
+import { BridgeContext } from "@/lib/bridge/types";
+import { formatTxHash, getExplorerUrl } from "@/lib/bridge/utils";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useAmountValidation } from "@/utils/validationUtils";
-import { safeParseUnits, formatBalance, addCommasToInput, formatWeiAmount } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, fmt } from "@/utils/numberUtils";
+import { BRIDGE_OUT_FEE, usdstAddress, DECIMALS } from "@/lib/constants";
+
+// Components
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import { BridgeContext } from "@/lib/bridge/types";
-import {
-  formatTxHash,
-  getExplorerUrl,
-} from "@/lib/bridge/utils";
-import { Modal } from "antd";
-import { BRIDGE_OUT_FEE, usdstAddress } from "@/lib/constants";
 
-type BridgeOperationType = "bridgeWrap" | "bridgeUnwrap" | "bridgeMint" | "bridgeBurn";
+// ============================================================================
+// TYPES & INTERFACES
+// ============================================================================
+
+type BridgeOperationType =
+  | "bridgeWrap"
+  | "bridgeUnwrap"
+  | "bridgeMint"
+  | "bridgeBurn";
 
 interface BridgeOperationProps {
   operation: BridgeOperationType;
 }
 
+// ============================================================================
+// CUSTOM HOOKS
+// ============================================================================
+
+/**
+ * Custom hook for bridge direction logic
+ * Centralizes all operation-specific state and configuration
+ */
+const useBridgeDirection = (
+  operation: string,
+  selectedNetwork: string | null,
+  tokens: {
+    selectedMintToken: any;
+    selectedToken: any;
+    setSelectedMintToken: any;
+    setSelectedToken: any;
+    redeemableTokens: any[];
+    bridgeableTokens: any[];
+    availableNetworks: any[];
+  }
+) => {
+  return useMemo(() => {
+    const inbound = operation === "bridgeWrap" || operation === "bridgeMint";
+    const mint = operation === "bridgeMint" || operation === "bridgeBurn";
+    const token = mint ? tokens.selectedMintToken : tokens.selectedToken;
+    const setToken = mint ? tokens.setSelectedMintToken : tokens.setSelectedToken;
+    const list = mint ? tokens.redeemableTokens : tokens.bridgeableTokens;
+    const netCfg = tokens.availableNetworks.find((n) => n.chainName === selectedNetwork) || null;
+    const expChainId = netCfg ? Number(netCfg.chainId) : null;
+    const native = token?.externalToken === NATIVE_TOKEN_ADDRESS;
+    const extDec = Number(token?.externalDecimals ?? DECIMALS);
+    const stratoDec = DECIMALS;
+
+    return {
+      inbound,
+      mint,
+      token,
+      setToken,
+      list,
+      netCfg,
+      expChainId,
+      native,
+      extDec,
+      stratoDec,
+    };
+  }, [
+    operation,
+    selectedNetwork,
+    tokens.selectedMintToken,
+    tokens.selectedToken,
+    tokens.setSelectedMintToken,
+    tokens.setSelectedToken,
+    tokens.redeemableTokens,
+    tokens.bridgeableTokens,
+    tokens.availableNetworks,
+  ]);
+};
+
+/**
+ * Custom hook for balance logic
+ * Handles all balance-related computations and API calls
+ */
+const useBalances = ({
+  op,
+  amount,
+  operation,
+  tokenAddrIn,
+  feeUSDST,
+  usdstBalance,
+  usdstAddress,
+  getMaxTransferable,
+  loadingUsdstBalance,
+  address,
+  useBalance,
+}: {
+  op: any;
+  amount: string;
+  operation: string;
+  tokenAddrIn: string;
+  feeUSDST: string;
+  usdstBalance: any;
+  usdstAddress: string;
+  getMaxTransferable: any;
+  loadingUsdstBalance: boolean;
+  address: string;
+  useBalance: any;
+}) => {
+  // Parse amount without memoization - cheap operation with debounced validation
+  const parsedAmount = safeParseUnits(amount || "0", op.inbound ? op.extDec : op.stratoDec);
+
+  // External token balance (for inbound operations)
+  const {
+    data: externalTokenBalance,
+    refetch: refetchExternalToken,
+    isLoading: externalTokenLoading,
+  } = useWagmiBalance({
+    address: address as `0x${string}`,
+    token: op.native ? undefined : (op.token?.externalToken as `0x${string}`),
+    chainId: op.expChainId ?? undefined,
+  });
+
+  // STRATO token balance (for outbound operations)
+  const {
+    data: balanceData,
+    isLoading: isBalanceLoading,
+    refetch: refetchBalance,
+  } = useBalance(op.token?.stratoToken || null);
+
+  // Maximum amount calculation
+  const maxAmount = useMemo(() => {
+    if (!op.token) return 0n;
+    if (op.inbound) return externalTokenBalance?.value ?? 0n;
+    if (operation === "bridgeBurn") return BigInt(usdstBalance || "0");
+    const wei = balanceData?.balance ? BigInt(balanceData.balance) : 0n;
+    return wei;
+  }, [
+    op.token,
+    op.inbound,
+    operation,
+    externalTokenBalance?.value,
+    usdstBalance,
+    balanceData?.balance,
+    op.stratoDec,
+  ]);
+
+  // Maximum transferable amount (after fees)
+  const maxTransferable = useMemo(() => {
+    if (!op.token) return 0n;
+    const tokenAddress = op.inbound
+      ? tokenAddrIn
+      : operation === "bridgeBurn"
+        ? usdstAddress
+        : tokenAddrIn;
+    return getMaxTransferable(maxAmount, tokenAddress, feeUSDST);
+  }, [op.token, maxAmount, getMaxTransferable, op.inbound, tokenAddrIn, feeUSDST, operation]);
+
+  // Precomputed balance view for UI
+  const balancesView = useMemo(() => {
+    const sideDec = op.inbound ? op.extDec : op.stratoDec;
+    const post = maxAmount > parsedAmount ? maxAmount - parsedAmount : 0n;
+    const maxTransferableRaw = maxTransferable === 0n ? "0" : fmt(maxTransferable, op.inbound ? op.extDec : op.stratoDec, 0, 4);
+    return {
+      before: fmt(maxAmount, sideDec, 2, 2),
+      after: fmt(post, sideDec, 2, 2),
+      receiveHuman: fmt(parsedAmount, op.inbound ? op.extDec : op.stratoDec, 0, 4),
+      maxTransferableRaw,
+      maxTransferableFormatted: maxTransferableRaw,
+    };
+  }, [
+    op.inbound,
+    op.extDec,
+    op.stratoDec,
+    maxAmount,
+    parsedAmount,
+    maxTransferable,
+  ]);
+
+  // Combined loading state
+  const isDataLoading = loadingUsdstBalance || (op.inbound ? externalTokenLoading : isBalanceLoading);
+
+  return {
+    maxAmount,
+    maxTransferable,
+    balancesView,
+    isDataLoading,
+    refetchExternalToken,
+    refetchBalance,
+    parsedAmount,
+    externalTokenLoading,
+    isBalanceLoading,
+  };
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
 const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
-  // Hooks
+  // ============================================================================
+  // HOOKS & CONTEXT
+  // ============================================================================
+
+  // Wagmi hooks
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
   const { writeContractAsync } = useWriteContract();
   const { switchChain } = useSwitchChain();
   const { signTypedDataAsync } = useSignTypedData();
+
+  // UI hooks
   const { toast } = useToast();
+
+  // Context hooks
   const { userAddress } = useUser();
   const { loadingUsdstBalance, usdstBalance, fetchUsdstBalance } = useUserTokens();
   const { handleInput, getMaxTransferable } = useAmountValidation();
-  
+
   const {
     availableNetworks,
     bridgeableTokens,
@@ -70,200 +270,265 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
     useBalance,
   } = useBridgeContext();
 
-  // State
+  // ============================================================================
+  // STATE
+  // ============================================================================
+
   const [amount, setAmount] = useState("");
   const [amountError, setAmountError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [approvalState, setApprovalState] = useState<"idle" | "approving" | "approved">("idle");
-  const [networkError, setNetworkError] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const inFlightRef = useRef(false);
 
+  // ============================================================================
+  // DERIVED STATE
+  // ============================================================================
 
-  // Determine operation characteristics
-  const isInbound = operation === "bridgeWrap" || operation === "bridgeMint";
-  const isMint = operation === "bridgeMint" || operation === "bridgeBurn";
-  const isWrap = operation === "bridgeWrap" || operation === "bridgeUnwrap";
-
-  // Get the current token based on operation
-  const currentToken = isMint ? selectedMintToken : selectedToken;
-  const setCurrentToken = isMint ? setSelectedMintToken : setSelectedToken;
-  const tokenList = isMint ? redeemableTokens : bridgeableTokens;
-
-  // Computed values
-  const selectedNetworkConfig = availableNetworks.find(
-    (n) => n.chainName === selectedNetwork,
-  );
-  const activeChainId = selectedNetworkConfig?.chainId;
-  const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
-  const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = currentToken?.externalToken === NATIVE_TOKEN_ADDRESS;
-
-  // Balance hooks
-  const {
-    data: nativeBalance,
-    refetch: refetchNative,
-    isError: nativeError,
-    isLoading: nativeLoading,
-  } = useWagmiBalance({
-    address: address as `0x${string}`,
-    chainId: expectedChainId,
+  // Bridge direction logic
+  const op = useBridgeDirection(operation, selectedNetwork, {
+    selectedMintToken,
+    selectedToken,
+    setSelectedMintToken,
+    setSelectedToken,
+    redeemableTokens,
+    bridgeableTokens,
+    availableNetworks,
   });
 
+  // Pure labels - computed as locals near render
+  const symbolIn = op.inbound ? op.token?.externalSymbol : op.token?.stratoTokenSymbol;
+  const symbolOut = op.inbound
+    ? op.mint
+      ? "USDST"
+      : op.token?.stratoTokenSymbol
+    : op.token?.externalSymbol;
+  const tokenAddrIn = op.inbound ? op.token?.externalToken : op.token?.stratoToken;
+  const feeUSDST = op.inbound ? "0" : BRIDGE_OUT_FEE;
+  const targetLabel = op.inbound ? "STRATO" : selectedNetwork;
+
+  // Balance logic
   const {
-    data: tokenBalanceData,
-    refetch: refetchToken,
-    isError: tokenError,
-    isLoading: tokenLoading,
-  } = useWagmiBalance({
-    address: address as `0x${string}`,
-    token: currentToken?.externalToken as `0x${string}`,
-    chainId: expectedChainId,
+    maxAmount,
+    maxTransferable,
+    balancesView,
+    isDataLoading,
+    refetchExternalToken,
+    refetchBalance,
+    parsedAmount,
+    externalTokenLoading,
+    isBalanceLoading,
+  } = useBalances({
+    op,
+    amount,
+    operation,
+    tokenAddrIn,
+    feeUSDST,
+    usdstBalance,
+    usdstAddress,
+    getMaxTransferable,
+    loadingUsdstBalance,
+    address,
+    useBalance,
   });
 
-  // BridgeOut balance hook (for unwrap operations)
-  const {
-    data: balanceData,
-    isLoading: isBalanceLoading,
-    refetch: refetchBalance,
-  } = useBalance(currentToken?.stratoToken || null);
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
 
-  // Computed values
-  const maxAmount = isInbound 
-    ? (currentToken ? BigInt(safeParseUnits(tokenBalanceData?.formatted || "0", 18).toString()) : 0n)
-    : operation === "bridgeBurn"
-      ? BigInt(usdstBalance)
-      : (currentToken ? BigInt(safeParseUnits(balanceData?.formatted || "0", 18).toString()) : 0n);
-  
-  const maxTransferable = useMemo(() => {
-    if (!currentToken) return 0n;
-    const tokenAddress = isInbound 
-      ? currentToken.externalToken 
-      : operation === "bridgeBurn" 
-        ? usdstAddress 
-        : currentToken.stratoToken;
-    const fee = isInbound ? "0" : BRIDGE_OUT_FEE;
-    return getMaxTransferable(maxAmount, tokenAddress, fee);
-  }, [currentToken, maxAmount, getMaxTransferable, isInbound, operation]);
+  // Button text with early returns
+  const buttonText = (() => {
+    if (isLoading)
+      return op.inbound
+        ? op.mint
+          ? "Minting..."
+          : "Bridging..."
+        : op.mint
+          ? "Burning..."
+          : "Unwrapping...";
+    if (!isConnected) return "Connect Wallet";
+    if (!selectedNetwork) return "Select Network";
+    if (!op.token) return "Select Asset";
+    if (!amount) return "Enter Amount";
+    if (op.inbound && chainId !== op.expChainId)
+      return `Switch to ${selectedNetwork}`;
+    return op.inbound
+      ? op.mint
+        ? "Get USDST"
+        : "Bridge Assets"
+      : op.mint
+        ? "Burn USDST"
+        : "Bridge Assets";
+  })();
 
-  const isDataLoading = loadingUsdstBalance || (isInbound ? tokenLoading : isBalanceLoading);
+  // Action button disabled state
+  const actionDisabled =
+    isLoading ||
+    !amount ||
+    !op.token ||
+    !isConnected ||
+    (op.inbound ? chainId !== op.expChainId : !selectedNetwork) ||
+    !!amountError ||
+    isDataLoading;
 
-  // Functions
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const symbol = isInbound 
-      ? currentToken?.externalSymbol || ""
-      : currentToken?.stratoTokenSymbol || "";
-    const tokenAddress = isInbound
-      ? currentToken?.externalToken || ""
-      : currentToken?.stratoToken || "";
-    const fee = isInbound ? "0" : BRIDGE_OUT_FEE;
+  // Voucher calculation (cheap operation - no memoization needed)
+  const vouchers = (() => {
+    const feeWei = safeParseUnits(feeUSDST ?? "0", DECIMALS);
+    return ((feeWei * 100n) / 10n ** BigInt(DECIMALS)).toString();
+  })();
 
-    handleInput(
-      value,
-      setAmount,
-      setAmountError,
-      {
+  // ============================================================================
+  // VALIDATION & INPUT HANDLING
+  // ============================================================================
+
+  // Single validation callback - eliminates repeated handleInput calls
+  const validateAmount = useCallback(
+    (v: string) =>
+      handleInput(v, setAmount, setAmountError, {
         maxAmount,
-        symbol,
-        tokenAddress,
-        transactionFee: fee
-      }
-    );
-  };
+        symbol: symbolIn || "",
+        tokenAddress: tokenAddrIn || "",
+        transactionFee: feeUSDST,
+        decimals: op.inbound ? op.extDec : op.stratoDec, // Pass token decimals for proper parsing
+      }),
+    [handleInput, maxAmount, symbolIn, tokenAddrIn, feeUSDST, op.inbound, op.extDec, op.stratoDec],
+  );
 
+  // Debounced input handler
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = e.target.value;
+    setAmount(v);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => validateAmount(v), 120);
+  }, [validateAmount]);
 
-  // BridgeIn specific functions
-  const preflight = (): BridgeContext => {
-    if (!currentToken || !selectedNetworkConfig || !userAddress || !address) {
-      throw new Error("Missing configuration");
-    }
+  // ============================================================================
+  // BRIDGE IN FUNCTIONS
+  // ============================================================================
+
+  // Preflight validation with specific error messages
+  const preflight = useCallback((): BridgeContext => {
+    // Guard once with exact missing fields
+    if (!op.token) throw new Error("Missing token selection");
+    if (!op.netCfg) throw new Error("Missing network configuration");
+    if (!userAddress) throw new Error("Missing user address");
+    if (!address) throw new Error("Missing wallet address");
+    if (!selectedNetwork) throw new Error("Missing selected network");
+    if (!amount) throw new Error("Missing amount");
+    if (parsedAmount === 0n) throw new Error("Amount must be greater than zero");
+
+    // Type normalization - ensure all values are properly typed
     return {
-      selectedToken: currentToken,
+      selectedToken: op.token,
       selectedNetwork: selectedNetwork,
       amount,
       userAddress,
       address: address as `0x${string}`,
-      activeChainId: selectedNetworkConfig.chainId,
-      depositRouter: selectedNetworkConfig.depositRouter,
-      depositAmount: safeParseUnits(amount, parseInt(currentToken.externalDecimals || "18")),
-      isNative: isNativeToken,
+      activeChainId: op.netCfg.chainId,
+      depositRouter: op.netCfg.depositRouter,
+      depositAmount: parsedAmount,
+      isNative: op.native,
+      mintUSDST: op.mint,
     };
-  };
+  }, [
+    op.token,
+    op.netCfg,
+    userAddress,
+    address,
+    selectedNetwork,
+    amount,
+    parsedAmount,
+    op.native,
+    op.mint,
+  ]);
 
-  const validateOnChain = async (ctx: BridgeContext) => {
+  // On-chain validation
+  const validateOnChain = useCallback(async (ctx: BridgeContext) => {
     const validation = await bridgeContractService.validateRouterContract({
       depositRouterAddress: ctx.depositRouter,
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
       tokenAddress: ctx.selectedToken.externalToken,
-      mint: isMint,
+      mint: ctx.mintUSDST,
     });
     if (!validation.isValid) {
       throw new Error(validation.error || "Validation failed");
     }
-  };
+  }, []);
 
-  const executeDeposit = async (ctx: BridgeContext): Promise<`0x${string}`> => {
-    if (ctx.isNative) {
-      return await bridgeContractService.executeETHDepositTransaction({
-        web3Context: {
-          address: ctx.address as `0x${string}`,
-          writeContractAsync,
-        },
-        amount: ctx.amount,
-        stratoAddress: ctx.userAddress,
-        depositRouter: ctx.depositRouter,
-        chainId: ctx.activeChainId,
-      });
-    } else {
-      return await bridgeContractService.executeDepositTransaction({
-        web3Context: {
-          address: ctx.address as `0x${string}`,
-          signTypedDataAsync,
-          writeContractAsync,
-        },
-        tokenInfo: {
-          externalToken: ctx.selectedToken.externalToken,
-          externalDecimals: ctx.selectedToken.externalDecimals,
-        },
-        amount: ctx.amount,
-        stratoAddress: ctx.userAddress,
-        depositRouter: ctx.depositRouter,
-        chainId: ctx.activeChainId,
-        mintUSDST: isMint,
-      });
-    }
-  };
+  // Transaction execution
+  const executeDeposit = useCallback(
+    async (ctx: BridgeContext): Promise<`0x${string}`> => {
+      if (ctx.isNative) {
+        return await bridgeContractService.executeETHDepositTransaction({
+          web3Context: {
+            address: ctx.address as `0x${string}`,
+            writeContractAsync,
+          },
+          amount: ctx.amount,
+          stratoAddress: ctx.userAddress,
+          depositRouter: ctx.depositRouter,
+          chainId: ctx.activeChainId,
+        });
+      } else {
+        return await bridgeContractService.executeDepositTransaction({
+          web3Context: {
+            address: ctx.address as `0x${string}`,
+            signTypedDataAsync,
+            writeContractAsync,
+          },
+          tokenInfo: {
+            externalToken: ctx.selectedToken.externalToken,
+            externalDecimals: ctx.selectedToken.externalDecimals,
+          },
+          amount: ctx.amount,
+          stratoAddress: ctx.userAddress,
+          depositRouter: ctx.depositRouter,
+          chainId: ctx.activeChainId,
+          mintUSDST: ctx.mintUSDST,
+        });
+      }
+    },
+    [writeContractAsync, signTypedDataAsync],
+  );
 
-  const waitAndFinalize = async (ctx: BridgeContext, txHash: `0x${string}`) => {
-    const success = await bridgeContractService.waitForTransaction(
+  // Bridge pipeline - combines all steps into one async function
+  const runBridgeIn = useCallback(async () => {
+    const ctx = preflight(); // throws if misconfigured
+    await validateOnChain(ctx); // throws if invalid
+    const txHash = await executeDeposit(ctx); // throws if rejected
+    const ok = await bridgeContractService.waitForTransaction(
       txHash,
       ctx.activeChainId,
     );
-    if (!success) {
-      throw new Error("Transaction reverted");
-    }
-  };
+    if (!ok) throw new Error("Transaction reverted");
+    return { ctx, txHash };
+  }, [preflight, validateOnChain, executeDeposit]);
 
-  const handleBridgeIn = async () => {
+  // Main bridge in handler with comprehensive error handling
+  const handleBridgeIn = useCallback(async () => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     setIsLoading(true);
     toast({ title: "Preparing transaction...", description: "Please wait" });
 
     try {
-      const ctx = preflight();
-      await validateOnChain(ctx);
-      const txHash = await executeDeposit(ctx);
+      const { ctx, txHash } = await runBridgeIn();
 
       const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
+      const successMessage = op.mint
+        ? "USDST minted successfully! Your tokens are now available."
+        : "Bridge initiated successfully! The relayer will process it shortly.";
+
       toast({
-        title: "Transaction Sent",
+        title: op.mint ? "USDST Minted" : "Bridge Initiated",
         description: (
           <div>
-            <p>Transaction submitted: {formatTxHash(txHash)}</p>
+            <p>{successMessage}</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Transaction: {formatTxHash(txHash)}
+            </p>
             <a
               href={explorerUrl}
               target="_blank"
@@ -276,41 +541,65 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
         ),
       });
 
-      await waitAndFinalize(ctx, txHash);
-
-      const successMessage = isMint 
-        ? "USDST minted successfully! Your tokens are now available."
-        : "Bridge initiated successfully! The relayer will process it shortly.";
-
-      toast({
-        title: isMint ? "USDST Minted" : "Bridge Initiated",
-        description: successMessage,
-      });
-
       setAmount("");
       setAmountError("");
 
-      // Refresh balances
-      if (ctx.isNative) {
-        refetchNative();
-      } else {
-        refetchToken();
-      }
-
-      // Refresh USDST balance after all operations since transaction fees are paid in USDST
-      await fetchUsdstBalance(userAddress);
+      // Refresh external balance and USDST balance in parallel
+      await Promise.all([
+        refetchExternalToken(),
+        fetchUsdstBalance(userAddress),
+      ]);
     } catch (error: any) {
-      // Error handling is done by global axios interceptor
+      console.error("Bridge operation failed:", error);
+      
+      // Provide user-friendly error messages based on error type
+      let errorTitle = "Transaction Failed";
+      let errorDescription = "An unexpected error occurred. Please try again.";
+      
+      if (error?.message?.includes("Missing")) {
+        errorTitle = "Configuration Error";
+        errorDescription = error.message;
+      } else if (error?.message?.includes("insufficient funds") || error?.message?.includes("balance")) {
+        errorTitle = "Insufficient Balance";
+        errorDescription = "You don't have enough tokens to complete this transaction.";
+      } else if (error?.message?.includes("rejected") || error?.message?.includes("denied")) {
+        errorTitle = "Transaction Rejected";
+        errorDescription = "You rejected the transaction. Please try again if you want to proceed.";
+      } else if (error?.message?.includes("reverted") || error?.message?.includes("failed")) {
+        errorTitle = "Transaction Failed";
+        errorDescription = "The transaction failed on-chain. Please check your balance and try again.";
+      } else if (error?.message?.includes("network") || error?.message?.includes("chain")) {
+        errorTitle = "Network Error";
+        errorDescription = "Please check your network connection and try again.";
+      } else if (error?.message) {
+        errorDescription = error.message;
+      }
+      
+      toast({
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+      });
     } finally {
       inFlightRef.current = false;
       setIsLoading(false);
-      setApprovalState("idle");
     }
-  };
+  }, [
+    runBridgeIn,
+    op.mint,
+    toast,
+    refetchExternalToken,
+    fetchUsdstBalance,
+    userAddress,
+  ]);
 
-  // BridgeOut specific functions
-  const showConfirmModal = () => {
-    if (!currentToken || !address || !selectedNetwork) {
+  // ============================================================================
+  // BRIDGE OUT FUNCTIONS
+  // ============================================================================
+
+  // Show confirmation modal
+  const showConfirmModal = useCallback(() => {
+    if (!op.token || !address || !selectedNetwork) {
       toast({
         title: "Error",
         description: "Invalid configuration",
@@ -318,22 +607,16 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       });
       return;
     }
-    if (!selectedNetwork) {
-      toast({
-        title: "Select Network",
-        description: "Please choose a destination network.",
-        variant: "destructive",
-      });
-      return;
-    }
     if (amountError) return;
     setIsModalOpen(true);
-  };
+  }, [op.token, address, selectedNetwork, amountError, toast]);
 
+  // Modal cancel handler
   const handleModalCancel = () => setIsModalOpen(false);
 
-  const handleBridgeOut = async () => {
-    if (!currentToken || !address || !selectedNetwork) return;
+  // Bridge out handler
+  const handleBridgeOut = useCallback(async () => {
+    if (!op.token || !address || !selectedNetwork) return;
     setIsModalOpen(false);
     setIsLoading(true);
     toast({
@@ -342,32 +625,26 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
     });
 
     try {
-      const amountInSmallestUnit = safeParseUnits(amount || "0", 18).toString();
-      const selectedNetworkConfig = availableNetworks.find(
-        (n) => n.chainName === selectedNetwork,
-      );
-      const externalChainId = selectedNetworkConfig?.chainId || "";
+      const amountInSmallestUnit = parsedAmount.toString();
+      const externalChainId = op.netCfg?.chainId || "";
 
       const apiCall = operation === "bridgeBurn" ? redeemOutAPI : bridgeOutAPI;
       const response = await apiCall({
         stratoTokenAmount: amountInSmallestUnit,
         externalRecipient: address,
-        stratoToken: currentToken.stratoToken,
+        stratoToken: op.token.stratoToken,
         externalChainId: String(externalChainId),
       });
 
       if (response?.success) {
-        const operationName = isMint ? "burned" : "bridged";
-        const tokenSymbol = currentToken.stratoTokenSymbol;
+        const operationName = op.mint ? "burned" : "bridged";
+        const tokenSymbol = op.token.stratoTokenSymbol;
         toast({
           title: "Transaction Proposed Successfully",
           description: `Your tokens have been ${operationName} and ${amount} ${tokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
-        await refetchBalance();
-        
-        // Refresh USDST balance after all operations since transaction fees are paid in USDST
-        await fetchUsdstBalance(userAddress);
-        
+        await Promise.all([refetchBalance(), fetchUsdstBalance(userAddress)]);
+
         setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
@@ -377,74 +654,67 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [
+    op.token,
+    address,
+    selectedNetwork,
+    parsedAmount,
+    op.netCfg,
+    operation,
+    op.mint,
+    amount,
+    toast,
+    refetchBalance,
+    fetchUsdstBalance,
+    userAddress,
+  ]);
 
-  // Effects
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+
+  // Reset form when token or network changes
   useEffect(() => {
     setAmount("");
     setAmountError("");
-    setApprovalState("idle");
-  }, [currentToken, selectedNetworkConfig, isInbound]);
+  }, [op.token, op.netCfg, op.inbound]);
 
+  // Auto-switch network for inbound operations
   useEffect(() => {
-    const handleNetworkSwitch = async () => {
-      if (
-        isConnected &&
-        selectedNetwork &&
-        expectedChainId &&
-        chainId &&
-        chainId !== expectedChainId
-      ) {
-        try {
-          await switchChain({ chainId: expectedChainId });
-        } catch (error) {
-          setNetworkError("Failed to switch network");
-        }
-      }
-    };
-
-    handleNetworkSwitch();
-  }, [isConnected, selectedNetwork, expectedChainId, chainId, switchChain]);
-
+    if (!isConnected || !selectedNetwork || !op.expChainId || !chainId) return;
+    if (chainId === op.expChainId || inFlightRef.current) return;
+    try {
+      switchChain({ chainId: op.expChainId });
+    } catch (error) {
+      toast({
+        title: "Network switch failed",
+        description: `Switch to ${selectedNetwork}`,
+        variant: "destructive",
+      });
+    }
+  }, [
+    isConnected,
+    selectedNetwork,
+    op.expChainId,
+    chainId,
+    switchChain,
+    toast,
+  ]);
 
   // Load networks and tokens on mount
   useEffect(() => {
     loadNetworksAndTokens();
-    if (isMint && selectedNetworkConfig) {
-      fetchRedeemableTokens(selectedNetworkConfig.chainId);
-    }
-  }, [loadNetworksAndTokens, fetchRedeemableTokens, isMint, selectedNetworkConfig]);
+  }, [loadNetworksAndTokens]);
 
-  // Get operation display names
-  const getOperationName = () => {
-    switch (operation) {
-      case "bridgeWrap": return "Bridge Wrap";
-      case "bridgeUnwrap": return "Bridge Unwrap";
-      case "bridgeMint": return "Bridge Mint";
-      case "bridgeBurn": return "Bridge Burn";
-      default: return "Bridge Operation";
-    }
-  };
+  // Fetch redeemable tokens for mint operations
+  useEffect(() => {
+    if (op.mint && op.netCfg?.chainId) fetchRedeemableTokens(op.netCfg.chainId);
+  }, [op.mint, op.netCfg?.chainId, fetchRedeemableTokens]);
 
-  const getButtonText = () => {
-    if (isLoading) {
-      if (approvalState === "approving") return "Approving...";
-      if (approvalState === "approved") return isInbound ? (isMint ? "Minting..." : "Bridging...") : (isMint ? "Burning..." : "Unwrapping...");
-      return "Processing...";
-    }
-    if (!isConnected) return "Connect Wallet";
-    if (isConnected && !selectedNetwork) return "Select Network";
-    if (isConnected && selectedNetwork && !currentToken) return "Select Asset";
-    if (isConnected && currentToken && !amount) return "Enter Amount";
-    if (isConnected && currentToken && amount && !isCorrectNetwork) return `Switch to ${selectedNetwork}`;
-    if (isConnected && currentToken && amount && isCorrectNetwork) {
-      if (isInbound) return isMint ? "Get USDST" : "Bridge Assets";
-      return isMint ? "Burn USDST" : "Bridge Assets";
-    }
-    return getOperationName();
-  };
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
-  // Render
   return (
     <div className="space-y-6">
       <BridgeWalletStatus />
@@ -453,12 +723,12 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="from">From Network</Label>
-          {isInbound ? (
+          {op.inbound ? (
             <Select
               value={selectedNetwork || ""}
               onValueChange={(v) => {
                 setSelectedNetwork(v);
-                setCurrentToken(null);
+                op.setToken(null);
               }}
             >
               <SelectTrigger>
@@ -484,7 +754,7 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
 
         <div className="flex-1 space-y-1.5">
           <Label htmlFor="to">To Network</Label>
-          {isInbound ? (
+          {op.inbound ? (
             <Input value="STRATO" disabled className="bg-gray-50" />
           ) : (
             <Select
@@ -510,39 +780,40 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       <div>
         <Label htmlFor="asset">Select Asset</Label>
         <Select
-          value={currentToken?.externalSymbol || ""}
+          value={op.token?.externalToken || ""}
           onValueChange={(v) => {
-            const newToken = tokenList.find((t) => t.externalSymbol === v) || null;
-            setCurrentToken(newToken);
+            const newToken = op.list.find((t) => t.externalToken === v) || null;
+            op.setToken(newToken);
           }}
-          disabled={tokenList.length === 0}
+          disabled={op.list.length === 0}
         >
           <SelectTrigger id="from-token">
             <SelectValue>
-              {currentToken
-                ? isInbound 
-                  ? currentToken.externalSymbol
-                  : currentToken.stratoTokenSymbol
+              {op.token
+                ? op.inbound
+                  ? op.token.externalSymbol
+                  : op.token.stratoTokenSymbol
                 : "Select asset"}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            {tokenList.map((t) => (
-              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
-                {isInbound ? t.externalSymbol : t.stratoTokenSymbol}
+            {op.list.map((t) => (
+              <SelectItem key={t.externalToken} value={t.externalToken}>
+                {op.inbound ? t.externalSymbol : t.stratoTokenSymbol}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        
         {/* You will receive */}
-        {currentToken && (
+        {op.token && (
           <div className="text-sm text-gray-600 mt-1">
-            You will receive {isInbound 
-              ? isMint 
-                ? `USDST on Mercata network`
-                : `${currentToken.stratoTokenSymbol} on Mercata network`
-              : `${currentToken.externalSymbol} on ${selectedNetwork || "selected"} network`
-            }
+            You will receive{" "}
+            {op.inbound
+              ? op.mint
+                ? `USDST on ${targetLabel}`
+                : `${op.token.stratoTokenSymbol} on ${targetLabel}`
+              : `${op.token.externalSymbol} on ${targetLabel || "selected"} network`}
           </div>
         )}
       </div>
@@ -551,137 +822,92 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       <div className="space-y-1.5">
         <label className="text-sm text-gray-600">
           {operation === "bridgeBurn" ? "Amount (USDST to withdraw)" : "Amount"}
-          {currentToken && (
-            <>{" ("}
+          {op.token && (
+            <>
+              {" ("}
               <button
                 type="button"
                 onClick={() => {
-                  const maxFormatted = formatWeiAmount(maxTransferable.toString());
-                  
-                  const symbol = isInbound 
-                    ? currentToken?.externalSymbol || ""
-                    : currentToken?.stratoTokenSymbol || "";
-                  const tokenAddress = isInbound
-                    ? currentToken?.externalToken || ""
-                    : currentToken?.stratoToken || "";
-                  const fee = isInbound ? "0" : BRIDGE_OUT_FEE;
-
-                  handleInput(
-                    maxFormatted,
-                    setAmount,
-                    setAmountError,
-                    {
-                      maxAmount,
-                      symbol,
-                      tokenAddress,
-                      transactionFee: fee
-                    }
-                  );
+                  setAmount(balancesView.maxTransferableRaw);
+                  setAmountError("");
                 }}
-                disabled={!isConnected || !currentToken || maxTransferable === 0n}
+                disabled={!isConnected || !op.token || maxTransferable === 0n}
                 className={`font-medium focus:outline-none ${
-                  !isConnected || !currentToken || maxTransferable === 0n
-                    ? "text-gray-400 cursor-not-allowed" 
+                  !isConnected || !op.token || maxTransferable === 0n
+                    ? "text-gray-400 cursor-not-allowed"
                     : "text-blue-600 hover:underline"
                 }`}
               >
-                Max: {maxTransferable === 0n ? "0" : formatBalance(maxTransferable, undefined, 18, 0, 4)}
+                Max: {balancesView.maxTransferableFormatted}
               </button>
-              {")"}</>
+              {")"}
+            </>
           )}
         </label>
         <Input
           id="amount"
           type="text"
           inputMode="decimal"
-          pattern="[0-9]*\.?[0-9]*"
           placeholder={
-            isInbound
+            op.inbound
               ? isConnected
-                ? tokenLoading
+                ? externalTokenLoading
                   ? "Loading..."
                   : "0.00"
                 : "Connect wallet"
-              : isConnected ? "0.00" : "Connect wallet to enter amount"
+              : isConnected
+                ? "0.00"
+                : "Connect wallet to enter amount"
           }
           className={amountError ? "border-red-500" : ""}
           value={addCommasToInput(amount)}
           onChange={handleAmountChange}
-          disabled={!isConnected || (isInbound ? tokenLoading : isBalanceLoading)}
+          disabled={
+            !isConnected ||
+            (op.inbound ? externalTokenLoading : isBalanceLoading)
+          }
         />
-        
-        {amountError && (
-          <p className="text-sm text-red-500">{amountError}</p>
-        )}
-        
+
+        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+
         {/* Percentage Buttons */}
-        {currentToken && (
+        {op.token && (
           <PercentageButtons
             value={amount}
-            maxValue={formatBalance(maxTransferable, undefined, 18, 0, 4)}
-            onChange={(val) => {
-              const symbol = isInbound 
-                ? currentToken?.externalSymbol || ""
-                : currentToken?.stratoTokenSymbol || "";
-              const tokenAddress = isInbound
-                ? currentToken?.externalToken || ""
-                : currentToken?.stratoToken || "";
-              const fee = isInbound ? "0" : BRIDGE_OUT_FEE;
-
-              handleInput(
-                val,
-                setAmount,
-                setAmountError,
-                {
-                  maxAmount,
-                  symbol,
-                  tokenAddress,
-                  transactionFee: fee
-                }
-              );
-            }}
+            maxValue={balancesView.maxTransferableRaw}
+            onChange={validateAmount}
             className="mt-2"
           />
         )}
       </div>
 
-
-
       {/* Transaction Info */}
-      {currentToken && (
+      {op.token && (
         <div className="bg-gray-50 p-4 rounded-lg space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">Transaction Fee</span>
             <span className="font-medium">
-              {isInbound ? "N/A" : `${BRIDGE_OUT_FEE} USDST (${parseFloat(BRIDGE_OUT_FEE) * 100} vouchers)`}
+              {op.inbound
+                ? "N/A"
+                : `${feeUSDST} USDST (${vouchers} vouchers)`}
             </span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-600">
-              {operation === "bridgeBurn" 
-                ? "USDST" 
-                : isInbound 
-                  ? currentToken.externalSymbol 
-                  : currentToken.stratoTokenSymbol} Balance
+              {operation === "bridgeBurn" ? "USDST" : symbolIn} Balance
             </span>
             <span className="font-medium">
-              {formatBalance(maxAmount, undefined, 18, 2, 2)} → {formatBalance(maxAmount - BigInt(safeParseUnits(amount || "0", 18)), undefined, 18, 2, 2)} {isInbound ? `on ${selectedNetwork || "external chain"}` : "on STRATO"}
+              {`${balancesView.before} → ${balancesView.after}`}{" "}
+              {op.inbound
+                ? `on ${selectedNetwork || "external chain"}`
+                : "on STRATO"}
             </span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">{isInbound 
-              ? isMint 
-                ? "USDST" 
-                : currentToken.stratoTokenSymbol
-              : currentToken.externalSymbol
-            } Balance</span>
+            <span className="text-gray-600">{symbolOut} Balance</span>
             <span className="font-medium">
-              {amount || "0.00"} {isInbound 
-                ? isMint 
-                  ? "USDST" 
-                  : currentToken.stratoTokenSymbol
-                : currentToken.externalSymbol
-              } {isInbound ? "to STRATO" : `to ${selectedNetwork || "selected"}`}
+              {amount || "0.00"} {symbolOut}{" "}
+              {op.inbound ? "on STRATO" : `on ${selectedNetwork || "selected"}`}
             </span>
           </div>
         </div>
@@ -690,29 +916,16 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       {/* Action Button */}
       <div className="flex justify-end">
         <Button
-          onClick={isInbound ? handleBridgeIn : showConfirmModal}
-          disabled={
-            isLoading ||
-            !amount ||
-            !currentToken ||
-            !isConnected ||
-            (isInbound ? !isCorrectNetwork : !selectedNetwork) ||
-            !!amountError ||
-            isDataLoading
-          }
+          onClick={op.inbound ? handleBridgeIn : showConfirmModal}
+          disabled={actionDisabled}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {getButtonText()}
+          {buttonText}
         </Button>
       </div>
 
-      {/* Network Error */}
-      {networkError && (
-        <p className="text-sm text-red-500">{networkError}</p>
-      )}
-
       {/* BridgeOut Confirmation Modal */}
-      {!isInbound && (
+      {!op.inbound && (
         <Modal
           title="Confirm Bridge Transaction"
           open={isModalOpen}
@@ -729,21 +942,21 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
                 <p>From: STRATO</p>
                 <p>To: {selectedNetwork || "Not selected"}</p>
                 <p>
-                  Amount: {currentToken ? formatBalance(safeParseUnits(amount, 18), undefined, 18, 0, 4) : amount}{" "}
-                  {currentToken?.stratoTokenSymbol}
+                  Amount: {op.token ? balancesView.receiveHuman : amount}{" "}
+                  {op.token?.stratoTokenSymbol}
                 </p>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Transaction Fee</span>
-                  <span className="font-medium">{BRIDGE_OUT_FEE} USDST ({parseFloat(BRIDGE_OUT_FEE) * 100} vouchers)</span>
+                  <span className="font-medium">
+                    {feeUSDST} USDST ({vouchers} vouchers)
+                  </span>
                 </div>
-                {currentToken?.externalSymbol && (
+                {symbolOut && (
                   <p className="text-blue-600">
                     You will receive{" "}
-                    {currentToken
-                      ? formatBalance(safeParseUnits(amount, 18), undefined, 18, 0, 4)
-                      : amount}{" "}
-                    {currentToken?.externalSymbol} on{" "}
-                    {selectedNetwork || "selected"} network
+                    {op.token ? balancesView.receiveHuman : amount}{" "}
+                    {symbolOut} on {targetLabel || "selected"}{" "}
+                    network
                   </p>
                 )}
               </div>

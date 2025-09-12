@@ -196,3 +196,13 @@ export const formatCurrency = (value: string | number): string => {
     maximumFractionDigits: 6,
   });
 };
+
+/**
+ * Simplified formatting helper for bigint values
+ * @param v - The bigint value to format
+ * @param dec - Number of decimals (default: 18)
+ * @param min - Minimum decimal places (default: 2)
+ * @param max - Maximum decimal places (default: 6)
+ * @returns Formatted string
+ */
+export const fmt = (v: bigint, dec = 18, min = 2, max = 6) => formatBalance(v, undefined, dec, min, max);

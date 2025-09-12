@@ -236,4 +236,5 @@ export interface BridgeContext {
   depositRouter: string;
   depositAmount: bigint;
   isNative: boolean;
+  mintUSDST: boolean;
 }

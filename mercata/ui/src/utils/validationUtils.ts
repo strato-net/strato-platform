@@ -26,6 +26,7 @@ export interface AmountValidationOptions {
   usdstBalance: bigint;
   minAmount?: bigint;
   allowZero?: boolean;
+  decimals?: number;
 }
 
 export interface AmountValidationResult {
@@ -40,13 +41,17 @@ export const validateAmount = (value: string, o: AmountValidationOptions): Amoun
   if (value.trim() === "") return { isValid: true };
   if (!DECIMAL_PATTERN.test(value)) return { isValid: false, error: "Please enter a valid number" };
 
+  // Use provided decimals or default to 18
+  const decimals = o.decimals ?? DECIMALS;
+  
   // Check if the decimal part is too long
   const decimalPart = value.includes('.') ? value.split('.')[1] : '';
-  if (decimalPart.length > DECIMALS) {
-    return { isValid: false, error: `Maximum ${DECIMALS} decimal places allowed` };
+  if (decimalPart.length > decimals) {
+    return { isValid: false, error: `Maximum ${decimals} decimal places allowed` };
   }
 
-  const amt = toWei(value);
+  // Use safeParseUnits with the correct decimals
+  const amt = safeParseUnits(value, decimals);
   if (amt === 0n && !o.allowZero && value !== "0" && value !== "0.") {
     return { isValid: false, error: "Amount must be greater than 0" };
   }
