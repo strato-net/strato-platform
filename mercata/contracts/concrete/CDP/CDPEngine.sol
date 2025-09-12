@@ -3,7 +3,7 @@
 // - Accrues stability fee via rateAccumulator (RAY); all debt reads use scaledDebt * rate / RAY
 // - Liquidation with direct seize (no auctions)
 // - Fees: split between FeeCollector and CDPReserve (feeToReserveBps)
-// - FIFO juniors queue lives in Engine; owner pays them out using funds held in CDPReserve
+// - Pro-rata juniors: splits USDST from reserve across all active notes proportionally to their remaining caps
 
 import "./CDPVault.sol";
 import "../Tokens/Token.sol";
@@ -12,7 +12,6 @@ import "../Lending/PriceOracle.sol";
 import "./CDPRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "./CDPReserve.sol";
-import {DoubleEndedQueue} from "../../abstract/ERC20/utils/DoubleEndedQueue.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -64,18 +63,16 @@ contract record CDPEngine is Ownable {
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
 
-    // ─────────────── FIFO Juniors ───────────────
-    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
-
-    struct JuniorNote { 
-      address owner; 
-      uint128 capUSD; 
-      uint128 repaidUSD; 
+    // ─────────────── Pro-rata Juniors ───────────────
+    struct JuniorNote {
+        address owner;
+        uint128 capUSD;     // fixed at creation (principal + premium)
+        uint128 repaidUSD;  // increases as payouts occur
     }
-
-    DoubleEndedQueue.Bytes32Deque private _jQueue;
-    mapping(uint256 => JuniorNote) record private _jNotes;
-    uint256 private _jNextId;
+    mapping(uint256 => JuniorNote) record private _jNotes;  // id => note
+    uint256[] private _jActive;                              // active note ids
+    uint256 private _jNextId;                                // incremental id
+    uint256 private _totalRemainingCap;                      // sum of (capUSD - repaidUSD) over all active notes
 
     event JuniorEnqueued(uint indexed id, address indexed owner, uint capUSD);
     event JuniorPaid(uint indexed id, address indexed owner, uint paidUSD, uint remainingUSD);
@@ -223,50 +220,86 @@ contract record CDPEngine is Ownable {
         emit JuniorWindowToggled(open);
     }
 
-    /// @notice Owner pays juniors FIFO using funds held in CDPReserve.
-    /// @param budgetUSD Max USDST to spend from reserve this call.
-    function payJuniors(uint256 budgetUSD) external onlyOwner returns (uint256 spentUSD) {
+    /// @notice Pro-rata payout: splits `budgetUSD` across ALL active notes proportionally to their remaining caps.
+    /// @param budgetUSD  USDST to distribute from reserve this call (capped by reserve balance).
+    /// @param maxSweeps  Optional gas guard: max active notes to sweep for cleanup (0 = sweep all).
+    function payJuniorsProRata(uint256 budgetUSD, uint256 maxSweeps)
+        external
+        onlyOwner
+        returns (uint256 spentUSD)
+    {
         if (budgetUSD == 0) return 0;
-
-        // Limit by actual reserve balance
         uint256 bal = registry.cdpReserve().balance();
         if (bal == 0) return 0;
         if (budgetUSD > bal) budgetUSD = bal;
 
-        uint256 budget = budgetUSD;
+        uint256 n = _jActive.length;
+        if (n == 0) return 0;
+        require(_totalRemainingCap > 0, "junior: nothing owed");
 
-        while (budget > 0 && !_jQueue.empty()) {
-            uint256 id = uint256(_jQueue.front());
-            JuniorNote storage n = _jNotes[id];
+        uint256 remainingBudget = budgetUSD;
 
-            // Defensive cleanup
-            if (n.capUSD <= n.repaidUSD) {
-                _jQueue.popFront();
-                delete _jNotes[id];
-                emit JuniorClosed(id);
-                continue;
-            }
+        // First pass: pay proportional shares (bounded by current active set)
+        for (uint256 i = 0; i < n && remainingBudget > 0; i++) {
+            uint256 id = _jActive[i];
+            JuniorNote storage note = _jNotes[id];
+            uint256 remainingCap = uint256(note.capUSD) - uint256(note.repaidUSD);
+            if (remainingCap == 0) continue;
 
-            uint256 outstanding = uint256(n.capUSD) - uint256(n.repaidUSD);
-            uint256 pay = budget < outstanding ? budget : outstanding;
+            // base proportional share
+            uint256 share = (budgetUSD * remainingCap) / _totalRemainingCap;
+            if (share > remainingBudget) share = remainingBudget;
+            if (share > remainingCap)    share = remainingCap;
+            if (share == 0) continue; // rounding floor; will be covered by leftovers
 
-            // Pull directly from Reserve to recipient
-            _cdpReserve().transferTo(n.owner, pay);
+            _cdpReserve().transferTo(note.owner, share);
+            note.repaidUSD = uint128(uint256(note.repaidUSD) + share);
+            remainingBudget -= share;
+            spentUSD += share;
+            emit JuniorPaid(id, note.owner, share, uint256(note.capUSD) - uint256(note.repaidUSD));
+        }
 
-            n.repaidUSD = uint128(uint256(n.repaidUSD) + pay);
-            budget -= pay;
-            spentUSD += pay;
-
-            emit JuniorPaid(id, n.owner, pay, uint256(n.capUSD) - uint256(n.repaidUSD));
-
-            if (n.repaidUSD >= n.capUSD) {
-                _jQueue.popFront();
-                delete _jNotes[id];
-                emit JuniorClosed(id);
-            } else {
-                break; // keep FIFO head for next call
+        // If rounding left some dust budget, send it to the first non-closed note.
+        if (remainingBudget > 0) {
+            for (uint256 i = 0; i < n && remainingBudget > 0; i++) {
+                uint256 id = _jActive[i];
+                JuniorNote storage note = _jNotes[id];
+                uint256 remainingCap = uint256(note.capUSD) - uint256(note.repaidUSD);
+                if (remainingCap == 0) continue;
+                uint256 add = remainingBudget > remainingCap ? remainingCap : remainingBudget;
+                if (add == 0) continue;
+                _cdpReserve().transferTo(note.owner, add);
+                note.repaidUSD = uint128(uint256(note.repaidUSD) + add);
+                remainingBudget -= add;
+                spentUSD += add;
+                emit JuniorPaid(id, note.owner, add, uint256(note.capUSD) - uint256(note.repaidUSD));
             }
         }
+
+        // Global remaining cap falls exactly by spentUSD
+        _totalRemainingCap -= spentUSD;
+
+        // Cleanup: remove closed notes (swap-pop). Gas-bounded by maxSweeps (0 = sweep all).
+        uint256 sweeps = (maxSweeps == 0 || maxSweeps > _jActive.length) ? _jActive.length : maxSweeps;
+        for (uint256 i = 0; i < _jActive.length && sweeps > 0; ) {
+            uint256 id = _jActive[i];
+            JuniorNote storage note = _jNotes[id];
+            if (note.repaidUSD >= note.capUSD) {
+                _removeActiveAt(i);
+                delete _jNotes[id];
+                emit JuniorClosed(id);
+                sweeps--;
+                // do not increment i; we just moved the last element here
+            } else {
+                i++;
+            }
+        }
+    }
+
+    function _removeActiveAt(uint256 idx) internal {
+        uint256 last = _jActive.length - 1;
+        if (idx != last) _jActive[idx] = _jActive[last];
+        _jActive.pop();
     }
 
     // ─────────────── User Actions (unchanged except fee routing) ───────────────
@@ -678,7 +711,8 @@ contract record CDPEngine is Ownable {
             capUSD: uint128(capUSD),
             repaidUSD: 0
         });
-        _jQueue.pushBack(bytes32(id));
+        _jActive.push(id);                     // NEW: track as active
+        _totalRemainingCap += capUSD;          // NEW: grow global remainder
         emit JuniorEnqueued(id, msg.sender, capUSD);
     }
 
@@ -831,6 +865,10 @@ contract record CDPEngine is Ownable {
     * @param asset Collateral asset address.
     * @return crWad Collateralization ratio in WAD units.
     */
+    function totalJuniorRemaining() external view returns (uint256) {
+        return _totalRemainingCap;
+    }
+
     function collateralizationRatio(address user, address asset) public view returns (uint crWad) {
         CollateralGlobalState storage s = collateralGlobalStates[asset];
         Vault storage v = vaults[user][asset];
