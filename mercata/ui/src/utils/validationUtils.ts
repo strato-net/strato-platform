@@ -5,7 +5,7 @@ import { DECIMAL_PATTERN, DECIMALS, usdstAddress } from "@/lib/constants";
 import { useUserTokens } from "@/context/UserTokensContext";
 
 export const toWei = (s: string) => safeParseUnits(s, DECIMALS);
-export const fmt = (wei: bigint, sym: string) => `${(Number(wei) / 10 ** DECIMALS).toFixed(6)} ${sym}`;
+export const fmt = (wei: bigint, sym: string) => `${(Number(wei) / 10 ** DECIMALS).toFixed(18)} ${sym}`;
 export const isDecimal = (s: string) => s === "" || s === "." || DECIMAL_PATTERN.test(s);
 
 export const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>, setRecipient: (value: string) => void, setError: (error: string) => void, userAddress: string): void => {
@@ -61,7 +61,7 @@ export const validateAmount = (value: string, o: AmountValidationOptions): Amoun
   if (feeWei > 0n && feeCover < feeWei)
     return { isValid: false, error: `Insufficient USDST + vouchers for transaction fee (${fmt(feeWei, "USDST")} required)` };
 
-  const maxNet = (o.tokenAddress === usdstAddress && feeWei > 0n) ? (feeCover - feeWei) : o.maxAmount;
+  const maxNet = o.maxAmount; // Always use the raw balance, vouchers only pay fees
   if (amt > maxNet)
     return { isValid: false, error: `Insufficient balance. Maximum: ${fmt(maxNet, o.symbol)}` };
 
