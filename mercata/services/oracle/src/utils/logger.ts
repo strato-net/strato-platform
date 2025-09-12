@@ -1,3 +1,5 @@
+import { healthMonitor } from "./healthMonitor";
+
 // Utility function to sanitize sensitive data in log messages
 function sanitizeLogMessage(message: string): string {
     // Remove API keys from URLs
@@ -28,7 +30,12 @@ export function logInfo(context: string, message: string): void {
 export function logError(context: string, error: Error): void {
     const sanitizedMessage = sanitizeLogMessage(error.message);
     const logTime = new Date().toISOString();
-    console.log(`[ERROR] ${logTime} | ${context} | ${sanitizedMessage}`);
+    const error_message = `[ERROR] ${logTime} | ${context} | ${sanitizedMessage}`
+    console.error(error_message);
+    healthMonitor.appendToErrorFile(error_message).catch(err => {
+        console.error("CRITICAL: Failed to write the error log. That is an unexpected server configuration error, so we exit(1):", err);
+        process.exit(1);
+    })
 }
 
 // Feed-specific logging with table format

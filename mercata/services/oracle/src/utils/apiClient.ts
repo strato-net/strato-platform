@@ -53,7 +53,6 @@ async function withRetry<T>(
             
             if (attempt === config.maxAttempts) {
                 logError(config.logPrefix, new Error(`All ${config.maxAttempts} attempts failed. Last error: ${errorMessage}`));
-                healthMonitor.recordFailure(`API call failed after ${config.maxAttempts} attempts: ${errorMessage}`);
                 throw new Error(errorMessage);
             }
             logError(config.logPrefix, new Error(`Attempt ${attempt} failed: ${errorMessage}`));
