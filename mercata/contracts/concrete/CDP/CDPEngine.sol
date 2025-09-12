@@ -55,35 +55,32 @@ contract record CDPEngine is Ownable {
     uint public WAD = 1e18;
     mapping(address => bool) public record isSupportedAsset;
 
-    // ─────────────── Fee split to Reserve & Juniors ───────────────
-    uint256 public feeToReserveBps; // portion of feeUSD minted to CDPReserve (0..10000)
+    // ─────────────── Bad Debt Management ───────────────
+    uint256 public feeToReserveBps; // portion of feeUSD sent to CDPReserve (0..10000)
     uint256 public juniorPremiumBps;   // e.g., 1000 = +10% payout premium over principal burned
-    bool public juniorWindowOpen;      // gate for users to open junior notes
 
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
 
-    // ─── Pro-rata juniors via global index ───
-    // index units: RAY (1e27). Tracks cumulative USD paid per 1 USD of outstanding junior.
-    uint256 public juniorIndex;                 // starts at 1e27
-    uint256 public totalJuniorOutstandingUSD;   // sum over notes of (capUSD - repaidUSD)
-    
-    // how much of realized stability fees is allocated to juniors (before reserve/collector split)
-    uint256 public juniorSliceBps;              // 0..10000
-    
+    // ─── Pro-rata juniors via global index fed by Reserve inflows ───
+    // juniorIndex is RAY (1e27) and means: cumulative USD distributed per 1 USD of outstanding cap.
+    uint256 public juniorIndex;                   // init lazily to 1e27
+    uint256 public totalJuniorOutstandingUSD;     // sum of all (capUSD - repaidUSD)
+    uint256 private reserveAccountedUSD;          // last Reserve balance accounted into index
+    uint256 private juniorCarryUSD;               // unindexed USD remainder from rounding
+
     struct JuniorNote {
         address owner;
-        uint256 capUSD;        // fixed (principal + premium)
-        uint256 repaidUSD;     // cumulative paid
-2       uint256 entryIndex;    // RAY snapshot when note opened or last rebase
+        uint256 capUSD;       // principal + premium
+        uint256 repaidUSD;    // cumulative cash paid
+        uint256 entryIndex;   // snapshot of juniorIndex at last rebase/claim
     }
-    mapping(uint256 => JuniorNote) record private _jNotes;  // id => note
-    uint256 private _jNextId;                                // incremental id
 
-    event JuniorEnqueued(uint indexed id, address indexed owner, uint capUSD);
-    event JuniorPaid(uint indexed id, address indexed owner, uint paidUSD, uint remainingUSD);
-    event JuniorClosed(uint indexed id);
-    event JuniorClaimed(uint indexed id, address indexed owner, uint paidUSD, uint remainingUSD);
+    mapping(address => JuniorNote) public record juniorNotes;
+
+    event JuniorNoteCreated(address indexed owner, uint256 capUSD);
+    event JuniorNoteClosed(address indexed owner);
+    event JuniorNoteClaimed(address indexed owner, uint256 paidUSD, uint256 remainingUSD);
 
     // ─────────────── Events ───────────────
     event CollateralConfigured(
@@ -149,7 +146,6 @@ contract record CDPEngine is Ownable {
     event BadDebtRealized(address indexed asset, address indexed borrower, uint amountUSD);
     event Paused(address indexed asset, bool isPaused);
     event PausedGlobal(bool isPaused);
-    event JuniorWindowToggled(bool open);
     event JuniorParamsSet(uint premiumBps, uint sliceBps);
     event BadDebtRepaid(address indexed asset, uint amountUSD, uint badDebtRemaining);
     
@@ -216,38 +212,42 @@ contract record CDPEngine is Ownable {
         emit FeeToReserveBpsSet(old, newBps);
     }
 
-    function setJuniorParams(uint256 newPremiumBps, uint256 newSliceBps) external onlyOwner {
+    function setJuniorPremium(uint256 newPremiumBps) external onlyOwner {
         require(newPremiumBps <= 10000, "junior: premium > 100%");
-        require(newSliceBps <= 10000, "junior: slice > 100%");
         juniorPremiumBps = newPremiumBps;
-        juniorSliceBps   = newSliceBps;
-        // lazy init of index
+        emit JuniorParamsSet(newPremiumBps, 0);
+    }
+
+    /// @notice Index sync from Reserve inflows (O(1), no loops)
+    /// @dev Call this before opening/increasing notes, and on claimJunior()
+    function _syncReserveToIndex() internal {
         if (juniorIndex == 0) juniorIndex = 1e27;
-        emit JuniorParamsSet(newPremiumBps, newSliceBps);
-    }
 
-    function setJuniorWindow(bool open) external onlyOwner {
-        juniorWindowOpen = open;
-        emit JuniorWindowToggled(open);
-    }
+        uint256 bal = registry.cdpReserve().balance();
+        if (bal <= reserveAccountedUSD) return;          // nothing new to index
 
-    /// @notice Internal helper: tracks junior budget allocation (deferred index calculation)
-    /// @param budgetUSD Amount allocated to juniors from stability fees
-    function _addJuniorBudget(uint256 budgetUSD) internal {
-        if (budgetUSD == 0) return;
-        if (juniorIndex == 0) juniorIndex = 1e27;                // init once
-        
-        // Simply update the index based on current outstanding - minimal logic here
+        uint256 deltaUSD = bal - reserveAccountedUSD;    // newly arrived USD in Reserve
+        if (deltaUSD == 0) return;
+
         uint256 outstanding = totalJuniorOutstandingUSD;
-        if (outstanding > 0) {
-            // Δindex = budget / outstanding  (RAY math)
-            uint256 numer = budgetUSD * 1e27 + juniorCarryUSD;
-            uint256 delta = numer / totalOutstanding;
-            juniorCarryUSD = numer - delta * totalOutstanding; // carry to next step
-            juniorIndex += delta;
+        if (outstanding == 0) {
+            // No juniors outstanding: park inflow to carry to avoid precision loss
+            juniorCarryUSD += deltaUSD;
+            reserveAccountedUSD = bal;                   // we've accounted this balance
+            return;
         }
-        // Note: budgetUSD is sent directly to reserve in fee routing, no minting here
+
+        // Convert USD inflow into an index bump (RAY scale), with exact carry handling.
+        // We do integer math in USD, then translate to RAY only for the delta.
+        uint256 numerUSD   = juniorCarryUSD + deltaUSD;                 // total inflow to allocate
+        uint256 deltaIndex = (numerUSD * 1e27) / outstanding;           // RAY
+        uint256 usedUSD    = (deltaIndex * outstanding) / 1e27;         // exact USD actually indexed
+        juniorCarryUSD     = numerUSD - usedUSD;                        // remainder to carry forward
+
+        juniorIndex       += deltaIndex;
+        reserveAccountedUSD = bal;                                      // balance is fully accounted
     }
+
 
 
     // ─────────────── User Actions (unchanged except fee routing) ───────────────
@@ -432,20 +432,14 @@ contract record CDPEngine is Ownable {
         Token(_usdst()).burn(msg.sender, owedForDelta);
 
         if (feeUSD > 0) {
-            // 1) calculate juniors' slice and track it (minimal logic)
-            uint256 toJuniors = (feeUSD * juniorSliceBps) / 10000;
-            _addJuniorBudget(toJuniors);
+            // Simple two-way split: Reserve vs FeeCollector
+            uint256 toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint256 toCollector = feeUSD - toReserve;
 
-            // 2) route fees: juniors + reserve split goes to CDPReserve, rest to FeeCollector
-            uint256 remainder   = feeUSD - toJuniors;
-            uint256 toReserve   = (remainder * feeToReserveBps) / 10000;
-            uint256 totalToReserve = toJuniors + toReserve;  // combine junior slice with reserve portion
-            uint256 toCollector = remainder - toReserve;
+            if (toReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
 
-            if (totalToReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), totalToReserve);
-            if (toCollector > 0)    Token(_usdst()).mint(address(_feeCollector()), toCollector);
-
-            emit FeesRouted(asset, totalToReserve, toCollector);
+            emit FeesRouted(asset, toReserve, toCollector);
         }
 
         userVault.scaledDebt = newScaledDebt;
@@ -483,20 +477,14 @@ contract record CDPEngine is Ownable {
         uint feeUSD = owed > baseUSD ? (owed - baseUSD) : 0;
 
         if (feeUSD > 0) {
-            // 1) calculate juniors' slice and track it (minimal logic)
-            uint256 toJuniors = (feeUSD * juniorSliceBps) / 10000;
-            _addJuniorBudget(toJuniors);
+            // Simple two-way split: Reserve vs FeeCollector
+            uint256 toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint256 toCollector = feeUSD - toReserve;
 
-            // 2) route fees: juniors + reserve split goes to CDPReserve, rest to FeeCollector
-            uint256 remainder   = feeUSD - toJuniors;
-            uint256 toReserve   = (remainder * feeToReserveBps) / 10000;
-            uint256 totalToReserve = toJuniors + toReserve;  // combine junior slice with reserve portion
-            uint256 toCollector = remainder - toReserve;
+            if (toReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
 
-            if (totalToReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), totalToReserve);
-            if (toCollector > 0)    Token(_usdst()).mint(address(_feeCollector()), toCollector);
-
-            emit FeesRouted(asset, totalToReserve, toCollector);
+            emit FeesRouted(asset, toReserve, toCollector);
         }
 
         userVault.scaledDebt = 0;
@@ -575,20 +563,14 @@ contract record CDPEngine is Ownable {
         Token(_usdst()).burn(msg.sender, owedForDelta);
 
         if (feeUSD > 0) {
-            // 1) calculate juniors' slice and track it (minimal logic)
-            uint256 toJuniors = (feeUSD * juniorSliceBps) / 10000;
-            _addJuniorBudget(toJuniors);
+            // Simple two-way split: Reserve vs FeeCollector
+            uint256 toReserve   = (feeUSD * feeToReserveBps) / 10000;
+            uint256 toCollector = feeUSD - toReserve;
 
-            // 2) route fees: juniors + reserve split goes to CDPReserve, rest to FeeCollector
-            uint256 remainder   = feeUSD - toJuniors;
-            uint256 toReserve   = (remainder * feeToReserveBps) / 10000;
-            uint256 totalToReserve = toJuniors + toReserve;  // combine junior slice with reserve portion
-            uint256 toCollector = remainder - toReserve;
+            if (toReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), toReserve);
+            if (toCollector > 0) Token(_usdst()).mint(address(_feeCollector()), toCollector);
 
-            if (totalToReserve > 0) Token(_usdst()).mint(address(_cdpReserve()), totalToReserve);
-            if (toCollector > 0)    Token(_usdst()).mint(address(_feeCollector()), toCollector);
-
-            emit FeesRouted(collateralAsset, totalToReserve, toCollector);
+            emit FeesRouted(collateralAsset, toReserve, toCollector);
         }
 
         borrowerVault.scaledDebt -= scaledDebtToLiquidate;
@@ -644,54 +626,65 @@ contract record CDPEngine is Ownable {
     }
 
     /**
-     * @notice Burn USDST to reduce bad debt for a specific asset and receive a FIFO junior note.
-     * @dev - Requires junior window to be open.
-     *      - Burns up to the remaining bad debt for `asset`.
-     *      - Enqueues a note with cap = burned * (1 + juniorPremiumBps/10000).
+     * @notice Burn USDST to reduce bad debt for a specific asset and receive a junior note.
+     * @dev - Burns up to the remaining bad debt for `asset`.
+     *      - Creates a note with cap = burned * (1 + juniorPremiumBps/10000).
      * @param asset The asset whose bad debt will be reduced.
      * @param amountUSD Desired USDST to burn (will be clamped to remaining bad debt).
-     * @return id         The newly created junior note id.
      * @return burnedUSD  The actual USDST burned.
-     * @return capUSD     The note’s payout cap (principal+premium).
+     * @return capUSD     The note's payout cap (principal+premium).
      */
     function openJuniorNote(address asset, uint256 amountUSD)
         external
         onlyKnownAsset(asset)
-        returns (uint256 id, uint256 burnedUSD, uint256 capUSD)
+        returns (uint256 burnedUSD, uint256 capUSD)
     {
-        require(juniorWindowOpen, "junior: closed");
         require(amountUSD > 0, "junior: zero amount");
 
         uint256 bad = badDebtUSD[asset];
-        require(bad > 0, "junior: no bad debt");
+        require(bad > 0, "junior: no bad debt for asset");
 
-        // Clamp burn to remaining bad debt for this asset
+        // Burn and reduce bad debt
         burnedUSD = amountUSD > bad ? bad : amountUSD;
-
-        // Burn user's USDST directly (token must allow burn-from pattern used elsewhere)
         Token(_usdst()).burn(msg.sender, burnedUSD);
-
-        // Reduce bad debt
         badDebtUSD[asset] = bad - burnedUSD;
         emit BadDebtRepaid(asset, burnedUSD, badDebtUSD[asset]);
 
-        // Compute payout cap with premium; bound into uint128 for storage
+        // Cap with premium
         capUSD = (burnedUSD * (10000 + juniorPremiumBps)) / 10000;
-        require(capUSD <= type(uint128).max, "junior: cap overflow");
 
+        // 1) Pull new Reserve inflows into the index first
+        _syncReserveToIndex();
         if (juniorIndex == 0) juniorIndex = 1e27;
 
-        id = ++_jNextId;
-        _jNotes[id] = JuniorNote({
-            owner: msg.sender,
-            capUSD:  uint256(capUSD),
-            repaidUSD: 0,
-            entryIndex: uint256(juniorIndex)  // snapshot now
-        });
+        // 2) Rebase caller's note, then add new cap at current index
+        JuniorNote storage note = juniorNotes[msg.sender];
+        if (note.owner == address(0)) {
+            juniorNotes[msg.sender] = JuniorNote({
+                owner: msg.sender,
+                capUSD: capUSD,
+                repaidUSD: 0,
+                entryIndex: juniorIndex
+            });
+            totalJuniorOutstandingUSD += capUSD;
+            emit JuniorNoteCreated(msg.sender, capUSD);
+        } else {
+            // Rebase existing note to realize entitlement (accounting only)
+            uint256 ent = _entitlement(note, juniorIndex);
+            if (ent > 0) {
+                note.repaidUSD += ent;
+                totalJuniorOutstandingUSD = (ent > totalJuniorOutstandingUSD)
+                    ? 0
+                    : (totalJuniorOutstandingUSD - ent);
+            }
+            note.entryIndex = juniorIndex;
 
-        totalJuniorOutstandingUSD += capUSD;
+            // Add new cap at *current* index (doesn't retro-earn)
+            note.capUSD += capUSD;
+            totalJuniorOutstandingUSD += capUSD;
 
-        emit JuniorEnqueued(id, msg.sender, capUSD);
+            emit JuniorNoteCreated(msg.sender, note.capUSD);
+        }
     }
 
     // ───────────────────────── Accrual & Views ──────────────────────────────
@@ -843,65 +836,88 @@ contract record CDPEngine is Ownable {
     * @param asset Collateral asset address.
     * @return crWad Collateralization ratio in WAD units.
     */
-    /// @notice View function to show what's claimable for a junior note right now
-    function claimable(uint256 id) public view returns (uint256) {
-        JuniorNote storage n = _jNotes[id];
-        if (n.owner == address(0)) return 0;
-        uint256 cap     = uint256(n.capUSD);
-        uint256 repaid  = uint256(n.repaidUSD);
-        uint256 remain  = cap - repaid;
-        if (remain == 0) return 0;
-        uint256 idx     = juniorIndex == 0 ? 1e27 : juniorIndex;
-        uint256 last    = uint256(n.entryIndex);
+
+    /// @notice Calculate entitlement for a note at given index
+    function _entitlement(JuniorNote storage note, uint256 idx) internal view returns (uint256) {
+        if (note.owner == address(0)) return 0;
+        if (note.capUSD <= note.repaidUSD) return 0;
+        if (idx == 0) idx = 1e27;
+
+        uint256 last   = note.entryIndex;
         if (idx <= last) return 0;
-        // entitlement = remain * (idx - last) / RAY
-        uint256 ent = (remain * (idx - last)) / 1e27;
-        if (ent > remain) ent = remain; // cap never exceeds remaining
+
+        uint256 remain = note.capUSD - note.repaidUSD;
+        uint256 ent    = (remain * (idx - last)) / 1e27;  // RAY → USD
+        if (ent > remain) ent = remain;
         return ent;
     }
 
-    /// @notice Pull-based claiming: users claim their pro-rata share from reserve
-    function claimJunior(uint256 id, uint256 maxPay) external {
-        JuniorNote storage n = _jNotes[id];
-        require(n.owner == msg.sender, "junior: not owner");
-
-        uint256 due = claimable(id);
-        require(due > 0, "junior: nothing to claim");
-
-        if (maxPay != 0 && maxPay < due) due = maxPay;
-
+    /// @notice Calculate effective index including unaccounted reserve inflows
+    function _effectiveIndexView() internal view returns (uint256 idxEff) {
+        uint256 idx = juniorIndex == 0 ? 1e27 : juniorIndex;
         uint256 bal = registry.cdpReserve().balance();
-        require(bal >= due, "junior: reserve short");
 
-        if (due > bal) due = bal;
-        require(due > 0, "junior: reserve empty");
+        if (bal <= reserveAccountedUSD) return idx; // no new inflow in view
 
-        // transfer from reserve to claimer
-        _cdpReserve().transferTo(msg.sender, due);
+        uint256 deltaUSD = bal - reserveAccountedUSD;
+        uint256 outstanding = totalJuniorOutstandingUSD;
+        if (outstanding == 0) return idx;           // nothing to allocate in view
 
-        // update note + pool accounting
-        uint256 newRepaid = uint256(n.repaidUSD) + due;
-        n.repaidUSD = uint256(newRepaid);
-        n.entryIndex = uint256(juniorIndex); // rebase to current index
-        totalJuniorOutstandingUSD -= due;
+        // Hypothetical index bump if we synced right now (using carry)
+        uint256 numerUSD   = juniorCarryUSD + deltaUSD;
+        uint256 deltaIndex = (numerUSD * 1e27) / outstanding;
+        return idx + deltaIndex;
+    }
 
-        emit JuniorClaimed(id, msg.sender, due, uint256(n.capUSD) - newRepaid);
+    /// @notice View function to show what's claimable for an owner
+    function claimable(address owner) public view returns (uint256) {
+        JuniorNote storage note = juniorNotes[owner];
+        uint256 idxEff = _effectiveIndexView();
+        return _entitlement(note, idxEff);
+    }
 
-        // if fully repaid, close & remove from active set
-        if (newRepaid == uint256(n.capUSD)) {
-            _closeJunior(id);
+    /// @notice Claim maximum available from user's junior note
+    function claimJunior() external {
+        JuniorNote storage note = juniorNotes[msg.sender];
+        require(note.owner != address(0), "junior: no note");
+
+        // 1) Pull the latest Reserve inflows into the index
+        _syncReserveToIndex();
+
+        // 2) Economic entitlement since last entryIndex
+        uint256 ent = _entitlement(note, juniorIndex);
+        require(ent > 0, "junior: nothing to claim");
+
+        // 3) Liquidity bound
+        uint256 reserveBal = registry.cdpReserve().balance();
+        require(reserveBal > 0, "junior: reserve empty");
+
+        uint256 toPay = ent <= reserveBal ? ent : reserveBal;
+
+        // 4) Transfer and account
+        _cdpReserve().transferTo(msg.sender, toPay);
+
+        note.repaidUSD += toPay;
+        note.entryIndex = juniorIndex; // rebase to current
+
+        // Global outstanding down by *paid* amount
+        totalJuniorOutstandingUSD = (toPay > totalJuniorOutstandingUSD)
+            ? 0
+            : (totalJuniorOutstandingUSD - toPay);
+
+        // Keep reserveAccountedUSD in sync with its actual balance decrease
+        // so the next _syncReserveToIndex() only sees true inflows.
+        reserveAccountedUSD -= toPay;
+
+        emit JuniorNoteClaimed(msg.sender, toPay, note.capUSD - note.repaidUSD);
+
+        // Optional: close the note when fully repaid
+        if (note.repaidUSD >= note.capUSD) {
+            delete juniorNotes[msg.sender];
+            emit JuniorNoteClosed(msg.sender);
         }
     }
 
-    /// @notice Close helper: removes junior note (O(1))
-    function _closeJunior(uint256 id) internal {
-        delete _jNotes[id];
-        emit JuniorClosed(id);
-    }
-
-    function totalJuniorRemaining() external view returns (uint256) {
-        return totalJuniorOutstandingUSD;
-    }
 
     function collateralizationRatio(address user, address asset) public view returns (uint crWad) {
         CollateralGlobalState storage s = collateralGlobalStates[asset];
