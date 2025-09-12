@@ -294,7 +294,11 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       }
     } catch (error) {
       console.error("Liquidation failed:", error);
-      // Error handling is done by global axios interceptor
+      toast({
+        title: "Liquidation Failed",
+        description: "Failed to execute liquidation",
+        variant: "destructive",
+      });
     } finally {
       setLiquidatingVaults(prev => ({ ...prev, [vaultKey]: false }));
     }
