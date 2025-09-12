@@ -15,6 +15,7 @@ import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.Validator
 import Data.Text (Text)
+import qualified Data.Text as Text
 import Data.Text.Encoding
 import SolidVM.Model.Storable hiding (size)
 import Text.RawString.QQ
@@ -60,7 +61,7 @@ insertMercataGovernanceContract validators admins gi =
           ++ map
             ( \case
                 (i, Validator c) ->
-                  ( encodeUtf8 $ ".validatorMap<\"" <> c <> "\">",
+                  ( encodeUtf8 $ ".validatorMap<a:" <> Text.pack (show c) <> ">",
                     addrToCertIdx $ validatorAddr i
                   )
             )
@@ -82,7 +83,7 @@ insertMercataGovernanceContract validators admins gi =
                 0
                 (SolidVMCode "MercataValidator" (KECCAK256.hash encodedGovernance))
                 [ (".owner", BAccount (NamedAccount 100 UnspecifiedChain)),
-                  (".commonName", BString $ encodeUtf8 validator),
+                  (".commonName", BAccount $ NamedAccount validator UnspecifiedChain),
                   (".isActive", BBool True)
                 ]
         )

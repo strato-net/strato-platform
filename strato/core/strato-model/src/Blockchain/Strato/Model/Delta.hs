@@ -75,7 +75,7 @@ getDeltasFromEvents = foldr go (mempty, mempty)
             "CertificateRevoked" -> maybe ds (\c -> (vd, Delta ca ((c:) . cr))) $ revocation e
             _ -> ds
           _ -> ds
-        extractCommonName = fmap (Validator . T.pack . second) . find (\(x, _, _) -> x == "commonName") . evArgs
+        extractCommonName = fmap (Validator . read . second) . find (\(x, _, _) -> x == "commonName") . evArgs
         registration      = either (const Nothing) Just . bytesToCert . encodeUtf8 . T.pack <=< getFirstArg
         revocation        = pure . DummyCertRevocation <=< stringAddress <=< getFirstArg
         getFirstArg       = pure . second . fst <=< uncons . evArgs

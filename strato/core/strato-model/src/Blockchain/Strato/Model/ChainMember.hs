@@ -21,6 +21,7 @@ module Blockchain.Strato.Model.ChainMember
 where
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
 --import Control.Lens hiding ((.=))
@@ -34,7 +35,6 @@ import qualified Data.Functor.Identity as DFI
 import Data.Ranged
 import qualified Data.Set as S
 import Data.Swagger hiding (Format, get, name, put, url)
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified Database.Persist.Sql as DPS
@@ -48,14 +48,14 @@ import Text.Format
 
 data BoundedData a = LowerBound | Middle a | UpperBound deriving (Eq, Generic, Show)
 
-data ChainMemberF f = ChainMemberF { commonName :: f (Maybe T.Text) }
+data ChainMemberF f = ChainMemberF { commonName :: f (Maybe Address) }
   deriving (Generic)
 
 newtype ChainMemberRSet = ChainMemberRSet {getChainMemberRSet :: (RSet ChainMemberBounded)} deriving (Eq, Show)
 
 newtype ChainMembers = ChainMembers {unChainMembers :: S.Set ChainMemberParsedSet} deriving (Generic, Eq, Data, Show, Ord)
 
-data ChainMemberParsedSet = CommonName Text deriving (Generic, Eq, Data, Show, Ord, Read)
+data ChainMemberParsedSet = CommonName Address deriving (Generic, Eq, Data, Show, Ord, Read)
 
 type ChainMemberBounded = ChainMemberF BoundedData
 
@@ -93,7 +93,7 @@ instance Show (ChainMemberF BoundedData) where
 deriving instance Show (ChainMemberF DFI.Identity)
 
 emptyChainMember :: ChainMemberParsedSet
-emptyChainMember = CommonName "" --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
+emptyChainMember = CommonName 0x0 --(Everyone a) (Org a b) (OrgUnit a b c) (CommonName a b c d)
 
 instance Binary ChainMembers
 
@@ -103,7 +103,7 @@ instance RLPSerializable ChainMembers where
   rlpEncode (ChainMembers cms) = rlpEncode $ S.toList cms
   rlpDecode x = ChainMembers . S.fromList $ rlpDecode x
 
-instance RLPSerializable (BoundedData Text) where
+instance RLPSerializable (BoundedData Address) where
   rlpEncode (LowerBound) = RLPScalar 0
   rlpEncode (Middle a) = RLPArray [RLPScalar 1, rlpEncode a]
   rlpEncode (UpperBound) = RLPScalar 2
@@ -112,7 +112,7 @@ instance RLPSerializable (BoundedData Text) where
   rlpDecode (RLPScalar 2) = UpperBound
   rlpDecode _ = error ("Error in rlpDecode for BoundedData: bad RLPObject")
 
-instance RLPSerializable (BoundedData (Maybe Text)) where
+instance RLPSerializable (BoundedData (Maybe Address)) where
   rlpEncode (LowerBound) = RLPScalar 0
   rlpEncode (Middle (Just a)) = RLPArray [RLPScalar 1, rlpEncode a]
   rlpEncode (Middle Nothing) = RLPArray [RLPScalar 1]
@@ -194,7 +194,7 @@ instance ToJSON ChainMembers where
   toJSON (ChainMembers xs) = toJSON (S.toList xs)
   
 instance FromJSON ChainMemberParsedSet where
-  parseJSON (A.String s) = pure $ CommonName s
+  parseJSON (A.String s) = pure $ CommonName $ read $ T.unpack s
   parseJSON (Object o) = do
     c <- o .:? "commonName"
     case c of

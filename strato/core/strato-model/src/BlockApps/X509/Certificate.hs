@@ -186,11 +186,10 @@ x509CertToCertInfoState cert =
         }
 
 getAddressFromCM :: ChainMemberParsedSet -> X509CertInfoState -> Maybe Address
-getAddressFromCM (CommonName cmn) (X509CertInfoState ua _ _ _ _ _ cnmx) =
-  if cmn == T.pack cnmx then Just ua else Nothing
+getAddressFromCM (CommonName cmn) _ = Just cmn
 
 getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
-getChainMemberFromX509 (X509CertInfoState _ _ _ _ _ _ cname) = CommonName (T.pack $ cname)
+getChainMemberFromX509 (X509CertInfoState addr _ _ _ _ _ _) = CommonName addr
 
 getX509FromAddress ::
   A.Selectable Address X509CertInfoState m =>

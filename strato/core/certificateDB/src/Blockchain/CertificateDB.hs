@@ -31,7 +31,6 @@ import Blockchain.Strato.RedisBlockDB.Models as Models
 import Control.Monad.Change.Modify hiding (get)
 import Control.Monad.Trans
 import qualified Data.ByteString.Char8 as S8
-import qualified Data.Text as T
 import Database.Redis
 
 newtype RedisConnection = RedisConnection {unRedisConnection :: Connection}
@@ -140,10 +139,10 @@ insertRootCertificate = do
       TxError e -> Left . SingleLine $ "insertRootCertificate - Error " <> S8.pack e
 
 addParsedSet :: X509CertInfoState -> Redis (Either Reply Status)
-addParsedSet (X509CertInfoState _ _ _ _ _ _ c) = do
-  let setOrg = CM.CommonName ""
-      setOrgUnit = CM.CommonName ""
-      setCommonName = CM.CommonName (T.pack c)
+addParsedSet (X509CertInfoState addr _ _ _ _ _ _) = do
+  let setOrg = CM.CommonName addr
+      setOrgUnit = CM.CommonName addr
+      setCommonName = CM.CommonName addr
   currentUnits <-
     getInNamespace ParsedSetWhitePage setOrg >>= \case
       Right (Just runits) ->
@@ -178,8 +177,8 @@ addParsedSet (X509CertInfoState _ _ _ _ _ _ c) = do
     (_, _) -> pure $ Left . SingleLine $ "This probably shouldn't happen."
 
 modifyParsedSetFromCert :: X509CertInfoState -> Redis (Either Reply Status)
-modifyParsedSetFromCert certInfo@(X509CertInfoState _ _ _ _ _ _ c) = do
-  let parsedSet = CM.CommonName (T.pack c)
+modifyParsedSetFromCert certInfo@(X509CertInfoState addr _ _ _ _ _ _) = do
+  let parsedSet = CM.CommonName addr
   res <- multiExec $ set (inNamespace ParsedSetToX509 parsedSet) (toValue certInfo)
   case res of
     TxSuccess _ -> pure $ Right Ok

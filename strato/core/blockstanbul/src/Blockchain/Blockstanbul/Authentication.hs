@@ -1,13 +1,24 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Blockchain.Blockstanbul.Authentication
-  ( module Blockchain.Blockstanbul.Authentication,
-    module Blockchain.Blockstanbul.Model.Authentication,
+module Blockchain.Blockstanbul.Authentication (
+    signMessage,
+    proposerSeal,
+    addProposerSeal,
+    addValidators,
+    commitmentSeal,
+    addCommitmentSeals,
+    authenticate,
+    verifyProposerSeal,
+    getProposerSeal,
+    verifyCommitmentSeal,
+    replayHistoricBlock,
+    scrubConsensus,
+    isHistoricBlock,
+    getValidatorSet
   )
 where
 
@@ -20,7 +31,6 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -30,13 +40,10 @@ import Control.Lens as L
 import Control.Monad (unless)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Except
-import Data.Binary
-import qualified Data.ByteString.Lazy as BL
 import Data.Either.Extra
 import Data.List
-import Data.Maybe (catMaybes, fromJust, fromMaybe)
+import Data.Maybe (fromJust, fromMaybe)
 import Data.Set (Set)
-import qualified Data.Text as T
 import qualified Data.Set as S
 import Text.Printf
 import Text.Format
@@ -49,11 +56,6 @@ proposerSeal blk =
 commitmentSeal :: (HasVault m) => Keccak256 -> m (Signature)
 commitmentSeal sha =
   let mesg = commitmentMessage sha
-   in sign mesg
-
-signBenfInfo :: (HasVault m) => (Validator, Bool, Int) -> m (Signature)
-signBenfInfo bnf =
-  let mesg = keccak256ToByteString $ hash $ BL.toStrict $ encode bnf
    in sign mesg
 
 signMessage :: (StateMachineM m) => TrustedMessage -> m (OutEvent)
@@ -78,22 +80,7 @@ authenticate (IMsg (MsgAuth cm sig) tm) = do
   return (mAddress == cmAddress)
 authenticate _ = return True
 
-getValidatorFromAddress :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                           Address -> m (Maybe Validator)
-getValidatorFromAddress addr = case addr of
-  Address 0x8c945210bbedf90a0c54d0e68357398586c865c3 -> pure . Just $ Validator "dustin-node" -- testnet2 hack
-  _ -> fmap (chainMemberParsedSetToValidator . getChainMemberFromX509) <$> getX509FromAddress addr
-
-getValidatorFromAddress' :: (MonadError String m, A.Selectable Address X509CertInfoState m) =>
-                       Address -> m Validator
-getValidatorFromAddress' address = do
-  maybeValidator <- getValidatorFromAddress address
-
-  case maybeValidator of
-    Nothing -> throwError $ "Missing address in X509 certificate database: " ++ formatAddressWithoutColor address
-    Just v -> return v
-
-replayHistoricBlock :: (MonadLogger m, MonadError String m, A.Selectable Address X509CertInfoState m) =>
+replayHistoricBlock :: (MonadLogger m, MonadError String m) =>
                        Set Validator -> Word256 -> Block -> m (Word256, Validator)
 replayHistoricBlock realValidators seqNo blk = do
   IstanbulExtra {..} <- liftEither $ maybeToEither "no istanbul metadata" $ evalIstanbulExtra id blk
@@ -102,14 +89,14 @@ replayHistoricBlock realValidators seqNo blk = do
 
   signers <- sequence $ map (verifyCommitmentSeal (blockHash blk)) _commitment
       
-  signerRes <- S.fromList . catMaybes <$> traverse getValidatorFromAddress signers
+  let signerRes = S.fromList $ map Validator signers
   
   unless (seqNo + 1 == blockNo) $
     throwError $ printf "unexpected block number: have %d, wanted %d" blockNo (seqNo + 1)
 
   prop <- liftEither $ maybeToEither "invalid proposer seal" mProp
 
-  propValidator <- getValidatorFromAddress' prop
+  let propValidator = Validator prop
 
   unless (propValidator `elem` realValidators) $
     blockstanbulError $
@@ -126,9 +113,7 @@ replayHistoricBlock realValidators seqNo blk = do
         
   unless (signerRes `S.isSubsetOf` realValidators) $ do
         let unexplained = intercalate "," . map format . S.toList $ signerRes S.\\ realValidators
-        if (signerRes S.\\ realValidators) `S.isSubsetOf` futureValidatorsHack
-          then $logErrorS "replayHistoricBlock" . T.pack $ "future validators " ++ show unexplained ++ " jumped the gun, signed block #" ++ show blockNo ++ " before they were authorized to do so.  I'll throw the block away and wait for another validator to send me the properly signed block"
-          else blockstanbulError $
+        blockstanbulError $
                "unknown signers in block #" ++ show blockNo ++ ": " ++ unexplained
                ++ "\nsignerRes: " ++ show (map format $ S.toList signerRes)
                ++ "\nreal validator list: " ++ show (map format $ S.toList realValidators)
@@ -144,10 +129,3 @@ replayHistoricBlock realValidators seqNo blk = do
 
 isHistoricBlock :: Block -> Bool
 isHistoricBlock = fromMaybe False . evalIstanbulExtra (fmap $ not . null . _commitment) -- check if signatures list from IstanbulExtra is empty
-
---Required hack to ignore known bugs in the production chain for now.  This should be removed once we restart the chain, or purge the bad blocks from the network
-futureValidatorsHack :: Set Validator
-futureValidatorsHack = S.fromList [
-  "service-account-io-stratomercata-dsnallapu",
-  "service-account-io-stratomercata-chessgm9" -- not only does this suffer from the future validator bug, but it also was a false x509 cert because the case of the commonName was wrong
-  ]

@@ -55,6 +55,7 @@ import           Blockchain.DB.SQLDB                             (runSqlPool,
 import           Blockchain.MiscJSON                             ()
 import           Blockchain.Strato.Discovery.Data.PeerDefinition
 import           Blockchain.Strato.Discovery.Metrics
+import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.ExtendedWord
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
@@ -318,8 +319,7 @@ getPeersClosestTo limit targetNID requesterPubkey = do
     validators <- Mod.access (Mod.Proxy @[Validator])
     $logInfoS "getPeersClosestTo" $ T.pack $ "adding validator list to closest peers: " ++ show validators
     let targetPt = nodeIDToPoint targetNID
-        hostToValidator (Host v) = Validator v
-        (vals, nonvals) = Set.partition (\p -> hostToValidator (pPeerHost p) `elem` validators) peers
+        (vals, nonvals) = Set.partition (\p -> (Validator . fromPublicKey . pointToSecPubKey <$> pPeerPubkey p) `elem` map Just validators) peers
     return $
       Set.toList vals ++
       (take (fromIntegral limit) .

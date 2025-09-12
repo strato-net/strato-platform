@@ -23,6 +23,7 @@ where
 
 import BlockApps.X509.Certificate
 import Blockchain.Data.GenesisInfo
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
@@ -213,8 +214,8 @@ readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo 
     let storageMap = M.fromList storage
     c <- M.lookup ".commonName" storageMap
     case c of
-      BString c' -> do
-        pure $ (Validator $ decodeUtf8 c')
+      BAccount c' -> do
+        pure $ (Validator $ _namedAccountAddress c')
       _ -> Nothing
   _ -> Nothing
 

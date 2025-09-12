@@ -23,9 +23,9 @@ import BlockApps.Tools.State as State
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Participation
 import Blockchain.Sequencer.Event
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainMember
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.Text as T
 import qualified LabeledError
 import System.Console.CmdArgs
 import System.Process
@@ -35,7 +35,7 @@ data Options
   | AddBlocksFromFile {fileName :: String}
   | AddGenesisFromFile {fileName :: String}
   | AddTxsFromFile {fileName :: String}
-  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | AskForBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qAddr :: Address}
 --  | Checkpoints {service :: CheckpointService, operation :: CheckpointOperation, offset :: Maybe Int64, cp :: Maybe String}
   | Code {hash :: String}
   | DeleteDepBlock {valK :: String}
@@ -50,7 +50,7 @@ data Options
   | Hash {hash :: String}
   | InsertTX {}
   | Migrate {tables :: String}
-  | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qCommonName :: String}
+  | PushBlocks {startBlock :: Integer, endBlock :: Integer, qOrg :: String, qOrgUnit :: String, qAddr :: Address}
   | Raw {filename :: String}
   | RawMP {stateRoot :: String, filename :: String}
   | RLP {filename :: String}
@@ -180,23 +180,23 @@ checkpointOptions =
 askOptions :: Annotate Ann
 askOptions =
   record
-    AskForBlocks {startBlock = error "unused start block", endBlock = error "unused end block", qOrg = "", qOrgUnit = "", qCommonName = ""}
+    AskForBlocks {startBlock = error "unused start block", endBlock = error "unused end block", qOrg = "", qOrgUnit = "", qAddr = 0x0}
     [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block",
       endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block",
       qOrg := "" += typ "STRING" += explicit += name "org",
       qOrgUnit := "" += typ "STRING" += explicit += name "orgUnit",
-      qCommonName := "" += typ "STRING" += explicit += name "commonName"
+      qAddr := 0x0 += typ "ADDRESS" += explicit += name "address"
     ]
 
 pushOptions :: Annotate Ann
 pushOptions =
   record
-    PushBlocks {startBlock = error "unused start block", endBlock = error "unused end block", qOrg = "", qOrgUnit = "", qCommonName = ""}
+    PushBlocks {startBlock = error "unused start block", endBlock = error "unused end block", qOrg = "", qOrgUnit = "", qAddr = 0x0}
     [ startBlock := error "--start-block required" += typ "NUMBER" += explicit += name "start-block",
       endBlock := error "--end-block required" += typ "NUMBER" += explicit += name "end-block",
       qOrg := "" += typ "STRING" += explicit += name "org",
       qOrgUnit := "" += typ "STRING" += explicit += name "orgUnit",
-      qCommonName := "" += typ "STRING" += explicit += name "commonName"
+      qAddr := 0x0 += typ "ADDRESS" += explicit += name "address"
     ]
 
 redisOptions :: Annotate Ann
@@ -344,7 +344,7 @@ run AddBlocksFromFile {..} = addBlocksFromFile fileName
 run AddGenesisFromFile {} = error "strato-barometer: the addGenesisFromFile tool has been deprecated."
 run AddTxsFromFile {..} = addTxsFromFile fileName
 run AskForBlocks {..} =
-  let i = CommonName (T.pack qCommonName)
+  let i = CommonName qAddr
    in insertP2P (P2pAskForBlocks startBlock endBlock i)
 run Code {..} = Code.doit hash
 run DeleteDepBlock {..} = deleteDepBlock valK
@@ -364,7 +364,7 @@ run RLP {..} = RLP.doit filename
 run RawMP {..} = RawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/RawMP" $ BC.pack stateRoot)
 run FRawMP {..} = FRawMP.doit filename (MP.StateRoot . LabeledError.b16Decode "strato-barometer/FRawMP" $ BC.pack stateRoot)
 run PushBlocks {..} =
-  let i = CommonName (T.pack qCommonName)
+  let i = CommonName qAddr
    in insertP2P (P2pPushBlocks startBlock endBlock i)
 run SetParticipationMode {..} = remoteSetParticipationMode mode
 run State {..} = let sr = MP.StateRoot $ LabeledError.b16Decode "strato-barometer/state" $ BC.pack root in State.doit sr
