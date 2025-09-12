@@ -35,6 +35,11 @@ contract record PoolConfigurator is Ownable {
      * @param interestRates Array of interest rates for assets
      * @param reserveFactors Array of reserve factors for assets
      * @param perSecondFactorsRAY Array of per-second compound factors in RAY (1e27)
+     * @param debtCeilingAssetUnits debt ceiling asset units
+     * @param debtCeilingUSD debt ceiling USD
+     * @param recapCap the cap on amount earned back from recap notes
+     * @param recapSlice the slice of reserve used to repay recap notes
+     * @param doAutoCoverFromReserves Whether to auto cover bad debt from reserves
      */
 
     function initializeProtocol(
@@ -53,8 +58,8 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata perSecondFactorsRAY,
         uint debtCeilingAssetUnits,
         uint debtCeilingUSD,
-        uint recapCapBps,
-        uint recapSliceBps
+        uint recapCap,
+        uint recapSlice,
         bool doAutoCoverFromReserves,
     ) external onlyOwner {
         // Set all registry components
@@ -68,7 +73,7 @@ contract record PoolConfigurator is Ownable {
         pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
 
         // Set bad debt handling parameters
-        pool.setRecapParams(recapCapBps, recapSliceBps);
+        pool.setRecapParams(recapCap, recapSlice);
         pool.setDoAutoCoverFromReserves(doAutoCoverFromReserves);
         
         // Configure all assets if provided
@@ -216,9 +221,9 @@ contract record PoolConfigurator is Ownable {
         pool.setDoAutoCoverFromReserves(_doAutoCoverFromReserves);
     }
 
-    function setRecapParams(uint capBps, uint sliceBps) external onlyOwner {
+    function setRecapParams(uint cap, uint slice) external onlyOwner {
         LendingPool pool = LendingPool(registry.getLendingPool());
-        pool.setRecapParams(capBps, sliceBps);
+        pool.setRecapParams(cap, slice);
     }
 
     /**

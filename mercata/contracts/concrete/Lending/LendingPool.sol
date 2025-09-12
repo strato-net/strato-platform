@@ -31,7 +31,7 @@ contract record LendingPool is Ownable {
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter, uint recapAccruedAfter);
     event ReservesSwept(uint amount, address to);
-    event RecapNoteUpdated(uint capBps, uint sliceBps);
+    event RecapNoteUpdated(uint cap, uint slice);
     event BadDebtWrittenOff(address indexed borrower, address indexed asset, uint amount);
     event BadDebtCoveredFromReserves(uint amount);
 
@@ -54,8 +54,8 @@ contract record LendingPool is Ownable {
     }
 
     struct RecapNote {
-        uint capBps;
-        uint sliceBps;
+        uint cap;
+        uint slice;
         uint outstanding;
         uint accrued;
     }
@@ -99,7 +99,7 @@ contract record LendingPool is Ownable {
     // Bad Debt Handling
     uint public badDebt; // total bad debt in underlying units
     bool public doAutoCoverFromReserves; // whether to automatically cover bad debt from reserves
-    struct RecapNote public recapNote;
+    RecapNote public recapNote;
     mapping(address => uint) public record recapShares;
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -829,7 +829,8 @@ contract record LendingPool is Ownable {
             if (rf > 0 && interestDelta > 0) {
                 // TODO correct this
                 uint newReservesAccrued = (interestDelta * rf) / 10000;
-                uint newRecapAccrued = (interestDelta * recapNote.sliceBps) / 10000;
+                uint newRecapAccrued = (newReservesAccrued * recapNote.slice) / 10000;
+                newRecapAccrued = newRecapAccrued > recapNote.outstanding ? recapNote.outstanding : newRecapAccrued; // don't exceed outstanding 
                 reservesAccrued += newReservesAccrued - newRecapAccrued;
                 recapNote.accrued += newRecapAccrued;
             }
@@ -899,10 +900,10 @@ contract record LendingPool is Ownable {
         doAutoCoverFromReserves = _doAutoCoverFromReserves;
     }
 
-    function setRecapParams(uint capBps, uint sliceBps) external onlyPoolConfigurator {
-        recapNote.capBps = capBps;
-        recapNote.sliceBps = sliceBps;
-        emit RecapNoteUpdated(capBps, sliceBps);
+    function setRecapParams(uint cap, uint slice) external onlyPoolConfigurator {
+        recapNote.cap = cap;
+        recapNote.slice = slice;
+        emit RecapNoteUpdated(cap, slice);
     }
 
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
@@ -1111,19 +1112,25 @@ contract record LendingPool is Ownable {
         require(amount > 0, "Invalid amount");
         _accrue();
         uint cover = amount > badDebt ? badDebt : amount; // cover up to the bad debt amount
-        uint note_increase = cover * recapNote.capBps / 10000;
+        // transfer cover from msg.sender the amount to pool
+        require(IERC20(borrowableAsset).transferFrom(msg.sender, _liquidityPool(), cover), "Recap transfer failed"); // TODO approval in interface; 0.02 USDST tx fee
+        badDebt -= cover;
+        uint note_increase = cover * recapNote.cap / 10000;
         recapNote.outstanding += note_increase;
-        recapShares[msg.sender] += note_increase / recapNote.outstanding; // TODO wrong
+        recapShares[msg.sender] += 1e18 * note_increase / recapNote.outstanding;
         emit RecapNoteIssued(msg.sender, note_increase);
         emit BadDebtCoveredWithRecap(cover);
     }
 
     function claimRecapNote() external {
         _accrue(); 
-        uint amount = recapShares[msg.sender] * recapNote.accrued;
-        recapNote.accrued -= amount; // TODO wrong
+        uint amount = recapShares[msg.sender] * recapNote.accrued / 1e18;
+        recapNote.accrued -= amount;
         recapNote.outstanding -= amount;
         recapShares[msg.sender] -= amount;
+
+        // transfer underlying asset from pool to msg.sender
+        LiquidityPool(_liquidityPool()).repay(amount, msg.sender);
         emit RecapNoteClaimed(msg.sender, amount);
     }
 
