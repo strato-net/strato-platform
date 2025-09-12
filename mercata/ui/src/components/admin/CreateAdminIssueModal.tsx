@@ -1,10 +1,13 @@
+import { useEffect, useState} from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Plus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useUser } from '@/context/UserContext';
 import * as React from 'react';
 
 type CreateAdminIssueFormValues = {
@@ -17,7 +20,7 @@ interface CreateAdminIssueModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   // Will be called with JSON-stringified target/func and a JSON array (string[])
-  handleCastVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void> | void;
+  handleCastVoteOnIssue: (target: string, func: string, args: any[]) => Promise<void> | void;
 }
 
 const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
@@ -26,6 +29,18 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
   handleCastVoteOnIssue,
 }) => {
   const { toast } = useToast();
+  const { contractSearch, contractSearchResults, contractSearchResultsLoading,
+          getContractDetails, contractDetailsResults, contractDetailsResultsLoading } = useUser();
+  const [selectedFunction, setSelectedFunction] = useState('');
+  const searchObjects = contractSearchResults.reduce((b, a) => {
+    if (a['address']) {
+      const aa = { ...b[a['address']], ...a } 
+      return { ...b, [a['address']]: aa };
+    } else {
+      return b;
+    }
+  }, {});
+  const searchAddresses = Object.keys(searchObjects);
 
   const form = useForm<CreateAdminIssueFormValues>({
     defaultValues: {
@@ -36,22 +51,38 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     mode: 'onChange',
   });
 
-  const {
-    fields,
-    append,
-    remove,
-  } = useFieldArray({
-    control: form.control,
-    name: 'args',
-  });
+  const allContractFunctions = (contractDetailsResults || {})['_functions'] || {};
+  const contractFunctions = (Object.entries(allContractFunctions) || []).filter(([N, t]) => {
+    return form.getValues().target === '000000000000000000000000000000000000100c'
+      || (t['_funcVisibility'] !== 'internal' && t['_funcVisibility'] !== 'private');
+  }).map(([N, t]) => N);
+
+  const { fields, replace } = useFieldArray({ control: form.control, name: 'args' });
+
+  const functionArgs = (allContractFunctions[selectedFunction] || {})._funcArgs as Array<[string, { type?: { tag?: string } }]> | undefined;
+  
+  useEffect(() => {
+    if (Array.isArray(functionArgs) && functionArgs.length > 0) {
+      replace(functionArgs.map(() => ({ value: '' })));
+    } else {
+      replace([{ value: '' }]);
+    }
+  }, [functionArgs?.length, replace]);
 
   const onSubmit = async (values: CreateAdminIssueFormValues) => {
     // Clean up whitespace and empty args
     const trimmedTarget = values.target.trim();
     const trimmedFunc = values.func.trim();
     const argsArray = values.args
-      .map(a => a.value.trim())
-      .filter(v => v.length > 0);
+      .map((a, i) => {
+        if (functionArgs[i][1].type?.tag === 'Int') {
+          return parseInt(a.value.trim());
+        }
+        if (functionArgs[i][1].type?.tag === 'Bool') {
+          return a.value.toLocaleLowerCase() === 'true';
+        }
+        return a.value.trim();
+      });
 
     // Build payload with JSON-stringified target/func, and a JSON array for args
     const payload = {
@@ -107,21 +138,40 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               name="target"
               rules={{
                 required: 'Contract address is required',
-                validate: (v) =>
-                  v.trim().length > 0 || 'Contract address cannot be empty',
+                validate: (v) => v.trim().length > 0 || 'Contract address cannot be empty',
               }}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Contract Address</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="..."
-                      {...field}
-                    />
+                    <div>
+                      <Input
+                        {...field}
+                        list="contract-search"
+                        onChange={(e) => {
+                          field.onChange(e);
+                          contractSearch(e.target.value);
+                        }}
+                        onBlur={(e) => {
+                          field.onBlur();
+                          const val = e.target.value.trim();
+                          if (searchAddresses.includes(val)) {
+                            getContractDetails(val);
+                          }
+                        }}
+                      />
+                      <datalist id="contract-search">
+                        {Object.entries(searchObjects).map(([address, val]: any) => (
+                          <option
+                            key={address}
+                            value={address}
+                            label={`${val.contractName ?? 'Storage'}`}
+                          />
+                        ))}
+                      </datalist>
+                    </div>
                   </FormControl>
-                  <FormDescription>
-                    The on-chain address of the target contract.
-                  </FormDescription>
+                  <FormDescription>The on-chain address of the target contract.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -133,21 +183,31 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               name="func"
               rules={{
                 required: 'Function name is required',
-                validate: (v) =>
-                  v.trim().length > 0 || 'Function name cannot be empty',
+                validate: (v) => v.trim().length > 0 || 'Function name cannot be empty',
               }}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Function Name</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="setTokenStatus"
-                      {...field}
-                    />
+                    <Select
+                      value={field.value}
+                      onValueChange={(v) => {
+                        field.onChange(v);
+                        setSelectedFunction(v);
+                      }}
+                      disabled={contractSearchResultsLoading || contractDetailsResultsLoading}
+                    >
+                      <SelectTrigger id="select-function">
+                        <SelectValue placeholder="Select function" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contractFunctions.map((fn) => (
+                          <SelectItem key={fn} value={fn}>{fn}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
-                  <FormDescription>
-                    The exact name of the function to call on the target contract.
-                  </FormDescription>
+                  <FormDescription>The exact function to call.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -157,57 +217,41 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <FormLabel>Arguments</FormLabel>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => append({ value: '' })}
-                  disabled={isSubmitting}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add argument
-                </Button>
               </div>
 
               <div className="space-y-2">
-                {fields.map((field, idx) => (
-                  <FormField
-                    key={field.id}
-                    control={form.control}
-                    name={`args.${idx}.value`}
-                    render={({ field: argField }) => (
-                      <FormItem>
-                        <div className="flex items-center gap-2">
-                          <FormControl className="flex-1">
-                            <Input
-                              placeholder={`Argument ${idx + 1}`}
-                              {...argField}
-                            />
-                          </FormControl>
-                          {fields.length > 1 && (
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => remove(idx)}
-                              disabled={isSubmitting}
-                              className="shrink-0"
-                              title="Remove argument"
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        {idx === 0 && (
-                          <FormDescription>
-                            Enter each argument in call order. Click “Add argument” to append more.
-                          </FormDescription>
-                        )}
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                ))}
+                {fields.map((f, idx) => {
+                  const abi = functionArgs?.[idx];
+                  const abiName = abi?.[0];
+                  const abiType = abi?.[1]?.type?.tag?.toLocaleLowerCase();
+              
+                  return (
+                    <FormField
+                      key={f.id}
+                      control={form.control}
+                      name={`args.${idx}.value`}
+                      rules={{
+                        required: 'Argument is required',
+                        // add per-type validation here if desired (e.g., address, uint, etc.)
+                      }}
+                      render={({ field: argField }) => (
+                        <FormItem>
+                          <div className="flex items-center gap-2">
+                            <FormControl className="flex-1">
+                              <Input
+                                {...argField}
+                                placeholder={
+                                  abiName ? `${abiName}: ${abiType}` : `Argument ${idx + 1}`
+                                }
+                              />
+                            </FormControl>
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  );
+                })}
               </div>
             </div>
 
@@ -226,14 +270,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                 disabled={isSubmitting || !form.formState.isValid}
                 className="bg-strato-blue hover:bg-strato-blue/90"
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting…
-                  </>
-                ) : (
-                  'Create Issue'
-                )}
+                {isSubmitting ? (<> <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting… </>) : 'Create Issue'}
               </Button>
             </div>
           </form>

@@ -24,22 +24,9 @@ const VoteTab = () => {
     getOpenIssues();
   }, []);
 
-  const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
+  const handleCastVoteOnIssue = (target: string, func: string, args: any[]) => {
     castVoteOnIssue(target, func, args);
   };
-
-  const flatten = (arr: any[]) => {
-    let ret = [];
-    for (let i = 0; i < arr.length; i++) {
-      if (Array.isArray(arr[i])) {
-        ret = [ ...ret, ...arr[i]];
-      } else {
-        ret = [ ...ret, arr[i]];
-      }
-    }
-    return ret;
-  }
-
 
   if (openIssuesLoading) {
     return (
@@ -165,7 +152,7 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, flatten(issue.args))}
+                            onClick={() => handleCastVoteOnIssue(address, issue.func, issue.args)}
                             disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >

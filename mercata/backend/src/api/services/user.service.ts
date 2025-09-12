@@ -1,4 +1,4 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { bloc, cirrus, eth, strato } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -177,5 +177,63 @@ export const getOpenIssues = async (
     return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
   } catch (error) {
     return [];
+  }
+};
+
+export const contractSearch = async (
+  accessToken: string,
+  search: string,
+): Promise<object> => {
+  try {
+    const accountResponse = await eth.get(accessToken, "/account", {
+      params: {
+        search
+      },
+    });
+
+    const storageResponse = await eth.get(accessToken, "/storage", {
+      params: {
+        search
+      },
+    });
+
+    if (storageResponse.status !== 200) {
+      return {};
+    }
+
+    let responseData: any[] = [];
+
+    if (accountResponse.data && Array.isArray(storageResponse.data)) {
+      responseData = [ ...responseData, ...accountResponse.data];
+    }
+
+    if (storageResponse.data && Array.isArray(storageResponse.data)) {
+      responseData = [ ...responseData, ...storageResponse.data];
+    }
+
+    return responseData;
+  } catch (error) {
+    return [];
+  }
+};
+
+export const getContractDetails = async (
+  accessToken: string,
+  address: string,
+): Promise<object> => {
+  try {
+    const response = await bloc.get(accessToken, `/contracts/contract/${address}/details`);
+
+    if (response.status !== 200) {
+      return {};
+    }
+
+    if (!response.data) {
+      return {};
+    }
+
+    return response.data;
+  } catch (error) {
+    return {};
   }
 };
