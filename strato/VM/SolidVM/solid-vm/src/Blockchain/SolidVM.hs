@@ -63,7 +63,6 @@ import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
-import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
 import Control.Lens hiding (Context, assign, from, to, uncons)
@@ -357,7 +356,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
-  let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
+  let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
   return
     ExecResults
       { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
@@ -375,8 +374,8 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         erAppName = parentName',
         erNewValidators = newV,
         erRemovedValidators = remV,
-        erNewCerts = newC,
-        erRevokedCerts = revC
+        erNewCerts = [],
+        erRevokedCerts = []
       }
 
 call ::
@@ -434,7 +433,7 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
     solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
-    let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
+    let (newV, remV) = fromDelta . getDeltasFromEvents $ toList finalEvs
 
     return $
       ExecResults
@@ -453,8 +452,8 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
           erAppName = appName,
           erNewValidators = newV,
           erRemovedValidators = remV,
-          erNewCerts = newC,
-          erRevokedCerts = revC
+          erNewCerts = [],
+          erRevokedCerts = []
         }
 
 call' ::
