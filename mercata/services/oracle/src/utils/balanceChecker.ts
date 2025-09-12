@@ -39,14 +39,12 @@ export async function checkUSDSTBalance(): Promise<void> {
     if (balance < CONSTANTS.GAS_FEE_USDST) {
         const gasFeeUSD = Number(CONSTANTS.GAS_FEE_USDST) / 1e18;
         const error = `USDST balance is critically low (less than ${gasFeeUSD} USDST gas fee)`;
-        healthMonitor.recordFailure(error);
         logError('BalanceChecker', new Error(error));
         process.exit(1); // Stop the service immediately
     }
     
     if (balance < CONSTANTS.MIN_USDST_BALANCE) {
         const error = `Low USDST balance: ${balanceUSD} USDST (minimum: 10 USDST). Service will continue but may fail on next transaction.`;
-        healthMonitor.recordFailure(error);
         logError('BalanceChecker', new Error(error));
     }
 }

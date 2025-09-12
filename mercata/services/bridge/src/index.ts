@@ -33,9 +33,9 @@ app.use(
   },
 );
 
-app.get("/health", (_, res) => {
-  const status = healthMonitor.getStatus();
-  res.status(healthMonitor.isHealthy() ? 200 : 503).json(status);
+app.get("/health", async (_, res) => {
+  const errorFileExists = await healthMonitor.errorFileExists();
+  res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
 
 app.listen(port, async () => {
