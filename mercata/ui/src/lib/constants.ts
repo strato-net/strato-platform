@@ -13,6 +13,7 @@ export const musdstAddress = "000000000000000000000000000000000000100f"
 export const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
 export const DECIMALS = 18;
+export const VOUCHERS_PER_UNIT = 100;
 
 // ============================================
 // Transaction fees (display only - validation handled by backend)

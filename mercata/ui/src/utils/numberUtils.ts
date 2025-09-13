@@ -217,24 +217,36 @@ export const fmt = (v: bigint, dec = 18, min = 2, max = 6) => formatBalance(v, u
 export const formatMaxDisplay = (maxTransferable: bigint, tokenSymbol: string, decimals: number): string => {
   if (maxTransferable === 0n) return `0 ${tokenSymbol}`;
   
-  const formatted = fmt(maxTransferable, decimals);
-  const numericPart = formatted.split(' ')[0];
-  const numericValue = parseFloat(numericPart);
+  // Get the full precision value
+  const fullPrecision = formatUnits(maxTransferable, decimals);
+  const fullNumericValue = parseFloat(fullPrecision);
   
   // If very small (less than 0.0000001), show ⪆0
-  if (numericValue < 0.0000001) {
+  if (fullNumericValue < 0.0000001) {
     return `⪆0 ${tokenSymbol}`;
   }
   
+  // Get the truncated value (6 decimal places)
+  const truncated = fmt(maxTransferable, decimals);
+  const truncatedPart = truncated.split(' ')[0];
+  const truncatedNumericValue = parseFloat(truncatedPart);
+  
+  // Check if truncation occurred (values differ)
+  const isApproximation = Math.abs(fullNumericValue - truncatedNumericValue) > 0;
+  
   // For amounts >= 0.0000001, show up to 7 decimals without trailing zeros
-  const parts = numericPart.split('.');
+  const parts = truncatedPart.split('.');
+  let cleanAmount: string;
   if (parts.length === 2) {
     const decimalPart = parts[1].substring(0, 7).replace(/0+$/, '');
-    const cleanAmount = decimalPart ? `${parts[0]}.${decimalPart}` : parts[0];
-    return `${cleanAmount} ${tokenSymbol}`;
+    cleanAmount = decimalPart ? `${parts[0]}.${decimalPart}` : parts[0];
+  } else {
+    cleanAmount = truncatedPart;
   }
   
-  return `${numericPart} ${tokenSymbol}`;
+  // Add approximation symbol if truncation occurred
+  const prefix = isApproximation ? '≈' : '';
+  return `${prefix}${cleanAmount} ${tokenSymbol}`;
 };
 
 // Re-export formatUnits for convenience

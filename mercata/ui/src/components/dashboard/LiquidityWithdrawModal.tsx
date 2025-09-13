@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,14 +9,12 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSwapContext } from "@/context/SwapContext";
-import { WITHDRAW_FEE } from "@/lib/constants";
+import { WITHDRAW_FEE, DECIMALS, VOUCHERS_PER_UNIT } from "@/lib/constants";
 import { LiquidityPool } from "@/interface";
-import { formatBalance, fmt } from "@/utils/numberUtils";
+import { formatBalance, fmt, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/validationUtils";
 import { Balances } from "@/context/UserTokensContext";
 import TokenInput from "@/components/shared/TokenInput";
-
-const VOUCHERS_PER_TX = Math.round(Number(WITHDRAW_FEE) * 100);
 
 interface LiquidityWithdrawModalProps {
   isOpen: boolean;
@@ -36,6 +34,12 @@ const LiquidityWithdrawModal = ({
   balances,
 }: LiquidityWithdrawModalProps) => {
   // ============================================================================
+  // HOOKS & CONTEXT
+  // ============================================================================
+  const { removeLiquidity } = useSwapContext();
+  const { toast } = useToast();
+
+  // ============================================================================
   // STATE
   // ============================================================================
   const [withdrawPercent, setWithdrawPercent] = useState("");
@@ -43,16 +47,10 @@ const LiquidityWithdrawModal = ({
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   // ============================================================================
-  // HOOKS & CONTEXT
-  // ============================================================================
-  const { removeLiquidity } = useSwapContext();
-  const { toast } = useToast();
-
-  // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
 
-  // Collapse repeated BigInt reads into single poolView object
+  // Pool view object
   const poolView = useMemo(() => {
     if (!selectedPool) return null;
     return {
@@ -63,27 +61,20 @@ const LiquidityWithdrawModal = ({
       a: BigInt(selectedPool.tokenABalance ?? "0"),
       b: BigInt(selectedPool.tokenBBalance ?? "0"),
     };
-  }, [
-    selectedPool?.address,
-    selectedPool?.lpToken?._totalSupply,
-    selectedPool?.lpToken?.balances,
-    selectedPool?.tokenABalance,
-    selectedPool?.tokenBBalance,
-    selectedPool?._name,
-    selectedPool?._symbol,
-  ]);
+  }, [selectedPool]);
 
-  // Derive once, reuse everywhere
+  // Derive token names from pool name
   const nameParts = poolView?.name?.split("/") ?? [];
   const tokenAName = nameParts[0] ?? "Token A";
   const tokenBName = nameParts[1] ?? "Token B";
 
+  // Parse and validate withdraw percentage
   const rawPct = Number(withdrawPercent) || 0;
   const clampedPct = Math.max(0, Math.min(100, rawPct));
   const pct = BigInt(Math.floor(clampedPct));
   const hasValidPercent = clampedPct > 0;
 
-  // User position - only memoize this heavy calculation
+  // User position calculation
   const position = useMemo(() => {
     if (!poolView || poolView.total === 0n || poolView.lpBal === 0n)
       return { a: 0n, b: 0n };
@@ -93,14 +84,25 @@ const LiquidityWithdrawModal = ({
     };
   }, [poolView]);
 
-  const lpToBurn =
-    hasValidPercent && poolView ? (poolView.lpBal * pct) / 100n : 0n;
+  // Withdraw amounts
+  const lpToBurn = hasValidPercent && poolView ? (poolView.lpBal * pct) / 100n : 0n;
   const outA = hasValidPercent ? (position.a * pct) / 100n : 0n;
   const outB = hasValidPercent ? (position.b * pct) / 100n : 0n;
 
+  // Fee math
+  const feeWei = safeParseUnits(WITHDRAW_FEE, DECIMALS);
+  const vouchersRequired = Math.round(Number(WITHDRAW_FEE) * VOUCHERS_PER_UNIT);
+  const availableVoucherCount = Math.floor(
+    Number(formatUnits(balances.voucher, DECIMALS)) * VOUCHERS_PER_UNIT
+  );
+
+  // Fee gating
+  const canPayFee = (balances.usdst + balances.voucher) >= feeWei;
+  const feeError = canPayFee ? null : "Insufficient USDST + vouchers for transaction fee";
+
+  // Max transferable calculation
   const maxTransferable = useMemo(() => {
     if (!isOpen || !poolView) return 0n;
-    // Withdraw flow does not send USDST as the asset; fees are paid separately.
     return computeMaxTransferable(
       100n,
       null,
@@ -110,32 +112,15 @@ const LiquidityWithdrawModal = ({
     );
   }, [isOpen, poolView, balances.usdst, balances.voucher]);
 
-  const canSubmit =
-    !withdrawPercentError &&
-    hasValidPercent &&
-    poolView &&
-    poolView.lpBal > 0n &&
-    maxTransferable > 0n &&
-    !withdrawLoading;
-
-  // Get the fee error message from TokenInput or proactive validation
-  const feeError = withdrawPercentError?.includes(
-    "Insufficient USDST + vouchers for transaction fee",
-  )
-    ? withdrawPercentError
-    : maxTransferable === 0n && poolView && poolView.lpBal > 0n
-      ? "Insufficient USDST + vouchers for transaction fee"
-      : null;
-
   // ============================================================================
   // HANDLERS
   // ============================================================================
 
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setWithdrawPercent("");
     setWithdrawPercentError("");
     onClose();
-  };
+  }, [onClose]);
 
   const handleWithdrawSubmit = async () => {
     if (
@@ -143,7 +128,7 @@ const LiquidityWithdrawModal = ({
       operationInProgressRef.current ||
       withdrawLoading ||
       !hasValidPercent ||
-      maxTransferable === 0n
+      !canPayFee
     )
       return;
 
@@ -162,16 +147,10 @@ const LiquidityWithdrawModal = ({
         variant: "success",
       });
 
-      // Success path - refresh data and close modal
-      await onWithdrawSuccess();
       handleClose();
-    } catch (e) {
-      toast({
-        title: "Error",
-        description: String(e),
-        variant: "destructive",
-      });
     } finally {
+      // Always call success callback and reset loading state, even if transaction fails
+      await onWithdrawSuccess();
       setWithdrawLoading(false);
       operationInProgressRef.current = false;
     }
@@ -180,6 +159,15 @@ const LiquidityWithdrawModal = ({
   // ============================================================================
   // RENDER
   // ============================================================================
+
+  const canSubmit =
+    !withdrawPercentError &&
+    hasValidPercent &&
+    poolView &&
+    poolView.lpBal > 0n &&
+    canPayFee &&
+    !withdrawLoading;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -209,9 +197,7 @@ const LiquidityWithdrawModal = ({
               maxTransferable={100n}
               transactionFee={WITHDRAW_FEE}
               decimals={0}
-              disabled={
-                !(poolView && poolView.lpBal > 0n) || maxTransferable === 0n
-              }
+              disabled={!(poolView && poolView.lpBal > 0n) || !canPayFee}
               loading={withdrawLoading}
               usdstBalance={balances.usdst}
               voucherBalance={balances.voucher}
@@ -270,7 +256,13 @@ const LiquidityWithdrawModal = ({
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">
-                {WITHDRAW_FEE} USDST ({VOUCHERS_PER_TX} vouchers)
+                {WITHDRAW_FEE} USDST ({vouchersRequired} vouchers)
+              </span>
+            </div>
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Your vouchers</span>
+              <span className="font-medium">
+                {availableVoucherCount} vouchers
               </span>
             </div>
             {feeError && (

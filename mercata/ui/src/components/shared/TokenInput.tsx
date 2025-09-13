@@ -18,6 +18,7 @@ interface TokenInputProps {
   voucherBalance: bigint;
   onValueChange: (value: string) => void;
   onErrorChange: (error: string) => void;
+  onMaxClick?: () => void;
 }
 
 const TokenInput = ({
@@ -36,6 +37,7 @@ const TokenInput = ({
   voucherBalance,
   onValueChange,
   onErrorChange,
+  onMaxClick,
 }: TokenInputProps) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,6 +62,11 @@ const TokenInput = ({
   const isMaxDisabled = loading || disabled || !maxTransferable || maxTransferable === 0n;
   
   const handleMaxClick = () => {
+    if (onMaxClick) {
+      onMaxClick();
+      return;
+    }
+    
     if (!maxTransferable) return;
     const maxValue = formatUnits(maxTransferable, decimals);
     handleAmountInputChange(

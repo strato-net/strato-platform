@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,14 +9,12 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useSwapContext } from "@/context/SwapContext";
-import { DEPOSIT_FEE, SINGLE_TOKEN_DEPOSIT_FEE } from "@/lib/constants";
+import { DEPOSIT_FEE, SINGLE_TOKEN_DEPOSIT_FEE, DECIMALS, VOUCHERS_PER_UNIT } from "@/lib/constants";
 import { LiquidityPool } from "@/interface";
-import { safeParseUnits } from "@/utils/numberUtils";
+import { safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { computeMaxTransferable } from "@/utils/validationUtils";
 import { Balances } from "@/context/UserTokensContext";
 import TokenInput from "@/components/shared/TokenInput";
-
-const VOUCHERS_PER_UNIT = 100;
 
 interface LiquidityDepositModalProps {
   isOpen: boolean;
@@ -27,6 +25,31 @@ interface LiquidityDepositModalProps {
   balances: Balances;
 }
 
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+const min = (a: bigint, b: bigint) => (a < b ? a : b);
+const floorDiv = (x: bigint, y: bigint) => x / y;
+const ceilDiv = (x: bigint, y: bigint) => (x + y - 1n) / y;
+
+type Side = "A" | "B";
+function canon(side: Side, X: bigint, RA: bigint, RB: bigint, aD: bigint, bD: bigint) {
+  if (RA === 0n || RB === 0n) return { A: 0n, B: 0n };
+  if (side === "A") {
+    const aMaxByB = floorDiv(bD * RA, RB);         // Breq ≤ bD
+    const A = min(X, min(aD, aMaxByB));
+    const B = ceilDiv(A * RB, RA);
+    return { A, B };
+  } else {
+    // Mirror on-chain rule when B is primary: A = floor(B*RA/RB) + 1
+    // To ensure A ≤ aD after the +1, cap B by floor((aD-1)*RB/RA)
+    const bMaxByA = aD > 0n ? floorDiv((aD - 1n) * RB, RA) : 0n; // ensures A<=aD
+    const B = min(X, min(bD, bMaxByA));
+    const A = floorDiv(B * RA, RB) + 1n; // exact contract mirror
+    return { A, B };
+  }
+}
 const LiquidityDepositModal = ({
   isOpen,
   onClose,
@@ -36,235 +59,325 @@ const LiquidityDepositModal = ({
   balances,
 }: LiquidityDepositModalProps) => {
   // ============================================================================
-  // STATE
-  // ============================================================================
-  const [token1Amount, setToken1Amount] = useState("");
-  const [token1AmountError, setToken1AmountError] = useState("");
-  const [token2Amount, setToken2Amount] = useState("");
-  const [token2AmountError, setToken2AmountError] = useState("");
-  const [depositLoading, setDepositLoading] = useState(false);
-
-  // ============================================================================
   // HOOKS & CONTEXT
   // ============================================================================
   const { addLiquidityDualToken, addLiquiditySingleToken } = useSwapContext();
   const { toast } = useToast();
 
-  // Gate heavy work behind isOpen and pool
-  const tokenAMaxAmount =
-    isOpen && selectedPool
-      ? BigInt(selectedPool.tokenA?.balances?.[0]?.balance ?? "0")
-      : 0n;
-  const tokenBMaxAmount =
-    isOpen && selectedPool
-      ? BigInt(selectedPool.tokenB?.balances?.[0]?.balance ?? "0")
-      : 0n;
-  const addrA = isOpen ? (selectedPool?.tokenA?.address ?? null) : null;
-  const addrB = isOpen ? (selectedPool?.tokenB?.address ?? null) : null;
-  const usdst = balances.usdst;
-  const voucher = balances.voucher;
-
-  // Memoize the 4 maxes with minimal deps
-  const maxes = useMemo(() => {
-    if (!isOpen || !selectedPool) return { aS: 0n, bS: 0n, aD: 0n, bD: 0n };
-    return {
-      aS: addrA
-        ? computeMaxTransferable(
-            tokenAMaxAmount,
-            addrA,
-            SINGLE_TOKEN_DEPOSIT_FEE,
-            voucher,
-            usdst,
-          )
-        : 0n,
-      bS: addrB
-        ? computeMaxTransferable(
-            tokenBMaxAmount,
-            addrB,
-            SINGLE_TOKEN_DEPOSIT_FEE,
-            voucher,
-            usdst,
-          )
-        : 0n,
-      aD: addrA
-        ? computeMaxTransferable(
-            tokenAMaxAmount,
-            addrA,
-            DEPOSIT_FEE,
-            voucher,
-            usdst,
-          )
-        : 0n,
-      bD: addrB
-        ? computeMaxTransferable(
-            tokenBMaxAmount,
-            addrB,
-            DEPOSIT_FEE,
-            voucher,
-            usdst,
-          )
-        : 0n,
-    };
-  }, [isOpen, addrA, addrB, tokenAMaxAmount, tokenBMaxAmount, voucher, usdst]);
-
-  // pick initial mode ONCE from real data; no temp
-  const [depositMode, setDepositMode] = useState<"A" | "B" | "A&B">(() => {
-    const canA = maxes.aS > 0n;
-    const canB = maxes.bS > 0n;
-    const canBmin = tokenBMaxAmount > 0n;
-    return canA && canB ? "A&B" : canA ? "A" : canBmin ? "B" : "A&B";
-  });
+  // ============================================================================
+  // STATE
+  // ============================================================================
+  const [Astr, setAstr] = useState("");
+  const [Bstr, setBstr] = useState("");
+  const [token1AmountError, setToken1AmountError] = useState("");
+  const [token2AmountError, setToken2AmountError] = useState("");
+  const [depositLoading, setDepositLoading] = useState(false);
+  const [primary, setPrimary] = useState<"A" | "B">("B");
+  const [depositMode, setDepositMode] = useState<"A" | "B" | "A&B">("A");
 
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
+  // Token balances (only compute when modal is open)
+  const tokenAMaxAmount = useMemo(() => {
+    if (!isOpen || !selectedPool) return 0n;
+    const balance = selectedPool.tokenA?.balances?.[0]?.balance ?? "0";
+    return BigInt(balance);
+  }, [isOpen, selectedPool?.tokenA?.balances]);
+  
+  const tokenBMaxAmount = useMemo(() => {
+    if (!isOpen || !selectedPool) return 0n;
+    const balance = selectedPool.tokenB?.balances?.[0]?.balance ?? "0";
+    return BigInt(balance);
+  }, [isOpen, selectedPool?.tokenB?.balances]);
 
-  // Build poolView once for readability (gated by isOpen && selectedPool)
-  const poolView =
-    isOpen && selectedPool
-      ? {
-          nameA: selectedPool._name?.split("/")?.[0] ?? "Token A",
-          nameB: selectedPool._name?.split("/")?.[1] ?? "Token B",
-          decA: selectedPool.tokenA?.customDecimals ?? 18,
-          decB: selectedPool.tokenB?.customDecimals ?? 18,
-          ratioStr: Number.isFinite(Number(selectedPool.aToBRatio))
-            ? Number(selectedPool.aToBRatio).toFixed(6)
-            : "N/A",
-        }
-      : null;
+  const { usdst, voucher } = balances;
 
-  const maxA = depositMode === "A&B" ? maxes.aD : maxes.aS;
-  const maxB = depositMode === "A&B" ? maxes.bD : maxes.bS;
+  // Pool view object - memoized from stable inputs
+  const poolView = useMemo(() => {
+    if (!isOpen || !selectedPool) return null;
+    
+    const [nameA = "", nameB = ""] = (selectedPool._name || "Token A/Token B").split("/");
+    
+    return {
+      nameA,
+      nameB,
+      decA: 18, // Default to 18 decimals
+      decB: 18, // Default to 18 decimals
+      RA: BigInt(selectedPool.tokenABalance ?? "0"),
+      RB: BigInt(selectedPool.tokenBBalance ?? "0"),
+      lpTotalSupply: BigInt(selectedPool.lpToken?._totalSupply ?? "0"),
+    };
+  }, [isOpen, selectedPool?.address, selectedPool?.tokenABalance, selectedPool?.tokenBBalance, selectedPool?.lpToken?._totalSupply]);
 
-  // Check if user can pay fees for current deposit mode
-  const maxTransferable = depositMode === "A" ? maxA : depositMode === "B" ? maxB : 0;
+  // Derived constants
+  const decA = poolView?.decA ?? 18;
+  const decB = poolView?.decB ?? 18;
+  const isDual = depositMode === "A&B";
+  const isBootstrap = !!poolView && poolView.lpTotalSupply === 0n;
+  
+  // Minimum A needed for dual deposits (when pool has existing liquidity)
+  const AMin = useMemo(() => {
+    if (!poolView || isBootstrap) return 0n;
+    return 1n + ceilDiv(poolView.RA, poolView.RB);
+  }, [poolView, isBootstrap]);
+  
+  
+  // Convert strings to wei when needed - memoized to avoid re-parsing
+  const Awei = useMemo(() => safeParseUnits(Astr, decA), [Astr, decA]);
+  const Bwei = useMemo(() => safeParseUnits(Bstr, decB), [Bstr, decB]);
 
-  // Validation fee and voucher calculation
-  const validationFee =
-    depositMode === "A&B" ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE;
-  const depositVouchersRequired = Math.round(
-    Number(validationFee) * VOUCHERS_PER_UNIT,
-  );
+  // Fee calculations
+  const TEN_DEC = 10n ** BigInt(DECIMALS);
+  const feeWeiDual = safeParseUnits(DEPOSIT_FEE, DECIMALS);
+  const feeWeiSingle = safeParseUnits(SINGLE_TOKEN_DEPOSIT_FEE, DECIMALS);
+  
+  const vouchersRequiredDual = Math.round(Number((feeWeiDual * BigInt(VOUCHERS_PER_UNIT)) / TEN_DEC));
+  const vouchersRequiredSingle = Math.round(Number((feeWeiSingle * BigInt(VOUCHERS_PER_UNIT)) / TEN_DEC));
 
-  // Get the fee error message from either TokenInput or proactive validation
-  const feeError = token1AmountError?.includes(
-    "Insufficient USDST + vouchers for transaction fee",
-  )
-    ? token1AmountError
-    : token2AmountError?.includes(
-          "Insufficient USDST + vouchers for transaction fee",
-        )
-      ? token2AmountError
-      : maxTransferable === 0n
-        ? "Insufficient USDST + vouchers for transaction fee"
-        : null;
+  // Fee gating
+  const canPayFee = isDual
+    ? (usdst + voucher) >= feeWeiDual
+    : (usdst + voucher) >= feeWeiSingle;
+  const feeError = canPayFee ? null : `Insufficient USDST + vouchers for transaction fee. You have ${formatUnits(usdst + voucher, DECIMALS)} USDST, need ${isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE} USDST`;
+  const validationFee = isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE;
+  const vouchersRequired = isDual ? vouchersRequiredDual : vouchersRequiredSingle;
+
+  // Max transferable amounts (after fees)
+  const maxes = useMemo(() => {
+    if (!isOpen || !selectedPool) return { aS: 0n, bS: 0n, aD: 0n, bD: 0n };
+    
+    const addrA = selectedPool.tokenA?.address;
+    const addrB = selectedPool.tokenB?.address;
+    
+    const aS = computeMaxTransferable(tokenAMaxAmount, addrA, SINGLE_TOKEN_DEPOSIT_FEE, voucher, usdst);
+    const bS = computeMaxTransferable(tokenBMaxAmount, addrB, SINGLE_TOKEN_DEPOSIT_FEE, voucher, usdst);
+    const aD = computeMaxTransferable(tokenAMaxAmount, addrA, DEPOSIT_FEE, voucher, usdst);
+    const bD = computeMaxTransferable(tokenBMaxAmount, addrB, DEPOSIT_FEE, voucher, usdst);
+    
+    return { aS, bS, aD, bD };
+  }, [isOpen, selectedPool?.address, selectedPool?.tokenA?.address, selectedPool?.tokenB?.address, tokenAMaxAmount, tokenBMaxAmount, voucher, usdst]);
+
+  // Check if dual deposits are feasible
+  const dualFeasible = useMemo(() => {
+    if (!poolView) return false;
+    if (isBootstrap) return maxes.aD > 0n && maxes.bD > 0n;
+    return maxes.aD >= AMin && maxes.bD > 0n;
+  }, [poolView, isBootstrap, maxes.aD, maxes.bD, AMin]);
+
+  // Token balance error (only show if user can pay fees but has no tokens)
+  const tokenBalanceError = (maxes.aS <= 0n && maxes.bS <= 0n && canPayFee) ? "You only have enough USDST to cover transaction fees, but no tokens to deposit" : null;
+
+  // Update deposit mode based on available balances
+  useEffect(() => {
+    const canA = maxes.aD > 0n;
+    const canB = maxes.bD > 0n;
+    const canAmin = maxes.aS > 0n;
+    const canBmin = maxes.bS > 0n;
+    
+    if (dualFeasible) {
+      setDepositMode("A&B");
+    } else if (canA && canAmin) {
+      setDepositMode("A");
+    } else if (canB && canBmin) {
+      setDepositMode("B");
+    } else {
+      setDepositMode("A");
+    }
+  }, [dualFeasible, maxes.aD, maxes.bD, maxes.aS, maxes.bS]);
+
+  // Dual mode max amounts (canonicalized to pool ratio)
+  const dualMax = useMemo(() => {
+    if (!poolView || !isDual || isBootstrap) return { A: maxes.aD, B: maxes.bD };
+    
+    return {
+      A: canon("A", maxes.aD, poolView.RA, poolView.RB, maxes.aD, maxes.bD).A,
+      B: canon("B", maxes.bD, poolView.RA, poolView.RB, maxes.aD, maxes.bD).B,
+    };
+  }, [isDual, isBootstrap, poolView?.RA, poolView?.RB, maxes.aD, maxes.bD]);
+
+  const maxA = isDual ? maxes.aD : maxes.aS;
+  const maxB = isDual ? maxes.bD : maxes.bS;
 
   // ============================================================================
-  // UTILITIES
+  // EFFECTS
   // ============================================================================
 
-  // Guarded setters to avoid redundant re-renders (e.g., when clicking Max sets same value)
-  const setToken1AmountSafe = (v: string) =>
-    setToken1Amount((prev) => (prev === v ? prev : v));
-  const setToken2AmountSafe = (v: string) =>
-    setToken2Amount((prev) => (prev === v ? prev : v));
-  const setToken1ErrorSafe = (e: string) =>
-    setToken1AmountError((prev) => (prev === e ? prev : e));
-  const setToken2ErrorSafe = (e: string) =>
-    setToken2AmountError((prev) => (prev === e ? prev : e));
+  // Canonicalize when entering dual mode - trimmed dependencies
+  useEffect(() => {
+    if (!poolView) return;
+    if (isDual && (Awei > 0n || Bwei > 0n) && !isBootstrap) {
+      if (primary === "A") {
+        const { A, B } = canon("A", Awei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+        setAstr(formatUnits(A, decA));
+        setBstr(formatUnits(B, decB));
+      } else {
+        const { A, B } = canon("B", Bwei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+        setAstr(formatUnits(A, decA));
+        setBstr(formatUnits(B, decB));
+      }
+    }
+  }, [isDual, isBootstrap, primary, poolView?.RA, poolView?.RB, maxes.aD, maxes.bD, Awei, Bwei, decA, decB]);
+
+  // Reset on pool change
+  useEffect(() => {
+    setAstr("");
+    setBstr("");
+    setPrimary("B");
+  }, [selectedPool?.address]);
 
   // ============================================================================
   // HANDLERS
   // ============================================================================
 
-  const handleClose = () => {
-    setToken1Amount("");
-    setToken2Amount("");
-    setToken1AmountError("");
-    setToken2AmountError("");
-    onClose();
-  };
+  const handleTokenChange = useCallback((side: "A" | "B", value: string) => {
+    if (!poolView) return;
+    
+    const isA = side === "A";
+    const decimals = isA ? decA : decB;
+    const inputBigInt = safeParseUnits(value, decimals);
+    
+    // Update the edited field
+    if (isA) setAstr(value);
+    else setBstr(value);
+    
+    // Single mode or bootstrap - no canonicalization needed
+    if (depositMode === side || isBootstrap) return;
 
-  const isConfirmButtonDisabled =
-    depositLoading ||
-    !!token1AmountError ||
-    !!token2AmountError ||
-    (depositMode === "A" && !token1Amount) ||
-    (depositMode === "B" && !token2Amount) ||
-    (depositMode === "A&B" && (!token1Amount || !token2Amount));
+    // Dual mode with existing liquidity - canonicalize from edited side
+    if (isA) {
+      const { A, B } = canon("A", inputBigInt, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(value);
+      setBstr(formatUnits(B, decB));
+    } else {
+      const { A, B } = canon("B", inputBigInt, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(formatUnits(A, decA));
+      setBstr(formatUnits(B, decB));
+    }
+  }, [poolView, decA, decB, depositMode, isBootstrap, maxes.aD, maxes.bD]);
 
-  const handleDepositSubmit = async () => {
-    if (!selectedPool || operationInProgressRef.current) return;
+  // Prebind the two handlers once for stability
+  const onAChange = useCallback((value: string) => handleTokenChange("A", value), [handleTokenChange]);
+  const onBChange = useCallback((value: string) => handleTokenChange("B", value), [handleTokenChange]);
 
-    // Check for validation errors first
-    if (token1AmountError || token2AmountError) {
-      toast({
-        title: "Error",
-        description: "Please fix validation errors before proceeding",
-        variant: "destructive",
-      });
+  const handleMaxClick = useCallback((side: "A" | "B") => () => {
+    if (!poolView) return;
+    
+    if (depositMode === side) {
+      // Single mode - set to max
+      if (side === "A") {
+        setAstr(formatUnits(maxes.aS, decA));
+      } else {
+        setBstr(formatUnits(maxes.bS, decB));
+      }
       return;
     }
 
+    // Bootstrap mode - set to spendable cap
+    if (isBootstrap) {
+      if (side === "A") {
+        setAstr(formatUnits(maxes.aD, decA));
+      } else {
+        setBstr(formatUnits(maxes.bD, decB));
+      }
+      return;
+    }
+
+    // Dual mode with existing liquidity - use canonical functions with spendable caps
+    if (side === "A") {
+      const { A, B } = canon("A", maxes.aD, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(formatUnits(A, decA));
+      setBstr(formatUnits(B, decB));
+    } else {
+      const { A, B } = canon("B", maxes.bD, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(formatUnits(A, decA));
+      setBstr(formatUnits(B, decB));
+    }
+  }, [poolView, depositMode, isBootstrap, maxes.aS, maxes.bS, maxes.aD, maxes.bD, decA, decB]);
+
+  const handlePrimaryToggle = useCallback(() => {
+    if (!poolView || !isDual) return;
+    setPrimary(primary === "A" ? "B" : "A");
+  }, [poolView, isDual, primary]);
+
+  const handleDepositModeChange = useCallback((mode: "A" | "B" | "A&B") => {
+    setDepositMode(mode);
+    if (mode === "A") {
+      setBstr("");
+    } else if (mode === "B") {
+      setAstr("");
+    }
+  }, []);
+
+  const handleClose = useCallback(() => {
+    setAstr("");
+    setBstr("");
+    setToken1AmountError("");
+    setToken2AmountError("");
+    onClose();
+  }, [onClose]);
+
+  const handleDepositSubmit = async () => {
+    if (
+      !poolView ||
+      operationInProgressRef.current ||
+      depositLoading ||
+      !canPayFee
+    )
+      return;
+
+    operationInProgressRef.current = true;
+    setDepositLoading(true);
+
     try {
-      operationInProgressRef.current = true;
-      setDepositLoading(true);
-      
-      if (depositMode === "A") {
-        // Single token mode - Token A
-        const token1AmountWei = safeParseUnits(
-          token1Amount,
-          poolView?.decA ?? 18,
-        );
+      if (depositMode === "A" || depositMode === "B") {
         await addLiquiditySingleToken({
-          poolAddress: selectedPool.address,
-          singleTokenAmount: token1AmountWei.toString(),
-          isAToB: true,
-        });
-      } else if (depositMode === "B") {
-        // Single token mode - Token B
-        const token2AmountWei = safeParseUnits(
-          token2Amount,
-          poolView?.decB ?? 18,
-        );
-        await addLiquiditySingleToken({
-          poolAddress: selectedPool.address,
-          singleTokenAmount: token2AmountWei.toString(),
-          isAToB: false,
+          poolAddress: selectedPool!.address,
+          singleTokenAmount: (depositMode === "A" ? Awei : Bwei).toString(),
+          isAToB: depositMode === "A",
         });
       } else {
-        // Dual token mode
-        const isInitialLiquidity =
-          BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-        const aRaw = safeParseUnits(token1Amount || "0", poolView?.decA ?? 18);
-        const tokenAAmount = isInitialLiquidity ? aRaw : (aRaw * 102n) / 100n; // 2% slippage using BigInt
-        const tokenBAmount = safeParseUnits(
-          token2Amount || "0",
-          poolView?.decB ?? 18,
-        );
-        
-        await addLiquidityDualToken({
-          poolAddress: selectedPool.address,
-          maxTokenAAmount: tokenAAmount.toString(),
-          tokenBAmount: tokenBAmount.toString(),
-        });
+        // Dual mode: validate and clamp to ensure contract acceptance
+        if (!isBootstrap) {
+          const { RA, RB } = poolView;
+          const bMax = Awei > 0n ? floorDiv((Awei - 1n) * RB, RA) : 0n;
+          const Bclamped = Bwei > bMax ? bMax : Bwei;
+          const Areq = floorDiv(Bclamped * RA, RB) + 1n;
+          
+          if (Awei < Areq) {
+            toast({
+              title: "Invalid amounts",
+              description: `Token A amount too small for dual deposit. Required: ${formatUnits(Areq, decA)}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          await addLiquidityDualToken({
+            poolAddress: selectedPool!.address,
+            maxTokenAAmount: Areq.toString(),
+            tokenBAmount: Bclamped.toString(),
+          });
+        } else {
+          // Bootstrap mode: no ratio constraints
+          await addLiquidityDualToken({
+            poolAddress: selectedPool!.address,
+            maxTokenAAmount: Awei.toString(),
+            tokenBAmount: Bwei.toString(),
+          });
+        }
       }
 
       toast({
         title: "Success",
-        description: `${selectedPool._name} deposited successfully.`,
+        description: `Liquidity added to ${poolView.nameA}/${poolView.nameB}`,
         variant: "success",
       });
 
       handleClose();
-      await onDepositSuccess();
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: String(error),
-        variant: "destructive",
-      });
     } finally {
+      // Always call success callback and reset loading state, even if transaction fails
+      await onDepositSuccess();
       setDepositLoading(false);
       operationInProgressRef.current = false;
     }
@@ -273,16 +386,22 @@ const LiquidityDepositModal = ({
   // ============================================================================
   // RENDER
   // ============================================================================
+
+  const isConfirmButtonDisabled =
+    depositLoading ||
+    !!token1AmountError ||
+    !!token2AmountError ||
+    !canPayFee ||
+    (depositMode === "A" && Awei === 0n) ||
+    (depositMode === "B" && Bwei === 0n) ||
+    (isDual && (Awei === 0n || Bwei === 0n)) ||
+    (isDual && !dualFeasible);
+
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) handleClose();
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Deposit Liquidity</DialogTitle>
+          <DialogTitle>Add Liquidity</DialogTitle>
           <DialogDescription>
             Add liquidity to the {selectedPool?._name} pool
           </DialogDescription>
@@ -301,7 +420,7 @@ const LiquidityDepositModal = ({
               type="button"
               variant={depositMode === "A" ? "default" : "outline"}
               size="sm"
-              onClick={() => setDepositMode("A")}
+              onClick={() => handleDepositModeChange("A")}
               disabled={maxes.aS <= 0n}
               className="flex-1 text-xs"
             >
@@ -312,7 +431,7 @@ const LiquidityDepositModal = ({
               type="button"
               variant={depositMode === "B" ? "default" : "outline"}
               size="sm"
-              onClick={() => setDepositMode("B")}
+              onClick={() => handleDepositModeChange("B")}
               disabled={maxes.bS <= 0n}
               className="flex-1 text-xs"
             >
@@ -323,50 +442,90 @@ const LiquidityDepositModal = ({
               type="button"
               variant={depositMode === "A&B" ? "default" : "outline"}
               size="sm"
-              onClick={() => setDepositMode("A&B")}
-              disabled={maxes.aD <= 0n || maxes.bD <= 0n}
+              onClick={() => handleDepositModeChange("A&B")}
+              disabled={!dualFeasible}
               className="flex-1 text-xs"
             >
               Both Tokens
             </Button>
           </div>
+          
+          {/* Helper text when Both Tokens button is disabled */}
+          {!dualFeasible && maxes.aD > 0n && maxes.bD > 0n && !isBootstrap && (
+            <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
+              Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
+            </div>
+          )}
+
+          {/* Primary Selection for Dual Mode */}
+          {depositMode === "A&B" && (
+            <div className="flex space-x-2 p-1">
+              <Button
+                type="button"
+                variant={primary === "A" ? "default" : "outline"}
+                size="sm"
+                onClick={handlePrimaryToggle}
+                className="flex-1 text-xs"
+              >
+                {poolView?.nameA} Primary
+              </Button>
+              <Button
+                type="button"
+                variant={primary === "B" ? "default" : "outline"}
+                size="sm"
+                onClick={handlePrimaryToggle}
+                className="flex-1 text-xs"
+              >
+                {poolView?.nameB} Primary
+              </Button>
+            </div>
+          )}
 
           {/* Token Inputs */}
           <div className="grid grid-cols-1 gap-4 px-1">
             <TokenInput
-              value={token1Amount}
+              value={Astr}
               error={token1AmountError}
               tokenName={`${poolView?.nameA} Amount`}
               tokenSymbol={selectedPool?.tokenA?.symbol || poolView?.nameA}
               tokenAddress={selectedPool?.tokenA?.address || ""}
               maxAmount={tokenAMaxAmount}
-              maxTransferable={maxA}
-              transactionFee={validationFee}
-              decimals={poolView?.decA ?? 18}
-              disabled={maxA <= 0n || depositMode === "B"}
+              maxTransferable={isDual ? dualMax.A : maxA}
+              transactionFee={isDual ? "0" : validationFee}
+              decimals={decA}
+              disabled={maxA <= 0n || depositMode === "B" || (isDual && primary === "B" && !isBootstrap)}
               loading={depositLoading}
               usdstBalance={usdst}
               voucherBalance={voucher}
-              onValueChange={setToken1AmountSafe}
-              onErrorChange={setToken1ErrorSafe}
+              onValueChange={onAChange}
+              onErrorChange={setToken1AmountError}
+              onMaxClick={handleMaxClick("A")}
             />
+            
+            {/* Helper text for dual mode minimum A */}
+            {isDual && !isBootstrap && !dualFeasible && maxes.aD > 0n && (
+              <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
+              </div>
+            )}
 
             <TokenInput
-              value={token2Amount}
+              value={Bstr}
               error={token2AmountError}
               tokenName={`${poolView?.nameB} Amount`}
               tokenSymbol={selectedPool?.tokenB?.symbol || poolView?.nameB}
               tokenAddress={selectedPool?.tokenB?.address || ""}
               maxAmount={tokenBMaxAmount}
-              maxTransferable={maxB}
-              transactionFee={validationFee}
-              decimals={poolView?.decB ?? 18}
-              disabled={maxB <= 0n || depositMode === "A"}
+              maxTransferable={isDual ? dualMax.B : maxB}
+              transactionFee={isDual ? "0" : validationFee}
+              decimals={decB}
+              disabled={maxB <= 0n || depositMode === "A" || (isDual && primary === "A" && !isBootstrap)}
               loading={depositLoading}
               usdstBalance={usdst}
               voucherBalance={voucher}
-              onValueChange={setToken2AmountSafe}
-              onErrorChange={setToken2ErrorSafe}
+              onValueChange={onBChange}
+              onErrorChange={setToken2AmountError}
+              onMaxClick={handleMaxClick("B")}
             />
           </div>
 
@@ -381,25 +540,27 @@ const LiquidityDepositModal = ({
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">
-                  Current pool ratio
-                </span>
+                <span className="text-sm text-gray-500">Current pool ratio</span>
                 <span className="font-medium text-sm text-right">
-                  {selectedPool &&
-                    `1 ${poolView?.nameA} = ${poolView?.ratioStr} ${poolView?.nameB}`}
+                  {selectedPool && poolView &&
+                    `1 ${poolView.nameA} = ${Number(selectedPool.aToBRatio || 0).toFixed(6)} ${poolView.nameB}`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Transaction fee</span>
                 <span className="font-medium text-sm">
-                  {validationFee} USDST ({depositVouchersRequired} vouchers
-                  required)
+                  {validationFee} USDST ({vouchersRequired} vouchers)
                 </span>
               </div>
             </div>
             {feeError && (
               <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
                 <p className="text-sm text-red-600">{feeError}</p>
+              </div>
+            )}
+            {tokenBalanceError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{tokenBalanceError}</p>
               </div>
             )}
           </div>
@@ -411,7 +572,7 @@ const LiquidityDepositModal = ({
               type="submit"
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
             >
-              {depositLoading ? "Depositing..." : "Confirm Deposit"}
+              {depositLoading ? "Adding Liquidity..." : "Confirm Deposit"}
             </Button>
           </div>
         </form>
