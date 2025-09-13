@@ -753,12 +753,11 @@ contract record CDPEngine is Ownable {
     uint256 public juniorIndex;                   // init lazily to 1e27
     uint256 public totalJuniorOutstandingUSD;     // sum of all capUSD
     uint256 private prevReserveBalance;          // last Reserve balance accounted into index
-    uint256 private juniorCarryUSD;               // unindexed USD remainder from rounding
 
     struct JuniorNote {
         address owner;
-        uint256 capUSD;       // remaining amount to be paid (starts at principal + premium)
-        uint256 entryIndex;   // snapshot of juniorIndex at last rebase/claim
+        uint256 capUSD;       // remaining cap (decreases on claims)
+        uint256 entryIndex;   // earning baseline (resets on claims)
     }
 
     mapping(address => JuniorNote) public record juniorNotes;
@@ -798,20 +797,14 @@ contract record CDPEngine is Ownable {
 
         uint256 outstanding = totalJuniorOutstandingUSD;
         if (outstanding == 0) {
-            // No juniors outstanding: park inflow to carry to avoid precision loss
-            juniorCarryUSD += deltaUSD;
-            prevReserveBalance = reserveBal;                   // we've accounted this balance
+            // No juniors outstanding: skip indexing
+            prevReserveBalance = reserveBal;
             return;
         }
 
-        // Convert USD inflow into an index bump (RAY scale), with exact carry handling.
-        // We do integer math in USD, then translate to RAY only for the delta.
-        uint256 numerUSD   = juniorCarryUSD + deltaUSD;                 // total inflow to allocate
-        uint256 deltaIndex = (numerUSD * 1e27) / outstanding;           // RAY
-        uint256 usedUSD    = (deltaIndex * outstanding) / 1e27;         // exact USD actually indexed
-        juniorCarryUSD     = numerUSD - usedUSD;                        // remainder to carry forward
-
-        juniorIndex       += deltaIndex;
+        // Convert USD inflow into an index bump (RAY scale)
+        uint256 deltaIndex = (deltaUSD * 1e27) / outstanding;  // RAY
+        juniorIndex += deltaIndex;
         prevReserveBalance = reserveBal;                                      // balance is fully accounted
     }
 
@@ -857,21 +850,24 @@ contract record CDPEngine is Ownable {
             totalJuniorOutstandingUSD += capUSD;
             emit JuniorNoteCreated(msg.sender, capUSD);
         } else {
-            // Rebase existing note to realize entitlement (accounting only)
-            uint256 ent = _entitlement(note, juniorIndex);
-            if (ent > 0) {
-                note.capUSD = (ent > note.capUSD) ? 0 : (note.capUSD - ent);
-                totalJuniorOutstandingUSD = (ent > totalJuniorOutstandingUSD)
-                    ? 0
-                    : (totalJuniorOutstandingUSD - ent);
+            // Merge new contribution with existing note using blended entry index
+            uint256 oldCap = note.capUSD;
+            uint256 oldEntry = note.entryIndex;
+            uint256 newCap = oldCap + capUSD;
+            
+            // Blended entry = currentIndex - (oldCap/newCap) * (currentIndex - oldEntry)
+            uint256 blendedEntry = juniorIndex;
+            if (juniorIndex > oldEntry) {
+                uint256 indexGrowth = juniorIndex - oldEntry;
+                uint256 adjustment = (oldCap * indexGrowth) / newCap;
+                blendedEntry = juniorIndex - adjustment;
             }
-            note.entryIndex = juniorIndex;
-
-            // Add new cap at *current* index (doesn't retro-earn)
-            note.capUSD += capUSD;
+            
+            note.capUSD = newCap;
+            note.entryIndex = blendedEntry;
             totalJuniorOutstandingUSD += capUSD;
-
-            emit JuniorNoteCreated(msg.sender, note.capUSD);
+            
+            emit JuniorNoteCreated(msg.sender, newCap);
         }
     }
 
@@ -884,10 +880,12 @@ contract record CDPEngine is Ownable {
         uint256 last = note.entryIndex;
         if (idx <= last) return 0;
 
+        // Simple: remaining cap earns from its entry point
         uint256 ent = (note.capUSD * (idx - last)) / 1e27;  // RAY → USD
-        if (ent > note.capUSD) ent = note.capUSD;
+        if (ent > note.capUSD) ent = note.capUSD;  // Cap at remaining cap
         return ent;
     }
+
 
     /// @notice Calculate effective index including unaccounted reserve inflows
     function _effectiveIndexView() internal view returns (uint256 idxEff) {
@@ -900,9 +898,8 @@ contract record CDPEngine is Ownable {
         uint256 outstanding = totalJuniorOutstandingUSD;
         if (outstanding == 0) return idx;           // nothing to allocate in view
 
-        // Hypothetical index bump if we synced right now (using carry)
-        uint256 numerUSD   = juniorCarryUSD + deltaUSD;
-        uint256 deltaIndex = (numerUSD * 1e27) / outstanding;
+        // Hypothetical index bump if we synced right now
+        uint256 deltaIndex = (deltaUSD * 1e27) / outstanding;
         return idx + deltaIndex;
     }
 
@@ -914,43 +911,35 @@ contract record CDPEngine is Ownable {
     }
 
     /// @notice Claim maximum available from user's junior note
-    function claimJunior() external {
+    function claimJuniors() external {
+        _syncReserveToIndex();
         JuniorNote storage note = juniorNotes[msg.sender];
         require(note.owner != address(0), "junior: no note");
-
-        // 1) Pull the latest Reserve inflows into the index
-        _syncReserveToIndex();
-
-        // 2) Economic entitlement since last entryIndex
-        uint256 ent = _entitlement(note, juniorIndex);
-        require(ent > 0, "junior: nothing to claim");
-
-        // 3) Liquidity bound
+        
+        uint256 noteEntitlement = _entitlement(note, juniorIndex);
+        require(noteEntitlement > 0, "junior: nothing to claim");
+        
         uint256 reserveBal = registry.cdpReserve().balance();
         require(reserveBal > 0, "junior: reserve empty");
-
-        uint256 toPay = ent <= reserveBal ? ent : reserveBal;
-
-        // 4) Transfer and account
+        
+        uint256 toPay = noteEntitlement <= reserveBal ? noteEntitlement : reserveBal;
+        
+        // Transfer and update note
         _cdpReserve().transferTo(msg.sender, toPay);
-
-        note.capUSD = (toPay > note.capUSD) ? 0 : (note.capUSD - toPay);
-        note.entryIndex = juniorIndex; // rebase to current
-
-        // Global outstanding down by *paid* amount
-        totalJuniorOutstandingUSD = (toPay > totalJuniorOutstandingUSD)
-            ? 0
-            : (totalJuniorOutstandingUSD - toPay);
-
-        // Keep prevReserveBalance in sync with its actual balance decrease
+        note.capUSD -= toPay;           // Cap-down
+        note.entryIndex = juniorIndex;  // Reset to current index
+        
+        // Global accounting
+        totalJuniorOutstandingUSD -= toPay;
         prevReserveBalance -= toPay;
-
+        
         emit JuniorNoteClaimed(msg.sender, toPay, note.capUSD);
-
-        // Optional: close the note when fully repaid
+        
+        // Remove note if fully repaid
         if (note.capUSD == 0) {
             delete juniorNotes[msg.sender];
             emit JuniorNoteClosed(msg.sender);
         }
     }
+
 }
