@@ -24,13 +24,12 @@ import Blockchain.Blockstanbul.StateMachine
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class (blockHash, DummyCertRevocation(..))
+import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Conduit
-import Control.Arrow ((&&&))
 import Control.Lens hiding (view)
 import Control.Monad hiding (sequence)
 import qualified Control.Monad.Change.Alter as A
@@ -176,18 +175,14 @@ nextRound nt = do
 
   when (isJust self) $ isValidator .= (Validator (fromJust self) `elem` vals)
 
-applyValidatorAndCertChanges ::
+applyValidatorChanges ::
   ( (Address `A.Alters` X509CertInfoState) m
   , MonadState BlockstanbulContext m
   ) =>
   BlockHeader ->
   m ()
-applyValidatorAndCertChanges BlockHeader{} = pure ()
-applyValidatorAndCertChanges BlockHeaderV2{..} = do
-  A.insertMany (A.Proxy @X509CertInfoState) . M.fromList $
-    (userAddress &&& id) . x509CertToCertInfoState <$> newCerts
-  A.deleteMany (A.Proxy @X509CertInfoState) $
-    (\(DummyCertRevocation a) -> a) <$> revokedCerts
+applyValidatorChanges BlockHeader{} = pure ()
+applyValidatorChanges BlockHeaderV2{..} = do
   validators %= (S.union $ S.fromList newValidators)
   validators %= (flip S.difference $ S.fromList removedValidators)
 
@@ -198,7 +193,7 @@ commitBlock ::
   Block ->
   ConduitM InEvent EOutEvent m ()
 commitBlock blk = do
-  lift . applyValidatorAndCertChanges $ blockBlockData blk
+  lift . applyValidatorChanges $ blockBlockData blk
   yieldR $ ToCommit blk
   let hsh = blockHash blk
   $logInfoS "blockstanbul" . T.pack $ "Successful block commit of " ++ format hsh

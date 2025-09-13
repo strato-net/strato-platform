@@ -269,7 +269,7 @@ makeNewBlock mineTransactions mSelfAddress = do
           let lastHead = B.bestBlockHeader cache
           let promoted = take ((fromInteger flags_maxTxsPerBlock) - lastExecLen) $ B.promotedTransactions cache
           let time = B.startTimestamp cache
-          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty mempty
+          let tempBlockHeader = buildNextBlockHeader lastHead lastSHA lastSR [] time mempty
           let remGas = B.remainingGas cache
           $logDebugS "Bagger.makeNewBlock" . T.pack $ "pre-incremental run :: (" ++ show remGas ++ ", " ++ format lastSR ++ ")"
           withBagger $ do
@@ -533,10 +533,10 @@ buildFromMiningCache = do
   let parentHash = B.bestBlockSHA cache
   let parentHeader = B.bestBlockHeader cache
   let stateRoot = B.lastExecutedStateRoot cache
-  let (vDelt, cDelt) = getDeltasFromResults $ B.lastExecutedTxs cache
+  let vDelt = getDeltasFromResults $ B.lastExecutedTxs cache
   let txs = (trrTransaction <$> B.lastExecutedTxs cache) ++ (DL.toList $ B.privateHashes cache)
   let time = B.startTimestamp cache
-  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt cDelt
+  let nextBlockData = buildNextBlockHeader parentHeader parentHash stateRoot txs time vDelt
   recordMaxBlockNumber "bagger_build" . number $ nextBlockData
   rewardedBlockData <- buildRewardedBlockHeader nextBlockData
   when isPBFT $
@@ -556,12 +556,10 @@ buildNextBlockHeader ::
   [OutputTx] ->
   UTCTime ->
   ValidatorDelta ->
-  CertDelta ->
   BlockHeader
-buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
+buildNextBlockHeader parentHeader parentHash stateRoot txs time vd =
   let parentNum = number parentHeader
       (newV, remV) = fromDelta vd
-      (newC, revC) = fromDelta cd
       curValidators = case parentHeader of
         BlockHeaderV2{} -> S.toList $ S.difference
                                        (S.union
@@ -582,8 +580,6 @@ buildNextBlockHeader parentHeader parentHash stateRoot txs time vd cd =
           currentValidators = curValidators,
           newValidators = newV,
           removedValidators = remV,
-          newCerts = newC,
-          revokedCerts = revC,
           proposalSignature = Nothing,
           signatures = []
         }

@@ -3,7 +3,6 @@
 
 module Blockchain.Strato.Model.Class where
 
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
@@ -63,8 +62,6 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderValidators :: h -> [Validator]
   blockHeaderNewValidators :: h -> [Validator]
   blockHeaderRemovedValidators :: h -> [Validator]
-  blockHeaderNewCerts :: h -> [X509Certificate]
-  blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
   blockHeaderProposal :: h -> Maybe Signature
   blockHeaderSignatures :: h -> [Signature]
   blockHeaderVersion :: h -> Int
@@ -90,8 +87,6 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
     blockHeaderValidators,
     blockHeaderNewValidators,
     blockHeaderRemovedValidators,
-    blockHeaderNewCerts,
-    blockHeaderRevokedCerts,
     blockHeaderProposal,
     blockHeaderSignatures,
     morphBlockHeader,

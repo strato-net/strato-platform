@@ -365,8 +365,6 @@ blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
               currentValidators = bvr2v <$> vs,
               newValidators = mapMaybe (vdr2v True) vd,
               removedValidators = mapMaybe (vdr2v False) vd,
-              newCerts = [],
-              revokedCerts = [],
               proposalSignature = join . listToMaybe $ psr2s <$> ps,
               signatures = mapMaybe csr2s sigs
             },
@@ -412,8 +410,6 @@ instance ToJSON BlockData' where
         "currentValidators" .= currentValidators,
         "newValidators" .= newValidators,
         "removedValidators" .= removedValidators,
-        "newCerts" .= newCerts,
-        "revokedCerts" .= revokedCerts,
         "proposalSignature" .= proposalSignature,
         "signatures" .= signatures
       ]
