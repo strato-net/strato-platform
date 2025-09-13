@@ -6,14 +6,12 @@
 
 module Blockchain.Strato.Model.ChainMember
   ( ChainMemberRSet (..),
-    ChainMemberParsedSet (..),
-    chainMemberParsedSetToValidator,
+    ChainMemberParsedSet (..)
   )
 where
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Validator (Validator(..))
 import Control.DeepSeq
 import Data.Aeson hiding (Array, String)
 import qualified Data.Aeson as A (Value (..))
@@ -199,6 +197,3 @@ instance DPS.PersistField ChainMemberParsedSet where
 
 instance DPS.PersistFieldSql ChainMemberParsedSet where
   sqlType _ = DPS.SqlString
-
-chainMemberParsedSetToValidator :: ChainMemberParsedSet -> Validator
-chainMemberParsedSetToValidator (CommonName c) = Validator c
