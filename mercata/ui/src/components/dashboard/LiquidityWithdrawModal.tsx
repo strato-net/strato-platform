@@ -1,17 +1,22 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { useToast } from '@/hooks/use-toast';
-import { useSwapContext } from '@/context/SwapContext';
+import { useToast } from "@/hooks/use-toast";
+import { useSwapContext } from "@/context/SwapContext";
 import { WITHDRAW_FEE } from "@/lib/constants";
-import { LiquidityPool } from '@/interface';
-import { formatBalance, fmt } from '@/utils/numberUtils';
-import TokenInput from '@/components/shared/TokenInput';
+import { LiquidityPool } from "@/interface";
+import { formatBalance, fmt } from "@/utils/numberUtils";
+import { computeMaxTransferable } from "@/utils/validationUtils";
+import { Balances } from "@/context/UserTokensContext";
+import TokenInput from "@/components/shared/TokenInput";
+
+const VOUCHERS_PER_TX = Math.round(Number(WITHDRAW_FEE) * 100);
 
 interface LiquidityWithdrawModalProps {
   isOpen: boolean;
@@ -19,20 +24,22 @@ interface LiquidityWithdrawModalProps {
   selectedPool: LiquidityPool | null;
   onWithdrawSuccess: () => Promise<void>;
   operationInProgressRef: React.MutableRefObject<boolean>;
+  balances: Balances;
 }
 
-const LiquidityWithdrawModal = ({ 
-  isOpen, 
-  onClose, 
-  selectedPool, 
+const LiquidityWithdrawModal = ({
+  isOpen,
+  onClose,
+  selectedPool,
   onWithdrawSuccess,
-  operationInProgressRef 
+  operationInProgressRef,
+  balances,
 }: LiquidityWithdrawModalProps) => {
   // ============================================================================
   // STATE
   // ============================================================================
-  const [withdrawPercent, setWithdrawPercent] = useState('');
-  const [withdrawPercentError, setWithdrawPercentError] = useState('');
+  const [withdrawPercent, setWithdrawPercent] = useState("");
+  const [withdrawPercentError, setWithdrawPercentError] = useState("");
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   // ============================================================================
@@ -44,64 +51,109 @@ const LiquidityWithdrawModal = ({
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
-  
-  // Pool data
-  const lpBal = useMemo(() => BigInt(selectedPool?.lpToken?.balances?.[0]?.balance ?? "0"), [selectedPool]);
-  const totalSupply = useMemo(() => BigInt(selectedPool?.lpToken?._totalSupply ?? "0"), [selectedPool]);
-  const tokenA = useMemo(() => BigInt(selectedPool?.tokenABalance ?? "0"), [selectedPool]);
-  const tokenB = useMemo(() => BigInt(selectedPool?.tokenBBalance ?? "0"), [selectedPool]);
-  
-  // User position
-  const position = useMemo(() => {
-    if (!selectedPool || totalSupply === 0n || lpBal === 0n) return { a: 0n, b: 0n };
+
+  // Collapse repeated BigInt reads into single poolView object
+  const poolView = useMemo(() => {
+    if (!selectedPool) return null;
     return {
-      a: (lpBal * tokenA) / totalSupply,
-      b: (lpBal * tokenB) / totalSupply,
+      name: selectedPool._name,
+      symbol: selectedPool._symbol ?? "LP",
+      lpBal: BigInt(selectedPool.lpToken?.balances?.[0]?.balance ?? "0"),
+      total: BigInt(selectedPool.lpToken?._totalSupply ?? "0"),
+      a: BigInt(selectedPool.tokenABalance ?? "0"),
+      b: BigInt(selectedPool.tokenBBalance ?? "0"),
     };
-  }, [selectedPool, lpBal, tokenA, tokenB, totalSupply]);
+  }, [
+    selectedPool?.address,
+    selectedPool?.lpToken?._totalSupply,
+    selectedPool?.lpToken?.balances,
+    selectedPool?.tokenABalance,
+    selectedPool?.tokenBBalance,
+    selectedPool?._name,
+    selectedPool?._symbol,
+  ]);
 
-  // Token names
-  const [tokenAName, tokenBName] = useMemo(
-    () => (selectedPool?._name?.split('/') ?? ["Token A", "Token B"]),
-    [selectedPool]
-  );
+  // Derive once, reuse everywhere
+  const nameParts = poolView?.name?.split("/") ?? [];
+  const tokenAName = nameParts[0] ?? "Token A";
+  const tokenBName = nameParts[1] ?? "Token B";
 
-  // Withdrawal calculations
-  const percentNum = parseFloat(withdrawPercent) || 0;
-  const pct = BigInt(Math.floor(percentNum));
-  const lpToBurn = percentNum > 0 ? (lpBal * pct) / 100n : 0n;
-  const outA = percentNum > 0 ? (position.a * pct) / 100n : 0n;
-  const outB = percentNum > 0 ? (position.b * pct) / 100n : 0n;
+  const rawPct = Number(withdrawPercent) || 0;
+  const clampedPct = Math.max(0, Math.min(100, rawPct));
+  const pct = BigInt(Math.floor(clampedPct));
+  const hasValidPercent = clampedPct > 0;
 
-  // UI state
-  const maxWithdrawPercent = lpBal > 0n ? 100 : 0;
-  const canSubmit = !withdrawPercentError && percentNum > 0 && maxWithdrawPercent > 0 && !withdrawLoading;
+  // User position - only memoize this heavy calculation
+  const position = useMemo(() => {
+    if (!poolView || poolView.total === 0n || poolView.lpBal === 0n)
+      return { a: 0n, b: 0n };
+    return {
+      a: (poolView.lpBal * poolView.a) / poolView.total,
+      b: (poolView.lpBal * poolView.b) / poolView.total,
+    };
+  }, [poolView]);
 
-  // ============================================================================
-  // UTILITIES
-  // ============================================================================
-  const vouchers = Math.round(parseFloat(WITHDRAW_FEE) * 100);
+  const lpToBurn =
+    hasValidPercent && poolView ? (poolView.lpBal * pct) / 100n : 0n;
+  const outA = hasValidPercent ? (position.a * pct) / 100n : 0n;
+  const outB = hasValidPercent ? (position.b * pct) / 100n : 0n;
 
+  const maxTransferable = useMemo(() => {
+    if (!isOpen || !poolView) return 0n;
+    // Withdraw flow does not send USDST as the asset; fees are paid separately.
+    return computeMaxTransferable(
+      100n,
+      null,
+      WITHDRAW_FEE,
+      balances.voucher,
+      balances.usdst,
+    );
+  }, [isOpen, poolView, balances.usdst, balances.voucher]);
+
+  const canSubmit =
+    !withdrawPercentError &&
+    hasValidPercent &&
+    poolView &&
+    poolView.lpBal > 0n &&
+    maxTransferable > 0n &&
+    !withdrawLoading;
+
+  // Get the fee error message from TokenInput or proactive validation
+  const feeError = withdrawPercentError?.includes(
+    "Insufficient USDST + vouchers for transaction fee",
+  )
+    ? withdrawPercentError
+    : maxTransferable === 0n && poolView && poolView.lpBal > 0n
+      ? "Insufficient USDST + vouchers for transaction fee"
+      : null;
 
   // ============================================================================
   // HANDLERS
   // ============================================================================
+
   const handleClose = () => {
-    setWithdrawPercent('');
-    setWithdrawPercentError('');
+    setWithdrawPercent("");
+    setWithdrawPercentError("");
     onClose();
   };
 
   const handleWithdrawSubmit = async () => {
-    if (!selectedPool || operationInProgressRef.current || !percentNum || percentNum <= 0) return;
-    
+    if (
+      !poolView ||
+      operationInProgressRef.current ||
+      withdrawLoading ||
+      !hasValidPercent ||
+      maxTransferable === 0n
+    )
+      return;
+
     operationInProgressRef.current = true;
     setWithdrawLoading(true);
-    
+
     try {
-      await removeLiquidity({ 
-        poolAddress: selectedPool.address, 
-        lpTokenAmount: lpToBurn.toString() 
+      await removeLiquidity({
+        poolAddress: selectedPool!.address,
+        lpTokenAmount: lpToBurn.toString(),
       });
 
       toast({
@@ -109,15 +161,15 @@ const LiquidityWithdrawModal = ({
         description: `Received ${fmt(outA, 18, 2, 6)} ${tokenAName} • ${fmt(outB, 18, 2, 6)} ${tokenBName}`,
         variant: "success",
       });
-      
+
       // Success path - refresh data and close modal
       await onWithdrawSuccess();
       handleClose();
     } catch (e) {
-      toast({ 
-        title: "Error", 
-        description: String(e), 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: String(e),
+        variant: "destructive",
       });
     } finally {
       setWithdrawLoading(false);
@@ -130,80 +182,109 @@ const LiquidityWithdrawModal = ({
   // ============================================================================
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Withdraw Liquidity</DialogTitle>
+          <DialogDescription>
+            Remove liquidity from the {selectedPool?._name} pool
+          </DialogDescription>
         </DialogHeader>
-        
-        <form onSubmit={(e) => { e.preventDefault(); handleWithdrawSubmit(); }} className="space-y-4">
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleWithdrawSubmit();
+          }}
+          className="space-y-4"
+        >
           {/* Input Section */}
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4 px-1">
             <TokenInput
               value={withdrawPercent}
               error={withdrawPercentError}
               tokenName="LP Token"
               tokenSymbol="%"
-              tokenAddress="0x0000000000000000000000000000000000000000"
+              tokenAddress=""
               maxAmount={100n}
+              maxTransferable={100n}
               transactionFee={WITHDRAW_FEE}
               decimals={0}
-              disabled={maxWithdrawPercent === 0}
+              disabled={
+                !(poolView && poolView.lpBal > 0n) || maxTransferable === 0n
+              }
               loading={withdrawLoading}
+              usdstBalance={balances.usdst}
+              voucherBalance={balances.voucher}
               onValueChange={setWithdrawPercent}
               onErrorChange={setWithdrawPercentError}
             />
           </div>
 
           {/* Position Information */}
-          <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg space-y-2">
+          <div className="bg-gray-50 border border-gray-200 p-4 rounded-lg space-y-2 mx-1">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">LP Tokens</span>
               <span className="font-medium">
-                {formatBalance(lpBal, selectedPool?._symbol || 'LP', 18, 2, 6)}
+                {formatBalance(
+                  poolView?.lpBal ?? 0n,
+                  poolView?.symbol ?? "LP",
+                  18,
+                  2,
+                  6,
+                )}
               </span>
             </div>
-            
+
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">{tokenAName} position</span>
               <span className="font-medium">
-                {percentNum > 0 ? (
+                {hasValidPercent ? (
                   <span>
                     {fmt(position.a - outA, 18, 2, 6)}
-                    <span className="text-green-600 ml-2">(+{fmt(outA, 18, 2, 6)})</span>
+                    <span className="text-green-600 ml-2">
+                      (+{fmt(outA, 18, 2, 6)})
+                    </span>
                   </span>
                 ) : (
                   fmt(position.a, 18, 2, 6)
                 )}
               </span>
             </div>
-            
+
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">{tokenBName} position</span>
               <span className="font-medium">
-                {percentNum > 0 ? (
+                {hasValidPercent ? (
                   <span>
                     {fmt(position.b - outB, 18, 2, 6)}
-                    <span className="text-green-600 ml-2">(+{fmt(outB, 18, 2, 6)})</span>
+                    <span className="text-green-600 ml-2">
+                      (+{fmt(outB, 18, 2, 6)})
+                    </span>
                   </span>
                 ) : (
                   fmt(position.b, 18, 2, 6)
                 )}
               </span>
             </div>
-            
+
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Transaction Fee</span>
               <span className="font-medium">
-                {WITHDRAW_FEE} USDST ({vouchers} vouchers)
+                {WITHDRAW_FEE} USDST ({VOUCHERS_PER_TX} vouchers)
               </span>
             </div>
+            {feeError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{feeError}</p>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}
-          <div className="pt-2">
-            <Button 
+          <div className="pt-2 px-1">
+            <Button
               disabled={!canSubmit}
-              type="submit" 
+              type="submit"
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
             >
               {withdrawLoading ? "Withdrawing..." : "Confirm Withdraw"}

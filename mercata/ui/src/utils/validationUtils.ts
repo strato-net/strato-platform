@@ -1,11 +1,24 @@
-import { useCallback } from "react";
 import { isAddress } from "ethers";
 import { safeParseUnits } from "./numberUtils";
 import { DECIMAL_PATTERN, DECIMALS, usdstAddress } from "@/lib/constants";
-import { useUserTokens } from "@/context/UserTokensContext";
 
 export const toWei = (s: string) => safeParseUnits(s, DECIMALS);
-export const fmt = (wei: bigint, sym: string, decimals: number = DECIMALS) => `${(Number(wei) / 10 ** decimals).toFixed(decimals)} ${sym}`;
+export const fmt = (wei: bigint, sym: string, decimals: number = DECIMALS) => {
+  // Use precise formatting to avoid floating-point issues
+  const divisor = BigInt(10 ** decimals);
+  const wholePart = wei / divisor;
+  const fractionalPart = wei % divisor;
+  
+  if (fractionalPart === 0n) {
+    return `${wholePart.toString()}.${'0'.repeat(decimals)} ${sym}`;
+  }
+  
+  const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+  // Remove trailing zeros
+  const trimmedFractional = fractionalStr.replace(/0+$/, '');
+  
+  return `${wholePart.toString()}.${trimmedFractional} ${sym}`;
+};
 export const isDecimal = (s: string) => s === "" || s === "." || DECIMAL_PATTERN.test(s);
 
 export const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>, setRecipient: (value: string) => void, setError: (error: string) => void, userAddress: string): void => {
@@ -78,46 +91,30 @@ export const handleAmountInputChange = (raw: string, setAmount: (v: string) => v
 };
 
 export const computeMaxTransferable = (
-  maxAmount: bigint,
-  tokenAddress: string,
+  maxAmount: bigint, 
+  tokenAddress: string | null, 
   transactionFee: string,
-  voucherBalance: bigint,
+  voucherBalance: bigint, 
   usdstBalance: bigint
 ): bigint => {
   const feeWei = toWei(transactionFee);
-  
   if (tokenAddress === usdstAddress) {
     const totalAvailableForFee = usdstBalance + voucherBalance;
     if (totalAvailableForFee < feeWei) {
       return 0n;
     }
     
+    // If vouchers can cover the full fee, user can deposit their entire USDST balance
     if (voucherBalance >= feeWei) {
       return maxAmount;
     }
-    
-    const availableForTransfer = usdstBalance - feeWei;
-    return availableForTransfer > 0n ? availableForTransfer : 0n;
+
+    // If vouchers don't cover the full fee, user needs to reserve some USDST for the fee
+    // The amount they can deposit = total USDST - (fee - vouchers)
+    const usdstNeededForFee = feeWei - voucherBalance;
+    const availableForDeposit = usdstBalance - usdstNeededForFee;
+    return availableForDeposit > 0n ? availableForDeposit : 0n;
   }
   
   return maxAmount;
 };
-
-export const useAmountValidation = () => {
-  const { usdstBalance, voucherBalance } = useUserTokens();
-  const vb = BigInt(voucherBalance);
-  const ub = BigInt(usdstBalance);
-
-  const validateAmountWithContext = useCallback((v: string, opts: Omit<AmountValidationOptions, "voucherBalance"|"usdstBalance">) =>
-    validateAmount(v, { ...opts, voucherBalance: vb, usdstBalance: ub }), [vb, ub]);
-
-  const handleInput = useCallback((v: string, setAmt: (v: string) => void, setErr: (e: string) => void,
-    opts: Omit<AmountValidationOptions, "voucherBalance"|"usdstBalance">) =>
-      handleAmountInputChange(v, setAmt, setErr, { ...opts, voucherBalance: vb, usdstBalance: ub }),
-    [vb, ub]);
-
-  const getMaxTransferable = useCallback((maxAmount: bigint, tokenAddress: string, transactionFee: string) =>
-    computeMaxTransferable(maxAmount, tokenAddress, transactionFee, vb, ub), [vb, ub]);
-
-  return { validateAmount: validateAmountWithContext, handleInput, getMaxTransferable };
-}; 

@@ -23,14 +23,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Token } from "@/interface";
 import { TRANSFER_FEE } from "@/lib/constants";
 import { safeParseUnits, addCommasToInput, formatBalance, formatWeiAmount } from "@/utils/numberUtils";
-import { handleRecipientAddress, useAmountValidation } from "@/utils/validationUtils";
+import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
 
 const Transfer = () => {
   // Hooks
   const { userAddress } = useUser();
   const { fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
   const { getUserTokensWithBalance, transferToken, loading: tokenLoading } = useTokenContext();
-  const { handleInput, getMaxTransferable } = useAmountValidation();
+  const { usdstBalance, voucherBalance } = useUserTokens();
   const { toast } = useToast();
 
   // State
@@ -47,8 +47,8 @@ const Transfer = () => {
   // Computed values
   const maxAmount = selectedToken ? BigInt(selectedToken.balance) : 0n;
   const maxTransferable = useMemo(() => {
-    return selectedToken ? getMaxTransferable(maxAmount, selectedToken.address, TRANSFER_FEE) : 0n;
-  }, [selectedToken, maxAmount, getMaxTransferable]);
+    return selectedToken ? computeMaxTransferable(maxAmount, selectedToken.address, TRANSFER_FEE, BigInt(voucherBalance), BigInt(usdstBalance)) : 0n;
+  }, [selectedToken, maxAmount, voucherBalance, usdstBalance]);
   const isLoading = loadingUsdstBalance || tokenLoading;
   const isDisabled = 
     isLoading ||
@@ -197,7 +197,7 @@ const Transfer = () => {
                 value={addCommasToInput(amount)}
                 onChange={(e) => {
                   const value = e.target.value;
-                  handleInput(
+                  handleAmountInputChange(
                     value,
                     setAmount,
                     setAmountError,
@@ -205,7 +205,9 @@ const Transfer = () => {
                       maxAmount,
                       symbol: selectedToken?.token?._symbol || "",
                       tokenAddress: selectedToken?.address,
-                      transactionFee: TRANSFER_FEE
+                      transactionFee: TRANSFER_FEE,
+                      voucherBalance: BigInt(voucherBalance),
+                      usdstBalance: BigInt(usdstBalance)
                     }
                   );
                 }}

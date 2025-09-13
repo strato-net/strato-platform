@@ -10,7 +10,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, usdstAddress, musdstAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
-import { useAmountValidation } from "@/utils/validationUtils";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
@@ -29,7 +29,7 @@ const LendingPoolSection = () => {
   const [withdrawAmountError, setWithdrawAmountError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
-  const { handleInput, getMaxTransferable } = useAmountValidation();
+  const { usdstBalance, voucherBalance } = useUserTokens();
 
   // AbortController ref for managing fetch cancellation
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -41,12 +41,12 @@ const LendingPoolSection = () => {
   const withdrawMaxAmount = musdstToken ? BigInt(musdstToken.balance || "0") : 0n;
   
   const maxDepositTransferable = useMemo(() => {
-    return getMaxTransferable(depositMaxAmount, usdstAddress, LENDING_DEPOSIT_FEE);
-  }, [depositMaxAmount, getMaxTransferable]);
+    return computeMaxTransferable(depositMaxAmount, usdstAddress, LENDING_DEPOSIT_FEE, BigInt(voucherBalance), BigInt(usdstBalance));
+  }, [depositMaxAmount, voucherBalance, usdstBalance]);
   
   const maxWithdrawTransferable = useMemo(() => {
-    return getMaxTransferable(withdrawMaxAmount, musdstAddress, LENDING_WITHDRAW_FEE);
-  }, [withdrawMaxAmount, getMaxTransferable]);
+    return computeMaxTransferable(withdrawMaxAmount, musdstAddress, LENDING_WITHDRAW_FEE, BigInt(voucherBalance), BigInt(usdstBalance));
+  }, [withdrawMaxAmount, voucherBalance, usdstBalance]);
 
   // Centralized fee and voucher math - using integer math in cents
   const feeMath = useMemo(() => {
@@ -179,7 +179,7 @@ const LendingPoolSection = () => {
   // Extracted handlers to avoid inline lambdas
   const onDepositChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    handleInput(
+    handleAmountInputChange(
       value,
       setDepositAmount,
       setDepositAmountError,
@@ -188,13 +188,15 @@ const LendingPoolSection = () => {
         symbol: "USDST",
         tokenAddress: usdstAddress,
         transactionFee: LENDING_DEPOSIT_FEE,
+        voucherBalance: BigInt(voucherBalance),
+        usdstBalance: BigInt(usdstBalance)
       }
     );
-  }, [handleInput, depositMaxAmount]);
+  }, [depositMaxAmount, voucherBalance, usdstBalance]);
 
   const onWithdrawChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    handleInput(
+    handleAmountInputChange(
       value,
       setWithdrawAmount,
       setWithdrawAmountError,
@@ -203,9 +205,11 @@ const LendingPoolSection = () => {
         symbol: "mUSDST",
         tokenAddress: musdstAddress,
         transactionFee: LENDING_WITHDRAW_FEE,
+        voucherBalance: BigInt(voucherBalance),
+        usdstBalance: BigInt(usdstBalance)
       }
     );
-  }, [handleInput, withdrawMaxAmount]);
+  }, [withdrawMaxAmount, voucherBalance, usdstBalance]);
 
   const onSetDepositMax = useCallback(() => {
     setMaxAmount(maxDepositTransferable, setDepositAmount, setDepositAmountError);

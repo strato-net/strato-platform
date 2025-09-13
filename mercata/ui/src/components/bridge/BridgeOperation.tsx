@@ -34,7 +34,7 @@ import { formatTxHash, getExplorerUrl } from "@/lib/bridge/utils";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { useAmountValidation } from "@/utils/validationUtils";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
 import { safeParseUnits, addCommasToInput, fmt } from "@/utils/numberUtils";
 import { BRIDGE_OUT_FEE, usdstAddress, DECIMALS } from "@/lib/constants";
 
@@ -126,7 +126,7 @@ const useBalances = ({
   feeUSDST,
   usdstBalance,
   usdstAddress,
-  getMaxTransferable,
+  voucherBalance,
   loadingUsdstBalance,
   address,
   useBalance,
@@ -138,7 +138,7 @@ const useBalances = ({
   feeUSDST: string;
   usdstBalance: any;
   usdstAddress: string;
-  getMaxTransferable: any;
+  voucherBalance: any;
   loadingUsdstBalance: boolean;
   address: string;
   useBalance: any;
@@ -189,8 +189,8 @@ const useBalances = ({
       : operation === "bridgeBurn"
         ? usdstAddress
         : tokenAddrIn;
-    return getMaxTransferable(maxAmount, tokenAddress, feeUSDST);
-  }, [op.token, maxAmount, getMaxTransferable, op.inbound, tokenAddrIn, feeUSDST, operation]);
+    return computeMaxTransferable(maxAmount, tokenAddress, feeUSDST, BigInt(voucherBalance), BigInt(usdstBalance));
+  }, [op.token, maxAmount, voucherBalance, usdstBalance, op.inbound, tokenAddrIn, feeUSDST, operation]);
 
   // Precomputed balance view for UI
   const balancesView = useMemo(() => {
@@ -250,8 +250,7 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
 
   // Context hooks
   const { userAddress } = useUser();
-  const { loadingUsdstBalance, usdstBalance, fetchUsdstBalance } = useUserTokens();
-  const { handleInput, getMaxTransferable } = useAmountValidation();
+  const { loadingUsdstBalance, usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
 
   const {
     availableNetworks,
@@ -325,7 +324,7 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
     feeUSDST,
     usdstBalance,
     usdstAddress,
-    getMaxTransferable,
+    voucherBalance,
     loadingUsdstBalance,
     address,
     useBalance,
@@ -383,14 +382,16 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
   // Single validation callback - eliminates repeated handleInput calls
   const validateAmount = useCallback(
     (v: string) =>
-      handleInput(v, setAmount, setAmountError, {
+      handleAmountInputChange(v, setAmount, setAmountError, {
         maxAmount,
         symbol: symbolIn || "",
         tokenAddress: tokenAddrIn || "",
         transactionFee: feeUSDST,
         decimals: op.inbound ? op.extDec : op.stratoDec, // Pass token decimals for proper parsing
+        voucherBalance: BigInt(voucherBalance),
+        usdstBalance: BigInt(usdstBalance)
       }),
-    [handleInput, maxAmount, symbolIn, tokenAddrIn, feeUSDST, op.inbound, op.extDec, op.stratoDec],
+    [maxAmount, symbolIn, tokenAddrIn, feeUSDST, op.inbound, op.extDec, op.stratoDec, voucherBalance, usdstBalance],
   );
 
   // Debounced input handler

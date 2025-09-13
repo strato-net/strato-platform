@@ -5,6 +5,9 @@ import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
 import { usdstAddress } from "@/lib/constants";
 
+// types
+export type Balances = { usdst: bigint; voucher: bigint };
+
 type UserTokensContextType = {
   activeTokens: Token[];
   inactiveTokens: Token[];
@@ -18,7 +21,7 @@ type UserTokensContextType = {
   // USDST balance
   usdstBalance: string;
   loadingUsdstBalance: boolean;
-  fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<void>;
+  fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<Balances>;
   
   // Voucher balance (converted to USDST equivalent: 1e18 voucher = 0.01 USDST)
   voucherBalance: string;
@@ -45,8 +48,8 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   // Voucher balance state
   const [voucherBalance, setVoucherBalance] = useState("0");
 
-  const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal) => {
-    if (!userAddress) return;
+  const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal): Promise<Balances> => {
+    if (!userAddress) return { usdst: BigInt(0), voucher: BigInt(0) };
     
     setLoadingUsdstBalance(true);
     const [usdstRes, voucherRes] = await Promise.all([
@@ -54,15 +57,20 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       api.get(`/vouchers/balance`, { signal })
     ]);
     
-    if (signal?.aborted) return;
+    if (signal?.aborted) return { usdst: BigInt(0), voucher: BigInt(0) };
 
-    setUsdstBalance(usdstRes?.data?.[0]?.balance || "0");
-    
+    const usdst = BigInt(usdstRes?.data?.[0]?.balance || "0");
     const rawVoucherBalance = voucherRes?.data?.balance || "0";
-    const voucherBalanceUsdst = (BigInt(rawVoucherBalance) / 100n).toString();
-    setVoucherBalance(voucherBalanceUsdst);
-    
+    const voucher = BigInt(rawVoucherBalance) / 100n; // Convert to USDST equivalent
+
+    // update context state
+    setUsdstBalance(usdst.toString());
+    setVoucherBalance(voucher.toString());
+
     setLoadingUsdstBalance(false);
+    
+    // return the fresh values for immediate use
+    return { usdst, voucher };
   }, []);
 
   const fetchTokens = useCallback(async (signal?: AbortSignal) => {

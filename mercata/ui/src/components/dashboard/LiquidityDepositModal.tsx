@@ -1,21 +1,22 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription
+  DialogDescription,
 } from "@/components/ui/dialog";
-import { useToast } from '@/hooks/use-toast';
-import { useUser } from '@/context/UserContext';
-import { useSwapContext } from '@/context/SwapContext';
-import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
-import { LiquidityPool } from '@/interface';
-import { safeParseUnits, formatWeiAmount } from '@/utils/numberUtils';
-import { useAmountValidation } from '@/utils/validationUtils';
-import TokenInput from '@/components/shared/TokenInput';
+import { useToast } from "@/hooks/use-toast";
+import { useSwapContext } from "@/context/SwapContext";
+import { DEPOSIT_FEE, SINGLE_TOKEN_DEPOSIT_FEE } from "@/lib/constants";
+import { LiquidityPool } from "@/interface";
+import { safeParseUnits } from "@/utils/numberUtils";
+import { computeMaxTransferable } from "@/utils/validationUtils";
+import { Balances } from "@/context/UserTokensContext";
+import TokenInput from "@/components/shared/TokenInput";
 
+const VOUCHERS_PER_UNIT = 100;
 
 interface LiquidityDepositModalProps {
   isOpen: boolean;
@@ -23,142 +24,174 @@ interface LiquidityDepositModalProps {
   selectedPool: LiquidityPool | null;
   onDepositSuccess: () => Promise<void>;
   operationInProgressRef: React.MutableRefObject<boolean>;
+  balances: Balances;
 }
 
-const LiquidityDepositModal = ({ 
-  isOpen, 
-  onClose, 
-  selectedPool, 
+const LiquidityDepositModal = ({
+  isOpen,
+  onClose,
+  selectedPool,
   onDepositSuccess,
-  operationInProgressRef 
+  operationInProgressRef,
+  balances,
 }: LiquidityDepositModalProps) => {
-  const [token1Amount, setToken1Amount] = useState('');
-  const [token1AmountError, setToken1AmountError] = useState('');
-  const [token2Amount, setToken2Amount] = useState('');
-  const [token2AmountError, setToken2AmountError] = useState('');
+  // ============================================================================
+  // STATE
+  // ============================================================================
+  const [token1Amount, setToken1Amount] = useState("");
+  const [token1AmountError, setToken1AmountError] = useState("");
+  const [token2Amount, setToken2Amount] = useState("");
+  const [token2AmountError, setToken2AmountError] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
-  const [tokenABalance, setTokenABalance] = useState('');
-  const [tokenBBalance, setTokenBBalance] = useState('');
-  const [balanceLoading, setBalanceLoading] = useState(false);
-  const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
-  const { addLiquidityDualToken, addLiquiditySingleToken, fetchTokenBalances } = useSwapContext();
+  // ============================================================================
+  // HOOKS & CONTEXT
+  // ============================================================================
+  const { addLiquidityDualToken, addLiquiditySingleToken } = useSwapContext();
   const { toast } = useToast();
-  const { userAddress } = useUser();
-  const { getMaxTransferable } = useAmountValidation();
 
-  // Computed values
-  const tokenAMaxAmount = BigInt(tokenABalance || "0");
-  const tokenBMaxAmount = BigInt(tokenBBalance || "0");
-  
-  // Calculate vouchers required for deposit fee (1 voucher = 1 cent = 0.01 USDST)
-  const depositVouchersRequired = Math.round(Number(DEPOSIT_FEE) * 100);
-  
-  // Token configurations
-  const tokenConfigs = useMemo(() => {
-    if (!selectedPool) return { tokenA: null, tokenB: null };
-    
-    const tokenAName = selectedPool._name?.split('/')[0] || 'Token A';
-    const tokenBName = selectedPool._name?.split('/')[1] || 'Token B';
-    
+  // Gate heavy work behind isOpen and pool
+  const tokenAMaxAmount =
+    isOpen && selectedPool
+      ? BigInt(selectedPool.tokenA?.balances?.[0]?.balance ?? "0")
+      : 0n;
+  const tokenBMaxAmount =
+    isOpen && selectedPool
+      ? BigInt(selectedPool.tokenB?.balances?.[0]?.balance ?? "0")
+      : 0n;
+  const addrA = isOpen ? (selectedPool?.tokenA?.address ?? null) : null;
+  const addrB = isOpen ? (selectedPool?.tokenB?.address ?? null) : null;
+  const usdst = balances.usdst;
+  const voucher = balances.voucher;
+
+  // Memoize the 4 maxes with minimal deps
+  const maxes = useMemo(() => {
+    if (!isOpen || !selectedPool) return { aS: 0n, bS: 0n, aD: 0n, bD: 0n };
     return {
-      tokenA: {
-        name: tokenAName,
-        symbol: selectedPool.tokenA?.symbol || tokenAName,
-        address: selectedPool.tokenA?.address,
-        decimals: selectedPool.tokenA?.customDecimals || 18,
-        maxAmount: tokenAMaxAmount,
-        maxTransferable: getMaxTransferable(tokenAMaxAmount, selectedPool.tokenA?.address, DEPOSIT_FEE)
-      },
-      tokenB: {
-        name: tokenBName,
-        symbol: selectedPool.tokenB?.symbol || tokenBName,
-        address: selectedPool.tokenB?.address,
-        decimals: selectedPool.tokenB?.customDecimals || 18,
-        maxAmount: tokenBMaxAmount,
-        maxTransferable: getMaxTransferable(tokenBMaxAmount, selectedPool.tokenB?.address, DEPOSIT_FEE)
-      }
+      aS: addrA
+        ? computeMaxTransferable(
+            tokenAMaxAmount,
+            addrA,
+            SINGLE_TOKEN_DEPOSIT_FEE,
+            voucher,
+            usdst,
+          )
+        : 0n,
+      bS: addrB
+        ? computeMaxTransferable(
+            tokenBMaxAmount,
+            addrB,
+            SINGLE_TOKEN_DEPOSIT_FEE,
+            voucher,
+            usdst,
+          )
+        : 0n,
+      aD: addrA
+        ? computeMaxTransferable(
+            tokenAMaxAmount,
+            addrA,
+            DEPOSIT_FEE,
+            voucher,
+            usdst,
+          )
+        : 0n,
+      bD: addrB
+        ? computeMaxTransferable(
+            tokenBMaxAmount,
+            addrB,
+            DEPOSIT_FEE,
+            voucher,
+            usdst,
+          )
+        : 0n,
     };
-  }, [selectedPool, tokenAMaxAmount, tokenBMaxAmount, getMaxTransferable]);
+  }, [isOpen, addrA, addrB, tokenAMaxAmount, tokenBMaxAmount, voucher, usdst]);
 
+  // pick initial mode ONCE from real data; no temp
+  const [depositMode, setDepositMode] = useState<"A" | "B" | "A&B">(() => {
+    const canA = maxes.aS > 0n;
+    const canB = maxes.bS > 0n;
+    const canBmin = tokenBMaxAmount > 0n;
+    return canA && canB ? "A&B" : canA ? "A" : canBmin ? "B" : "A&B";
+  });
 
-  useEffect(() => {
-    if (selectedPool && isOpen) {
-      let alive = true;
-      
-      const fetchBalances = async () => {
-        try {
-          if (!alive) return;
-          setBalanceLoading(true);
-          
-          const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
-          
-          if (!alive) return;
-          setTokenABalance(balances.tokenABalance);
-          setTokenBBalance(balances.tokenBBalance);
-          setBalanceLoading(false);
-        } catch (error) {
-          if (!alive) return;
-          toast({
-            title: "Error",
-            description: "Failed to fetch token balances",
-            variant: "destructive",
-          });
-          setBalanceLoading(false);
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+
+  // Build poolView once for readability (gated by isOpen && selectedPool)
+  const poolView =
+    isOpen && selectedPool
+      ? {
+          nameA: selectedPool._name?.split("/")?.[0] ?? "Token A",
+          nameB: selectedPool._name?.split("/")?.[1] ?? "Token B",
+          decA: selectedPool.tokenA?.customDecimals ?? 18,
+          decB: selectedPool.tokenB?.customDecimals ?? 18,
+          ratioStr: Number.isFinite(Number(selectedPool.aToBRatio))
+            ? Number(selectedPool.aToBRatio).toFixed(6)
+            : "N/A",
         }
-      };
+      : null;
 
-      fetchBalances();
-      
-      return () => { alive = false; };
-    }
-  }, [selectedPool?.address, isOpen, userAddress, toast]); // Remove fetchTokenBalances from deps  
+  const maxA = depositMode === "A&B" ? maxes.aD : maxes.aS;
+  const maxB = depositMode === "A&B" ? maxes.bD : maxes.bS;
+
+  // Check if user can pay fees for current deposit mode
+  const maxTransferable = depositMode === "A" ? maxA : depositMode === "B" ? maxB : 0;
+
+  // Validation fee and voucher calculation
+  const validationFee =
+    depositMode === "A&B" ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE;
+  const depositVouchersRequired = Math.round(
+    Number(validationFee) * VOUCHERS_PER_UNIT,
+  );
+
+  // Get the fee error message from either TokenInput or proactive validation
+  const feeError = token1AmountError?.includes(
+    "Insufficient USDST + vouchers for transaction fee",
+  )
+    ? token1AmountError
+    : token2AmountError?.includes(
+          "Insufficient USDST + vouchers for transaction fee",
+        )
+      ? token2AmountError
+      : maxTransferable === 0n
+        ? "Insufficient USDST + vouchers for transaction fee"
+        : null;
+
+  // ============================================================================
+  // UTILITIES
+  // ============================================================================
+
+  // Guarded setters to avoid redundant re-renders (e.g., when clicking Max sets same value)
+  const setToken1AmountSafe = (v: string) =>
+    setToken1Amount((prev) => (prev === v ? prev : v));
+  const setToken2AmountSafe = (v: string) =>
+    setToken2Amount((prev) => (prev === v ? prev : v));
+  const setToken1ErrorSafe = (e: string) =>
+    setToken1AmountError((prev) => (prev === e ? prev : e));
+  const setToken2ErrorSafe = (e: string) =>
+    setToken2AmountError((prev) => (prev === e ? prev : e));
+
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
 
   const handleClose = () => {
-    setToken1Amount('');
-    setToken1AmountError('');
-    setToken2Amount('');
-    setToken2AmountError('');
-    setDepositMode('A&B');
+    setToken1Amount("");
+    setToken2Amount("");
+    setToken1AmountError("");
+    setToken2AmountError("");
     onClose();
   };
 
-  const handleDepositModeChange = (mode: 'A' | 'B' | 'A&B') => {
-    setDepositMode(mode);
-    
-    // Clear amounts and errors when switching to single token modes
-    if (mode === 'A') {
-      setToken2Amount('');
-      setToken2AmountError('');
-    } else if (mode === 'B') {
-      setToken1Amount('');
-      setToken1AmountError('');
-    }
-  };
-
-  // Auto-select best available mode based on balances
-  const availability = {
-    A: (tokenConfigs.tokenA?.maxTransferable || 0n) > 0n,
-    B: (tokenConfigs.tokenB?.maxTransferable || 0n) > 0n,
-  };
-  
-  // Auto-select the best available mode when balances change
-  useEffect(() => {
-    if (!isOpen || balanceLoading) return;
-    
-    const bothAvailable = availability.A && availability.B;
-    const onlyA = availability.A && !availability.B;
-    const onlyB = !availability.A && availability.B;
-    
-    if (bothAvailable) {
-      setDepositMode('A&B');
-    } else if (onlyA) {
-      setDepositMode('A');
-    } else if (onlyB) {
-      setDepositMode('B');
-    }
-  }, [availability.A, availability.B, isOpen, balanceLoading]);
-
+  const isConfirmButtonDisabled =
+    depositLoading ||
+    !!token1AmountError ||
+    !!token2AmountError ||
+    (depositMode === "A" && !token1Amount) ||
+    (depositMode === "B" && !token2Amount) ||
+    (depositMode === "A&B" && (!token1Amount || !token2Amount));
 
   const handleDepositSubmit = async () => {
     if (!selectedPool || operationInProgressRef.current) return;
@@ -176,54 +209,59 @@ const LiquidityDepositModal = ({
     try {
       operationInProgressRef.current = true;
       setDepositLoading(true);
-
-      if (depositMode === 'A') {
+      
+      if (depositMode === "A") {
         // Single token mode - Token A
-        const token1AmountWei = safeParseUnits(token1Amount, 18);
+        const token1AmountWei = safeParseUnits(
+          token1Amount,
+          poolView?.decA ?? 18,
+        );
         await addLiquiditySingleToken({
           poolAddress: selectedPool.address,
           singleTokenAmount: token1AmountWei.toString(),
-          isAToB: true
+          isAToB: true,
         });
-      } else if (depositMode === 'B') {
+      } else if (depositMode === "B") {
         // Single token mode - Token B
-        const token2AmountWei = safeParseUnits(token2Amount, 18);
+        const token2AmountWei = safeParseUnits(
+          token2Amount,
+          poolView?.decB ?? 18,
+        );
         await addLiquiditySingleToken({
           poolAddress: selectedPool.address,
           singleTokenAmount: token2AmountWei.toString(),
-          isAToB: false
+          isAToB: false,
         });
       } else {
         // Dual token mode
-        const isInitialLiquidity = BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
-        const aRaw = safeParseUnits(token1Amount || "0");
-        const tokenAAmount = isInitialLiquidity 
-          ? aRaw
-          : (aRaw * 102n) / 100n; // 2% slippage using BigInt
-        const tokenBAmount = safeParseUnits(token2Amount || "0");
+        const isInitialLiquidity =
+          BigInt(selectedPool.lpToken._totalSupply) === BigInt(0);
+        const aRaw = safeParseUnits(token1Amount || "0", poolView?.decA ?? 18);
+        const tokenAAmount = isInitialLiquidity ? aRaw : (aRaw * 102n) / 100n; // 2% slippage using BigInt
+        const tokenBAmount = safeParseUnits(
+          token2Amount || "0",
+          poolView?.decB ?? 18,
+        );
         
         await addLiquidityDualToken({
           poolAddress: selectedPool.address,
           maxTokenAAmount: tokenAAmount.toString(),
-          tokenBAmount: tokenBAmount.toString()
+          tokenBAmount: tokenBAmount.toString(),
         });
       }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
 
       toast({
         title: "Success",
         description: `${selectedPool._name} deposited successfully.`,
         variant: "success",
       });
-      
-      // Success path - refresh data and close modal
-      await onDepositSuccess();
+
       handleClose();
+      await onDepositSuccess();
     } catch (error) {
       toast({
         title: "Error",
-        description: `Something went wrong - ${error}`,
+        description: String(error),
         variant: "destructive",
       });
     } finally {
@@ -232,164 +270,148 @@ const LiquidityDepositModal = ({
     }
   };
 
-  const isInputDisabled = (tokenType: 'A' | 'B') => {
-    if (depositMode === 'A') return tokenType === 'B';
-    if (depositMode === 'B') return tokenType === 'A';
-    return false; // Both enabled in A&B mode
-  };
-
-  const isConfirmButtonDisabled = () => {
-    if (depositLoading) return true;
-    if (balanceLoading) return true;
-    
-    // Check for validation errors
-    if (token1AmountError || token2AmountError) {
-      return true;
-    }
-    
-    // Check based on deposit mode
-    switch (depositMode) {
-      case 'A':
-        return !token1Amount;
-      case 'B':
-        return !token2Amount;
-      case 'A&B':
-        return !token1Amount || !token2Amount;
-      default:
-        return true;
-    }
-  };
-
-
+  // ============================================================================
+  // RENDER
+  // ============================================================================
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); }}>
-      <DialogContent>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) handleClose();
+      }}
+    >
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
           <DialogDescription>
-            Add liquidity to the {selectedPool?._name} pool.
+            Add liquidity to the {selectedPool?._name} pool
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); handleDepositSubmit(); }} className="space-y-4">
-          <div className="grid grid-cols-1 gap-4">
-            {/* First Token */}
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleDepositSubmit();
+          }}
+          className="space-y-4"
+        >
+          {/* Mode Selection */}
+          <div className="flex space-x-2 p-1">
+            <Button
+              type="button"
+              variant={depositMode === "A" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDepositMode("A")}
+              disabled={maxes.aS <= 0n}
+              className="flex-1 text-xs"
+            >
+              {selectedPool?.tokenA?.symbol || poolView?.nameA} Only
+            </Button>
+
+            <Button
+              type="button"
+              variant={depositMode === "B" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDepositMode("B")}
+              disabled={maxes.bS <= 0n}
+              className="flex-1 text-xs"
+            >
+              {selectedPool?.tokenB?.symbol || poolView?.nameB} Only
+            </Button>
+
+            <Button
+              type="button"
+              variant={depositMode === "A&B" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setDepositMode("A&B")}
+              disabled={maxes.aD <= 0n || maxes.bD <= 0n}
+              className="flex-1 text-xs"
+            >
+              Both Tokens
+            </Button>
+          </div>
+
+          {/* Token Inputs */}
+          <div className="grid grid-cols-1 gap-4 px-1">
             <TokenInput
               value={token1Amount}
               error={token1AmountError}
-              tokenName={`${tokenConfigs.tokenA?.name || 'Token A'} Amount`}
-              tokenSymbol={tokenConfigs.tokenA?.symbol || 'Token A'}
-              tokenAddress={tokenConfigs.tokenA?.address || ''}
-              maxAmount={tokenConfigs.tokenA?.maxAmount || 0n}
-              transactionFee={DEPOSIT_FEE}
-              decimals={tokenConfigs.tokenA?.decimals || 18}
-              disabled={balanceLoading || isInputDisabled('A') || (tokenConfigs.tokenA?.maxTransferable || 0n) === 0n}
+              tokenName={`${poolView?.nameA} Amount`}
+              tokenSymbol={selectedPool?.tokenA?.symbol || poolView?.nameA}
+              tokenAddress={selectedPool?.tokenA?.address || ""}
+              maxAmount={tokenAMaxAmount}
+              maxTransferable={maxA}
+              transactionFee={validationFee}
+              decimals={poolView?.decA ?? 18}
+              disabled={maxA <= 0n || depositMode === "B"}
               loading={depositLoading}
-              onValueChange={setToken1Amount}
-              onErrorChange={setToken1AmountError}
+              usdstBalance={usdst}
+              voucherBalance={voucher}
+              onValueChange={setToken1AmountSafe}
+              onErrorChange={setToken1ErrorSafe}
             />
 
-            {/* Deposit Mode Selection */}
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={(tokenConfigs.tokenA?.maxTransferable || 0n) === 0n}
-                className={`px-4 py-2 text-sm font-medium rounded-md border-blue-200 transition-colors ${
-                  (tokenConfigs.tokenA?.maxTransferable || 0n) === 0n
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : depositMode === 'A' 
-                      ? 'bg-blue-50 text-blue-700 border-blue-400' 
-                      : 'bg-white text-gray-600 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-                onClick={() => handleDepositModeChange('A')}
-              >
-                Token A Only
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={(tokenConfigs.tokenB?.maxTransferable || 0n) === 0n}
-                className={`px-4 py-2 text-sm font-medium rounded-md border-blue-200 transition-colors ${
-                  (tokenConfigs.tokenB?.maxTransferable || 0n) === 0n
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : depositMode === 'B' 
-                      ? 'bg-blue-50 text-blue-700 border-blue-400' 
-                      : 'bg-white text-gray-600 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-                onClick={() => handleDepositModeChange('B')}
-              >
-                Token B Only
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={(tokenConfigs.tokenA?.maxTransferable || 0n) === 0n || (tokenConfigs.tokenB?.maxTransferable || 0n) === 0n}
-                className={`px-4 py-2 text-sm font-medium rounded-md border-blue-200 transition-colors ${
-                  ((tokenConfigs.tokenA?.maxTransferable || 0n) === 0n || (tokenConfigs.tokenB?.maxTransferable || 0n) === 0n)
-                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
-                    : depositMode === 'A&B' 
-                      ? 'bg-blue-50 text-blue-700 border-blue-400' 
-                      : 'bg-white text-gray-600 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-                onClick={() => handleDepositModeChange('A&B')}
-              >
-                Both Tokens
-              </Button>
-            </div>
-
-            {/* Second Token */}
             <TokenInput
               value={token2Amount}
               error={token2AmountError}
-              tokenName={`${tokenConfigs.tokenB?.name || 'Token B'} Amount`}
-              tokenSymbol={tokenConfigs.tokenB?.symbol || 'Token B'}
-              tokenAddress={tokenConfigs.tokenB?.address || ''}
-              maxAmount={tokenConfigs.tokenB?.maxAmount || 0n}
-              transactionFee={DEPOSIT_FEE}
-              decimals={tokenConfigs.tokenB?.decimals || 18}
-              disabled={balanceLoading || isInputDisabled('B') || (tokenConfigs.tokenB?.maxTransferable || 0n) === 0n}
+              tokenName={`${poolView?.nameB} Amount`}
+              tokenSymbol={selectedPool?.tokenB?.symbol || poolView?.nameB}
+              tokenAddress={selectedPool?.tokenB?.address || ""}
+              maxAmount={tokenBMaxAmount}
+              maxTransferable={maxB}
+              transactionFee={validationFee}
+              decimals={poolView?.decB ?? 18}
+              disabled={maxB <= 0n || depositMode === "A"}
               loading={depositLoading}
-              onValueChange={setToken2Amount}
-              onErrorChange={setToken2AmountError}
+              usdstBalance={usdst}
+              voucherBalance={voucher}
+              onValueChange={setToken2AmountSafe}
+              onErrorChange={setToken2ErrorSafe}
             />
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-6">
+          {/* Pool Information */}
+          <div className="rounded-lg bg-gray-50 p-4 mx-1">
             <h3 className="font-medium mb-4">Pool Information</h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">APY</span>
-                <span className="font-medium text-sm">{selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}</span>
+                <span className="font-medium text-sm">
+                  {selectedPool?.apy ? `${selectedPool.apy}%` : "N/A"}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">Current pool ratio</span>
+                <span className="text-sm text-gray-500">
+                  Current pool ratio
+                </span>
                 <span className="font-medium text-sm text-right">
-                  {selectedPool && `1 ${selectedPool._name?.split('/')[0]} = ${formatWeiAmount(safeParseUnits(selectedPool.aToBRatio.toString()), 18)} ${selectedPool._name?.split('/')[1]}`}
+                  {selectedPool &&
+                    `1 ${poolView?.nameA} = ${poolView?.ratioStr} ${poolView?.nameB}`}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-500">Transaction fee</span>
-                <span className="font-medium text-sm">{DEPOSIT_FEE} USDST ({depositVouchersRequired} vouchers required)</span>
+                <span className="font-medium text-sm">
+                  {validationFee} USDST ({depositVouchersRequired} vouchers
+                  required)
+                </span>
               </div>
             </div>
+            {feeError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{feeError}</p>
+              </div>
+            )}
           </div>
 
-          <div className="pt-2">
-            <Button 
-              disabled={isConfirmButtonDisabled()} 
-              type="submit" 
+          {/* Submit Button */}
+          <div className="pt-2 px-1">
+            <Button
+              disabled={isConfirmButtonDisabled}
+              type="submit"
               className="w-full bg-strato-blue hover:bg-strato-blue/90"
             >
-              {depositLoading ? (
-                <div className="flex justify-center items-center h-12">
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                "Confirm Deposit"
-              )}
+              {depositLoading ? "Depositing..." : "Confirm Deposit"}
             </Button>
           </div>
         </form>
