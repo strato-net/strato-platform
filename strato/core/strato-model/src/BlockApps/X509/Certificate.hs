@@ -30,8 +30,6 @@ module BlockApps.X509.Certificate
     getCertIssuer,
     getParentUserAddress,
     dateTimeToString,
-    getAddressFromCM,
-    getX509FromAddress,
     getChainMemberFromX509,
   )
 where
@@ -185,17 +183,8 @@ x509CertToCertInfoState cert =
           commonName = cn
         }
 
-getAddressFromCM :: ChainMemberParsedSet -> X509CertInfoState -> Maybe Address
-getAddressFromCM (CommonName cmn) _ = Just cmn
-
 getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
 getChainMemberFromX509 (X509CertInfoState addr _ _ _ _ _ _) = CommonName addr
-
-getX509FromAddress ::
-  A.Selectable Address X509CertInfoState m =>
-  Address ->
-  m (Maybe (X509CertInfoState))
-getX509FromAddress addr = (A.select (A.Proxy @X509CertInfoState) addr)
 
 data Issuer = Issuer
   { issCommonName :: String,

@@ -15,13 +15,10 @@ module Blockchain.Strato.Model.Delta
     fromDelta,
     eqDelta,
     ValidatorDelta,
-    CertDelta,
     getDeltasFromEvents
   )
 where
 
-import BlockApps.X509.Certificate
-import Blockchain.Strato.Model.Class (DummyCertRevocation (..))
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
@@ -56,7 +53,6 @@ eqDelta :: (Eq a, Eq b) => Delta a b -> Delta a b -> Bool
 eqDelta = (==) `on` fromDelta
 
 type ValidatorDelta = Delta Validator Validator
-type CertDelta = Delta X509Certificate DummyCertRevocation
 
 getDeltasFromEvents :: [Event] -> ValidatorDelta
 getDeltasFromEvents = foldr go mempty
