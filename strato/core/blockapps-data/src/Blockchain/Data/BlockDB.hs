@@ -12,7 +12,6 @@ module Blockchain.Data.BlockDB
   )
 where
 
-import BlockApps.X509
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
@@ -38,10 +37,10 @@ blk2BlkDataRef ::
   Block ->
   Keccak256 ->
   Bool ->
-  (BlockDataRef, [Validator], [Validator], [Validator], [X509Certificate], [DummyCertRevocation], Maybe Signature, [Signature])
+  (BlockDataRef, [Validator], [Validator], [Validator], Maybe Signature, [Signature])
 blk2BlkDataRef b hash' makeHashOne =
   let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True v --- Horrible! Apparently I need to learn the Lens library, yesterday
-   in (bdr, vs, va, vr, ca, cr, ps, sigs)
+   in (bdr, vs, va, vr, ps, sigs)
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
     cC = getBlockBeneficiary bd
@@ -64,8 +63,6 @@ blk2BlkDataRef b hash' makeHashOne =
     vs = blockHeaderValidators bd
     va = blockHeaderNewValidators bd
     vr = blockHeaderRemovedValidators bd
-    ca = blockHeaderNewCerts bd
-    cr = blockHeaderRevokedCerts bd
     ps = blockHeaderProposal bd
     sigs = blockHeaderSignatures bd
 
@@ -100,7 +97,7 @@ putBlocks blockList makeHashOne = do
 
       case existingBlockData of
         [] -> do
-          let (toInsert, vs, va, vr, _, _, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
+          let (toInsert, vs, va, vr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
             txID <- updateBlockNumber b (transactionHash tx)
