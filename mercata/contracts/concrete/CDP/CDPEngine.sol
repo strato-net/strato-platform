@@ -140,7 +140,7 @@ contract record CDPEngine is Ownable {
     function _usdst() internal view returns (Token) { return Token(address(registry.usdst())); }
     function _tokenFactory() internal view returns (TokenFactory) { return TokenFactory(address(registry.tokenFactory())); }
     function _feeCollector() internal view returns (FeeCollector) { return FeeCollector(address(registry.feeCollector())); }
-    function _cdpReserve() internal view returns (CDPReserve) { return CDPReserve(address(registry.cdpReserve())); }
+    function _cdpReserve() internal view returns (CDPReserve) { return registry.cdpReserve(); }
 
    // ─────────────────────────── Access Modifiers ───────────────────────────
     modifier whenNotPaused(address asset) {
@@ -789,7 +789,8 @@ contract record CDPEngine is Ownable {
     function _syncReserveToIndex() internal {
         if (juniorIndex == 0) juniorIndex = 1e27;
 
-        uint256 reserveBal = registry.cdpReserve().balance();
+        address reserveAddr = address(registry.cdpReserve());
+        uint256 reserveBal = ERC20(address(_usdst())).balanceOf(reserveAddr);
         if (reserveBal <= prevReserveBalance) return;          // nothing new to index
 
         uint256 deltaUSD = reserveBal - prevReserveBalance;    // newly arrived USD in Reserve
@@ -842,11 +843,7 @@ contract record CDPEngine is Ownable {
         JuniorNote storage note = juniorNotes[msg.sender];
         if (note.owner == address(0)) {
             // Create new note
-            juniorNotes[msg.sender] = JuniorNote({
-                owner: msg.sender,
-                capUSD: capUSD,
-                entryIndex: juniorIndex
-            });
+            juniorNotes[msg.sender] = JuniorNote(msg.sender, capUSD, juniorIndex);
             totalJuniorOutstandingUSD += capUSD;
             emit JuniorNoteCreated(msg.sender, capUSD);
         } else {
@@ -887,30 +884,25 @@ contract record CDPEngine is Ownable {
     }
 
 
-    /// @notice Calculate effective index including unaccounted reserve inflows
-    function _effectiveIndexView() internal view returns (uint256 idxEff) {
-        uint256 idx = juniorIndex == 0 ? 1e27 : juniorIndex;
-        uint256 reserveBal = registry.cdpReserve().balance();
-
-        if (reserveBal <= prevReserveBalance) return idx; // no new inflow in view
-
-        uint256 deltaUSD = reserveBal - prevReserveBalance;
-        uint256 outstanding = totalJuniorOutstandingUSD;
-        if (outstanding == 0) return idx;           // nothing to allocate in view
-
-        // Hypothetical index bump if we synced right now
-        uint256 deltaIndex = (deltaUSD * 1e27) / outstanding;
-        return idx + deltaIndex;
-    }
-
     /// @notice View function to show what's claimable for an owner
     function claimable(address owner) public view returns (uint256) {
         JuniorNote storage note = juniorNotes[owner];
-        uint256 idxEff = _effectiveIndexView();
-        return _entitlement(note, idxEff);
+        
+        // Calculate effective index including unaccounted reserve inflows
+        uint256 effectiveIndex = juniorIndex == 0 ? 1e27 : juniorIndex;
+        address reserveAddr = address(registry.cdpReserve());
+        uint256 reserveBalance = ERC20(address(_usdst())).balanceOf(reserveAddr);
+        
+        if (reserveBalance > prevReserveBalance && totalJuniorOutstandingUSD > 0) {
+            uint256 newInflows = reserveBalance - prevReserveBalance;
+            uint256 indexBump = (newInflows * 1e27) / totalJuniorOutstandingUSD;
+            effectiveIndex += indexBump;
+        }
+        
+        return _entitlement(note, effectiveIndex);
     }
 
-    function claimJunior() external nonReentrant {
+    function claimJunior() external {
         _syncReserveToIndex();
         JuniorNote storage note = juniorNotes[msg.sender];
         require(note.owner != address(0), "junior: no note");
@@ -921,7 +913,8 @@ contract record CDPEngine is Ownable {
         uint256 entitlement = _entitlement(note, currentIndex);
         require(entitlement > 0, "junior: nothing to claim");
 
-        uint256 reserveBalance = registry.cdpReserve().balance();
+        address reserveAddr = address(registry.cdpReserve());
+        uint256 reserveBalance = ERC20(address(_usdst())).balanceOf(reserveAddr);
         require(reserveBalance > 0, "junior: reserve empty");
 
         uint256 payAmount = entitlement <= reserveBalance ? entitlement : reserveBalance;
@@ -950,7 +943,7 @@ contract record CDPEngine is Ownable {
         }
 
         // --- Interaction (after state updates) ---
-        _cdpReserve().transferTo(msg.sender, payAmount);
+        CDPReserve(address(registry.cdpReserve())).transferTo(msg.sender, payAmount);
     }
 
 }
