@@ -910,36 +910,47 @@ contract record CDPEngine is Ownable {
         return _entitlement(note, idxEff);
     }
 
-    /// @notice Claim maximum available from user's junior note
-    function claimJuniors() external {
+    function claimJunior() external nonReentrant {
         _syncReserveToIndex();
         JuniorNote storage note = juniorNotes[msg.sender];
         require(note.owner != address(0), "junior: no note");
-        
-        uint256 noteEntitlement = _entitlement(note, juniorIndex);
-        require(noteEntitlement > 0, "junior: nothing to claim");
-        
-        uint256 reserveBal = registry.cdpReserve().balance();
-        require(reserveBal > 0, "junior: reserve empty");
-        
-        uint256 toPay = noteEntitlement <= reserveBal ? noteEntitlement : reserveBal;
-        
-        // Transfer and update note
-        _cdpReserve().transferTo(msg.sender, toPay);
-        note.capUSD -= toPay;           // Cap-down
-        note.entryIndex = juniorIndex;  // Reset to current index
-        
-        // Global accounting
-        totalJuniorOutstandingUSD -= toPay;
-        prevReserveBalance -= toPay;
-        
-        emit JuniorNoteClaimed(msg.sender, toPay, note.capUSD);
-        
-        // Remove note if fully repaid
-        if (note.capUSD == 0) {
+
+        uint256 currentIndex = juniorIndex;
+        uint256 currentCap = note.capUSD;
+
+        uint256 entitlement = _entitlement(note, currentIndex);
+        require(entitlement > 0, "junior: nothing to claim");
+
+        uint256 reserveBalance = registry.cdpReserve().balance();
+        require(reserveBalance > 0, "junior: reserve empty");
+
+        uint256 payAmount = entitlement <= reserveBalance ? entitlement : reserveBalance;
+        uint256 unpaidAmount = entitlement - payAmount;
+        uint256 newCap = currentCap - payAmount;
+
+        // --- Effects (before interaction) ---
+        if (newCap == 0) {
+            totalJuniorOutstandingUSD -= payAmount;
+            prevReserveBalance -= payAmount;
             delete juniorNotes[msg.sender];
+            emit JuniorNoteClaimed(msg.sender, payAmount, 0);
             emit JuniorNoteClosed(msg.sender);
+        } else {
+            // Adjust entry index to preserve unpaid entitlement
+            uint256 indexAdjustment = (unpaidAmount == 0) ? 0 : (unpaidAmount * 1e27) / newCap;
+            uint256 newEntryIndex = currentIndex - indexAdjustment;
+
+            note.capUSD = newCap;
+            note.entryIndex = newEntryIndex;
+
+            totalJuniorOutstandingUSD -= payAmount;
+            prevReserveBalance -= payAmount;
+
+            emit JuniorNoteClaimed(msg.sender, payAmount, newCap);
         }
+
+        // --- Interaction (after state updates) ---
+        _cdpReserve().transferTo(msg.sender, payAmount);
     }
 
 }
