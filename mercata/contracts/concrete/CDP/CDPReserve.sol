@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 import "../abstract/ERC20/access/Ownable.sol";
+import "../abstract/ERC20/ERC20.sol";
+import "./CDPRegistry.sol";
 import "../Tokens/Token.sol";
 
 /**
@@ -10,8 +12,10 @@ import "../Tokens/Token.sol";
  *         single-entry accounting for fee flows.
  */
 contract record CDPReserve is Ownable {
-  Token public immutable usdst;
+  CDPRegistry public registry;
   address public engine;
+
+  function _usdst() internal view returns (Token) { return Token(address(registry.usdst())); }
 
   event EngineSet(address indexed oldEngine, address indexed newEngine);
   event Transferred(address indexed to, uint256 amount);
@@ -22,9 +26,9 @@ contract record CDPReserve is Ownable {
     _;
   }
 
-  constructor(address _owner, address _usdst) Ownable(_owner) {
-    require(_usdst != address(0), "Reserve: usdst=0");
-    usdst = Token(_usdst);
+  constructor(address _owner) Ownable(_owner) {
+    // require(_usdst != address(0), "Reserve: usdst=0");
+    // usdst = Token(_usdst);
   }
 
   function setEngine(address _engine) external onlyOwner {
@@ -37,19 +41,8 @@ contract record CDPReserve is Ownable {
   /// @notice Called by Engine to pay out USDST to `to`.
   function transferTo(address to, uint256 amount) external onlyEngine {
     require(to != address(0), "Reserve: to=0");
-    require(usdst.transfer(to, amount), "Reserve: transfer failed");
+    require(ERC20(address(_usdst())).transfer(to, amount), "Reserve: transfer failed");
     emit Transferred(to, amount);
   }
 
-  /// @notice USDST balance held by reserve.
-  function balance() external view returns (uint256) {
-    return usdst.balanceOf(address(this));
-  }
-
-  /// @notice Rescue any ERC20 (policy at owner's discretion).
-  function skim(address token, address to, uint256 amount) external onlyOwner {
-    require(to != address(0), "Reserve: to=0");
-    require(Token(token).transfer(to, amount), "Reserve: skim failed");
-    emit Skimmed(token, amount, to);
-  }
 }
