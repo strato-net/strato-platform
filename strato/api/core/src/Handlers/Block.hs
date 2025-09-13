@@ -203,12 +203,6 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
       vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
         E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
         pure v
-      ca <- fmap (buildList certificateAddedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
-        E.where_ $ v E.^. CertificateAddedRefBlockDataRefId `E.in_` E.valList blockIds
-        pure v
-      cr <- fmap (buildList certificateRevokedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
-        E.where_ $ v E.^. CertificateRevokedRefBlockDataRefId `E.in_` E.valList blockIds
-        pure v
       ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
         E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
         pure v
@@ -222,7 +216,7 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
           E.orderBy [E.asc (btx E.^. BlockTransactionId)]
           return (btx, rawTX)
 
-      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ca) (get' k  cr) (get' k  ps) (get' k  ss) (get' k txs)) blks
+      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ps) (get' k  ss) (get' k txs)) blks
 
 getBlockInfo ::
   Selectable BlocksFilterParams [Block] m =>

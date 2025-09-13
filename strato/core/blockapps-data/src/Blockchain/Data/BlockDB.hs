@@ -27,10 +27,8 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Monad (forM, forM_)
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
 import Data.Maybe
-import qualified Data.Text as T
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
@@ -102,7 +100,7 @@ putBlocks blockList makeHashOne = do
 
       case existingBlockData of
         [] -> do
-          let (toInsert, vs, va, vr, ca, cr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
+          let (toInsert, vs, va, vr, _, _, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
             txID <- updateBlockNumber b (transactionHash tx)
@@ -110,11 +108,6 @@ putBlocks blockList makeHashOne = do
           forM_ vs $ \v -> SQL.insert $ BlockValidatorRef blkDataRefId v
           forM_ va $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
           forM_ vr $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
-          forM_ ca $ \c -> do
-            let c' = x509CertToCertInfoState c 
-            SQL.insert $ CertificateAddedRef blkDataRefId (T.pack $ commonName c') (userAddress c') (T.pack . BC.unpack . certToBytes $ certificate c')
-          forM_ cr $ \(DummyCertRevocation ua) -> do
-            SQL.insert $ CertificateRevokedRef blkDataRefId ua
           forM_ ps $ \(Signature sig) -> do
             let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
                 s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
