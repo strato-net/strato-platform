@@ -4,6 +4,7 @@ import "./LiquidityPool.sol";
 import "./PriceOracle.sol";
 import "../Admin/FeeCollector.sol";
 import "../Tokens/TokenFactory.sol";
+import "./SafetyModule.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
@@ -29,11 +30,9 @@ contract record LendingPool is Ownable {
     event ExchangeRateUpdated(address indexed asset, uint newRate);
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
-    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter, uint recapAccruedAfter);
+    event SafetyFactorUpdated(uint safetyFactor);
+    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
     event ReservesSwept(uint amount, address to);
-    event RecapNoteUpdated(uint cap, uint slice);
-    event BadDebtWrittenOff(address indexed borrower, address indexed asset, uint amount);
-    event BadDebtCoveredFromReserves(uint amount);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -52,21 +51,6 @@ contract record LendingPool is Ownable {
         uint reserveFactor;         // Reserve factor in basis points (percentage to protocol treasury)
         uint perSecondFactorRAY;    // Optional per-second compound factor in RAY (1e27). 0 = disabled
     }
-
-    // Recapitalization (bad debt) index model state
-    // recap “accumulates” — as an accounting liability (recapAccrued) and per-share index (recapIndex)
-    uint public recapCapBps;          // +X% cap on principal (bps)
-    uint public recapSliceBps;        // % of reserves slice diverted (bps)
-
-    uint public recapTarget;          // Σ principal * (1 + capBps)
-    uint public recapAccrued;         // Σ diverted so far (liability)
-    uint public recapPaid;            // Σ actually paid out
-
-    uint public recapIndex;           // per-share cumulative (RAY)
-    uint public recapTotalShares;     // Σ shares (1:1 to principal by default)
-    mapping(address=>uint) public record recapUserIndex;  // user => last index
-    mapping(address=>uint) public record recapCredit;     // user => banked claimable to support partial claims
-    bool public recapActive;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -105,9 +89,9 @@ contract record LendingPool is Ownable {
     FeeCollector public feeCollector;
 
     // Bad Debt Handling
-    uint public badDebt; // total bad debt in underlying units
-    bool public doAutoCoverFromReserves; // whether to automatically cover bad debt from reserves
-    mapping(address => uint) public record recapShares;    // user => shares (kept constant; claims via index)
+    uint public safetyFactor;
+    uint public safetyReserves;
+    uint public badDebt;
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
@@ -148,6 +132,10 @@ contract record LendingPool is Ownable {
 
     function _priceOracle() internal view returns (PriceOracle) {
         return registry.priceOracle();
+    }
+
+    function _safetyModule() internal view returns (SafetyModule) {
+        return registry.safetyModule();
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -217,6 +205,7 @@ contract record LendingPool is Ownable {
         // ceilDiv: (a + b - 1) / b
         uint mTokensToBurn = (amount * 1e18 + exchangeRate - 1) / exchangeRate;
         
+        // redundant check
         require(IERC20(mToken).balanceOf(msg.sender) >= mTokensToBurn, "Insufficient mToken balance");
         
         // LiquidityPool burns calculated mTokens and transfers requested underlying amount
@@ -224,6 +213,28 @@ contract record LendingPool is Ownable {
         
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Withdrawn(msg.sender, borrowableAsset, amount);
+    }
+
+    /**
+     * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
+     * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
+     */
+    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
+        _accrue();
+        require(mToken != address(0), "mToken not set");
+        uint userShares = IERC20(mToken).balanceOf(msg.sender);
+        require(userShares > 0, "No mTokens to withdraw");
+
+        // Underlying amount based on current exchange rate
+        uint exchangeRate = getExchangeRate();
+        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
+        underlyingAmount = (userShares * exchangeRate) / 1e18;
+
+        // Withdraw from liquidity pool
+        LiquidityPool(_liquidityPool()).withdraw(userShares, msg.sender, underlyingAmount);
+
+        // Update exchange rate
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -435,30 +446,6 @@ contract record LendingPool is Ownable {
     }
 
     /**
-     * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
-     * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
-     */
-    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
-        _accrue();
-        require(mToken != address(0), "mToken not set");
-        uint userShares = IERC20(mToken).balanceOf(msg.sender);
-        require(userShares > 0, "No mTokens to withdraw");
-
-        // Underlying amount based on current exchange rate
-        uint exchangeRate = getExchangeRate();
-        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
-        underlyingAmount = (userShares * exchangeRate) / 1e18;
-
-        // Ensure pool has liquidity
-        address asset = borrowableAsset;
-        uint poolCash = IERC20(asset).balanceOf(address(_liquidityPool()));
-        require(poolCash >= underlyingAmount, "Insufficient liquidity");
-
-        LiquidityPool(_liquidityPool()).withdraw(userShares, msg.sender, underlyingAmount);
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-    }
-
-    /**
      * @notice Withdraw the maximum collateral for an asset while remaining healthy (minus 1 wei safety)
      * @param asset The collateral asset to withdraw
      * @return amountWithdrawn The amount actually withdrawn
@@ -600,12 +587,6 @@ contract record LendingPool is Ownable {
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
-
-        // Handle newly created bad debt
-        if (userLoan[borrower].scaledDebt != 0
-            && _isCollateralZero(borrower)) {
-            _handleBadDebt(borrower);
-        }
     }
 
     /**
@@ -671,6 +652,10 @@ contract record LendingPool is Ownable {
         LoanInfo memory loan = userLoan[user];
         if (loan.scaledDebt == 0) return 0;
         return (loan.scaledDebt * borrowIndex) / RAY;
+    }
+
+    function getWithholdings() public view returns (uint) {
+        return reservesAccrued + safetyReserves;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -780,28 +765,18 @@ contract record LendingPool is Ownable {
             return 1e18; // Initial 1:1 ratio
         }
 
-        uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
+        uint cash = LiquidityPool(_liquidityPool()).getUnderlyingBalanceAvailable();
         uint debt = _totalDebt(); // index-based system debt
 
-        // Suppliers' claimable underlying excludes protocol reserves and outstanding recap liability
+        // Suppliers' claimable underlying excludes protocol reserves
         uint underlying = cash + debt;
-        if (reservesAccrued < underlying) {
-            underlying -= reservesAccrued;
-        } else {
-            // Extreme guard: if reserves exceed assets (shouldn't happen), floor at cash
-            underlying = cash;
-        }
-        uint recapHeld = recapAccrued > recapPaid ? (recapAccrued - recapPaid) : 0;
-        if (recapHeld < underlying) {
-            underlying -= recapHeld;
-        } else {
-            underlying = cash;
-        }
 
+        // Fallback to 1:1 if no assets
         if (underlying == 0) {
-            return 1e18; // Fallback to 1:1 if no assets
+            return 1e18;
         }
 
+        // Exchange rate is underlying per share of supply
         return (underlying * 1e18) / totalSupply_;
     }
     
@@ -840,23 +815,9 @@ contract record LendingPool is Ownable {
             uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
             uint rf = assetConfigs[borrowableAsset].reserveFactor; // bps
             if (rf > 0 && interestDelta > 0) {
-                uint toRes = (interestDelta * rf) / 10000;
-
-                // Divert a slice of reserves to recap liabilities via index
-                if (recapActive && recapTotalShares > 0 && recapAccrued < recapTarget) {
-                    uint want = (toRes * recapSliceBps) / 10000;
-                    uint room = recapTarget - recapAccrued;
-                    uint divert = want < room ? want : room;
-                    if (divert > 0) {
-                        recapAccrued += divert;
-                        recapIndex += (divert * RAY) / recapTotalShares;
-                        toRes -= divert;
-                    }
-                    if (recapAccrued == recapTarget) recapActive = false;
-                }
-                reservesAccrued += toRes; // remainder still grows protocol reserves
+                reservesAccrued += (interestDelta * rf) / 10000;
             }
-            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued, recapAccrued);
+            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued);
         }
     }
 
@@ -918,24 +879,9 @@ contract record LendingPool is Ownable {
         emit DebtCeilingsUpdated(assetUnits, usdValue);
     }
 
-    function setDoAutoCoverFromReserves(bool _doAutoCoverFromReserves) external onlyPoolConfigurator {
-        doAutoCoverFromReserves = _doAutoCoverFromReserves;
-    }
-
-    /**
-     * @notice Set the recap params
-     * @param cap The cap on the amount earned back from recap notes (11_500 = 15%)
-     * @param slice The slice of reserve accrual used to repay recap notes (5_000 = 50%)
-     */
-    function setRecapParams(uint cap, uint slice) external onlyPoolConfigurator {
-        require(cap >= 10000 && slice <= 10000, "Recap params out of range");
-        recapCapBps = cap - 10000; // cap is full (e.g., 11500 means +15%); store as +X% bps
-        recapSliceBps = slice;
-        emit RecapNoteUpdated(cap, slice);
-    }
-
-    function setRecapActive(bool active) external onlyPoolConfigurator {
-        recapActive = active;
+    function setSafetyFactor(uint _safetyFactor) external onlyPoolConfigurator {
+        safetyFactor = _safetyFactor;
+        emit SafetyFactorUpdated(_safetyFactor);
     }
 
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
@@ -945,7 +891,7 @@ contract record LendingPool is Ownable {
         uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
         uint toSend = amount;
         if (toSend > reservesAccrued) toSend = reservesAccrued;
-        if (toSend > cash) toSend = cash;
+        if (toSend > cash) toSend = cash; // should never happen, since reserves are withheld
 
         if (toSend > 0 && address(feeCollector) != address(0)) {
             LiquidityPool(_liquidityPool()).transferReserve(toSend, address(feeCollector));
@@ -953,7 +899,6 @@ contract record LendingPool is Ownable {
             emit ReservesSwept(toSend, address(feeCollector));
         }
     }
-
     
     // ═══════════════════════════════════════════════════════════════════════════════
     // INTERNAL HELPERS
@@ -977,17 +922,6 @@ contract record LendingPool is Ownable {
         }
         return totalValue;
     }
-
-    function _isCollateralZero(address user) internal view returns (bool) {
-        for (uint i = 0; i < configuredAssets.length; i++) {
-            address asset = configuredAssets[i];
-            if (CollateralVault(_collateralVault()).userCollaterals(user, asset) > 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
 
     /**
      * @notice Calculate total borrow value for a user (single loan)
@@ -1107,123 +1041,5 @@ contract record LendingPool is Ownable {
         uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
         if (price == 0) return 0;
         return (debt * price) / 1e18;
-    }
-
-    // Bad Debt Handling
-
-    function _handleBadDebt(address borrower) internal {
-        _accrue();
-
-        LoanInfo storage loan = userLoan[borrower];
-        require(loan.scaledDebt > 0, "No active loan");
- 
-        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
-        require(owed > 0, "Nothing to write off");
-
-        badDebt += owed;
- 
-        // Write off the new bad debt
-        uint scaledDelta = (owed * RAY) / borrowIndex;
-        totalScaledDebt -= scaledDelta;
-        loan.scaledDebt = 0;
-        delete userLoan[borrower];
- 
-        emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
-
-        if (doAutoCoverFromReserves) _coverBadDebtFromReserves(owed);
-
-        return;
-    }
-
-    // ──────────────────────────────────────────────────────────────────────────────
-    // Recap index model: mint, preview claimable, claim
-    // ──────────────────────────────────────────────────────────────────────────────
-
-    function mintRecap(uint amount) external {
-        require(recapActive, "recap inactive");
-        _accrue();
-        require(badDebt > 0, "no bad debt");
-        if (amount > badDebt) amount = badDebt;
-        require(amount > 0, "zero");
-
-        // move tokens into pool cash
-        require(IERC20(borrowableAsset).transferFrom(msg.sender, address(_liquidityPool()), amount), "transferFrom");
-
-        // accounting
-        badDebt        -= amount;
-        // recapCapBps represents +X% bps; recapTarget increases by principal * (1 + cap)
-        recapTarget    += (amount * (10000 + recapCapBps)) / 10000;
-
-        // 1 share per unit; before increasing shares, bank any pending distribution as credit
-        uint idx = recapIndex;
-        uint uidx = recapUserIndex[msg.sender];
-        if (uidx == 0) uidx = idx; // first-time minter: sync to current
-        if (idx > uidx) {
-            uint pending = (recapShares[msg.sender] * (idx - uidx)) / RAY;
-            if (pending > 0) recapCredit[msg.sender] += pending;
-        }
-        recapShares[msg.sender]       += amount;
-        recapTotalShares              += amount;
-        recapUserIndex[msg.sender] = idx;
-    }
-
-    function recapClaimable(address u) public view returns (uint) {
-        uint sh = recapShares[u];
-        if (sh == 0) return 0;
-        uint idx = recapIndex;
-        uint uidx = recapUserIndex[u];
-        uint delta = idx > uidx ? (idx - uidx) : 0;
-        uint accrued = (sh * delta) / RAY;
-        return accrued + recapCredit[u];
-    }
-
-    function claimRecap(uint maxAmount) external {
-        _accrue();
-        uint claimable = recapClaimable(msg.sender);
-        require(claimable > 0, "nothing");
-        uint amt = claimable;
-        if (maxAmount > 0 && amt > maxAmount) amt = maxAmount;
-
-        // pay from the LiquidityPool (it holds the cash)
-        LiquidityPool(_liquidityPool()).transferReserve(amt, msg.sender);
-
-        recapPaid += amt;
-        // consume distribution by moving index and leaving leftover in credit if partial
-        uint idx = recapIndex;
-        uint uidx = recapUserIndex[msg.sender];
-        uint delta = idx > uidx ? (idx - uidx) : 0;
-        uint newlyAccrued = (recapShares[msg.sender] * delta) / RAY;
-        // total owed = credit + newlyAccrued; we paid amt; remainder stays as credit
-        uint totalOwed = recapCredit[msg.sender] + newlyAccrued;
-        recapUserIndex[msg.sender] = idx;
-        if (amt < totalOwed) {
-            recapCredit[msg.sender] = totalOwed - amt;
-        } else {
-            recapCredit[msg.sender] = 0;
-        }
-    }
-
-    /**
-     * @notice Cover bad debt from reserves
-     * @param amount The amount of bad debt to cover in underlying units
-     * Triggered automatically when bad debt first encountered, or manually by governance
-     */
-    function _coverBadDebtFromReserves(uint amount) internal {
-        require(amount > 0, "Invalid amount");
-        uint cover = amount > badDebt ? badDebt : amount; // cover up to the bad debt amount
-        reservesAccrued -= cover;
-        badDebt -= cover;
-        emit BadDebtCoveredFromReserves(cover);
-    }
-
-    /**
-     * @notice Cover bad debt from reserves
-     * @param amount The amount of bad debt to cover in underlying units
-     * 
-     * Allows governance to call this function at any time, in addition to the initial trigger
-     */
-    function coverBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
-        _coverBadDebtFromReserves(amount);
     }
 } 

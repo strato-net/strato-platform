@@ -35,11 +35,6 @@ contract record PoolConfigurator is Ownable {
      * @param interestRates Array of interest rates for assets
      * @param reserveFactors Array of reserve factors for assets
      * @param perSecondFactorsRAY Array of per-second compound factors in RAY (1e27)
-     * @param debtCeilingAssetUnits debt ceiling asset units
-     * @param debtCeilingUSD debt ceiling USD
-     * @param recapCap the cap on amount earned back from recap notes
-     * @param recapSlice the slice of reserve used to repay recap notes
-     * @param doAutoCoverFromReserves Whether to auto cover bad debt from reserves
      */
 
     function initializeProtocol(
@@ -49,6 +44,7 @@ contract record PoolConfigurator is Ownable {
         address rateStrategy,
         address priceOracle,
         address tokenFactory,
+        address safetyModule,
         address[] calldata assets,
         uint[] calldata ltvs,
         uint[] calldata liquidationThresholds,
@@ -58,12 +54,10 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata perSecondFactorsRAY,
         uint debtCeilingAssetUnits,
         uint debtCeilingUSD,
-        uint recapCap,
-        uint recapSlice,
-        bool doAutoCoverFromReserves,
+        uint safetyFactor
     ) external onlyOwner {
         // Set all registry components
-        registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
+        registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle, safetyModule);
         
         // Set token factory
         LendingPool pool = LendingPool(registry.getLendingPool());
@@ -72,9 +66,8 @@ contract record PoolConfigurator is Ownable {
         // Set initial debt ceilings
         pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
 
-        // Set bad debt handling parameters
-        pool.setRecapParams(recapCap, recapSlice);
-        pool.setDoAutoCoverFromReserves(doAutoCoverFromReserves);
+        // Set safety factor
+        pool.setSafetyFactor(safetyFactor);
         
         // Configure all assets if provided
         if (assets.length > 0) {
@@ -216,14 +209,14 @@ contract record PoolConfigurator is Ownable {
         pool.setDebtCeilings(assetUnits, usdValue);
     }
 
-    function setDoAutoCoverFromReserves(bool _doAutoCoverFromReserves) external onlyOwner {
+    /**
+     * @notice Set safety factor
+     * @param safetyFactor The safety factor in basis points of fees;
+     *                     e.g. 5000 = 50% of fees are used to fund the safety module
+     */
+    function setSafetyFactor(uint safetyFactor) external onlyOwner {
         LendingPool pool = LendingPool(registry.getLendingPool());
-        pool.setDoAutoCoverFromReserves(_doAutoCoverFromReserves);
-    }
-
-    function setRecapParams(uint cap, uint slice) external onlyOwner {
-        LendingPool pool = LendingPool(registry.getLendingPool());
-        pool.setRecapParams(cap, slice);
+        pool.setSafetyFactor(safetyFactor);
     }
 
     /**
@@ -233,10 +226,5 @@ contract record PoolConfigurator is Ownable {
     function sweepReserves(uint amount) external onlyOwner {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.sweepReserves(amount);
-    }
-
-    function coverBadDebtFromReserves(uint amount) external onlyOwner {
-        LendingPool pool = LendingPool(registry.getLendingPool());
-        pool.coverBadDebtFromReserves(amount);
     }
 } 

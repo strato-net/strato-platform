@@ -45,6 +45,15 @@ contract record LiquidityPool is Ownable  {
     }
 
     /**
+     * @notice Get current underlying balance available for withdrawal
+     */
+    function getUnderlyingBalanceAvailable() public view returns (uint) {
+        address asset = _getAsset();
+        uint currentBalance = IERC20(asset).balanceOf(address(this));
+        return currentBalance - LendingPool(registry.lendingPool()).getWithholdings();
+    }
+
+    /**
      * @notice Deposit underlying asset and mint interest-bearing mTokens based on current exchange rate
      * @param amount       Amount of underlying asset the user is supplying
      * @param mintAmount   Number of mTokens that should be minted for the user (calculated in LendingPool)
@@ -77,8 +86,8 @@ contract record LiquidityPool is Ownable  {
         require(address(mToken) != address(0), "mToken not set");
 
         address asset = _getAsset();
-        uint currentBalance = IERC20(asset).balanceOf(address(this));
-        require(currentBalance >= underlyingAmount, "Insufficient liquidity");
+        uint balanceAvailable = getUnderlyingBalanceAvailable();
+        require(balanceAvailable >= underlyingAmount, "Insufficient liquidity");
 
         // Burn mTokens from user first
         mToken.burn(user, mTokenAmount);
