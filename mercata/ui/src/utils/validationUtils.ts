@@ -92,6 +92,47 @@ export const handleAmountInputChange = (raw: string, setAmount: (v: string) => v
   setError(error ?? "");
 };
 
+export const handleSimpleAmountInputChange = (
+  raw: string, 
+  setAmount: (v: string) => void, 
+  setError: (e: string) => void, 
+  maxAmount: bigint, 
+  symbol: string, 
+  decimals: number
+) => {
+  const v = raw.replace(/,/g, "");
+  if (!isDecimal(v)) { setError("Please enter a valid number"); return; }
+  
+  const normalized = v === "." ? "0." : v;
+  setAmount(normalized);
+  
+  if (normalized.trim() === "") {
+    setError("");
+    return;
+  }
+  
+  if (!DECIMAL_PATTERN.test(normalized)) {
+    setError("Please enter a valid number");
+    return;
+  }
+  
+  // Check decimal places
+  const decimalPart = normalized.includes('.') ? normalized.split('.')[1] : '';
+  if (decimalPart.length > decimals) {
+    setError(`Maximum ${decimals} decimal places allowed`);
+    return;
+  }
+  
+  // Check max amount
+  const amountWei = safeParseUnits(normalized, decimals);
+  if (amountWei > maxAmount) {
+    setError(`Insufficient balance. Maximum: ${fmt(maxAmount, symbol, decimals)}`);
+    return;
+  }
+  
+  setError("");
+};
+
 export const computeMaxTransferable = (
   maxAmount: bigint, 
   tokenAddress: string | null, 
