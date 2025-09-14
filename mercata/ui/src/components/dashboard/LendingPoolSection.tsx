@@ -5,12 +5,12 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE, usdstAddress, musdstAddress } from "@/lib/constants";
-import { formatBalance, safeParseUnits, addCommasToInput } from "@/utils/numberUtils";
-import { handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { computeMaxTransferable } from "@/utils/validationUtils";
+import TokenInput from "@/components/shared/TokenInput";
 
 const LendingPoolSection = () => {
   const { userAddress } = useUser();
@@ -176,48 +176,14 @@ const LendingPoolSection = () => {
     setError("");
   }, []);
 
-  // Extracted handlers to avoid inline lambdas
-  const onDepositChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    handleAmountInputChange(
-      value,
-      setDepositAmount,
-      setDepositAmountError,
-      {
-        maxAmount: depositMaxAmount,
-        symbol: "USDST",
-        tokenAddress: usdstAddress,
-        transactionFee: LENDING_DEPOSIT_FEE,
-        voucherBalance: BigInt(voucherBalance),
-        usdstBalance: BigInt(usdstBalance)
-      }
-    );
-  }, [depositMaxAmount, voucherBalance, usdstBalance]);
-
-  const onWithdrawChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    handleAmountInputChange(
-      value,
-      setWithdrawAmount,
-      setWithdrawAmountError,
-      {
-        maxAmount: withdrawMaxAmount,
-        symbol: "mUSDST",
-        tokenAddress: musdstAddress,
-        transactionFee: LENDING_WITHDRAW_FEE,
-        voucherBalance: BigInt(voucherBalance),
-        usdstBalance: BigInt(usdstBalance)
-      }
-    );
-  }, [withdrawMaxAmount, voucherBalance, usdstBalance]);
-
+  // Max click handlers
   const onSetDepositMax = useCallback(() => {
     setMaxAmount(maxDepositTransferable, setDepositAmount, setDepositAmountError);
-  }, [setMaxAmount, maxDepositTransferable]);
+  }, [maxDepositTransferable, setMaxAmount]);
 
   const onSetWithdrawMax = useCallback(() => {
     setMaxAmount(maxWithdrawTransferable, setWithdrawAmount, setWithdrawAmountError);
-  }, [setMaxAmount, maxWithdrawTransferable]);
+  }, [maxWithdrawTransferable, setMaxAmount]);
 
   const onDeposit = useCallback(() => {
     handleLiquidityAction("deposit");
@@ -364,62 +330,26 @@ const LendingPoolSection = () => {
           {/* Deposit and Withdraw - Side by side on non-mobile */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-lg p-4 border">
-              <h3 className="font-medium mb-3">
-                Deposit
-                <>{" ("}
-                  <button
-                    type="button"
-                    onClick={onSetDepositMax}
-                    disabled={!userAddress || maxDepositTransferable === 0n}
-                    className={`font-medium focus:outline-none ${
-                      (!userAddress || maxDepositTransferable === 0n)
-                        ? "text-gray-400 cursor-not-allowed" 
-                        : "text-blue-600 hover:underline"
-                    }`}
-                  >
-                    Max: {displayStrings.depositMaxDisplay}
-                  </button>
-                  {")"}</>
-              </h3>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
-                <div className="relative flex-1">
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={addCommasToInput(depositAmount)}
-                    onChange={onDepositChange}
-                    disabled={!userAddress || maxDepositTransferable === 0n}
-                    aria-invalid={!!depositAmountError}
-                    aria-busy={isProcessing}
-                    className={`pl-16 ${depositAmountError ? 'border-red-500' : ''} ${(!userAddress || maxDepositTransferable === 0n) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                  />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
-                </div>
-                <Button
-                  onClick={onDeposit}
-                  className="bg-strato-blue hover:bg-strato-blue/90 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                  disabled={!userAddress || loading || isProcessing || !depositAmount || !!depositAmountError}
-                  aria-busy={isProcessing}
-                >
-                  {isProcessing ? (
-                    "Processing..."
-                  ) : (
-                    <>
-                      <CircleArrowDown className="mr-2 h-4 w-4" />
-                      Deposit
-                    </>
-                  )}
-                </Button>
-              </div>
-              {depositAmountError && <p className="text-sm text-red-500 mt-1">{depositAmountError}</p>}
+              <TokenInput
+                value={depositAmount}
+                error={depositAmountError}
+                tokenName="Deposit"
+                tokenSymbol="USDST"
+                maxTransferable={maxDepositTransferable}
+                decimals={18}
+                disabled={!userAddress || maxDepositTransferable === 0n}
+                loading={isProcessing}
+                onValueChange={setDepositAmount}
+                onErrorChange={setDepositAmountError}
+                onMaxClick={onSetDepositMax}
+                showPercentageButtons={false}
+              />
               <div className="text-xs text-gray-500 mt-1">
                 Transaction Fee: {displayStrings.depositFeeDisplay}
               </div>
-              {/* Mobile Button */}
               <Button
                 onClick={onDeposit}
-                className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4 sm:hidden"
+                className="bg-strato-blue hover:bg-strato-blue/90 w-full mt-4"
                 disabled={!userAddress || loading || isProcessing || !depositAmount || !!depositAmountError}
                 aria-busy={isProcessing}
               >
@@ -435,70 +365,27 @@ const LendingPoolSection = () => {
             </div>
 
             <div className="bg-white rounded-lg p-4 border">
-              <h3 className="font-medium mb-3">
-                Withdraw
-                <>{" ("}
-                  <button
-                    type="button"
-                    onClick={onSetWithdrawMax}
-                    disabled={!userAddress || maxWithdrawTransferable === 0n}
-                    className={`font-medium focus:outline-none ${
-                      (!userAddress || maxWithdrawTransferable === 0n)
-                        ? "text-gray-400 cursor-not-allowed" 
-                        : "text-blue-600 hover:underline"
-                    }`}
-                  >
-                    Max: {displayStrings.withdrawMaxDisplay}
-                  </button>
-                  {")"}</>
-              </h3>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
-                <div className="relative flex-1">
-                  <Input
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={addCommasToInput(withdrawAmount)}
-                    onChange={onWithdrawChange}
-                    disabled={!userAddress || maxWithdrawTransferable === 0n}
-                    aria-invalid={!!withdrawAmountError}
-                    aria-busy={isProcessing}
-                    className={`pl-16 ${withdrawAmountError ? 'border-red-500' : ''} ${(!userAddress || maxWithdrawTransferable === 0n) ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                  />
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">mUSDST</span>
-                </div>
-                <Button
-                  onClick={onWithdraw}
-                  variant="outline"
-                  className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                  disabled={
-                    !userAddress ||
-                    loadingLiquidity ||
-                    isProcessing ||
-                    !withdrawAmount ||
-                    !!withdrawAmountError
-                  }
-                  aria-busy={isProcessing}
-                >
-                  {isProcessing ? (
-                    "Processing..."
-                  ) : (
-                    <>
-                      <CircleArrowUp className="mr-2 h-4 w-4" />
-                      Withdraw
-                    </>
-                  )}
-                </Button>
-              </div>
-              {withdrawAmountError && <p className="text-sm text-red-500 mt-1">{withdrawAmountError}</p>}
+              <TokenInput
+                value={withdrawAmount}
+                error={withdrawAmountError}
+                tokenName="Withdraw"
+                tokenSymbol="mUSDST"
+                maxTransferable={maxWithdrawTransferable}
+                decimals={18}
+                disabled={!userAddress || maxWithdrawTransferable === 0n}
+                loading={isProcessing}
+                onValueChange={setWithdrawAmount}
+                onErrorChange={setWithdrawAmountError}
+                onMaxClick={onSetWithdrawMax}
+                showPercentageButtons={false}
+              />
               <div className="text-xs text-gray-500 mt-1">
                 Transaction Fee: {displayStrings.withdrawFeeDisplay}
               </div>
-              {/* Mobile Button */}
               <Button
                 onClick={onWithdraw}
                 variant="outline"
-                className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4 sm:hidden"
+                className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4"
                 disabled={
                   !userAddress ||
                   loadingLiquidity ||

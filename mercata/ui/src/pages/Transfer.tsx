@@ -14,6 +14,7 @@ import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
+import TokenInput from "../components/shared/TokenInput";
 
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -22,8 +23,8 @@ import { useToast } from "@/hooks/use-toast";
 
 import { Token } from "@/interface";
 import { TRANSFER_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatBalance, formatWeiAmount } from "@/utils/numberUtils";
-import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
+import { safeParseUnits, formatUnits } from "@/utils/numberUtils";
+import { handleRecipientAddress, computeMaxTransferable } from "@/utils/validationUtils";
 
 const Transfer = () => {
   // Hooks
@@ -49,6 +50,13 @@ const Transfer = () => {
   const maxTransferable = useMemo(() => {
     return selectedToken ? computeMaxTransferable(maxAmount, selectedToken.address, TRANSFER_FEE, BigInt(voucherBalance), BigInt(usdstBalance)) : 0n;
   }, [selectedToken, maxAmount, voucherBalance, usdstBalance]);
+
+  const feeError = useMemo(() => {
+    const fee = safeParseUnits(TRANSFER_FEE, 18);
+    return (BigInt(usdstBalance) + BigInt(voucherBalance)) < fee
+      ? `Insufficient USDST + vouchers for transaction fee (${TRANSFER_FEE} USDST required)`
+      : "";
+  }, [usdstBalance, voucherBalance]);
   const isLoading = loadingUsdstBalance || tokenLoading;
   const isDisabled = 
     isLoading ||
@@ -57,7 +65,8 @@ const Transfer = () => {
     !amount ||
     transferLoading ||
     !!recipientError ||
-    !!amountError;
+    !!amountError ||
+    !!feeError;
 
   // Functions
   const fetchAllData = useCallback(async () => {
@@ -71,6 +80,14 @@ const Transfer = () => {
     setTokens(tokens);
     return tokens;
   }, [userAddress, getUserTokensWithBalance, fetchUsdstBalance]);
+
+  const handleMaxClick = useCallback(() => {
+    if (selectedToken && maxTransferable > 0n) {
+      const maxFormatted = formatUnits(maxTransferable, 18);
+      setAmount(maxFormatted);
+      setAmountError("");
+    }
+  }, [selectedToken, maxTransferable]);
 
   // Effects
   useEffect(() => {
@@ -172,55 +189,23 @@ const Transfer = () => {
             </div>
 
             {/* Amount */}
-            <div className="space-y-2">
-              <label className="text-sm text-gray-600">
-                Amount
-                {selectedToken && (
-                  <>{" ("}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const maxFormatted = formatWeiAmount(maxTransferable.toString());
-                        setAmount(maxFormatted);
-                        setAmountError("");
-                      }}
-                      className="font-medium text-blue-600 hover:underline focus:outline-none"
-                    >
-                      Max: {formatBalance(maxTransferable, undefined, 18, 0, 4)}
-                    </button>
-                    {")"}</>
-                )}
-              </label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={addCommasToInput(amount)}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  handleAmountInputChange(
-                    value,
-                    setAmount,
-                    setAmountError,
-                    {
-                      maxAmount,
-                      symbol: selectedToken?.token?._symbol || "",
-                      tokenAddress: selectedToken?.address,
-                      transactionFee: TRANSFER_FEE,
-                      voucherBalance: BigInt(voucherBalance),
-                      usdstBalance: BigInt(usdstBalance)
-                    }
-                  );
-                }}
-                placeholder="0.00"
-                className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""
-                  }`}
-              />
-              {amountError && (
-                <p className="text-red-600 text-sm">
-                  {amountError}
-                </p>
-              )}
-            </div>
+            <TokenInput
+              value={amount}
+              error={amountError}
+              tokenName="Amount"
+              tokenSymbol={selectedToken?.token?._symbol || selectedToken?.token?._name || "Token"}
+              maxTransferable={maxTransferable}
+              decimals={18}
+              disabled={!selectedToken || maxTransferable === 0n}
+              loading={transferLoading}
+              onValueChange={setAmount}
+              onErrorChange={setAmountError}
+              onMaxClick={handleMaxClick}
+              showPercentageButtons={false}
+            />
+
+            {/* Fee Error Display */}
+            {feeError && <p className="text-sm text-red-500 mt-1">{feeError}</p>}
 
             {/* Transaction Fee Display */}
             <div className="bg-gray-50 p-4 rounded-lg">

@@ -306,7 +306,6 @@ const Borrow = () => {
                 executeWithdraw(selectedAsset, amount);
               }
             }}
-            usdstBalance={usdstBalance}
             transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
         />
       )}
