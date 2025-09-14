@@ -72,8 +72,7 @@ const LiquidityDepositModal = ({
   const [token1AmountError, setToken1AmountError] = useState("");
   const [token2AmountError, setToken2AmountError] = useState("");
   const [depositLoading, setDepositLoading] = useState(false);
-  const [primary, setPrimary] = useState<"A" | "B">("B");
-  const [depositMode, setDepositMode] = useState<"A" | "B" | "A&B">("A");
+  const [primary, setPrimary] = useState<"A" | "B">("A");
 
   // ============================================================================
   // COMPUTED VALUES
@@ -113,7 +112,6 @@ const LiquidityDepositModal = ({
   // Derived constants
   const decA = poolView?.decA ?? 18;
   const decB = poolView?.decB ?? 18;
-  const isDual = depositMode === "A&B";
   const isBootstrap = !!poolView && poolView.lpTotalSupply === 0n;
   
   // Minimum A needed for dual deposits (when pool has existing liquidity)
@@ -134,14 +132,6 @@ const LiquidityDepositModal = ({
   
   const vouchersRequiredDual = Math.round(Number((feeWeiDual * BigInt(VOUCHERS_PER_UNIT)) / TEN_DEC));
   const vouchersRequiredSingle = Math.round(Number((feeWeiSingle * BigInt(VOUCHERS_PER_UNIT)) / TEN_DEC));
-
-  // Fee gating
-  const canPayFee = isDual
-    ? (usdst + voucher) >= feeWeiDual
-    : (usdst + voucher) >= feeWeiSingle;
-  const feeError = canPayFee ? null : `Insufficient USDST + vouchers for transaction fee. You have ${formatUnits(usdst + voucher, DECIMALS)} USDST, need ${isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE} USDST`;
-  const validationFee = isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE;
-  const vouchersRequired = isDual ? vouchersRequiredDual : vouchersRequiredSingle;
 
   // Max transferable amounts (after fees)
   const maxes = useMemo(() => {
@@ -165,26 +155,38 @@ const LiquidityDepositModal = ({
     return maxes.aD >= AMin && maxes.bD > 0n;
   }, [poolView, isBootstrap, maxes.aD, maxes.bD, AMin]);
 
-  // Token balance error (only show if user can pay fees but has no tokens)
-  const tokenBalanceError = (maxes.aS <= 0n && maxes.bS <= 0n && canPayFee) ? "You only have enough USDST to cover transaction fees, but no tokens to deposit" : null;
 
-  // Update deposit mode based on available balances
-  useEffect(() => {
+  // Set initial deposit mode based on available balances
+  const [depositMode, setDepositMode] = useState<"A" | "B" | "A&B">(() => {
     const canA = maxes.aD > 0n;
     const canB = maxes.bD > 0n;
     const canAmin = maxes.aS > 0n;
     const canBmin = maxes.bS > 0n;
     
     if (dualFeasible) {
-      setDepositMode("A&B");
+      return "A&B";
     } else if (canA && canAmin) {
-      setDepositMode("A");
+      return "A";
     } else if (canB && canBmin) {
-      setDepositMode("B");
+      return "B";
     } else {
-      setDepositMode("A");
+      return "A";
     }
-  }, [dualFeasible, maxes.aD, maxes.bD, maxes.aS, maxes.bS]);
+  });
+
+  // Derived from deposit mode
+  const isDual = depositMode === "A&B";
+
+  // Fee gating
+  const canPayFeeSingle = (usdst + voucher) >= feeWeiSingle;
+  const canPayFeeDual = (usdst + voucher) >= feeWeiDual;
+  const canPayFee = isDual ? canPayFeeDual : canPayFeeSingle;
+  const feeError = canPayFee ? null : `Insufficient USDST + vouchers for transaction fee. You have ${formatUnits(usdst + voucher, DECIMALS)} USDST, need ${isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE} USDST`;
+  const validationFee = isDual ? DEPOSIT_FEE : SINGLE_TOKEN_DEPOSIT_FEE;
+  const vouchersRequired = isDual ? vouchersRequiredDual : vouchersRequiredSingle;
+
+  // Token balance error (only show if user can pay fees but has no tokens)
+  const tokenBalanceError = (maxes.aS <= 0n && maxes.bS <= 0n && canPayFee) ? "You only have enough USDST to cover transaction fees, but no tokens to deposit" : null;
 
   // Dual mode max amounts (canonicalized to pool ratio)
   const dualMax = useMemo(() => {
@@ -203,28 +205,33 @@ const LiquidityDepositModal = ({
   // EFFECTS
   // ============================================================================
 
-  // Canonicalize when entering dual mode - trimmed dependencies
-  useEffect(() => {
-    if (!poolView) return;
-    if (isDual && (Awei > 0n || Bwei > 0n) && !isBootstrap) {
-      if (primary === "A") {
-        const { A, B } = canon("A", Awei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
-        setAstr(formatUnits(A, decA));
-        setBstr(formatUnits(B, decB));
-      } else {
-        const { A, B } = canon("B", Bwei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
-        setAstr(formatUnits(A, decA));
-        setBstr(formatUnits(B, decB));
-      }
-    }
-  }, [isDual, isBootstrap, primary, poolView?.RA, poolView?.RB, maxes.aD, maxes.bD, Awei, Bwei, decA, decB]);
 
   // Reset on pool change
   useEffect(() => {
     setAstr("");
     setBstr("");
-    setPrimary("B");
+    setPrimary("A");
   }, [selectedPool?.address]);
+
+  // ============================================================================
+  // HELPERS
+  // ============================================================================
+
+  const canonicalizeFromPrimary = useCallback((newPrimary?: "A" | "B") => {
+    if (!poolView || isBootstrap || (Awei === 0n && Bwei === 0n)) return;
+    
+    const currentPrimary = newPrimary ?? primary;
+    
+    if (currentPrimary === "A") {
+      const { A, B } = canon("A", Awei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(formatUnits(A, decA));
+      setBstr(formatUnits(B, decB));
+    } else {
+      const { A, B } = canon("B", Bwei, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      setAstr(formatUnits(A, decA));
+      setBstr(formatUnits(B, decB));
+    }
+  }, [poolView, isBootstrap, Awei, Bwei, primary, maxes.aD, maxes.bD, decA, decB]);
 
   // ============================================================================
   // HANDLERS
@@ -232,27 +239,34 @@ const LiquidityDepositModal = ({
 
   const handleTokenChange = useCallback((side: "A" | "B", value: string) => {
     if (!poolView) return;
-    
+
     const isA = side === "A";
     const decimals = isA ? decA : decB;
-    const inputBigInt = safeParseUnits(value, decimals);
-    
-    // Update the edited field
-    if (isA) setAstr(value);
-    else setBstr(value);
-    
-    // Single mode or bootstrap - no canonicalization needed
-    if (depositMode === side || isBootstrap) return;
 
-    // Dual mode with existing liquidity - canonicalize from edited side
+    // always update the edited field verbatim
+    if (isA) setAstr(value); else setBstr(value);
+
+    // Clear any existing error for this field
+    if (isA) setToken1AmountError(""); else setToken2AmountError("");
+
+    // if user cleared input, don't touch the other side
+    if (value.trim() === "") return;
+
+    const inputBigInt = safeParseUnits(value, decimals);
+
+    // no canon in bootstrap or single-token modes
+    if (isBootstrap || depositMode !== "A&B") return;
+
+    // clamp to spendable caps to avoid impossible quotes
+    const cap = isA ? maxes.aD : maxes.bD;
+    const X = inputBigInt > cap ? cap : inputBigInt;
+
     if (isA) {
-      const { A, B } = canon("A", inputBigInt, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
-      setAstr(value);
+      const { B } = canon("A", X, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
       setBstr(formatUnits(B, decB));
     } else {
-      const { A, B } = canon("B", inputBigInt, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
+      const { A } = canon("B", X, poolView.RA, poolView.RB, maxes.aD, maxes.bD);
       setAstr(formatUnits(A, decA));
-      setBstr(formatUnits(B, decB));
     }
   }, [poolView, decA, decB, depositMode, isBootstrap, maxes.aD, maxes.bD]);
 
@@ -297,17 +311,25 @@ const LiquidityDepositModal = ({
 
   const handlePrimaryToggle = useCallback(() => {
     if (!poolView || !isDual) return;
-    setPrimary(primary === "A" ? "B" : "A");
-  }, [poolView, isDual, primary]);
+    const newPrimary = primary === "A" ? "B" : "A";
+    setPrimary(newPrimary);
+    setToken1AmountError(""); // Clear Token A error
+    setToken2AmountError(""); // Clear Token B error
+    canonicalizeFromPrimary(newPrimary);
+  }, [poolView, isDual, primary, canonicalizeFromPrimary]);
 
   const handleDepositModeChange = useCallback((mode: "A" | "B" | "A&B") => {
     setDepositMode(mode);
     if (mode === "A") {
       setBstr("");
+      setToken2AmountError(""); // Clear Token B error when switching to A-only
     } else if (mode === "B") {
       setAstr("");
+      setToken1AmountError(""); // Clear Token A error when switching to B-only
+    } else if (mode === "A&B") {
+      canonicalizeFromPrimary();
     }
-  }, []);
+  }, [canonicalizeFromPrimary]);
 
   const handleClose = useCallback(() => {
     setAstr("");
@@ -339,15 +361,49 @@ const LiquidityDepositModal = ({
       } else {
         // Dual mode: validate and clamp to ensure contract acceptance
         if (!isBootstrap) {
-          const { RA, RB } = poolView;
-          const bMax = Awei > 0n ? floorDiv((Awei - 1n) * RB, RA) : 0n;
+          // Re-read fresh reserves at submit time to handle drift
+          const freshRA = BigInt(selectedPool.tokenABalance ?? "0");
+          const freshRB = BigInt(selectedPool.tokenBBalance ?? "0");
+          
+          // Safety check for zero reserves (very rare desync case)
+          if (freshRA === 0n || freshRB === 0n) {
+            toast({
+              title: "Pool data error",
+              description: "Pool reserves are temporarily unavailable. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Re-quote with fresh reserves
+          const bMax = Awei > 0n ? floorDiv((Awei - 1n) * freshRB, freshRA) : 0n;
           const Bclamped = Bwei > bMax ? bMax : Bwei;
-          const Areq = floorDiv(Bclamped * RA, RB) + 1n;
+          const Areq = floorDiv(Bclamped * freshRA, freshRB) + 1n;
+          
+          // Check if Bclamped == 0 (A too small for any B to fit)
+          if (Bclamped === 0n) {
+            toast({
+              title: "Invalid amounts",
+              description: `Token A amount too small for dual deposit. Minimum required: ${formatUnits(AMin, decA)} ${poolView.nameA}`,
+              variant: "destructive",
+            });
+            return;
+          }
           
           if (Awei < Areq) {
             toast({
               title: "Invalid amounts",
               description: `Token A amount too small for dual deposit. Required: ${formatUnits(Areq, decA)}`,
+              variant: "destructive",
+            });
+            return;
+          }
+          
+          // Guard: If Areq > maxes.aD, block with clear message
+          if (Areq > maxes.aD) {
+            toast({
+              title: "Insufficient balance",
+              description: `Required Token A amount (${formatUnits(Areq, decA)}) exceeds your balance (${formatUnits(maxes.aD, decA)})`,
               variant: "destructive",
             });
             return;
@@ -391,7 +447,7 @@ const LiquidityDepositModal = ({
     depositLoading ||
     !!token1AmountError ||
     !!token2AmountError ||
-    !canPayFee ||
+    (!isDual ? !canPayFeeSingle : !canPayFeeDual) ||
     (depositMode === "A" && Awei === 0n) ||
     (depositMode === "B" && Bwei === 0n) ||
     (isDual && (Awei === 0n || Bwei === 0n)) ||
@@ -399,7 +455,7 @@ const LiquidityDepositModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Liquidity</DialogTitle>
           <DialogDescription>
@@ -443,7 +499,7 @@ const LiquidityDepositModal = ({
               variant={depositMode === "A&B" ? "default" : "outline"}
               size="sm"
               onClick={() => handleDepositModeChange("A&B")}
-              disabled={!dualFeasible}
+              disabled={!dualFeasible || !canPayFeeDual}
               className="flex-1 text-xs"
             >
               Both Tokens
@@ -453,31 +509,7 @@ const LiquidityDepositModal = ({
           {/* Helper text when Both Tokens button is disabled */}
           {!dualFeasible && maxes.aD > 0n && maxes.bD > 0n && !isBootstrap && (
             <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded mt-2">
-              Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
-            </div>
-          )}
-
-          {/* Primary Selection for Dual Mode */}
-          {depositMode === "A&B" && (
-            <div className="flex space-x-2 p-1">
-              <Button
-                type="button"
-                variant={primary === "A" ? "default" : "outline"}
-                size="sm"
-                onClick={handlePrimaryToggle}
-                className="flex-1 text-xs"
-              >
-                {poolView?.nameA} Primary
-              </Button>
-              <Button
-                type="button"
-                variant={primary === "B" ? "default" : "outline"}
-                size="sm"
-                onClick={handlePrimaryToggle}
-                className="flex-1 text-xs"
-              >
-                {poolView?.nameB} Primary
-              </Button>
+              ≈Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
             </div>
           )}
 
@@ -489,7 +521,7 @@ const LiquidityDepositModal = ({
               tokenName={`${poolView?.nameA} Amount`}
               tokenSymbol={selectedPool?.tokenA?.symbol || poolView?.nameA}
               tokenAddress={selectedPool?.tokenA?.address || ""}
-              maxAmount={tokenAMaxAmount}
+              maxAmount={isDual ? dualMax.A : maxA}
               maxTransferable={isDual ? dualMax.A : maxA}
               transactionFee={isDual ? "0" : validationFee}
               decimals={decA}
@@ -500,12 +532,27 @@ const LiquidityDepositModal = ({
               onValueChange={onAChange}
               onErrorChange={setToken1AmountError}
               onMaxClick={handleMaxClick("A")}
+              rightButton={
+                isDual && !isBootstrap ? (
+                  <Button
+                    type="button"
+                    variant={primary === "A" ? "default" : "outline"}
+                    size="sm"
+                    onClick={handlePrimaryToggle}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {primary === "A" ? "Primary" : "Set"}
+                  </Button>
+                ) : (
+                  <div className="h-6 w-16" /> // Reserve space to prevent layout shift
+                )
+              }
             />
             
             {/* Helper text for dual mode minimum A */}
             {isDual && !isBootstrap && !dualFeasible && maxes.aD > 0n && (
               <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
-                Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
+                ≈Minimum A for dual deposit: {formatUnits(AMin, decA)} {poolView?.nameA}
               </div>
             )}
 
@@ -515,7 +562,7 @@ const LiquidityDepositModal = ({
               tokenName={`${poolView?.nameB} Amount`}
               tokenSymbol={selectedPool?.tokenB?.symbol || poolView?.nameB}
               tokenAddress={selectedPool?.tokenB?.address || ""}
-              maxAmount={tokenBMaxAmount}
+              maxAmount={isDual ? dualMax.B : maxB}
               maxTransferable={isDual ? dualMax.B : maxB}
               transactionFee={isDual ? "0" : validationFee}
               decimals={decB}
@@ -526,8 +573,24 @@ const LiquidityDepositModal = ({
               onValueChange={onBChange}
               onErrorChange={setToken2AmountError}
               onMaxClick={handleMaxClick("B")}
+              rightButton={
+                isDual && !isBootstrap ? (
+                  <Button
+                    type="button"
+                    variant={primary === "B" ? "default" : "outline"}
+                    size="sm"
+                    onClick={handlePrimaryToggle}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {primary === "B" ? "Primary" : "Set"}
+                  </Button>
+                ) : (
+                  <div className="h-6 w-16" /> // Reserve space to prevent layout shift
+                )
+              }
             />
           </div>
+
 
           {/* Pool Information */}
           <div className="rounded-lg bg-gray-50 p-4 mx-1">
@@ -576,8 +639,8 @@ const LiquidityDepositModal = ({
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
   );
 };
 

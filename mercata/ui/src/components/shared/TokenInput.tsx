@@ -19,6 +19,7 @@ interface TokenInputProps {
   onValueChange: (value: string) => void;
   onErrorChange: (error: string) => void;
   onMaxClick?: () => void;
+  rightButton?: React.ReactNode;
 }
 
 const TokenInput = ({
@@ -38,6 +39,7 @@ const TokenInput = ({
   onValueChange,
   onErrorChange,
   onMaxClick,
+  rightButton,
 }: TokenInputProps) => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,23 +92,28 @@ const TokenInput = ({
 
   return (
     <div className="rounded-lg border p-3">
-      <h3 className="font-medium mb-3">
-        {tokenName}
-        <>{" ("}
-          <button
-            type="button"
-            onClick={handleMaxClick}
-            disabled={isMaxDisabled}
-            className={`font-medium focus:outline-none ${
-              isMaxDisabled
-                ? "text-gray-400 cursor-not-allowed"
-                : "text-blue-600 hover:underline"
-            }`}
-          >
-            Max: {maxTransferable ? formatMaxDisplay(maxTransferable, tokenSymbol, decimals) : "—"}
-          </button>
-          {")"}</>
-      </h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-medium">
+          {tokenName}
+          <>{" ("}
+            <button
+              type="button"
+              onClick={handleMaxClick}
+              disabled={isMaxDisabled}
+              className={`font-medium focus:outline-none ${
+                isMaxDisabled
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-blue-600 hover:underline"
+              }`}
+            >
+              Max: {maxTransferable ? formatMaxDisplay(maxTransferable, tokenSymbol, decimals) : "—"}
+            </button>
+            {")"}</>
+        </h3>
+        <div className="w-16 h-6 flex items-center justify-center">
+          {rightButton}
+        </div>
+      </div>
       
       <div className="relative">
           <Input
@@ -125,7 +132,9 @@ const TokenInput = ({
           </span>
       </div>
       
-      {displayError && <p className="text-sm text-red-500 mt-1">{displayError}</p>}
+      <div className="h-5 mt-1">
+        {displayError && <p className="text-sm text-red-500">{displayError}</p>}
+      </div>
     </div>
   );
 };

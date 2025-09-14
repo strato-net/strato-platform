@@ -4,19 +4,21 @@ import { DECIMAL_PATTERN, DECIMALS, usdstAddress } from "@/lib/constants";
 
 export const toWei = (s: string) => safeParseUnits(s, DECIMALS);
 export const fmt = (wei: bigint, sym: string, decimals: number = DECIMALS) => {
-  // Use precise formatting to avoid floating-point issues
   const divisor = BigInt(10 ** decimals);
   const wholePart = wei / divisor;
   const fractionalPart = wei % divisor;
-  
-  if (fractionalPart === 0n) {
-    return `${wholePart.toString()}.${'0'.repeat(decimals)} ${sym}`;
+
+  if (wei === 0n) {
+    return `0 ${sym}`;
   }
-  
+
+  if (fractionalPart === 0n) {
+    return `${wholePart.toString()} ${sym}`;
+  }
+
   const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
-  // Remove trailing zeros
   const trimmedFractional = fractionalStr.replace(/0+$/, '');
-  
+
   return `${wholePart.toString()}.${trimmedFractional} ${sym}`;
 };
 export const isDecimal = (s: string) => s === "" || s === "." || DECIMAL_PATTERN.test(s);
