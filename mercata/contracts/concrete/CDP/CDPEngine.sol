@@ -786,7 +786,7 @@ contract record CDPEngine is Ownable {
 
     /// @notice Index sync from Reserve inflows (O(1), no loops)
     /// @dev Call this before opening/increasing notes, and on claimJunior()
-    function _syncReserveToIndex() internal {
+    function _syncReserveToIndex() public {
         if (juniorIndex == 0) juniorIndex = 1e27;
 
         address reserveAddr = address(registry.cdpReserve());
