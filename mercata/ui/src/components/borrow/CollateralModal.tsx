@@ -178,7 +178,7 @@ const CollateralModal = ({
             tokenSymbol={asset?._symbol || ""}
             maxTransferable={maxTransferable}
             decimals={asset?.customDecimals ?? 18}
-            disabled={loading || maxTransferable === 0n}
+            disabled={loading || maxTransferable === 0n || !!feeError}
             loading={loading}
             onValueChange={setAmount}
             onErrorChange={setInputError}

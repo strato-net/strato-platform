@@ -50,7 +50,7 @@ const TokenInput = ({
                 : "text-blue-600 hover:underline"
             }`}
           >
-            Max: {maxTransferable ? formatMaxDisplay(maxTransferable, tokenSymbol, decimals) : "—"}
+            Max: {maxTransferable ? formatMaxDisplay(maxTransferable, tokenSymbol, decimals) : "0"}
           </button>
           )
         </h3>
@@ -83,13 +83,14 @@ const TokenInput = ({
       
       {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
       
-      {showPercentageButtons && !disabled && (
+      {showPercentageButtons && (
         <PercentageButtons
           value={value}
           maxValue={maxTransferable ? formatUnits(maxTransferable, decimals) : "0"}
           onChange={onValueChange}
           decimals={decimals}
           className="mt-3"
+          disabled={disabled}
         />
       )}
     </div>

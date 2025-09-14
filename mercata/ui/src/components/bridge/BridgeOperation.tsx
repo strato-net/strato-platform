@@ -34,12 +34,12 @@ import { formatTxHash, getExplorerUrl } from "@/lib/bridge/utils";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { handleAmountInputChange, computeMaxTransferable } from "@/utils/validationUtils";
-import { safeParseUnits, addCommasToInput, fmt } from "@/utils/numberUtils";
+import { computeMaxTransferable } from "@/utils/validationUtils";
+import { safeParseUnits, fmt, formatUnits } from "@/utils/numberUtils";
 import { BRIDGE_OUT_FEE, usdstAddress, DECIMALS } from "@/lib/constants";
 
 // Components
-import PercentageButtons from "@/components/ui/PercentageButtons";
+import TokenInput from "@/components/shared/TokenInput";
 import BridgeWalletStatus from "./BridgeWalletStatus";
 
 // ============================================================================
@@ -334,6 +334,26 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
   // COMPUTED VALUES
   // ============================================================================
 
+  // Fee validation for non-USDST tokens
+  const feeError = useMemo(() => {
+    if (op.inbound) return ""; // No fee for inbound operations
+    
+    const tokenAddress = operation === "bridgeBurn" ? usdstAddress : tokenAddrIn;
+    
+    // For USDST tokens, computeMaxTransferable already handles fee validation
+    if (tokenAddress === usdstAddress) return "";
+    
+    // For non-USDST tokens, check if user can cover the fee
+    const fee = safeParseUnits(feeUSDST || "0", 18);
+    const totalAvailableForFee = BigInt(usdstBalance) + BigInt(voucherBalance);
+    
+    if (totalAvailableForFee < fee) {
+      return `Insufficient USDST + vouchers for transaction fee (${feeUSDST} USDST required)`;
+    }
+    
+    return "";
+  }, [op.inbound, operation, usdstAddress, tokenAddrIn, feeUSDST, usdstBalance, voucherBalance]);
+
   // Button text with early returns
   const buttonText = (() => {
     if (isLoading)
@@ -367,6 +387,7 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
     !isConnected ||
     (op.inbound ? chainId !== op.expChainId : !selectedNetwork) ||
     !!amountError ||
+    !!feeError ||
     isDataLoading;
 
   // Voucher calculation (cheap operation - no memoization needed)
@@ -378,30 +399,14 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
   // ============================================================================
   // VALIDATION & INPUT HANDLING
   // ============================================================================
-
-  // Single validation callback - eliminates repeated handleInput calls
-  const validateAmount = useCallback(
-    (v: string) =>
-      handleAmountInputChange(v, setAmount, setAmountError, {
-        maxAmount,
-        symbol: symbolIn || "",
-        tokenAddress: tokenAddrIn || "",
-        transactionFee: feeUSDST,
-        decimals: op.inbound ? op.extDec : op.stratoDec, // Pass token decimals for proper parsing
-        voucherBalance: BigInt(voucherBalance),
-        usdstBalance: BigInt(usdstBalance)
-      }),
-    [maxAmount, symbolIn, tokenAddrIn, feeUSDST, op.inbound, op.extDec, op.stratoDec, voucherBalance, usdstBalance],
-  );
-
-  // Debounced input handler
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const handleAmountChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    setAmount(v);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => validateAmount(v), 120);
-  }, [validateAmount]);
+  // Max click handler
+  const handleMaxClick = useCallback(() => {
+    if (op.token && maxTransferable > 0n) {
+      const maxFormatted = formatUnits(maxTransferable, op.inbound ? op.extDec : op.stratoDec);
+      setAmount(maxFormatted);
+      setAmountError("");
+    }
+  }, [op.token, maxTransferable, op.inbound, op.extDec, op.stratoDec]);
 
   // ============================================================================
   // BRIDGE IN FUNCTIONS
@@ -820,67 +825,27 @@ const BridgeOperation: React.FC<BridgeOperationProps> = ({ operation }) => {
       </div>
 
       {/* Amount Input */}
-      <div className="space-y-1.5">
-        <label className="text-sm text-gray-600">
-          {operation === "bridgeBurn" ? "Amount (USDST to withdraw)" : "Amount"}
-          {op.token && (
-            <>
-              {" ("}
-              <button
-                type="button"
-                onClick={() => {
-                  setAmount(balancesView.maxTransferableRaw);
-                  setAmountError("");
-                }}
-                disabled={!isConnected || !op.token || maxTransferable === 0n}
-                className={`font-medium focus:outline-none ${
-                  !isConnected || !op.token || maxTransferable === 0n
-                    ? "text-gray-400 cursor-not-allowed"
-                    : "text-blue-600 hover:underline"
-                }`}
-              >
-                Max: {balancesView.maxTransferableFormatted}
-              </button>
-              {")"}
-            </>
-          )}
-        </label>
-        <Input
-          id="amount"
-          type="text"
-          inputMode="decimal"
-          placeholder={
-            op.inbound
-              ? isConnected
-                ? externalTokenLoading
-                  ? "Loading..."
-                  : "0.00"
-                : "Connect wallet"
-              : isConnected
-                ? "0.00"
-                : "Connect wallet to enter amount"
-          }
-          className={amountError ? "border-red-500" : ""}
-          value={addCommasToInput(amount)}
-          onChange={handleAmountChange}
-          disabled={
-            !isConnected ||
-            (op.inbound ? externalTokenLoading : isBalanceLoading)
-          }
-        />
-
-        {amountError && <p className="text-sm text-red-500">{amountError}</p>}
-
-        {/* Percentage Buttons */}
-        {op.token && (
-          <PercentageButtons
+      {op.token && (
+        <div>
+          <TokenInput
             value={amount}
-            maxValue={balancesView.maxTransferableRaw}
-            onChange={validateAmount}
-            className="mt-2"
+            error={feeError ? "" : amountError}
+            tokenName={operation === "bridgeBurn" ? "Amount (USDST to withdraw)" : "Amount"}
+            tokenSymbol={symbolIn || ""}
+            maxTransferable={maxTransferable}
+            decimals={op.inbound ? op.extDec : op.stratoDec}
+            disabled={!isConnected || maxTransferable === 0n || !!feeError}
+            loading={op.inbound ? externalTokenLoading : isBalanceLoading}
+            onValueChange={setAmount}
+            onErrorChange={setAmountError}
+            onMaxClick={handleMaxClick}
+            showPercentageButtons={true}
           />
-        )}
-      </div>
+
+          {/* Fee Error Display */}
+          {feeError && <p className="text-sm text-red-500 mt-1">{feeError}</p>}
+        </div>
+      )}
 
       {/* Transaction Info */}
       {op.token && (
