@@ -31,8 +31,11 @@ contract record LendingPool is Ownable {
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event SafetyFactorUpdated(uint safetyFactor);
-    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
+    event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter, uint safetyReservesAfter);
     event ReservesSwept(uint amount, address to);
+    event SafetyReservesSlashed(uint assetUnits, uint badDebtRemaining);
+    event SafetyModuleSlashed(uint assetUnits, uint badDebtRemaining);
+    event SafetyReservesRewarded(uint assetUnits);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -815,9 +818,13 @@ contract record LendingPool is Ownable {
             uint interestDelta = (totalScaledDebt * (idx1 - idx0)) / RAY;
             uint rf = assetConfigs[borrowableAsset].reserveFactor; // bps
             if (rf > 0 && interestDelta > 0) {
-                reservesAccrued += (interestDelta * rf) / 10000;
+                // Reserves split between protocol reserves and safety reserves
+                uint toBothReserves = (interestDelta * rf) / 10000;
+                uint toSafetyReserves = (toBothReserves * safetyFactor) / 10000;
+                reservesAccrued += toBothReserves - toSafetyReserves;
+                safetyReserves += toSafetyReserves;
             }
-            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued);
+            emit IndexAccrued(idx0, idx1, dt, rateBps, interestDelta, reservesAccrued, safetyReserves);
         }
     }
 
@@ -1041,5 +1048,51 @@ contract record LendingPool is Ownable {
         uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
         if (price == 0) return 0;
         return (debt * price) / 1e18;
+    }
+
+    // Bad Debt Handling
+    function _handleBadDebt() internal {
+        LoanInfo storage loan = userLoan[borrower];
+        require(loan.scaledDebt > 0, "No active loan");
+
+        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
+        require(owed > 0, "Nothing to write off");
+
+        badDebt += owed;
+
+
+        _slashSafetyForBadDebt();
+
+        // Write off the new bad debt
+        uint scaledDelta = (owed * RAY) / borrowIndex;
+        totalScaledDebt -= scaledDelta;
+        loan.scaledDebt = 0;
+        delete userLoan[borrower];
+
+        emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+
+        return;
+    }
+
+    function _slashSafetyForBadDebt() internal {
+        // first, cover from held safety reserves
+        safetyReservesSlash = safetyReserves < badDebt ? safetyReserves : badDebt;
+        safetyReserves -= safetyReservesSlash;
+        badDebt -= safetyReservesSlash;
+        emit SafetyReservesSlashed(safetyReservesSlash, badDebt);
+        if (badDebt == 0) return;
+
+        // then, slash sUSDST
+        uint covered = SafetyModule(_safetyModule()).slash(badDebt);
+        badDebt -= covered;
+        emit SafetyModuleSlashed(covered, badDebt);
+        if (badDebt == 0) return;
+    }
+
+    function rewardSafetyModule() public {
+        LiquidityPool(_liquidityPool()).transferReserve(safetyReserves, address(_safetyModule()));
+        safetyReserves = 0;
+        emit SafetyReservesRewarded(safetyReserves);
     }
 } 
