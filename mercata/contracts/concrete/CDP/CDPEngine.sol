@@ -770,6 +770,17 @@ contract record CDPEngine is Ownable {
     event JuniorNoteCreated(address indexed owner, uint256 capUSD);
     event JuniorNoteClosed(address indexed owner);
     event JuniorNoteClaimed(address indexed owner, uint256 paidUSD, uint256 remainingUSD);
+    /// @notice Emitted whenever new Reserve inflows are indexed into juniorIndex.
+    /// @dev progressWad is the per-sync fraction toward cap (x) in 1e18 (WAD) units.
+    ///      Sum progressWad across a time window (and divide by 1e18) to get S for that window.
+    event JuniorIndexSynced(
+        uint256 deltaUSD,           // USDST newly observed in Reserve for this sync
+        uint256 outstandingUSD,     // totalJuniorOutstandingUSD used for this sync
+        uint256 deltaIndexRay,      // index bump in RAY (1e27)
+        uint256 progressWad,        // x in WAD (1e18): deltaIndexRay / 1e9
+        uint256 newJuniorIndexRay,  // juniorIndex after the bump
+        uint256 timestamp           // block.timestamp at sync
+    );
 
 
     // ─────────────── Admin Functions ───────────────
@@ -785,28 +796,50 @@ contract record CDPEngine is Ownable {
     // ─────────────── Bad Debt & Junior Functions ───────────────
 
     /// @notice Index sync from Reserve inflows (O(1), no loops)
-    /// @dev Call this before opening/increasing notes, and on claimJunior()
+    /// @dev Emits per-sync progress so off-chain can sum to S over a window.
     function _syncReserveToIndex() public {
         if (juniorIndex == 0) juniorIndex = 1e27;
 
         address reserveAddr = address(registry.cdpReserve());
         uint256 reserveBal = ERC20(address(_usdst())).balanceOf(reserveAddr);
-        if (reserveBal <= prevReserveBalance) return;          // nothing new to index
 
-        uint256 deltaUSD = reserveBal - prevReserveBalance;    // newly arrived USD in Reserve
-        if (deltaUSD == 0) return;
+        // Nothing new to index
+        if (reserveBal <= prevReserveBalance) return;
+
+        uint256 deltaUSD = reserveBal - prevReserveBalance;
+        if (deltaUSD == 0) {
+            prevReserveBalance = reserveBal; // keep accounting consistent
+            return;
+        }
 
         uint256 outstanding = totalJuniorOutstandingUSD;
+
+        // No juniors outstanding: just advance accounting baseline
         if (outstanding == 0) {
-            // No juniors outstanding: skip indexing
             prevReserveBalance = reserveBal;
             return;
         }
 
         // Convert USD inflow into an index bump (RAY scale)
-        uint256 deltaIndex = (deltaUSD * 1e27) / outstanding;  // RAY
-        juniorIndex += deltaIndex;
-        prevReserveBalance = reserveBal;                                      // balance is fully accounted
+        uint256 deltaIndex = (deltaUSD * RAY) / outstanding;  // RAY
+        uint256 newIndex = juniorIndex + deltaIndex;
+
+        // Per-$cap progress fraction x, in WAD (so you can sum to S easily)
+        // x = deltaIndex / RAY  => WAD = deltaIndex / (RAY/WAD)
+        uint256 progressWad = deltaIndex / (RAY / WAD); // == deltaIndex / 1e9
+
+        // State updates
+        juniorIndex = newIndex;
+        prevReserveBalance = reserveBal;
+
+        emit JuniorIndexSynced(
+            deltaUSD,
+            outstanding,
+            deltaIndex,
+            progressWad,
+            newIndex,
+            block.timestamp
+        );
     }
 
     /**
