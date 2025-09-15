@@ -915,6 +915,7 @@ insertIndexTable ::
   (E.ProcessedContract, [T.Text]) ->
   ConduitM () SlipstreamQuery m ()
 insertIndexTable contract = do
+  yield $ insertContractTableQuery contract
   yield $ insertIndexTableQuery contract
 
 insertCollectionTable ::
@@ -1065,6 +1066,32 @@ addHistoryUnique (creator, a, n) =
    in [ CreateIndex indexName historyName ["address", "block_hash", "transaction_hash"],
         AlterTableAddPrimaryKey historyName indexName
       ]
+
+insertContractTableQuery :: (E.ProcessedContract, [T.Text]) -> SlipstreamQuery -- does not accomodate extra _fkey 
+insertContractTableQuery cs =
+    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, _) -> (c, Map.toList contractData)) cs
+        processContract (contract, list) =
+            let tableName = indexTableName "" "" "contract"
+                keySt = baseColumns ++ ["application", "contract_name", "data"]
+                baseVals =
+                  [ ValueAddress . E.address,
+                    ValueString . T.pack . keccak256ToHex . E.blockHash,
+                    ValueString . tshow . E.blockTimestamp,
+                    ValueInt False Nothing . E.blockNumber,
+                    ValueString . T.pack . keccak256ToHex . E.transactionHash,
+                    ValueAddress . E.transactionSender,
+                    ValueString . E.creator,
+                    ValueString . E.root,
+                    ValueString . E.application,
+                    ValueString . E.contractName
+                  ]
+                baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
+                dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
+                valsForSQL = baseRowVals ++ dataVals
+                conflictUpdateBaseCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
+                conflictUpdateCols = conflictUpdateBaseCols ++ ["data"]
+            in InsertTable tableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
+    in processContract cs'
 
 insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> SlipstreamQuery -- does not accomodate extra _fkey 
 insertIndexTableQuery cs =
