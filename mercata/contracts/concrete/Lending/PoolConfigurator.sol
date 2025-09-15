@@ -220,6 +220,19 @@ contract record PoolConfigurator is Ownable {
     }
 
     /**
+     * @notice Set safety module tokens
+     * @param sToken The safety token address
+     * @param underlyingAsset The underlying asset address (should be lending pool borrowable asset)
+     */
+    function setSafetyModuleTokens(address sToken, address underlyingAsset) external onlyOwner {
+        require(sToken != address(0), "Invalid sToken address");
+        require(underlyingAsset != address(0), "Invalid underlyingAsset address");
+        SafetyModule safetyModule = SafetyModule(registry.getSafetyModule());
+        safetyModule.setTokens(sToken, underlyingAsset);
+    }
+
+
+    /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
      */

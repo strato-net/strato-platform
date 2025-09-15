@@ -23,13 +23,21 @@ contract record SafetyModule is Ownable {
     event Deposited(address indexed user, uint amount, uint sTokenAmount);
     event Withdrawn(address indexed user, uint amount, uint sTokenAmount);
 
-    constructor(address _registry, address _poolConfigurator, address initialOwner, address _sToken, address _underlyingAsset) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         registry = LendingRegistry(_registry);
         poolConfigurator = PoolConfigurator(_poolConfigurator);
-        sToken = _sToken;
-        underlyingAsset = _underlyingAsset;
+    }
+
+    modifier onlyPoolConfigurator() {
+        require(msg.sender == address(poolConfigurator), "Caller is not PoolConfigurator");
+        _;
+    }
+
+    modifier onlyLendingPool() {
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
+        _;
     }
 
     modifier isConfigured() {
@@ -45,13 +53,15 @@ contract record SafetyModule is Ownable {
         registry = LendingRegistry(_registry);
     }
 
-    function _lendingPool() internal view returns (LendingPool) {
-        return LendingPool(registry.lendingPool());
+    function setTokens(address _sToken, address _underlyingAsset) external onlyPoolConfigurator {
+        require(_sToken != address(0), "Invalid sToken address");
+        require(_underlyingAsset != address(0), "Invalid underlyingAsset address");
+        sToken = _sToken;
+        underlyingAsset = _underlyingAsset;
     }
 
-    modifier onlyLendingPool() {
-        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
-        _;
+    function _lendingPool() internal view returns (LendingPool) {
+        return LendingPool(registry.lendingPool());
     }
 
     /**

@@ -36,6 +36,7 @@ contract record LendingPool is Ownable {
     event SafetyReservesSlashed(uint assetUnits, uint badDebtRemaining);
     event SafetyModuleSlashed(uint assetUnits, uint badDebtRemaining);
     event SafetyReservesRewarded(uint assetUnits);
+    event BadDebtWrittenOff(address indexed borrower, address indexed asset, uint amount);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -656,6 +657,7 @@ contract record LendingPool is Ownable {
         return (loan.scaledDebt * borrowIndex) / RAY;
     }
 
+    // The amount of cash in the liquidity pool which is reserved
     function getWithholdings() public view returns (uint) {
         return reservesAccrued + safetyReserves;
     }
@@ -1055,14 +1057,16 @@ contract record LendingPool is Ownable {
         LoanInfo storage loan = userLoan[borrower];
         uint scaledDebt = loan.scaledDebt;
 
+        // Calculate amount of bad debt owed
+        uint owed = (scaledDebt * borrowIndex) / RAY;
+        badDebt += owed;
+
         // Write off the new bad debt
         totalScaledDebt -= scaledDebt;
         delete userLoan[borrower];
         emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
 
         // Attempt to cover bad debt from safety module
-        uint owed = (scaledDebt * borrowIndex) / RAY;
-        badDebt += owed;
         _slashSafetyForBadDebt();
 
         return;
@@ -1070,15 +1074,15 @@ contract record LendingPool is Ownable {
 
     /**
      * @notice Slash the safety module to cover bad debt
-     * Allows the exchange rate to rise 
+     * Allows the exchange rate to rise
      */
     function _slashSafetyForBadDebt() internal {
         // first, cover from held safety reserves
-        safetyReservesSlash = safetyReserves < badDebt ? safetyReserves : badDebt;
+        uint safetyReservesSlash = safetyReserves < badDebt ? safetyReserves : badDebt;
         safetyReserves -= safetyReservesSlash;
         badDebt -= safetyReservesSlash;
         emit SafetyReservesSlashed(safetyReservesSlash, badDebt);
-        
+
         if (badDebt != 0) {
             // then, slash sUSDST
             uint covered = SafetyModule(_safetyModule()).slash(badDebt);
@@ -1103,8 +1107,9 @@ contract record LendingPool is Ownable {
      * Should be called routinely, but sToken holders may also call this
      */
     function rewardSafetyModule() public {
+        uint rewardAmount = safetyReserves;
         LiquidityPool(_liquidityPool()).transferReserve(safetyReserves, address(_safetyModule()));
         safetyReserves = 0;
-        emit SafetyReservesRewarded(safetyReserves);
+        emit SafetyReservesRewarded(rewardAmount);
     }
 } 

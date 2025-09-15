@@ -60,6 +60,7 @@ contract record Mercata {
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
+    SafetyModule public safetyModule;
     CDPEngine public cdpEngine;
     CDPVault public cdpVault;   
     CDPRegistry public cdpRegistry;
@@ -84,10 +85,10 @@ contract record Mercata {
         priceOracle = new PriceOracle(address(adminRegistry)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector));
-        // safetyModule = new SafetyModule(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), X, Y);
-           
+        safetyModule = new SafetyModule(address(lendingRegistry), address(poolConfigurator), address(adminRegistry));
+
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),address(safetyModule),[],[],[],[],[],[],[],0,0,0);
         Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services
