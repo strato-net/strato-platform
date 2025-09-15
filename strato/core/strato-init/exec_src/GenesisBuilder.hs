@@ -16,7 +16,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
 import Data.Foldable (foldlM)
-import Data.Text (Text)
 import System.Console.GetOpt
 import System.Environment
 
@@ -27,7 +26,7 @@ import System.Environment
 data Options = Options
   { optCerts :: [X509Certificate],
     optValidators :: [Validator],
-    optAdmins :: [Text],
+    optAdmins :: [Address],
     optFaucets :: [Address],
     optInput :: GenesisInfo,
     optOutputName :: String
@@ -81,7 +80,7 @@ options =
       ( ReqArg
           ( \s opts -> do
               adminsStr <- readFile s
-              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [Text]
+              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [Address]
                   !admins = either error id eAdmins
               return opts {optAdmins = admins}
           )

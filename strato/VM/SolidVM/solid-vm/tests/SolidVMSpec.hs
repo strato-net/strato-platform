@@ -71,7 +71,6 @@ import Data.Char
 import qualified Data.List as L
 import qualified Data.Map as M
 import Data.Maybe
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map.Ordered as OMap
 import Data.Text.Encoding
@@ -312,7 +311,7 @@ runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $
     runLoggingT . runTestContextM $ do
-      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [Text]
+      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [Address]
           !admins = either error id eAdmins
           eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [Validator]
           !vals = either error id eVals

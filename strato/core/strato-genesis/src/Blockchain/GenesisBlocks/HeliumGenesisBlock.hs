@@ -941,11 +941,12 @@ validators = [
   Validator 0x3
   ]
 
-admins :: [Text]
+admins :: [Address]
 admins = [
---  "Kieren James-Lubin",
---  "Victor Wong",
-  "James Hormuzdiar"
+  0x10000,
+  0x10001,
+  0x10002,
+  0x10003
   ]
 
 descriptions :: M.Map Text Text
