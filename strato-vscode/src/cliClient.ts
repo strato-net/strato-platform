@@ -1,7 +1,7 @@
 // src/cliClient.ts
-import { spawn, ChildProcessWithoutNullStreams } from 'node:child_process';
-import * as readline from 'node:readline';
-import { EventEmitter } from 'node:events';
+import { spawn, ChildProcessWithoutNullStreams } from 'child_process';
+import * as readline from 'readline';
+import { EventEmitter } from 'events';
 
 type Json = any;
 

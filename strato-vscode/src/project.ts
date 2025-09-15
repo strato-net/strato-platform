@@ -37,7 +37,7 @@ class ProjectAction extends vscode.TreeItem {
   }
 
   iconPath = {
-    light: path.join(__filename, '..', '..', 'resources', 'light', 'deployment.svg'),
-    dark: path.join(__filename, '..', '..', 'resources', 'dark', 'deployment.svg')
+    light: vscode.Uri.file(path.join(__filename, '..', '..', 'resources', 'light', 'deployment.svg')),
+    dark: vscode.Uri.file(path.join(__filename, '..', '..', 'resources', 'dark', 'deployment.svg'))
   };
 }
