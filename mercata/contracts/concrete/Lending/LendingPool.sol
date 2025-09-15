@@ -230,8 +230,7 @@ contract record LendingPool is Ownable {
 
         // Underlying amount based on current exchange rate
         uint exchangeRate = getExchangeRate();
-        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
-        underlyingAmount = (userShares * exchangeRate) / 1e18;
+        uint underlyingAmount = (userShares * exchangeRate) / 1e18;
 
         // Withdraw from liquidity pool
         LiquidityPool(_liquidityPool()).withdraw(userShares, msg.sender, underlyingAmount);

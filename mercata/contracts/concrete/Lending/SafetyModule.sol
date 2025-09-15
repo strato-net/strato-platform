@@ -1,6 +1,7 @@
 import "./LendingRegistry.sol";
 import "./LendingPool.sol";
 import "./PoolConfigurator.sol";
+import "../Tokens/Token.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
@@ -13,12 +14,14 @@ import "../../abstract/ERC20/IERC20.sol";
 
 contract record SafetyModule is Ownable {
     LendingRegistry public registry;
-    address public sToken; //TODO ensure token active like in lending pool
+    PoolConfigurator public poolConfigurator;
+    address public sToken;
     address public underlyingAsset;
-    address public poolConfigurator;
 
     event Slashed(uint amount, uint remaining);
     event ExchangeRateUpdated(uint newRate);
+    event Deposited(address indexed user, uint amount, uint sTokenAmount);
+    event Withdrawn(address indexed user, uint amount, uint sTokenAmount);
 
     constructor(address _registry, address _poolConfigurator, address initialOwner, address _sToken, address _underlyingAsset) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
@@ -27,6 +30,13 @@ contract record SafetyModule is Ownable {
         poolConfigurator = PoolConfigurator(_poolConfigurator);
         sToken = _sToken;
         underlyingAsset = _underlyingAsset;
+    }
+
+    modifier isConfigured() {
+        require(sToken != address(0), "sToken not set");
+        require(underlyingAsset != address(0), "underlyingAsset not set");
+        //TODO ensure tokens active in token factory, if necessary
+        _;
     }
 
     // Setter function for updating the LendingRegistry reference
@@ -39,14 +49,71 @@ contract record SafetyModule is Ownable {
         return LendingPool(registry.lendingPool());
     }
 
+    modifier onlyLendingPool() {
+        require(msg.sender == address(registry.lendingPool()), "Caller is not LendingPool");
+        _;
+    }
+
+    /**
+     * @notice Deposit underlying asset into the safety module, in exchange for sTokens
+     * @param amount The amount of underlying asset to deposit
+     */
+    function deposit(uint amount) external isConfigured {
+        require(amount > 0, "Invalid amount");
+        require(sToken != address(0), "sToken not set");
+
+        uint sTokenAmount = (amount * 1e18) / getExchangeRate();
+
+        require(IERC20(underlyingAsset).transferFrom(msg.sender, address(this), amount), "Deposit failed");
+        Token(sToken).mint(msg.sender, sTokenAmount);
+
+        emit Deposited(msg.sender, amount, sTokenAmount);
+        emit ExchangeRateUpdated(getExchangeRate());
+    }
+
+    /**
+     * @notice Withdraw underlying asset from the safety module, trading in sTokens
+     * @param amount The amount of underlying asset to withdraw
+     */
+    function withdraw(uint amount) external isConfigured {
+        require(amount > 0, "Invalid amount");
+        require(sToken != address(0), "sToken not set");
+
+        uint sTokenAmount = (amount * 1e18) / getExchangeRate();
+
+        Token(sToken).burn(msg.sender, sTokenAmount);
+        require(IERC20(underlyingAsset).transfer(msg.sender, amount), "Withdraw failed");
+
+        emit Withdrawn(msg.sender, amount, sTokenAmount);
+        emit ExchangeRateUpdated(getExchangeRate());
+    }
+
+    /**
+     * @notice Trade in all sTokens, withdrawing underling assets from the safety module
+     */
+    function withdrawAll() external isConfigured {
+        uint sTokenBalance = IERC20(sToken).balanceOf(msg.sender);
+        uint underlyingAmount = (sTokenBalance * getExchangeRate()) / 1e18;
+        withdraw(underlyingAmount);
+    }
+
     /**
      * @notice Get the exchange rate of the sToken in terms of the underlying asset
      * @return The exchange rate in 1e18 scale (1e18 implies 1 underlying per sToken)
      */
-    function getExchangeRate() public view returns (uint) {
+    function getExchangeRate() public view isConfigured returns (uint) {
         uint assetBalance = IERC20(underlyingAsset).balanceOf(address(this));
         uint sTokenSupply = IERC20(sToken).totalSupply();
-        return (assetBalance * 1e18) / sTokenSupply;
+
+        // Fallback to 1:1 if no sTokens in circulation
+        if (sTokenSupply == 0) return 1e18;
+
+        uint exchangeRate = (assetBalance * 1e18) / sTokenSupply;
+
+        // Fallback to 1:1 if no or too few assets
+        if (exchangeRate == 0) return 1e18;
+
+        return exchangeRate;
     }
 
     /**
@@ -55,11 +122,13 @@ contract record SafetyModule is Ownable {
      * @param amount The amount of underlying asset to slash
      * @return covered The amount of underlying asset successfully covered
      */
-    function slash(uint amount) external onlyLendingPool returns (uint covered) {
+    function slash(uint amount) external onlyLendingPool isConfigured returns (uint covered) {
         require(amount > 0, "Invalid amount");
         uint assetBalance = IERC20(underlyingAsset).balanceOf(address(this));
         uint slashAmount = assetBalance < amount ? assetBalance : amount;
-        IERC20(underlyingAsset).transfer(_lendingPool(), slashAmount);
+
+        // Tranfer assets to LendingPool
+        require(IERC20(underlyingAsset).transfer(address(_lendingPool()), slashAmount), "Slash transfer failed");
 
         // assetBalance - slashAmount
         uint remaining = IERC20(underlyingAsset).balanceOf(address(this));
