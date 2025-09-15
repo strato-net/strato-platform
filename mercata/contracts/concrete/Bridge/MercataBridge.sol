@@ -31,6 +31,10 @@ contract record MercataBridge is Ownable {
     uint8 public PERMISSION_WRAP = 1;   // 0b01 - permission to wrap original token
     uint8 public PERMISSION_MINT = 2;   // 0b10 - permission to mint USDST
     uint8 public PERMISSION_MASK = 3;   // 0b11 - maximum valid permission value (both wrap and mint)
+
+    function _has(uint8 perms, uint8 flag) private pure returns (bool) {
+        return (perms & flag) != 0;
+    }
 /* --------------------------------------------------------------------- */
 /*                            ─  ENUMS  ─                               */
 /* --------------------------------------------------------------------- */
@@ -314,14 +318,19 @@ contract record MercataBridge is Ownable {
         onlyRelayer
         whenDepositsOpen
     {
-        require(tokenFactory.isTokenActive(stratoToken), "MB: inactive token");
         AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
         uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require((a.permissions & need) != 0, "MB: not permitted");
+        require(_has(a.permissions, need), "MB: not permitted");
+
+        // Allow inactive tokens only when minting USDST and asset has MINT permission
+        require(
+            tokenFactory.isTokenActive(stratoToken) ||
+            (mintUSDST && _has(a.permissions, PERMISSION_MINT)),
+            "MB: inactive token"
+        );
 
         // replay protection on composite key
         require(deposits[externalChainId][externalTxHash].bridgeStatus == BridgeStatus.NONE,"MB: dup key");
@@ -476,17 +485,22 @@ contract record MercataBridge is Ownable {
         whenWithdrawalsOpen
         returns (uint256 id)
     {
-        require(tokenFactory.isTokenActive(stratoToken),"MB: inactive");
         AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.permissions != 0, "MB: asset disabled");
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
         uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require((a.permissions & need) != 0, "MB: not permitted");
+        require(_has(a.permissions, need), "MB: not permitted");
 
         uint256 cap = a.maxPerTx;
         require(cap == 0 || stratoTokenAmount<=cap,"MB: per-tx cap");
+
+        // Allow inactive tokens only when minting USDST and asset has MINT permission
+        require(
+            tokenFactory.isTokenActive(stratoToken) ||
+            (mintUSDST && _has(a.permissions, PERMISSION_MINT)),
+            "MB: inactive token"
+        );
 
         /* pull user funds; bridge holds until approval */
         IERC20(mintUSDST ? USDST_ADDRESS : stratoToken).transferFrom(msg.sender, address(this), stratoTokenAmount);
