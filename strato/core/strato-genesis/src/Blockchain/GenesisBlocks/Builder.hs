@@ -3,7 +3,6 @@ module Blockchain.GenesisBlocks.Builder where
 
 import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.Contracts.UserRegistry
 import Blockchain.Strato.Model.Address
@@ -15,6 +14,5 @@ buildGenesisInfo extraFaucets extraCerts validators admins gi =
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
    in insertUserRegistryContract extraCerts
         . insertMercataGovernanceContract validators admins
-        . insertCertRegistryContract extraCerts
         $ gi {genesisInfoAccountInfo = faucetAccounts ++ (genesisInfoAccountInfo gi)}
 
