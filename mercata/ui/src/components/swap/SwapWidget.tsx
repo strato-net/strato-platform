@@ -17,6 +17,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/constants";
 import { safeParseUnits, formatBalance as formatBalanceUtil, formatAmount } from "@/utils/numberUtils";
+import { computeMaxTransferable } from "@/utils/validationUtils";
 import {
   Dialog,
   DialogContent,
@@ -374,7 +375,7 @@ const SlippageControl = ({ slippage, autoSlippage, onSlippageChange, onAutoToggl
 const SwapWidget = () => {
   const { swappableTokens, pairableTokens, fetchPairableTokens, calculateSwap, swap, getPoolByTokenPair, fromAsset, toAsset, pool, setFromAsset, setToAsset, setPool,getTokenBalance, refreshSwapHistory } = useSwapContext();
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { getPrice, fetchPrice } = useOracleContext();
   const { toast } = useToast();
@@ -440,19 +441,31 @@ const SwapWidget = () => {
   // Fee warning logic
   const feeAmount = useMemo(() => safeParseUnits(SWAP_FEE, DECIMALS), [SWAP_FEE]);
   const usdstBalanceBigInt = useMemo(() => BigInt(usdstBalance || "0"), [usdstBalance]);
+  const voucherBalanceBigInt = useMemo(() => BigInt(voucherBalance || "0"), [voucherBalance]);
   
   // Safely parse input amounts
   const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
 
   // Fee warning checks
-  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+  const totalFeeCoverage = usdstBalanceBigInt + voucherBalanceBigInt;
+  const hasInsufficientUsdstForFee = totalFeeCoverage < feeAmount;
 
   const isLowBalanceWarning = useMemo(() => {
     if (fromAsset?.address !== usdstAddress || fromAmountWei <= 0n) return false;
     const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
-    const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
+    
+    // Calculate remaining balance after swap and fee, accounting for vouchers
+    const maxTransferable = computeMaxTransferable(
+      BigInt(fromAsset.balance || "0"),
+      fromAsset.address,
+      SWAP_FEE,
+      voucherBalanceBigInt,
+      usdstBalanceBigInt
+    );
+    const remainingBalance = maxTransferable - fromAmountWei;
+    
     return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-  }, [fromAsset, fromAmountWei, usdstBalanceBigInt, feeAmount]);
+  }, [fromAsset, fromAmountWei, usdstBalanceBigInt, voucherBalanceBigInt, feeAmount]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -846,14 +859,16 @@ const SwapWidget = () => {
   const isSwapDisabled = () => {
     const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+    const voucherBalanceBigInt = BigInt(voucherBalance || "0");
 
     // Basic validations
     if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount || insufficientPoolBalance) {
       return true;
     }
 
-    // Check if user has enough USDST for fee
-    if (usdstBalanceBigInt < feeAmount) {
+    // Check if user has enough USDST + vouchers for fee
+    const totalFeeCoverage = usdstBalanceBigInt + voucherBalanceBigInt;
+    if (totalFeeCoverage < feeAmount) {
       return true;
     }
 
@@ -866,8 +881,17 @@ const SwapWidget = () => {
       
       const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
       const balance = BigInt(fromAsset.balance || "0");
+      
+      // Use computeMaxTransferable to check if the amount is valid
+      const maxTransferable = computeMaxTransferable(
+        balance,
+        fromAsset.address,
+        SWAP_FEE,
+        voucherBalanceBigInt,
+        usdstBalanceBigInt
+      );
 
-      if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
+      if (fromAmountWei > maxTransferable) {
         return true;
       }
     }
@@ -892,23 +916,22 @@ const handleMaxClick = useCallback((isFrom: boolean) => {
   const asset = isFrom ? fromAsset : toAsset;
   if (!asset) return;
 
-  let balance = BigInt(asset.balance) || 0n;
+  const balance = BigInt(asset.balance) || 0n;
+  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+  const voucherBalanceBigInt = BigInt(voucherBalance || "0");
 
+  const maxTransferable = computeMaxTransferable(
+    balance,
+    asset.address,
+    SWAP_FEE,
+    voucherBalanceBigInt,
+    usdstBalanceBigInt
+  );
 
-   if (asset?.address === usdstAddress) {
-    const fee = safeParseUnits(SWAP_FEE, 18); // assumes fee is like "0.5"
-    if (balance > fee) {
-      balance -= fee;
-    } else {
-      balance = 0n;
-    }
-  }
-
-  const formatted = formatUnits(balance.toString() || 0,18);
+  const formatted = formatUnits(maxTransferable, DECIMALS);
   
-
   handleAmountChange(isFrom, formatted); // will auto-calculate the other amount
-},[fromAsset, toAsset, usdstAddress, SWAP_FEE, handleAmountChange]);
+},[fromAsset, toAsset, SWAP_FEE, usdstBalance, voucherBalance, handleAmountChange]);
 
   return (
     <div className="space-y-6">
@@ -993,7 +1016,7 @@ const handleMaxClick = useCallback((isFrom: boolean) => {
         {/* Fee Warnings */}
         {hasInsufficientUsdstForFee && (
           <p className="text-yellow-600 text-sm mt-1">
-            Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+            Insufficient USDST + vouchers for transaction fee ({SWAP_FEE} USDST)
           </p>
         )}
         {isLowBalanceWarning && (

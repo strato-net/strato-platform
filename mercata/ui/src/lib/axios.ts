@@ -24,6 +24,11 @@ api.interceptors.response.use(
   (error) => {
     const url = error?.config?.url || "";
     
+    // Don't show toast for cancelled requests
+    if (error.name === 'CanceledError' || error.code === 'ERR_CANCELED' || error.message?.includes('canceled')) {
+      return Promise.reject(error);
+    }
+    
     // Show toast for all API errors (except 401 which is handled separately)
     if (error.response?.status !== 401) {
       const errorMessage = extractApiErrorMessage(error);
