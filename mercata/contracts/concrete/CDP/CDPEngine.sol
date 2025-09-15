@@ -543,8 +543,9 @@ contract record CDPEngine is Ownable {
             assetState.rateAccumulator
         );
 
-        // Realize bad debt if no collateral remains but debt still > 1 wei
-        if (borrowerVault.collateral == 0) {
+        // Realize bad debt if no collateral remains OR collateral is dust (< 1000 wei) but debt still > 1 wei
+        uint collateralDustThreshold = 1000; // 1000 wei threshold for dust cleanup
+        if (borrowerVault.collateral == 0 || borrowerVault.collateral < collateralDustThreshold) {
             uint rem = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
             if (rem > 1) {
                 // remove from books
@@ -552,6 +553,13 @@ contract record CDPEngine is Ownable {
                 borrowerVault.scaledDebt = 0;
                 // make explicit, non-accruing
                 badDebtUSD[collateralAsset] += rem;
+                
+                // If there's dust collateral, seize it too (liquidator gets the dust)
+                if (borrowerVault.collateral > 0) {
+                    CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
+                    borrowerVault.collateral = 0;
+                }
+                
                 emit BadDebtRealized(collateralAsset, borrower, rem);
             }
         } else {
@@ -565,6 +573,44 @@ contract record CDPEngine is Ownable {
                 borrowerVault.scaledDebt = 0;
             }
         }
+    }
+
+    /**
+     * @notice Manually clean up dust positions that can't be liquidated economically
+     * @dev Can be called by anyone to clean up positions with dust collateral and significant debt
+     * @param borrower Address of the vault owner with dust position
+     * @param collateralAsset Address of the collateral token
+     */
+    function cleanupDustPosition(address borrower, address collateralAsset) external onlyKnownAsset(collateralAsset) {
+        require(borrower != address(0), "CDPEngine: invalid borrower");
+        
+        // Accrue for this asset
+        _accrue(collateralAsset);
+        
+        CollateralGlobalState storage assetState = collateralGlobalStates[collateralAsset];
+        Vault storage borrowerVault = vaults[borrower][collateralAsset];
+        
+        require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to clean up");
+        
+        uint collateralDustThreshold = 1000; // Same threshold as liquidation
+        require(borrowerVault.collateral < collateralDustThreshold, "CDPEngine: position not dust");
+        
+        uint remainingDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        require(remainingDebtUSD > 1, "CDPEngine: debt too small");
+        
+        // Remove from books and realize as bad debt
+        assetState.totalScaledDebt -= borrowerVault.scaledDebt;
+        borrowerVault.scaledDebt = 0;
+        badDebtUSD[collateralAsset] += remainingDebtUSD;
+        
+        // Seize any remaining dust collateral to caller as reward
+        if (borrowerVault.collateral > 0) {
+            CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
+            borrowerVault.collateral = 0;
+        }
+        
+        emit BadDebtRealized(collateralAsset, borrower, remainingDebtUSD);
+        emit VaultUpdated(borrower, collateralAsset, 0, 0);
     }
 
     // ───────────────────────── Accrual & Views ──────────────────────────────
