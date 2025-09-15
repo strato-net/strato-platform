@@ -8,9 +8,9 @@ import {
 	InitializedEvent, ContinuedEvent, StoppedEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent, InvalidatedEvent,
 	Thread, StackFrame, Scope, Source, Handles, Breakpoint, TerminatedEvent
-} from 'vscode-debugadapter';
+} from '@vscode/debugadapter';
 import * as vscode from 'vscode';
-import { DebugProtocol } from 'vscode-debugprotocol';
+import { DebugProtocol } from '@vscode/debugprotocol';
 import { basename } from 'path';
 import { Subject } from 'await-notify';
 import * as WebSocket from 'ws';

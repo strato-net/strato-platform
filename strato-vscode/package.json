@@ -1,10 +1,10 @@
 {
-	"name": "strato-vscode",
-	"publisher": "BlockApps",
-	"displayName": "STRATO IDE",
-	"description": "VSCode Integration for BlockApps STRATO",
+	"name": "strato-mercata",
+	"publisher": "stratomercata",
+	"displayName": "STRATO Mercata",
+	"description": "VSCode Integration for the STRATO Mercata blockchain",
 	"icon": "resources/rebrand-logo.png",
-	"version": "0.3.0",
+	"version": "0.0.1",
 	"repository": "https://github.com/blockapps/strato-platform/strato-vscode-images",
 	"engines": {
 		"vscode": "^1.53.0"
@@ -28,7 +28,7 @@
 			}
 		],
 		"configuration": {
-			"title": "STRATO IDE",
+			"title": "STRATO Mercata",
 			"properties": {
 				"strato-vscode.configPath": {
 					"type": "string",
@@ -276,7 +276,7 @@
 			"activitybar": [
 				{
 					"id": "strato-project",
-					"title": "STRATO IDE",
+					"title": "STRATO Mercata",
 					"icon": "resources/rebrand-logo.png"
 				}
 			]
@@ -300,7 +300,7 @@
 		"viewsWelcome": [
 			{
 				"view": "nodes",
-				"contents": "To start using the STRATO IDE, import a valid BlockApps REST configuration file.\n[Import Configuration File](command:nodes.addConfig)\n[Open Sample Configuration](command:extension.provideSampleConfiguration)\nTo learn more about how to configure the STRATO IDE, visit [the docs](https://docs.blockapps.net/blockapps-rest/).",
+				"contents": "To start using the STRATO Mercata VSCode extension, import a valid BlockApps REST configuration file.\n[Import Configuration File](command:nodes.addConfig)\n[Open Sample Configuration](command:extension.provideSampleConfiguration)\nTo learn more about how to configure the STRATO Mercata VSCode extension, visit [the docs](https://docs.blockapps.net/blockapps-rest/).",
 				"when": "!config.strato-vscode.configPath"
 			},
 			{
@@ -324,7 +324,7 @@
 		"blockapps-rest": "^8.4.0",
 		"js-yaml": "^4.0.0",
 		"qs": "^6.11.2",
-		"vscode-debugadapter": "^1.68.0",
+		"@vscode/debugadapter": "^1.68.0",
 		"ws": "^7.4.2"
 	},
 	"devDependencies": {

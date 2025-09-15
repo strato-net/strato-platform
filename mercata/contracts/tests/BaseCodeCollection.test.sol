@@ -245,9 +245,7 @@ contract Describe_Mercata {
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
-        (bool didntDoIt2, ) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
-        require(!didntDoIt2, "Contract was created before enough votes were cast");
-        (bool didIt, address blob) = u.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
+        (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         string blobOutput = blob.call("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }

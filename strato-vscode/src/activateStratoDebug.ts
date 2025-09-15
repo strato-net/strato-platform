@@ -47,7 +47,7 @@ export function activateStratoDebug(context: vscode.ExtensionContext) {
 	const factory = new InlineDebugAdapterFactory(vscode.window.activeTextEditor?.document.uri.fsPath || '');
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('strato', factory));
 	if ('dispose' in factory) {
-		context.subscriptions.push({ dispose: (() => factory.dispose) });
+		context.subscriptions.push({ dispose: (() => factory['dispose']) });
 	}
 
 	// override VS Code's default implementation of the debug hover
