@@ -40,6 +40,7 @@ import Numeric.Natural
 import Servant
 import Servant.Client
 import Settings
+import UnliftIO
 
 type API =
   "storage" :> QueryParam "key" Text
@@ -99,7 +100,7 @@ getStorageClient = uncurryStorageFilterParams getStorageClient'
         qsOffset
         qsLimit
 
-server :: HasSQL m => ServerT API m
+server :: Selectable StorageFilterParams [StorageAddress] m => ServerT API m
 server = getStorage
 
 -----------------------
@@ -120,7 +121,7 @@ instance ToSchema StorageAddress
 storage2StorageAddress :: Storage -> Address -> StorageAddress
 storage2StorageAddress stor addr = (StorageAddress (storageKey stor) (storageValue stor) addr)
 
-instance HasSQL m => Selectable StorageFilterParams [StorageAddress] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [StorageAddress] (SQLM m) where
   select _ StorageFilterParams {..} = do
     addrs <- fmap (map (entityVal *** E.unValue)) . sqlQuery $
       E.select . E.distinct $

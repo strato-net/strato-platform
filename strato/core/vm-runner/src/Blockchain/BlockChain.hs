@@ -68,6 +68,8 @@ import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
+import qualified Blockchain.Stream.Action as Action
+import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
@@ -78,20 +80,19 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
-import Control.Lens ((.~), (%~))
+import Control.Lens hiding (filtered)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Base ()
 import Control.Monad.Trans.Except
 import qualified Control.Monad.Trans.State.Strict as State
-import Data.Bifunctor (bimap)
 import qualified Data.Binary as Bin
 import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
-import Data.Foldable (traverse_)
+import Data.Foldable (toList)
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
@@ -100,9 +101,10 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
+import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Prometheus as P
-import SolidVM.Model.CodeCollection (FunctionCallType(..), emptyCodeCollection, invalidPragmasUsed)
+import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -620,27 +622,64 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents
-  yield . OutTXR $
-    TransactionResult
-      { transactionResultBlockHash = ranBlockHash,
-        transactionResultTransactionHash = theHash,
-        transactionResultMessage = message,
-        transactionResultResponse = response,
-        transactionResultTrace = theTrace',
-        transactionResultGasUsed = gasUsed,
-        transactionResultEtherUsed = etherUsed,
-        transactionResultContractsCreated = newAddresses,
-        transactionResultContractsDeleted = S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
-        transactionResultStateDiff = "",
-        transactionResultTime = realToFrac deltaT,
-        transactionResultNewStorage = "",
-        transactionResultDeletedStorage = "",
-        transactionResultStatus = Just txrStatus,
-        transactionResultCreator = creator,
-        transactionResultAppName = appName
-      }
-  when flags_diffPublish $ do
-    traverse_ (yield . OutAction) $ either (const Nothing) erAction result
+  let txr = NewTransactionResult $ TransactionResult
+        { transactionResultBlockHash = ranBlockHash,
+          transactionResultTransactionHash = theHash,
+          transactionResultMessage = message,
+          transactionResultResponse = response,
+          transactionResultTrace = theTrace',
+          transactionResultGasUsed = gasUsed,
+          transactionResultEtherUsed = etherUsed,
+          transactionResultContractsCreated = newAddresses,
+          transactionResultContractsDeleted = S.toList $ (beforeAddresses S.\\ afterAddresses) `S.union` (afterDeletes S.\\ beforeDeletes),
+          transactionResultStateDiff = "",
+          transactionResultTime = realToFrac deltaT,
+          transactionResultNewStorage = "",
+          transactionResultDeletedStorage = "",
+          transactionResultStatus = Just txrStatus,
+          transactionResultCreator = creator,
+          transactionResultAppName = appName
+        }
+  yield . OutVMEvents . (txr:) $ if not flags_diffPublish
+    then []
+    else case erAction <$> result of
+      Right (Just act) ->
+        let ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
+            dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
+            act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
+            actionEvents = [NewAction act']
+         in ccEvents ++ dcEvents ++ actionEvents
+      _ -> []
+
+extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
+extractCodeCollectionAddedMessages a =
+  case ( a ^. Action.src,
+         a ^. Action.name,
+         O.assocs $ a ^. Action.actionData
+       ) of
+    (Just c, Just n, actionDatas) ->
+      let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
+          cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
+            if _actionDataCodeHash == cp
+              then Just _actionDataCreator
+              else Nothing
+          cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
+          abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
+          contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
+                                            --  . (constructor .~ Nothing)
+                                             . (modifiers .~ M.empty)
+                                             )
+          cc' = emptyCodeCollection & contracts .~ contracts'
+       in Just $
+            CodeCollectionAdded
+              { codeCollection = const () <$> cc',
+                codePtr = cp,
+                creator = cn,
+                application = n,
+                abstracts = abstracts',
+                recordMappings = []
+              }
+    _ -> Nothing
 
 printTransactionMessage ::
   MonadLogger m =>

@@ -104,8 +104,7 @@ expressionHelper (FunctionCall _ e args) =
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) =
   concat [expressionHelper a, expressionHelper b, expressionHelper c]
-expressionHelper (BoolLiteral a _) =
-  ["Misuse of boolean literal. Consider removing." <$ a]
+expressionHelper (BoolLiteral _ _) = []
 expressionHelper (NumberLiteral _ _ _) = []
 expressionHelper (DecimalLiteral _ _) = []
 expressionHelper (StringLiteral _ _) = []

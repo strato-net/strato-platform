@@ -14,6 +14,8 @@ module Handlers.Block
     blocksFilterParams,
     getBlocksFilter,
     server,
+    getBlockInfo,
+    getBlockInfo'
   )
 where
 
@@ -142,12 +144,12 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
         qbChainId
         qbSortby
 
-server :: HasSQL m => ServerT API m
+server :: Selectable BlocksFilterParams [Block] m => ServerT API m
 server = getBlockInfo
 
 ---------------------
 
-instance HasSQL m => Selectable BlocksFilterParams [Block] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [Block] (SQLM m) where
   select _ b@BlocksFilterParams {..}
     | b == blocksFilterParams {qbSortby = qbSortby} =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)

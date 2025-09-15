@@ -25,7 +25,9 @@ class (Monad m) => HasMemLogDB m where
   enqueueLogEntry = enqueueLogEntries . pure
 
 putLogDB :: HasSQLDB m => LogDB -> m (Key LogDB)
-putLogDB = fmap head . putLogDBs . pure
+putLogDB = fmap unsafeHead . putLogDBs . pure
+  where unsafeHead []    = error "putLogDB: No keys returned"
+        unsafeHead (x:_) = x
 
 putLogDBs :: HasSQLDB m => [LogDB] -> m [Key LogDB]
 putLogDBs = sqlQuery . SQL.insertMany

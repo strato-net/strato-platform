@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -22,13 +23,14 @@ import Test.Hspec
 import Text.RawString.QQ
 
 import BlockApps.Logging
+import qualified Blockchain.Slipstream.Events as SE
+import Blockchain.Slipstream.OutputData
+import Blockchain.Slipstream.QueryFormatHelper
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256 (hash)
-import qualified Slipstream.Events as SE
-import Slipstream.OutputData
 import SolidVM.Model.CodeCollection hiding (contractName, contracts)
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type as SVMType
@@ -47,7 +49,7 @@ int = V.SimpleValue . V.valueInt
 
 createInserts :: OutputM m
               => (SE.ProcessedContract, ContractF())
-              -> ConduitM () T.Text m ()
+              -> ConduitM () SlipstreamQuery m ()
 createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
@@ -57,17 +59,17 @@ createInserts  (a,b) = do
 
 createInsertsCollection :: OutputM m
             => [ProcessedCollectionRow]
-              -> ConduitM () T.Text m ()
-createInsertsCollection collections = do
-  unless (null collections) $ do
-    let collection = head collections
+              -> ConduitM () SlipstreamQuery m ()
+createInsertsCollection = \case
+  [] -> pure ()
+  collections@(collection:_) -> do
     _ <- createCollectionTable  (creator collection, application collection, contractname collection) def def (collectionname collection, [SVMType.String Nothing], SVMType.String Nothing)
     insertCollectionTable collections
 
 createInsertsAbstract :: OutputM m
               => (SE.ProcessedContract, ContractF())
-              -> [(SE.ProcessedContract, [T.Text], T.Text, [T.Text])]
-              -> ConduitM () T.Text m ()
+              -> [(SE.ProcessedContract, [T.Text], TableName, [T.Text])]
+              -> ConduitM () SlipstreamQuery m ()
 createInsertsAbstract abstract inherited = do
     let contract = snd abstract
         cc = createDummyCodeCollection contract
@@ -125,7 +127,9 @@ spec :: Spec
 spec = do
   describe "Array serialization" $ do
     it "should create JSON entries" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
@@ -159,18 +163,18 @@ spec = do
 
       --  
       [vehicleCreate, _, _, _, vehicleInsert] <- runLoggingT . runConduit $ createInserts  input .| sinkList
-      vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
-  PRIMARY KEY (address) );|]
+      slipstreamQueryPostgres vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
+  PRIMARY KEY ("address"));|]
 
-      vehicleInsert
+      slipstreamQueryPostgres vehicleInsert
         `shouldBe` [r|INSERT INTO "Vehicle" ("address",
     "block_hash",
     "block_timestamp",
@@ -197,7 +201,9 @@ spec = do
 
   describe "Array serialization with history enabled" $ do
     it "should create JSON entries" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
           cHash = SolidVMCode "Vehicle2" $ hash "<CODEHASH>"
       let input =
              ( SE.ProcessedContract
@@ -234,18 +240,18 @@ spec = do
       [vehicleCreate, historyCreate, historyIndex, historyAlter, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
 
-      vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
-  PRIMARY KEY (address) );|]
+      slipstreamQueryPostgres vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "Vehicle2" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
+  PRIMARY KEY ("address"));|]
 
-      historyCreate
+      slipstreamQueryPostgres historyCreate
         `shouldBe` [r|CREATE TABLE IF NOT EXISTS "history@Vehicle2" (address text,
     block_hash text,
     block_timestamp text,
@@ -277,13 +283,13 @@ CREATE TRIGGER "after_update_on_Vehicle2"
 AFTER UPDATE ON "Vehicle2"
 FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
-      historyIndex
+      slipstreamQueryPostgres historyIndex
         `shouldBe` [r|CREATE UNIQUE INDEX IF NOT EXISTS "index_history@Vehicle2"
   ON "history@Vehicle2" (address, block_hash, transaction_hash);|]
-      historyAlter
+      slipstreamQueryPostgres historyAlter
         `shouldBe` [r|ALTER TABLE "history@Vehicle2" ADD PRIMARY KEY USING INDEX "index_history@Vehicle2";|]
 
-      vehicleInsert
+      slipstreamQueryPostgres vehicleInsert
         `shouldBe` [r|INSERT INTO "Vehicle2" ("address",
     "block_hash",
     "block_timestamp",
@@ -310,7 +316,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
 
   describe "String escaping" $ do
     it "should create JSON entries with quotes escaped" $ do
-      let testAdd = Address $ fst . head . readHex $ "ADDRESS"
+      let testAdd = case readHex "ADDRESS" of
+                      [] -> error "readHex failed reading \"ADDRESS\""
+                      (x:_) -> Address $ fst x
       let input =
              ( SE.ProcessedContract
                   { SE.address = testAdd,
@@ -345,18 +353,18 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
        
       [vehicleCreate, _, _, _, vehicleInsert] <-
         runLoggingT . runConduit $ createInserts  input .| sinkList
-      vehicleCreate
-        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
-  PRIMARY KEY (address) );|]
+      slipstreamQueryPostgres vehicleCreate
+        `shouldBe` [r|CREATE TABLE IF NOT EXISTS "\"Vehicle''''" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
+  PRIMARY KEY ("address"));|]
 
-      vehicleInsert
+      slipstreamQueryPostgres vehicleInsert
         `shouldBe` [r|INSERT INTO "\"Vehicle''''" ("address",
     "block_hash",
     "block_timestamp",
@@ -445,15 +453,15 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
-    swissArmyCreate
-      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
+    slipstreamQueryPostgres swissArmyCreate
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "MyOrg-MyApp-SwissArmy" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
     "addr" text,
     "boolean" bool,
     "contract" text,
@@ -461,9 +469,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  PRIMARY KEY (address) );|]
+  PRIMARY KEY ("address"));|]
 
-    swissArmyInsert
+    slipstreamQueryPostgres swissArmyInsert
       `shouldBe` [r|INSERT INTO "MyOrg-MyApp-SwissArmy" ("address",
     "block_hash",
     "block_timestamp",
@@ -659,15 +667,15 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     [swissArmyCreate, _, _, _, swissArmyInsert] <-
       runLoggingT . runConduit $ createInserts  input .| sinkList
 
-    swissArmyCreate
-      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
+    slipstreamQueryPostgres swissArmyCreate
+      `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
     "addr" text,
     "boolean" bool,
     "contract" text,
@@ -675,9 +683,9 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "number" decimal,
     "str" text,
     "strukt" jsonb,
-  PRIMARY KEY (address) );|]
+  PRIMARY KEY ("address"));|]
 
-    swissArmyInsert
+    slipstreamQueryPostgres swissArmyInsert
       `shouldBe` [r|INSERT INTO "SwissArmy" ("address",
     "block_hash",
     "block_timestamp",
@@ -749,22 +757,22 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     [swissArmyMappingCreate, swissArmyMappingRowInsert] <-
         runLoggingT . runConduit $ createInsertsCollection  input .| sinkList
 
-    swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "creator-SwissArmy-SwissArmyMapping" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
-    contract_name text,
-    collectionname text,
-    collectiontype text,
-    key text,
-    value text,
-  PRIMARY KEY (address, key));|]
+    slipstreamQueryPostgres swissArmyMappingCreate `shouldBe` [r|CREATE TABLE IF NOT EXISTS "creator-SwissArmy-SwissArmyMapping" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
+    "contract_name" text,
+    "collectionname" text,
+    "collectiontype" text,
+    "key" text,
+    "value" text,
+  PRIMARY KEY ("address", "key"));|]
 
-    swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
+    slipstreamQueryPostgres swissArmyMappingRowInsert `shouldBe` [r|INSERT INTO "cc_creator-SwissArmy-SwissArmyMapping" ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -841,27 +849,27 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           SE.contractData = M.fromList
             [ ("addr2", addr 0xdeadbeef)
             ]
-          }, [], T.pack "SwissArmy", [])]
+          }, [], IndexTableName "" "" "SwissArmy", [])]
 
 
      
     [swissArmyCreateAbstract, swissArmyInsertAbstract] <-
         runLoggingT . runConduit $ createInsertsAbstract  input inherited .| sinkList
 
-    swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" (address text,
-    block_hash text,
-    block_timestamp text,
-    block_number text,
-    transaction_hash text,
-    transaction_sender text,
-    creator text,
-    root text,
-    contract_name text,
-    data jsonb,
+    slipstreamQueryPostgres swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" ("address" text,
+    "block_hash" text,
+    "block_timestamp" text,
+    "block_number" text,
+    "transaction_hash" text,
+    "transaction_sender" text,
+    "creator" text,
+    "root" text,
+    "contract_name" text,
+    "data" jsonb,
     "addr" text,
-  PRIMARY KEY (address));|]
+  PRIMARY KEY ("address"));|]
 
-    swissArmyInsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("address",
+    slipstreamQueryPostgres swissArmyInsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("address",
     "block_hash",
     "block_timestamp",
     "block_number",
@@ -880,11 +888,11 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     '',
     '',
     'SwissArmyz',
-    '{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb) ON CONFLICT (address) DO UPDATE SET
-    block_hash = excluded.block_hash,
-    block_timestamp = excluded.block_timestamp,
-    block_number = excluded.block_number,
-    transaction_hash = excluded.transaction_hash,
-    transaction_sender = excluded.transaction_sender,
-    contract_name = excluded.contract_name,
-    data = SwissArmy.data || ('{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb);|]
+    '{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb) ON CONFLICT ("address") DO UPDATE SET
+    "block_hash" = excluded."block_hash",
+    "block_timestamp" = excluded."block_timestamp",
+    "block_number" = excluded."block_number",
+    "transaction_hash" = excluded."transaction_hash",
+    "transaction_sender" = excluded."transaction_sender",
+    "contract_name" = excluded."contract_name",
+    data = "SwissArmy".data || ('{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb);|]

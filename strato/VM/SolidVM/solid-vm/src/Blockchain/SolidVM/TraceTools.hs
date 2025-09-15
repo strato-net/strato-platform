@@ -8,6 +8,7 @@ import Blockchain.SolidVM.SetGet
 import Control.Monad
 import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import SolidVM.Model.SolidString
 import Text.Format
@@ -15,7 +16,7 @@ import Text.Tools
 
 showVariables :: MonadSM m => CallInfo -> m [String]
 showVariables ci = do
-  forM (M.toList $ localVariables ci) $ \(name, (_, var)) -> do
+  forM (M.toList . NE.head $ localVariables ci) $ \(name, (_, var)) -> do
     val <- getVar var
     valueString <- showSM val
     return $ "    \"" ++ labelToString name ++ "\": " ++ valueString

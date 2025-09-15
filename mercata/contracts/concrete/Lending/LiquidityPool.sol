@@ -78,7 +78,10 @@ contract record LiquidityPool is Ownable  {
 
         address asset = _getAsset();
         uint currentBalance = IERC20(asset).balanceOf(address(this));
-        require(currentBalance >= underlyingAmount, "Insufficient liquidity");
+        // Do not pay out protocol reserves: only cash minus reserves is withdrawable
+        uint reserves = LendingPool(registry.lendingPool()).reservesAccrued(); 
+        uint cashForLPs = currentBalance > reserves ? currentBalance - reserves : 0;
+        require(underlyingAmount <= cashForLPs, "Insufficient liquidity (excl reserves)");
 
         // Burn mTokens from user first
         mToken.burn(user, mTokenAmount);

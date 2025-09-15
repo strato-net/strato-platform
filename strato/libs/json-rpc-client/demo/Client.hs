@@ -70,15 +70,19 @@ connection input =
     do
       B.hPutStrLn inH input
       hFlush inH
-      line <- (head . B.lines) <$> B.hGetContents outH
-      return $
-        if B.null line
+      allLines <- B.lines <$> B.hGetContents outH
+      return $ case allLines of
+        [] -> Nothing
+        (line:_) -> if B.null line
           then Nothing
           else Just line
 
 -- Run the server as a subprocess:
 main = do
-  cmd <- head <$> getArgs
-  (inH, outH, _, processH) <- runInteractiveCommand cmd
-  runReaderT (runExceptT runRpcs) (inH, outH)
-  terminateProcess processH
+  cmds <- getArgs
+  case cmds of
+    [] -> error "No RPC commands given"
+    (cmd:_) -> do
+      (inH, outH, _, processH) <- runInteractiveCommand cmd
+      runReaderT (runExceptT runRpcs) (inH, outH)
+      terminateProcess processH

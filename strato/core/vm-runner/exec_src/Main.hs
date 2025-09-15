@@ -6,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
+module Main where
 -- HFlags
 
 import BlockApps.Init

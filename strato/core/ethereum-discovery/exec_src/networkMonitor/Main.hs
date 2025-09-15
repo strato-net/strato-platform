@@ -48,7 +48,7 @@ main = do
             $logInfoS "main" $ T.pack $ "Changed from " ++ format oldInterface ++ " to " ++ format newInterface
           when (not $ null connected) $ do
             $logInfoS "main" $ T.pack $ "New IP address added, resetting all peer timeouts so that we can reconnect to all peers"
-            resetAllPeerTimeouts
+            liftIO resetAllPeerTimeouts
           loop new
         else do
             -- $logInfoS "main" "no change"

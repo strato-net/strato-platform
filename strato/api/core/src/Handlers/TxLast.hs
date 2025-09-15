@@ -9,6 +9,7 @@
 
 module Handlers.TxLast
   ( API,
+    GetLastTransactions(..),
     getTxLastClient,
     server,
   )
@@ -18,11 +19,13 @@ import Blockchain.DB.SQLDB
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Control.Monad.Composable.SQL
+import Control.Monad.Trans.Class
 import Data.Int
 import qualified Database.Esqueleto.Legacy as E
 import Servant
 import Servant.Client
 import Settings
+import UnliftIO
 
 type API =
   "transaction" :> "last"
@@ -32,7 +35,7 @@ type API =
 getTxLastClient :: Integer -> ClientM [RawTransaction']
 getTxLastClient = client (Proxy @API)
 
-server :: HasSQL m => ServerT API m
+server :: GetLastTransactions m => ServerT API m
 server = getTxLast
 
 ---------------------
@@ -40,7 +43,10 @@ server = getTxLast
 class Monad m => GetLastTransactions m where
   getLastTransactions :: Integer -> m [RawTransaction]
 
-instance (Monad m, HasSQL m) => GetLastTransactions m where
+instance (Monad m, GetLastTransactions m, MonadTrans t) => GetLastTransactions (t m) where
+  getLastTransactions = lift . getLastTransactions
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastTransactions (SQLM m) where
   getLastTransactions num = do
     fmap (map E.entityVal) . sqlQuery $
       E.select $

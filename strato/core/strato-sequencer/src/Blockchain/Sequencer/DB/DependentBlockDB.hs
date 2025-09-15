@@ -4,12 +4,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.Sequencer.DB.DependentBlockDB (
-  DependentBlockDB,
+  DependentBlockDB(..),
   DependentBlockEntry,
-  HasDependentBlockDB(..),
   EmissionReadiness(..),
   bootstrapGenesisBlock,
   lookupDependentBlockDB,
@@ -26,6 +26,7 @@ import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Keccak256
 import Control.Monad (join)
 import Control.Monad.Change.Alter
+import Control.Monad.Change.Modify
 import Control.Monad.IO.Class
 import Data.Binary
 import qualified Data.ByteString.Lazy as B
@@ -35,7 +36,7 @@ import qualified GHC.Generics as GHCG
 import Text.Format
 import Prelude hiding (lookup)
 
-type DependentBlockDB = LDB.DB
+newtype DependentBlockDB = DependentBlockDB { getDependentBlockDB :: LDB.DB }
 
 -- totalDifficulty always includes the difficulty of the block currently being operated on
 data DependentBlockEntry
@@ -50,30 +51,22 @@ instance Binary DependentBlockEntry
 
 data EmissionReadiness = NotReadyToEmit | ReadyToEmit
 
-class (MonadLogger m, MonadIO m) => HasDependentBlockDB m where
-  getDependentBlockDB :: m DependentBlockDB
-
-  applyLDBBatchWrites :: [LDB.BatchOp] -> m ()
-  applyLDBBatchWrites ops = do
-    db <- getDependentBlockDB
-    LDB.write db LDB.defaultWriteOptions ops
-
-lookupDependentBlockDB :: HasDependentBlockDB m =>
+lookupDependentBlockDB :: (MonadIO m, Accessible DependentBlockDB m) =>
                           Keccak256 -> m (Maybe DependentBlockEntry)
 lookupDependentBlockDB k = do
-  db <- getDependentBlockDB
+  db <- getDependentBlockDB <$> access (Proxy @DependentBlockDB)
   fmap (fmap (decode . B.fromStrict)) $ LDB.get db LDB.defaultReadOptions (B.toStrict $ encode k)
 
-insertDependentBlockDB :: HasDependentBlockDB m =>
+insertDependentBlockDB :: (MonadIO m, Accessible DependentBlockDB m) =>
                           Keccak256 -> DependentBlockEntry -> m ()
 insertDependentBlockDB k v = do
-  db <- getDependentBlockDB
+  db <- getDependentBlockDB <$> access (Proxy @DependentBlockDB)
   LDB.put db LDB.defaultWriteOptions (B.toStrict $ encode k) (B.toStrict $ encode v)
 
-deleteDependentBlockDB :: HasDependentBlockDB m =>
+deleteDependentBlockDB :: (MonadIO m, Accessible DependentBlockDB m) =>
                           Keccak256 -> m ()
 deleteDependentBlockDB k = do
-  db <- getDependentBlockDB
+  db <- getDependentBlockDB <$> access (Proxy @DependentBlockDB)
   LDB.delete db LDB.defaultWriteOptions (B.toStrict $ encode k)
 
 bootstrapGenesisBlock :: (Keccak256 `Alters` DependentBlockEntry) m => Keccak256 -> m ()

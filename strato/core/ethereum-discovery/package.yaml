@@ -80,6 +80,7 @@ executables:
       - ethereum-discovery
       - format
       - hflags
+      - monad-alter
       - mtl
       - process-monitor
       - resourcet

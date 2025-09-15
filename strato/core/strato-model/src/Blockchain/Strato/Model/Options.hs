@@ -6,7 +6,7 @@ import Blockchain.Strato.Model.Util
 import Data.ByteString.Internal
 import HFlags
 
-defineFlag "network" ("mercata" :: String) "Choose a network to join"
+defineFlag "network" ("helium" :: String) "Choose a network to join"
 defineFlag "networkID" (-1 :: Integer) "set a custom network ID for the client"
 defineFlag "testnet" False "connect to testnet"
 defineFlag "txSizeLimit" (2097152 :: Int) "The maximum length of a valid RLP encoded transaction bytestring (default is 2 MiB)"

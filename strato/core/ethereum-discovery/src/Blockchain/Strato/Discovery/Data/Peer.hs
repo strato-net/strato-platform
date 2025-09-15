@@ -27,6 +27,7 @@ module Blockchain.Strato.Discovery.Data.Peer
     ClosestPeers(..),
     UnbondedPeersForUDP(..),
     PeerLastBestBlockHash(..),
+    buildPeer,
     createPeer,
     pointToNodeID,
     nodeIDToPoint,

@@ -18,6 +18,8 @@ module Blockchain.Blockstanbul
     ForcedValidatorChange (..),
     PreprepareDecision (..),
     currentView,
+    view,
+    sequence,
     blockstanbulRunning,
     isHistoricBlock,
     blockstanbulSender,
@@ -31,3 +33,4 @@ import Blockchain.Blockstanbul.Authentication
 import Blockchain.Blockstanbul.EventLoop
 import Blockchain.Blockstanbul.Messages
 import Blockchain.Blockstanbul.StateMachine
+import Prelude hiding (sequence)

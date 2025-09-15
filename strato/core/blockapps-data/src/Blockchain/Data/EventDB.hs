@@ -20,7 +20,9 @@ class (Monad m) => HasMemEventDB m where
   enqueueEventEntry = enqueueEventEntries . pure
 
 putEventDB :: HasSQLDB m => EventDB -> m (Key EventDB)
-putEventDB = fmap head . putEventDBs . pure
+putEventDB = fmap unsafeHead . putEventDBs . pure
+  where unsafeHead []    = error "putEventDB: No keys returned"
+        unsafeHead (x:_) = x
 
 putEventDBs :: HasSQLDB m => [EventDB] -> m [Key EventDB]
 putEventDBs = sqlQuery . SQL.insertMany

@@ -74,7 +74,7 @@ instance (Address `Alters` AddressState) m => (Address `Alters` AddressState) (M
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
+instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
   select p = lift . select p
 
 instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where

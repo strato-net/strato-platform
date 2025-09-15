@@ -279,11 +279,11 @@ commonAncestorHelper ::
   Redis (Either Reply ([(Keccak256, Integer)], [Integer])) -- ([Updates], [Deletions])
 commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] (S.fromList [oldSha', newSha'])
   where
+    helper [] _ _ = return $ Right ([], [])
+    helper _ [] _ = return $ Right ([], [])
     helper [oldSha] [newSha] _ | oldSha == newSha = return $ Right ([], [])
     helper (_ : (oldSha'' : _)) (_ : (newSha'' : ns)) _ | oldSha'' == newSha'' = complete oldSha'' (mkParentChain newSha'' ns)
-    helper oldShaChain newShaChain seen = do
-      let oldSha = head oldShaChain
-          newSha = head newShaChain
+    helper oldShaChain@(oldSha:_) newShaChain@(newSha:_) seen = do
       newParent <- (\x -> fromMaybe x <$> getParent x) newSha
       oldParent <- (\x -> fromMaybe x <$> getParent x) oldSha
       let ps = [newParent, oldParent]
@@ -315,7 +315,10 @@ commonAncestorHelper oldNum newNum oldSha' newSha' = helper [oldSha'] [newSha'] 
             then
               return . Left . SingleLine . S8.pack $
                 "Could not get ancestor header for Keccak256 " ++ keccak256ToHex lca
-            else complete (head newShaChain) newShaChain
+            else case newShaChain of
+              [] -> return . Left . SingleLine . S8.pack $
+                "Could not get ancestor header for Keccak256 " ++ keccak256ToHex lca
+              (x:_) -> complete x newShaChain
         Just ancestor -> do
           --liftIO . putStrLn $ show (keccak256ToHex lca, keccak256ToHex <$> newShaChain)
           let ancestorNumber = blockHeaderBlockNumber ancestor

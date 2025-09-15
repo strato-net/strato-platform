@@ -25,6 +25,7 @@ where
 import Control.Lens
 import Control.Monad (void)
 import Control.Monad.IO.Class
+import Control.Monad.Reader
 import Control.Monad.Trans.State (StateT, execStateT)
 import Data.Proxy
 
@@ -195,3 +196,15 @@ class Yields f a where
 
   yieldMany :: Monad f => [a] -> f ()
   yieldMany = mapM_ yield
+
+instance {-# OVERLAPPING #-} (Monad m) => Accessible a (ReaderT a m) where
+  access _ = ask
+
+instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
+  access p = lift (access p)
+
+instance (Monad m, Outputs m a, MonadTrans t) => Outputs (t m) a where
+  output = lift . output
+
+instance (Monad m, Awaitable a m, MonadTrans t) => Awaitable a (t m) where
+  await = lift await

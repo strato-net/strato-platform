@@ -55,26 +55,18 @@ transactionType (BlocTransfer _) = TRANSFER
 transactionType (BlocContract _) = CONTRACT
 transactionType (BlocFunction _) = FUNCTION
 
-instance ToParam (QueryFlag "queue") where
-  toParam _ =
-    DocQueryParam "queue" ["true", "false", ""] "flag for queueing a transaction request" Flag
-
-type PostBlocTransactionParallelCommon tokenHeaderName = 
+type PostBlocTransactionParallel = 
   "transaction"
     :> "parallel"
-    :> S.Header tokenHeaderName Text
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
-    :> QueryFlag "queue"
     :> ReqBody '[JSON] PostBlocTransactionRequest
     :> Post '[JSON] [BlocTransactionResult]
 
-type PostBlocTransactionParallel = PostBlocTransactionParallelCommon "X-USER-ACCESS-TOKEN"
-type PostBlocTransactionParallelExternal = PostBlocTransactionParallelCommon "Authorization"
+type PostBlocTransactionParallelExternal = S.Header "Authorization" Text :> PostBlocTransactionParallel
 
 type PostBlocTransaction =
   "transaction"
-    :> S.Header "X-USER-ACCESS-TOKEN" Text
     :> QueryParam "use_wallet" Bool -- Using QueryParam here to distinguish between Nothing and Just False
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] PostBlocTransactionRequest
@@ -87,10 +79,9 @@ type PostBlocTransaction =
 --
 -- This was made at the request of Stably for their API integration
 type PostBlocTransactionBody =
-  -- | Transaction results
   "transaction"
+  -- | Transaction results
     :> "body" -- /transaction/body
-    :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionBodyResult]
 
@@ -100,10 +91,9 @@ type PostBlocTransactionBody =
 --
 -- This was made at the request of Stably for their API integration
 type PostBlocTransactionUnsigned =
-  -- | Transaction results
   "transaction"
+  -- | Transaction results
     :> "unsigned" -- /transaction/unsigned
-    :> S.Header "X-USER-ACCESS-TOKEN" Text -- jwt
     :> ReqBody '[JSON] PostBlocTransactionRequest -- SolidVM transaction
     :> Post '[JSON] [BlocTransactionUnsignedResult]
 

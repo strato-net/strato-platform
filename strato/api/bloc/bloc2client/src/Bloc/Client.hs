@@ -17,6 +17,7 @@ module Bloc.Client
     postContractsXabi,
     getBlocTransactionResult,
     postBlocTransactionResults,
+    postBlocTransactionResultsExternal,
     postBlocTransaction,
     postBlocTransactionParallelExternal,
     postBlocTransactionParallel,
@@ -119,14 +120,15 @@ postContractsXabi = client (Proxy @PostContractsXabi)
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @GetBlocTransactionResult)
 
-postBlocTransactionResults :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
+
+postBlocTransactionResultsExternal :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResultsExternal = client (Proxy @PostBlocTransactionResultsExternal)
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
-  Maybe Text ->
   Maybe Bool ->
-  Bool ->
   Bool ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionResult]
@@ -136,25 +138,21 @@ postBlocTransactionParallelExternal ::
   Maybe Text ->
   Maybe Bool ->
   Bool ->
-  Bool ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionResult]
 postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
 
 postBlocTransactionBody ::
-  Maybe Text ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionBodyResult]
 postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
 
 postBlocTransactionUnsigned ::
-  Maybe Text ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
 
 postBlocTransaction ::
-  Maybe Text ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->

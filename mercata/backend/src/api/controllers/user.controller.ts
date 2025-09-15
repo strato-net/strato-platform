@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, getOpenIssues } from "../services/user.service";
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, getOpenIssues,
+         contractSearch, getContractDetails,
+ } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
 
 class UserController {
@@ -118,6 +120,38 @@ class UserController {
       const { accessToken } = req;
       const issues = await getOpenIssues(accessToken);
       res.status(RestStatus.OK).json(issues);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async contractSearch(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const { search } = query;
+      const searchResults = await contractSearch(accessToken, `${search}`);
+      res.status(RestStatus.OK).json(searchResults);
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async getContractDetails(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, query } = req;
+      const { address } = query;
+      const contractDetails = await getContractDetails(accessToken, `${address}`);
+      res.status(RestStatus.OK).json(contractDetails);
       next();
     } catch (e) {
       next(e);

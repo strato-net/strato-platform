@@ -8,7 +8,6 @@
 
 module Blockchain.Data.TransactionResult
   ( TransactionResult,
-    HasMemTXResultDB (..),
     putTransactionResult,
     putTransactionResults,
   )
@@ -104,18 +103,13 @@ instance ToSchema TransactionResult where
     return $
       NamedSchema (Just "TransactionResult") mempty
 
-class (Monad m) => HasMemTXResultDB m where
-  enqueueTransactionResults :: [TransactionResult] -> m ()
-  flushTransactionResults :: m ()
-
-  enqueueTransactionResult :: TransactionResult -> m ()
-  enqueueTransactionResult = enqueueTransactionResults . pure
-
 putTransactionResult ::
   HasSQLDB m =>
   TransactionResult ->
   m (Key TransactionResult)
-putTransactionResult = fmap head . putTransactionResults . pure
+putTransactionResult = fmap unsafeHead . putTransactionResults . pure
+  where unsafeHead []    = error "putTransactionResult: No keys returned"
+        unsafeHead (x:_) = x
 
 putTransactionResults ::
   HasSQLDB m =>

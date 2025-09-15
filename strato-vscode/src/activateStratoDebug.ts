@@ -44,10 +44,10 @@ export function activateStratoDebug(context: vscode.ExtensionContext) {
 		}
 	}, vscode.DebugConfigurationProviderTriggerKind.Dynamic));
 
-	const factory = new InlineDebugAdapterFactory();
+	const factory = new InlineDebugAdapterFactory(vscode.window.activeTextEditor?.document.uri.fsPath || '');
 	context.subscriptions.push(vscode.debug.registerDebugAdapterDescriptorFactory('strato', factory));
 	if ('dispose' in factory) {
-		context.subscriptions.push(factory);
+		context.subscriptions.push({ dispose: (() => factory.dispose) });
 	}
 
 	// override VS Code's default implementation of the debug hover
@@ -84,8 +84,12 @@ class StratoConfigurationProvider implements vscode.DebugConfigurationProvider {
 }
 
 class InlineDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
+	private _filepath = '';
+	public constructor(filepath: string) {
+		this._filepath = filepath;
+	}
 
 	createDebugAdapterDescriptor(_session: vscode.DebugSession): ProviderResult<vscode.DebugAdapterDescriptor> {
-		return new vscode.DebugAdapterInlineImplementation(new StratoDebugSession());
+		return new vscode.DebugAdapterInlineImplementation(new StratoDebugSession(this._filepath));
 	}
 }

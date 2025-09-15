@@ -182,7 +182,7 @@ contract Describe_Mercata {
         output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
     }
 
-    function it_can_store_variadic_args() {
+    function it_can_execute_issues() {
         User adminUser = new User();
         AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
         User u = new User();

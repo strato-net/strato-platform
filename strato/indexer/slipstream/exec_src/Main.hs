@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -7,9 +8,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
-import Bloc.Monad (BlocEnv (..))
 import BlockApps.Init
 import BlockApps.Logging
+import Blockchain.Slipstream.Globals
+import Blockchain.Slipstream.GlobalsColdStorage
+import Blockchain.Slipstream.MessageConsumer
+import Blockchain.Slipstream.Options
+import Blockchain.Slipstream.OutputData
 import Control.Concurrent
 import Control.Monad
 import Control.Monad.Composable.Kafka
@@ -28,12 +33,6 @@ import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 
-import SelectAccessible ()
-import Slipstream.Globals
-import Slipstream.GlobalsColdStorage
-import Slipstream.MessageConsumer
-import Slipstream.Options
-import Slipstream.OutputData
 import Text.Printf
 import Text.RawString.QQ
 
@@ -47,20 +46,6 @@ workerConnStr =
       flags_pguser
       flags_password
       flags_database
-
-createBlocEnv :: MonadIO m => m BlocEnv
-createBlocEnv = liftIO $ do
-  return
-    BlocEnv
-      { stateFetchLimit = 0,
-        txSizeLimit = 0,
-        gasLimit = 0,
-        globalNonceCounter = error ("globalNonceCounter shouldn't be needed in slipstream, it is undefined"),
-        txTBQueue = error ("txTBQueue shouldn't be needed in slipstream, it is undefined"),
-        userRegistryAddress = 0x0,
-        userRegistryCodeHash = Nothing,
-        useWalletsByDefault = error "useWalletsByDefault shouldn't be needed in slipstream"
-      }
 
 connectToCirrus :: MonadIO m => m PGConnection
 connectToCirrus = liftIO $ pgConnect cirrusInfo
@@ -80,7 +65,6 @@ main = do
       void . liftIO . forkIO . run 10777 $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
 
-      env <- createBlocEnv
       conn <- connectToCirrus
       let migrateCirrus :: MonadIO m => B.ByteString -> m ()
           migrateCirrus = liftIO . void . pgQuery conn
@@ -114,4 +98,4 @@ main = do
       gref <- newGlobals handle (CirrusHandle conn S.empty)
 
       flip runReaderT gref . runSQLM $
-        getAndProcessMessages env conn
+        getAndProcessMessages conn

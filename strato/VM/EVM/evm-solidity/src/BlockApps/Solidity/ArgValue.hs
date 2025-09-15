@@ -111,7 +111,9 @@ argValueToValue defs theType argVal = case theType of
                 return value
             )
             hm
-        let initialValueType = argValueToType $ snd . head $ KM.toList hm
+        let initialValueType = case KM.toList hm of
+              [] -> error "initialValueType: Empty list"
+              (x:_) -> argValueToType $ snd x
             isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Mapping"
