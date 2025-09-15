@@ -82,7 +82,7 @@ contract record Mercata {
         collateralVault = new CollateralVault(address(lendingRegistry), address(adminRegistry));
         liquidityPool = new LiquidityPool(address(lendingRegistry), address(adminRegistry));
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(address(adminRegistry)); 
+        priceOracle = new PriceOracle(address(msg.sender)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector));
         safetyModule = new SafetyModule(address(lendingRegistry), address(poolConfigurator), address(adminRegistry));

@@ -5,7 +5,8 @@
     "main": "deploy/deploy.js",
     "scripts": {
         "deploy": "node deploy/deploy.js",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "test:bad-debt": "node test_bad_debt_final.js"
     },
     "dependencies": {
         "@openzeppelin/contracts": "^5.4.0",
