@@ -88,6 +88,7 @@ tests:
       - containers
       - crypto-api
       - ethereum-rlp
+      - extra
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -106,9 +107,11 @@ tests:
       - strato-genesis
       - strato-init
       - strato-model
+      - strato-redis-blockdb
       - text
       - time
       - transformers
+      - unliftio
       - utf8-string
       - vm-tools
       - ordered-containers

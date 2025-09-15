@@ -327,6 +327,7 @@ type VMBase m =
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
     (Keccak256 `A.Alters` DBCode) m,
+    HasCodeDB m,
     (N.NibbleString `A.Alters` N.NibbleString) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,

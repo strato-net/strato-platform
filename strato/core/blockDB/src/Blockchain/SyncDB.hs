@@ -9,6 +9,7 @@
 
 module Blockchain.SyncDB
   ( HasSyncDB(..),
+    SyncStatus(..),
     getBestBlockInfo,
     putBestBlockInfo,
     getBestSequencedBlockInfo,
@@ -45,6 +46,8 @@ import           System.Random                         (randomIO)
 import qualified Text.Colors                           as CL
 import           Text.Format
 import           Text.RawString.QQ
+
+newtype SyncStatus = SyncStatus { unSyncStatus :: Bool }
 
 liftLog :: LoggingT m a -> m a
 liftLog = runLoggingT

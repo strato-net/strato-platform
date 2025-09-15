@@ -26,7 +26,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import qualified Data.Map.Strict as M
-import SelectAccessible ()
 
 instance HasSQLDB m => (Keccak256 `A.Alters` API OutputTx) m where
   lookup _ _ = liftIO . throwIO $ Lookup "API" "Keccak256" "OutputTx"

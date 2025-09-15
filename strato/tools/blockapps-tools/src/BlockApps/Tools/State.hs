@@ -21,9 +21,8 @@ nibbleStringToByteString :: N.NibbleString -> B.ByteString
 nibbleStringToByteString (N.EvenNibbleString x) = x
 nibbleStringToByteString _ = error "nibbleStringToByteString called for Odd length nibblestring"
 
-showVals :: DB.DB -> MP.StateRoot -> ResourceT IO ()
-showVals sdb sr = do
-  db <- DB.open "/tmp/.ethereumH/hash" def
+showVals :: DB.DB -> DB.DB -> MP.StateRoot -> ResourceT IO ()
+showVals sdb db sr = do
   kvs <- runReaderT (MP.unsafeGetKeyVals sr "") sdb
   liftIO $ putStrLn $ "Number of items: " ++ show (length kvs) ++ "\n------------------------"
   forM_ kvs $ \(key, val) -> do
@@ -39,11 +38,12 @@ showVals sdb sr = do
           ++ tab ("\n" ++ format (rlpDecode $ rlpDeserialize $ rlpDecode val :: AddressState))
           ++ "\n----------------------------"
 
-doit :: MP.StateRoot -> IO ()
-doit sr = DB.runResourceT $ do
+doit :: String -> String -> MP.StateRoot -> IO ()
+doit stateFileName hashFileName sr = DB.runResourceT $ do
   sdb <-
     DB.open
-      "/tmp/.ethereumH/state"
+      stateFileName
       DB.defaultOptions {DB.cacheSize = 1024}
+  db <- DB.open hashFileName def
 
-  showVals sdb sr
+  showVals sdb db sr

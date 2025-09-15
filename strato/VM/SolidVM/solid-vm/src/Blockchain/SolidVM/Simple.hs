@@ -12,14 +12,17 @@ module Blockchain.SolidVM.Simple
     argsSender,
     argsOrigin,
     argsTxHash,
+    argsArgs,
     argsChainId,
     argsMetadata,
     SolidVMCreateArgs (..),
     createNewAddress,
+    createContractName,
     createCode,
     createArgs,
     SolidVMCallArgs (..),
     callCodeAddress,
+    callFuncName,
     callArgs,
     SolidVMTx (..),
     _SolidVMCreate,
@@ -83,6 +86,7 @@ data SolidVMTxArgs = SolidVMTxArgs
     _argsOrigin :: Address,
     _argsProposer :: Address,
     _argsTxHash :: Keccak256,
+    _argsArgs :: [T.Text],
     _argsChainId :: Maybe Word256,
     _argsMetadata :: Maybe (M.Map T.Text T.Text)
   }
@@ -98,11 +102,13 @@ instance Default SolidVMTxArgs where
       0
       (Address 0)
       emptyHash
+      []
       Nothing
       Nothing
 
 data SolidVMCreateArgs = SolidVMCreateArgs
   { _createNewAddress :: Address,
+    _createContractName :: T.Text,
     _createCode :: Code,
     _createArgs :: SolidVMTxArgs
   }
@@ -114,11 +120,13 @@ instance Default SolidVMCreateArgs where
   def =
     SolidVMCreateArgs
       0
+      ""
       (Code "")
       def
 
 data SolidVMCallArgs = SolidVMCallArgs
   { _callCodeAddress :: Address,
+    _callFuncName :: T.Text,
     _callArgs :: SolidVMTxArgs
   }
   deriving (Eq, Show, Generic)
@@ -129,6 +137,7 @@ instance Default SolidVMCallArgs where
   def =
     SolidVMCallArgs
       0
+      ""
       def
 
 data SolidVMTx
@@ -152,8 +161,8 @@ create s =
     (s ^. createNewAddress)
     (s ^. createCode)
     (s ^. createArgs . argsTxHash)
-    ""
-    []
+    (s ^. createContractName)
+    (s ^. createArgs . argsArgs)
 
 call ::
   (SolidVM.SolidVMBase m) =>
@@ -169,6 +178,6 @@ call s =
     (Gas 100000000)
     (s ^. callArgs . argsOrigin)
     (s ^. callArgs . argsTxHash)
-    ""
-    []
+    (s ^. callFuncName)
+    (s ^. callArgs . argsArgs)
     Nothing

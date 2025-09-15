@@ -20,6 +20,8 @@ executables:
     - blockapps-datadefs
     - blockapps-mpdbs
     - blockapps-init
+    - blockapps-vault-wrapper-api
+    - blockapps-vault-wrapper-client
     - blockDB
     - bytestring
     - cache
@@ -27,6 +29,7 @@ executables:
     - common-log
     - containers
     - core-api2
+    - ethereum-discovery
     - format
     - http-types
     - identity-monad
@@ -44,6 +47,7 @@ executables:
     - strato-conf
     - sql-monad
     - strato-model
+    - strato-redis-blockdb
     - swagger2
     - text
     - transformers

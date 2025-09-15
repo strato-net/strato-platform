@@ -1,3 +1,4 @@
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -50,7 +51,6 @@ type BlocAPI =
     :<|> PostBlocTransactionBody
     :<|> PostBlocTransactionUnsigned
     :<|> PostBlocTransaction
-    :<|> PostBlocTransactionParallelExternal
 
 --Unsure what this will break if anything but remove later
 instance ToSample Text where

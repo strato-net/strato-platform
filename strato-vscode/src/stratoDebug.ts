@@ -5,9 +5,9 @@
 import {
 	Logger, logger,
 	LoggingDebugSession,
-	InitializedEvent, StoppedEvent, OutputEvent,
+	InitializedEvent, ContinuedEvent, StoppedEvent,
 	ProgressStartEvent, ProgressUpdateEvent, ProgressEndEvent, InvalidatedEvent,
-	Thread, StackFrame, Scope, Source, Handles, Breakpoint
+	Thread, StackFrame, Scope, Source, Handles, Breakpoint, TerminatedEvent
 } from 'vscode-debugadapter';
 import * as vscode from 'vscode';
 import { DebugProtocol } from 'vscode-debugprotocol';
@@ -18,6 +18,7 @@ import { rest } from 'blockapps-rest';
 import getConfig from './load.config';
 import { getApplicationUser } from './auth';
 import getOptions from './load.options';
+import { CliClient } from './cliClient';
 
 function timeout(ms: number) {
 	return new Promise(resolve => setTimeout(resolve, ms));
@@ -41,7 +42,7 @@ interface ILaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 }
 
 export class StratoDebugSession extends LoggingDebugSession {
-
+	private cli: CliClient;
 	// we don't support multiple threads, so we can use a hardcoded ID for the default thread
 	private static threadID = 1;
 
@@ -61,7 +62,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 	private _useInvalidatedEvent = false;
 
 	private _initialized = false;
-    private _ws;
 	private _status = undefined;
 	private _user;
     private _options;
@@ -71,47 +71,51 @@ export class StratoDebugSession extends LoggingDebugSession {
 	 * Creates a new debug adapter that is used for one debug session.
 	 * We configure the default implementation of a debug adapter here.
 	 */
-	public constructor() {
+	public constructor(filepath: string) {
 		super("strato-debug.txt");
 		this.setDebuggerLinesStartAt1(true);
 		this.setDebuggerColumnsStartAt1(true);
+
+        this.cli = new CliClient({
+          command: `${process.env.HOME}/.local/bin/solid-vm-cli`,
+          args: ['debug', 'source', 'breakpoints', '[]', filepath],
+          useContentLengthFraming: false, // true if your tool speaks DAP-style frames
+          log: (m) => this.sendEvent({ event: 'output', type: 'event', body: { category: 'console', output: m + '\n' } } as any),
+        });
+
+        // Example: subscribe to async tool notifications (push events)
+        this.cli.on('notification', (method, params) => {
+          if (method === 'status') {
+			const contents = params;
+			const oldStatus = this._status;
+            if (contents.tag === 'Running') {
+				this._status = undefined;
+			} else {
+				this._status = contents.contents;
+			}
+			if (!oldStatus) {
+			 if (this._status) {
+			        this.sendEvent(new StoppedEvent('pause', StratoDebugSession.threadID));
+			 }
+			} else {
+			    if (this._status) {
+			        this.sendEvent(new StoppedEvent('step', StratoDebugSession.threadID));
+			    } else {
+            		this.sendEvent(new ContinuedEvent(params?.threadId ?? 1, false));
+			    }
+			}
+		  }
+          //}
+          // map more events as needed…
+        });
+
+        this.cli.on('exit', () => {
+          this.sendEvent(new TerminatedEvent());
+        });
 	}
 
 	public async initialize() {
 		this._initialized = true;
-		const { user, options } = await this.getUserAndOptionsInternal()
-		const { config } = options
-		const { nodes } = config
-		var token = user.token;
-        var wsOptions = {
-            headers: {
-                "Authorization" : "Bearer " + token
-            }
-        };
-		const activeNode: number = vscode.workspace.getConfiguration().get('strato.activeNode') || 0;
-        this._ws = new WebSocket(`${nodes[activeNode].url}/vm-debug-ws/`, wsOptions);
-        this._ws.on('message', (bytes) => {
-           const message = JSON.parse(bytes.toString('utf-8'));
-		   if(message.tag === 'WSOStatus') {
-			   const { contents } = message;
-			   const oldStatus = this._status;
-               if (contents.tag === 'Running') {
-				   this._status = undefined;
-			   } else {
-				   this._status = contents.contents;
-			   }
-			   if (!oldStatus) {
-				   if (this._status) {
-			           this.sendEvent(new StoppedEvent('pause', StratoDebugSession.threadID));
-				   }
-			   } else {
-				   if (this._status) {
-			           this.sendEvent(new StoppedEvent('step', StratoDebugSession.threadID));
-				   }
-			   }
-		   }
-           console.debug(`From websocket: ${message}`)
-        });
 	}
 
 	/**
@@ -183,23 +187,6 @@ export class StratoDebugSession extends LoggingDebugSession {
 		this.sendEvent(new InitializedEvent());
 	}
 
-	private async getUserAndOptionsInternal(): Promise<any> {
-		if (!this._user) {
-		    this._user = await getApplicationUser()
-		}
-		if (!this._options) {
-            this._options = getOptions() || {};
-		}
-		return { user: this._user, options: this._options }
-	}
-
-	protected async getUserAndOptions(): Promise<any> {
-		if (!this._initialized) {
-			await this.initialize();
-		}
-        return this.getUserAndOptionsInternal();
-	}
-
 	/**
 	 * Called at the end of the configuration sequence.
 	 * Indicates that all breakpoints etc. have been sent to the DA and that the 'launch' can start.
@@ -211,77 +198,84 @@ export class StratoDebugSession extends LoggingDebugSession {
 		this._configurationDone.notify();
 	}
 
-	protected async launchRequest(response: DebugProtocol.LaunchResponse, args: ILaunchRequestArguments) {
+    protected async launchRequest(
+      response: DebugProtocol.LaunchResponse,
+      args: DebugProtocol.LaunchRequestArguments
+    ): Promise<void> {
+	  this.sendResponse(response);
+      // try {
+      //   // Example: ask your CLI to start/attach the target program
+      //   await this.cli.send('launch', {});
+      //   this.sendResponse(response);
+      // } catch (e: any) {
+      //   response.success = false;
+      //   response.message = e?.message ?? String(e);
+      //   this.sendResponse(response);
+      //   this.sendEvent(new TerminatedEvent());
+      // }
+    }
 
-		// make sure to 'Stop' the buffered logging if 'trace' is not set
-		logger.setup(args.trace ? Logger.LogLevel.Verbose : Logger.LogLevel.Stop, false);
+    protected async continueRequest(
+      response: DebugProtocol.ContinueResponse,
+      args: DebugProtocol.ContinueArguments
+    ): Promise<void> {
+      try {
+        const result = await this.cli.send('continue', { threadId: args.threadId });
+        response.body = { allThreadsContinued: !!result?.allThreadsContinued };
+        this.sendResponse(response);
+        this.sendEvent(new ContinuedEvent(args.threadId ?? 1, false));
+      } catch (e: any) {
+        response.success = false;
+        response.message = e?.message ?? String(e);
+        this.sendResponse(response);
+      }
+    }
 
-		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
-
-		this.sendResponse(response);
-	}
+    protected async disconnectRequest(
+      response: DebugProtocol.DisconnectResponse,
+      _args: DebugProtocol.DisconnectArguments
+    ): Promise<void> {
+      try {
+        this.cli.notify('disconnect', {});
+      } catch {
+        await this.cli.dispose();
+	  } finally {
+        this.sendResponse(response);
+      }
+    }
 
 	protected async pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments) {
-
-		const { user, options } = await this.getUserAndOptions();
-		// wait until configuration has finished (and configurationDoneRequest has been called)
-		await this._configurationDone.wait(1000);
-
-		try {
-		// start the program in the runtime
-        const res = await rest.debugPause(user, options)
-		} catch(e) {
-			console.log(e);
-		}
-
-	    this._ws.send(JSON.stringify({tag: "WSIStatus"}))
-		this.sendResponse(response);
+      try {
+        this.cli.notify('pause', {});
+      } catch {
+        await this.cli.dispose();
+	  } finally {
+        this.sendResponse(response);
+      }
 	}
 
 	protected async setBreakPointsRequest(response: DebugProtocol.SetBreakpointsResponse, args: DebugProtocol.SetBreakpointsArguments): Promise<void> {
-
-		const { user, options } = await this.getUserAndOptions();
 		const path = args.source.path as string;
-		const file = basename(path);
 		const clientLines = args.lines || [];
 		const bps = clientLines.map((l) => ({
 			tag: "UnconditionalBP",
 			contents: {
-				name: file,
+				name: path,
 				line: l,
 				column: 1
 			}
 		}))
 
-		// clear all breakpoints for this file
-		try {
-        const res = await rest.debugClearBreakpointsPath(user, file, options)
-		} catch(e) {
-			console.log(e);
-		}
-		try {
-		const res2 = await rest.debugPutBreakpoints(user, bps, options)
-		} catch(e) {
-			console.log(e);
-		}
-
-		// set and verify breakpoint locations
-		const actualBreakpoints = clientLines.map(l => {
-			const bp = new Breakpoint(true, this.convertDebuggerLineToClient(l)) as DebugProtocol.Breakpoint;
-			bp.id= l;
-			return bp;
-		});
-
-		// send back the actual breakpoint positions
-		response.body = {
-			breakpoints: actualBreakpoints
-		};
-		this.sendResponse(response);
+        try {
+          this.cli.notify('breakpoints', bps);
+        } catch {
+          await this.cli.dispose();
+	    } finally {
+          this.sendResponse(response);
+        }
 	}
 
 	protected breakpointLocationsRequest(response: DebugProtocol.BreakpointLocationsResponse, args: DebugProtocol.BreakpointLocationsArguments, request?: DebugProtocol.Request): void {
-
 		if (args.source.path) {
 			// const bps = this._runtime.getBreakpoints(args.source.path, this.convertClientLineToDebugger(args.line));
 			response.body = {
@@ -354,32 +348,35 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 	protected async stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): Promise<void> {
 
-	    // this._ws.send(JSON.stringify({tag: "WSIStackTrace"}))
 		const startFrame = typeof args.startFrame === 'number' ? args.startFrame : 0;
 		const maxLevels = typeof args.levels === 'number' ? args.levels : 1000;
 		const endFrame = startFrame + maxLevels;
-		const { user, options } = await this.getUserAndOptions();
-		// wait until configuration has finished (and configurationDoneRequest has been called)
-		// await this._configurationDone.wait(1000);
+        try {
+            this.cli.send('trace', {}).then(async (stk) => {
+		        const stackFrames: StackFrame[] = []
+		        for (let i = 0; i < stk.length; i++) {
+		        	const f = stk[i];
+					if (f.name && f.name !== '') {
+		   	     		const source = this.createSourceFromFilename(f.name)
+		   	     		const sf = new StackFrame(i, f.name, source, this.convertDebuggerLineToClient(f.line));
+		   	     		sf.column = this.convertDebuggerColumnToClient(f.column);
+		   	     		stackFrames.push(sf);
+					}
+		        }
+		        response.body = {
+		        	stackFrames,
+		        	//no totalFrames: 				// VS Code has to probe/guess. Should result in a max. of two requests
+		        	totalFrames: stackFrames.length	// stk.count is the correct size, should result in a max. of two requests
+		        	//totalFrames: 1000000 			// not the correct size, should result in a max. of two requests
+		        	//totalFrames: endFrame + 20 	// dynamically increases the size with every requested chunk, results in paging
+		        };
+		        this.sendResponse(response);
 
-        const stk = await rest.debugGetStackTrace(user, options)
-
-		const stackFrames: StackFrame[] = []
-		for (let i = 0; i < stk.length; i++) {
-			const f = stk[i];
-			const source = await this.createSourceFromFilename(f.name)
-			const sf = new StackFrame(i, f.name, source, this.convertDebuggerLineToClient(f.line));
-			sf.column = this.convertDebuggerColumnToClient(f.column);
-			stackFrames.push(sf);
-		}
-		response.body = {
-			stackFrames,
-			//no totalFrames: 				// VS Code has to probe/guess. Should result in a max. of two requests
-			totalFrames: stk.length			// stk.count is the correct size, should result in a max. of two requests
-			//totalFrames: 1000000 			// not the correct size, should result in a max. of two requests
-			//totalFrames: endFrame + 20 	// dynamically increases the size with every requested chunk, results in paging
-		};
-		this.sendResponse(response);
+		    })
+        } catch {
+          await this.cli.dispose();
+          this.sendResponse(response);
+        }
 	}
 
 	protected scopesRequest(response: DebugProtocol.ScopesResponse, args: DebugProtocol.ScopesArguments): void {
@@ -398,46 +395,42 @@ export class StratoDebugSession extends LoggingDebugSession {
 		const variables: DebugProtocol.Variable[] = [];
 		// wait until configuration has finished (and configurationDoneRequest has been called)
 		// await this._configurationDone.wait(1000);
-		const { user, options } = await this.getUserAndOptions();
-        const ress = await rest.debugGetVariables(user, options)
-		// TODO: Find out how to use the scopes to organize the variables
-		const id = this._variableHandles.get(args.variablesReference);
-		let res = {}
-		if (id === 'local') {
-		  res = {...ress['Local Variables']}
-		} else if (id === 'state') {
-		  res = {...ress['State Variables']}
-		}
-		Object.entries(res).forEach((entry:any) => {
-			const { Right: val } = entry[1] || {}
-			if (val) {
-			  variables.push({
-			  	name: entry[0],
-			  	type: "string",
-			  	value: `${val}`,
-			  	variablesReference: 0
-			  })
-		    }
-		})
+        this.cli.send('variables', {}).then(async (ress) => {
+	    	// TODO: Find out how to use the scopes to organize the variables
+	    	const id = this._variableHandles.get(args.variablesReference);
+	    	let res = {}
+	    	if (id === 'local') {
+	    	  res = {...ress['Local Variables']}
+	    	} else if (id === 'state') {
+	    	  res = {...ress['State Variables']}
+	    	}
+	    	Object.entries(res).forEach((entry:any) => {
+	    		const { Right: val } = entry[1] || {}
+	    		if (val) {
+	    		  variables.push({
+	    		  	name: entry[0],
+	    		  	type: "string",
+	    		  	value: `${val}`,
+	    		  	variablesReference: 0
+	    		  })
+	    	    }
+	    	})
 
-		response.body = {
-			variables
-		};
-		this.sendResponse(response);
-	}
-
-	protected async continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): Promise<void> {
-		const { user, options } = await this.getUserAndOptions();
-
-        await rest.debugResume(user, options)
-		this.sendResponse(response);
+	    	response.body = {
+	    		variables
+	    	};
+	    	this.sendResponse(response);
+	    });
 	}
 
 	protected async nextRequest(response: DebugProtocol.NextResponse, args: DebugProtocol.NextArguments): Promise<void> {
-		const { user, options } = await this.getUserAndOptions();
-
-        await rest.debugStepOver(user, options)
-		this.sendResponse(response);
+        try {
+        	this.cli.notify('stepOver', {});
+        } catch {
+        	await this.cli.dispose();
+        } finally {
+        	this.sendResponse(response);
+        }
 	}
 
 	protected stepInTargetsRequest(response: DebugProtocol.StepInTargetsResponse, args: DebugProtocol.StepInTargetsArguments) {
@@ -450,41 +443,47 @@ export class StratoDebugSession extends LoggingDebugSession {
 	}
 
 	protected async stepInRequest(response: DebugProtocol.StepInResponse, args: DebugProtocol.StepInArguments): Promise<void> {
-		const { user, options } = await this.getUserAndOptions();
-
-        await rest.debugStepIn(user, options)
-		this.sendResponse(response);
+        try {
+        	this.cli.notify('stepIn', {});
+        } catch {
+        	await this.cli.dispose();
+        } finally {
+        	this.sendResponse(response);
+        }
 	}
 
 	protected async stepOutRequest(response: DebugProtocol.StepOutResponse, args: DebugProtocol.StepOutArguments): Promise<void> {
-		const { user, options } = await this.getUserAndOptions();
-
-        await rest.debugStepOut(user, options)
-		this.sendResponse(response);
+        try {
+        	this.cli.notify('stepOut', {});
+        } catch {
+        	await this.cli.dispose();
+        } finally {
+        	this.sendResponse(response);
+        }
 	}
 
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
       const { context, expression } = args
-      const { user, options } = await this.getUserAndOptions();
       try {
-        const ress = await rest.debugPostEval(user, [expression], options)
-		const res = (ress || [])[0] || {Left: ''}
-		if (res.Right) {
-          response.body = {
-            result: res.Right,
-            variablesReference: 0
-          };
-          this.sendResponse(response);
-		} else {
-          const msg = res.Left || '';
-		  if (context === 'watch') {
-            response.body = {
-              result: msg,
-              variablesReference: 0
-            };
-            this.sendResponse(response);
-		  }
-		}
+        this.cli.send('eval', [expression]).then((ress) => {
+		    const res = (ress || [])[0] || {Left: ''}
+		    if (res.Right) {
+              response.body = {
+                result: res.Right,
+                variablesReference: 0
+              };
+              this.sendResponse(response);
+		    } else {
+              const msg = res.Left || '';
+		      if (context === 'watch') {
+                response.body = {
+                  result: msg,
+                  variablesReference: 0
+                };
+                this.sendResponse(response);
+		      }
+		    }
+		});
       } catch (e) {
         console.log(e);
       }
@@ -570,9 +569,14 @@ export class StratoDebugSession extends LoggingDebugSession {
 		}
 	}
 
-	protected terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments) {
-		this._ws.close();
-		this.sendResponse(response);
+	protected async terminateRequest(response: DebugProtocol.TerminateResponse, args: DebugProtocol.TerminateArguments) {
+    	try {
+    	  this.cli.notify('disconnect', {});
+    	} catch {
+    	  await this.cli.dispose();
+		} finally {
+    	  this.sendResponse(response);
+    	}
 	}
 
 	protected customRequest(command: string, response: DebugProtocol.Response, args: any) {
@@ -589,22 +593,16 @@ export class StratoDebugSession extends LoggingDebugSession {
 
 	//---- helpers
 
-	private async createSourceFromFilename(fileName: string): Promise<Source> {
+	private createSourceFromFilename(fileName: string): Source {
 		let file = this._sourceMap[fileName];
 		if (!file) {
-		  let workspaceFolderPath = (vscode.workspace.workspaceFolders || [])[0].uri.path;
-          let relativePattern: vscode.RelativePattern = new vscode.RelativePattern(
-              workspaceFolderPath,
-              '**/'+fileName);
-
-          const files = await vscode.workspace.findFiles(relativePattern, null, 50)
-		  file = files[0].path;
+		  file = this.createSource(fileName);
 		  this._sourceMap[fileName] = file;
 		}
-	    return this.createSource(file);
+		return file;
 	}
 
 	private createSource(filePath: string): Source {
-		return new Source(basename(filePath), this.convertDebuggerPathToClient(filePath), undefined, undefined, 'strato-adapter-data');
+		return new Source(filePath, this.convertDebuggerPathToClient(filePath), undefined, undefined, 'strato-adapter-data');
 	}
 }

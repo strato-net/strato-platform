@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -16,32 +17,30 @@ import Bloc.Server.TransactionResult
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.CirrusDefs
+import Blockchain.Model.SyncState (BestBlock, WorldBestBlock)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Keccak256
+import Blockchain.SyncDB
 import Control.Lens (makeLenses, over, (&), (.~), (?~))
 import Control.Monad.Change.Alter
-import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
-import Control.Monad.Logger
+import qualified Control.Monad.Change.Modify as Mod
+import Core.API
 import Data.HashMap.Strict.InsOrd
-import Data.Source.Map
 import Data.Swagger
 import Servant
 import Servant.Swagger
-import SolidVM.Model.CodeCollection.Contract
 
-bloc ::
-  ( MonadLogger m,
+type MonadBlocAPI m = 
+  ( MonadCoreAPI m,
     HasBlocEnv m,
-    HasVault m,
-    HasSQL m,
-    Selectable Address Contract m,
+    Mod.Accessible (Maybe SyncStatus) m,
+    Mod.Accessible (Maybe BestBlock) m,
+    Mod.Accessible (Maybe WorldBestBlock) m,
     Selectable Address AddressState m,
     Selectable Address Certificate m,
-    HasCodeDB m,
-    (Keccak256 `Selectable` SourceMap) m
-  ) =>
-  ServerT BlocAPI m
+    HasCodeDB m
+  )
+
+bloc :: MonadBlocAPI m => ServerT BlocAPI m
 bloc =
   return gitInfo
     :<|> getContracts
@@ -63,7 +62,6 @@ bloc =
     :<|> postBlocTransactionBody
     :<|> postBlocTransactionUnsigned
     :<|> postBlocTransaction
-    :<|> postBlocTransactionParallelExternal
 
 blocSwagger :: Swagger
 blocSwagger =

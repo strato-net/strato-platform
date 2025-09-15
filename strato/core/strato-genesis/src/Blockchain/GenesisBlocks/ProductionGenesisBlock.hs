@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.GenesisBlocks.ProductionGenesisBlock (
-  productionGenesisBlock
+module Blockchain.GenesisBlocks.ProductionGenesisBlock
+  ( productionGenesisBlock
+  , extraCerts
+  , validators
+  , admins
   ) where
 
 import BlockApps.X509
@@ -20,7 +23,7 @@ productionGenesisBlock  =
         genesisInfoDifficulty=8192,
         genesisInfoLogBloom=B.replicate 256 0,
         genesisInfoGasLimit=22517998136852480000000000000000,
-        genesisInfoCoinbase=Org "00000000000000000000" True,
+        genesisInfoCoinbase= Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624
             ]

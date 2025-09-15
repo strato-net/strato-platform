@@ -21,15 +21,16 @@ import Control.Monad.Composable.SQL
 import Database.Persist.Postgresql
 import Servant
 import Settings
+import UnliftIO
 
 type API = "transaction" :> "last" :> "queued" :> Get '[JSON] [RawTransaction']
 
-server :: HasSQL m => ServerT API m
+server :: (Functor m, Accessible [RawTransaction] m) => ServerT API m
 server = getQueuedTransactions
 
 ---------------------
 
-instance HasSQL m => Accessible [RawTransaction] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible [RawTransaction] (SQLM m) where
   access _ =
     fmap (map entityVal) . sqlQuery $
       selectList

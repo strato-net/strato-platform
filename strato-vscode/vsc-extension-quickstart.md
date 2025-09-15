@@ -11,8 +11,6 @@
 
 ## Preliminary Steps (for BlockApps devs)
 
-* Go to `strato-platform/blockapps-rest` and `yarn install && yarn build`
-  * The extension depends on a local build of `blockapps-rest`
 * Go to `strato-platform/strato-vscode` and `yarn install && yarn watch`
   * This will leave the compiler on so any changes can instantly be reflected
 

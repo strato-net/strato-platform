@@ -47,7 +47,7 @@ instance Monad m => (Address `A.Alters` AddressState) (MemAddressStateDB m) wher
   insert _ k = MemAddressStateDB . modify' . M.insert k
   delete _ = MemAddressStateDB . modify' . M.delete
 
-instance Monad m => A.Selectable Address AddressState (MemAddressStateDB m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address AddressState (MemAddressStateDB m) where
   select = A.lookup
 
 runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Address AddressState -> m a

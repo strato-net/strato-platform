@@ -20,6 +20,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Hashable
 import qualified Data.IntMap as I
+import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -116,7 +117,9 @@ bytesToSimpleValue bs = \case
         then 0
         else
           let bs' = ByteString.unpack bs
-              h = head bs'
+              h = case bs' of
+                    [] -> error "bytesToNum: Empty bytestring"
+                    h':_ -> h'
               neg =
                 if signed'
                   then h >= 0x80
@@ -171,8 +174,7 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
     toBytesTypePair _ [] = Just []
     toBytesTypePair b (_ : _) | ByteString.null b = Nothing
     toBytesTypePair b types =
-      let headType = head types
-          tailTypes = tail types
+      let (headType, tailTypes) = fromMaybe (error "toBytesTypePair: Empty list") $ uncons types
        in case headType of
             TypeMapping {} -> Nothing
             TypeFunction {} -> Nothing

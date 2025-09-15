@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Handlers.Transaction
   ( TxsFilterParams (..),
@@ -43,8 +44,10 @@ import Control.DeepSeq
 import qualified Control.Exception as E
 import Control.Monad (unless, when)
 import Control.Monad.Change.Alter
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
+import Control.Monad.Trans.Class
 import Data.Aeson
 import qualified Data.Binary as Bin
 import qualified Data.ByteString as B
@@ -146,12 +149,17 @@ txsFilterParams =
     Nothing
     Nothing
 
-server :: (MonadLogger m, HasSQL m) => Int -> ServerT API m
+server ::
+  ( MonadIO m
+  , MonadLogger m
+  , Selectable TxsFilterParams [RawTransaction] m
+  , m `Mod.Outputs` [IngestEvent]
+  ) => Int -> ServerT API m
 server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
 
 ---------------------------
 
-instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable TxsFilterParams [RawTransaction] (SQLM m) where
   select _ t@TxsFilterParams {..}
     | t == txsFilterParams = throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " transactionQueryParams
     | otherwise = do
@@ -198,6 +206,12 @@ instance HasSQL m => Selectable TxsFilterParams [RawTransaction] m where
 
       return . Just $ nub txs
 
+instance {-# OVERLAPPING #-} (LoggingT IO) `Mod.Outputs` [IngestEvent] where
+  output txs = do
+    $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
+    resps <- liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
+    $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+
 postTransactionC :: (MonadIO m, MonadLogger m) => Maybe Int -> RawTransaction' -> ConduitT a IngestEvent m Keccak256
 postTransactionC limit (RawTransaction' raw "") = do
   let tx' = rawTX2TX raw
@@ -214,11 +228,11 @@ postTransactionC _ _ =
   throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 postTransaction ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
   Maybe Int ->
   RawTransaction' ->
   m Keccak256
-postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitKafkaTransactions
+postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitTransactions
 
 postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
 postTransactionListC limit raws = do
@@ -268,11 +282,11 @@ makeEncodedTxs ts txs limit =
       txs
 
 postTransactionList ::
-  (MonadIO m, MonadLogger m) =>
+  (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
   Maybe Int ->
   [RawTransaction'] ->
   m [Keccak256]
-postTransactionList limit rts = runConduit $ postTransactionListC limit rts `fuseUpstream` emitKafkaTransactions
+postTransactionList limit rts = runConduit $ postTransactionListC limit rts `fuseUpstream` emitTransactions
 
 getTransaction ::
   Selectable TxsFilterParams [RawTransaction] m =>
@@ -335,13 +349,6 @@ transactionQueryParams =
     "search"
   ]
 
-emitKafkaTransactions :: (MonadIO m, MonadLogger m) => ConduitT IngestEvent Void m ()
-emitKafkaTransactions = loop id
-  where
-    -- this is essentially the same as sinkList,
-    -- except emitting to Kafka instead of returning the list
-    loop front = await >>= maybe (emit $ front []) (\x -> loop $ front . (x :))
-    emit txs = do
-      $logDebugS "writeUnseqEventsBegin" . T.pack $ "Writing " ++ show (length txs) ++ " faucet tx(s) to unseqevents"
-      resps <- liftIO $ runKafkaMConfigured "strato-api" $ writeUnseqEvents txs
-      $logDebug $ T.pack $ "writeUnseqEventsEnd Kafka commit: " ++ show resps
+emitTransactions :: (MonadIO m, m `Mod.Outputs` [IngestEvent]) => ConduitT IngestEvent Void m ()
+emitTransactions = loop id
+  where loop front = await >>= maybe (lift . Mod.output $ front []) (\x -> loop $ front . (x :))

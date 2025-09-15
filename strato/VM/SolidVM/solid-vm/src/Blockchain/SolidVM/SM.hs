@@ -102,12 +102,14 @@ import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.List (find)
+import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
+import qualified Data.Set as S
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -129,7 +131,7 @@ data CallInfo = CallInfo
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
-    localVariables :: Map SolidString (SVMType.Type, Variable),
+    localVariables :: NE.NonEmpty (Map SolidString (SVMType.Type, Variable)),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -173,7 +175,7 @@ type MonadSM m =
   ( (Address `A.Alters` AddressState) m,
     A.Selectable Address AddressState m,
     HasStateDB m,
-    (Keccak256 `A.Alters` DBCode) m,
+    HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
     HasSelectX509FieldDB m,
@@ -182,6 +184,8 @@ type MonadSM m =
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
     Mod.Accessible Env.Environment m,
+    Mod.Accessible [SourcePosition] m,
+    Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
     Mod.Modifiable Env.Sender m,
@@ -344,6 +348,28 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
+variableSet :: VMBase m => SM m VariableSet
+variableSet = do
+  cis <- Mod.get (Mod.Proxy @[CallInfo])
+  let textSet = S.fromList . M.keys
+      varNames = case cis of
+        [] -> S.empty
+        (ci : _) -> textSet . NE.head $ localVariables ci
+      locals = M.singleton "Local Variables" varNames
+  acct <- getCurrentAddress
+  ~(contract, _, _) <- getCodeAndCollection acct
+  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
+      globals = M.singleton "State Variables" stateVars
+  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
+
+instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible VariableSet (SM m) where
+  access _ = variableSet
+
+instance {-# OVERLAPPING #-} VMBase m => Mod.Accessible [SourcePosition] (SM m) where
+  access _ = do
+    cis <- Mod.get (Mod.Proxy @[CallInfo])
+    pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
+
 runSM ::
   ( MonadUnliftIO m,
     MonadLogger m,
@@ -459,7 +485,7 @@ getVariableOfName name = do
                         }
                   }
               else x
-      vars = localVariables currentCallInfo
+      vars = NE.head $ localVariables currentCallInfo
       t s v = ('x' : s, v) `seq` v
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
@@ -485,6 +511,7 @@ getVariableOfName name = do
                        "byte",
                        "bytes",
                        "string",
+                       "log",
                        "keccak256",
                        "ripemd160",
                        "modExp",
@@ -649,7 +676,7 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
-            localVariables = initialLocalVariables,
+            localVariables = NE.singleton initialLocalVariables,
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -679,13 +706,18 @@ withLocalVars = bracket_ pushLocalVars popLocalVars
 pushLocalVars :: MonadSM m => m ()
 pushLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "pushLocalVars was called with an empty stack" ()
-  (curFrame : rest) -> pure $ curFrame : curFrame : rest
+  (curFrame : rest) -> do
+    let lvs = case localVariables curFrame of
+                v NE.:| vs -> v NE.:| v:vs
+    pure $ curFrame{localVariables = lvs} : rest
 
 -- The inverse operation as above, called when exiting a statement block and those declared variables need to be destroyed
 popLocalVars :: MonadSM m => m ()
 popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "popLocalVars was called with an empty stack" ()
-  (_ : rest) -> pure rest
+  (curFrame : rest) -> case localVariables curFrame of
+    _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
+    _ -> internalError "popLocalVars was called with an empty stack" ()
 
 withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
@@ -753,7 +785,7 @@ getCurrentFunctionName = do
 getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
 getLocal name = do
   currentCallInfo <- getCurrentCallInfo
-  return . M.lookup name $ localVariables currentCallInfo
+  return . M.lookup name . NE.head $ localVariables currentCallInfo
 
 setLocal :: MonadSM m => SolidString -> Variable -> m ()
 setLocal name val = do
@@ -761,11 +793,11 @@ setLocal name val = do
   let (info, rest) = case stack of
         (ci : r) -> (ci, r)
         [] -> internalError "setLocal stack underflow" ()
-      locals = localVariables info
+      locals NE.:| locals' = localVariables info
       (theType, _) =
         fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name) $
           M.lookup name locals
-      newVariables = M.insert name (theType, val) locals
+      newVariables = M.insert name (theType, val) locals NE.:| locals'
   Mod.put (Mod.Proxy @[CallInfo]) $ info {localVariables = newVariables} : rest
 
 addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
@@ -846,7 +878,9 @@ getXabiValueType (AccountPath loc path) = do
     Left e -> typeError "getXabiValueType/invalid storage path" e
     Right field -> getXabiType loc field >>= \case
       Nothing -> todo "getXabiValueType/unknown storage reference" field
-      Just v -> return $!! loop ccs' (tail $ MS.toList path) v
+      Just v -> return $!!  case MS.toList path of
+                  [] -> v
+                  (_:xs) -> loop ccs' xs v
   where
     loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
     loop _ [] = id

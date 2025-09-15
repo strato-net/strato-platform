@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,7 +16,6 @@ module Main where
 
 import Bloc.API
 -- hiding (handleRuntimeError)
-import Bloc.Database.Queries
 import Bloc.Monad
 import Bloc.Server
 import BlockApps.Init
@@ -27,13 +27,18 @@ import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import Blockchain.Model.JsonBlock
+import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
+import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.RedisBlockDB
+import Blockchain.SyncDB
 import Control.Lens.Operators
 import Control.Monad.Change.Alter
-import Control.Monad.Change.Modify (Accessible)
+import Control.Monad.Change.Modify
 import Control.Monad.Composable.Identity
 import Control.Monad.Composable.SQL
 import Control.Monad.Composable.Vault hiding (httpManager)
@@ -41,6 +46,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Monad.Trans.Reader
+import Core.API
 import Data.Aeson
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
@@ -49,23 +55,12 @@ import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
-import Data.Swagger hiding (Http, delete)
+import Data.Swagger hiding (Header, Http, delete)
+import Data.Text (Text)
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
-import qualified Handlers.BatchTransactionResult as BatchTransactionResult
-import qualified Handlers.BlkLast as BlkLast
-import qualified Handlers.Block as Block
-import qualified Handlers.IdentityServerCallback as Identity
-import qualified Handlers.Metadata as Metadata
 import Handlers.Options
-import qualified Handlers.Peers as Peers
-import qualified Handlers.QueuedTransactions as QueuedTransactions
-import qualified Handlers.Stats as Stats
-import qualified Handlers.Storage as Storage
-import qualified Handlers.Transaction as Transaction
-import qualified Handlers.TransactionResult as TransactionResult
-import qualified Handlers.TxLast as TxLast
 import Instrumentation
 import Network.HTTP.Types.Status
 import Network.Wai
@@ -81,31 +76,18 @@ import Servant.Client.Core hiding (requestMethod)
 import Servant.Multipart
 import Servant.Swagger
 import Servant.Swagger.UI
-import SolidVM.Model.CodeCollection.Contract
+import qualified Strato.Strato23.API.Types as V
+import Strato.Strato23.Client
 import System.Clock
 import Text.Regex
 import Text.Tools
 import UnliftIO hiding (Handler)
 import Prelude hiding (lookup)
 
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Contract (SQLM m) where
-  select _ a = runMaybeT $ do
-    (AddressStateRef' r _) <-
-      MaybeT
-        . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ a
-    codePtr <- MaybeT . pure $ addressStateRefCodePtr r
-    MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
-
-instance Selectable Address Contract m => Selectable Address Contract (ReaderT a m) where
-  select p = lift . select p
-
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Selectable` SourceMap) (SQLM m) where
-  select _ = Account.getCodeFromPostgres
+  select _ = getCodeFromPostgres
 
-instance (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
+instance {-# OVERLAPPING #-} (Keccak256 `Selectable` SourceMap) m => (Keccak256 `Selectable` SourceMap) (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => (Keccak256 `Alters` DBCode) (SQLM m) where
@@ -123,10 +105,10 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
     (AddressStateRef' r _) <-
       MaybeT
         . fmap listToMaybe
-        . Account.getAccount'
-        $ Account.accountsFilterParams
-          & Account.qaAddress ?~ a
-          & Account.qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
+        . getAccount'
+        $ accountsFilterParams
+          & qaAddress ?~ a
+          & qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     pure $
       AddressState
@@ -136,95 +118,65 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         codePtr
         (Just 0)
 
-instance Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
+instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = Account.getX509CertForAccount
+  select _ = getX509CertForAccount
 
-instance Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
+instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
-type CoreAPI =
-  "eth" :> "v1.2"
-    :> ( Account.API
-           :<|> Account.CodeAPI
-           :<|> BatchTransactionResult.API
-           :<|> BlkLast.API
-           :<|> Block.API
-           :<|> Identity.API
-           :<|> Metadata.API
-           :<|> Peers.API
-           :<|> QueuedTransactions.API
-           :<|> Stats.API
-           :<|> Storage.API
-           :<|> Transaction.API
-           :<|> TransactionResult.API
-           :<|> TxLast.API
-       )
+instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
+  access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
 
-type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
+instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
+  access _ = runStratoRedisIO getBestBlockInfo
 
-coreServer ::
-  ( MonadLogger m,
-    HasSQL m,
-    Accessible Metadata.UrlMap m,
-    Accessible IdentityData m,
-    Accessible VaultData m,
-    Selectable Keccak256 SourceMap m
-  ) =>
-  ServerT CoreAPI m
-coreServer =
-  Account.server
-    :<|> Account.codeServer
-    :<|> BatchTransactionResult.server
-    :<|> BlkLast.server
-    :<|> Block.server
-    :<|> Identity.server
-    :<|> Metadata.server
-    :<|> Peers.server
-    :<|> QueuedTransactions.server
-    :<|> Stats.server
-    :<|> Storage.server
-    :<|> Transaction.server flags_txSizeLimit
-    :<|> TransactionResult.server
-    :<|> TxLast.server
+instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
+  access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
+
+type FullAPI = Header "X-USER-ACCESS-TOKEN" Text :> (CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI)
+
+newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
+
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m, Accessible VaultData m) => HasVault (ReaderT AccessToken m) where
+  sign msgHash = do
+    AccessToken jwtToken <- ask
+    blocVaultWrapper $ postSignature jwtToken (V.MsgHash msgHash)
+  getPub = do
+    AccessToken jwtToken <- ask
+    fmap V.unPubKey . blocVaultWrapper $ getKey jwtToken Nothing
+  getShared _ = error "getShared ReaderT VaultData: unimplemented"
 
 fullServer ::
-  ( MonadLogger m,
-    HasSQL m,
-    HasBlocEnv m,
-    HasIdentity m,
-    HasVault m,
-    Accessible Metadata.UrlMap m,
-    Selectable Address Contract m,
-    Selectable Address AddressState m,
-    Selectable Address Certificate m,
-    HasCodeDB m,
-    Selectable Keccak256 SourceMap m
+  ( MonadBlocAPI n,
+    n ~ ReaderT AccessToken m
   ) =>
   ServerT FullAPI m
-fullServer = coreServer :<|> bloc
+fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken jwtToken)) coreApiServer
+                 :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken jwtToken)) bloc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> Metadata.UrlMap -> Server FullAPI
-hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) (convertErrors runM) fullServer
+hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
+hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors r x = Handler $ do
-      y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
-      case y of
-        Right a -> pure a
-        Left e -> throwE $ apiErrorToServantErr e
-    runM f =
-      runLoggingT
+    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))))) a -> Handler a
+    convertErrors x = Handler $ do
+      y <- liftIO 
+        . try
+        . runLoggingT
         . runSQLM
         . runCirrusM
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runVaultM ("http://localhost:8013/strato/v2.3")
         . runIdentitytM getIdentityServerUrl
-        $ f
+        $ x `catch` handleRuntimeError `catch` handleApiError
+      case y of
+        Right a -> pure a
+        Left e -> throwE $ apiErrorToServantErr e
 
 fullAPI :: Proxy FullAPI
 fullAPI = Proxy
@@ -278,10 +230,8 @@ main = do
 
   let stateFetchLimit' = 100
       nonceCounterTimeout = 10
-      txQueueSize = 4096
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
-  tbqueue <- newTBQueueIO txQueueSize
 
   let env =
         BlocEnv
@@ -289,14 +239,13 @@ main = do
             gasLimit = flags_gasLimit,
             stateFetchLimit = stateFetchLimit',
             globalNonceCounter = nonceCache,
-            txTBQueue = tbqueue,
             userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault
           }
   runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> Metadata.UrlMap -> Application
+app :: BlocEnv -> Swagger -> UrlMap -> Application
 app blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $

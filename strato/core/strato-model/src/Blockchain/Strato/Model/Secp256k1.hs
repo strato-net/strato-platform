@@ -29,15 +29,19 @@ where
 
 
 import Blockchain.Data.RLP
+import Blockchain.Strato.Model.Util (bytes2Integer)
 import Control.DeepSeq
 import Control.Monad
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.State.Strict (StateT)
+import qualified Crypto.PubKey.ECC.DH as ECDH
+import qualified Crypto.PubKey.ECC.Types as ECDH
 import Crypto.Random.Entropy
 import qualified Crypto.Secp256k1 as S
 import Data.ASN1.Types
 import Data.Aeson
 import Data.Binary
+import Data.ByteArray (unpack)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as C8
@@ -135,7 +139,6 @@ instance ASN1Object PrivateKey where
         : Start (Container Context 0)
         : OID [1, 3, 132, 0, 10]
         : End (Container Context 0)
-        : End Sequence
         : xs
       ) = case (importPrivateKey str) of
       Nothing -> Left "could not asn1decode privkey"
@@ -192,7 +195,30 @@ importPublicKey bs = PublicKey <$> S.importPubKey bs
 -- We're making hashed be the default, but allow Vault to still call unhashed for backwards compatibility
 -- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
 deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
-deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv
+-- deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv
+deriveSharedKey = ecdhSharedSecret
+
+ecdhBytesToPoint :: B.ByteString -> ECDH.Point
+ecdhBytesToPoint bs
+  | B.length bs == 64 =
+    let (xs, ys) = B.splitAt 32 bs
+     in ECDH.Point (bytes2Integer $ B.unpack xs) (bytes2Integer $ B.unpack ys)
+ecdhBytesToPoint _ = error "bytesToPoint called with the wrong number of bytes"
+
+-- TODO: eventually, secp256k1 is the ONLY library we should use (no Point conversions)
+ecdhSecPubKeyToPoint :: PublicKey -> ECDH.Point
+ecdhSecPubKeyToPoint pub =
+  let pkbs = B.drop 1 $ exportPublicKey False pub
+   in ecdhBytesToPoint pkbs
+
+-- | Derive shared secret from a private key and a public point using SHA256
+ecdhSharedSecret :: PrivateKey -> PublicKey -> SharedKey
+ecdhSharedSecret privKey pubKey =
+  let -- scalar multiplication: Q = k * P
+      privNum = bytes2Integer . B.unpack $ exportPrivateKey privKey
+      pubPoint = ecdhSecPubKeyToPoint pubKey
+      ECDH.SharedKey sharedPoint = ECDH.getShared (ECDH.getCurveByName ECDH.SEC_p256k1) privNum pubPoint
+   in SharedKey . B.pack $ unpack sharedPoint
 
 ------------------------------------------------------------------
 ------------------------- SIGNATURES -----------------------------

@@ -21,9 +21,12 @@ import Test.HUnit
 import Test.Hspec
 import Test.Hspec.Contrib.HUnit (fromHUnitTest)
 
+bigTestHead :: (B.ByteString, String)
+bigTestHead = ("00000000000000000000000000000000ffffffffffffffff0000000000000000", "90467269656e647320262046616d696c79")
+
 bigTest :: [(B.ByteString, String)]
 bigTest =
-  [ ("00000000000000000000000000000000ffffffffffffffff0000000000000000", "90467269656e647320262046616d696c79"),
+  [ bigTestHead,
     ("00000000000000000000000000000000ffffffffffffffff0000000000000001", "8772656631323334"),
     ("00000000000000000000000000000000ffffffffffffffff0000000000000002", "04"),
     ("00000000000000000000000000000000ffffffffffffffff0000000000000003", "84548123a8"),
@@ -68,9 +71,9 @@ testSingleInsert = TestCase $ do
     db <- LD.open "/tmp/testDB" LD.defaultOptions {LD.createIfMissing = True}
     flip runReaderT db $ do
       initializeBlank
-      addAllKVs emptyTriePtr [head bigTest]
+      addAllKVs emptyTriePtr [bigTestHead]
 
-  sr2 <- runMP $ addAllKVs emptyTriePtr [head bigTest]
+  sr2 <- runMP $ addAllKVs emptyTriePtr [bigTestHead]
 
   assertEqual "disk - mem single insert" sr sr2
 

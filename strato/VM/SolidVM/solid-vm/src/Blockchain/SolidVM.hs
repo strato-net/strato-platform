@@ -59,14 +59,13 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
-import qualified Blockchain.Stream.VMEvent as VME
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
 import Control.Arrow ((***))
 import Control.DeepSeq (force)
 import Control.Exception (throw)
-import Control.Lens hiding (Context, assign, from, to, uncons)
+import Control.Lens hiding (Context, assign, from, to, uncons, unsnoc)
 import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
@@ -87,7 +86,7 @@ import Data.Decimal
 import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
-import Data.List.Extra ((!?))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
 import qualified Data.Map.Merge.Lazy as M
 import Data.Maybe
@@ -151,37 +150,6 @@ withSrcPos pos str =
         ": ",
         str
       ]
-
--- TODO: I'm putting all of these instances related to debugging here,
---       but they should really go in SM.hs
---       However, the functions needed to run `variableSet` and `runExpr`,
---       which are critical for debugging, are defined in SetGet.hs and
---       SolidVM.hs. I think this suggests a reorganization of the
---       solid-vm package should be done, but I don't want to interfere
---       with it too much just to get the debugger working.
-
-variableSet :: MonadSM m => m VariableSet
-variableSet = do
-  cis <- Mod.get (Mod.Proxy @[CallInfo])
-  let textSet = S.fromList . M.keys
-      varNames = case cis of
-        [] -> S.empty
-        (ci : _) -> textSet $ localVariables ci
-      locals = M.singleton "Local Variables" varNames
-  acct <- getCurrentAddress
-  ~(contract, _, _) <- getCodeAndCollection acct
-  let stateVars = S.fromList $ M.keys $ contract ^. CC.storageDefs
-      globals = M.singleton "State Variables" stateVars
-  pure . VariableSet $ fmap (S.map labelToText) $ locals <> globals
-
-instance MonadSM m => Mod.Accessible VariableSet m where
-  access _ = variableSet
-
-instance MonadSM m => Mod.Accessible [SourcePosition] m where
-  access _ = do
-    cis <- Mod.get (Mod.Proxy @[CallInfo])
-    pure $ fromMaybe (initialPosition "") . currentSourcePos <$> cis
-
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
 runExpr exprText = withoutDebugging . withTempCallInfo True $ do
@@ -354,7 +322,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
 
-  solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
   let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
@@ -431,7 +398,6 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
       traverse (fmap Just . maybe (return "()") encodeForReturn)
         =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) Nothing (textToLabel funcName) isRCC argVals
 
-    solidVMBreakpoint emptySourceAnnotation -- just to force a resume at the end of the transaction
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
     let ((newV, remV), (newC, revC)) = (fromDelta *** fromDelta) . getDeltasFromEvents $ toList finalEvs
@@ -1186,7 +1152,7 @@ expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack $ labelToString x
-  case x `M.lookup` localVariables callInfo of
+  case x `M.lookup` NE.head (localVariables callInfo) of
     Just (_, var) -> do
       val <- weakGetVar var
       case val of
@@ -1359,7 +1325,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       functionName <- getCurrentFunctionName
       callInfo <- getCurrentCallInfo
       let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
-          localVars = localVariables callInfo
+          localVars = NE.head $ localVariables callInfo
       argVals <- forM argList (\(n, _) -> getVar . snd $ localVars M.! (fromMaybe "" n))
       return . Constant $ SVariadic argVals
     (SBuiltinVariable "msg", "sig") -> do
@@ -2354,6 +2320,7 @@ callBuiltin "uint" args = return $ intBuiltin args
 callBuiltin "int" args = return $ intBuiltin args
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
+callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
 callBuiltin "keccak256" args = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
@@ -2510,23 +2477,10 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
-      -- metadata = Env.metadata theEnv
-      isRunningTests = Env.runningTests theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals) True
   case erNewContractAddress execResults of
-    Just nca -> do
-      when (not isRunningTests) $ 
-      
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                     (const () <$> cc)
-                                     (SolidVMCode contractName' hsh) 
-                                     (T.pack ctrName)
-                                     (T.pack contractName')
-                                     M.empty
-                                     []
-                                   ]
-      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
@@ -2543,23 +2497,10 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
-  theEnv <- getEnv
-  let -- metadata = Env.metadata theEnv
-      isRunningTests = Env.runningTests theEnv
   (ctr, originAddress, ctrName) <- getCreator creator
   execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals True
   case erNewContractAddress execResults of
-    Just nca -> do
-      when (not isRunningTests) $ 
-        void $ VME.produceVMEvents [ VME.CodeCollectionAdded 
-                                      (const () <$> cc)
-                                      (SolidVMCode contractName' hsh) 
-                                      (T.pack ctrName) 
-                                      (T.pack contractName')
-                                      M.empty
-                                      []
-                                   ]
-      pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
@@ -2717,12 +2658,13 @@ addLocalVariable theType name value = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
-    (currentSlice : rest) ->
+    (currentSlice : rest) -> do
+      let lvs NE.:| lvs' = localVariables currentSlice
       Mod.put (Mod.Proxy @[CallInfo]) $
         currentSlice
           { localVariables =
-              M.insert name (theType, newVariable) $
-                localVariables currentSlice
+              M.insert name (theType, newVariable) lvs
+                NE.:| lvs'
           } :
         rest
 
@@ -2847,7 +2789,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               -- SolidVM cannot distinguish between
               -- a value and single-tupled value
               currentCallInfo <- getCurrentCallInfo
-              let mReturnVar = M.lookup name $ localVariables currentCallInfo
+              let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
                 Just returnVar -> fmap Just . forceLoadVar =<< getVar (snd returnVar)
@@ -2855,7 +2797,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               Just . STuple . V.fromList <$> do
                 currentCallInfo <- getCurrentCallInfo
                 for (fst <$> xs) $ \name -> do
-                  let mReturnVar = M.lookup name $ localVariables currentCallInfo
+                  let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
                     Just returnVar -> fmap Constant . forceLoadVar =<< getVar (snd returnVar)

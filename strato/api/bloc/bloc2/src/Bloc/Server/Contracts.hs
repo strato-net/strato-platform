@@ -14,7 +14,6 @@ module Bloc.Server.Contracts where
 import Bloc.API.Contracts
 import Bloc.API.Utils
 import Bloc.Database.Queries
-import Bloc.Server.Utils (getBlockTimestamp)
 import Bloc.XabiHelper
 import BlockApps.Logging
 import BlockApps.SolidVMStorageDecoder
@@ -36,7 +35,6 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
 import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -44,6 +42,7 @@ import Data.Maybe
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Handlers.AccountInfo
 import Handlers.Storage
@@ -53,8 +52,8 @@ import SolidVM.Model.CodeCollection.Function
 import UnliftIO
 
 getContracts ::
-  ( MonadLogger m,
-    HasSQL m
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m -- ,
   ) =>
   Maybe Text ->
   Maybe Integer ->
@@ -65,11 +64,11 @@ getContracts mName mOffset mLimit chainId = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM
-          ( \(AddressStateRef' AddressStateRef {..} _) m -> do
-              ts <- getBlockTimestamp addressStateRefLatestBlockDataRefNumber
-              case addressStateRefContractName of
-                Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
-                Nothing -> pure m
+          ( \(AddressStateRef' AddressStateRef {..} _) m -> case addressStateRefContractName of
+              Nothing -> pure m
+              Just n -> do
+                ts <- liftIO getCurrentTime
+                pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
           )
           Map.empty
   addrStateRefs <-
@@ -86,7 +85,7 @@ getContracts mName mOffset mLimit chainId = do
 
 getContractsData ::
   ( MonadLogger m,
-    HasSQL m
+    A.Selectable AccountsFilterParams [AddressStateRef] m
   ) =>
   ContractName ->
   m [Address]
@@ -100,10 +99,11 @@ getContractsData (ContractName cName) = do
   return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
 
 getContractsContract ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -139,11 +139,13 @@ getContractsContract name addr chainId = do
           Right contract -> pure $ snd contract
 
 getContractsState ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -154,6 +156,7 @@ getContractsState ::
   Bool ->
   m GetContractsStateResponses -- state-translation
 getContractsState _ address chainId mName mCount mOffset _ = do
+  $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
   contract' <- getContractsDetails' address chainId
 
   storage' <- case mName of
@@ -201,11 +204,13 @@ getContractsState _ address chainId mName mCount mOffset _ = do
   return $ Map.fromList ret
 
 postContractsBatchStates ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   [PostContractsBatchStatesRequest] ->
   m [GetContractsStateResponses]
@@ -222,10 +227,11 @@ postContractsBatchStates = traverse flattenRequest
         (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails' ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
   Maybe ChainId ->
@@ -258,10 +264,11 @@ getContractsDetails' contractAddress chainId = do
           Right contract -> pure $ snd contract
 
 getContractsDetails ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
   Maybe ChainId ->
@@ -269,10 +276,11 @@ getContractsDetails ::
 getContractsDetails = getContractsDetails'
 
 getContractsFunctions ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -283,10 +291,11 @@ getContractsFunctions _ contractId chainId = do
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
 getContractsSymbols ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -297,10 +306,11 @@ getContractsSymbols _ contractId chainId = do
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
 getContractsEnum ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -314,7 +324,6 @@ getContractsEnum _ contractId (EnumName enumName) chainId = do
 getContractsStateMapping :: -- ( A.Selectable Account AddressState m
 -- , (Keccak256 `A.Selectable` SourceMap) m
 -- , MonadLogger m
--- , HasSQL m
 -- , HasBlocEnv m
 -- )
   Monad m =>

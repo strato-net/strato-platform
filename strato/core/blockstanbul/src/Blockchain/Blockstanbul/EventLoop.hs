@@ -229,7 +229,7 @@ instance (Address `A.Alters` X509CertInfoState) m => (Address `A.Alters` X509Cer
   insert p k = lift . A.insert p k
   delete p   = lift . A.delete p
 
-instance (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
+instance {-# OVERLAPPING #-} (Address `A.Alters` X509CertInfoState) m => (A.Selectable Address X509CertInfoState) (ExceptT e m) where
   select p = lift . A.lookup p
 
 
@@ -289,18 +289,18 @@ eventLoop ctx = execStateC ctx $
            -- nodes here will be syncing and looking to verify each block in the chain
           realValidators <- use validators
           seqNo <- use $ view . sequence
+          network' <- use network
           eNextSeqNo <- lift $ lift $ runExceptT $ replayHistoricBlock realValidators seqNo blk
           let blockNo = number . blockBlockData $ blk
           recordMaxBlockNumber "pbft_previousblock" blockNo
           case eNextSeqNo of
             Left err -> do
               rejectHistoric
-              $logWarnS "blockstanbul" . T.pack
+              $logErrorS "blockstanbul" . T.pack
                 . printf "Rejecting historical block #%d: %s" blockNo
                 $ err
               yieldR $ FailedHistoric blk
             Right _ -> do
-              network' <- use network
               lift . validatorTimingHack network' $ number (blockBlockData blk)
               acceptHistoric
               $logInfoS "blockstanbul" . T.pack . printf "Accepting historical block #%d" $ blockNo

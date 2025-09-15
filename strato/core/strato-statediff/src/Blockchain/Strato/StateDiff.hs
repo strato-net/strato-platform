@@ -244,7 +244,7 @@ accountEnd ::
 accountEnd k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
-  $logDebugS "accountEnd" . T.pack $ "End account state: " ++ show addrState
+  $logDebugS "accountEnd" . T.pack $ "End account state for " ++ formatAddressWithoutColor address ++ ": " ++ show addrState
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
 
