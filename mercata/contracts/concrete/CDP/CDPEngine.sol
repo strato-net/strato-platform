@@ -522,22 +522,23 @@ contract record CDPEngine is Ownable {
         borrowerVault.collateral -= collateralToSeize;
         CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
-        // Events & dust cleanup
+        // Dust cleanup first, then emit events with final state
         uint remainingDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        emit LiquidationExecuted(
-            borrower,
-            collateralAsset,
-            owedForDelta,            // actual debt burned
-            penaltyUSD,
-            collateralToSeize,
-            msg.sender,
-            remainingDebtUSD,
-            assetState.rateAccumulator
-        );
 
-        // Realize bad debt if no collateral remains OR collateral is dust (< 1000 wei) but debt still > 1 wei
+        // Collateral dust cleanup and bad debt realization
         uint collateralDustThreshold = 1000; // 1000 wei threshold for dust cleanup
-        if (borrowerVault.collateral == 0 || borrowerVault.collateral < collateralDustThreshold) {
+        uint dustCollateralSeized = 0;
+        
+        // First handle dust collateral cleanup
+        if (borrowerVault.collateral > 0 && borrowerVault.collateral <= collateralDustThreshold) {
+            // Transfer dust collateral to liquidator and zero it out
+            dustCollateralSeized = borrowerVault.collateral;
+            CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
+            borrowerVault.collateral = 0;
+        }
+        
+        // Realize bad debt if no collateral remains and debt still > 1 wei
+        if (borrowerVault.collateral == 0) {
             uint rem = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
             if (rem > 1) {
                 // remove from books
@@ -546,16 +547,8 @@ contract record CDPEngine is Ownable {
                 // make explicit, non-accruing
                 badDebtUSDST[collateralAsset] += rem;
                 
-                // If there's dust collateral, seize it too (liquidator gets the dust)
-                if (borrowerVault.collateral > 0) {
-                    CDPVault(_cdpVault()).seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
-                    borrowerVault.collateral = 0;
-                }
-                
                 emit BadDebtRealized(collateralAsset, borrower, rem);
             }
-        } else {
-          emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
         }
         
         // If ≤ 1 wei debt remains, zero it out in normalized units
@@ -565,6 +558,23 @@ contract record CDPEngine is Ownable {
                 borrowerVault.scaledDebt = 0;
             }
         }
+
+        // Calculate final state after dust cleanup and emit events
+        uint finalDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint totalCollateralSeized = collateralToSeize + dustCollateralSeized;
+        
+        emit LiquidationExecuted(
+            borrower,
+            collateralAsset,
+            owedForDelta,            // actual debt burned
+            penaltyUSD,
+            totalCollateralSeized,   // includes dust cleanup
+            msg.sender,
+            finalDebtUSD,           // debt after dust cleanup
+            assetState.rateAccumulator
+        );
+
+        emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
     }
 
     /**
@@ -1017,4 +1027,5 @@ contract record CDPEngine is Ownable {
         CDPReserve(address(registry.cdpReserve())).transferTo(msg.sender, payAmount);
     }
 
+}
 }
