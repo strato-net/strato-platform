@@ -8,6 +8,7 @@ import { LiquidationEntry } from '@/context/LiquidationContext';
 import TokenIcon from '@/components/ui/TokenIcon';
 import PercentageButtons from '@/components/ui/PercentageButtons';
 import { useLiquidationContext } from '@/context/LiquidationContext';
+import { useUserTokens } from '@/context/UserTokensContext';
 import { parseUnits, formatUnits } from 'ethers';
 
 interface LiquidateModalProps {
@@ -79,6 +80,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const { toast } = useToast();
   const { executeLiquidation } = useLiquidationContext();
+  const { usdstBalance, voucherBalance } = useUserTokens();
 
   // Guard – nothing to render if data missing
   if (!loan || !collateral) return null;
@@ -147,6 +149,16 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
 
   const repayUsdCost = repayEth * loanPriceUsd;
 
+  // Check if user has enough balance for liquidation
+  const canLiquidate = () => {
+    const liquidationFee = 0.02; // USDST fee for liquidation
+    const usdstBal = weiToEth(usdstBalance);
+    const voucherBal = weiToEth(voucherBalance);
+    
+    // User needs USDST for liquidation amount, vouchers can help with fee
+    return usdstBal >= repayEth && (usdstBal + voucherBal) >= liquidationFee;
+  };
+
   const handleConfirm = async () => {
     // If 100 % selected, delegate exact resolution to backend by sending 'ALL'
     const repayWeiOrAll = isAllSelected ? ("ALL" as any) : toWeiFromStr(repayStr);
@@ -154,6 +166,17 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
+    
+    // Check if user has enough balance
+    if (!canLiquidate()) {
+      toast({ 
+        title: "Insufficient balance", 
+        description: "You don't have enough USDST + vouchers for this liquidation",
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
     toast({ title: "Liquidation submitted", variant: "success" });
     onSuccess();
@@ -233,7 +256,7 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           <Button 
             variant="destructive" 
             onClick={handleConfirm} 
-            disabled={repayEth <= 0}
+            disabled={repayEth <= 0 || !canLiquidate()}
             className="px-6"
           >
             Confirm Liquidation
