@@ -79,7 +79,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   const [availableUsdstBalance, setAvailableUsdstBalance] = useState<number>(0);
   const { toast } = useToast();
   const { userAddress } = useUser();
-  const { fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
+  const { fetchTokens, fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
 
   // Fetch liquidatable positions, asset configs, and USDST balance
   useEffect(() => {
@@ -115,8 +115,10 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         if (userAddress) {
           await fetchUsdstBalance(userAddress);
           const availableUsdstWei = BigInt(usdstBalance || "0");
-          const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
-          setAvailableUsdstBalance(availableUsdstDecimal);
+          const availableVoucherWei = BigInt(voucherBalance || "0");
+          const totalAvailableWei = availableUsdstWei + availableVoucherWei;
+          const totalAvailableDecimal = parseFloat(formatWeiToDecimal(totalAvailableWei.toString(), 18));
+          setAvailableUsdstBalance(totalAvailableDecimal);
         }
         
       } catch (error) {
@@ -132,7 +134,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     };
 
     fetchData();
-  }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
+  }, [toast, userAddress, fetchUsdstBalance, usdstBalance, voucherBalance]);
 
   const toggleExpanded = (vaultKey: string) => {
     setExpandedVaults(prev => ({
@@ -167,9 +169,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     return maxAmount && currentAmount > maxAmount;
   };
 
-  // Check if USDST balance is insufficient (less than 0.02)
+  // Check if USDST balance is insufficient (less than liquidation fee)
   const isUsdstBalanceInsufficient = (): boolean => {
-    return availableUsdstBalance < 0.02;
+    const liquidationFee = 0.02;
+    const usdstBal = parseFloat(formatWeiToDecimal(usdstBalance || "0", 18));
+    const voucherBal = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
+    
+    // User needs USDST + vouchers to pay the fee
+    return (usdstBal + voucherBal) < liquidationFee;
   };
 
   // Handle MAX button click
@@ -188,14 +195,19 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         // Convert backend max from wei to decimal (18 decimals for USDST)
         const backendMaxDecimal = parseFloat(formatWeiToDecimal(backendMaxWei, 18));
         
+        // For liquidations: user needs USDST for liquidation amount, vouchers can help with fee
+        const liquidationFee = 0.02;
+        const usdstBal = parseFloat(formatWeiToDecimal(usdstBalance || "0", 18));
+        const voucherBal = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
         
-        // Check if balance is insufficient
-        if (availableUsdstBalance < 0.02) {
+        // Check if user can pay the fee (USDST + vouchers)
+        if ((usdstBal + voucherBal) < liquidationFee) {
           return;
         }
         
         // Calculate actual max as minimum of backend max and available USDST balance
-        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+        // (vouchers can only be used for fee, not for liquidation amount)
+        const actualMaxDecimal = Math.min(backendMaxDecimal, usdstBal);
         
         // Store the max value and set max state
         setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
@@ -286,10 +298,12 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           await fetchTokens(); // Refresh all token balances (including received collateral)
           await fetchUsdstBalance(userAddress); // Refresh USDST balance (spent during liquidation)
           
-          // Update the global USDST balance after fetching
+          // Update the global USDST balance after fetching (including vouchers)
           const updatedUsdstWei = BigInt(usdstBalance || "0");
-          const updatedUsdstDecimal = parseFloat(formatWeiToDecimal(updatedUsdstWei.toString(), 18));
-          setAvailableUsdstBalance(updatedUsdstDecimal);
+          const updatedVoucherWei = BigInt(voucherBalance || "0");
+          const updatedTotalWei = updatedUsdstWei + updatedVoucherWei;
+          const updatedTotalDecimal = parseFloat(formatWeiToDecimal(updatedTotalWei.toString(), 18));
+          setAvailableUsdstBalance(updatedTotalDecimal);
         }
       }
     } catch (error) {
