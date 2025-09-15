@@ -9,7 +9,7 @@ import { cdpService, VaultData, TransactionResponse } from "@/services/cdpServic
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useOracleContext } from "@/context/OracleContext";
-import { usdstAddress } from "@/lib/constants";
+import { usdstAddress, SUPPLY_COLLATERAL_FEE, WITHDRAW_COLLATERAL_FEE, BORROW_FEE, REPAY_FEE } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
 const calculateHealthFactor = (cr: number, lt: number): number => {
@@ -92,8 +92,35 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [positions, setPositions] = useState<VaultData[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { activeTokens } = useUserTokens();
+  const { activeTokens, usdstBalance, voucherBalance } = useUserTokens();
   const { getPrice } = useOracleContext();
+  
+  // Simple fee validation - check if user can pay the fee with USDST + vouchers
+  const canPayFee = (action: string): boolean => {
+    const usdstBal = parseFloat(formatWeiToDecimal(usdstBalance || "0", 18));
+    const voucherBal = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
+    
+    let feeAmount: number;
+    switch (action) {
+      case 'deposit': feeAmount = parseFloat(SUPPLY_COLLATERAL_FEE); break;
+      case 'withdraw': feeAmount = parseFloat(WITHDRAW_COLLATERAL_FEE); break;
+      case 'borrow': feeAmount = parseFloat(BORROW_FEE); break;
+      default: feeAmount = 0;
+    }
+    
+    return (usdstBal + voucherBal) >= feeAmount;
+  };
+
+  // Repay validation - check if user has enough USDST for repay amount + fee (with vouchers for fee)
+  const canRepay = (repayAmount: string): boolean => {
+    const usdstBal = parseFloat(formatWeiToDecimal(usdstBalance || "0", 18));
+    const voucherBal = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
+    const repayAmt = parseFloat(repayAmount || "0");
+    const repayFee = parseFloat(REPAY_FEE);
+    
+    // User needs USDST for repay amount, but can use USDST + vouchers for fee
+    return usdstBal >= repayAmt && (usdstBal + voucherBal) >= repayFee;
+  };
   
   // State for active action and input amounts for each position
   const [activeActions, setActiveActions] = useState<Record<string, 'deposit' | 'withdraw' | 'borrow' | 'repay' | null>>({});
@@ -256,14 +283,35 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       }
       
       case 'repay': {
-        // Maximum repay is min(current debt, available USDST balance)
+        // Maximum repay is min(current debt, available USDST after reserving fee portion)
         const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
         const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
           token.address.toLowerCase() === usdstAddress.toLowerCase()
         )?.balance || "0", 18));
+        const availableVouchers = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
+        const repayFee = parseFloat(REPAY_FEE);
+        // Calculate how much USDST needs to be reserved for the fee
+        const usdstNeededForFee = Math.max(0, repayFee - availableVouchers);
+        const availableForRepay = Math.max(0, availableUSDST - usdstNeededForFee);
         
-        const maxRepayAmount = Math.min(currentDebt, availableUSDST);
-        return maxRepayAmount.toString();
+        // Get debt floor from backend to calculate max partial repayment
+        try {
+          const debtInfo = await cdpService.getAssetDebtInfo(position.asset);
+          const debtFloor = parseFloat(formatWeiToDecimal(debtInfo.debtFloor, 18));
+          
+          // Calculate max partial repayment (leave debt at or above floor)
+          const maxPartialRepay = Math.max(0, currentDebt - debtFloor);
+          
+          // Max repay is the minimum of: available funds, current debt, and max partial repay
+          const maxRepayAmount = Math.min(currentDebt, availableForRepay, maxPartialRepay);
+          return maxRepayAmount.toString();
+        } catch (error) {
+          console.error("Failed to get debt floor info:", error);
+          // Fallback: only allow full repayment if user can afford it
+          const totalNeededForFullRepay = currentDebt + repayFee;
+          const canRepayAll = (availableUSDST + availableVouchers) >= totalNeededForFullRepay;
+          return canRepayAll ? currentDebt.toString() : "0";
+        }
       }
       
       default:
@@ -497,7 +545,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           }
           break;
         case 'repay':
-          // If user is in max state, check if they can repay all debt or just partial
+          // If user is in max state, use repayAll if the max amount equals the debt
           if (maxStates[asset]) {
             const position = positions.find(p => p.asset === asset);
             if (position) {
@@ -505,9 +553,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
                 token.address.toLowerCase() === usdstAddress.toLowerCase()
               )?.balance || "0", 18));
+              const availableVouchers = parseFloat(formatWeiToDecimal(voucherBalance || "0", 18));
+              const repayFee = parseFloat(REPAY_FEE);
               
-              // Use repayAll only if user has enough USDST to cover full debt
-              if (availableUSDST >= currentDebt) {
+              // Calculate max repay amount (same logic as getMaxAmount)
+              const usdstNeededForFee = Math.max(0, repayFee - availableVouchers);
+              const availableForRepay = Math.max(0, availableUSDST - usdstNeededForFee);
+              const maxRepayAmount = Math.min(currentDebt, availableForRepay);
+              
+              // Use repayAll if max repay amount equals the full debt
+              if (maxRepayAmount >= currentDebt) {
                 result = await cdpService.repayAll(asset);
               } else {
                 // Use regular repay with the limited amount they can afford
@@ -746,6 +801,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                       placeholder="Amount"
                       value={inputAmounts[position.asset] || ""}
                       onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
+                      disabled={
+                        (activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'withdraw' || activeActions[position.asset] === 'borrow') && !canPayFee(activeActions[position.asset]!) ||
+                        (activeActions[position.asset] === 'repay' && !canRepay(inputAmounts[position.asset] || ""))
+                      }
                       className={`flex-1 ${
                         maxStates[position.asset] 
                           ? 'text-blue-600 bg-blue-50 border-blue-300' 
@@ -761,6 +820,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     size="sm" 
                     className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
                     onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
+                    disabled={
+                      (activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'withdraw' || activeActions[position.asset] === 'borrow') && !canPayFee(activeActions[position.asset]!) ||
+                      (activeActions[position.asset] === 'repay' && !canRepay(inputAmounts[position.asset] || ""))
+                    }
                   >
                     MAX
                   </Button>
@@ -769,11 +832,19 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     size="sm" 
                     className="min-w-[80px]"
                     onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
-                    disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
+                    disabled={
+                      isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") ||
+                      ((activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'withdraw' || activeActions[position.asset] === 'borrow') && !canPayFee(activeActions[position.asset]!)) ||
+                      (activeActions[position.asset] === 'repay' && !canRepay(inputAmounts[position.asset] || ""))
+                    }
                   >
                     {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
                       ? "Amount exceeds maximum"
-                      : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                      : ((activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'withdraw' || activeActions[position.asset] === 'borrow') && !canPayFee(activeActions[position.asset]!))
+                        ? "Insufficient gas"
+                        : (activeActions[position.asset] === 'repay' && !canRepay(inputAmounts[position.asset] || ""))
+                          ? "Insufficient gas"
+                          : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
                     }
                   </Button>
                   </div>

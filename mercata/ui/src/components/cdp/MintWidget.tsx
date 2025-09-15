@@ -7,7 +7,8 @@ import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { useUser } from "@/context/UserContext";
+import { formatBalance as formatBalanceUtil, safeParseUnits } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 
 interface BorrowWidgetProps {
@@ -31,9 +32,30 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [existingVaultCollateral, setExistingVaultCollateral] = useState<string>("0"); // Wei format
   const [existingVaultDebt, setExistingVaultDebt] = useState<string>("0"); // Wei format
   const { toast } = useToast();
-  const { activeTokens } = useUserTokens();
+  const { activeTokens, usdstBalance, voucherBalance } = useUserTokens();
+  const { userAddress } = useUser();
 
   const borrowRate = depositAsset?.stabilityFeeRate || 5.54;
+  
+  // Fee validation logic
+  const getTransactionFee = useCallback(() => {
+    const hasDeposit = parseFloat(depositAmount || "0") > 0;
+    const hasBorrow = parseFloat(borrowAmount || "0") > 0;
+    
+    if (hasDeposit && hasBorrow) return "0.03";
+    if (hasDeposit && !hasBorrow) return "0.02";
+    if (!hasDeposit && hasBorrow) return "0.01";
+    
+    return "0.01";
+  }, [depositAmount, borrowAmount]);
+
+  const canPayFee = useCallback(() => {
+    const feeAmount = safeParseUnits(getTransactionFee(), 18);
+    const usdstBal = BigInt(usdstBalance || "0");
+    const voucherBal = BigInt(voucherBalance || "0");
+    
+    return (usdstBal + voucherBal) >= feeAmount;
+  }, [getTransactionFee, usdstBalance, voucherBalance]);
   
   // Get real asset price from dynamic data only
   const getAssetPrice = useCallback((): number => {
@@ -913,16 +935,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       {depositAsset && (parseFloat(depositAmount || "0") > 0 || parseFloat(borrowAmount || "0") > 0) && (
         <div className="text-center">
           <p className="text-xs text-gray-500">
-            Transaction Fee: {(() => {
-              const hasDeposit = parseFloat(depositAmount || "0") > 0;
-              const hasBorrow = parseFloat(borrowAmount || "0") > 0;
-              
-              if (hasDeposit && hasBorrow) return "0.03";
-              if (hasDeposit && !hasBorrow) return "0.02";
-              if (!hasDeposit && hasBorrow) return "0.01";
-              
-              return "0.01";
-            })()} USDST
+            Transaction Fee: {getTransactionFee()} USDST
           </p>
         </div>
       )}
@@ -936,7 +949,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
           getAssetPrice() <= 0 ||
           isDepositAmountAboveMax() ||
-          isBorrowAmountAboveMax()
+          isBorrowAmountAboveMax() ||
+          !canPayFee()
         }
       >
         {(() => {
@@ -944,6 +958,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
           if (getAssetPrice() <= 0) return "Price data required";
           if (!depositAsset) return "Select asset";
+          if (!canPayFee()) return "Insufficient USDST + vouchers for fee";
           
           const hasDeposit = parseFloat(depositAmount || "0") > 0;
           const hasBorrow = parseFloat(borrowAmount || "0") > 0;
