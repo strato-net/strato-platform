@@ -590,6 +590,12 @@ contract record LendingPool is Ownable {
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
+
+        // Handle newly created bad debt
+        if (userLoan[borrower].scaledDebt != 0
+            && _isCollateralZero(borrower)) {
+            _handleBadDebt(borrower);
+        }
     }
 
     /**
@@ -930,6 +936,21 @@ contract record LendingPool is Ownable {
             totalValue += (collateralAmount * price * liqThreshold) / (1e18 * 10000);
         }
         return totalValue;
+    }
+
+    /**
+     * @notice Check if a user has no collateral
+     * @param user The user address
+     * @return true if the user has zero collateral, false otherwise
+     */
+    function _isCollateralZero(address user) internal view returns (bool) {
+        for (uint i = 0; i < configuredAssets.length; i++) {
+            address asset = configuredAssets[i];
+            if (CollateralVault(_collateralVault()).userCollaterals(user, asset) > 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
