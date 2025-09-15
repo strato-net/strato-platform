@@ -12,23 +12,23 @@ const auth = require('./deploy/auth');
 
 // Contract addresses from latest deployment with fixed AdminRegistry
 const ADDRESSES = {
-    POOL_FACTORY:'91920a1dbe1cff51dc56529a3c1aded394fe6909',
-    TOKEN_FACTORY:'c505eadd34ee9ae885250e07ea6dc4f7d74d64c2',
-    ADMIN_REGISTRY:'23d62a937b2b5dfaaa22a19915dca256577cec29',
-    FEE_COLLECTOR:'5b6141e44042211cde5e04f1ad18d4305c1b76c5',
-    PRICE_ORACLE:'25e239fffc207231f3023a943903c962f5ac02fc',
-    RATE_STRATEGY:'cd06dc2ea10aa68db4b0ba03135b96470e0e35b7',
-    LIQUIDITY_POOL:'50c3407f558f50e01e96af4f01ffb65932386e4e',
-    COLLATERAL_VAULT:'018a3817f444b183ddc6f66fefb112077a70655f',
-    LENDING_POOL:'b5cdf655f5dfbbd71da12ab2c0624b8fb81ccdbb',
-    LENDING_REGISTRY:'299b92fce28d86d354437d83c3c2ef5549c616a5',
-    POOL_CONFIGURATOR:'67960267f7f1af6d89cdcd99e901a048f749e5b6',
-    MERCATA_BRIDGE:'212afbadc8affb1e9a565fc450695f6171561d1c',
-    CDP_REGISTRY:'68630bec7f44fd71c48a2c5acb25d8f70ad87ec8',
-    CDP_ENGINE:'d0cfcc9bebe1cf36d2f76c766002acc1aba7e407',
-    CDP_VAULT:'4bac12b903c4b265d792a39f2689808de2918ae4',
-    SAFETY_MODULE:'d4c6322856ffc6873d9a2e06bec4f718ee580f45',
-    MERCATA_CORE:'4abf06ff8558e0285351f89977a75268edb87803',
+    POOL_FACTORY:'e953f17a4200228083ce85d56abdc322e3cd3e35',
+    TOKEN_FACTORY:'d863a4c2ceefff95f2c7235452c945eeb8e328e1',
+    ADMIN_REGISTRY:'aa52dba12dc2b46430c073b2ef18dcbfc10db666',
+    FEE_COLLECTOR:'2c068d9afb115030388fa5de53e9c2164fe560b4',
+    PRICE_ORACLE:'a9b1659802c0e3c861c4f28b1db32557986bc4bd',
+    RATE_STRATEGY:'236394ced4873fb2f38a52ab8d42e518564e7930',
+    LIQUIDITY_POOL:'46c60101ffb1219c844f986b5d546bd3d8b02d77',
+    COLLATERAL_VAULT:'052a9217ac8961206e32a3253e03cd68a65811d8',
+    LENDING_POOL:'19ee4452d81573e3b5b2cf4d34009db856dcf162',
+    LENDING_REGISTRY:'d320cdf91adfb8f561d04d9e2aa710409fd2e818',
+    POOL_CONFIGURATOR:'fda0a0e7b5088113dd76ee51ff58a47e6400281e',
+    MERCATA_BRIDGE:'f3066007c82773627dda01ed1d1d74ed44911867',
+    CDP_REGISTRY:'e2c9090d20d08d0d4440147b932a114ce3e4353a',
+    CDP_ENGINE:'438bbac3e76a6cbf8b9f55fb61dc332acdfc8722',
+    CDP_VAULT:'33cf4da674ab455b2d0bb7c7680449a196030fe6',
+    SAFETY_MODULE:'4d82fee4a0b1bd3ab1c7a0492dc347c06a19dda1',
+    MERCATA_CORE:'c5fcca19fb9917b1cb02abc1cac2d4bd8fe8b035',
 };
 
 // Test configuration
@@ -162,8 +162,8 @@ async function executeBatch(calls, batchName, token, retries = 3) {
             
             console.log(`✅ Batch completed: ${batchName}`);
             
-            // Add a small delay to let the blockchain process before next batch
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Add a longer delay to let the blockchain process before next batch
+            await new Promise(resolve => setTimeout(resolve, 5000));
             
             return results;
             
@@ -423,13 +423,27 @@ async function runBadDebtTest() {
         
         console.log(`👤 User address: ${userAddress}`);
         
-        const healthCheckCall = createCall(ADDRESSES.LENDING_POOL, 'getHealthFactor', {
-            user: userAddress
-        }, 'LendingPool');
-        
-        const healthResults = await executeBatch([healthCheckCall], 'Health Factor Check', token);
-        const healthFactor = healthResults[0].txResult.returnValue;
-        console.log(`💊 Initial health factor: ${healthFactor}`);
+        // Call view function to get initial health factor
+        console.log('💊 Checking initial health factor...');
+        try {
+            const healthFactorResult = await rest.call(token, {
+                contract: 'LendingPool',
+                contractAddress: ADDRESSES.LENDING_POOL,
+                function: 'getHealthFactor',
+                args: {
+                    user: userAddress
+                }
+            }, { config });
+            
+            const healthFactor = healthFactorResult;
+            console.log(`💊 Initial health factor: ${healthFactor}`);
+            
+            if (!healthFactor || healthFactor === 'undefined') {
+                console.log('⚠️ Health factor is undefined, user may not have any borrows yet');
+            }
+        } catch (error) {
+            console.log(`⚠️ Could not get health factor: ${error.message}`);
+        }
         
         // Step 7: Crash price and check for bad debt
         console.log('💥 Crashing WETH price...');
@@ -439,10 +453,27 @@ async function runBadDebtTest() {
         }, 'PriceOracle');
         
         await executeBatch([priceCrashCall], 'Price Crash', token);
+        console.log('✅ WETH price crashed to $1000');
         
-        const healthAfterResults = await executeBatch([healthCheckCall], 'Health Factor After Crash', token);
-        const healthFactorAfter = healthAfterResults[0].txResult.returnValue;
-        console.log(`📉 Health factor after crash: ${healthFactorAfter}`);
+        // Check health factor after price crash using view function
+        console.log('📉 Checking health factor after price crash...');
+        let healthFactorAfter;
+        try {
+            const healthFactorAfterResult = await rest.call(token, {
+                contract: 'LendingPool',
+                contractAddress: ADDRESSES.LENDING_POOL,
+                function: 'getHealthFactor',
+                args: {
+                    user: userAddress
+                }
+            }, { config });
+            
+            healthFactorAfter = healthFactorAfterResult;
+            console.log(`📉 Health factor after crash: ${healthFactorAfter}`);
+        } catch (error) {
+            console.log(`⚠️ Could not get health factor after crash: ${error.message}`);
+            healthFactorAfter = 0; // Assume unhealthy if we can't get the value
+        }
         
         if (healthFactorAfter >= 1e18) {
             console.log('⚠️ Position is still healthy! May need to crash price more or increase borrow amount');
@@ -450,12 +481,21 @@ async function runBadDebtTest() {
         
         // Step 8: Attempt liquidation to create bad debt
         console.log('🔥 Attempting liquidation to create bad debt...');
+        
+        // Add extra delay before liquidation to ensure nonce synchronization
+        console.log('⏱️ Waiting for blockchain synchronization...');
+        await new Promise(resolve => setTimeout(resolve, 10000));
+        
+        const approvalForLiquidationCall = createCall(testTokens.usdst, 'approve', {
+            spender: ADDRESSES.LIQUIDITY_POOL,
+            value: (100_000_000_000n*10n**18n).toString() // approve as much as is needed to liquidate all collateral
+        }, 'USDST');
         const liquidationCall = createCall(ADDRESSES.LENDING_POOL, 'liquidationCallAll', {
             collateralAsset: testTokens.weth,
             borrower: userAddress
         }, 'LendingPool');
 
-        await executeBatch([liquidationCall], 'Liquidation Attempt', token);
+        await executeBatch([approvalForLiquidationCall, liquidationCall], 'Liquidation Attempt', token);
         console.log('✅ Liquidation completed');
 
         // Step 9: Check bad debt and test slashing
