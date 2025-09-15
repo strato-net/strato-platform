@@ -24,40 +24,46 @@ async function ensureFeeCoverage(
   accessToken: string,
   requiredUSDST?: bigint
 ) {
-  const requiredFeeWei = constants.GAS_FEE_WEI * BigInt(n);
-  const requiredVoucherUnits = constants.DECIMALS * BigInt(n);
-
+  const gasFeeWei = constants.GAS_FEE_WEI * BigInt(n);
+  
   // Calculate total required USDST
-  const totalRequiredUSDST = requiredUSDST ? requiredUSDST + requiredFeeWei : requiredFeeWei;
+  const totalRequiredUSDST = requiredUSDST ? requiredUSDST + gasFeeWei : gasFeeWei;
 
-  // Check both voucher and USDST balances in parallel
+  // Fetch actual balances
   const [voucherResponse, usdstResponse] = await Promise.all([
     cirrus.get(accessToken, `/${constants.Voucher}-_balances`, {
       params: {
         address: `eq.${constants.voucher}`,
         key: `eq.${userAddress}`,
-        value: `gte.${requiredVoucherUnits.toString()}`,
+        select: 'value::text'
       },
     }),
     cirrus.get(accessToken, `/${constants.Token}-_balances`, {
       params: {
         address: `eq.${constants.USDST}`,
         key: `eq.${userAddress}`,
-        value: `gte.${totalRequiredUSDST.toString()}`,
+        select: 'value::text'
       },
     })
   ]);
 
-  // If user has enough vouchers OR enough USDST, they're good to go
-  const hasVoucher = voucherResponse.data && voucherResponse.data.length > 0;
-  const hasUSD = usdstResponse.data && usdstResponse.data.length > 0;
+  // Get actual balance values
+  const voucherBalanceWei = BigInt(voucherResponse.data?.[0]?.value || "0");
+  const usdstBalanceWei = BigInt(usdstResponse.data?.[0]?.value || "0");
+  
+  // Convert vouchers to USDST equivalent
+  // 1 voucher (1e18 wei) = 0.01 USDST (1e16 wei)
+  // So: voucherUSDST = (voucherBalanceWei * 1e16) / 1e18 = voucherBalanceWei / 100
+  const voucherUSDSTEquivalent = voucherBalanceWei / 100n; // 1 voucher = 0.01 USDST  
+  const totalAvailableUSDST = usdstBalanceWei + voucherUSDSTEquivalent;
 
-  if (hasVoucher || hasUSD) {
+  // Check if total available covers the required amount
+  if (totalAvailableUSDST >= totalRequiredUSDST) {
     return;
   }
 
-  // If user doesn't have enough of either, throw error
-  throw new Error(formatFeeError(requiredFeeWei, requiredUSDST));
+  // If user doesn't have enough, throw error
+  throw new Error(formatFeeError(gasFeeWei, requiredUSDST));
 }
 
 export function buildDeployTx({

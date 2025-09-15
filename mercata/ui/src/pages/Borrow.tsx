@@ -1,7 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { safeParseUnits } from "@/utils/numberUtils";
-import { formatUnits } from "ethers";
-import { useToast } from "@/hooks/use-toast";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -17,67 +15,59 @@ import { WITHDRAW_COLLATERAL_FEE, SUPPLY_COLLATERAL_FEE } from "@/lib/constants"
 import BorrowForm from "@/components/borrow/BorrowForm";
 import RepayForm from "@/components/borrow/RepayForm";
 import CollateralManagementTable from "@/components/borrow/CollateralManagementTable";
-import { useBalancePolling } from "@/hooks/useSmartPolling";
+import { useSmartPolling } from "@/hooks/useSmartPolling";
 
 const Borrow = () => {
   const { userAddress } = useUser();
   const { usdstBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
-  const [borrowLoading, setBorrowLoading] = useState(false);
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
     type: "supply" | "withdraw" | null;
   }>({ isOpen: false, type: null });
   const [modalLoading, setModalLoading] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const [repayLoading, setRepayLoading] = useState(false);
   const [eligibleCollateral, setEligibleCollateral] = useState<CollateralData[]>([]);
 
-  const { toast } = useToast();
   const {
     refreshLoans,
     loans,
-    borrowAsset: borrowAssetFn,
     collateralInfo,
     loadingCollateral,
     refreshCollateral,
     supplyCollateral,
     withdrawCollateral,
-    repayLoan: repayLoanFn,
-    repayAll,
-    withdrawCollateralMax,
-    borrowMax
+    withdrawCollateralMax
   } = useLendingContext();
 
-  // Use the new smart polling hook for balance updates
-  const { startPolling, stopPolling } = useBalancePolling(
-    userAddress || "",
-    fetchUsdstBalance,
-    (amount) => amount && parseFloat(amount) > 0
-  );
+  // Function to refresh all data
+  const refetchData = useCallback(async () => {
+    if (!userAddress) return;
+    try {
+      await Promise.all([
+        refreshLoans(),
+        refreshCollateral(),
+        fetchUsdstBalance(userAddress),
+      ]);
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    }
+  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
+
+  // Automatic polling for loan data updates
+  useSmartPolling({
+    fetchFn: refetchData,
+    shouldPoll: () => !!userAddress,
+    interval: 15000, // 15 seconds - reasonable for loan data
+    autoStart: true,
+    enabled: !!userAddress,
+    onError: (error) => console.error("Loan data polling error:", error)
+  });
 
   useEffect(() => {
     document.title = "Borrow Assets | STRATO Mercata";
   }, []);
 
-
-  // Refresh data when page loads and when userAddress changes
-  useEffect(() => {
-    if (userAddress) {
-      const refreshData = async () => {
-        try {
-          await Promise.all([
-            refreshLoans(),
-            refreshCollateral(),
-            fetchUsdstBalance(userAddress),
-          ]);
-        } catch (error) {
-          console.error("Error refreshing data:", error);
-        }
-      };
-      refreshData();
-    }
-  }, [userAddress, refreshLoans, refreshCollateral, fetchUsdstBalance]);
 
     useEffect(() => {
     if (collateralInfo && Array.isArray(collateralInfo)) {
@@ -111,11 +101,6 @@ const Borrow = () => {
         asset: asset.address,
         amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
       });
-      toast({
-        title: "Supply Initiated",
-        description: `You supplied ${amount} ${asset._symbol}`,
-        variant: "success",
-      });
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
       // Refresh all data after successful supply
@@ -141,11 +126,6 @@ const Borrow = () => {
           amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
         });
       }
-      toast({
-        title: "Withdraw Initiated",
-        description: `Withdrawal submitted: ${amount === 'ALL' ? 'max available' : amount} ${asset._symbol}`,
-        variant: "success",
-      });
       setModalLoading(false);
       setModalState({ isOpen: false, type: null });
       // Refresh all data after successful withdraw
@@ -163,71 +143,6 @@ const Borrow = () => {
   };
 
 
-  const executeEmbeddedBorrow = async (amount: string) => {
-    try {
-      setBorrowLoading(true);
-      if (amount === 'ALL') {
-        await borrowMax();
-        toast({
-          title: "Borrow Initiated",
-          description: `Borrowed max available USDST`,
-          variant: "success",
-        });
-      } else {
-        await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
-        toast({
-          title: "Borrow Initiated",
-          description: `You borrowed ${amount} USDST`,
-          variant: "success",
-        });
-      }
-      setBorrowLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      setBorrowLoading(false);
-    }
-  };
-
-  const executeEmbeddedRepay = async (amount: string) => {
-    try {
-      setRepayLoading(true);
-      if (amount === 'ALL') {
-        const res = await repayAll();
-        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead), 18) : 'all';
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
-      } else {
-        const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
-        let amountInWei = safeParseUnits(amount || "0", 18);
-        if (amountInWei > totalOwedWei) {
-          amountInWei = totalOwedWei;
-        }
-        const res = await repayLoanFn({ amount: amountInWei.toString() } as any);
-        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent), 18) : amount;
-        toast({
-          title: "Success",
-          description: `Successfully repaid ${sent} USDST`,
-          variant: "success",
-        });
-      }
-      setRepayLoading(false);
-      await Promise.all([
-        refreshLoans(),
-        refreshCollateral(),
-        fetchUsdstBalance(userAddress || ""),
-      ]);
-    } catch (error) {
-      console.error("Error repaying loan:", error);
-      setRepayLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -255,20 +170,16 @@ const Borrow = () => {
                   <TabsContent value="borrow">
                     <BorrowForm
                       loans={loans}
-                      borrowLoading={borrowLoading}
-                      onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
                       collateralInfo={eligibleCollateral}
-                      startPolling={startPolling}
-                      stopPolling={stopPolling}
+                      onActionComplete={refetchData}
                     />
                   </TabsContent>
                   <TabsContent value="repay">
                     <RepayForm
                       loans={loans}
-                      repayLoading={repayLoading}
-                      onRepay={executeEmbeddedRepay}
                       usdstBalance={usdstBalance}
+                      onActionComplete={refetchData}
                     />
                   </TabsContent>
                 </Tabs>

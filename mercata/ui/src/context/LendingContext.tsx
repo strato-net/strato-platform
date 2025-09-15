@@ -10,6 +10,7 @@ import { safeParseUnits } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 import { CollateralData, LendData, LiquidityData, NewLoanData } from "@/interface";
 import { useUser } from "@/context/UserContext";
+import { useToast } from "@/hooks/use-toast";
 
 
 type LendingContextType = {
@@ -69,6 +70,7 @@ export const LendingProvider = ({
 
   // Access authentication status
   const { isLoggedIn } = useUser();
+  const { toast } = useToast();
 
   const fetchLiquidityInfo = useCallback(async (signal?: AbortSignal) => {
     setLoadingLiquidity(true);
@@ -139,36 +141,75 @@ export const LendingProvider = ({
     }
   };
 
-  const borrowAsset = async ({
-    amount,
-  }: {
-    amount: string;
-  }) => {
-    await api.post("/lending/loans", {
-      amount
-    });
+  const borrowAsset = async ({ amount }: { amount: string }) => {
+    setLoading(true);
+    try {
+      await api.post("/lending/loans", { amount });
+      toast({
+        title: "Borrow Successful",
+        description: `Successfully borrowed ${amount} USDST`,
+        variant: "success",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const borrowMax = async () => {
-    await api.post("/lending/loans/borrow-max");
+    setLoading(true);
+    try {
+      await api.post("/lending/loans/borrow-max");
+      toast({
+        title: "Borrow Successful",
+        description: "Successfully borrowed maximum available USDST",
+        variant: "success",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const repayLoan = async ({
+    loanId,
     amount,
+    asset,
   }: {
     loanId: string;
     amount: string;
     asset: string;
   }): Promise<{ status: string; hash: string; amountSent?: string }> => {
-    const res = await api.patch("/lending/loans", {
-      amount
-    });
-    return res.data;
+    setLoading(true);
+    try {
+      const res = await api.patch("/lending/loans", { loanId, amount, asset });
+      toast({
+        title: "Repay Successful",
+        description: `Successfully repaid ${amount} USDST`,
+        variant: "success",
+      });
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const repayAll = async (): Promise<{ status: string; hash: string; amountRequested?: string; estimatedDebtAtRead?: string }> => {
-    const res = await api.post("/lending/loans/repay-all");
-    return res.data;
+  const repayAll = async (): Promise<{
+    status: string;
+    hash: string;
+    amountRequested?: string;
+    estimatedDebtAtRead?: string;
+  }> => {
+    setLoading(true);
+    try {
+      const res = await api.post("/lending/loans/repay-all");
+      toast({
+        title: "Repay Successful",
+        description: "Successfully repaid all outstanding debt",
+        variant: "success",
+      });
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getLend = async () => {

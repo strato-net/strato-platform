@@ -90,7 +90,7 @@ const TokenInput = ({
           onChange={onValueChange}
           decimals={decimals}
           className="mt-3"
-          disabled={disabled}
+          disabled={disabled || !maxTransferable || maxTransferable < 100n}
         />
       )}
     </div>

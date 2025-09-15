@@ -1,97 +1,186 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { REPAY_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatCurrency } from "@/utils/numberUtils";
+import { REPAY_FEE, usdstAddress, VOUCHERS_PER_UNIT } from "@/lib/constants";
+import { safeParseUnits, formatCurrency, safeParseFloat } from "@/utils/numberUtils";
 import { NewLoanData } from "@/interface";
 import { calculateRepayHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
-import PercentageButtons from "../ui/PercentageButtons";
+import TokenInput from "@/components/shared/TokenInput";
 import { useLendingContext } from "@/context/LendingContext";
+import { useUserTokens } from "@/context/UserTokensContext";
+
+// Centralized parsing helpers
+const toWei18 = (x?: string) => safeParseUnits(x || "0", 18);
+const toBig = (x?: string | number | bigint) => {
+  if (typeof x === "bigint") return x;
+  if (typeof x === "number") return BigInt(Math.trunc(x));
+  const s = String(x ?? "0").trim();
+  if (!/^\d+$/.test(s)) return 0n; // fallback
+  return BigInt(s);
+};
+
+// Constants
+const DUST_USD_WEI = toWei18("0.00000000000000001");
+
+// Hoisted presentational components
+const FeeNotice = ({ fee, canPay, vouchersRequired }: { fee: string; canPay: boolean; vouchersRequired: number }) => (
+  <div className="px-4 py-3 bg-gray-50 rounded-md">
+    <div className="flex justify-between text-sm mb-2">
+      <span className="text-gray-600">Transaction Fee</span>
+      <span className="font-medium">
+        {fee} USDST ({vouchersRequired} vouchers)
+      </span>
+    </div>
+    {!canPay && (
+      <p className="text-yellow-600 text-sm mt-1">
+        Insufficient fee coverage. Add USDST or vouchers.
+      </p>
+    )}
+  </div>
+);
 
 interface RepayFormProps {
   loans: NewLoanData | null;
-  repayLoading: boolean;
-  onRepay: (amount: string) => void;
   usdstBalance: string;
+  onActionComplete?: () => void;
 }
 
-const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProps) => {
+const RepayForm = ({ loans, usdstBalance, onActionComplete }: RepayFormProps) => {
   const [repayAmount, setRepayAmount] = useState<string>("");
-  const [repayDisplayAmount, setRepayDisplayAmount] = useState("");
-  const [riskLevel, setRiskLevel] = useState(0);
-  const [healthImpact, setHealthImpact] = useState({
-    currentHealthFactor: 0,
-    newHealthFactor: 0,
-    healthImpact: 0,
-    isHealthy: true,
-  });
+  const [repayAmountError, setRepayAmountError] = useState<string>("");
+  const { voucherBalance } = useUserTokens();
+  const { repayLoan, repayAll, loading } = useLendingContext();
+  
+  // Track previous max to detect changes
+  const prevMaxRef = useRef<bigint>(0n);
+  const [isUpdating, setIsUpdating] = useState(false);
 
+  // Centralized parsing - once per render
+  const totalOwed = toBig(loans?.totalAmountOwed);
+  const collatUSD = toBig(loans?.totalCollateralValueUSD);
+  const repayWei = toWei18(repayAmount);
+  const usdstBal = toBig(usdstBalance);
+  const voucherBal = toBig(voucherBalance);
 
-  // Calculate risk level when repay amount changes
+  // Derived state via useMemo
+  const maxTransferable = useMemo(() => {
+    // For repaying, max is the amount owed, but we need to ensure user can pay the fee
+    const feeWei = toWei18(REPAY_FEE);
+    const totalAvailableForFee = usdstBal + voucherBal;
+    
+    // If user can't pay the fee, they can't repay anything
+    if (totalAvailableForFee < feeWei) {
+      return 0n;
+    }
+    
+    // If vouchers cover the fee, user can repay up to totalOwed
+    if (voucherBal >= feeWei) {
+      return totalOwed;
+    }
+    
+    // If vouchers don't cover the fee, user needs to reserve some USDST for the fee
+    const usdstNeededForFee = feeWei - voucherBal;
+    const availableForRepay = usdstBal - usdstNeededForFee;
+    
+    // Return the minimum of what they owe and what they can afford
+    return availableForRepay > 0n ? (availableForRepay < totalOwed ? availableForRepay : totalOwed) : 0n;
+  }, [totalOwed, voucherBal, usdstBal]);
+
+  const riskLevel = useMemo(() => {
+    if (collatUSD <= DUST_USD_WEI) return 0;
+    const newBorrowedAmount = totalOwed - repayWei;
+    if (newBorrowedAmount <= 0n) return 0;
+    const bp = Number((newBorrowedAmount * 10000n) / collatUSD) / 100;
+    return Math.max(0, Math.min(bp, 100));
+  }, [repayWei, totalOwed, collatUSD]);
+
+  const healthImpact = useMemo(
+    () => calculateRepayHealthImpact(repayWei, loans),
+    [repayWei, loans]
+  );
+
+  const remainingOwed = useMemo(() => {
+    const remaining = totalOwed - repayWei;
+    return remaining > 0n ? remaining : 0n;
+  }, [totalOwed, repayWei]);
+
+  const remainingDisplay = useMemo(() => {
+    return formatCurrency(formatUnits(remainingOwed, 18));
+  }, [remainingOwed]);
+
+  // Initialize prev max once to avoid first-render clamp
   useEffect(() => {
+    prevMaxRef.current = maxTransferable;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Make the "shrink input if max drops" effect robust
+  useEffect(() => {
+    const prevMax = prevMaxRef.current;
+    
+    // Always trigger animation when max changes (regardless of user input)
+    if (prevMax !== 0n && maxTransferable !== prevMax) {
+      setIsUpdating(true);
+      setTimeout(() => setIsUpdating(false), 300);
+    }
+    
+    // Only adjust user input if they have entered an amount
+    if (repayAmount) {
+      const inputWei = toWei18(repayAmount);
+      if (maxTransferable > 0n && inputWei > maxTransferable) {
+        setRepayAmount(formatUnits(maxTransferable, 18));
+        setRepayAmountError("");
+      }
+    }
+    
+    prevMaxRef.current = maxTransferable;
+  }, [maxTransferable, repayAmount]);
+
+  // Callbacks for side effects
+  const onAmountChange = useCallback((v: string) => {
+    setRepayAmount(v);
+    setRepayAmountError("");
+  }, []);
+
+  const onMaxClick = useCallback(() => {
+    if (maxTransferable <= 0n) return;        // no-op
+    setRepayAmount(formatUnits(maxTransferable, 18));
+    setRepayAmountError("");
+  }, [maxTransferable]);
+
+
+  const handleRepay = useCallback(async () => {
+    const isFullRepay = repayWei >= totalOwed && totalOwed > 0n;
+    
     try {
-      if (!loans?.totalCollateralValueUSD || !loans?.totalAmountOwed) {
-        setRiskLevel(0);
-        return;
+      if (isFullRepay) {
+        await repayAll();
+      } else {
+        const feeWei = toWei18(REPAY_FEE);
+        const availableWei = usdstBal > feeWei ? (usdstBal - feeWei) : 0n;
+        const safeAvailableWei = availableWei > 1n ? (availableWei - 1n) : 0n; // 1-wei safety
+        const finalRepayWei = repayWei > totalOwed ? totalOwed : (repayWei > safeAvailableWei ? safeAvailableWei : repayWei);
+        await repayLoan({ amount: finalRepayWei.toString() } as any);
       }
-
-      const totalBorrowedBigInt = BigInt(loans.totalAmountOwed);
-      const collateralValueBigInt = BigInt(loans.totalCollateralValueUSD);
-      const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-      const newBorrowedAmount = totalBorrowedBigInt - repayAmountWei;
       
-      if (newBorrowedAmount <= 0n) {
-        setRiskLevel(0);
-        return;
-      }
-
-      const risk = Number((newBorrowedAmount * 10000n) / collateralValueBigInt) / 100;
-      setRiskLevel(Math.min(risk, 100));
-    } catch {
-      setRiskLevel(0);
+      setRepayAmount("");
+      setRepayAmountError("");
+    } finally {
+      onActionComplete?.();
     }
-  }, [repayAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+  }, [repayWei, totalOwed, usdstBal, repayAll, repayLoan, onActionComplete]);
 
-  // Calculate health impact when repay amount changes
-  useEffect(() => {
-    const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-    const impact = calculateRepayHealthImpact(repayAmountWei, loans);
-    setHealthImpact(impact);
-  }, [repayAmount, loans]);
+  // Memoized vouchers calculation
+  const vouchersRequired = useMemo(
+    () => Math.ceil(safeParseFloat(REPAY_FEE) * VOUCHERS_PER_UNIT),
+    []
+  );
 
-  const handleRepayAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, '');
-    if (/^\d*\.?\d*$/.test(value)) {
-      setRepayDisplayAmount(addCommasToInput(value));
-      setRepayAmount(value);
-    }
-  };
-
-  const handleRepayPercentage = (percentageAmount: string) => {
-    setRepayAmount(percentageAmount);
-    setRepayDisplayAmount(addCommasToInput(percentageAmount));
-  };
-
-  const handleRepay = async () => {
-    const owed = BigInt(loans?.totalAmountOwed || 0);
-    const inputWei = safeParseUnits(repayAmount || "0", 18);
-    const isFullRepay = inputWei >= owed && owed > 0n;
-    if (isFullRepay) {
-      onRepay('ALL');
-      setRepayAmount(""); setRepayDisplayAmount("");
-      return;
-    }
-    const feeWei = safeParseUnits(REPAY_FEE, 18);
-    const balWei = BigInt(usdstBalance || "0");
-    const availableWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-    const safeAvailableWei = availableWei > 1n ? (availableWei - 1n) : 0n; // 1-wei safety
-    const repayWei = inputWei > owed ? owed : (inputWei > safeAvailableWei ? safeAvailableWei : inputWei);
-    onRepay(formatUnits(repayWei, 18));
-    setRepayAmount(""); setRepayDisplayAmount("");
-  };
+  // Precomputed button state
+  const repayAmountValid = repayWei > 0n && repayWei <= maxTransferable && !repayAmountError;
+  const repayDisabled = loading || !repayAmountValid;
 
 
   if (!loans) {
@@ -102,10 +191,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
     );
   }
 
-  const feeWei = safeParseUnits(REPAY_FEE, 18);           // bigint
-  const balWei = BigInt(usdstBalance || "0");             // bigint
-  const availWei = balWei > feeWei ? (balWei - feeWei) : 0n;
-  const safeAvailWei = availWei > 1n ? (availWei - 1n) : 0n; // 1-wei safety for display and validation
+  const canPayFee = usdstBal + voucherBal >= toWei18(REPAY_FEE);
 
   return (
     <div className="space-y-4 pt-4">
@@ -113,115 +199,41 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
       <div className="space-y-2">
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Total Amount Owed</span>
-          <span className="font-normal">
-            {(() => {
-              try {
-                const bi = BigInt(loans?.totalAmountOwed ?? "0");
-                const display = bi <= 1n ? 0n : bi;
-                return `USDST ${formatUnits(display, 18)}`;
-              } catch {
-                return `USDST 0`;
-              }
-            })()}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-normal transition-opacity duration-300 ${isUpdating ? 'opacity-50' : 'opacity-100'}`}>
+              USDST {formatUnits(totalOwed <= 1n ? 0n : totalOwed, 18)}
+            </span>
+            {loading && (
+              <div className="animate-spin rounded-full h-3 w-3 border-t border-b border-blue-500"></div>
+            )}
+          </div>
         </div>
 
         {loans?.totalAmountOwedPreview && (
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-500">Projected Debt</span>
-            <span className="font-medium">
-              {(() => {
-                try {
-                  const bi = BigInt(loans?.totalAmountOwedPreview ?? "0");
-                  const display = bi <= 1n ? 0n : bi;
-                  return `USDST ${formatUnits(display, 18)}`;
-                } catch {
-                  return `USDST 0`;
-                }
-              })()}
+            <span className={`font-medium transition-opacity duration-300 ${isUpdating ? 'opacity-50' : 'opacity-100'}`}>
+              USDST {formatUnits(toBig(loans?.totalAmountOwedPreview) <= 1n ? 0n : toBig(loans?.totalAmountOwedPreview), 18)}
             </span>
           </div>
         )}
-        
-                    <div className="flex justify-between items-center pt-2 border-t">
-          <span className="text-lg">{(() => { try { const bi = BigInt(loans?.totalAmountOwed ?? "0"); const display = bi <= 1n ? 0n : bi; return `USDST ${formatUnits(display, 18)}`; } catch { return `USDST 0`; } })()}</span>
-        </div>
       </div>
 
       {/* Repay Amount Input */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium">Repay Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-gray-500">
-          <span>Min: 0.01 USDST</span>
-          <div>
-            <button
-              type="button"
-              onClick={() => {
-                try {
-                  const owed = BigInt(loans?.totalAmountOwed || 0);
-                  const maxFormatted = formatUnits(owed, 18);
-                  setRepayAmount(maxFormatted);
-                  setRepayDisplayAmount(addCommasToInput(maxFormatted));
-                } catch {}
-              }}
-              disabled={(() => {
-                const owed = BigInt(loans?.totalAmountOwed || 0);
-                return owed === 0n;
-              })()}
-              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-              title={(() => {
-                const owed = BigInt(loans?.totalAmountOwed || 0);
-                return owed === 0n ? "No amount available to repay" : "Set to total debt (Repay All)";
-              })()}
-            >
-              Max :
-            </button>
-            <span>{(() => {
-              const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
-              const max = maxWalletSafe < totalOwed ? maxWalletSafe : totalOwed;
-              return max <= 0n ? '-' : formatCurrency(formatUnits(max, 18));
-            })()} USDST</span>
-          </div>
-        </div>
-        <div className="relative">
-          <Input
-            placeholder="0.00"
-            className={`pr-16 ${(() => { 
-              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-              const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-              const maxWalletSafe = safeAvailWei;
-              return repayAmountWei > totalOwed || repayAmountWei > maxWalletSafe ? 'text-red-600' : ''; 
-            })()}`}
-            value={repayDisplayAmount}
-            onChange={handleRepayAmountChange}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
-        </div>
-        <PercentageButtons
-          value={repayAmount}
-          maxValue={(() => {
-            const maxAvailable = BigInt(loans?.totalAmountOwed || 0);
-            const maxWalletSafe = safeAvailWei;
-            const maxAmount = maxWalletSafe > 0n && maxWalletSafe < maxAvailable ? maxWalletSafe : maxAvailable;
-            return maxAmount.toString();
-          })()}
-          onChange={(val) => {
-            handleRepayPercentage(val);
-          }}
-          className="pt-2"
-          renderLabel={(p) => {
-            try {
-              const owed = BigInt(loans?.totalAmountOwed || 0);
-              const walletSafe = safeAvailWei;
-              const isWalletLimited = walletSafe < owed;
-              return p === 1 ? (isWalletLimited ? 'Max' : '100%') : `${Math.round(p*100)}%`;
-            } catch {
-              return p === 1 ? 'Max' : `${Math.round(p*100)}%`;
-            }
-          }}
-        />
-      </div>
+      <TokenInput
+        value={repayAmount}
+        error={repayAmountError}
+        tokenName="Repay Amount (USDST)"
+        tokenSymbol="USDST"
+        maxTransferable={maxTransferable}
+        decimals={18}
+        disabled={loading || maxTransferable === 0n}
+        loading={loading}
+        onValueChange={onAmountChange}
+        onErrorChange={setRepayAmountError}
+        onMaxClick={onMaxClick}
+        showPercentageButtons
+      />
 
       {/* Risk Level */}
       <RiskLevelProgress riskLevel={riskLevel} />
@@ -241,60 +253,22 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance }: RepayFormProp
         <div className="flex justify-between items-center">
           <span className="text-sm text-gray-500">Remaining Balance</span>
           <span className="font-medium">
-            {(() => {
-              try {
-                const totalOwed = BigInt(loans?.totalAmountOwed || 0);
-                const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-                const remaining = totalOwed - repayAmountWei;
-                return `${formatCurrency(formatUnits(remaining > 0n ? remaining : 0n, 18))} USDST`;
-              } catch {
-                return `${formatCurrency(formatUnits(BigInt(loans?.totalAmountOwed || "0"), 18))} USDST`;
-              }
-            })()}
+            {remainingDisplay} USDST
           </span>
         </div>
       </div>
 
       {/* Transaction Fee */}
-      <div className="px-4 py-3 bg-gray-50 rounded-md">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{REPAY_FEE} USDST</span>
-        </div>
-        {(() => {
-          const feeAmount = safeParseUnits(REPAY_FEE, 18);
-          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-          
-          return isInsufficientUsdstForFee ? (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({REPAY_FEE} USDST)
-            </p>
-          ) : null;
-        })()}
-      </div>
+      <FeeNotice fee={REPAY_FEE} canPay={canPayFee} vouchersRequired={vouchersRequired} />
 
       {/* Repay Button */}
       <Button
+        type="button"
         onClick={handleRepay}
-        disabled={
-          repayLoading ||
-          !repayAmount ||
-          (() => { try { return safeParseUnits(repayAmount || "0", 18) === 0n; } catch { return true; } })() ||
-          (() => { try { return safeParseUnits(repayAmount || "0", 18) > BigInt(loans?.totalAmountOwed || 0); } catch { return true; } })() ||
-          (() => {
-            try {
-              const repayAmountWei = safeParseUnits(repayAmount || "0", 18);
-              const totalNeeded = repayAmountWei + feeWei;
-              return balWei < totalNeeded || repayAmountWei > safeAvailWei;
-            } catch {
-              return true;
-            }
-          })()
-        }
+        disabled={repayDisabled}
         className="w-full"
       >
-        {repayLoading ? (
+        {loading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
         ) : (
           "Repay"

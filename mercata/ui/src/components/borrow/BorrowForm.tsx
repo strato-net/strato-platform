@@ -1,132 +1,224 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { formatUnits } from "ethers";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BORROW_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat } from "@/utils/numberUtils";
-import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
+import { BORROW_FEE, VOUCHERS_PER_UNIT } from "@/lib/constants";
+import { safeParseUnits, formatWeiAmount, safeParseFloat } from "@/utils/numberUtils";
+import { NewLoanData, CollateralData } from "@/interface";
 import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
-import PercentageButtons from "../ui/PercentageButtons";
+import TokenInput from "@/components/shared/TokenInput";
 import { useLendingContext } from "@/context/LendingContext";
+import { useUserTokens } from "@/context/UserTokensContext";
+
+// Centralized parsing helpers
+const toWei18 = (x?: string) => safeParseUnits(x || "0", 18);
+const toBig = (x?: string | number | bigint) => {
+  if (typeof x === "bigint") return x;
+  if (typeof x === "number") return BigInt(Math.trunc(x));
+  const s = String(x ?? "0").trim();
+  if (!/^\d+$/.test(s)) return 0n; // fallback
+  return BigInt(s);
+};
+
+// Constants
+const DUST_USD_WEI = toWei18("0.00000000000000001");
+
+// Hoisted presentational components
+const FeeNotice = ({ fee, canPay, vouchersRequired }: { fee: string; canPay: boolean; vouchersRequired: number }) => (
+  <div className="px-4 py-3 bg-gray-50 rounded-md">
+    <div className="flex justify-between text-sm mb-2">
+      <span className="text-gray-600">Transaction Fee</span>
+      <span className="font-medium">
+        {fee} USDST ({vouchersRequired} vouchers)
+      </span>
+    </div>
+    {!canPay && (
+      <p className="text-yellow-600 text-sm mt-1">
+        Insufficient fee coverage. Add USDST or vouchers.
+      </p>
+    )}
+  </div>
+);
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
-  borrowLoading: boolean;
-  onBorrow: (amount: string) => void;
   usdstBalance: string;
   collateralInfo: CollateralData[] | null;
-  startPolling?: () => void;
-  stopPolling?: () => void;
+  onActionComplete?: () => void;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
+const BorrowForm = ({ loans, usdstBalance, collateralInfo, onActionComplete }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
-  const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
-  const [riskLevel, setRiskLevel] = useState(0);
-  const [healthImpact, setHealthImpact] = useState<HealthImpactData>({
-    currentHealthFactor: 0,
-    newHealthFactor: 0,
-    healthImpact: 0,
-    isHealthy: true,
-  });
-  const { borrowMax } = useLendingContext();
+  const [borrowAmountError, setBorrowAmountError] = useState<string>("");
+  const { borrowMax, borrowAsset, loading } = useLendingContext();
+  const { voucherBalance } = useUserTokens();
+  
+  // Track previous max to detect changes
+  const prevMaxRef = useRef<bigint>(0n);
+  const [isUpdating, setIsUpdating] = useState(false);
 
-  // Calculate risk level for borrow form
+  // Centralized parsing - once per render
+  const loansMax = toBig(loans?.maxAvailableToBorrowUSD);
+  const totalOwed = toBig(loans?.totalAmountOwed);
+  const collatUSD = toBig(loans?.totalCollateralValueUSD);
+  const borrowWei = toWei18(borrowAmount);
+  const usdstBal = toBig(usdstBalance);
+  const voucherBal = toBig(voucherBalance);
+
+  // Memoized constants
+  const feeWei = useMemo(() => toWei18(BORROW_FEE), []);
+  const EPS = 1n;
+
+  // Derived state via useMemo
+  const canPayFee = useMemo(() => usdstBal + voucherBal >= feeWei, [usdstBal, voucherBal, feeWei]);
+
+  const maxTransferable = useMemo(
+    () => (canPayFee ? loansMax : 0n),
+    [canPayFee, loansMax]
+  );
+
+  const riskLevel = useMemo(() => {
+    if (collatUSD <= DUST_USD_WEI) return 0;
+    const totalBorrowed = totalOwed + borrowWei;
+    const bp = Number((totalBorrowed * 10000n) / collatUSD) / 100;
+    return Math.max(0, Math.min(bp, 100));
+  }, [borrowWei, totalOwed, collatUSD]);
+
+  const healthImpact = useMemo(
+    () => calculateBorrowHealthImpact(borrowWei, loans),
+    [borrowWei, loans]
+  );
+
+  const interestRateDisplay = useMemo(() => {
+    const num = Number(loans?.interestRate);
+    return Number.isFinite(num) ? `${(num / 100).toFixed(2)}%` : "-";
+  }, [loans?.interestRate]);
+
+  const availableIsZero = useMemo(() => loansMax === 0n, [loansMax]);
+  const availableStr = useMemo(
+    () => formatWeiAmount(String(loansMax)),
+    [loansMax]
+  );
+
+  const owedDisplay = useMemo(() => {
+    const d = totalOwed <= 1n ? 0n : totalOwed;
+    return formatUnits(d, 18);
+  }, [totalOwed]);
+
+  // Initialize prev max once to avoid first-render clamp
   useEffect(() => {
-    try {
-      const existingBorrowedBigInt = BigInt(loans?.totalAmountOwed || 0);
-      const newBorrowAmountBigInt = safeParseUnits(borrowAmount || "0", 18);
-      const totalBorrowedBigInt = existingBorrowedBigInt + newBorrowAmountBigInt;
-      const collateralValueBigInt = BigInt(loans?.totalCollateralValueUSD || 0);
+    prevMaxRef.current = maxTransferable;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      if (collateralValueBigInt === 0n) {
-        setRiskLevel(0);
-        return;
+  // Make the "shrink input if max drops" effect robust
+  useEffect(() => {
+    const prevMax = prevMaxRef.current;
+    
+    // Always trigger animation when max changes (regardless of user input)
+    if (prevMax !== 0n && maxTransferable !== prevMax) {
+      setIsUpdating(true);
+      setTimeout(() => setIsUpdating(false), 300);
+    }
+    
+    // Only adjust user input if they have entered an amount
+    if (borrowAmount) {
+      const inputWei = toWei18(borrowAmount);
+      if (maxTransferable > 0n && inputWei > maxTransferable) {
+        setBorrowAmount(formatUnits(maxTransferable, 18));
+        setBorrowAmountError("");
       }
-
-      const risk = Number((totalBorrowedBigInt * 10000n) / collateralValueBigInt) / 100;
-      setRiskLevel(Math.min(risk, 100));
-    } catch {
-      setRiskLevel(0);
     }
-  }, [borrowAmount, loans?.totalCollateralValueUSD, loans?.totalAmountOwed]);
+    
+    prevMaxRef.current = maxTransferable;
+  }, [maxTransferable, borrowAmount]);
 
-  // Consolidated polling handler
-  const handlePollingUpdate = (amount: string) => {
-    if (amount && parseFloat(amount) > 0) {
-      startPolling?.();
-    } else {
-      stopPolling?.();
-    }
-  };
+  // Callbacks for side effects
+  const onAmountChange = useCallback((v: string) => {
+    setBorrowAmount(v);
+    setBorrowAmountError("");
+  }, []);
 
-  const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, '');
-    if (/^\d*\.?\d*$/.test(value)) {
-      setBorrowDisplayAmount(addCommasToInput(value));
-      setBorrowAmount(value);
-      handlePollingUpdate(value);
-    }
-  };
+  const onMaxClick = useCallback(() => {
+    if (maxTransferable <= 0n) return;        // no-op
+    setBorrowAmount(formatUnits(maxTransferable, 18));
+    setBorrowAmountError("");
+  }, [maxTransferable]);
 
-  const handleBorrowPercentage = (percentageAmount: string) => {
-    setBorrowAmount(percentageAmount);
-    setBorrowDisplayAmount(addCommasToInput(percentageAmount));
-    handlePollingUpdate(percentageAmount);
-  };
-
-  const handleBorrow = async () => {
-    const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
-    const wei = safeParseUnits(borrowAmount || "0", 18);
-
-    // If at or within 1 wei of the max available, route via parent as 'ALL' to use on-chain borrowMax and parent UX
-    if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
-      onBorrow('ALL');
+  const handleBorrow = useCallback(async () => {
+    const nearMaxNow = loansMax > 0n && borrowWei + EPS >= loansMax;
+    try {
+      await (nearMaxNow ? borrowMax() : borrowAsset({ amount: borrowWei.toString() }));
       setBorrowAmount("");
-      setBorrowDisplayAmount("");
-      handlePollingUpdate("");
-      return;
+      setBorrowAmountError("");
+    } finally {
+      onActionComplete?.();
     }
+  }, [loansMax, borrowWei, EPS, borrowMax, borrowAsset, onActionComplete]);
 
-    onBorrow(borrowAmount);
-    setBorrowAmount("");
-    setBorrowDisplayAmount("");
-    handlePollingUpdate("");
+  // Precomputed button state
+  const borrowAmountValid = borrowWei > 0n && borrowWei <= maxTransferable && !borrowAmountError;
+  const borrowDisabled = loading || !borrowAmountValid;
+
+  // Memoized vouchers calculation
+  const vouchersRequired = useMemo(
+    () => Math.ceil(safeParseFloat(BORROW_FEE) * VOUCHERS_PER_UNIT),
+    []
+  );
+
+
+  const BorrowingTips = () => {
+    const hasCollateral = (collateralInfo?.length ?? 0) > 0;
+    
+    // Only show tips if there's no borrowing power
+    if (!availableIsZero) {
+      return null; // Normal state - no message needed
+    }
+    
+    // Case 1: No collateral at all (no assets with balance > 0)
+    if (!hasCollateral && availableIsZero) {
+      return (
+        <p className="text-yellow-600 text-xs mt-1">
+          No assets available. Supply collateral to enable borrowing.
+        </p>
+      );
+    }
+    
+    // Case 2: Has assets but no borrowing power (already at max or insufficient value)
+    if (availableIsZero) {
+      return (
+        <p className="text-yellow-600 text-xs mt-1">
+          Insufficient collateral value. Add more collateral or reduce existing debt.
+        </p>
+      );
+    }
+    
+    return null;
   };
-
-  useEffect(()=>{
-    const borrowAmountWei = safeParseUnits(borrowAmount || "0", 18);
-    const res = calculateBorrowHealthImpact(borrowAmountWei, loans)    
-    setHealthImpact(res)
-  },[borrowAmount, loans])
-
-  const interestRateDisplay = (() => {
-    const raw = (loans as any)?.interestRate; // bps
-    const num = Number(raw);
-    if (!isFinite(num)) return "-";
-    return `${(num / 100).toFixed(2)}%`;
-  })();
 
   return (
     <div className="space-y-4 pt-4">
       {/* Loan Details */}
       <div className="space-y-3">
         <div className="flex justify-between">
-          <span className="text-sm text-gray-500">Available to borrow</span>
-          <span className="font-medium">
-            USDST {safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')}
+          <span className="text-sm text-gray-500">
+            Available to borrow {canPayFee ? "" : "(fee required)"}
           </span>
+          <div className="flex items-center gap-2">
+            <span className={`font-medium transition-opacity duration-300 ${isUpdating ? 'opacity-50' : 'opacity-100'}`}>
+              USDST {availableIsZero ? "-" : availableStr}
+            </span>
+            {loading && (
+              <div className="animate-spin rounded-full h-3 w-3 border-t border-b border-blue-500"></div>
+            )}
+          </div>
         </div>
+        <BorrowingTips />
         <div className="flex justify-between">
           <span className="text-sm text-gray-500">Total Amount Owed</span>
-          <span className="font-medium">
-            {(() => {
-              const owed = (() => { try { return BigInt(loans?.totalAmountOwed || 0); } catch { return 0n; } })();
-              const display = owed <= 1n ? 0n : owed;
-              return `USDST ${formatUnits(display, 18)}`;
-            })()}
+          <span className={`font-medium transition-opacity duration-300 ${isUpdating ? 'opacity-50' : 'opacity-100'}`}>
+            USDST {owedDisplay}
           </span>
         </div>
         <div className="flex justify-between">
@@ -138,138 +230,43 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
       </div>
 
       {/* Borrow Amount Input */}
-      <div className="space-y-3">
-        <label className="text-sm font-medium">Borrow Amount (USDST)</label>
-        <div className="flex justify-between items-center text-xs text-gray-500">
-          <span>Min: 0.01 USDST</span>
-          <div>
-            <button
-              type="button"
-              onClick={async () => {
-                try {
-                  await borrowMax();
-                  // After borrowMax, clear input and rely on refresh from parent
-                  setBorrowAmount("");
-                  setBorrowDisplayAmount("");
-                  handlePollingUpdate("");
-                } catch {
-                  // noop
-                }
-              }}
-              disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
-              className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
-              title={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? "No amount available to borrow" : "Set to safe maximum available amount"}
-            >
-              Max :
-            </button>
-            <span>{safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0 ? '-' : formatWeiAmount(loans?.maxAvailableToBorrowUSD || '0')} USDST</span>
-          </div>
-        </div>
-        <div className="relative">
-          <Input
-            placeholder="0.00"
-            className={`pr-16 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''}`}
-            value={borrowDisplayAmount}
-            onChange={handleBorrowAmountChange}
-          />
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
-        </div>
-        <PercentageButtons
-          value={borrowAmount}
-          maxValue={loans?.maxAvailableToBorrowUSD || "0"}
-          onChange={(val) => {
-            handleBorrowPercentage(val);
-          }}
-          className="mt-2"
-        />
-      </div>
+      <TokenInput
+        value={borrowAmount}
+        error={borrowAmountError}
+        tokenName="Borrow Amount (USDST)"
+        tokenSymbol="USDST"
+        maxTransferable={maxTransferable}
+        decimals={18}
+        disabled={loading || maxTransferable === 0n}
+        loading={loading}
+        onValueChange={onAmountChange}
+        onErrorChange={setBorrowAmountError}
+        onMaxClick={onMaxClick}
+        showPercentageButtons
+      />
 
       {/* Risk Level */}
       <RiskLevelProgress riskLevel={riskLevel} />
 
-      {/* Transaction Fee */}
-      <div className="px-4 py-3 bg-gray-50 rounded-md">
-        <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
-        <div className="flex justify-between text-sm mb-2">
-          <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{BORROW_FEE} USDST</span>
-        </div>
-        {(() => {
-          const feeAmount = safeParseUnits(BORROW_FEE, 18);
-          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
+      {/* Health Impact */}
+      <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} />
 
-          return isInsufficientUsdstForFee ? (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
-            </p>
-          ) : null;
-        })()}
-      </div>
+      {/* Transaction Fee */}
+      <FeeNotice fee={BORROW_FEE} canPay={canPayFee} vouchersRequired={vouchersRequired} />
 
       {/* Borrow Button */}
-      <Button
-        onClick={handleBorrow}
-        disabled={
-          !borrowAmount ||
-          safeParseUnits(borrowAmount, 18) <= 0n ||
-          borrowLoading ||
-          safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
-          (() => {
-            const feeAmount = safeParseUnits(BORROW_FEE, 18);
-            const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-            return usdstBalanceBigInt < feeAmount;
-          })()
-        }
-        className="w-full"
-      >
-        {borrowLoading ? (
+        <Button
+          type="button"
+          onClick={handleBorrow}
+          disabled={borrowDisabled}
+          className="w-full"
+        >
+        {loading ? (
           <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
         ) : null}
         Borrow
       </Button>
 
-      {/* Conditional Warning Messages */}
-      {(() => {
-        const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
-        const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
-        
-        // collateralInfo already contains only eligible collateral (balance > 0)
-        const eligibleCollateralTokens = collateralInfo || [];
-
-        const borrowInfoMessage = (
-          <p className="text-gray-600 mt-2">
-            Borrowing against your assets allows you to access liquidity
-            without selling your holdings. Be mindful of the risk level, as
-            high borrowing increases liquidation risk during market
-            volatility.
-          </p>
-        );
-
-        if (isZeroAvailable) {
-          return (
-            <div className="mt-2">
-              <p className="text-gray-600">
-                You currently have no available borrowing power. Supply collateral to enable borrowing.
-              </p>
-              {borrowInfoMessage}
-            </div>
-          );
-        }
-
-        if (eligibleCollateralTokens.length === 0) {
-          return (
-            <div className="mt-2">
-              <p className="text-gray-600">
-                You have no eligible collateral. Supply assets to enable borrowing.
-              </p>
-              {borrowInfoMessage}
-            </div>
-          );
-        }
-
-        return null;
-      })()}
     </div>
   );
 };

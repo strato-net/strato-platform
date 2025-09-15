@@ -183,7 +183,7 @@ const CollateralModal = ({
             onValueChange={setAmount}
             onErrorChange={setInputError}
             onMaxClick={handleMaxClick}
-            showPercentageButtons={maxTransferable && maxTransferable >= 100n}
+            showPercentageButtons={true}
           />
 
           {/* Risk Level */}

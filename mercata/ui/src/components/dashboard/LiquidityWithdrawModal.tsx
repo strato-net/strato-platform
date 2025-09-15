@@ -192,17 +192,13 @@ const LiquidityWithdrawModal = ({
               error={withdrawPercentError}
               tokenName="LP Token"
               tokenSymbol="%"
-              tokenAddress=""
-              maxAmount={100n}
               maxTransferable={100n}
-              transactionFee={WITHDRAW_FEE}
               decimals={0}
               disabled={!(poolView && poolView.lpBal > 0n) || !canPayFee}
               loading={withdrawLoading}
-              usdstBalance={balances.usdst}
-              voucherBalance={balances.voucher}
               onValueChange={setWithdrawPercent}
               onErrorChange={setWithdrawPercentError}
+              onMaxClick={() => setWithdrawPercent("100")}
             />
           </div>
 
