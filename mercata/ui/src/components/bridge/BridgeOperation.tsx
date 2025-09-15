@@ -195,10 +195,14 @@ const useBalances = ({
   // Precomputed balance view for UI
   const balancesView = useMemo(() => {
     const sideDec = op.inbound ? op.extDec : op.stratoDec;
-    const post = maxAmount > parsedAmount ? maxAmount - parsedAmount : 0n;
+    
+    // For USDST operations, show available balance after fees
+    const displayAmount = (operation === "bridgeBurn" && !op.inbound) ? maxTransferable : maxAmount;
+    const post = displayAmount > parsedAmount ? displayAmount - parsedAmount : 0n;
+    
     const maxTransferableRaw = maxTransferable === 0n ? "0" : fmt(maxTransferable, op.inbound ? op.extDec : op.stratoDec, 0, 4);
     return {
-      before: fmt(maxAmount, sideDec, 2, 2),
+      before: fmt(displayAmount, sideDec, 2, 2),
       after: fmt(post, sideDec, 2, 2),
       receiveHuman: fmt(parsedAmount, op.inbound ? op.extDec : op.stratoDec, 0, 4),
       maxTransferableRaw,
@@ -209,8 +213,9 @@ const useBalances = ({
     op.extDec,
     op.stratoDec,
     maxAmount,
-    parsedAmount,
     maxTransferable,
+    parsedAmount,
+    operation,
   ]);
 
   // Combined loading state
