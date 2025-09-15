@@ -17,47 +17,114 @@ const TOKEN_ADDRESSES = {
 };
 
 /**
+ * Parse array input from environment variable (comma-separated values)
+ */
+function parseArrayFromEnv(envVar) {
+  if (!envVar) return [];
+  return envVar.split(',').map(item => item.trim()).filter(item => item);
+}
+
+/**
+ * Get user addresses from environment variables (supports both single and array)
+ */
+function getUserAddressesFromEnv() {
+  try {
+    const singleAddress = getEnvVar('USER_ADDRESS');
+    if (singleAddress) {
+      // Check if USER_ADDRESS contains comma-separated values
+      if (singleAddress.includes(',')) {
+        return parseArrayFromEnv(singleAddress);
+      }
+      return [singleAddress];
+    }
+  } catch (error) {
+    // USER_ADDRESS not set, try USER_ADDRESSES
+  }
+
+  try {
+    const addressArray = getEnvVar('USER_ADDRESSES');
+    return parseArrayFromEnv(addressArray);
+  } catch (error) {
+    throw new Error('Either USER_ADDRESS or USER_ADDRESSES must be set');
+  }
+}
+
+/**
  * Get token amounts from environment variables and convert to wei
+ * Supports both single amounts and arrays
  */
 function getTokenAmountsFromEnv() {
   const amounts = {};
   const tokens = ['USDST', 'bCSPXST', 'SILVST', 'GOLDST', 'WBTCST', 'ETHST'];
-  
+
   tokens.forEach(token => {
     try {
-      const amount = getEnvVar(token);
-      if (amount && parseFloat(amount) > 0) {
-        // Convert to wei (assuming 18 decimals for all tokens)
-        const weiAmount = ethers.parseEther(amount);
-        amounts[token] = weiAmount.toString();
-        console.log(`  ${token}: ${amount} (${weiAmount.toString()} wei)`);
+      // Try single amount first
+      const singleAmount = getEnvVar(token);
+      if (singleAmount && parseFloat(singleAmount) > 0) {
+        const weiAmount = ethers.parseEther(singleAmount);
+        amounts[token] = [weiAmount.toString()];
+        console.log(`  ${token}: ${singleAmount} (${weiAmount.toString()} wei)`);
+        return;
       }
     } catch (error) {
-      // Token amount not set in env, skip it
+      // Single amount not set, try array
+    }
+
+    try {
+      // Try array amounts
+      const arrayAmounts = getEnvVar(`${token}_ARRAY`);
+      if (arrayAmounts) {
+        const parsedAmounts = parseArrayFromEnv(arrayAmounts);
+        if (parsedAmounts.length > 0) {
+          const weiAmounts = parsedAmounts
+            .filter(amount => parseFloat(amount) > 0)
+            .map(amount => {
+              const weiAmount = ethers.parseEther(amount);
+              console.log(`  ${token}: ${amount} (${weiAmount.toString()} wei)`);
+              return weiAmount.toString();
+            });
+          if (weiAmounts.length > 0) {
+            amounts[token] = weiAmounts;
+          }
+        }
+      }
+    } catch (error) {
+      // Array amounts not set, skip token
     }
   });
-  
+
   return amounts;
 }
 
-function createTransferCalls(userAddress, tokenAmounts) {
+function createTransferCalls(userAddresses, tokenAmounts) {
   const calls = [];
-  
-  Object.entries(tokenAmounts).forEach(([token, weiAmount]) => {
-    calls.push({
-      contract: { address: TOKEN_ADDRESSES[token], name: "ERC20" },
-      method: "transfer",
-      args: {
-        to: userAddress,
-        value: weiAmount,
-      }
+
+  Object.entries(tokenAmounts).forEach(([token, weiAmounts]) => {
+    weiAmounts.forEach((weiAmount, amountIndex) => {
+      userAddresses.forEach(userAddress => {
+        calls.push({
+          contract: { address: TOKEN_ADDRESSES[token], name: "ERC20" },
+          method: "transfer",
+          args: {
+            to: userAddress,
+            value: weiAmount,
+          },
+          metadata: {
+            token,
+            userAddress,
+            weiAmount,
+            amountIndex
+          }
+        });
+      });
     });
   });
-  
+
   return calls;
 }
 
-function generateTransferReport(userAddress, tokenAmounts, results) {
+function generateTransferReport(userAddresses, tokenAmounts, transferCalls, results) {
   const report = {
     timestamp: new Date().toISOString(),
     summary: {
@@ -65,29 +132,41 @@ function generateTransferReport(userAddress, tokenAmounts, results) {
       successfulTransfers: 0,
       failedTransfers: 0,
       totalAmountTransferred: 0,
-      userAddress: userAddress,
-      tokensProcessed: new Set()
+      userAddresses: userAddresses,
+      tokensProcessed: new Set(),
+      transfersByUser: {}
     },
     successfulTransfers: [],
     failedTransfers: [],
     errors: []
   };
-  
-  const tokenEntries = Object.entries(tokenAmounts);
-  
+
+  // Initialize user transfer counts
+  userAddresses.forEach(address => {
+    report.summary.transfersByUser[address] = {
+      successful: 0,
+      failed: 0,
+      totalAmount: 0
+    };
+  });
+
   results.forEach((result, index) => {
-    const [token, weiAmount] = tokenEntries[index];
-    
+    const call = transferCalls[index];
+    const { token, userAddress, weiAmount } = call.metadata;
+    const amount = ethers.formatEther(weiAmount);
+
     if (result.status === 'Success') {
       report.summary.successfulTransfers++;
-      report.summary.totalAmountTransferred += parseFloat(ethers.formatEther(weiAmount));
+      report.summary.totalAmountTransferred += parseFloat(amount);
       report.summary.tokensProcessed.add(token);
-      
+      report.summary.transfersByUser[userAddress].successful++;
+      report.summary.transfersByUser[userAddress].totalAmount += parseFloat(amount);
+
       report.successfulTransfers.push({
         recipientAddress: userAddress,
         token: token,
         tokenAddress: TOKEN_ADDRESSES[token],
-        amount: ethers.formatEther(weiAmount),
+        amount: amount,
         weiAmount: weiAmount,
         transactionHash: result.hash,
         status: result.status
@@ -101,11 +180,15 @@ function generateTransferReport(userAddress, tokenAmounts, results) {
         (result.txResult && result.txResult.message) ||
         ""
       ) || "Unknown error";
+
+      report.summary.failedTransfers++;
+      report.summary.transfersByUser[userAddress].failed++;
+
       const failedTransfer = {
         recipientAddress: userAddress,
         token: token,
         tokenAddress: TOKEN_ADDRESSES[token],
-        amount: ethers.formatEther(weiAmount),
+        amount: amount,
         weiAmount: weiAmount,
         transactionHash: result.hash,
         status: result.status,
@@ -115,9 +198,9 @@ function generateTransferReport(userAddress, tokenAmounts, results) {
       report.errors.push(`${token} transfer to ${userAddress} failed with status ${result.status}`);
     }
   });
-  
+
   report.summary.tokensProcessed = Array.from(report.summary.tokensProcessed);
-  
+
   return report;
 }
 
@@ -137,36 +220,52 @@ function saveTransferReport(report) {
 
 async function transferTokens() {
   try {
-    const userAddress = getEnvVar('USER_ADDRESS');
+    const userAddresses = getUserAddressesFromEnv();
     const tokenAmounts = getTokenAmountsFromEnv();
-    
+
     if (Object.keys(tokenAmounts).length === 0) {
       console.log('No token amounts found in environment variables');
       return;
     }
-    
-    console.log(`Transferring to ${userAddress}:`);
-    
-    const transferCalls = createTransferCalls(userAddress, tokenAmounts);
+
+    if (userAddresses.length === 0) {
+      console.log('No user addresses found in environment variables');
+      return;
+    }
+
+    console.log(`Transferring to ${userAddresses.length} address(es):`);
+    userAddresses.forEach((address, index) => {
+      console.log(`  [${index + 1}] ${address}`);
+    });
+    console.log();
+
+    const transferCalls = createTransferCalls(userAddresses, tokenAmounts);
     console.log(`Executing ${transferCalls.length} transfers...`);
-    
+
     const results = await callListAndWait(transferCalls);
-    
-    const report = generateTransferReport(userAddress, tokenAmounts, results);
+
+    const report = generateTransferReport(userAddresses, tokenAmounts, transferCalls, results);
     const reportPath = saveTransferReport(report);
-    
+
     console.log(`\nResults: ${report.summary.successfulTransfers}/${report.summary.totalTransfers} successful`);
+
+    // Show per-user summary
+    console.log('\nPer-user summary:');
+    Object.entries(report.summary.transfersByUser).forEach(([address, stats]) => {
+      console.log(`  ${address}: ${stats.successful} successful, ${stats.failed} failed, ${stats.totalAmount.toFixed(6)} tokens transferred`);
+    });
+
     if (report.failedTransfers.length > 0) {
       console.log('\nFailed transfers:');
       report.failedTransfers.forEach(transfer => {
-        let msg = `  ${transfer.token}: ${transfer.status} (tx: ${transfer.transactionHash || 'N/A'})`;
+        let msg = `  ${transfer.token} to ${transfer.recipientAddress}: ${transfer.status} (tx: ${transfer.transactionHash || 'N/A'})`;
         if (transfer.error) msg += `\n    Error: ${transfer.error}`;
         console.log(msg);
       });
     }
-    
+
     console.log(`\nTransfer report saved to: ${reportPath}`);
-    
+
   } catch (error) {
     console.error('Script failed:', error.message);
     throw error;
@@ -175,9 +274,12 @@ async function transferTokens() {
 
 if (require.main === module) {
   console.error('Set environment variables:');
-  console.error('  USER_ADDRESS - Target user address');
-  console.error('  USDST, bCSPXST, SILVST, GOLDST, WBTCST, ETHST - Token amounts (in token units, not wei)');
-  
+  console.error('  USER_ADDRESS - Single target user address, OR');
+  console.error('  USER_ADDRESSES - Comma-separated list of target user addresses');
+  console.error('  Token amounts (in token units, not wei):');
+  console.error('    Single amounts: USDST, bCSPXST, SILVST, GOLDST, WBTCST, ETHST');
+  console.error('    Array amounts: USDST_ARRAY, bCSPXST_ARRAY, etc. (comma-separated)');
+
   (async () => {
     try {
       await transferTokens();
@@ -191,6 +293,8 @@ if (require.main === module) {
 module.exports = {
   transferTokens,
   getTokenAmountsFromEnv,
+  getUserAddressesFromEnv,
   createTransferCalls,
-  generateTransferReport
+  generateTransferReport,
+  parseArrayFromEnv
 }; 
