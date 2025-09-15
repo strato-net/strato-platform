@@ -227,4 +227,22 @@ contract record PoolConfigurator is Ownable {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.sweepReserves(amount);
     }
+
+    /**
+     * @notice Slash the safety module for bad debt
+     */
+    function slashSafetyForBadDebt() external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.slashSafetyForBadDebt();
+    }
+
+    /**
+     * @notice Reward the safety module with the safety reserves
+     * Should be called routinely, but may be swept by anyone
+     */
+    function rewardSafetyModule() external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.rewardSafetyModule();
+    }
+
 } 

@@ -768,6 +768,7 @@ contract record LendingPool is Ownable {
             return 1e18; // Initial 1:1 ratio
         }
 
+        // Cash is the underlying balance in the liquidity pool less reserves
         uint cash = LiquidityPool(_liquidityPool()).getUnderlyingBalanceAvailable();
         uint debt = _totalDebt(); // index-based system debt
 
@@ -1051,45 +1052,57 @@ contract record LendingPool is Ownable {
     }
 
     // Bad Debt Handling
-    function _handleBadDebt() internal {
+    function _handleBadDebt(address borrower) internal {
         LoanInfo storage loan = userLoan[borrower];
-        require(loan.scaledDebt > 0, "No active loan");
-
-        uint owed = (loan.scaledDebt * borrowIndex) / RAY;
-        require(owed > 0, "Nothing to write off");
-
-        badDebt += owed;
-
-
-        _slashSafetyForBadDebt();
+        uint scaledDebt = loan.scaledDebt;
 
         // Write off the new bad debt
-        uint scaledDelta = (owed * RAY) / borrowIndex;
-        totalScaledDebt -= scaledDelta;
-        loan.scaledDebt = 0;
+        totalScaledDebt -= scaledDebt;
         delete userLoan[borrower];
-
         emit BadDebtWrittenOff(borrower, borrowableAsset, owed);
-        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+
+        // Attempt to cover bad debt from safety module
+        uint owed = (scaledDebt * borrowIndex) / RAY;
+        badDebt += owed;
+        _slashSafetyForBadDebt();
 
         return;
     }
 
+    /**
+     * @notice Slash the safety module to cover bad debt
+     * Allows the exchange rate to rise 
+     */
     function _slashSafetyForBadDebt() internal {
         // first, cover from held safety reserves
         safetyReservesSlash = safetyReserves < badDebt ? safetyReserves : badDebt;
         safetyReserves -= safetyReservesSlash;
         badDebt -= safetyReservesSlash;
         emit SafetyReservesSlashed(safetyReservesSlash, badDebt);
-        if (badDebt == 0) return;
+        
+        if (badDebt != 0) {
+            // then, slash sUSDST
+            uint covered = SafetyModule(_safetyModule()).slash(badDebt);
+            badDebt -= covered;
+            emit SafetyModuleSlashed(covered, badDebt);
+        }
 
-        // then, slash sUSDST
-        uint covered = SafetyModule(_safetyModule()).slash(badDebt);
-        badDebt -= covered;
-        emit SafetyModuleSlashed(covered, badDebt);
-        if (badDebt == 0) return;
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
+    /**
+     * @notice Slash the safety module to cover bad debt
+     * May be manually triggered by the PoolConfigurator,
+     * in case a badDebt balance remains and safety balance becomes available
+     */
+    function slashSafetyForBadDebt() public onlyPoolConfigurator {
+        _slashSafetyForBadDebt();
+    }
+
+    /**
+     * @notice Reward the safety module with the safety reserves
+     * Should be called routinely, but sToken holders may also call this
+     */
     function rewardSafetyModule() public {
         LiquidityPool(_liquidityPool()).transferReserve(safetyReserves, address(_safetyModule()));
         safetyReserves = 0;

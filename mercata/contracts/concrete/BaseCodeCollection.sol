@@ -35,6 +35,7 @@ import "Lending/LiquidityPool.sol";
 import "Lending/PoolConfigurator.sol";
 import "Lending/PriceOracle.sol";
 import "Lending/RateStrategy.sol";
+import "Lending/SafetyModule.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
@@ -83,6 +84,7 @@ contract record Mercata {
         priceOracle = new PriceOracle(address(adminRegistry)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector));
+        // safetyModule = new SafetyModule(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), X, Y);
            
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);

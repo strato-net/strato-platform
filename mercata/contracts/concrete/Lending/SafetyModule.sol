@@ -1,5 +1,6 @@
 import "./LendingRegistry.sol";
 import "./LendingPool.sol";
+import "./PoolConfigurator.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
@@ -12,16 +13,18 @@ import "../../abstract/ERC20/IERC20.sol";
 
 contract record SafetyModule is Ownable {
     LendingRegistry public registry;
-    address public sToken;
+    address public sToken; //TODO ensure token active like in lending pool
     address public underlyingAsset;
+    address public poolConfigurator;
 
     event Slashed(uint amount, uint remaining);
     event ExchangeRateUpdated(uint newRate);
 
-    constructor(address _registry, address initialOwner, address _sToken, address _underlyingAsset) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner, address _sToken, address _underlyingAsset) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
-        require(_sToken != address(0) && tokenFactory.isTokenActive(_sToken), "Invalid or inactive sToken");
+        require(_poolConfigurator != address(0), "Invalid pool configurator address");
         registry = LendingRegistry(_registry);
+        poolConfigurator = PoolConfigurator(_poolConfigurator);
         sToken = _sToken;
         underlyingAsset = _underlyingAsset;
     }
@@ -32,22 +35,18 @@ contract record SafetyModule is Ownable {
         registry = LendingRegistry(_registry);
     }
 
-    /**
-     * @notice Set sToken for the single borrowable asset
-     * @param _sToken The sToken for the asset that can be borrowed
-     */
-    function setSToken(address _sToken) external onlyPoolConfigurator {
-        require(_sToken != address(0) && tokenFactory.isTokenActive(_sToken), "Invalid or inactive sToken");
-        sToken = _sToken;
-    }
-
     function _lendingPool() internal view returns (LendingPool) {
         return LendingPool(registry.lendingPool());
     }
 
+    /**
+     * @notice Get the exchange rate of the sToken in terms of the underlying asset
+     * @return The exchange rate in 1e18 scale (1e18 implies 1 underlying per sToken)
+     */
     function getExchangeRate() public view returns (uint) {
-        //TODO
-        return IERC20(underlyingAsset).balanceOf(address(this)) / IERC20(sToken).balanceOf(address(this));
+        uint assetBalance = IERC20(underlyingAsset).balanceOf(address(this));
+        uint sTokenSupply = IERC20(sToken).totalSupply();
+        return (assetBalance * 1e18) / sTokenSupply;
     }
 
     /**
@@ -62,8 +61,12 @@ contract record SafetyModule is Ownable {
         uint slashAmount = assetBalance < amount ? assetBalance : amount;
         IERC20(underlyingAsset).transfer(_lendingPool(), slashAmount);
 
-        emit Slashed(slashAmount, assetBalance - slashAmount);
+        // assetBalance - slashAmount
+        uint remaining = IERC20(underlyingAsset).balanceOf(address(this));
+
+        emit Slashed(slashAmount, remaining);
         emit ExchangeRateUpdated(getExchangeRate());
+        
         return slashAmount;
     }
 }
