@@ -1649,7 +1649,15 @@ valueToSQLText' z (ValueContract acct@(NamedAccount (Address addr) _)) =
     then Nothing
     else Just . T.pack $ show acct
 valueToSQLText' _ ValueFunction{} = Nothing
-valueToSQLText' _ ValueMapping{} = Nothing
+valueToSQLText' z (ValueMapping m) = Just
+  . decodeUtf8
+  . BL.toStrict
+  . Aeson.encode
+  . MapWrapper
+  . aesonHelper
+  . Map.fromList
+  . mapMaybe (\(k,v) -> (,) <$> valueToSQLText' z (SimpleValue k) <*> valueToSQLText' z v)
+  $ Map.toList m
 valueToSQLText' _ ValueArrayFixed{} = Nothing
 valueToSQLText' _ ValueArrayDynamic{} = Nothing
 valueToSQLText' _ struct@ValueStruct{} = solidityValueToText <$> valueToSolidityValue struct
