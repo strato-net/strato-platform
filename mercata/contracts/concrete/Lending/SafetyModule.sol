@@ -79,8 +79,12 @@ contract record SafetyModule is Ownable {
         require(amount > 0, "Invalid amount");
         require(sToken != address(0), "sToken not set");
 
-        uint sTokenAmount = (amount * 1e18) / getExchangeRate();
+        // Calculate mTokens to burn based on current exchange rate
+        uint exchangeRate = getExchangeRate();
+        // ceilDiv: (a + b - 1) / b
+        uint sTokenAmount = (amount * 1e18 + exchangeRate - 1) / exchangeRate;
 
+        // Burn sTokens in exchange for underlying assets
         Token(sToken).burn(msg.sender, sTokenAmount);
         require(IERC20(underlyingAsset).transfer(msg.sender, amount), "Withdraw failed");
 
@@ -93,8 +97,16 @@ contract record SafetyModule is Ownable {
      */
     function withdrawAll() external isConfigured {
         uint sTokenBalance = IERC20(sToken).balanceOf(msg.sender);
+        require(sTokenBalance > 0, "No sTokens to withdraw");
+
         uint underlyingAmount = (sTokenBalance * getExchangeRate()) / 1e18;
-        withdraw(underlyingAmount);
+        
+        // Burn sTokens in exchange for underlying assets
+        Token(sToken).burn(msg.sender, sTokenBalance);
+        require(IERC20(underlyingAsset).transfer(msg.sender, underlyingAmount), "Withdraw failed");
+
+        emit Withdrawn(msg.sender, underlyingAmount, sTokenBalance);
+        emit ExchangeRateUpdated(getExchangeRate());
     }
 
     /**
