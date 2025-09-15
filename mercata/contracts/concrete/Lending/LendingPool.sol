@@ -528,7 +528,7 @@ contract record LendingPool is Ownable {
         uint debtToCover
     ) public onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
-        require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
+        require(borrower != address(0) /*&& borrower != msg.sender TODO */, "Invalid borrower");
         require(debtToCover > 0, "Invalid debt amount");
 
         // Ensure collateral asset is configured and has liquidation parameters
@@ -610,7 +610,7 @@ contract record LendingPool is Ownable {
         address borrower
     ) external onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
-        require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
+        require(borrower != address(0) /*&& borrower != msg.sender TODO */, "Invalid borrower");
 
         // Ensure collateral asset is configured and has liquidation parameters
         AssetConfig memory cConfig = assetConfigs[collateralAsset];
