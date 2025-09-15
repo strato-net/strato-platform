@@ -29,15 +29,13 @@ module BlockApps.X509.Certificate
     getCertValidity,
     getCertIssuer,
     getParentUserAddress,
-    dateTimeToString,
-    getChainMemberFromX509,
+    dateTimeToString
   )
 where
 
 import BlockApps.X509.Keys
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Secp256k1
 import Control.Applicative ((<|>))
 import Control.DeepSeq
@@ -182,9 +180,6 @@ x509CertToCertInfoState cert =
           orgUnit = ou,
           commonName = cn
         }
-
-getChainMemberFromX509 :: X509CertInfoState -> ChainMemberParsedSet
-getChainMemberFromX509 (X509CertInfoState addr _ _ _ _ _ _) = CommonName addr
 
 data Issuer = Issuer
   { issCommonName :: String,

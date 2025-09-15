@@ -19,7 +19,6 @@ module Blockchain.Sequencer (
   ) where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul 
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
@@ -35,7 +34,6 @@ import Blockchain.Sequencer.Metrics
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Class as BDB
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Concurrent hiding (yield)
 import Control.Monad (forever, forM, when)
@@ -93,21 +91,7 @@ sequencer = do
     ctx <- fromJust <$> getBlockstanbulContext
     let selfAddr = fromJust $ _selfAddr ctx
     _ <- writeSeqVmEvents [VmSelfAddress selfAddr]
-    -- check for own cert and if val
-    maybeCert <- A.lookup (A.Proxy @X509CertInfoState) selfAddr
-    ctx'' <- case maybeCert of
-      Just cert -> do
-        let chainm = getChainMemberFromX509 cert
-        logF $ "Node identity verified: " ++ show chainm
-        case Validator selfAddr `S.member` _validators ctx of
-          True -> do
-            logF "You are a validator in this network!"
-            return ctx { _isValidator = True }
-          False -> return ctx
-      Nothing -> do
-        logF "Awaiting node identity verification..."
-        return ctx
-    putBlockstanbulContext ctx''
+    putBlockstanbulContext ctx
   logF "Sequencer startup"
   source <- fuseChannels
   bootstrapBlockstanbul
