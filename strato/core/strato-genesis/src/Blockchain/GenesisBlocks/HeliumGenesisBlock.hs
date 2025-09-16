@@ -457,7 +457,7 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 (CodeAtAcc
 
 mercataBridge :: AccountInfo
 mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount mercataAddress "MercataBridge") $ ownedByBlockApps mercataAddress ++
-  [ (".relayer", BAccount $ unspecifiedChain blockappsAddress)
+  [ (".relayer", BAccount $ unspecifiedChain 0x72b572ed77397da1ece4768cb2fec1943e1af7cb)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".depositsPaused", BBool False)
   , (".withdrawalCounter", BInteger 0)
@@ -503,6 +503,10 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS blockappsAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS 0x61960004350908061a90246f50ef2ab9d4b4f2c9 <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS 0x61960004350908061a90246f50ef2ab9d4b4f2c9 <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS 0x11298e3fd793aab22178d185ef7cedff24dbec7d <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS 0x11298e3fd793aab22178d185ef7cedff24dbec7d <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
