@@ -25,7 +25,6 @@ library:
   - blockapps-vault-wrapper-client
   - blockDB
   - bytestring
-  - certificateDB
   - common-log
   - conduit
   - containers

@@ -19,7 +19,6 @@ module Blockchain.Event
 where
 
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate            as XC
 import           Blockchain.Blockstanbul               (WireMessage,
                                                         blockstanbulSender)
 import           Blockchain.Context
@@ -40,7 +39,6 @@ import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.Sequencer.Event
 import           Blockchain.Strato.Discovery.Data.Peer
-import           Blockchain.Strato.Model.Address       (Address)
 import           Blockchain.Strato.Model.Class
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.MicroTime
@@ -206,7 +204,6 @@ handleEvents peer = awaitForever $ \case
     where
       getUntilMissing ::
         ( (Keccak256 `Alters` OutputBlock) m,
-          (Address `Selectable` X509CertInfoState) m,
           Accessible PublicKey m
         ) =>
         [Keccak256] ->

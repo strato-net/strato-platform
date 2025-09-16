@@ -10,7 +10,6 @@ packages:
 - core/blockapps-mpdbs
 - core/blockDB
 - core/blockstanbul
-- core/certificateDB
 - core/ethereum-discovery
 - core/ethereum-encryption
 - core/fast-keccak256
