@@ -29,7 +29,6 @@ module BlockApps.X509.Certificate
     getCertValidity,
     getCertIssuer,
     getParentUserAddress,
-    dateTimeToString
   )
 where
 
@@ -434,9 +433,6 @@ getValidity = do
       oneYear = Period {periodYears = 1, periodMonths = 0, periodDays = 0}
       endDate = DateTime (dt `dateAddPeriod` oneYear) tm -- all certs are valid for a year
   return (curDate, endDate)
-
-dateTimeToString :: DateTime -> String
-dateTimeToString = show . timeGetElapsed
 
 getParentUserAddress :: X509Certificate -> Maybe Address
 getParentUserAddress (X509Certificate (CertificateChain (_ : c2 : _))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))

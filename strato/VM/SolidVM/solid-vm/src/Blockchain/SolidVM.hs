@@ -83,7 +83,6 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char as CHAR
 import Data.Decimal
-import Data.Either.Extra (eitherToMaybe)
 import Data.Foldable (for_)
 import Data.List
 import Data.List.Extra ((!?))
@@ -2409,61 +2408,6 @@ callBuiltin "require" (SBool cond : msg) = do
     (m : _) -> require cond (Just $ show m)
   return SNULL
 callBuiltin "assert" [SBool cond] = SNULL <$ assert cond
-callBuiltin "getUserCert" [SAccount a _] = do
-  --Add others
-  curContract <- getCurrentContract
-  maybeCert <- A.select (A.Proxy @X509Certificate) $ a ^. namedAccountAddress
-  return $ certificateMap (fmap (BC.unpack . certToBytes) maybeCert) curContract
-callBuiltin "getCertField" [(SAccount a _), (SString certField)] = do
-  --Add others
-  maybeField <- A.select (A.Proxy @X509CertificateField) $ ((a ^. namedAccountAddress), ((T.pack $ show certField)))
-  case maybeField of
-    Nothing -> return $ (SString $ fromString "")
-    Just f -> return $ SString ((\(X509CertificateField xf) -> xf) f)
-
--- SolidVM built in function that verifies that the root cert is signed by the key
--- verifyCert checks that the root of a chained cert is signed by the public key.
--- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
--- Expects the public key to be in PEM format
--- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifyCert" [SString cert, SString pubkey] = do
-  let ex509Cert = bytesToCert . BC.pack $ cert
-  let ePublicKey = bsToPub $ BC.pack pubkey
-  case (ex509Cert, ePublicKey) of
-    (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
-    (_, Left r) -> malformedData "Could not parse public key" r
-    (Right x509Cert, Right publicKey) -> do
-      let isValid = verifyCert publicKey x509Cert
-      onTraced $
-        liftIO $
-          putStrLn $
-            ( if isValid
-                then C.green "The certificate is valid."
-                else C.red "The certificate is invalid"
-            )
-      return $ SBool isValid
-
--- SolidVM built in function that verifies a cert that if it's signed by a given key
--- verifyCert checks that the root of a chained cert is signed by the public key.
--- But verifyCertSignedBy checks that the target of a chained cert is signed by the public key.
--- Expects the public key to be in PEM format
--- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifyCertSignedBy" [SString cert, SString pubkey] = do
-  let ex509Cert = bytesToCert . BC.pack $ cert
-  let ePublicKey = bsToPub $ BC.pack pubkey
-  case (ex509Cert, ePublicKey) of
-    (Left q, _) -> invalidCertificate "Could not parse X.509 certificate" q
-    (_, Left r) -> malformedData "Could not parse public key" r
-    (Right x509Cert, Right publicKey) -> do
-      let isValid = verifyCertSignedBy publicKey x509Cert
-      onTraced $
-        liftIO $
-          putStrLn $
-            ( if isValid
-                then C.green "The certificate is valid."
-                else C.red "The certificate is invalid"
-            )
-      return $ SBool isValid
 
 -- SolidVM builtin function that verifies a ECSDA non-recoverable signature is signed by a given key with on the SECP256k1 curve
 -- Expects the signature as a DER/PEM format encoded string
@@ -2492,9 +2436,6 @@ callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] =
                     )
               return $ SBool isValid
     Left err -> malformedData "Could not decode hex string" err
-callBuiltin "parseCert" [SString cert] = do
-  curContract <- getCurrentContract
-  return $ certificateMap (Just cert) curContract
 callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args
@@ -2563,51 +2504,6 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
       pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
-
-certificateMap :: Maybe String -> CC.Contract -> Value
-certificateMap maybeCert _ =
-  case maybeCert of
-    Nothing -> SMap emptyCertMap
-    Just cert -> SMap (fromMaybe emptyCertMap $ fmap (certMap cert) (subject cert))
-  where
-    subject cert = getCertSubject =<< (eitherToMaybe . bytesToCert . BC.pack $ cert)
-    rawCert cert = eitherToMaybe . bytesToCert . BC.pack $ cert
-    nonEmptyFields cert sub =
-      M.fromList
-        [ (SString "commonName", Constant . SString $ subCommonName sub),
-          (SString "country", Constant . SString $ fromMaybe "" $ subCountry sub),
-          (SString "organization", Constant . SString $ subOrg sub),
-          (SString "group", Constant . SString $ fromMaybe "" $ subUnit sub),
-          (SString "publicKey", Constant . SString $ BC.unpack $ pubToBytes $ subPub sub),
-          (SString "userAddress", Constant . SString $ show $ fromPublicKey $ subPub sub),
-          (SString "certString", Constant . SString $ cert),
-          (SString "parent", Constant . SString $ maybe "0" show (getParentUserAddress =<< (eitherToMaybe . bytesToCert . BC.pack $ cert)))
-        ]
-    emptyFields =
-      M.fromList
-        [ (SString "commonName", Constant . SString $ ""),
-          (SString "country", Constant . SString $ ""),
-          (SString "organization", Constant . SString $ ""),
-          (SString "group", Constant . SString $ ""),
-          (SString "publicKey", Constant . SString $ ""),
-          (SString "userAddress", Constant . SString $ ""),
-          (SString "certString", Constant . SString $ ""),
-          (SString "parent", Constant . SString $ "")
-        ]
-    certMap cert sub =
-      let fieldsToUpdate =
-            M.fromList
-              [ (SString "organizationalUnit", Constant . SString $ fromMaybe "" $ subUnit sub),
-                (SString "expirationDate", Constant . SString $ fromMaybe "" $ dateTimeToString . snd . getCertValidity <$> rawCert cert)
-              ]
-       in M.union fieldsToUpdate $ nonEmptyFields cert sub
-    emptyCertMap =
-      let fieldsToUpdate =
-            M.fromList
-              [ (SString "organizationalUnit", Constant . SString $ ""),
-                (SString "expirationDate", Constant . SString $ "")
-              ]
-       in M.union fieldsToUpdate $ emptyFields
 
 runTheConstructors :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ()
 runTheConstructors from to hsh cc contractName' argVals' = do
