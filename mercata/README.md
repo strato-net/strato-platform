@@ -1,96 +1,51 @@
-# Mercata
+# Mercata Lending — Foundry Tests
 
-The app consists of multiple parts:
-- backend (ExpressJS-based API server)
-- ui (Vite/React-based UI)
-- nginx
-  - The purpose of the Nginx in the app:
-    - Handle OAuth2 authentication and authorization
-      - In the future: can be moved to the backend - handle client-credentials, authorization-code flows, keep user sessions to avoid having access token in cookie, etc.
-    - Serve backend and frontend on a single domain and port
-      - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
-- services
-  - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
-  - Look at the individual services read me for further details.
+This directory contains concrete Lending contracts and a Foundry-based test suite for:
+- Bad-debt lifecycle (recognition and cover)
+- Reserve sweeping and fee routing
+- SafetyModule staking, slashing (cover), and repayments to stakers via sweeps
+- Liquidity operations (deposit/withdraw/borrow) with bad debt present
 
----
+## Prerequisites
+- Foundry (forge/anvil): https://book.getfoundry.sh/
 
-## DEV MODE
-
-### Prerequisites
-- Node.js v22.12+ (not tested with 23+) (with nvm and npm) — see https://nodejs.org/en/download
-
-### Run Backend:
+Install/update:
 ```
-cd backend/
-npm i
-OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=localhost \
-  OAUTH_CLIENT_SECRET=client-secret-here \
-  NODE_URL=https://node5.mercata-testnet.blockapps.net \
-  BASE_URL=http://localhost \
-  POOL_FACTORY=0x100a \
-  LENDING_REGISTRY=0x1007 \
-  TOKEN_FACTORY=0x100b \
-  ADMIN_REGISTRY=0x100c \
-  npm run dev
-```
-- `NETWORK` options are: `testnet|prod`.
-
-### Run UI:
-```
-cd ../../ui/
-npm i
-npm run dev
+curl -L https://foundry.paradigm.xyz | bash
+foundryup
 ```
 
-### Run Nginx Standalone:
-- Make sure the port 80 is not used on your machine: `lsof -i :80` (should return empty output)
-- Then run:
-  ```
-  cd ../nginx
-  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration \
-    OAUTH_CLIENT_ID=localhost \
-    OAUTH_CLIENT_SECRET=client-secret-here \
-    docker compose -f docker-compose.nginx-standalone.yml up -d --build
-  ```
-
-- BEWARE! Disable any VPN on your host machine.  It can interfere with Docker networking and cause a hang on http://localhost.
-- If `http://localhost` does not open, try a browser incognito mode (the permanent redirect 301 to https could be cached in browser for the localhost domain, after running other software).
-- In most Linux scenarios 'host.docker.internal' will work just fine and there is no need to pass an explicit `HOST_IP` parameter into Docker Compose.  If there are network issues then you can drop back to a hardcoded IP address - usually `HOST_IP=172.17.0.1 \` (the gateway IP of the default Docker bridge interface), or any static local IP of your host machine.  More details here: https://github.com/blockapps/strato-platform/issues/3959#issuecomment-3051025844
-- You may also need to explicitly open ports in your Linux host's firewall configuration to allow Docker to communicate with the node processes running on your host.  See iptables example below.
-- Nginx also supports the live updates of the Next.js app during development, when it is deployed with `npm run dev`.
-
-iptables example for Docker network bridge port setup:
-
-    0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:8080
-    0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:8080
-    0     0 ACCEPT     6    --  *      *       172.17.0.0/16        0.0.0.0/0            tcp dpt:3001
-    0     0 ACCEPT     17   --  *      *       172.17.0.0/16        0.0.0.0/0            udp dpt:3001
----
-
-## PROD MODE - DOCKERIZED
-
-### Prerequisites
-- Docker
-  - Linux: Docker (Engine, CLI, Compose v2 plugin)
-  - Mac/Windows: Docker Desktop
-
-### Run the Full App
-
-This single command will build and start the full application (backend, frontend, nginx) in the background. With `ssl=true` the app will be served on port 443, and with `ssl=false` on port 80.
+## Quick start
+From repo root:
 ```
-# in the root directory of the project:
-sudo \
-  OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/REALM-NAME-HERE/.well-known/openid-configuration \
-  OAUTH_CLIENT_ID=client-id-here \
-  OAUTH_CLIENT_SECRET=client-secret-here \
-  NODE_URL=https://node5.mercata.blockapps.net \
-  ssl=true \
-  BASE_URL=host-url-here \
-  POOL_FACTORY=0x100a \
-  LENDING_REGISTRY=0x1007 \
-  TOKEN_FACTORY=0x100b \
-  ADMIN_REGISTRY=0x100c \
-  docker compose up -d --build
+FOUNDRY_PROFILE=default forge test -vvv --match-path mercata/contracts/tests-foundry/*
 ```
+
+Run a specific test:
+```
+# Exchange rate drops when bad debt is written off (simulated)
+FOUNDRY_PROFILE=default forge test -vvv --match-test test_exchangeRate_drops_on_writeoff_simulated | cat
+
+# No interest accrues on recognized bad debt (but accrues on active loans)
+FOUNDRY_PROFILE=default forge test -vvv --match-test test_badDebt_no_interest_accrual | cat
+
+# Sweep reserves: split to SafetyModule and FeeCollector, bounded by cash & reserves
+FOUNDRY_PROFILE=default forge test -vvv --match-test test_sweepReserves_split_and_bounds | cat
+
+# SafetyModule: stake→cover (rate falls)→accrue+sweep (rate rises)
+FOUNDRY_PROFILE=default forge test -vvv --match-test test_safetyModule_rate_increases_after_sweep_post_cover | cat
+```
+
+## Notable behaviors covered
+- LendingPool.getExchangeRate(): `cash + debt + badDebt − reserves` per mToken supply.
+- Recognizing bad debt does not immediately lower exchange rate. Removing badDebt without cash inflow does.
+- Reserves accrue only on active debt via borrow index; sweeps transfer reserves to FeeCollector and SafetyModule according to `safetyShareBps` and bounded by `reservesAccrued` and LP cash.
+- SafetyModule "yield" arrives only via sweeps; cover reduces SM assets (rate down), sweeps increase assets (rate up).
+
+## Permissions tested
+- Only PoolConfigurator can: `setBorrowableAsset`, `setMToken`, `configureAsset`, `setSafetyShareBps`, `sweepReserves`.
+- Only SafetyModule can call `pool.coverShortfall`.
+
+## Notes
+- Tests use the concrete contracts from `.foundry-prepared/lending` with minimal compatibility scaffolding for fast execution.
+- Some tests simulate share accounting where needed to avoid pulling unrelated systems.
