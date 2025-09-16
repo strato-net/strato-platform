@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT
-
 /*
  * CDPRegistry
  * - Single source of truth for CDP component addresses

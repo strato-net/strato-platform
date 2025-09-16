@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: MIT
-
 import "../abstract/ERC20/access/Ownable.sol";
 import "../abstract/ERC20/ERC20.sol";
 import "./CDPRegistry.sol";
