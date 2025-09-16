@@ -37,7 +37,7 @@ contract record SafetyModule is Ownable {
     // Cooldown mechanics
     uint public COOLDOWN_SECONDS = 259200;
     uint public UNSTAKE_WINDOW  = 172800;
-    mapping(address => uint) public cooldownStart; // 0 = not cooling
+    mapping(address => uint) public record cooldownStart; // 0 = not cooling
 
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
@@ -99,35 +99,81 @@ contract record SafetyModule is Ownable {
 
     // ─────────────────────────────────────────
     // Views / math
-    function totalAssets() public view returns (uint) { return IERC20(asset).balanceOf(address(this)); }
-    function totalShares() public view returns (uint) { return IERC20(sToken).totalSupply(); }
+    // Vault TVL in underlying (pulls live ERC20 balance)
+    function totalAssets() public view returns (uint) 
+    { 
+        require(asset != address(0), "SM:asset not set");
+        return IERC20(asset).balanceOf(address(this)); 
+    }
+
+    // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
+    function totalShares() public view returns (uint) 
+    { 
+        require(sToken != address(0), "SM:sToken not set");
+        return IERC20(sToken).totalSupply(); 
+    }
+
+    /// @notice Current sUSDST price in USDST units (1e18 = 1.0).
+    /// @dev
+    ///  - Reverts if the module is not initialized (missing asset/sToken).
+    ///  - If no shares exist yet, returns 1e18 (defines the initial price).
+    ///  - Floors on division (rounds down), as with standard ERC-4626.
+    /// @return rate Scaled 1e18 exchange rate = totalAssets / totalShares (or 1e18 when shares==0).
     function exchangeRate() public view returns (uint) {
         uint s = totalShares();
         if (s == 0) return 1e18;
         return (totalAssets() * 1e18) / s;
     }
+    
+    /// @notice Pure estimate of shares minted for depositing `assetsIn` right now.
+    /// @dev
+    ///  - Uses the CURRENT ratio only; ignores transfer fees and donation guard.
+    ///  - If no shares exist yet, preview equals `assetsIn` (initial 1:1).
+    ///  - Reverts if module is not initialized or `assetsIn == 0`.
+    ///  - Actual mint uses balance-delta and may be LOWER when the token is fee-on-transfer.
+    /// @param assetsIn Amount of USDST the user intends to stake.
+    /// @return sharesOut Estimated shares that would be minted at the current ratio.
     function previewStake(uint assetsIn) external view returns (uint) {
         require(assetsIn > 0, "SM:zero");
         uint s = totalShares();
         uint a = totalAssets();
-        return s == 0 ? assetsIn : (assetsIn * s) / a;
+        if (s == 0) return assetsIn;           // initial 1:1
+        require(a > 0, "SM:price=0");          // shares exist but vault has no assets 
+        return (assetsIn * s) / a;             // floor by design
     }
+
+    /// @notice Pure estimate of USDST returned for redeeming `sharesIn` right now.
+    /// @dev
+    ///  - Uses the CURRENT ratio only; ignores cooldown/window and caller’s balance.
+    ///  - Reverts if module is not initialized, `sharesIn == 0`, or totalShares == 0.
+    ///  - Floors on division (rounds down), matching actual redeem semantics.
+    /// @param sharesIn Amount of sUSDST the user intends to redeem.
+    /// @return assetsOut Estimated USDST that would be returned at the current ratio.
     function previewRedeem(uint sharesIn) external view returns (uint) {
         require(sharesIn > 0, "SM:zero");
-        return (sharesIn * totalAssets()) / totalShares();
+        uint s = totalShares();
+        require(s > 0, "SM:no shares"); 
+        return (sharesIn * totalAssets()) / s;
     }
 
     // ─────────────────────────────────────────
     // User actions
 
-    /// @notice Stake `assetsIn` USDST, minting sUSDST. Uses balance-delta minting.
+    /// @notice Stake `assetsIn` USDST; mints shares using balance-delta to account for fee-on-transfer tokens.
+    /// @dev Guards:
+    ///  - Active underlying (prevents deposits into offboarded market)
+    ///  - Donation guard on first mint (no pre-loaded funds)
+    ///  - Slippage (minSharesOut)
     function stake(uint assetsIn, uint minSharesOut) external onlyActiveToken(asset) onlyActiveToken(sToken) returns (uint sharesOut) {
         require(assetsIn > 0, "SM:zero");
         uint s = totalShares();
         uint beforeBal = totalAssets();
 
-        // Initial-donation guard
-        if (s == 0) require(beforeBal == 0, "SM:init stray funds");
+        if (s == 0) {
+            require(beforeBal == 0, "SM:init stray funds"); // donation guard
+        } else {
+            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
+        }
 
         IERC20(asset).transferFrom(msg.sender, address(this), assetsIn);
         uint delta = totalAssets() - beforeBal;
@@ -145,6 +191,8 @@ contract record SafetyModule is Ownable {
         emit Staked(msg.sender, delta, sharesOut);
     }
 
+    /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
+    /// @dev Overwrites previous starts. Requires wallet-held shares (not Chef).
     function startCooldown() external {
         require(IERC20(sToken).balanceOf(msg.sender) > 0, "SM:no shares");
         uint start = block.timestamp;
@@ -152,8 +200,9 @@ contract record SafetyModule is Ownable {
         emit UnstakeCooldown(msg.sender, start, start + COOLDOWN_SECONDS);
     }
 
-    /// @notice Redeem `sharesIn` sUSDST for USDST to `to`. Caller must hold the shares (i.e., withdraw from Chef first).
-    function redeem(uint sharesIn, uint minAssetsOut, address to) external returns (uint assetsOut) {
+    /// @notice Redeem shares for USDST to `to` after cooldown and within unstake window.
+    /// @dev Caller must hold the shares in wallet (withdraw from Chef first).
+    function redeem(uint sharesIn, uint minAssetsOut) external returns (uint assetsOut) {
         require(sharesIn > 0, "SM:zero");
         require(IERC20(sToken).balanceOf(msg.sender) >= sharesIn, "SM:not holder");
 
@@ -170,7 +219,7 @@ contract record SafetyModule is Ownable {
 
         // burn then transfer
         Token(sToken).burn(msg.sender, sharesIn);
-        IERC20(asset).transfer(to, assetsOut);
+        IERC20(asset).transfer(msg.sender, assetsOut);
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
@@ -180,12 +229,16 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // Rewards / Shortfall
     // ─────────────────────────────────────────
+    /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
         emit RewardNotified(amount);
     }
 
+    /// @notice Slash vault to cover protocol shortfall.
+    /// @dev Data plane: send USDST to LiquidityPool.
+    /// Control plane: tell LendingPool to consume badDebt (accounting).
     function coverShortfall(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
         uint ta = totalAssets();
@@ -201,6 +254,8 @@ contract record SafetyModule is Ownable {
 
     // ─────────────────────────────────────────
     // Admin
+
+    /// @notice Update cooldown/window and per-event slash cap.
     function setParams(uint cooldown, uint window, uint maxSlashBps) external onlyOwner {
         require(cooldown > 0 && window > 0, "SM:bad params");
         require(maxSlashBps <= 10000, "SM:bad slash");
@@ -210,14 +265,21 @@ contract record SafetyModule is Ownable {
         emit ParamsUpdated(cooldown, window, maxSlashBps);
     }
 
+    /// @notice set the tokens - typically one-time
     function setTokens(address _sToken, address _asset) external onlyOwner {
         require(_sToken != address(0), "Invalid sToken address");
         require(_asset != address(0), "Invalid underlyingAsset address");
+        // Ensure SM protects the same asset as LendingPool
+        require(LendingPool(address(lendingPool)).borrowableAsset() == _asset, "SM:asset mismatch");
+        // Avoid accidental equality (receipt token must differ from underlying)
+        require(_sToken != _asset, "SM:equal tokens");
+
         sToken = _sToken;
         asset = _asset;
         emit TokensUpdated(_asset, _sToken);
     }
 
+    /// @notice Rescue stray tokens (not the vault asset).
     function rescueToken(address token, address to, uint amount) external onlyOwner {
         require(token != address(asset), "SM:no USDST rescue");
         IERC20(token).transfer(to, amount);
