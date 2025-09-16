@@ -22,13 +22,9 @@ module BlockApps.X509.Certificate
     rootCert,
     certToBytes,
     bytesToCert,
-    verifyCert,
-    verifyCertSignedBy,
     makeSignedCertSigF,
     getCertSubject,
-    getCertValidity,
-    getCertIssuer,
-    getParentUserAddress,
+    getCertIssuer
   )
 where
 
@@ -157,9 +153,6 @@ instance Arbitrary X509CertInfoState where
       <*> arbitrary
       <*> arbitrary
 
-signedsToX509 :: [SignedCertificate] -> X509Certificate
-signedsToX509 = X509Certificate . CertificateChain
-
 x509ToSigneds :: X509Certificate -> [SignedCertificate]
 x509ToSigneds (X509Certificate (CertificateChain cs)) = cs
 
@@ -202,10 +195,6 @@ data Subject = Subject
 
 instance Format Subject where
   format = CL.blue . show
-
-issuerEqSubject :: Issuer -> Subject -> Bool
-issuerEqSubject Issuer {..} Subject {..} =
-  (issCommonName, issOrg, issUnit, issCountry) == (subCommonName, subOrg, subUnit, subCountry)
 
 instance ToJSON Subject where
   toJSON (Subject cn o ou c pub) =
@@ -434,10 +423,6 @@ getValidity = do
       endDate = DateTime (dt `dateAddPeriod` oneYear) tm -- all certs are valid for a year
   return (curDate, endDate)
 
-getParentUserAddress :: X509Certificate -> Maybe Address
-getParentUserAddress (X509Certificate (CertificateChain (_ : c2 : _))) = fmap (fromPublicKey . subPub) (getCertSubject (X509Certificate (CertificateChain [c2])))
-getParentUserAddress _ = Nothing
-
 getCertPub :: Subject -> PubKey
 getCertPub = serializeAndWrap . subPub
 
@@ -463,12 +448,6 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
     extractDn :: SignedCertificate -> DnElement -> Maybe String
     extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
 
-getCertValidity :: X509Certificate -> (DateTime, DateTime)
-getCertValidity (X509Certificate (CertificateChain (c : _))) = certValidity cert
-  where
-    (Signed cert _ _) = getSigned c
-getCertValidity (X509Certificate (_)) = error "Cannot get the validity period of an empty certificate"
-
 --To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
 -- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
 
@@ -489,37 +468,3 @@ getCertIssuers certs = for (x509ToSigneds certs) $ \cert -> do
   where
     extractDn :: SignedCertificate -> DnElement -> Maybe String
     extractDn cert dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
-
---------------------------------------------------------------------------------------------
-------------------------------------- CERT VERIFICATION ------------------------------------
---------------------------------------------------------------------------------------------
-
-verifyCert :: PublicKey -> X509Certificate -> Bool
-verifyCert pkey (X509Certificate (CertificateChain cs)) = verifyCertChain pkey cs
-
-verifyCertSignedBy :: PublicKey -> X509Certificate -> Bool
-verifyCertSignedBy pkey (X509Certificate (CertificateChain (c : _))) =
-  let signed = getSigned c
-      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
-   in case importSignature' $ signedSignature signed of
-        Nothing -> False
-        Just sig -> verifySig pkey sig mesgBS
-verifyCertSignedBy _ _ = False ---error ("Cannot verify cert " <> show cs <> " against " <> show pkey)
-
-verifyCertChain :: PublicKey -> [SignedCertificate] -> Bool
-verifyCertChain _ [] = False
-verifyCertChain pkey [c] =
-  let signed = getSigned c
-      mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 (getSignedData c)
-   in case importSignature' $ signedSignature signed of
-        Nothing -> False
-        Just sig -> verifySig pkey sig mesgBS
-verifyCertChain pkey (c : c' : cs) = issuerMatchesSubject c c' && signedBy c c' && verifyCertChain pkey (c' : cs)
-
--- Verify that c's issuer match c''s subject
-issuerMatchesSubject :: SignedCertificate -> SignedCertificate -> Bool
-issuerMatchesSubject c c' = fromMaybe False $ issuerEqSubject <$> getCertIssuer (signedsToX509 [c]) <*> getCertSubject (signedsToX509 [c'])
-
--- Verify that c signed by c'
-signedBy :: SignedCertificate -> SignedCertificate -> Bool
-signedBy c c' = fromMaybe False $ (\k -> verifyCertChain k [c]) . subPub <$> getCertSubject (signedsToX509 [c'])

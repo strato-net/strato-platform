@@ -347,7 +347,6 @@ runTestWithTimeout timeout f = do
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
         f
   case result of
     Left {} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
