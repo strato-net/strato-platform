@@ -12,7 +12,6 @@ module Blockchain.Generation
     insertContractsJSON,
     insertContractsJSONHashMaps,
     insertContracts,
-    readCertsFromGenesisInfo,
     readValidatorsFromGenesisInfo,
     Records (..),
     RecordsHashMap (..),
@@ -21,7 +20,6 @@ module Blockchain.Generation
   )
 where
 
-import BlockApps.X509.Certificate
 import Blockchain.Data.GenesisInfo
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -197,16 +195,6 @@ insertContracts slotss name src code start gi =
         { genesisInfoAccountInfo = initialAccounts ++ map mkContract addrsAndSlots,
           genesisInfoCodeInfo = initialCode ++ [CodeInfo src $ Just name]
         }
-
-readCertsFromGenesisInfo :: GenesisInfo -> [X509Certificate]
-readCertsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
-  SolidVMContractWithStorage _ _ (SolidVMCode "Certificate" _) storage -> do
-    let storageMap = M.fromList storage
-    certStr <- M.lookup ".certificateString" storageMap
-    case certStr of
-      BString certStr' -> either (const Nothing) Just $ bytesToCert certStr'
-      _ -> Nothing
-  _ -> Nothing
 
 readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case

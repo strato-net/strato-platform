@@ -14,9 +14,7 @@ module Blockchain.GenesisBlock
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.BlockDB
-import Blockchain.CertificateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
@@ -34,10 +32,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
-import Blockchain.Generation
-  ( readCertsFromGenesisInfo,
-    readValidatorsFromGenesisInfo,
-  )
+import Blockchain.Generation (readValidatorsFromGenesisInfo)
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
@@ -89,33 +84,14 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Ad.Address `Alters` AddressState) m,
-    HasRedis m
+    (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([(Ad.Address, X509CertInfoState)], [Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- getGenesisInfo
-  let certs' = readCertsFromGenesisInfo genesisInfo
-      validators = readValidatorsFromGenesisInfo genesisInfo
+  let validators = readValidatorsFromGenesisInfo genesisInfo
 
-  -- Need to insert the X509 certificates INTO Redis
-  void . execRedis $ insertRootCertificate
-  $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
-
-  extraCertInfoStates <-
-    mapM
-      ( \c -> do
-          let c' = x509CertToCertInfoState c
-              ua' = userAddress c'
-          insertCert <- execRedis $ registerCertificate ua' c'
-          case insertCert of
-            Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
-            Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
-          pure (ua', c')
-      )
-      certs'
-
-  (extraCertInfoStates, validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
+  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -133,8 +109,8 @@ initializeGenesisBlock ::
   m ()
 initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
-  obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
+  (validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
+  obGB <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
   void $ putBlocks [genesisBlock] False
