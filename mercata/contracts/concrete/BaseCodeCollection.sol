@@ -44,6 +44,7 @@ import "./Bridge/MercataBridge.sol";
 import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
+import "CDP/CDPReserve.sol";
 
 //TODO
 contract record Mercata {
@@ -63,6 +64,7 @@ contract record Mercata {
     CDPEngine public cdpEngine;
     CDPVault public cdpVault;   
     CDPRegistry public cdpRegistry;
+    CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
 
     constructor() public {
@@ -99,7 +101,8 @@ contract record Mercata {
         cdpRegistry = new CDPRegistry(this);
         cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
         cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
-        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector));
+        cdpReserve = new CDPReserve(address(cdpRegistry), address(adminRegistry));
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
