@@ -526,7 +526,7 @@ contract record CDPEngine is Ownable {
         uint remainingDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
 
         // Collateral dust cleanup and bad debt realization
-        uint collateralDustThreshold = 1000; // 1000 wei threshold for dust cleanup
+        uint collateralDustThreshold = 1; 
         uint dustCollateralSeized = 0;
         
         // First handle dust collateral cleanup
