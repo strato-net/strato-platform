@@ -206,6 +206,12 @@ contract record PoolConfigurator is Ownable {
         pool.setDebtCeilings(assetUnits, usdValue);
     }
 
+    /// @notice Governance setter to update safety module share
+    function setSafetyShareBps(uint bps) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setSafetyShareBps(bps);
+    }
+
     /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
