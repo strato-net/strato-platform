@@ -1,207 +1,48 @@
 // Junior Notes Test: Test the junior note system with bad debt recovery
-// Required: ADMIN_TOKEN (JWT), multiple user tokens, CDP contract addresses in .env
+// Required: ADMIN_TOKEN (JWT for setJuniorPremium), ACC1_TOKEN, ACC2_TOKEN, ACC3_TOKEN (JWTs for users), CDP contract addresses in .env
+// Role separation: ADMIN sets premium, ACC1/ACC2/ACC3 open notes and claim
 // Prerequisite: Run setupCDPTest.js first to create bad debt
 
 const axios = require("axios");
 require("dotenv").config();
 
+// Import utility functions
+const { checkBadDebt, checkJuniorState, checkClaimable, getTokenBalance } = require("./util/cirrusHelpers");
+const { buildCall, createHeaders, extractErrorMessage, executeWithRetry, sleep, validateEnvironment, setupApiConfig } = require("./util/transactionHelpers");
+const { getEnvironmentConfig, getRequiredEnvironment, JUNIOR_TEST_AMOUNTS, TIMING } = require("./util/constants");
+
 (async () => {
-  // Config - Tokens are JWT tokens for the accounts (3 different accounts)
-  const ACC1_TOKEN = process.env.ACC1_TOKEN;
-  const ACC2_TOKEN = process.env.ACC2_TOKEN;
-  const ACC3_TOKEN = process.env.ACC3_TOKEN;
+  // Get environment configuration
+  const config = getEnvironmentConfig();
+  const requiredEnv = getRequiredEnvironment('junior');
   
-  const ACC1_ADDRESS = process.env.ACC1_ADDRESS || "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce";
-  const ACC2_ADDRESS = process.env.ACC2_ADDRESS;
-  const ACC3_ADDRESS = process.env.ACC3_ADDRESS;
+  // Validate required environment variables
+  validateEnvironment(requiredEnv);
   
-  // Contract addresses from .env
-  const USDST = process.env.USDST || "937efa7e3a77e20bbdbd7c0d32b6514f368c1010";
-  const ETHST = process.env.ETHST || "93fb7295859b2d70199e0a4883b7c320cf874e6c";
-  const CDP_ENGINE = process.env.CDP_ENGINE;
-  const CDP_RESERVE = process.env.CDP_RESERVE;
-  const ADMIN_REGISTRY = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
-
-  if (!ACC1_TOKEN) throw new Error("ACC1_TOKEN JWT required");
-  if (!ACC2_TOKEN) throw new Error("ACC2_TOKEN JWT required");
-  if (!ACC3_TOKEN) throw new Error("ACC3_TOKEN JWT required");
-
-  if (!CDP_ENGINE) throw new Error("CDP_ENGINE address required in .env");
-  if (!CDP_RESERVE) throw new Error("CDP_RESERVE address required in .env");
-
-  // ═══════════════ CONFIGURATION ═══════════════
-  // Adjust TRANSACTION_DELAY based on network conditions:
-  // - Fast networks: 500-1000ms
-  // - Slow/congested networks: 2000-5000ms
-  const TRANSACTION_DELAY = 5000; // milliseconds between transactions
+  // Destructure configuration
+  const {
+    ADMIN_TOKEN, ACC1_TOKEN, ACC2_TOKEN, ACC3_TOKEN,
+    ADMIN_ADDRESS, ACC1_ADDRESS, ACC2_ADDRESS, ACC3_ADDRESS,
+    USDST, ETHST, CDP_ENGINE, CDP_RESERVE
+  } = config;
   
-  // Test amounts - following the outline exactly
-  const JUNIOR_PREMIUM = "1000"; // 10% (1000 bps)
-  const ACC1_BURN = "2000000000000000000000"; // 2,000 USDST
-  const ACC2_BURN = "1500000000000000000000"; // 1,500 USDST  
-  const ACC3_BURN = "500000000000000000000";  // 500 USDST
-  const ACC2_TOPUP = "1000000000000000000000"; // 1,000 USDST (for top-up)
+  // Setup API configuration
+  const { ROOT, txEndpoint } = setupApiConfig();
   
-  const INFLOW_1 = "1000000000000000000000"; // 1,000 USDST
-  const INFLOW_2 = "700000000000000000000";  // 700 USDST
-  const INFLOW_3 = "2000000000000000000000"; // 2,000 USDST
-  const INFLOW_4 = "300000000000000000000";  // 300 USDST
+  // Create headers for different accounts
+  const headers = createHeaders({ ADMIN_TOKEN, ACC1_TOKEN, ACC2_TOKEN, ACC3_TOKEN });
+  
+  // Use constants for test amounts and timing
+  const TRANSACTION_DELAY = TIMING.TRANSACTION_DELAY;
 
-  // API setup - Following testNewPool.js pattern exactly
-  const ROOT = (process.env.STRATO_NODE_URL || process.env.NODE_URL).replace(/\/+$/, "");
-  const BASE = ROOT.includes("/strato/") ? ROOT : `${ROOT}/strato/v2.3`;
-  const txEndpoint = `${BASE}/transaction/parallel?resolve=true`;
-  const headers = { Authorization: `Bearer ${ACC1_TOKEN}`, "Content-Type": "application/json" };
-  const buildCall = (name, addr, method, args = {}) => ({ type: "FUNCTION", payload: { contractName: name, contractAddress: addr, method, args } });
-
-  // Helper function to extract error message from 422 responses
-  const extractErrorMessage = (error) => {
-    if (error.response && error.response.status === 422 && error.response.data) {
-      const errorData = error.response.data;
-      if (typeof errorData === 'string') {
-        // Try to extract Solidity error: "Error running the transaction: solidity require failed: SString \"<message>\""
-        const solidityMatch = errorData.match(/solidity require failed: SString "([^"]+)"/);
-        if (solidityMatch) {
-          return solidityMatch[1];
-        }
-        
-        // Try to extract other error patterns: "Error running the transaction: <message>"
-        const generalMatch = errorData.match(/Error running the transaction: (.+)/);
-        if (generalMatch) {
-          return generalMatch[1];
-        }
-        
-        // Return the full error data if no pattern matches
-        return errorData;
-      }
-    }
-    return error.message;
-  };
-
-  // Helper function to execute transaction with retry logic
-  const executeWithRetry = async (txFunction, description = "transaction") => {
-    let lastError;
-    
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        return await txFunction();
-      } catch (error) {
-        lastError = error;
-        
-        // Check if it's a retryable error (mempool issues, network congestion, etc.)
-        const errorMsg = extractErrorMessage(error);
-        const isRetryable = errorMsg.includes('mempool') || 
-                           errorMsg.includes('nonce') || 
-                           errorMsg.includes('lucrative') ||
-                           errorMsg.includes('pending') ||
-                           (error.response && error.response.status >= 500);
-        
-        if (attempt === 1 && isRetryable) {
-          console.warn(`⚠️  ${description} failed (attempt ${attempt}/2): ${errorMsg}`);
-          console.log(`🔄 Retrying in ${TRANSACTION_DELAY * 3}ms...`);
-          await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY * 3));
-        } else {
-          // Don't retry on second attempt or non-retryable errors
-          throw error;
-        }
-      }
-    }
-    
-    // This shouldn't be reached, but just in case
-    throw lastError;
-  };
-
-  // Helper to get headers for different users
-  const getHeaders = (token) => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" });
-
-  // Helper to check bad debt via Cirrus
-  const checkBadDebt = async () => {
-    try {
-      const { data } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-badDebtUSD`, {
-        headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
-        params: { 
-          address: `eq.${CDP_ENGINE}`, 
-          select: "key,value",
-          "value": "gt.0" // Only get entries where bad debt > 0
-        }
-      });
-      
-      if (data && data.length > 0) {
-        let totalBadDebt = 0;
-        for (const entry of data) {
-          const debtValue = Number(entry.value || 0);
-          totalBadDebt += debtValue;
-        }
-        return totalBadDebt.toString();
-      }
-      return "0";
-    } catch (error) {
-      console.warn("⚠️  Could not fetch bad debt from Cirrus:", error.message);
-      return "0";
-    }
-  };
-
-  // Helper to check junior system state via Cirrus
-  const checkJuniorState = async () => {
-    try {
-      // Get only the specific fields we need from CDPEngine contract state
-      const { data: contractData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine`, {
-        headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
-        params: { 
-          address: `eq.${CDP_ENGINE}`, 
-          select: "juniorIndex,totalJuniorOutstandingUSD",
-          limit: 1 
-        }
-      });
-      
-      if (contractData && contractData.length > 0) {
-        const contractState = contractData[0];
-        const juniorIndex = contractState.juniorIndex || "0";
-        const totalOutstanding = contractState.totalJuniorOutstandingUSD || "0";
-        return { juniorIndex, totalOutstanding };
-      }
-      
-      return { juniorIndex: "0", totalOutstanding: "0" };
-    } catch (error) {
-      console.warn("⚠️  Could not get junior system state via Cirrus:", error.message);
-      return { juniorIndex: "0", totalOutstanding: "0" };
-    }
-  };
-
-  // Helper to check claimable amount for a user via Cirrus (junior notes)
-  const checkClaimable = async (userAddress, token) => {
-    try {
-      // Get user's junior note via Cirrus
-      const { data: noteData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-juniorNotes`, {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { 
-          address: `eq.${CDP_ENGINE}`, 
-          select: "key,value",
-          key: `eq.${userAddress.toLowerCase()}`,
-          limit: 1
-        }
-      });
-      
-      if (!noteData || noteData.length === 0) return "0";
-      
-      const userNote = noteData[0];
-      if (!userNote || !userNote.value) return "0";
-      
-      // For now, return the cap (we'd need to calculate claimable based on index)
-      // This is a simplified version - in practice you'd calculate based on entryIndex vs current index
-      const capUSD = userNote.value.capUSD || "0";
-      return capUSD;
-    } catch (error) {
-      console.warn(`⚠️  Could not get claimable for ${userAddress} via Cirrus:`, error.message);
-      return "0";
-    }
-  };
+  // Helper functions - now imported from utilities
 
   console.log(`🚀 Junior Notes Test Starting...`);
   console.log(`👤 Account Mapping:`);
-  console.log(`   Acc1: ${ACC1_ADDRESS}`);
-  console.log(`   Acc2: ${ACC2_ADDRESS}`);
-  console.log(`   Acc3: ${ACC3_ADDRESS}`);
+  console.log(`   Admin: ${ADMIN_ADDRESS} (premium setting only)`);
+  console.log(`   Acc1: ${ACC1_ADDRESS} (user operations)`);
+  console.log(`   Acc2: ${ACC2_ADDRESS} (user operations)`);
+  console.log(`   Acc3: ${ACC3_ADDRESS} (user operations)`);
   console.log(`🏭 CDP Engine: ${CDP_ENGINE}`);
 
   try {
@@ -212,12 +53,19 @@ require("dotenv").config();
     console.log("\n📊 Part 2: Verifying Bad Debt & Configuring Junior System...");
     
     // Check initial bad debt - must have enough for the test (≥ 4,400 USDST)
-    const initialBadDebt = await checkBadDebt();
-    const initialBadDebtNum = Number(initialBadDebt);
-    const requiredBadDebt = 4400e18; // 4,400 USDST for the test
+    const badDebtResult = await checkBadDebt(ROOT, CDP_ENGINE, ACC1_TOKEN);
+    const initialBadDebtNum = Number(badDebtResult.totalBadDebt);
+    const requiredBadDebt = Number(JUNIOR_TEST_AMOUNTS.REQUIRED_BAD_DEBT);
     
     console.log(`💸 Initial bad debt: ${initialBadDebtNum / 1e18} USDST`);
     console.log(`💸 Required bad debt: ${requiredBadDebt / 1e18} USDST`);
+    
+    if (badDebtResult.entries.length > 0) {
+      console.log(`📊 Bad debt breakdown:`);
+      badDebtResult.entries.forEach((entry, i) => {
+        console.log(`   Asset ${i + 1}: ${entry.asset} = ${Number(entry.badDebt) / 1e18} USDST`);
+      });
+    }
     
     if (initialBadDebtNum === 0) {
       throw new Error("No bad debt found! Run setupCDPTest.js first to create bad debt.");
@@ -230,13 +78,13 @@ require("dotenv").config();
     console.log("✅ Sufficient bad debt available for testing");
 
     // Set junior premium to 10%
-    console.log("\n🔧 Setting junior premium to 10%...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    console.log("\n🔧 Setting junior premium to 10%... (ADMIN ONLY)");
+    await sleep(TRANSACTION_DELAY);
     try {
       const setPremiumTx = buildCall("CDPEngine", CDP_ENGINE, "setJuniorPremium", {
-        newPremiumBps: JUNIOR_PREMIUM
+        newPremiumBps: JUNIOR_TEST_AMOUNTS.JUNIOR_PREMIUM
       });
-      const { data: setPremiumRes } = await axios.post(txEndpoint, { txs: [setPremiumTx] }, { headers });
+      const { data: setPremiumRes } = await axios.post(txEndpoint, { txs: [setPremiumTx] }, { headers: headers.admin });
       if (setPremiumRes[0].status !== "Success") {
         console.warn("⚠️  Failed to set junior premium (may already be set):", setPremiumRes[0].error || setPremiumRes[0].status);
         console.warn("Full response:", JSON.stringify(setPremiumRes[0], null, 2));
@@ -254,24 +102,8 @@ require("dotenv").config();
     }
 
     // Check initial reserve balance via Cirrus
-    let initialReserveBalance = "0";
-    try {
-      const { data: reserveData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-Token-_balances`, {
-        headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
-        params: { 
-          address: `eq.${USDST}`, 
-          select: "key,value",
-          key: `eq.${CDP_RESERVE}`,
-          limit: 1
-        }
-      });
-      if (reserveData && reserveData.length > 0) {
-        initialReserveBalance = reserveData[0].value || "0";
-      }
-    } catch (error) {
-      console.warn("⚠️  Could not get reserve balance via Cirrus:", error.message);
-    }
-    console.log(`💰 Initial CDP Reserve balance: ${initialReserveBalance} USDST`);
+    const initialReserveBalance = await getTokenBalance(ROOT, USDST, CDP_RESERVE, ACC1_TOKEN);
+    console.log(`💰 Initial CDP Reserve balance: ${Number(initialReserveBalance) / 1e18} USDST`);
 
 
 
@@ -284,24 +116,24 @@ require("dotenv").config();
     console.log("💸 Transferring USDST to users for junior notes...");
     try {
       // Transfer to acc2
-      await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+      await sleep(TRANSACTION_DELAY);
       const transferToAcc2Tx = buildCall("Token", USDST, "transfer", { 
         to: ACC2_ADDRESS, 
-        value: "5000000000000000000000" // 5,000 USDST
+        value: JUNIOR_TEST_AMOUNTS.TRANSFER_TO_ACC2
       });
-      const { data: transferAcc2Res } = await axios.post(txEndpoint, { txs: [transferToAcc2Tx] }, { headers });
+      const { data: transferAcc2Res } = await axios.post(txEndpoint, { txs: [transferToAcc2Tx] }, { headers: headers.acc1 });
       if (transferAcc2Res[0].status === "Success") {
         console.log("✅ Transferred USDST to Acc2");
       }
 
       // Transfer to acc3
       if (ACC3_ADDRESS !== ACC1_ADDRESS) {
-        await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+        await sleep(TRANSACTION_DELAY);
         const transferToAcc3Tx = buildCall("Token", USDST, "transfer", { 
           to: ACC3_ADDRESS, 
-          value: "2000000000000000000000" // 2,000 USDST
+          value: JUNIOR_TEST_AMOUNTS.TRANSFER_TO_ACC3
         });
-        const { data: transferAcc3Res } = await axios.post(txEndpoint, { txs: [transferToAcc3Tx] }, { headers });
+        const { data: transferAcc3Res } = await axios.post(txEndpoint, { txs: [transferToAcc3Tx] }, { headers: headers.acc1 });
         if (transferAcc3Res[0].status === "Success") {
           console.log("✅ Transferred USDST to Acc3");
         }
@@ -311,71 +143,71 @@ require("dotenv").config();
     }
 
     // Ensure users approve CDPEngine for burns
-    const approveAmount = "10000000000000000000000"; // 10,000 USDST approval
+    const approveAmount = JUNIOR_TEST_AMOUNTS.APPROVAL_AMOUNT;
     
-    // Acc1 opens note (2,000 USDST burn → 2,200 USD cap)
+    // Acc1 opens note (2,000 USDST burn → 2,200 USDST cap)
     console.log("\n💼 Acc1: Opening junior note with 2,000 USDST burn...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       // Approve if needed
       const approveAcc1Tx = buildCall("Token", USDST, "approve", { spender: CDP_ENGINE, value: approveAmount });
-      const { data: approveAcc1Res } = await axios.post(txEndpoint, { txs: [approveAcc1Tx] }, { headers: getHeaders(ACC1_TOKEN) });
+      const { data: approveAcc1Res } = await axios.post(txEndpoint, { txs: [approveAcc1Tx] }, { headers: headers.acc1 });
       if (approveAcc1Res[0].status !== "Success") {
         console.warn("⚠️  Acc1 approval may have failed:", approveAcc1Res[0].error);
       }
 
-      const openAcc1Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSD: ACC1_BURN });
-      const { data: openAcc1Res } = await axios.post(txEndpoint, { txs: [openAcc1Tx] }, { headers: getHeaders(ACC1_TOKEN) });
+      const openAcc1Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSDST: JUNIOR_TEST_AMOUNTS.ACC1_BURN });
+      const { data: openAcc1Res } = await axios.post(txEndpoint, { txs: [openAcc1Tx] }, { headers: headers.acc1 });
       if (openAcc1Res[0].status !== "Success") {
         throw new Error(`Failed to open Acc1 note: ${openAcc1Res[0].error || openAcc1Res[0].status}`);
       }
-      console.log("✅ Acc1 note opened (2,000 USDST → ~2,200 USD cap)");
+      console.log("✅ Acc1 note opened (2,000 USDST → ~2,200 USDST cap)");
     } catch (error) {
       console.error("❌ Acc1 note creation failed:", error.message);
     }
 
-    // Acc2 opens note (1,500 USDST burn → 1,650 USD cap)
+    // Acc2 opens note (1,500 USDST burn → 1,650 USDST cap)
     console.log("\n💼 Acc2: Opening junior note with 1,500 USDST burn...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const approveAcc2Tx = buildCall("Token", USDST, "approve", { spender: CDP_ENGINE, value: approveAmount });
-      const { data: approveAcc2Res } = await axios.post(txEndpoint, { txs: [approveAcc2Tx] }, { headers: getHeaders(ACC2_TOKEN) });
+      const { data: approveAcc2Res } = await axios.post(txEndpoint, { txs: [approveAcc2Tx] }, { headers: headers.acc2 });
       if (approveAcc2Res[0].status !== "Success") {
         console.warn("⚠️  Acc2 approval may have failed:", approveAcc2Res[0].error);
       }
 
-      const openAcc2Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSD: ACC2_BURN });
-      const { data: openAcc2Res } = await axios.post(txEndpoint, { txs: [openAcc2Tx] }, { headers: getHeaders(ACC2_TOKEN) });
+      const openAcc2Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSDST: JUNIOR_TEST_AMOUNTS.ACC2_BURN });
+      const { data: openAcc2Res } = await axios.post(txEndpoint, { txs: [openAcc2Tx] }, { headers: headers.acc2 });
       if (openAcc2Res[0].status !== "Success") {
         throw new Error(`Failed to open Acc2 note: ${openAcc2Res[0].error || openAcc2Res[0].status}`);
       }
-      console.log("✅ Acc2 note opened (1,500 USDST → ~1,650 USD cap)");
+      console.log("✅ Acc2 note opened (1,500 USDST → ~1,650 USDST cap)");
     } catch (error) {
       console.error("❌ Acc2 note creation failed:", error.message);
     }
 
-    // Acc3 opens note (500 USDST burn → 550 USD cap)  
+    // Acc3 opens note (500 USDST burn → 550 USDST cap)  
     console.log("\n💼 Acc3: Opening junior note with 500 USDST burn...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const approveAcc3Tx = buildCall("Token", USDST, "approve", { spender: CDP_ENGINE, value: approveAmount });
-      const { data: approveAcc3Res } = await axios.post(txEndpoint, { txs: [approveAcc3Tx] }, { headers: getHeaders(ACC3_TOKEN) });
+      const { data: approveAcc3Res } = await axios.post(txEndpoint, { txs: [approveAcc3Tx] }, { headers: headers.acc3 });
       if (approveAcc3Res[0].status !== "Success") {
         console.warn("⚠️  Acc3 approval may have failed:", approveAcc3Res[0].error);
       }
 
-      const openAcc3Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSD: ACC3_BURN });
-      const { data: openAcc3Res } = await axios.post(txEndpoint, { txs: [openAcc3Tx] }, { headers: getHeaders(ACC3_TOKEN) });
+      const openAcc3Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSDST: JUNIOR_TEST_AMOUNTS.ACC3_BURN });
+      const { data: openAcc3Res } = await axios.post(txEndpoint, { txs: [openAcc3Tx] }, { headers: headers.acc3 });
       if (openAcc3Res[0].status !== "Success") {
         throw new Error(`Failed to open Acc3 note: ${openAcc3Res[0].error || openAcc3Res[0].status}`);
       }
-      console.log("✅ Acc3 note opened (500 USDST → ~550 USD cap)");
+      console.log("✅ Acc3 note opened (500 USDST → ~550 USDST cap)");
     } catch (error) {
       console.error("❌ Acc3 note creation failed:", error.message);
     }
 
     // Check junior system state after note creation
-    const { juniorIndex, totalOutstanding } = await checkJuniorState();
+    const { juniorIndex, totalOutstanding } = await checkJuniorState(ROOT, CDP_ENGINE, ACC1_TOKEN);
     console.log(`📊 Junior system after notes created:`);
     console.log(`   Junior Index: ${juniorIndex}`);
     console.log(`   Total Outstanding: ${totalOutstanding} (should be ~4,400e18)`);
@@ -385,41 +217,32 @@ require("dotenv").config();
 
     // Inflow #1: Send 1,000 USDST to Reserve
     console.log("\n🌊 Inflow #1: Sending 1,000 USDST to Reserve...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
-    const inflow1Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: INFLOW_1 });
-    const { data: inflow1Res } = await axios.post(txEndpoint, { txs: [inflow1Tx] }, { headers });
+    await sleep(TRANSACTION_DELAY);
+    const inflow1Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: JUNIOR_TEST_AMOUNTS.INFLOW_1 });
+    const { data: inflow1Res } = await axios.post(txEndpoint, { txs: [inflow1Tx] }, { headers: headers.acc1 });
     if (inflow1Res[0].status !== "Success") {
       console.warn("⚠️  Inflow #1 failed:", inflow1Res[0].error || inflow1Res[0].status);
     } else {
       console.log("✅ Sent 1,000 USDST to Reserve");
     }
 
-    // Sync reserve to index
-    console.log("🔄 Syncing reserve to index...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
-    const sync1Tx = buildCall("CDPEngine", CDP_ENGINE, "_syncReserveToIndex", {});
-    const { data: sync1Res } = await axios.post(txEndpoint, { txs: [sync1Tx] }, { headers });
-    if (sync1Res[0].status !== "Success") {
-      console.warn("⚠️  Sync #1 failed:", sync1Res[0].error || sync1Res[0].status);
-    } else {
-      console.log("✅ Reserve synced to index");
-    }
+    // Note: _syncReserveToIndex is now internal and handled automatically by junior note operations
 
     // Check claimables after inflow #1
     console.log("📊 Checking claimables after inflow #1...");
-    const acc1Claimable1 = await checkClaimable(ACC1_ADDRESS, ACC1_TOKEN);
-    const acc2Claimable1 = await checkClaimable(ACC2_ADDRESS, ACC2_TOKEN);
-    const acc3Claimable1 = await checkClaimable(ACC3_ADDRESS, ACC3_TOKEN);
+    const acc1Claimable1 = await checkClaimable(ROOT, CDP_ENGINE, ACC1_ADDRESS, ACC1_TOKEN);
+    const acc2Claimable1 = await checkClaimable(ROOT, CDP_ENGINE, ACC2_ADDRESS, ACC2_TOKEN);
+    const acc3Claimable1 = await checkClaimable(ROOT, CDP_ENGINE, ACC3_ADDRESS, ACC3_TOKEN);
     console.log(`   Acc1 claimable: ${acc1Claimable1}`);
     console.log(`   Acc2 claimable: ${acc2Claimable1}`);
     console.log(`   Acc3 claimable: ${acc3Claimable1}`);
 
     // Claim from all users
     console.log("💸 Claiming from all users...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const claimAcc1Tx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-      const { data: claimAcc1Res } = await axios.post(txEndpoint, { txs: [claimAcc1Tx] }, { headers: getHeaders(ACC1_TOKEN) });
+      const { data: claimAcc1Res } = await axios.post(txEndpoint, { txs: [claimAcc1Tx] }, { headers: headers.acc1 });
       if (claimAcc1Res[0].status === "Success") {
         console.log("✅ Acc1 claimed successfully");
       } else {
@@ -429,10 +252,10 @@ require("dotenv").config();
       console.warn("⚠️  Acc1 claim error:", extractErrorMessage(error));
     }
 
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const claimAcc2Tx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-      const { data: claimAcc2Res } = await axios.post(txEndpoint, { txs: [claimAcc2Tx] }, { headers: getHeaders(ACC2_TOKEN) });
+      const { data: claimAcc2Res } = await axios.post(txEndpoint, { txs: [claimAcc2Tx] }, { headers: headers.acc2 });
       if (claimAcc2Res[0].status === "Success") {
         console.log("✅ Acc2 claimed successfully");
       } else {
@@ -442,10 +265,10 @@ require("dotenv").config();
       console.warn("⚠️  Acc2 claim error:", extractErrorMessage(error));
     }
 
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const claimAcc3Tx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-      const { data: claimAcc3Res } = await axios.post(txEndpoint, { txs: [claimAcc3Tx] }, { headers: getHeaders(ACC3_TOKEN) });
+      const { data: claimAcc3Res } = await axios.post(txEndpoint, { txs: [claimAcc3Tx] }, { headers: headers.acc3 });
       if (claimAcc3Res[0].status === "Success") {
         console.log("✅ Acc3 claimed successfully");
       } else {
@@ -461,31 +284,23 @@ require("dotenv").config();
 
     // Inflow #2: Send 700 USDST to Reserve
     console.log("\n🌊 Inflow #2: Sending 700 USDST to Reserve...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
-    const inflow2Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: INFLOW_2 });
-    const { data: inflow2Res } = await axios.post(txEndpoint, { txs: [inflow2Tx] }, { headers });
+    await sleep(TRANSACTION_DELAY);
+    const inflow2Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: JUNIOR_TEST_AMOUNTS.INFLOW_2 });
+    const { data: inflow2Res } = await axios.post(txEndpoint, { txs: [inflow2Tx] }, { headers: headers.acc1 });
     if (inflow2Res[0].status !== "Success") {
       console.warn("⚠️  Inflow #2 failed:", inflow2Res[0].error || inflow2Res[0].status);
     } else {
       console.log("✅ Sent 700 USDST to Reserve");
     }
 
-    // Sync reserve to index
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
-    const sync2Tx = buildCall("CDPEngine", CDP_ENGINE, "_syncReserveToIndex", {});
-    const { data: sync2Res } = await axios.post(txEndpoint, { txs: [sync2Tx] }, { headers });
-    if (sync2Res[0].status !== "Success") {
-      console.warn("⚠️  Sync #2 failed:", sync2Res[0].error || sync2Res[0].status);
-    } else {
-      console.log("✅ Reserve synced to index");
-    }
+    // Note: _syncReserveToIndex is now internal and handled automatically
 
     // Claim only from Acc3 (leave Acc1/Acc2 to accumulate)
     console.log("💸 Claiming only from Acc3...");
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
     try {
       const claimAcc3_2Tx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-      const { data: claimAcc3_2Res } = await axios.post(txEndpoint, { txs: [claimAcc3_2Tx] }, { headers: getHeaders(ACC3_TOKEN) });
+      const { data: claimAcc3_2Res } = await axios.post(txEndpoint, { txs: [claimAcc3_2Tx] }, { headers: headers.acc3 });
       if (claimAcc3_2Res[0].status === "Success") {
         console.log("✅ Acc3 claimed successfully (Acc1/Acc2 accumulating)");
       } else {
@@ -504,8 +319,8 @@ require("dotenv").config();
     
     // Acc2 top-up
     try {
-      const topupAcc2Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSD: ACC2_TOPUP });
-      const { data: topupAcc2Res } = await axios.post(txEndpoint, { txs: [topupAcc2Tx] }, { headers: getHeaders(ACC2_TOKEN) });
+      const topupAcc2Tx = buildCall("CDPEngine", CDP_ENGINE, "openJuniorNote", { asset: ETHST, amountUSDST: JUNIOR_TEST_AMOUNTS.ACC2_TOPUP });
+      const { data: topupAcc2Res } = await axios.post(txEndpoint, { txs: [topupAcc2Tx] }, { headers: headers.acc2 });
       if (topupAcc2Res[0].status !== "Success") {
         console.warn("⚠️  Acc2 top-up failed:", topupAcc2Res[0].error || topupAcc2Res[0].status);
       } else {
@@ -517,29 +332,21 @@ require("dotenv").config();
 
     // Send large inflow to reserve
     await executeWithRetry(async () => {
-      const inflow3Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: INFLOW_3 });
-      const { data: inflow3Res } = await axios.post(txEndpoint, { txs: [inflow3Tx] }, { headers });
+      const inflow3Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: JUNIOR_TEST_AMOUNTS.INFLOW_3 });
+      const { data: inflow3Res } = await axios.post(txEndpoint, { txs: [inflow3Tx] }, { headers: headers.acc1 });
       if (inflow3Res[0].status !== "Success") {
         throw new Error(inflow3Res[0].error || inflow3Res[0].status);
       }
       console.log("✅ Sent 2,000 USDST to Reserve");
     }, "Inflow #3 transfer");
 
-    // Sync and claim until one closes
-    await executeWithRetry(async () => {
-      const sync3Tx = buildCall("CDPEngine", CDP_ENGINE, "_syncReserveToIndex", {});
-      const { data: sync3Res } = await axios.post(txEndpoint, { txs: [sync3Tx] }, { headers });
-      if (sync3Res[0].status !== "Success") {
-        throw new Error(sync3Res[0].error || sync3Res[0].status);
-      }
-      console.log("✅ Reserve synced to index");
-    }, "Sync #3");
+    // Note: _syncReserveToIndex is now internal and handled automatically by claims
 
     // Check claimables and claim from all
     console.log("📊 Checking claimables after inflow #3...");
-    const acc1Claimable3 = await checkClaimable(ACC1_ADDRESS, ACC1_TOKEN);
-    const acc2Claimable3 = await checkClaimable(ACC2_ADDRESS, ACC2_TOKEN);
-    const acc3Claimable3 = await checkClaimable(ACC3_ADDRESS, ACC3_TOKEN);
+    const acc1Claimable3 = await checkClaimable(ROOT, CDP_ENGINE, ACC1_ADDRESS, ACC1_TOKEN);
+    const acc2Claimable3 = await checkClaimable(ROOT, CDP_ENGINE, ACC2_ADDRESS, ACC2_TOKEN);
+    const acc3Claimable3 = await checkClaimable(ROOT, CDP_ENGINE, ACC3_ADDRESS, ACC3_TOKEN);
     console.log(`   Acc1 claimable: ${acc1Claimable3}`);
     console.log(`   Acc2 claimable: ${acc2Claimable3}`);
     console.log(`   Acc3 claimable: ${acc3Claimable3}`);
@@ -549,7 +356,7 @@ require("dotenv").config();
     for (const [name, address, token] of [["Acc1", ACC1_ADDRESS, ACC1_TOKEN], ["Acc2", ACC2_ADDRESS, ACC2_TOKEN], ["Acc3", ACC3_ADDRESS, ACC3_TOKEN]]) {
       try {
         const claimTx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-        const { data: claimRes } = await axios.post(txEndpoint, { txs: [claimTx] }, { headers: getHeaders(token) });
+        const { data: claimRes } = await axios.post(txEndpoint, { txs: [claimTx] }, { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
         if (claimRes[0].status === "Success") {
           console.log(`✅ ${name} claimed successfully`);
         } else {
@@ -566,8 +373,8 @@ require("dotenv").config();
 
     // Inflow #4: Final flush
     console.log("\n🌊 Inflow #4: Final flush (300 USDST)...");
-    const inflow4Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: INFLOW_4 });
-    const { data: inflow4Res } = await axios.post(txEndpoint, { txs: [inflow4Tx] }, { headers });
+    const inflow4Tx = buildCall("Token", USDST, "transfer", { to: CDP_RESERVE, value: JUNIOR_TEST_AMOUNTS.INFLOW_4 });
+    const { data: inflow4Res } = await axios.post(txEndpoint, { txs: [inflow4Tx] }, { headers: headers.acc1 });
     if (inflow4Res[0].status !== "Success") {
       console.warn("⚠️  Inflow #4 failed:", inflow4Res[0].error || inflow4Res[0].status);
     } else {
@@ -575,20 +382,15 @@ require("dotenv").config();
     }
 
     // Brief delay to allow state to settle
-    await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY));
+    await sleep(TRANSACTION_DELAY);
 
-    // Final sync and claims
-    const sync4Tx = buildCall("CDPEngine", CDP_ENGINE, "_syncReserveToIndex", {});
-    const { data: sync4Res } = await axios.post(txEndpoint, { txs: [sync4Tx] }, { headers });
-    if (sync4Res[0].status === "Success") {
-      console.log("✅ Final reserve sync completed");
-    }
+    // Note: _syncReserveToIndex is now internal and handled automatically by claims
 
     // Check claimables before final claims
     console.log("📊 Checking final claimables...");
-    const acc1FinalClaimable2 = await checkClaimable(ACC1_ADDRESS, ACC1_TOKEN);
-    const acc2FinalClaimable2 = await checkClaimable(ACC2_ADDRESS, ACC2_TOKEN);
-    const acc3FinalClaimable2 = await checkClaimable(ACC3_ADDRESS, ACC3_TOKEN);
+    const acc1FinalClaimable2 = await checkClaimable(ROOT, CDP_ENGINE, ACC1_ADDRESS, ACC1_TOKEN);
+    const acc2FinalClaimable2 = await checkClaimable(ROOT, CDP_ENGINE, ACC2_ADDRESS, ACC2_TOKEN);
+    const acc3FinalClaimable2 = await checkClaimable(ROOT, CDP_ENGINE, ACC3_ADDRESS, ACC3_TOKEN);
     console.log(`   Acc1 final claimable: ${acc1FinalClaimable2}`);
     console.log(`   Acc2 final claimable: ${acc2FinalClaimable2}`);
     console.log(`   Acc3 final claimable: ${acc3FinalClaimable2}`);
@@ -597,7 +399,7 @@ require("dotenv").config();
     for (const [name, address, token] of [["Acc1", ACC1_ADDRESS, ACC1_TOKEN], ["Acc2", ACC2_ADDRESS, ACC2_TOKEN], ["Acc3", ACC3_ADDRESS, ACC3_TOKEN]]) {
       try {
         const claimTx = buildCall("CDPEngine", CDP_ENGINE, "claimJunior", {});
-        const { data: claimRes } = await axios.post(txEndpoint, { txs: [claimTx] }, { headers: getHeaders(token) });
+        const { data: claimRes } = await axios.post(txEndpoint, { txs: [claimTx] }, { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" } });
         if (claimRes[0].status === "Success") {
           console.log(`✅ ${name} final claim successful`);
         } else {
@@ -618,38 +420,22 @@ require("dotenv").config();
     // Final Status Check
     console.log("\n📈 Final Status Check...");
     
-    const finalBadDebt = await checkBadDebt();
-    const { juniorIndex: finalIndex, totalOutstanding: finalOutstanding } = await checkJuniorState();
+    const finalBadDebtResult = await checkBadDebt(ROOT, CDP_ENGINE, ACC1_TOKEN);
+    const { juniorIndex: finalIndex, totalOutstanding: finalOutstanding } = await checkJuniorState(ROOT, CDP_ENGINE, ACC1_TOKEN);
     
     // Get final reserve balance via Cirrus
-    let finalReserveBalance = "0";
-    try {
-      const { data: finalReserveData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-Token-_balances`, {
-        headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
-        params: { 
-          address: `eq.${USDST}`, 
-          select: "key,value",
-          key: `eq.${CDP_RESERVE}`,
-          limit: 1
-        }
-      });
-      if (finalReserveData && finalReserveData.length > 0) {
-        finalReserveBalance = finalReserveData[0].value || "0";
-      }
-    } catch (error) {
-      console.warn("⚠️  Could not get final reserve balance via Cirrus:", error.message);
-    }
+    const finalReserveBalance = await getTokenBalance(ROOT, USDST, CDP_RESERVE, ACC1_TOKEN);
 
-    console.log(`💸 Final bad debt: ${finalBadDebt}`);
+    console.log(`💸 Final bad debt: ${Number(finalBadDebtResult.totalBadDebt) / 1e18} USDST`);
     console.log(`📊 Final junior index: ${finalIndex}`);
     console.log(`📊 Final total outstanding: ${finalOutstanding}`);
-    console.log(`💰 Final reserve balance: ${finalReserveBalance} USDST`);
+    console.log(`💰 Final reserve balance: ${Number(finalReserveBalance) / 1e18} USDST`);
 
     // Check final claimables
     console.log("\n📊 Final claimables:");
-    const acc1FinalClaimable = await checkClaimable(ACC1_ADDRESS, ACC1_TOKEN);
-    const acc2FinalClaimable = await checkClaimable(ACC2_ADDRESS, ACC2_TOKEN);
-    const acc3FinalClaimable = await checkClaimable(ACC3_ADDRESS, ACC3_TOKEN);
+    const acc1FinalClaimable = await checkClaimable(ROOT, CDP_ENGINE, ACC1_ADDRESS, ACC1_TOKEN);
+    const acc2FinalClaimable = await checkClaimable(ROOT, CDP_ENGINE, ACC2_ADDRESS, ACC2_TOKEN);
+    const acc3FinalClaimable = await checkClaimable(ROOT, CDP_ENGINE, ACC3_ADDRESS, ACC3_TOKEN);
     console.log(`   Acc1 remaining claimable: ${acc1FinalClaimable}`);
     console.log(`   Acc2 remaining claimable: ${acc2FinalClaimable}`);
     console.log(`   Acc3 remaining claimable: ${acc3FinalClaimable}`);
@@ -657,9 +443,9 @@ require("dotenv").config();
     console.log("\n🎉 Junior Notes Test Complete!");
     console.log("Summary:");
     console.log(`- Created 3 junior notes with 10% premium across 3 different accounts`);
-    console.log(`- Acc1: 2,000 USDST → ~2,200 USD cap`);
-    console.log(`- Acc2: 1,500 USDST + 1,000 USDST top-up → ~2,750 USD cap`);  
-    console.log(`- Acc3: 500 USDST → ~550 USD cap`);
+    console.log(`- Acc1: 2,000 USDST → ~2,200 USDST cap`);
+    console.log(`- Acc2: 1,500 USDST + 1,000 USDST top-up → ~2,750 USDST cap`);  
+    console.log(`- Acc3: 500 USDST → ~550 USDST cap`);
     console.log(`- Total inflows: 4,000 USDST (1,000 + 700 + 2,000 + 300)`);
     console.log(`- Pro-rata indexing tested with selective claims`);
     console.log(`- Account separation: ${ACC1_ADDRESS !== ACC2_ADDRESS && ACC2_ADDRESS !== ACC3_ADDRESS && ACC1_ADDRESS !== ACC3_ADDRESS ? 'All different ✓' : 'Some shared ⚠️'}`);

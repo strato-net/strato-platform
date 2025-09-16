@@ -96,7 +96,7 @@ const main = async () => {
 
     // Step 1: Check existing junior notes
     console.log("📝 Step 1: Checking existing junior notes...");
-    const { data: notesData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-juniorNotes`, {
+    const { data: notesData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-CDPEngine-juniorNotes`, {
       headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
       params: { 
         address: `eq.${CDP_ENGINE}`, 
@@ -221,7 +221,7 @@ const main = async () => {
     console.log("\n🔍 Step 3: Verifying cleanup...");
     await new Promise(resolve => setTimeout(resolve, TRANSACTION_DELAY * 2)); // Wait for state to update
     
-    const { data: finalNotesData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-juniorNotes`, {
+    const { data: finalNotesData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-CDPEngine-juniorNotes`, {
       headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
       params: { 
         address: `eq.${CDP_ENGINE}`, 

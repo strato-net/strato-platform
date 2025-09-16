@@ -1,13 +1,16 @@
 // CDP Test Setup: Deploy, configure, and test liquidation scenario
-// Required: ADMIN_TOKEN (JWT), LIQUIDATOR_TOKEN (JWT), CDP contract addresses in .env
+// Required: ADMIN_TOKEN (JWT for oracle), ACC1_TOKEN (JWT for vault owner), ACC2_TOKEN (JWT for liquidator), CDP contract addresses in .env
+// Role separation: ADMIN sets prices, ACC1 opens vault, ACC2 liquidates
 
 const axios = require("axios");
 require("dotenv").config();
 
 (async () => {
   // Config - Tokens are JWT tokens for the accounts
+  const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
   const ACC1_TOKEN = process.env.ACC1_TOKEN;
   const ACC2_TOKEN = process.env.ACC2_TOKEN;
+  const ADMIN_ADDRESS = process.env.ADMIN_ADDRESS;
   const ACC1_ADDRESS = process.env.ACC1_ADDRESS || "1b7dc206ef2fe3aab27404b88c36470ccf16c0ce";
   const ACC2_ADDRESS = process.env.ACC2_ADDRESS;
   
@@ -22,7 +25,8 @@ require("dotenv").config();
   const ADMIN_REGISTRY = process.env.ADMIN_REGISTRY || "000000000000000000000000000000000000100c";
   const TOKEN_FACTORY = process.env.TOKEN_FACTORY || "000000000000000000000000000000000000100b";
 
-  if (!ACC1_TOKEN) throw new Error("ACC1_TOKEN (ADMIN_TOKEN) JWT required");
+  if (!ADMIN_TOKEN) throw new Error("ADMIN_TOKEN JWT required");
+  if (!ACC1_TOKEN) throw new Error("ACC1_TOKEN JWT required");
   if (!ACC2_TOKEN) throw new Error("ACC2_TOKEN (LIQUIDATOR_TOKEN) JWT required");
   if (!CDP_ENGINE) throw new Error("CDP_ENGINE address required in .env");
   if (!CDP_VAULT) throw new Error("CDP_VAULT address required in .env");
@@ -42,7 +46,9 @@ require("dotenv").config();
   const BASE = ROOT.includes("/strato/") ? ROOT : `${ROOT}/strato/v2.3`;
   const txEndpoint = `${BASE}/transaction/parallel?resolve=true`;
   const cirrusBase = `${ROOT}/cirrus/search`;
-  const headers = { Authorization: `Bearer ${ACC1_TOKEN}`, "Content-Type": "application/json" };
+  const adminHeaders = { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" };
+  const acc1Headers = { Authorization: `Bearer ${ACC1_TOKEN}`, "Content-Type": "application/json" };
+  const acc2Headers = { Authorization: `Bearer ${ACC2_TOKEN}`, "Content-Type": "application/json" };
   const buildCall = (name, addr, method, args = {}) => ({ type: "FUNCTION", payload: { contractName: name, contractAddress: addr, method, args } });
 
   // Cirrus helper for reading on-chain data
@@ -68,8 +74,9 @@ require("dotenv").config();
   };
 
   console.log(`🚀 CDP Test Setup Starting...`);
-  console.log(`Acc1: ${ACC1_ADDRESS}`);
-  console.log(`Acc2: ${ACC2_ADDRESS}`);
+  console.log(`Admin: ${ADMIN_ADDRESS} (price oracle only)`);
+  console.log(`Acc1: ${ACC1_ADDRESS} (vault owner)`);
+  console.log(`Acc2: ${ACC2_ADDRESS} (liquidator)`);
   console.log(`CDP Engine: ${CDP_ENGINE}`);
 
   try {
@@ -81,7 +88,7 @@ require("dotenv").config();
     
     // Check acc1 USDST balance
     const balanceTx = buildCall("Token", USDST, "balanceOf", { accountAddress: ACC1_ADDRESS });
-    const { data: balanceRes } = await axios.post(txEndpoint, { txs: [balanceTx] }, { headers });
+    const { data: balanceRes } = await axios.post(txEndpoint, { txs: [balanceTx] }, { headers: acc1Headers });
     if (balanceRes[0].status !== "Success") {
       throw new Error(`Failed to get balance: ${balanceRes[0].error || balanceRes[0].status}`);
     }
@@ -90,7 +97,7 @@ require("dotenv").config();
     
     // Check CDP Reserve balance
     const reserveBalanceTx = buildCall("Token", USDST, "balanceOf", { accountAddress: CDP_RESERVE });
-    const { data: reserveBalanceRes } = await axios.post(txEndpoint, { txs: [reserveBalanceTx] }, { headers });
+    const { data: reserveBalanceRes } = await axios.post(txEndpoint, { txs: [reserveBalanceTx] }, { headers: acc1Headers });
     const initialReserveBalance = reserveBalanceRes[0].data?.contents?.[0] || "0";
     console.log(`💰 Initial CDP Reserve balance: ${initialReserveBalance} USDST`);
     
@@ -134,7 +141,7 @@ require("dotenv").config();
     // Step 1: Approve CDP Vault for large amount of USDST
     console.log("\n📝 Step 1: Approving CDP Vault for USDST...");
     const approveTx = buildCall("Token", USDST, "approve", { spender: CDP_VAULT, value: LARGE_APPROVAL });
-    const { data: approveRes } = await axios.post(txEndpoint, { txs: [approveTx] }, { headers });
+    const { data: approveRes } = await axios.post(txEndpoint, { txs: [approveTx] }, { headers: acc1Headers });
     if (approveRes[0].status !== "Success") {
       throw new Error(`Failed to approve: ${approveRes[0].error || approveRes[0].status}`);
     }
@@ -144,41 +151,41 @@ require("dotenv").config();
 
 
     // Step 2: Give CDPEngine mint/burn rights on USDST
-    console.log("\n🔑 Step 2: Granting CDPEngine mint/burn rights on USDST...");
+    // console.log("\n🔑 Step 2: Granting CDPEngine mint/burn rights on USDST...");
     
-    // First, whitelist CDPEngine for mint function
-    try {
-      const mintWhitelistTx = buildCall("Token", USDST, "addWhitelist", {
-        _admin: ADMIN_REGISTRY,
-        _func: "mint",
-        _accountToWhitelsit: CDP_ENGINE
-      });
-      const { data: mintRes } = await axios.post(txEndpoint, { txs: [mintWhitelistTx] }, { headers });
-      if (mintRes[0].status !== "Success") {
-        console.warn("⚠️  Mint whitelist may have failed (might already be set):", mintRes[0].error || mintRes[0].status);
-      } else {
-        console.log("✅ CDPEngine granted mint rights on USDST");
-      }
-    } catch (error) {
-      console.warn("⚠️  Mint whitelist may have failed (might already be set):", error.message);
-    }
+    // // First, whitelist CDPEngine for mint function
+    // try {
+    //   const mintWhitelistTx = buildCall("Token", USDST, "addWhitelist", {
+    //     _admin: ADMIN_REGISTRY,
+    //     _func: "mint",
+    //     _accountToWhitelsit: CDP_ENGINE
+    //   });
+    //   const { data: mintRes } = await axios.post(txEndpoint, { txs: [mintWhitelistTx] }, { headers });
+    //   if (mintRes[0].status !== "Success") {
+    //     console.warn("⚠️  Mint whitelist may have failed (might already be set):", mintRes[0].error || mintRes[0].status);
+    //   } else {
+    //     console.log("✅ CDPEngine granted mint rights on USDST");
+    //   }
+    // } catch (error) {
+    //   console.warn("⚠️  Mint whitelist may have failed (might already be set):", error.message);
+    // }
     
-    // Then, whitelist CDPEngine for burn function  
-    try {
-      const burnWhitelistTx = buildCall("Token", USDST, "addWhitelist", {
-        _admin: ADMIN_REGISTRY,
-        _func: "burn", 
-        _accountToWhitelsit: CDP_ENGINE
-      });
-      const { data: burnRes } = await axios.post(txEndpoint, { txs: [burnWhitelistTx] }, { headers });
-      if (burnRes[0].status !== "Success") {
-        console.warn("⚠️  Burn whitelist may have failed (might already be set):", burnRes[0].error || burnRes[0].status);
-      } else {
-        console.log("✅ CDPEngine granted burn rights on USDST");
-      }
-    } catch (error) {
-      console.warn("⚠️  Burn whitelist may have failed (might already be set):", error.message);
-    }
+    // // Then, whitelist CDPEngine for burn function  
+    // try {
+    //   const burnWhitelistTx = buildCall("Token", USDST, "addWhitelist", {
+    //     _admin: ADMIN_REGISTRY,
+    //     _func: "burn", 
+    //     _accountToWhitelsit: CDP_ENGINE
+    //   });
+    //   const { data: burnRes } = await axios.post(txEndpoint, { txs: [burnWhitelistTx] }, { headers });
+    //   if (burnRes[0].status !== "Success") {
+    //     console.warn("⚠️  Burn whitelist may have failed (might already be set):", burnRes[0].error || burnRes[0].status);
+    //   } else {
+    //     console.log("✅ CDPEngine granted burn rights on USDST");
+    //   }
+    // } catch (error) {
+    //   console.warn("⚠️  Burn whitelist may have failed (might already be set):", error.message);
+    // }
 
     // Step 2.5: Set TokenFactory in CDPRegistry
     // console.log("\n🔧 Step 2.5: Setting TokenFactory in CDPRegistry...");
@@ -193,35 +200,35 @@ require("dotenv").config();
     // }
 
     // Step 3: Configure ETHST as collateral asset
-    console.log("\n⚙️  Step 3: Configuring ETHST as collateral in CDPEngine...");
-    const configTx = buildCall("CDPEngine", CDP_ENGINE, "setCollateralAssetParams", {
-      asset: ETHST,
-      liquidationRatio: ETHST_CONFIG.liquidationRatio,
-      liquidationPenaltyBps: ETHST_CONFIG.liquidationPenaltyBps,
-      closeFactorBps: ETHST_CONFIG.closeFactorBps,
-      stabilityFeeRate: ETHST_CONFIG.stabilityFeeRate,
-      debtFloor: ETHST_CONFIG.debtFloor,
-      debtCeiling: ETHST_CONFIG.debtCeiling,
-      unitScale: ETHST_CONFIG.unitScale,
-      pause: ETHST_CONFIG.pause
-    });
-    const { data: configRes } = await axios.post(txEndpoint, { txs: [configTx] }, { headers });
-    if (configRes[0].status !== "Success") {
-      throw new Error(`Failed to configure ETHST: ${configRes[0].error || configRes[0].status}`);
-    }
-    console.log("✅ ETHST configured as collateral asset");
+    // console.log("\n⚙️  Step 3: Configuring ETHST as collateral in CDPEngine...");
+    // const configTx = buildCall("CDPEngine", CDP_ENGINE, "setCollateralAssetParams", {
+    //   asset: ETHST,
+    //   liquidationRatio: ETHST_CONFIG.liquidationRatio,
+    //   liquidationPenaltyBps: ETHST_CONFIG.liquidationPenaltyBps,
+    //   closeFactorBps: ETHST_CONFIG.closeFactorBps,
+    //   stabilityFeeRate: ETHST_CONFIG.stabilityFeeRate,
+    //   debtFloor: ETHST_CONFIG.debtFloor,
+    //   debtCeiling: ETHST_CONFIG.debtCeiling,
+    //   unitScale: ETHST_CONFIG.unitScale,
+    //   pause: ETHST_CONFIG.pause
+    // });
+    // const { data: configRes } = await axios.post(txEndpoint, { txs: [configTx] }, { headers });
+    // if (configRes[0].status !== "Success") {
+    //   throw new Error(`Failed to configure ETHST: ${configRes[0].error || configRes[0].status}`);
+    // }
+    // console.log("✅ ETHST configured as collateral asset");
 
 
 
 
 
     // Step 4: Set ETHST price to $3,000
-    console.log("\n💰 Step 4: Setting ETHST price to $3,000...");
+    console.log("\n💰 Step 4: Setting ETHST price to $3,000... (ADMIN ONLY)");
     const setPriceTx = buildCall("PriceOracle", PRICE_ORACLE, "setAssetPrice", {
       asset: ETHST,
       price: INITIAL_ETHST_PRICE
     });
-    const { data: setPriceRes } = await axios.post(txEndpoint, { txs: [setPriceTx] }, { headers });
+    const { data: setPriceRes } = await axios.post(txEndpoint, { txs: [setPriceTx] }, { headers: adminHeaders });
     if (setPriceRes[0].status !== "Success") {
       throw new Error(`Failed to set price: ${setPriceRes[0].error || setPriceRes[0].status}`);
     }
@@ -236,7 +243,7 @@ require("dotenv").config();
     
     // First approve ETHST for CDP Vault
     const approveETHSTTx = buildCall("Token", ETHST, "approve", { spender: CDP_VAULT, value: ETHST_DEPOSIT });
-    const { data: approveETHSTRes } = await axios.post(txEndpoint, { txs: [approveETHSTTx] }, { headers });
+    const { data: approveETHSTRes } = await axios.post(txEndpoint, { txs: [approveETHSTTx] }, { headers: acc1Headers });
     if (approveETHSTRes[0].status !== "Success") {
       throw new Error(`Failed to approve ETHST: ${approveETHSTRes[0].error || approveETHSTRes[0].status}`);
     }
@@ -246,7 +253,7 @@ require("dotenv").config();
       asset: ETHST,
       amount: ETHST_DEPOSIT
     });
-    const { data: depositRes } = await axios.post(txEndpoint, { txs: [depositTx] }, { headers });
+    const { data: depositRes } = await axios.post(txEndpoint, { txs: [depositTx] }, { headers: acc1Headers });
     if (depositRes[0].status !== "Success") {
       throw new Error(`Failed to deposit: ${depositRes[0].error || depositRes[0].status}`);
     }
@@ -266,7 +273,7 @@ require("dotenv").config();
     });
     
     try {
-      const { data: mintRes } = await axios.post(txEndpoint, { txs: [mintTx] }, { headers });
+      const { data: mintRes } = await axios.post(txEndpoint, { txs: [mintTx] }, { headers: acc1Headers });
       if (mintRes[0].status !== "Success") {
         console.error("❌ Mint transaction failed:");
         console.error("Status:", mintRes[0].status);
@@ -293,14 +300,14 @@ require("dotenv").config();
     console.log("\n📊 Checking position health...");
     try {
       const checkBalanceTx = buildCall("Token", USDST, "balanceOf", { accountAddress: ACC1_ADDRESS });
-      const { data: checkBalanceRes } = await axios.post(txEndpoint, { txs: [checkBalanceTx] }, { headers });
+      const { data: checkBalanceRes } = await axios.post(txEndpoint, { txs: [checkBalanceTx] }, { headers: acc1Headers });
       
       if (checkBalanceRes[0].status !== "Success") {
         console.warn("⚠️  Balance check failed:", checkBalanceRes[0].error || checkBalanceRes[0].status);
         console.log("Continuing anyway...");
       } else {
-        const adminUSDSTBalance = checkBalanceRes[0].data?.contents?.[0] || "0";
-        console.log(`Admin USDST balance: ${adminUSDSTBalance}`);
+        const acc1USDSTBalance = checkBalanceRes[0].data?.contents?.[0] || "0";
+        console.log(`Acc1 USDST balance: ${acc1USDSTBalance}`);
       }
     } catch (error) {
       console.warn("⚠️  Balance check failed:", error.message);
@@ -312,12 +319,12 @@ require("dotenv").config();
 
 
     // Step 7: Crash ETHST price to $100
-    console.log("\n📉 Step 7: Crashing ETHST price to $100...");
+    console.log("\n📉 Step 7: Crashing ETHST price to $100... (ADMIN ONLY)");
     const crashPriceTx = buildCall("PriceOracle", PRICE_ORACLE, "setAssetPrice", {
       asset: ETHST,
       price: CRASH_ETHST_PRICE
     });
-    const { data: crashPriceRes } = await axios.post(txEndpoint, { txs: [crashPriceTx] }, { headers });
+    const { data: crashPriceRes } = await axios.post(txEndpoint, { txs: [crashPriceTx] }, { headers: adminHeaders });
     if (crashPriceRes[0].status !== "Success") {
       throw new Error(`Failed to crash price: ${crashPriceRes[0].error || crashPriceRes[0].status}`);
     }
@@ -337,7 +344,7 @@ require("dotenv").config();
         to: ACC2_ADDRESS,
         value: LIQUIDATION_AMOUNT
       });
-      const { data: transferRes } = await axios.post(txEndpoint, { txs: [transferTx] }, { headers });
+      const { data: transferRes } = await axios.post(txEndpoint, { txs: [transferTx] }, { headers: acc1Headers });
       if (transferRes[0].status !== "Success") {
         console.warn("⚠️  Failed to transfer USDST to acc2:", transferRes[0].error || transferRes[0].status);
       } else {
@@ -348,13 +355,12 @@ require("dotenv").config();
     }
 
     // Perform liquidation using acc2 account
-    const liquidateHeaders = { Authorization: `Bearer ${ACC2_TOKEN}`, "Content-Type": "application/json" };
     const liquidateTx = buildCall("CDPEngine", CDP_ENGINE, "liquidate", {
       collateralAsset: ETHST,
       borrower: ACC1_ADDRESS,
       debtToCover: LIQUIDATION_AMOUNT
     });
-    const { data: liquidateRes } = await axios.post(txEndpoint, { txs: [liquidateTx] }, { headers: liquidateHeaders });
+    const { data: liquidateRes } = await axios.post(txEndpoint, { txs: [liquidateTx] }, { headers: acc2Headers });
     if (liquidateRes[0].status !== "Success") {
       throw new Error(`Failed to liquidate: ${liquidateRes[0].error || liquidateRes[0].status}`);
     }
@@ -364,12 +370,11 @@ require("dotenv").config();
     console.log("\n🧹 Step 9: Cleaning up dust position to trigger bad debt...");
     
     try {
-      const secondLiquidateHeaders = { Authorization: `Bearer ${ACC2_TOKEN}`, "Content-Type": "application/json" };
       const dustCleanupTx = buildCall("CDPEngine", CDP_ENGINE, "cleanupDustPosition", {
         borrower: ACC1_ADDRESS,
         collateralAsset: ETHST
       });
-      const { data: dustCleanupRes } = await axios.post(txEndpoint, { txs: [dustCleanupTx] }, { headers: secondLiquidateHeaders });
+      const { data: dustCleanupRes } = await axios.post(txEndpoint, { txs: [dustCleanupTx] }, { headers: acc2Headers });
       if (dustCleanupRes[0].status !== "Success") {
         console.warn("⚠️  Dust cleanup failed:", dustCleanupRes[0].error || dustCleanupRes[0].status);
       } else {
@@ -388,17 +393,16 @@ require("dotenv").config();
     
     // Check final balances
     const finalUSDSTTx = buildCall("Token", USDST, "balanceOf", { accountAddress: ACC1_ADDRESS });
-    const { data: finalUSDSTRes } = await axios.post(txEndpoint, { txs: [finalUSDSTTx] }, { headers });
+    const { data: finalUSDSTRes } = await axios.post(txEndpoint, { txs: [finalUSDSTTx] }, { headers: acc1Headers });
     const finalUSDSTBalance = finalUSDSTRes[0].data?.contents?.[0] || "0";
     
-    const acc2Headers = { Authorization: `Bearer ${ACC2_TOKEN}`, "Content-Type": "application/json" };
     const acc2ETHSTTx = buildCall("Token", ETHST, "balanceOf", { accountAddress: ACC2_ADDRESS });
     const { data: acc2ETHSTRes } = await axios.post(txEndpoint, { txs: [acc2ETHSTTx] }, { headers: acc2Headers });
     const acc2ETHSTBalance = acc2ETHSTRes[0].data?.contents?.[0] || "0";
     
     // Check final CDP Reserve balance
     const finalReserveBalanceTx = buildCall("Token", USDST, "balanceOf", { accountAddress: CDP_RESERVE });
-    const { data: finalReserveBalanceRes } = await axios.post(txEndpoint, { txs: [finalReserveBalanceTx] }, { headers });
+    const { data: finalReserveBalanceRes } = await axios.post(txEndpoint, { txs: [finalReserveBalanceTx] }, { headers: acc1Headers });
     const finalReserveBalance = finalReserveBalanceRes[0].data?.contents?.[0] || "0";
     
     // Check final bad debt via Cirrus

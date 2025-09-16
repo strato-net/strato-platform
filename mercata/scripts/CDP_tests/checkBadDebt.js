@@ -19,11 +19,11 @@ require("dotenv").config();
   try {
     // Method 1: Check main contract state
     console.log("\n📊 Method 1: Main Contract State");
-    const { data: contractData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine`, {
+    const { data: contractData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-CDPEngine`, {
       headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
       params: { 
         address: `eq.${CDP_ENGINE}`, 
-        select: "juniorIndex,totalJuniorOutstandingUSD,feeToReserveBps,juniorPremiumBps", 
+        select: "juniorIndex,totalJuniorOutstandingUSDST,feeToReserveBps,juniorPremiumBps", 
         limit: 1 
       }
     });
@@ -32,7 +32,7 @@ require("dotenv").config();
       const state = contractData[0];
       console.log(`✅ Contract found:`);
       console.log(`   Junior Index: ${state.juniorIndex || 0}`);
-      console.log(`   Total Outstanding: ${state.totalJuniorOutstandingUSD || 0}`);
+      console.log(`   Total Outstanding: ${state.totalJuniorOutstandingUSDST || 0}`);
       console.log(`   Fee to Reserve BPS: ${state.feeToReserveBps || 0}`);
       console.log(`   Junior Premium BPS: ${state.juniorPremiumBps || 0}`);
     } else {
@@ -41,7 +41,7 @@ require("dotenv").config();
 
     // Method 2: Check bad debt mapping
     console.log("\n💸 Method 2: Bad Debt Mapping");
-    const { data: badDebtData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-badDebtUSD`, {
+    const { data: badDebtData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-CDPEngine-badDebtUSDST`, {
       headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
       params: { 
         address: `eq.${CDP_ENGINE}`, 
@@ -63,7 +63,7 @@ require("dotenv").config();
           totalBadDebt += Number(entry.value);
         } else if (entry.value && typeof entry.value === 'object') {
           // Handle nested object structure
-          const debtValue = entry.value.badDebtUSD || entry.value;
+          const debtValue = entry.value.badDebtUSDST || entry.value;
           if (typeof debtValue === 'string' || typeof debtValue === 'number') {
             totalBadDebt += Number(debtValue);
           }
@@ -72,12 +72,12 @@ require("dotenv").config();
       
       console.log(`📊 Total Bad Debt: ${totalBadDebt}`);
     } else {
-      console.log("✅ No bad debt found (good!)");
+      console.log("❌ No bad debt found");
     }
 
     // Method 3: Check junior notes mapping
     console.log("\n📝 Method 3: Junior Notes Mapping");
-    const { data: notesData } = await axios.get(`${ROOT}/cirrus/search/CDPEngine-juniorNotes`, {
+    const { data: notesData } = await axios.get(`${ROOT}/cirrus/search/BlockApps-Mercata-CDPEngine-juniorNotes`, {
       headers: { Authorization: `Bearer ${ACC1_TOKEN}` },
       params: { 
         address: `eq.${CDP_ENGINE}`, 
