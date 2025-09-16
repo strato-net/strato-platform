@@ -96,6 +96,7 @@ async function uploadDappContract(token, options) {
     }
 
     console.log("Comments stripped from combined source(s)");
+    fs.writeFile("contract_source",source);
 
     // Deployment arguments
     const contractArgs = {

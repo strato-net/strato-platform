@@ -52,7 +52,8 @@ contract record PoolConfigurator is Ownable {
         uint[] calldata reserveFactors,
         uint[] calldata perSecondFactorsRAY,
         uint debtCeilingAssetUnits,
-        uint debtCeilingUSD
+        uint debtCeilingUSD,
+        uint safetyShareBps
     ) external onlyOwner {
         // Set all registry components
         registry.setAllComponents(lendingPool, liquidityPool, collateralVault, rateStrategy, priceOracle);
@@ -61,8 +62,9 @@ contract record PoolConfigurator is Ownable {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.setTokenFactory(tokenFactory);
 
-        // Set initial debt ceilings
+        // Set initial debt ceilings and safety share
         pool.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
+        pool.setSafetyShareBps(safetyShareBps);
         
         // Configure all assets if provided
         if (assets.length > 0) {
