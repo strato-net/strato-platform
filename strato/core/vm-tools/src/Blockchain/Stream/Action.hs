@@ -341,7 +341,8 @@ data Delegatecall = Delegatecall
   { _delegatecallStorageAddress :: Address,
     _delegatecallCodeAddress :: Address,
     _delegatecallOrganization :: Text,
-    _delegatecallApplication :: Text
+    _delegatecallApplication :: Text,
+    _delegatecallContractName :: Text
   }
   deriving (Eq, Show, Generic, NFData)
 
@@ -358,6 +359,9 @@ instance Format Delegatecall where
       ++ "\n"
       ++ "delegatecallApplication: "
       ++ T.unpack _delegatecallApplication
+      ++ "\n"
+      ++ "delegatecallContractName: "
+      ++ T.unpack _delegatecallContractName
 
 instance Binary Delegatecall
 
@@ -367,7 +371,8 @@ instance ToJSON Delegatecall where
       [ "storageAddress" .= _delegatecallStorageAddress,
         "codeAddress" .= _delegatecallCodeAddress,
         "organization" .= _delegatecallOrganization,
-        "application" .= _delegatecallApplication
+        "application" .= _delegatecallApplication,
+        "contractName" .= _delegatecallContractName
       ]
 
 instance FromJSON Delegatecall where
@@ -376,7 +381,8 @@ instance FromJSON Delegatecall where
     c <- o .: "codeAddress"
     r <- o .: "organization"
     a <- o .: "application"
-    pure $ Delegatecall s c r a
+    n <- o .: "contractName"
+    pure $ Delegatecall s c r a n
   parseJSON o = fail $ "parseJSON Delegatecall: Expected object, got: " ++ show o
 
 data Action = Action

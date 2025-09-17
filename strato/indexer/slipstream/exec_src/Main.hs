@@ -69,7 +69,7 @@ main = do
       let migrateCirrus :: MonadIO m => B.ByteString -> m ()
           migrateCirrus = liftIO . void . pgQuery conn
       migrateCirrus
-        [r|CREATE TABLE IF NOT EXISTS contract (
+        [r|CREATE TABLE IF NOT EXISTS storage (
                 address text,
                 block_hash text,
                 block_timestamp text,
@@ -84,6 +84,14 @@ main = do
                 PRIMARY KEY (address)
             )|]
       migrateCirrus
+        [r|CREATE TABLE IF NOT EXISTS contract (
+                address text,
+                creator text,
+                application text,
+                contract_name text,
+                CONSTRAINT contract_storage FOREIGN KEY (address) REFERENCES storage (address)
+            )|]
+      migrateCirrus
         [r|CREATE TABLE IF NOT EXISTS record (
                 address text,
                 block_hash text,
@@ -93,7 +101,7 @@ main = do
                 transaction_sender text,
                 key jsonb,
                 value jsonb,
-                CONSTRAINT contract_record FOREIGN KEY (address) REFERENCES contract (address)
+                CONSTRAINT contract_record FOREIGN KEY (address) REFERENCES storage (address)
             )|]
       migrateCirrus
         [r|CREATE TABLE IF NOT EXISTS event (
@@ -110,7 +118,7 @@ main = do
                 event_name text,
                 attributes jsonb,
                 PRIMARY KEY (transaction_hash, event_index),
-                CONSTRAINT contract_event FOREIGN KEY (address) REFERENCES contract (address)
+                CONSTRAINT contract_event FOREIGN KEY (address) REFERENCES storage (address)
             )|]
 
       -- There are three permanent connections/pools to postgres:

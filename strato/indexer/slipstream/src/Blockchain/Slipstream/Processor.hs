@@ -242,6 +242,8 @@ processTheMessages messages = do
       -- level like this
       creates =
         [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
+      delegatecalls =
+        [d | VME.DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
@@ -268,14 +270,14 @@ processTheMessages messages = do
             
             deferredForeignKeys <- case (_contractType c) of
               AbstractType -> do
-                abstractfkeys <- createExpandAbstractTable c nameParts abstracts' cc
-                createExpandHistoryTable True c cc nameParts
+                abstractfkeys <- createAbstractTable c nameParts abstracts' cc
+                createHistoryTable' True c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
                 return abstractfkeys
               _ -> do
-                indexfkeys <- createExpandIndexTable c cc nameParts
+                indexfkeys <- createIndexTable c cc nameParts
                 $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                createExpandHistoryTable False c cc nameParts
+                createHistoryTable' False c cc nameParts
                 return indexfkeys
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
@@ -349,6 +351,8 @@ processTheMessages messages = do
       insertAbstractTable (abstractInserts ins)-- not historic
       unless ((length (collectionInserts ins) < 1)) $
         insertCollectionTable $ collectionInserts ins
+
+    forM_ delegatecalls insertDelegatecall
 
       --updating the foreign keys from null
     forM_ insertsByCodeHash $ \ins -> do
