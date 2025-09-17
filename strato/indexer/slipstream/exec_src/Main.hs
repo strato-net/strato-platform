@@ -89,6 +89,7 @@ main = do
                 creator text,
                 application text,
                 contract_name text,
+                PRIMARY KEY (address, creator, application, contract_name),
                 CONSTRAINT contract_storage FOREIGN KEY (address) REFERENCES storage (address)
             )|]
       migrateCirrus
