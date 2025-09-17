@@ -36,6 +36,7 @@ import { LendingProvider } from "./context/LendingContext";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
+import { SafetyProvider } from "./context/SafetyContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
@@ -108,9 +109,10 @@ const App = () => {
                 <OracleProvider>
                   <TokenProvider>
                     <LiquidationProvider>
-                      <BridgeProvider>
-                          <TooltipProvider>
-                            <Toaster />
+                      <SafetyProvider>
+                        <BridgeProvider>
+                              <TooltipProvider>
+                              <Toaster />
                             <BrowserRouter>
                               <UsdstBalanceBox />
                               <Routes>
@@ -205,6 +207,7 @@ const App = () => {
                             </BrowserRouter>
                           </TooltipProvider>
                         </BridgeProvider>
+                      </SafetyProvider>
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>

@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import LendingPoolSection from '@/components/dashboard/LendingPoolSection';
 import SwapPoolsSection from '@/components/dashboard/SwapPoolsSection';
 import LiquidationsSection from '@/components/dashboard/LiquidationsSection';
+import SafetyModuleSection from '@/components/dashboard/SafetyModuleSection';
 
 const Pools = () => {
-  const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations">("lending");
+  const [activeTab, setActiveTab] = useState<"lending" | "swap" | "liquidations" | "safety">("lending");
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   return (
@@ -31,11 +32,15 @@ const Pools = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lending" | "swap" | "liquidations")} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 mb-4">
+              <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "lending" | "swap" | "liquidations" | "safety")} className="w-full">
+                <TabsList className="grid w-full grid-cols-4 mb-4">
                   <TabsTrigger value="lending" className="text-xs sm:text-sm">
                     <span className="hidden sm:inline">Lending Pools</span>
                     <span className="sm:hidden">Lending</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="safety" className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Safety Module</span>
+                    <span className="sm:hidden">Safety</span>
                   </TabsTrigger>
                   <TabsTrigger value="swap" className="text-xs sm:text-sm">
                     <span className="hidden sm:inline">Swap Pools</span>
@@ -48,6 +53,9 @@ const Pools = () => {
                 </TabsList>
                 <TabsContent value="lending">
                   <LendingPoolSection />
+                </TabsContent>
+                <TabsContent value="safety">
+                  <SafetyModuleSection />
                 </TabsContent>
                 <TabsContent value="swap">
                   <SwapPoolsSection />

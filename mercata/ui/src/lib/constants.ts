@@ -26,3 +26,5 @@ export const LENDING_DEPOSIT_FEE = "0.02"; // USDST fee for lending pool deposit
 export const LENDING_WITHDRAW_FEE = "0.01"; // USDST fee for lending pool withdraw transactions
 export const WITHDRAW_USDST_FEE = "0.02"; // USDST fee for withdraw USDST transactions
 export const BRIDGE_OUT_FEE = "0.02"; // USDST fee for bridge out transactions
+export const SAFETY_STAKE_FEE = "0.02"; // USDST fee for SafetyModule stake transactions
+export const SAFETY_REDEEM_FEE = "0.01"; // USDST fee for SafetyModule redeem transactions
