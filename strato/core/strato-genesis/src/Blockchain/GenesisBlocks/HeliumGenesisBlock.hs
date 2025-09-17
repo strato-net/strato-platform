@@ -354,7 +354,7 @@ assetBalances GA.Asset{..} =
               Nothing -> [(o, q)]
               Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
     . (++) (case () of
-              _ | root == ethstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (ethstPoolAddress, 100 * oneE18)]
+              _ | root == ethstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (ethstPoolAddress, 11_129_288_949_700_000_000)]
                 | root == wbtcstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (wbtcstPoolAddress, (425 * oneE18) `div` 1000)]
                 | root == goldstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (goldstPoolAddress, (151 * oneE18) `div` 10)]
                 | root == silvstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (silvstPoolAddress, (13_125 * oneE18) `div` 10)]
@@ -641,16 +641,16 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS sUsdstAddress <> "><\"mint\"><a:" <> addrBS safetyModuleAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS sUsdstAddress <> "><\"burn\"><a:" <> addrBS safetyModuleAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS ethstPoolAddress <> "><\"mint\"><a:" <> addrBS ethstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS ethstPoolAddress <> "><\"burn\"><a:" <> addrBS ethstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS wbtcstPoolAddress <> "><\"mint\"><a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS wbtcstPoolAddress <> "><\"burn\"><a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS goldstPoolAddress <> "><\"mint\"><a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS goldstPoolAddress <> "><\"burn\"><a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS silvstPoolAddress <> "><\"mint\"><a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS silvstPoolAddress <> "><\"burn\"><a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
-     -- , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"mint\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
-     -- , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"burn\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS ethstLpTokenAddress <> "><\"mint\"><a:" <> addrBS ethstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS ethstLpTokenAddress <> "><\"burn\"><a:" <> addrBS ethstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS wbtcstLpTokenAddress <> "><\"mint\"><a:" <> addrBS wbtcstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS wbtcstLpTokenAddress <> "><\"burn\"><a:" <> addrBS wbtcstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS goldstLpTokenAddress <> "><\"mint\"><a:" <> addrBS goldstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS goldstLpTokenAddress <> "><\"burn\"><a:" <> addrBS goldstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS silvstLpTokenAddress <> "><\"mint\"><a:" <> addrBS silvstPoolAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS silvstLpTokenAddress <> "><\"burn\"><a:" <> addrBS silvstPoolAddress <> ">", BBool True)
+     -- , (".whitelist<a:" <> addrBS paxgstLpTokenAddress <> "><\"mint\"><a:" <> addrBS paxgstPoolAddress <> ">", BBool True)
+     -- , (".whitelist<a:" <> addrBS paxgstLpTokenAddress <> "><\"burn\"><a:" <> addrBS paxgstPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
@@ -861,10 +861,10 @@ ethstPool = SolidVMContractWithStorage ethstPoolAddress 0 (CodeAtAccount mercata
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
      , (".lpToken", BContract "Token" $ unspecifiedChain ethstLpTokenAddress)
      , (".locked", BBool False)
-     , (".aToBRatio", BDecimal "0.000333333333333333333333333333333333333333333333333333333333333333333333333333333333333")
-     , (".bToARatio", BDecimal "3000.0")
-     , (".tokenABalance", BInteger $ 100 * oneE18)
-     , (".tokenBBalance", BInteger $ 300_000 * oneE18)
+     , (".aToBRatio", BDecimal "0.00022258577")
+     , (".bToARatio", BDecimal "4492.65")
+     , (".tokenABalance", BInteger 11_129_288_949_700_000_000)
+     , (".tokenBBalance", BInteger $ 50_000 * oneE18)
      , (".swapFeeRate", BInteger 0)
      , (".lpSharePercent", BInteger 0)
      , (".zapSwapFeesEnabled", BBool True)
