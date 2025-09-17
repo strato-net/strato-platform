@@ -3,17 +3,19 @@ import { CircleArrowDown, CircleArrowUp, Clock, Shield } from "lucide-react";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE } from "@/lib/constants";
+import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 
 const SafetyModuleSection = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance } = useUserTokens();
+  const { activeTokens: tokens, loading: tokensLoading, fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
+  const { approveToken } = useTokenContext();
   const {
     safetyInfo,
     loading,
@@ -27,6 +29,7 @@ const SafetyModuleSection = () => {
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
+
 
   const refreshData = (signal?: AbortSignal) => {
     if (!userAddress) return;
@@ -45,7 +48,7 @@ const SafetyModuleSection = () => {
     };
   }, [userAddress]);
 
-  const usdstBalance = tokens.find(token => token.symbol === "USDST")?.balance || "0";
+  // usdstBalance is now coming directly from useUserTokens() context
 
   const isStakeAmountValid = () => {
     if (!stakeAmount) return false;
@@ -63,6 +66,7 @@ const SafetyModuleSection = () => {
       return false;
     }
   };
+
 
   const isRedeemAmountValid = () => {
     if (!redeemAmount) return false;
@@ -86,6 +90,29 @@ const SafetyModuleSection = () => {
     try {
       setIsProcessing(true);
       const amountWei = safeParseUnits(stakeAmount, 18).toString();
+      
+      // First, approve the SafetyModule contract to spend USDST
+      
+      toast({
+        title: "Approving USDST...",
+        description: "Please approve the SafetyModule to spend your USDST tokens.",
+        variant: "default",
+      });
+
+      // Approve the SafetyModule to spend the stake amount
+      await approveToken({
+        address: usdstAddress,
+        spender: safetyModuleAddress,
+        value: amountWei
+      });
+
+      toast({
+        title: "Approval Successful",
+        description: "Now staking your USDST...",
+        variant: "success",
+      });
+
+      // Then stake the tokens
       await stakeSafety({ amount: amountWei });
 
       toast({
@@ -245,6 +272,10 @@ const SafetyModuleSection = () => {
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                  </div>
+                  {/* Approval Info */}
+                  <div className="text-sm text-blue-600 mt-1">
+                    ℹ️ Staking requires two transactions: approval + stake
                   </div>
                   {/* Fee Warning */}
                   {(() => {

@@ -1,4 +1,5 @@
 export const usdstAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
+export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 
 // ============================================
 // Input Validation Patterns

@@ -39,13 +39,13 @@ const getSafetyModuleConfig = (): SafetyModuleConfig => {
   // similar to how lendingRegistry, poolFactory, etc. are configured
   return {
     safetyModule: {
-      address: process.env.SAFETY_MODULE || "0000000000000000000000000000000000001009"
+      address: process.env.SAFETY_MODULE || "0000000000000000000000000000000000001015"
     },
     asset: {
       address: process.env.USDST_ADDRESS || "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
     },
     sToken: {
-      address: process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001010"
+      address: process.env.SUSDST_ADDRESS || "0000000000000000000000000000000000001016"
     }
   };
 };
@@ -106,8 +106,7 @@ export const getSafetyModuleInfo = async (
         `/BlockApps-Mercata-SafetyModule-cooldownStart`,
         {
           params: {
-            key: `eq.${safetyModuleAddress}`,
-            key2: `eq.${userAddress.toLowerCase()}`,
+            key: `eq.${userAddress.toLowerCase()}`,
             select: "value::text"
           }
         }
