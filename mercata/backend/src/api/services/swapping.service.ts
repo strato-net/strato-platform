@@ -97,19 +97,15 @@ export const getPools = async (
     const tokenABalance = pool.tokenA?.balances?.[0]?.balance || "0";
     const tokenBBalance = pool.tokenB?.balances?.[0]?.balance || "0";
     
-    // Remove balances array and add direct balance property
-    const { balances: tokenABalances, ...tokenARest } = pool.tokenA || {};
-    const { balances: tokenBBalances, ...tokenBRest } = pool.tokenB || {};
-    
     return {
       ...pool,
       tokenA: {
-        ...tokenARest,
-        balance: tokenABalance
+        ...pool.tokenA,
+        balance: tokenABalance // Add direct balance property for convenience
       },
       tokenB: {
-        ...tokenBRest,
-        balance: tokenBBalance
+        ...pool.tokenB,
+        balance: tokenBBalance // Add direct balance property for convenience
       },
       tokenAPrice,
       tokenBPrice,
