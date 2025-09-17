@@ -264,10 +264,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params } = req;
+      const { accessToken, params, address } = req;
       validateTokenPairArgs(params);
 
-      const pools = await getPools(accessToken, undefined, {
+      const pools = await getPools(accessToken, address, {
         tokenA: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });

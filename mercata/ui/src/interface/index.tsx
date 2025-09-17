@@ -334,6 +334,8 @@ export interface LiquidityPool {
   totalLiquidityUSD?: string;
   tradingVolume24h?: string;
   apy?: string;
+  oracleAToBRatio?: string;
+  oracleBToARatio?: string;
   _name?: string;
   _symbol?: string;
 }
@@ -493,7 +495,6 @@ export interface SwapPollingConfig {
   fromAmount: string; 
   editingField: 'from' | 'to' | null;
   getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  calculateSwap: (params: any) => Promise<any>;
   setPool: (pool: any) => void; 
   setToAsset: (asset: any) => void; 
   setToAmount: (amount: string) => void; 
@@ -507,7 +508,6 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  setPool: (pool: any) => void;
   interval?: number;
 }
 
@@ -522,7 +522,6 @@ export interface SwapCalculationConfig {
   fromAsset: any;
   fromAmount: string;
   editingField: 'from' | 'to' | null;
-  calculateSwap: (params: any) => Promise<string>;
   setToAmount: (amount: string) => void;
   lastCalculatedFromRef: React.MutableRefObject<string>;
 }

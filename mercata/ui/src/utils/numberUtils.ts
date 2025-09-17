@@ -8,7 +8,7 @@ import { parseUnits, formatUnits } from "ethers";
  * @param decimals - The number of decimals to use for parsing
  * @returns BigInt representation of the value, or 0n if invalid
  */
-export const safeParseUnits = (value: string, decimals: number): bigint => {
+export const safeParseUnits = (value: string, decimals: number = 18): bigint => {
   try {
     // Handle edge cases that parseUnits can't handle
     if (!value || value === '.') {
@@ -146,9 +146,8 @@ export const formatBalance = (
 
   let [int, dec = ""] = formatted.split(".");
 
-  if (maxPrecision !== undefined) {
-    const rounded = Number(formatted).toFixed(maxPrecision);
-    [int, dec = ""] = rounded.split(".");
+  if (maxPrecision !== undefined && dec.length > maxPrecision) {
+    dec = dec.substring(0, maxPrecision);
   }
 
   if (minPrecision !== undefined && dec.length < minPrecision) {
@@ -196,3 +195,23 @@ export const formatCurrency = (value: string | number): string => {
     maximumFractionDigits: 6,
   });
 };
+
+/**
+ * Formats a wei amount to human readable format - exactly like formatAmount but with wei conversion
+ */
+export const formatWeiAmountDisplay = (weiAmount: string, decimals: number = 18): string => {
+  try {
+    const formatted = formatUnits(BigInt(weiAmount), decimals);
+    if (!formatted) return "";
+    const value = Number(formatted);
+    const roundedDown = Math.floor(value * decimals) / decimals;
+    return roundedDown.toLocaleString(undefined, {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: decimals,
+    });
+  } catch (err) {
+    return "0";
+  }
+};
+
+export { formatUnits } from "ethers";
