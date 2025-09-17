@@ -1,40 +1,19 @@
-export const getInputPrice = (
-  inputAmount: bigint,
-  inputReserve: bigint,
-  outputReserve: bigint
-): string => {
-  if (inputAmount <= BigInt(0) || inputReserve <= BigInt(0) || outputReserve <= BigInt(0)) {
-    throw new Error("Invalid amounts or reserves");
-  }
+import { cirrus } from "../../utils/mercataApiHelper";
+import { constants } from "../../config/constants";
 
-  const numerator = inputAmount * outputReserve;
-  const denominator = inputReserve + inputAmount;
+const { Pool } = constants;
 
-  return String(numerator / denominator);
-};
+export const getRawPoolData = async (
+  accessToken: string,
+  params: Record<string, string> = {}
+) => {
+  const queryParams = {
+    _owner: "eq." + constants.poolFactory,
+    ...params
+  };
 
-export const getRequiredInput = (
-  outputAmount: bigint,
-  inputReserve: bigint,
-  outputReserve: bigint
-): string => {
-  if (outputAmount <= BigInt(0) || inputReserve <= BigInt(0) || outputReserve <= BigInt(0)) {
-    throw new Error("Invalid amounts or reserves");
-  }
-  
-  if (outputAmount >= outputReserve) {
-    throw new Error("Desired output amount exceeds pool reserves");
-  }
-
-  // This is the inverse of the getInputPrice formula
-  // If the forward formula is: outputAmount = (inputAmount * outputReserve) / (inputReserve + inputAmount)
-  // Then the reverse is: inputAmount = (inputReserve * outputAmount) / (outputReserve - outputAmount)
-  
-  const numerator = inputReserve * outputAmount;
-  const denominator = outputReserve - outputAmount;
-  
-  // Add 1 to round up (to ensure user provides enough input)
-  return String(numerator / denominator + BigInt(1));
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, { params: queryParams });
+  return poolData;
 };
 
 export const calculateImpliedPrice = (
@@ -114,21 +93,18 @@ export const calculateLPTokenPrice = (
   tokenBPrice: string,
   lpTokenTotalSupply: string
 ): string => {
-  const tokenABalanceBig = BigInt(tokenABalance || "0");
-  const tokenBBalanceBig = BigInt(tokenBBalance || "0");
-  const tokenAPriceBig = BigInt(tokenAPrice || "0");
-  const tokenBPriceBig = BigInt(tokenBPrice || "0");
-  const lpTokenSupplyBig = BigInt(lpTokenTotalSupply || "0");
+  const toBig = (v: string) => (v ? BigInt(v) : 0n);
+  const aBal = toBig(tokenABalance);
+  const bBal = toBig(tokenBBalance);
+  const aPrice = toBig(tokenAPrice);
+  const bPrice = toBig(tokenBPrice);
+  const supply = toBig(lpTokenTotalSupply);
 
-  if (lpTokenSupplyBig === 0n) return "0";
+  if (supply === 0n) return "0";
+  if ((aBal === 0n && bBal === 0n) || (aPrice === 0n && bPrice === 0n)) return "0";
 
-  // Calculate total value of underlying tokens in USD
-  const tokenAValue = (tokenABalanceBig * tokenAPriceBig) / BigInt(10 ** 18);
-  const tokenBValue = (tokenBBalanceBig * tokenBPriceBig) / BigInt(10 ** 18);
-  const totalValue = tokenAValue + tokenBValue;
+  const Q = 10n ** 18n;
+  const totalValueUSD = (aBal * aPrice + bBal * bPrice) / Q; // both prices are 1e18-scaled
 
-  // LP token price = total value / total supply
-  const lpTokenPrice = (totalValue * BigInt(10 ** 18)) / lpTokenSupplyBig;
-
-  return lpTokenPrice.toString();
+  return ((totalValueUSD * Q) / supply).toString();
 };
