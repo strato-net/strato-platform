@@ -37,9 +37,6 @@ router.post("/swap-pools/:poolAddress/liquidity/single", authHandler.authorizeRe
 router.delete("/swap-pools/:poolAddress/liquidity", authHandler.authorizeRequest(), SwappingController.removeLiquidity);
 
 // ----- Swap Operations -----
-// Get swap quote (calculate output amount for given input)
-router.get("/swap/quote", authHandler.authorizeRequest(true), SwappingController.calculateSwap);
-
 // Execute swap transaction
 router.post("/swap", authHandler.authorizeRequest(), SwappingController.swap);
 

@@ -35,8 +35,10 @@ const Dashboard = () => {
   const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
-  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+ 
   const { totalCDPDebt, loading: cdpLoading } = useCDP();
+  const { poolsLoading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
