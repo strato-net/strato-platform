@@ -508,6 +508,8 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
+  fetchUsdstBalance?: (userAddress: string) => Promise<void>;
+  userAddress?: string;
   interval?: number;
 }
 

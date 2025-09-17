@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/constants";
-import { safeParseUnits, formatBalance, formatAmount, formatWeiAmountDisplay, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalance, formatAmount, formatUnits } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -232,7 +232,7 @@ const TokenInput = ({
           }
           return BigInt(balance) === 0n && isFromInput ? "text-red-600" : "text-gray-600";
         })()}`}>
-          User Balance: {(() => {
+          Available User Balance: {(() => {
             let balance = asset?.balance || "0";
             if (asset?.address === usdstAddress && isFromInput) {
               const fee = safeParseUnits(SWAP_FEE, DECIMALS);
@@ -494,6 +494,8 @@ const SwapWidget = () => {
     fromAsset,
     toAsset,
     getPoolByTokenPair,
+    fetchUsdstBalance,
+    userAddress,
     interval: POLL_INTERVAL
   });
 
@@ -504,7 +506,7 @@ const SwapWidget = () => {
   const usdstBalanceBigInt = BigInt(usdstBalance || "0");
   const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
 
-  const hasInsufficientUsdstForFee = usdstBalanceBigInt <= feeAmount;
+  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
   const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n ? (() => {
     const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
     const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;

@@ -7,8 +7,6 @@ import {
   addLiquiditySingleToken,
   removeLiquidity,
   swap,
-  calculateSwap,
-  calculateSwapReverse,
   getSwapHistory,
   setPoolRates,
 } from "../services/swapping.service";
@@ -23,7 +21,6 @@ import {
   validateRemoveLiquidityArgs,
   validateSwapArgs,
   validateQueryParams,
-  validateCalculateSwapArgs,
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
 } from "../validators/swapping.validator";
@@ -145,32 +142,6 @@ class SwappingController {
     const result = await swap(accessToken, { ...body, deadline });
     res.status(200).json(result);
     return next();
-  }
-
-  // Calculators
-  static async calculateSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const { accessToken, query } = req;
-    validateCalculateSwapArgs(query);
-    
-    const poolAddress = query.poolAddress as string;
-    const isAToB = query.isAToB === "true";
-    const amountIn = query.amountIn as string;
-    const reverse = query.reverse as string;
-    const isReverse = reverse === "true";
-
-    if (isReverse) {
-      const price = await calculateSwapReverse(
-        accessToken,
-        { poolAddress, isAToB, amountIn }
-      );
-      res.status(RestStatus.OK).json(price);
-    } else {
-      const price = await calculateSwap(
-        accessToken,
-        { poolAddress, isAToB, amountIn }
-      );
-      res.status(RestStatus.OK).json(price);
-    }
   }
 
   // Helpers

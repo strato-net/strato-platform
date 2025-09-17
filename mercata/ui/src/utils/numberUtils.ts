@@ -196,22 +196,4 @@ export const formatCurrency = (value: string | number): string => {
   });
 };
 
-/**
- * Formats a wei amount to human readable format - exactly like formatAmount but with wei conversion
- */
-export const formatWeiAmountDisplay = (weiAmount: string, decimals: number = 18): string => {
-  try {
-    const formatted = formatUnits(BigInt(weiAmount), decimals);
-    if (!formatted) return "";
-    const value = Number(formatted);
-    const roundedDown = Math.floor(value * decimals) / decimals;
-    return roundedDown.toLocaleString(undefined, {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: decimals,
-    });
-  } catch (err) {
-    return "0";
-  }
-};
-
 export { formatUnits } from "ethers";

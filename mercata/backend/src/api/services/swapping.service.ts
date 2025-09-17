@@ -4,7 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { poolFactory } from "../../config/config";
-import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice, getRawPoolData } from "../helpers/swapping.helper";
+import { calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice, getRawPoolData } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import { SwapHistoryEntry } from "../../types";
 
@@ -32,7 +32,16 @@ export const getPools = async (
         }),
   };
 
-  const poolData = await getRawPoolData(accessToken, params);
+  // Get pool data and factory data in parallel
+  const [poolData, { data: factoryData }] = await Promise.all([
+    getRawPoolData(accessToken, params),
+    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
+      params: {
+        address: "eq." + poolFactory,
+        select: "swapFeeRate,lpSharePercent"
+      }
+    })
+  ]);
 
   // Extract token addresses for oracle price filtering
   const tokenAddresses = [...new Set([
@@ -66,8 +75,10 @@ export const getPools = async (
     );
     
     const tradingVolume24h = volumeMap.get(pool.address) || "0";
-    const swapFeeRate = pool.swapFeeRate || 30;
-    const lpSharePercent = pool.lpSharePercent || 7000;
+    const factorySwapFeeRate = factoryData?.[0]?.swapFeeRate || 30;
+    const factoryLpSharePercent = factoryData?.[0]?.lpSharePercent || 7000;
+    const swapFeeRate = pool.swapFeeRate === 0 ? factorySwapFeeRate : pool.swapFeeRate;
+    const lpSharePercent = pool.lpSharePercent === 0 ? factoryLpSharePercent : pool.lpSharePercent;
     
     const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
     const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
@@ -107,7 +118,9 @@ export const getPools = async (
       tradingVolume24h,
       apy: apy.toFixed(2),
       oracleAToBRatio: oracleAToBRatio.toString(),
-      oracleBToARatio: oracleBToARatio.toString()
+      oracleBToARatio: oracleBToARatio.toString(),
+      swapFeeRate,
+      lpSharePercent,
     };
   });
 };
@@ -357,62 +370,6 @@ export const swap = async (
   } catch (error) {
     throw error;
   }
-};
-
-export const calculateSwap = async (
-  accessToken: string,
-  calculateSwapParams: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-  }
-) => {
-  const { poolAddress, isAToB, amountIn } = calculateSwapParams;
-  
-  const pools = await getPools(accessToken, undefined, {
-    address: "eq." + poolAddress,
-    select: "tokenABalance,tokenBBalance,swapFeeRate",
-  });
-
-  if (!pools || pools.length === 0) {
-    throw new Error("No pools found for the given address");
-  }
-
-  const pool = pools[0];
-  const fee = (BigInt(amountIn) * BigInt(pool.swapFeeRate)) / BigInt(10000);
-  const netInput = BigInt(amountIn) - fee;
-  const [inputReserve, outputReserve] = isAToB 
-    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
-    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
-
-  return getInputPrice(netInput, inputReserve, outputReserve);
-};
-
-export const calculateSwapReverse = async (
-  accessToken: string,
-  calculateSwapReverseParams: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-  }
-) => {
-  const { poolAddress, isAToB, amountIn } = calculateSwapReverseParams;
-  
-  const pools = await getPools(accessToken, undefined, {
-    address: "eq." + poolAddress,
-    select: "tokenABalance,tokenBBalance",
-  });
-
-  if (!pools || pools.length === 0) {
-    throw new Error("No pools found for the given address");
-  }
-
-  const pool = pools[0];
-  const [inputReserve, outputReserve] = isAToB 
-    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
-    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
-
-  return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
 };
 
 export const getTradingVolume24hForPools = async (
