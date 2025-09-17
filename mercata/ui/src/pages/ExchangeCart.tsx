@@ -12,6 +12,7 @@ import { Tabs as AntdTabs } from 'antd';
 import { History } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useBridgeContext } from '@/context/BridgeContext';
+import { useCDP } from '@/context/CDPContext';
 
 interface ExchangeCartProps {
   onVaultActionSuccess?: () => void; // Callback passed from parent
@@ -35,6 +36,7 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
   });
   const navigate = useNavigate();
   const { setTargetTransactionTab } = useBridgeContext();
+  const { refreshVaults } = useCDP();
   const [convertAction, setConvertAction] = useState<'deposit' | 'withdraw' | null>(null);
   const [vaultsRefreshTrigger, setVaultsRefreshTrigger] = useState(0);
 
@@ -57,8 +59,8 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
     }
   };
 
-  // Pass the callback from parent to VaultsList - no local refresh logic
   const handleVaultActionSuccess = () => {
+    refreshVaults();
     if (onVaultActionSuccess) {
       onVaultActionSuccess();
     }

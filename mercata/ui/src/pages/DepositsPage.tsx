@@ -15,6 +15,7 @@ import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
+import { useCDP } from '@/context/CDPContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 import { useSearchParams } from 'react-router-dom';
@@ -23,6 +24,7 @@ const DepositsPage = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
   const { loans } = useLendingContext();
+  const { totalCDPDebt } = useCDP();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchParams] = useSearchParams();
@@ -73,15 +75,32 @@ const DepositsPage = () => {
       total += totalTokenValue;
     }
 
-    // Get USDST borrowed from loans data
-    const usdstBorrowed = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
+    const lendingPoolDebt = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits((() => { 
+          try { 
+            const bi = BigInt(loans.totalAmountOwed); 
+            return bi <= 1n ? 0n : bi; 
+          } catch { 
+            return 0n; 
+          } 
+        })(), 18))
       : 0;
 
-    // Net Balance = All deposits (including supplied) - USDST Borrowed
-    const netBalance = total - usdstBorrowed;
+    const cdpDebt = totalCDPDebt
+      ? parseFloat(formatUnits((() => {
+          try {
+            const bi = BigInt(totalCDPDebt);
+            return bi <= 1n ? 0n : bi;
+          } catch {
+            return 0n;
+          }
+        })(), 18))
+      : 0;
+
+    const totalDebt = lendingPoolDebt + cdpDebt;
+    const netBalance = total - totalDebt;
     setTotalBalance(netBalance);
-  }, [tokens, loans]);
+  }, [tokens, loans, totalCDPDebt]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
