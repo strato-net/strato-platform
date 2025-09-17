@@ -38,6 +38,7 @@ enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
 contract record Token is ERC20, Ownable, TokenMetadata {
     uint8 public customDecimals;
+    bool public isPaused;
     TokenStatus public status;
     TokenFactory public tokenFactory;
     RewardsManager public rewardsManager;
@@ -46,6 +47,16 @@ contract record Token is ERC20, Ownable, TokenMetadata {
 
     modifier onlyTokenFactory() {
         require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
+        _;
+    }
+
+    modifier whenNotPaused() {
+        require(!isPaused, "Token: paused");
+        _;
+    }
+
+    modifier whenPaused() {
+        require(isPaused, "Token: not paused");
         _;
     }
 
@@ -63,7 +74,7 @@ contract record Token is ERC20, Ownable, TokenMetadata {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
-
+        isPaused = false;
         _mint(_tokenCreator, _initialSupply);
 
         emit StatusChanged(status);
@@ -94,6 +105,14 @@ contract record Token is ERC20, Ownable, TokenMetadata {
         _burn(from, amount);
     }
 
+    function pause() external onlyOwner whenNotPaused {
+        isPaused = true;
+    }
+
+    function unpause() external onlyOwner whenPaused {
+        isPaused = false;
+    }
+
     function addWhitelist(address _admin, string _func, address _accountToWhitelsit) external onlyOwner {
         AdminRegistry(_admin).castVoteOnIssue(_admin, "addWhitelist", this, _func, _accountToWhitelsit);
     }
@@ -113,6 +132,10 @@ contract record Token is ERC20, Ownable, TokenMetadata {
 
     function decimals() external view virtual override returns (uint8) {
         return customDecimals;
+    }
+
+    function _transfer(address from, address to, uint256 amount) internal override whenNotPaused {
+        super._transfer(from, to, amount);
     }
 
     function _update(address from, address to, uint256 value) internal override {
