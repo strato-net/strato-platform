@@ -66,13 +66,14 @@ export const useFormPolling = (fetchFn: () => Promise<any>, shouldPoll: (amount:
 // Optimized focused hooks
 
 // Hook for managing pool data fetching and state
-export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, setPool, interval = 10000 }: PoolPollingConfig) =>
+export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUsdstBalance, userAddress, interval = 10000 }: PoolPollingConfig) =>
   useSmartPolling({
     fetchFn: async () => {
       if (!fromAsset?.address || !toAsset?.address) return null;
       const poolData = await getPoolByTokenPair(fromAsset.address, toAsset.address);
-      if (poolData) {
-        setPool(poolData); // Only set pool if we got valid data
+      // Also fetch USDST balance to keep it updated
+      if (userAddress && fetchUsdstBalance) {
+        await fetchUsdstBalance(userAddress);
       }
       return poolData;
     },
@@ -87,25 +88,6 @@ export const useExchangeRate = ({ poolData, fromAsset, setExchangeRate }: Exchan
     const rate = poolData ? (poolData.tokenA?.address === fromAsset?.address ? poolData.aToBRatio : poolData.bToARatio) || "0" : "0";
     setExchangeRate(rate);
   }, [poolData, fromAsset?.address, setExchangeRate]);
-
-// Hook for managing swap calculations
-export const useSwapCalculation = ({ poolData, fromAsset, fromAmount, editingField, calculateSwap, setToAmount, lastCalculatedFromRef }: SwapCalculationConfig) =>
-  useEffect(() => {
-    if (!poolData || !fromAmount || fromAmount !== lastCalculatedFromRef.current || editingField !== null) return;
-
-    const calculateSwapAmount = async () => {
-      try {
-        const parsedValue = parseUnits(fromAmount, 18);
-        const isAToB = poolData.tokenA?.address === fromAsset?.address;
-        const swapAmount = await calculateSwap({ poolAddress: poolData.address, isAToB, amountIn: parsedValue.toString() });
-        setToAmount(formatUnits(BigInt(swapAmount || "0"), 18));
-      } catch (error) {
-        console.error("Swap calculation error:", error);
-      }
-    };
-
-    calculateSwapAmount();
-  }, [poolData, fromAsset?.address, fromAmount, editingField, calculateSwap, setToAmount, lastCalculatedFromRef]);
 
 // Hook for managing swap state cleanup
 export const useSwapStateCleanup = ({ poolData, setToAsset, setExchangeRate }: SwapStateCleanupConfig) =>

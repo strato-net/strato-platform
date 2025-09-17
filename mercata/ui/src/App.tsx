@@ -33,6 +33,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
 import { LendingProvider } from "./context/LendingContext";
+import { CDPProvider } from "./context/CDPContext";
 import { TokenProvider } from "./context/TokenContext";
 import { BridgeProvider } from "@/context/BridgeContext";
 import { LiquidationProvider } from "./context/LiquidationContext";
@@ -104,7 +105,8 @@ const App = () => {
         <UserProvider>
           <UserTokensProvider>
             <LendingProvider>
-              <SwapProvider>
+              <CDPProvider>
+                <SwapProvider>
                 <OracleProvider>
                   <TokenProvider>
                     <LiquidationProvider>
@@ -208,7 +210,8 @@ const App = () => {
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>
-              </SwapProvider>
+                </SwapProvider>
+              </CDPProvider>
             </LendingProvider>
           </UserTokensProvider>
         </UserProvider>

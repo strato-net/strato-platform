@@ -17,6 +17,7 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { useCDP } from "@/context/CDPContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -34,7 +35,10 @@ const Dashboard = () => {
   const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
-  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+ 
+  const { totalCDPDebt, loading: cdpLoading } = useCDP();
+  const { poolsLoading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -76,6 +80,9 @@ const Dashboard = () => {
 
   useEffect(() => {
     if (!tokens || tokens.length === 0) return;
+
+    // Wait for CDP data to load before calculating
+    if (cdpLoading) return;
 
     let total = 0;
     let cataTotal = 0;
@@ -124,14 +131,37 @@ const Dashboard = () => {
       });
     }
 
-    const usdstBorrowed = loans?.totalAmountOwed 
-    ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
-    : 0;
+    // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
+    const lendingPoolDebt = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits((() => { 
+          try { 
+            const bi = BigInt(loans.totalAmountOwed); 
+            return bi <= 1n ? 0n : bi; 
+          } catch { 
+            return 0n; 
+          } 
+        })(), 18))
+      : 0;
 
-    const netBalance = total - usdstBorrowed;
+    // CDP vault debt
+    const cdpDebt = totalCDPDebt
+      ? parseFloat(formatUnits((() => {
+          try {
+            const bi = BigInt(totalCDPDebt);
+            return bi <= 1n ? 0n : bi;
+          } catch {
+            return 0n;
+          }
+        })(), 18))
+      : 0;
+
+    // Net balance calculation includes both debt types
+    const totalDebt = lendingPoolDebt + cdpDebt;
+    const netBalance = total - totalDebt;
+    
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens, loans, liquidityInfo, lpTokens]);
+  }, [tokens, loans, liquidityInfo, lpTokens, totalCDPDebt, cdpLoading]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -169,11 +199,33 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Borrowed"
-              value={loans?.totalAmountOwed 
-                ? `${parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18)).toFixed(2)} USDST`
-                : "0.00 USDST"
-              }
+              title="Total Borrowed"
+              value={(() => {
+                const lendingDebt = loans?.totalAmountOwed 
+                  ? parseFloat(formatUnits((() => { 
+                      try { 
+                        const bi = BigInt(loans.totalAmountOwed); 
+                        return bi <= 1n ? 0n : bi; 
+                      } catch { 
+                        return 0n; 
+                      } 
+                    })(), 18))
+                  : 0;
+                
+                const cdpDebt = totalCDPDebt
+                  ? parseFloat(formatUnits((() => {
+                      try {
+                        const bi = BigInt(totalCDPDebt);
+                        return bi <= 1n ? 0n : bi;
+                      } catch {
+                        return 0n;
+                      }
+                    })(), 18))
+                  : 0;
+                
+                const total = lendingDebt + cdpDebt;
+                return `${total.toFixed(2)} USDST`;
+              })()}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
