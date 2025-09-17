@@ -99,14 +99,8 @@ silvstRoot = 0x2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94
 altSilvstRoot :: Address
 altSilvstRoot = 0x7b5f6d756c4e02104d5039205442cf7aa913a8a6
 
-usdtstRoot :: Address
-usdtstRoot = 0x86a5ae535ded415203c3e27d654f9a1d454c553b
-
-usdcstRoot :: Address
-usdcstRoot = 0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
-
-paxgstRoot :: Address
-paxgstRoot = 0x491cdfe98470bfe69b662ab368826dca0fc2f24d
+-- paxgstRoot :: Address
+-- paxgstRoot = 0x491cdfe98470bfe69b662ab368826dca0fc2f24d
 
 mercataAddress :: Address
 mercataAddress = 0x1000
@@ -198,23 +192,11 @@ silvstPoolAddress = 0x101d
 silvstLpTokenAddress :: Address
 silvstLpTokenAddress = 0x101e
 
-usdtstPoolAddress :: Address
-usdtstPoolAddress = 0x101f
-
-usdtstLpTokenAddress :: Address
-usdtstLpTokenAddress = 0x1020
-
-usdcstPoolAddress :: Address
-usdcstPoolAddress = 0x1021
-
-usdcstLpTokenAddress :: Address
-usdcstLpTokenAddress = 0x1022
-
-paxgstPoolAddress :: Address
-paxgstPoolAddress = 0x1023
-
-paxgstLpTokenAddress :: Address
-paxgstLpTokenAddress = 0x1024
+-- paxgstPoolAddress :: Address
+-- paxgstPoolAddress = 0x1023
+-- 
+-- paxgstLpTokenAddress :: Address
+-- paxgstLpTokenAddress = 0x1024
 
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
@@ -312,12 +294,8 @@ genesisBlock  =
             , goldstLpToken
             , silvstPool
             , silvstLpToken
-            , usdtstPool
-            , usdtstLpToken
-            , usdcstPool
-            , usdcstLpToken
-            , paxgstPool
-            , paxgstLpToken
+            -- , paxgstPool
+            -- , paxgstLpToken
             ],
         genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")],
         genesisInfoEvents = M.fromList $
@@ -376,29 +354,26 @@ assetBalances GA.Asset{..} =
               Nothing -> [(o, q)]
               Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
     . (++) (case () of
-              _ | root == ethstRoot -> [(ethstPoolAddress, 100 * oneE18)]
-                | root == wbtcstRoot -> [(wbtcstPoolAddress, (17 * oneE18) `div` 10)]
-                | root == goldstRoot -> [(goldstPoolAddress, (604 * oneE18) `div` 10)]
-                | root == silvstRoot -> [(silvstPoolAddress, 5_250 * oneE18)]
-                | root == usdtstRoot -> [(usdtstPoolAddress, 200_000 * oneE18)]
-                | root == usdcstRoot -> [(usdcstPoolAddress, 200_000 * oneE18)]
-                | root == paxgstRoot -> [(paxgstPoolAddress, (598 * oneE18) `div` 10)]
+              _ | root == ethstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (ethstPoolAddress, 100 * oneE18)]
+                | root == wbtcstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (wbtcstPoolAddress, (425 * oneE18) `div` 1000)]
+                | root == goldstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (goldstPoolAddress, (151 * oneE18) `div` 10)]
+                | root == silvstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (silvstPoolAddress, (13_125 * oneE18) `div` 10)]
+                -- | root == paxgstRoot -> [(paxgstPoolAddress, (598 * oneE18) `div` 10)]
                 | otherwise -> []
            )
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
-            [ (blockappsAddress, correctQuantity decimals name q)
+            [ (blockappsAddress, 1_000_000 * oneE18) -- correctQuantity decimals name q)
             , (bridgeRelayerAddress, 1_000 * oneE18)
             , (oracleAddress1, 1_000 * oneE18)
             , (oracleAddress2, 1_000 * oneE18)
-            , (ethstPoolAddress, 300_000 * oneE18)
-            , (wbtcstPoolAddress, 200_000 * oneE18)
-            , (goldstPoolAddress, 200_000 * oneE18)
-            , (silvstPoolAddress, 200_000 * oneE18)
-            , (usdtstPoolAddress, 200_000 * oneE18)
-            , (usdcstPoolAddress, 200_000 * oneE18)
-            , (paxgstPoolAddress, 200_000 * oneE18)
+            , (ethstPoolAddress, 50_000 * oneE18)
+            , (wbtcstPoolAddress, 50_000 * oneE18)
+            , (goldstPoolAddress, 50_000 * oneE18)
+            , (silvstPoolAddress, 50_000 * oneE18)
+            -- , (paxgstPoolAddress, 200_000 * oneE18)
+            , (liquidityPoolAddress, 250_000 * oneE18)
             ]
         | root == goldstRoot ->
             let goldstBalance = correctQuantity decimals name q
@@ -573,41 +548,55 @@ mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 (CodeAtAccount
   , (".chains<11155111>.lastProcessedBlock", BInteger 9217425)
   , (".chains<11155111>.enabled", BBool True)
   , (".chains<11155111>.chainName", BString "Ethereum Sepolia")
-  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalToken", BAccount $ unspecifiedChain 0x0000000000000000000000000000000000000000)
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalToken", BAccount $ unspecifiedChain 0x0000000000000000000000000000000000000000)
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalDecimals", BInteger 18)
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalChainId", BInteger 11155111)
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalName", BString "Ether")
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalSymbol", BString "ETH")
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.maxPerTx", BInteger 0)
+  -- , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.permissions", BInteger 1)
+  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalToken", BAccount $ unspecifiedChain 0xe46550c8d3c4e5a04da14a948543d918d69f3df1)
   , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalDecimals", BInteger 18)
   , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalChainId", BInteger 11155111)
-  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalName", BString "Ether")
-  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalSymbol", BString "ETH")
+  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalName", BString "METH")
+  , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.externalSymbol", BString "METH")
   , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.maxPerTx", BInteger 0)
   , (".assets<a:93fb7295859b2d70199e0a4883b7c320cf874e6c><11155111>.permissions", BInteger 1)
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalToken", BAccount $ unspecifiedChain 0x29f2d40b0605204364af54ec677bd022da425d03)
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalDecimals", BInteger 8)
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalChainId", BInteger 11155111)
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalName", BString "WBTC")
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalSymbol", BString "WBTC")
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.maxPerTx", BInteger 0)
-  , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.permissions", BInteger 1)
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalToken", BAccount $ unspecifiedChain 0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3)
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalDecimals", BInteger 18)
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalChainId", BInteger 11155111)
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalName", BString "PAXG")
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalSymbol", BString "PAXG")
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.maxPerTx", BInteger 0)
-  , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.permissions", BInteger 1)
-  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalToken", BAccount $ unspecifiedChain 0x1c7d4b196cb0c7b01d743fbc6116a902379c7238)
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalToken", BAccount $ unspecifiedChain 0x29f2d40b0605204364af54ec677bd022da425d03)
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalDecimals", BInteger 8)
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalChainId", BInteger 11155111)
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalName", BString "WBTC")
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.externalSymbol", BString "WBTC")
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.maxPerTx", BInteger 0)
+  -- , (".assets<a:7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9><11155111>.permissions", BInteger 1)
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalToken", BAccount $ unspecifiedChain 0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3)
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalDecimals", BInteger 18)
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalChainId", BInteger 11155111)
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalName", BString "PAXG")
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.externalSymbol", BString "PAXG")
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.maxPerTx", BInteger 0)
+  -- , (".assets<a:491cdfe98470bfe69b662ab368826dca0fc2f24d><11155111>.permissions", BInteger 1)
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalToken", BAccount $ unspecifiedChain 0x1c7d4b196cb0c7b01d743fbc6116a902379c7238)
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalDecimals", BInteger 6)
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalChainId", BInteger 11155111)
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalName", BString "USDC")
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalSymbol", BString "USDC")
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.maxPerTx", BInteger 0)
+  -- , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.permissions", BInteger 2)
+  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalToken", BAccount $ unspecifiedChain 0x46e96acf148b019da71e41f36239833f550dfeb9)
   , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalDecimals", BInteger 6)
   , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalChainId", BInteger 11155111)
-  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalName", BString "USDC")
-  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalSymbol", BString "USDC")
+  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalName", BString "MUSDC")
+  , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.externalSymbol", BString "MUSDC")
   , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.maxPerTx", BInteger 0)
   , (".assets<a:3d351a4a339f6eef7371b0b1b025b3a434ad0399><11155111>.permissions", BInteger 2)
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalToken", BAccount $ unspecifiedChain 0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0)
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalDecimals", BInteger 6)
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalChainId", BInteger 11155111)
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalName", BString "USDT")
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalSymbol", BString "USDT")
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.maxPerTx", BInteger 0)
-  , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.permissions", BInteger 2)
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalToken", BAccount $ unspecifiedChain 0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0)
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalDecimals", BInteger 6)
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalChainId", BInteger 11155111)
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalName", BString "USDT")
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.externalSymbol", BString "USDT")
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.maxPerTx", BInteger 0)
+  -- , (".assets<a:86a5ae535ded415203c3e27d654f9a1d454c553b><11155111>.permissions", BInteger 2)
   ]
 
 poolFactory :: AccountInfo
@@ -626,19 +615,15 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 (CodeAtAccount m
      , (".isFactoryToken<a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
      , (".isFactoryToken<a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
      , (".isFactoryToken<a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
-     , (".isFactoryToken<a:" <> addrBS usdtstLpTokenAddress <> ">", BBool True)
-     , (".isFactoryToken<a:" <> addrBS usdcstLpTokenAddress <> ">", BBool True)
-     , (".isFactoryToken<a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
+     -- , (".isFactoryToken<a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
      , (".allTokens[0]", BAccount $ unspecifiedChain mTokenAddress)
      , (".allTokens[1]", BAccount $ unspecifiedChain sUsdstAddress)
      , (".allTokens[2]", BAccount $ unspecifiedChain ethstLpTokenAddress)
      , (".allTokens[3]", BAccount $ unspecifiedChain wbtcstLpTokenAddress)
      , (".allTokens[4]", BAccount $ unspecifiedChain goldstLpTokenAddress)
      , (".allTokens[5]", BAccount $ unspecifiedChain silvstLpTokenAddress)
-     , (".allTokens[6]", BAccount $ unspecifiedChain usdtstLpTokenAddress)
-     , (".allTokens[7]", BAccount $ unspecifiedChain usdcstLpTokenAddress)
-     , (".allTokens[8]", BAccount $ unspecifiedChain paxgstLpTokenAddress)
-     , (".allTokens.length", BInteger . fromIntegral $ 9 + length GA.assets)
+     -- , (".allTokens[8]", BAccount $ unspecifiedChain paxgstLpTokenAddress)
+     , (".allTokens.length", BInteger . fromIntegral $ 6 + length GA.assets)
      ]
   ++ ((\GA.Asset{..} -> (".isFactoryToken<a:" <> addrBS root <> ">", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(9 :: Integer)..] GA.assets)
@@ -664,12 +649,8 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS goldstPoolAddress <> "><\"burn\"><a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS silvstPoolAddress <> "><\"mint\"><a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS silvstPoolAddress <> "><\"burn\"><a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS usdtstPoolAddress <> "><\"mint\"><a:" <> addrBS usdtstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS usdtstPoolAddress <> "><\"burn\"><a:" <> addrBS usdtstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS usdcstPoolAddress <> "><\"mint\"><a:" <> addrBS usdcstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS usdcstPoolAddress <> "><\"burn\"><a:" <> addrBS usdcstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"mint\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"burn\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
+     -- , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"mint\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
+     -- , (".whitelist<a:" <> addrBS paxgstPoolAddress <> "><\"burn\"><a:" <> addrBS paxgstLpTokenAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS tokenFactoryAddress <> "><\"createTokenWithInitialOwner\"><a:" <> addrBS poolFactoryAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
@@ -712,9 +693,10 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , ("._symbol", BString "MUSDST")
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger 0)
+     , ("._totalSupply", BInteger $ 250_000 * oneE18)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 250_000 * oneE18)
      ]
 
 rewardsManager :: AccountInfo
@@ -894,10 +876,10 @@ ethstLpToken = SolidVMContractWithStorage ethstLpTokenAddress 0 (CodeAtAccount m
      , ("._symbol", BString "ETHST-USDST-LP")
      , (".description", BString "Liquidity Provider Token")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 300_000 * oneE18)
+     , ("._totalSupply", BInteger $ 50_000 * oneE18)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 300_000 * oneE18)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 50_000 * oneE18)
      ]
 
 wbtcstPool :: AccountInfo
@@ -909,8 +891,8 @@ wbtcstPool = SolidVMContractWithStorage wbtcstPoolAddress 0 (CodeAtAccount merca
      , (".locked", BBool False)
      , (".aToBRatio", BDecimal "0.0000085")
      , (".bToARatio", BDecimal "117647.058824")
-     , (".tokenABalance", BInteger $ (17 * oneE18) `div` 10)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
+     , (".tokenABalance", BInteger $ (425 * oneE18) `div` 1000)
+     , (".tokenBBalance", BInteger $ 50_000 * oneE18)
      , (".swapFeeRate", BInteger 0)
      , (".lpSharePercent", BInteger 0)
      , (".zapSwapFeesEnabled", BBool True)
@@ -922,10 +904,10 @@ wbtcstLpToken = SolidVMContractWithStorage wbtcstLpTokenAddress 0 (CodeAtAccount
      , ("._symbol", BString "WBTCST-USDST-LP")
      , (".description", BString "Liquidity Provider Token")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
+     , ("._totalSupply", BInteger $ 50_000 * oneE18)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 50_000 * oneE18)
      ]
 
 goldstPool :: AccountInfo
@@ -937,8 +919,8 @@ goldstPool = SolidVMContractWithStorage goldstPoolAddress 0 (CodeAtAccount merca
      , (".locked", BBool False)
      , (".aToBRatio", BDecimal "0.000302")
      , (".bToARatio", BDecimal "3311.25827815")
-     , (".tokenABalance", BInteger $ (604 * oneE18) `div` 10)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
+     , (".tokenABalance", BInteger $ (151 * oneE18) `div` 10)
+     , (".tokenBBalance", BInteger $ 50_000 * oneE18)
      , (".swapFeeRate", BInteger 0)
      , (".lpSharePercent", BInteger 0)
      , (".zapSwapFeesEnabled", BBool True)
@@ -950,10 +932,10 @@ goldstLpToken = SolidVMContractWithStorage goldstLpTokenAddress 0 (CodeAtAccount
      , ("._symbol", BString "GOLDST-USDST-LP")
      , (".description", BString "Liquidity Provider Token")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
+     , ("._totalSupply", BInteger $ 50_000 * oneE18)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 50_000 * oneE18)
      ]
 
 silvstPool :: AccountInfo
@@ -965,8 +947,8 @@ silvstPool = SolidVMContractWithStorage silvstPoolAddress 0 (CodeAtAccount merca
      , (".locked", BBool False)
      , (".aToBRatio", BDecimal "0.02625")
      , (".bToARatio", BDecimal "38.0952380952")
-     , (".tokenABalance", BInteger $ 5_250 * oneE18)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
+     , (".tokenABalance", BInteger $ (13_125 * oneE18) `div` 10)
+     , (".tokenBBalance", BInteger $ 50_000 * oneE18)
      , (".swapFeeRate", BInteger 0)
      , (".lpSharePercent", BInteger 0)
      , (".zapSwapFeesEnabled", BBool True)
@@ -978,95 +960,39 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 (CodeAtAccount
      , ("._symbol", BString "SILVST-USDST-LP")
      , (".description", BString "Liquidity Provider Token")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
+     , ("._totalSupply", BInteger $ 50_000 * oneE18)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
+     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 50_000 * oneE18)
      ]
 
-usdtstPool :: AccountInfo
-usdtstPool = SolidVMContractWithStorage usdtstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
-     , (".tokenA", BContract "Token" $ unspecifiedChain usdtstRoot)
-     , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
-     , (".lpToken", BContract "Token" $ unspecifiedChain usdtstLpTokenAddress)
-     , (".locked", BBool False)
-     , (".aToBRatio", BDecimal "1.0")
-     , (".bToARatio", BDecimal "1.0")
-     , (".tokenABalance", BInteger $ 200_000 * oneE18)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
-     , (".swapFeeRate", BInteger 0)
-     , (".lpSharePercent", BInteger 0)
-     , (".zapSwapFeesEnabled", BBool True)
-     ]
-
-usdtstLpToken :: AccountInfo
-usdtstLpToken = SolidVMContractWithStorage usdtstLpTokenAddress 0 (CodeAtAccount mercataAddress "Token") $ ownedByBlockApps mercataAddress
-  ++ [ ("._name", BString "USDTST-USDST LP Token")
-     , ("._symbol", BString "USDTST-USDST-LP")
-     , (".description", BString "Liquidity Provider Token")
-     , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
-     , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
-     , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
-     ]
-
-usdcstPool :: AccountInfo
-usdcstPool = SolidVMContractWithStorage usdcstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
-     , (".tokenA", BContract "Token" $ unspecifiedChain usdcstRoot)
-     , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
-     , (".lpToken", BContract "Token" $ unspecifiedChain usdcstLpTokenAddress)
-     , (".locked", BBool False)
-     , (".aToBRatio", BDecimal "1.0")
-     , (".bToARatio", BDecimal "1.0")
-     , (".tokenABalance", BInteger $ 200_000 * oneE18)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
-     , (".swapFeeRate", BInteger 0)
-     , (".lpSharePercent", BInteger 0)
-     , (".zapSwapFeesEnabled", BBool True)
-     ]
-
-usdcstLpToken :: AccountInfo
-usdcstLpToken = SolidVMContractWithStorage usdcstLpTokenAddress 0 (CodeAtAccount mercataAddress "Token") $ ownedByBlockApps mercataAddress
-  ++ [ ("._name", BString "USDCST-USDST LP Token")
-     , ("._symbol", BString "USDCST-USDST-LP")
-     , (".description", BString "Liquidity Provider Token")
-     , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
-     , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
-     , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
-     ]
-
-paxgstPool :: AccountInfo
-paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
-     , (".tokenA", BContract "Token" $ unspecifiedChain paxgstRoot)
-     , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
-     , (".lpToken", BContract "Token" $ unspecifiedChain paxgstLpTokenAddress)
-     , (".locked", BBool False)
-     , (".aToBRatio", BDecimal "0.000299")
-     , (".bToARatio", BDecimal "3344.48160535")
-     , (".tokenABalance", BInteger $ (598 * oneE18) `div` 10)
-     , (".tokenBBalance", BInteger $ 200_000 * oneE18)
-     , (".swapFeeRate", BInteger 0)
-     , (".lpSharePercent", BInteger 0)
-     , (".zapSwapFeesEnabled", BBool True)
-     ]
-
-paxgstLpToken :: AccountInfo
-paxgstLpToken = SolidVMContractWithStorage paxgstLpTokenAddress 0 (CodeAtAccount mercataAddress "Token") $ ownedByBlockApps mercataAddress
-  ++ [ ("._name", BString "PAXGST-USDST LP Token")
-     , ("._symbol", BString "PAXGST-USDST-LP")
-     , (".description", BString "Liquidity Provider Token")
-     , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 200_000 * oneE18)
-     , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
-     , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
-     ]
+-- paxgstPool :: AccountInfo
+-- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+--   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+--      , (".tokenA", BContract "Token" $ unspecifiedChain paxgstRoot)
+--      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
+--      , (".lpToken", BContract "Token" $ unspecifiedChain paxgstLpTokenAddress)
+--      , (".locked", BBool False)
+--      , (".aToBRatio", BDecimal "0.000299")
+--      , (".bToARatio", BDecimal "3344.48160535")
+--      , (".tokenABalance", BInteger $ (598 * oneE18) `div` 10)
+--      , (".tokenBBalance", BInteger $ 200_000 * oneE18)
+--      , (".swapFeeRate", BInteger 0)
+--      , (".lpSharePercent", BInteger 0)
+--      , (".zapSwapFeesEnabled", BBool True)
+--      ]
+-- 
+-- paxgstLpToken :: AccountInfo
+-- paxgstLpToken = SolidVMContractWithStorage paxgstLpTokenAddress 0 (CodeAtAccount mercataAddress "Token") $ ownedByBlockApps mercataAddress
+--   ++ [ ("._name", BString "PAXGST-USDST LP Token")
+--      , ("._symbol", BString "PAXGST-USDST-LP")
+--      , (".description", BString "Liquidity Provider Token")
+--      , (".customDecimals", BInteger 18)
+--      , ("._totalSupply", BInteger $ 200_000 * oneE18)
+--      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
+--      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
+--      , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 200_000 * oneE18)
+--      ]
 
 certStrings :: [String]
 certStrings =
