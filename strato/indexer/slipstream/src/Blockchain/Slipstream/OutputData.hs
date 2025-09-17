@@ -28,6 +28,7 @@ module Blockchain.Slipstream.OutputData (
   pipeInsertGlobalEventTable,
   insertEventTables,
   insertIndexTable,
+  insertDelegatecall,
   insertCollectionTable,
   insertCollectionTableQuery,
   insertAbstractTable,
@@ -36,15 +37,10 @@ module Blockchain.Slipstream.OutputData (
   createCollectionTable,
   createAbstractTable,
   createExpandEventTables,
-  createExpandIndexTable,
   createForeignIndexesForJoins,
-  createExpandAbstractTable,
   createHistoryTable',
   createHistoryTable,
-  expandAbstractTable,
-  expandAbstractContractTable,
   notifyPostgREST,
-  createExpandHistoryTable,
   updateForeignKeysFromNULLAbstract,
   updateForeignKeysFromNULLIndex,
   updateForeignKeysFromNULLArray,
@@ -88,6 +84,7 @@ import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
+import           Blockchain.Stream.Action        (Delegatecall(..))
 import           Data.List                       ( groupBy, nubBy, sortBy)
 import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
@@ -140,6 +137,7 @@ sqlTypePostgres SqlSerial  = "serial"
 data OnConflict = OnConflict [Text] [Text] (Maybe Text) deriving (Eq, Ord, Show)
 
 data SlipstreamQuery = CreateTable TableName [(Text, SqlType)] [Text] (Maybe (Text, Text))
+                     | CreateView TableName [Text] [Text] [(Text, SqlType)]
                      | CreateIndex Text TableName [Text]
                      | InsertTable TableName [Text] [[Maybe Value]] (Maybe OnConflict)
                      | InsertTableWithUC TableName [Text] [[Maybe Value]] (Maybe (Text, [Text]))
@@ -214,6 +212,38 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mUc) = T.concat $
             "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
           ]
     _ -> [])
+slipstreamQueryText _ (CreateView tableName storageCols contractCols cols) = T.concat $
+  [ "CREATE OR REPLACE VIEW "
+  , tableNameToDoubleQuoteText tableName
+  , " AS SELECT "
+  , T.intercalate ", " $
+      (("s." <>) <$> storageCols)
+   ++ (("c." <>) <$> contractCols)
+   ++ ((\(c, t) -> T.concat
+      [ "CASE WHEN s.data ? '"
+      , c
+      , "' "
+      , if t == SqlDecimal
+          then "AND (s.data->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
+          else ""
+      , "THEN (s.data->>'"
+      , c
+      , "')"
+      , if t == SqlDecimal
+          then "::numeric"
+          else ""
+      , " ELSE NULL END AS \""
+      , c
+      , "\""
+      ]) <$> cols)
+  , " FROM storage s INNER JOIN contract c ON s.address = c.address WHERE c.creator = '"
+  , tableNameCreator tableName
+  , "' AND c.application = '"
+  , tableNameApplication tableName
+  , "' AND c.contract_name = '"
+  , tableNameContractName tableName
+  , "';"
+  ]
 slipstreamQueryText _ (CreateIndex indexName tableName cols) = T.concat
   [ "CREATE UNIQUE INDEX IF NOT EXISTS "
   , wrapDoubleQuotes indexName
@@ -540,31 +570,6 @@ compareCollectionRows' x y =
                    contractname x == contractname y &&
                    collectionname x == collectionname y
 
-createExpandIndexTable ::
-  OutputM m =>
-  --
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandIndexTable c cc nameParts = do
-  creationForeignKeys <- createIndexTable c cc nameParts
-  expansionForeignKeys <- expandIndexTable c cc nameParts
-  return $ creationForeignKeys ++ expansionForeignKeys
-
-createExpandAbstractTable ::
-  OutputM m =>
-  ContractF () ->
-  (Text, Text, Text) ->
-  Map.Map (Address, Text) (Text, Text, [Text]) ->
-  CodeCollectionF () ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandAbstractTable c nameParts abstracts cc = do
-  creationForeignKeys <- createAbstractTable c nameParts abstracts cc
-  expansionForeignKeys <- expandAbstractTable c nameParts abstracts cc
-  return $ creationForeignKeys ++ expansionForeignKeys
-
-
 createForeignIndexesForJoins ::
   OutputM m =>
   ForeignKeyInfo ->
@@ -590,18 +595,6 @@ notifyPostgREST ::
   ConduitM i [SlipstreamQuery] m ()
 notifyPostgREST = yield [NotifyPostgREST]
   -- dbQueryCatchError conn "NOTIFY pgrst, 'reload schema';"
-
-createExpandHistoryTable ::
-  OutputM m =>
-  Bool ->
-
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m ()
-createExpandHistoryTable isAbstract c cc nameParts = do
-  createHistoryTable' isAbstract c cc nameParts
-  expandHistoryTable isAbstract c cc nameParts
 
 getDeferredForeignKeys :: (MonadLogger m) => TableName -> ContractF () -> CodeCollectionF () -> Text -> Text -> m [ForeignKeyInfo] --circular dependancy only fixed for abstract tables
 getDeferredForeignKeys tableName c (CodeCollection ccs _ _ _ _ _ _ _) creator a =
@@ -792,131 +785,19 @@ createHistoryTable contract cc (creator, a, n) = do
   yield $ createHistoryTableQuery False (creator, a, n) list
   yieldMany $ addHistoryUnique (creator, a, n)
 
--- Runs ALTER TABLE <name> [ADD COLUMN <column>] for any new fields added to a contract definition
-expandIndexTable ::
-  OutputM m =>
-  --
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-expandIndexTable contract cc (creator, a, n) = do
-  let tableName = indexTableName creator a n
-  expandContractTable contract cc tableName
-
-expandAbstractTable ::
-  OutputM m =>
-  ContractF () ->
-  (Text, Text, Text) ->
-  Map.Map (Address, Text) (Text, Text, [Text]) ->
-  CodeCollectionF () ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-expandAbstractTable  contract (creator, a, n) abstracts' cc = do
-  let tableName = abstractTableName creator a n
-  expandAbstractContractTable  contract tableName abstracts' cc
-
-expandHistoryTable ::
-  OutputM m =>
-  Bool ->
-  ContractF () ->
-  CodeCollectionF () ->
-  (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m ()
-expandHistoryTable isAbstract  contract cc (creator, a, n) = do
-  let tableName = historyTableName creator a n
-  void $
-    if isAbstract
-      then expandAbstractContractTable contract tableName Map.empty cc --abstracts' needs to be passed in for fkeys
-      else expandContractTable' contract cc tableName
-
-expandContractTable' ::
-  OutputM m =>
-  ContractF () ->
-  CodeCollectionF () ->
-  TableName ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-expandContractTable'  contract cc tableName = do
-  let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
-      isEvent = False
-      cols = getTableColumnAndType isEvent cc list
-      colsCombined = map (\(x,y) -> x <> " " <> tshow y) cols
-  unless (null cols) $ do
-    $logInfoS "expandTable" . T.pack $ "We just got fields for a contract that already has a table!"
-    $logInfoS "expandTable" $
-      T.concat
-        [ "Adding columns to ",
-          (tableNameToText tableName),
-          " for the following fields: ",
-          T.intercalate ", " colsCombined
-        ]
-    yield $ expandTableQuery tableName cols
-  return $ []
-
-expandContractTable ::
-  OutputM m =>
-  ContractF () ->
-  CodeCollectionF () ->
-  TableName ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-expandContractTable  contract cc tableName = do
-    let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
-        isEvent = False
-        cols = getTableColumnAndType isEvent cc list
-        colsCombined = map (\(x,y)-> x <> " " <> tshow y) cols
-    unless (null colsCombined) $ do
-      $logInfoS "expandTable" . T.pack $ "We just got fields for a contract that already has a table!"
-      $logInfoS "expandTable" $
-        T.concat
-          [ "Adding columns to ",
-            (tableNameToText tableName),
-            " for the following fields: ",
-            T.intercalate ", " colsCombined
-          ]
-      yield $ expandTableQuery tableName cols
-    case tableName of
-      IndexTableName creator a _ -> getDeferredForeignKeys tableName contract cc creator a
-      _ -> return $ []
-
-expandAbstractContractTable ::
-  OutputM m =>
-  ContractF () ->
-  TableName ->
-  Map.Map (Address, Text) (Text, Text, [Text]) ->
-  CodeCollectionF () ->
-  ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-expandAbstractContractTable  contract tableName abstracts' cc = do
-  let list = fillFirstEmptyEntries . map (fmap _varType) . Map.toList $ Map.mapKeys labelToText $ contract ^. storageDefs
-      isEvent = False
-      cols = getTableColumnAndType isEvent cc list
-      colsCombined = map (\(x,y)-> x <> " " <> tshow y) cols
-  unless (null colsCombined) $ do
-    $logInfoS "expandAbstractContractTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-    $logInfoS "expandAbstractContractTable" $
-      T.concat
-        [ "Adding columns to ",
-          (tableNameToText tableName),
-          " for the following new fields: ",
-          T.intercalate ", " colsCombined
-        ]
-    yield $ expandAbstractTableQuery tableName cols
-  case tableName of
-    AbstractTableName creator a _ -> getDeferredForeignKeysAbstract tableName contract creator a abstracts' cc
-    _ -> return $ []
-
-expandTableQuery :: TableName -> [(Text, SqlType)] -> SlipstreamQuery
-expandTableQuery = AlterTableAddColumns
-
-expandAbstractTableQuery :: TableName -> [(Text, SqlType)] -> SlipstreamQuery
-expandAbstractTableQuery tableName cols = AlterTableAddColumns tableName (cols ++ abstractCols)
-  where abstractCols = [("contract_name", SqlText), ("data", SqlJsonb)]
-
 insertIndexTable ::
   OutputM m =>
   (E.ProcessedContract, [T.Text]) ->
   ConduitM () SlipstreamQuery m ()
 insertIndexTable contract = do
-  yield $ insertContractTableQuery contract
-  yield $ insertIndexTableQuery contract
+  yieldMany $ insertContractTableQuery contract
+
+insertDelegatecall ::
+  OutputM m =>
+  Delegatecall ->
+  ConduitM () SlipstreamQuery m ()
+insertDelegatecall d = do
+  yieldMany $ insertDelegatecallQuery d
 
 insertCollectionTable ::
   OutputM m =>
@@ -1013,7 +894,7 @@ eventBaseColumnsQuery =
 createIndexTableQuery :: (Text, Text, Text) -> [(Text, SqlType)] -> SlipstreamQuery
 createIndexTableQuery (creator, a, n) cols =
   let tableName = indexTableName creator a n
-   in CreateTable tableName (baseColumnsQuery ++ cols) ["address"] Nothing
+   in CreateView tableName (filter (/= "creator") baseColumns) ["creator", "application", "contract_name"] cols
 
 keyColumnNames :: [a] -> [(Text, a)]
 keyColumnNames = zipWith (\i t -> ("key" <> (if i == 1 then "" else T.pack $ show i), t)) [(1 :: Int)..]
@@ -1067,12 +948,14 @@ addHistoryUnique (creator, a, n) =
         AlterTableAddPrimaryKey historyName indexName
       ]
 
-insertContractTableQuery :: (E.ProcessedContract, [T.Text]) -> SlipstreamQuery -- does not accomodate extra _fkey 
+insertContractTableQuery :: (E.ProcessedContract, [T.Text]) -> [SlipstreamQuery] -- does not accomodate extra _fkey 
 insertContractTableQuery cs =
     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, _) -> (c, Map.toList contractData)) cs
         processContract (contract, list) =
-            let tableName = indexTableName "" "" "contract"
+            let storageTableName = indexTableName "" "" "storage"
+                contractTableName = indexTableName "" "" "contract"
                 keySt = baseColumns ++ ["application", "contract_name", "data"]
+                contractKeySt = ["address", "creator", "application", "contract_name"]
                 baseVals =
                   [ ValueAddress . E.address,
                     ValueString . T.pack . keccak256ToHex . E.blockHash,
@@ -1088,42 +971,62 @@ insertContractTableQuery cs =
                 baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
                 dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
                 valsForSQL = baseRowVals ++ dataVals
+                contractValsForSQL = map (Just . SimpleValue . ($ contract))
+                  [ ValueAddress . E.address,
+                    ValueString . E.creator,
+                    ValueString . E.application,
+                    ValueString . E.contractName
+                  ]
                 conflictUpdateBaseCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
                 conflictUpdateCols = conflictUpdateBaseCols ++ ["data"]
-            in InsertTable tableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
+            in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
+               , InsertTable contractTableName contractKeySt [contractValsForSQL] Nothing
+               ]
     in processContract cs'
 
-insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> SlipstreamQuery -- does not accomodate extra _fkey 
-insertIndexTableQuery cs =
-    let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys) -> ((c, Map.toList contractData), fkeys)) cs
-        processContract ((contract, list), fkeys) =
-            let tableName =
-                  indexTableName
-                    (fromMaybe (E.creator contract) (E.cc_creator contract))
-                    (E.application contract)
-                    (E.contractName contract)
-                fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
-                keysForSQL = map fst list ++ fkeyColumns
-                keySt = baseColumns ++ keysForSQL
-                baseVals =
-                  [ ValueAddress . E.address,
-                    ValueString . T.pack . keccak256ToHex . E.blockHash,
-                    ValueString . tshow . E.blockTimestamp,
-                    ValueInt False Nothing . E.blockNumber,
-                    ValueString . T.pack . keccak256ToHex . E.transactionHash,
-                    ValueAddress . E.transactionSender,
-                    ValueString . E.creator,
-                    ValueString . E.root
-                  ]
-                baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
-                contractValEntries = list
-                regularVals = [Just (snd kv) | kv@(k, _) <- contractValEntries, k `elem` keysForSQL]
-                fkeyVals = [Nothing | k <- fkeyColumns, k `elem` keysForSQL]
-                valsForSQL = baseRowVals ++ regularVals ++ fkeyVals
-                conflictUpdateBaseCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
-                conflictUpdateCols = conflictUpdateBaseCols ++ keysForSQL
-            in InsertTable tableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
-    in processContract cs'
+insertDelegatecallQuery :: Delegatecall -> [SlipstreamQuery] -- does not accomodate extra _fkey 
+insertDelegatecallQuery (Delegatecall s _ c a n) =
+  let contractTableName = indexTableName "" "" "contract"
+      contractKeySt = ["address", "creator", "application", "contract_name"]
+      contractValsForSQL = map (Just . SimpleValue)
+        [ ValueAddress s,
+          ValueString c,
+          ValueString a,
+          ValueString n
+        ]
+   in [InsertTable contractTableName contractKeySt [contractValsForSQL] Nothing]
+
+-- insertIndexTableQuery :: (E.ProcessedContract, [T.Text]) -> SlipstreamQuery -- does not accomodate extra _fkey 
+-- insertIndexTableQuery cs =
+--     let cs' = (\(c@E.ProcessedContract {contractData = contractData}, fkeys) -> ((c, Map.toList contractData), fkeys)) cs
+--         processContract ((contract, list), fkeys) =
+--             let tableName =
+--                   indexTableName
+--                     (fromMaybe (E.creator contract) (E.cc_creator contract))
+--                     (E.application contract)
+--                     (E.contractName contract)
+--                 fkeyColumns = [T.pack ((T.unpack k) ++ "_fkey") | k <- fkeys]
+--                 keysForSQL = map fst list ++ fkeyColumns
+--                 keySt = baseColumns ++ keysForSQL
+--                 baseVals =
+--                   [ ValueAddress . E.address,
+--                     ValueString . T.pack . keccak256ToHex . E.blockHash,
+--                     ValueString . tshow . E.blockTimestamp,
+--                     ValueInt False Nothing . E.blockNumber,
+--                     ValueString . T.pack . keccak256ToHex . E.transactionHash,
+--                     ValueAddress . E.transactionSender,
+--                     ValueString . E.creator,
+--                     ValueString . E.root
+--                   ]
+--                 baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
+--                 contractValEntries = list
+--                 regularVals = [Just (snd kv) | kv@(k, _) <- contractValEntries, k `elem` keysForSQL]
+--                 fkeyVals = [Nothing | k <- fkeyColumns, k `elem` keysForSQL]
+--                 valsForSQL = baseRowVals ++ regularVals ++ fkeyVals
+--                 conflictUpdateBaseCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
+--                 conflictUpdateCols = conflictUpdateBaseCols ++ keysForSQL
+--             in InsertTable tableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols Nothing
+--     in processContract cs'
 
 insertCollectionTableQuery :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 insertCollectionTableQuery [] = []
@@ -1351,10 +1254,7 @@ createExpandEventTables ::
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
 createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
-    go (evName, ev) = do
-      fkInfo <- createEventTable nameParts evName ev cc
-      expandEventTable nameParts evName ev cc
-      return fkInfo
+    go (evName, ev) = createEventTable nameParts evName ev cc
 
 extractLabelOrEntry :: SVMType.Type -> T.Text
 extractLabelOrEntry (SVMType.UnknownLabel solidString _) = T.pack solidString
@@ -1409,33 +1309,6 @@ createEventTableQuery tableName cols uniqueConstraint =
           _ -> Nothing
      in CreateTable tableName' (eventBaseColumnsQuery ++ cols) pKey mUc
   ) <$> [(False, tableNameToText tableName), (True, tableNameToText tableName)]
-
-expandEventTable ::
-  OutputM m =>
-  (Text, Text, Text) ->
-  SolidString ->
-  EventF () ->
-  CodeCollectionF() ->
-  ConduitM () SlipstreamQuery m ()
-expandEventTable  (creator, a, n) evName ev cc = do
-  let (crtr, app, cname) = constructTableNameParameters creator a n
-      tableName = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
-      indexedTableName = EventTableName ("indexed@" <> crtr) app cname (escapeQuotes $ labelToText evName)
-      isEvent = True
-      evLogToPair (EventLog n' _ t') = (n', t')
-      (allTableCols :: [(T.Text, SqlType)]) = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
-      allTableColsCombined = map (\(x,y)-> x <> " " <> tshow y) allTableCols
-  unless (null allTableCols) $ do
-    $logInfoS "expandEventTable" . T.pack $ "We just got new fields for a contract that already has a table!"
-    $logInfoS "expandEventTable" $
-      T.concat
-        [ "Adding columns to ",
-          (tableNameToText tableName),
-          " for the following new fields: ",
-          T.intercalate ", " allTableColsCombined
-        ]
-    yield $ expandTableQuery tableName allTableCols
-    yield $ expandTableQuery indexedTableName allTableCols
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
 aggEventToCollectionRows :: AggregateEvent -> [ProcessedCollectionRow]

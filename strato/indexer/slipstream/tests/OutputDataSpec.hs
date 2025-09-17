@@ -599,7 +599,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         cc =  createDummyCodeCollection (snd input)
      
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
     cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 

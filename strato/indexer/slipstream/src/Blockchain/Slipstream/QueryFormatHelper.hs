@@ -152,6 +152,30 @@ tableShortName (EventTableName _ _ n e) = n <> "-" <> e
 tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
 tableShortName (AbstractTableName _ _ n) = n
 
+tableNameCreator :: TableName -> T.Text
+tableNameCreator (IndexTableName c _ _) = c
+tableNameCreator (CollectionTableName c _ _ _) = c
+tableNameCreator (HistoryTableName c _ _) = c
+tableNameCreator (EventTableName c _ _ _) = c
+tableNameCreator (EventCollectionTableName c _ _ _ _) = c
+tableNameCreator (AbstractTableName c _ _) = c
+
+tableNameApplication :: TableName -> T.Text
+tableNameApplication (IndexTableName _ a _) = a
+tableNameApplication (CollectionTableName _ a _ _) = a
+tableNameApplication (HistoryTableName _ a _) = a
+tableNameApplication (EventTableName _ a _ _) = a
+tableNameApplication (EventCollectionTableName _ a _ _ _) = a
+tableNameApplication (AbstractTableName _ a _) = a
+
+tableNameContractName :: TableName -> T.Text
+tableNameContractName (IndexTableName _ _ n) = n
+tableNameContractName (CollectionTableName _ _ n _) = n
+tableNameContractName (HistoryTableName _ _ n) = n
+tableNameContractName (EventTableName _ _ n _) = n
+tableNameContractName (EventCollectionTableName _ _ n _ _) = n
+tableNameContractName (AbstractTableName _ _ n) = n
+
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
 
