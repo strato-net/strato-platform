@@ -67,8 +67,9 @@ export const calculateSwapInput = (
   const numerator = inputReserve * outputAmountBigInt;
   const denominator = outputReserve - outputAmountBigInt;
   
-  // Add 1 to round up (to ensure user provides enough input)
-  const requiredInput = numerator / denominator + 1n;
+  // Ceil to beat on-chain floor
+  // a=11, b=5: ceil(11/5)=3. (11+5-1)/5 = 15/5 = 3.
+  const requiredInput = (numerator + denominator - 1n) / denominator;
 
   // Calculate total input including fee
   // If requiredInput is the net input, we need to calculate the gross input
@@ -80,7 +81,8 @@ export const calculateSwapInput = (
   
   const feeRate = BigInt(pool.swapFeeRate);
   const denominatorForFee = BigInt(10000) - feeRate;
-  const grossInput = (requiredInput * BigInt(10000)) / denominatorForFee;
+  // Ceil to beat on-chain floor
+  const grossInput = (requiredInput * BigInt(10000) + denominatorForFee - 1n) / denominatorForFee;
 
   return grossInput.toString();
 };

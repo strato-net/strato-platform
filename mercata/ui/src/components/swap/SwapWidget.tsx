@@ -615,7 +615,7 @@ const SwapWidget = () => {
       }
 
       const parsedValue = safeParseUnits(inputAmount);
-      const isAToB = pool.tokenA?.address === inputAsset.address;
+      const isAToB = pool.tokenA?.address === fromAsset?.address;
 
       if (isFromInput) {
         // Forward calculation: input -> output
