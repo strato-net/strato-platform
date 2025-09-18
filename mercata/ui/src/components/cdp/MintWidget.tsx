@@ -903,7 +903,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             </div>
             <span className="text-sm text-red-700 font-medium">
               Warning: Position is at liquidation threshold ({formatPercentage(liquidationRatio, 0)}). 
-              This position can be liquidated. Consider increasing collateral or reducing borrow amount.
+              Consider increasing collateral or reducing borrow amount.
             </span>
           </div>
         </div>
