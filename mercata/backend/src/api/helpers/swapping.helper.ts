@@ -1,5 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { SwapToken } from "../../types/swaps";
 
 const { Pool } = constants;
 
@@ -108,3 +109,74 @@ export const calculateLPTokenPrice = (
 
   return ((totalValueUSD * Q) / supply).toString();
 };
+
+export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string) => ({
+  ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
+  select: rawParams.select || constants.poolSelectFields.join(","),
+  ...(rawParams.select || !userAddress ? {} : {
+    "lpToken.balances.value": "gt.0",
+    "lpToken.balances.key": `eq.${userAddress}`,
+    "tokenA.balances.value": "gt.0",
+    "tokenA.balances.key": `eq.${userAddress}`,
+    "tokenB.balances.value": "gt.0",
+    "tokenB.balances.key": `eq.${userAddress}`,
+  }),
+});
+
+export const extractTokenAddresses = (poolData: any[]) => [
+  ...new Set([
+    ...poolData.map(p => p.tokenA?.address).filter(Boolean),
+    ...poolData.map(p => p.tokenB?.address).filter(Boolean)
+  ])
+];
+
+export const calculatePoolMetrics = (pool: any, tokenAPrice: string, tokenBPrice: string, volume24h: string, factoryData: any) => {
+  const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
+  const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
+  const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
+  
+  const swapFeeRate = pool.swapFeeRate || factoryData?.swapFeeRate || 30;
+  const lpSharePercent = pool.lpSharePercent || factoryData?.lpSharePercent || 7000;
+  
+  const fees24h = calculateLPFees24h(volume24h, swapFeeRate, lpSharePercent);
+  const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
+  
+  const lpTokenPrice = calculateLPTokenPrice(
+    pool.tokenABalance || "0",
+    pool.tokenBBalance || "0",
+    tokenAPrice,
+    tokenBPrice,
+    pool.lpToken?._totalSupply || "0"
+  );
+  
+  return { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent };
+};
+
+export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string) => {
+  if (tokenAPrice === "0" || tokenBPrice === "0") return { aToB: "0", bToA: "0" };
+  return {
+    aToB: (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18),
+    bToA: (Number(tokenBPrice) / Number(tokenAPrice)).toFixed(18)
+  };
+};
+
+export const buildSwapToken = (token: any, price: string, poolBalance: string, userBalance: string): SwapToken => ({
+  address: token?.address || "",
+  _name: token?._name || "",
+  _symbol: token?._symbol || "",
+  customDecimals: token?.customDecimals || 18,
+  _totalSupply: token?._totalSupply || "0",
+  balance: userBalance,
+  price,
+  poolBalance
+});
+
+export const buildLPToken = (lpToken: any, price: string, userBalance: string) => ({
+  address: lpToken?.address || "",
+  _name: lpToken?._name || "",
+  _symbol: lpToken?._symbol || "",
+  customDecimals: lpToken?.customDecimals || 18,
+  _totalSupply: lpToken?._totalSupply || "0",
+  balance: userBalance,
+  price
+});

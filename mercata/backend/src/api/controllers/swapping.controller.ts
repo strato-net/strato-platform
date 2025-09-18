@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
+  getSwapableTokens,
+  getSwapableTokenPairs,
   createPool,
   addLiquidityDualToken,
   addLiquiditySingleToken,
@@ -145,7 +147,7 @@ class SwappingController {
   }
 
   // Helpers
-  static async getLPTokens(
+  static async getUserLiquidityPools(
     req: Request,
     res: Response,
     next: NextFunction
@@ -172,21 +174,9 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      const pools = await getPools(accessToken, address);
+      const tokens = await getSwapableTokens(accessToken, address);
 
-      const tokenMap = new Map();
-      
-      pools.forEach((pool: any) => {
-        [pool.tokenA, pool.tokenB].forEach((token: any) => {
-          if (!tokenMap.has(token.address)) {
-            tokenMap.set(token.address, token);
-          }
-        });
-      });
-
-      const uniqueTokens = Array.from(tokenMap.values());
-
-      res.status(RestStatus.OK).json(uniqueTokens);
+      res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);
     }
@@ -201,29 +191,9 @@ class SwappingController {
       const { accessToken, params, address } = req;
       validateTokenAddressArgs(params);
 
-      const poolA = await getPools(accessToken, address, {
-        tokenA: "eq." + params.tokenAddress,
-      });
+      const tokens = await getSwapableTokenPairs(accessToken, params.tokenAddress, address);
 
-      const poolB = await getPools(accessToken, address, {
-        tokenB: "eq." + params.tokenAddress,
-      });
-
-      const tokens = [
-        ...poolA.map((pool: any) => pool.tokenB),
-        ...poolB.map((pool: any) => pool.tokenA),
-      ].filter(Boolean);
-
-      const tokenMap = new Map();
-      tokens.forEach((token: any) => {
-        if (!tokenMap.has(token.address)) {
-          tokenMap.set(token.address, token);
-        }
-      });
-
-      const uniqueTokenPairs = Array.from(tokenMap.values());
-
-      res.status(RestStatus.OK).json(uniqueTokenPairs);
+      res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);
     }

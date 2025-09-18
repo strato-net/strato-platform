@@ -1,4 +1,5 @@
 import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
+import { poolConstants } from "./poolConstants";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -16,9 +17,6 @@ export const constants = (() => {
   const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
   const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
   const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
-  const PoolFactory = `${CONTRACT_PREFIX}PoolFactory`;
-  const Pool = `${CONTRACT_PREFIX}Pool`;
-  const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
   const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
@@ -29,6 +27,8 @@ export const constants = (() => {
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const Event = "event";
+  
+  const poolConsts = poolConstants();
   
   const tokenSelectFields = [
     "address",
@@ -43,25 +43,14 @@ export const constants = (() => {
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,
   ];
+
   const tokenBalanceSelectFields = [
     "address",
     "user:key",
     "balance:value::text",
     `token:${Token}(${tokenSelectFields.join(',')})`,
   ];
-  const poolSelectFields = [
-    "address",
-    "_owner",
-    "swapFeeRate",
-    "lpSharePercent",
-    "aToBRatio::text", 
-    "bToARatio::text",
-    `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,
-    "tokenABalance::text",
-    `tokenB:tokenB_fkey(${tokenSelectFields.join(',')})`,
-    "tokenBBalance::text",
-    `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
-  ];
+
   const registrySelectFields = [
     "address",
     "lendingPool:lendingPool_fkey(" +
@@ -144,9 +133,6 @@ export const constants = (() => {
     LiquidityPool,
     CollateralVault,
     PriceOracle,
-    PoolFactory,
-    Pool,
-    PoolSwap,
     PriceOracleEvents,
     PriceOracleBatchUpdateEvents,
     LendingRegistry,
@@ -160,7 +146,7 @@ export const constants = (() => {
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
-    poolSelectFields,
+    ...poolConsts,
     registrySelectFields,
     cdpRegistrySelectFields,
     swapHistorySelectFields,

@@ -4,121 +4,146 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { poolFactory } from "../../config/config";
-import { calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice, getRawPoolData } from "../helpers/swapping.helper";
+import { 
+  calculateImpliedPrice,
+  getRawPoolData,
+  buildPoolParams,
+  extractTokenAddresses,
+  calculatePoolMetrics,
+  calculateOracleRatios,
+  buildSwapToken,
+  buildLPToken
+} from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { SwapHistoryEntry } from "../../types";
+import { SwapHistoryEntry, PoolList } from "../../types/swaps";
 
-const { poolSelectFields, Pool, PoolFactory, Token, PoolSwap, swapHistorySelectFields } = constants;
+const { Pool, PoolFactory, Token, PoolSwap, swapHistorySelectFields } = constants;
 
 export const getPools = async (
   accessToken: string,
   userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
-) => {
-  const params = {
-    ...Object.fromEntries(
-      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-    ),
-    select: rawParams.select || poolSelectFields.join(","),
-    ...(rawParams.select || !userAddress
-      ? {}
-      : {
-          "lpToken.balances.value": "gt.0",
-          "lpToken.balances.key": `eq.${userAddress}`,
-          "tokenA.balances.value": "gt.0",
-          "tokenA.balances.key": `eq.${userAddress}`,
-          "tokenB.balances.value": "gt.0",
-          "tokenB.balances.key": `eq.${userAddress}`,
-        }),
-  };
+): Promise<PoolList> => {
+  const params = buildPoolParams(rawParams, userAddress);
 
-  // Get pool data and factory data in parallel
   const [poolData, { data: factoryData }] = await Promise.all([
     getRawPoolData(accessToken, params),
     cirrus.get(accessToken, `/${constants.PoolFactory}`, {
-      params: {
-        address: "eq." + poolFactory,
-        select: "swapFeeRate,lpSharePercent"
-      }
+      params: { address: "eq." + poolFactory, select: "swapFeeRate,lpSharePercent" }
     })
   ]);
 
-  // Extract token addresses for oracle price filtering
-  const tokenAddresses = [...new Set([
-    ...poolData.map((p: any) => p.tokenA?.address).filter(Boolean),
-    ...poolData.map((p: any) => p.tokenB?.address).filter(Boolean)
-  ])];
-
-  // Fetch oracle prices for specific tokens
-  const priceMap = await getOraclePrices(accessToken, {
-    select: "asset:key,price:value::text",
-    key: `in.(${tokenAddresses.join(',')})`
-  });
-
-  const poolAddresses = poolData.map((pool: any) => pool.address);
-  const volumeMap = await getTradingVolume24hForPools(accessToken, poolAddresses, priceMap);
+  const tokenAddresses = extractTokenAddresses(poolData);
+  const [priceMap, volumeMap] = await Promise.all([
+    getOraclePrices(accessToken, {
+      select: "asset:key,price:value::text",
+      key: `in.(${tokenAddresses.join(',')})`
+    }),
+    getTradingVolume24hForPools(accessToken, poolData.map((p: any) => p.address), new Map())
+  ]);
   
   return poolData.map((pool: any) => {
     const tokenAPrice = priceMap.get(pool.tokenA?.address) || "0";
     const tokenBPrice = priceMap.get(pool.tokenB?.address) || "0";
+    const volume24h = volumeMap.get(pool.address) || "0";
     
-    const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
-    const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
-    const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
+    const { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent } = 
+      calculatePoolMetrics(pool, tokenAPrice, tokenBPrice, volume24h, factoryData?.[0]);
     
-    const lpTokenPrice = calculateLPTokenPrice(
-      pool.tokenABalance || "0",
-      pool.tokenBBalance || "0",
-      tokenAPrice,
-      tokenBPrice,
-      pool.lpToken?._totalSupply || "0"
-    );
+    const { aToB: oracleAToBRatio, bToA: oracleBToARatio } = 
+      calculateOracleRatios(tokenAPrice, tokenBPrice);
     
-    const tradingVolume24h = volumeMap.get(pool.address) || "0";
-    const factorySwapFeeRate = factoryData?.[0]?.swapFeeRate || 30;
-    const factoryLpSharePercent = factoryData?.[0]?.lpSharePercent || 7000;
-    const swapFeeRate = pool.swapFeeRate === 0 ? factorySwapFeeRate : pool.swapFeeRate;
-    const lpSharePercent = pool.lpSharePercent === 0 ? factoryLpSharePercent : pool.lpSharePercent;
-    
-    const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
-    const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
-    
-    // Calculate oracle exchange rate (A to B) with proper decimal precision
-    const oracleAToBRatio = tokenAPrice !== "0" && tokenBPrice !== "0" 
-      ? (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18)
-      : "0";
-    
-    // Calculate oracle exchange rate (B to A) with proper decimal precision
-    const oracleBToARatio = tokenAPrice !== "0" && tokenBPrice !== "0"
-      ? (Number(tokenBPrice) / Number(tokenAPrice)).toFixed(18)
-      : "0";
-    
-    // Extract user balance from balances array for each token
     const tokenABalance = pool.tokenA?.balances?.[0]?.balance || "0";
     const tokenBBalance = pool.tokenB?.balances?.[0]?.balance || "0";
+    const lpTokenBalance = pool.lpToken?.balances?.[0]?.balance || "0";
+    
+    const symbolA = pool.tokenA?._symbol || "Unknown";
+    const symbolB = pool.tokenB?._symbol || "Unknown";
     
     return {
-      ...pool,
-      tokenA: {
-        ...pool.tokenA,
-        balance: tokenABalance // Add direct balance property for convenience
-      },
-      tokenB: {
-        ...pool.tokenB,
-        balance: tokenBBalance // Add direct balance property for convenience
-      },
-      tokenAPrice,
-      tokenBPrice,
-      lpTokenPrice,
+      address: pool.address,
+      poolName: `${symbolA}-${symbolB}`,
+      poolSymbol: `${symbolA}-${symbolB}`,
+      tokenA: buildSwapToken(pool.tokenA, tokenAPrice, pool.tokenABalance || "0", tokenABalance),
+      tokenB: buildSwapToken(pool.tokenB, tokenBPrice, pool.tokenBBalance || "0", tokenBBalance),
+      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance),
       totalLiquidityUSD,
-      tradingVolume24h,
+      tradingVolume24h: volume24h,
       apy: apy.toFixed(2),
-      oracleAToBRatio: oracleAToBRatio.toString(),
-      oracleBToARatio: oracleBToARatio.toString(),
+      aToBRatio: pool.aToBRatio || "0",
+      bToARatio: pool.bToARatio || "0",
+      oracleAToBRatio,
+      oracleBToARatio,
       swapFeeRate,
       lpSharePercent,
     };
   });
+};
+
+export const getSwapableTokens = async (
+  accessToken: string,
+  userAddress: string
+) => {
+  const poolData = await getRawPoolData(accessToken, {
+    select: `tokenA:tokenA_fkey(address,_name,_symbol,balances:${Token}-_balances(user:key,balance:value::text)),tokenB:tokenB_fkey(address,_name,_symbol,balances:${Token}-_balances(user:key,balance:value::text))`,
+    "tokenA.balances.key": `eq.${userAddress}`,
+    "tokenB.balances.key": `eq.${userAddress}`,
+  });
+
+  const tokenMap = new Map();
+  
+  poolData.forEach((pool: any) => {
+    [pool.tokenA, pool.tokenB].forEach((token: any) => {
+      if (!tokenMap.has(token.address)) {
+        tokenMap.set(token.address, {
+          address: token.address,
+          _name: token._name,
+          _symbol: token._symbol,
+          balance: token.balances?.[0]?.balance || "0"
+        });
+      }
+    });
+  });
+
+  return Array.from(tokenMap.values());
+};
+
+export const getSwapableTokenPairs = async (
+  accessToken: string,
+  tokenAddress: string,
+  userAddress: string
+) => {
+  const [poolDataA, poolDataB] = await Promise.all([
+    getRawPoolData(accessToken, {
+      select: `tokenB:tokenB_fkey(address,_name,_symbol,balances:${Token}-_balances(user:key,balance:value::text))`,
+      tokenA: "eq." + tokenAddress,
+      "tokenB.balances.key": `eq.${userAddress}`,
+    }),
+    getRawPoolData(accessToken, {
+      select: `tokenA:tokenA_fkey(address,_name,_symbol,balances:${Token}-_balances(user:key,balance:value::text))`,
+      tokenB: "eq." + tokenAddress,
+      "tokenA.balances.key": `eq.${userAddress}`,
+    })
+  ]);
+
+  const tokens = [
+    ...poolDataA.map((pool: any) => pool.tokenB),
+    ...poolDataB.map((pool: any) => pool.tokenA),
+  ].filter(Boolean);
+
+  const tokenMap = new Map();
+  tokens.forEach((token: any) => {
+    if (!tokenMap.has(token.address)) {
+        tokenMap.set(token.address, {
+          address: token.address,
+          _name: token._name,
+          _symbol: token._symbol,
+          balance: token.balances?.[0]?.balance || "0"
+        });
+    }
+  });
+
+  return Array.from(tokenMap.values());
 };
 
 export const createPool = async (
@@ -158,25 +183,25 @@ export const addLiquidityDualToken = async (
   try {
     const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
 
-    const pools = await getPools(accessToken, undefined, {
+    const poolData = await getRawPoolData(accessToken, {
       address: "eq." + poolAddress,
-      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+      select: "tokenA,tokenB",
     });
-    if (!pools || pools.length === 0) {
+    if (!poolData || poolData.length === 0) {
       throw new Error("No pools found for the given address");
     }
-    const pool = pools[0];
+    const pool = poolData[0];
 
     const tx = buildFunctionTx([
       {
         contractName: extractContractName(Token),
-        contractAddress: pool.tokenAAddress || "",
+        contractAddress: pool.tokenA || "",
         method: "approve",
         args: { spender: poolAddress || "", value: maxTokenAAmount || "" },
       },
       {
         contractName: extractContractName(Token),
-        contractAddress: pool.tokenBAddress || "",
+        contractAddress: pool.tokenB || "",
         method: "approve",
         args: { spender: poolAddress || "", value: tokenBAmount || "" },
       },
@@ -214,16 +239,16 @@ export const addLiquiditySingleToken = async (
   try {
     const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
 
-    const pools = await getPools(accessToken, undefined, {
+    const poolData = await getRawPoolData(accessToken, {
       address: "eq." + poolAddress,
-      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+      select: "tokenA,tokenB",
     });
-    if (!pools || pools.length === 0) {
+    if (!poolData || poolData.length === 0) {
       throw new Error("No pools found for the given address");
     }
-    const pool = pools[0];
+    const pool = poolData[0];
 
-    const depositTokenAddress = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+    const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
     
     const tx = buildFunctionTx([
       {
@@ -265,13 +290,14 @@ export const removeLiquidity = async (
   try {
     const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
 
-    const pools = await getPools(accessToken, undefined, {
+    const poolData = await getRawPoolData(accessToken, {
       address: "eq." + poolAddress,
+      select: "tokenABalance,tokenBBalance,lpToken:lpToken_fkey(_totalSupply)",
     });
-    if (!pools || pools.length === 0) {
+    if (!poolData || poolData.length === 0) {
       throw new Error("No pools found for the given address");
     }
-    const pool = pools[0];
+    const pool = poolData[0];
     // calculate tokenA and tokenB amounts
     const tokenAAmount =
       (BigInt(pool.tokenABalance) * BigInt(lpTokenAmount || "0")) /
@@ -327,16 +353,16 @@ export const swap = async (
   try {
     const { poolAddress, isAToB, amountIn, minAmountOut, deadline } = swapParams;
 
-    const pools = await getPools(accessToken, undefined, {
+    const poolData = await getRawPoolData(accessToken, {
       address: "eq." + poolAddress,
-      select: "tokenAAddress:tokenA,tokenBAddress:tokenB",
+      select: "tokenA,tokenB",
     });
-    if (!pools || pools.length === 0) {
+    if (!poolData || poolData.length === 0) {
       throw new Error("No pools found for the given address");
     }
-    const pool = pools[0];
+    const pool = poolData[0];
 
-    const token = isAToB ? pool.tokenAAddress : pool.tokenBAddress;
+    const token = isAToB ? pool.tokenA : pool.tokenB;
 
     const tx = buildFunctionTx([
       {
@@ -478,15 +504,6 @@ export const setPoolRates = async (
 ) => {
   try {
     const { poolAddress, swapFeeRate, lpSharePercent } = setPoolRatesParams;
-    
-    // Verify the pool exists
-    const pools = await getPools(accessToken, undefined, {
-      address: "eq." + poolAddress,
-      select: "address,_owner",
-    });
-    if (!pools || pools.length === 0) {
-      throw new Error("No pools found for the given address");
-    }
 
     // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
     const tx = buildFunctionTx({
