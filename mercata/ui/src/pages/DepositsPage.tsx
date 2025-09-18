@@ -16,6 +16,7 @@ import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
 import { useCDP } from '@/context/CDPContext';
+import { useSwapContext } from '@/context/SwapContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 import { useSearchParams } from 'react-router-dom';
@@ -23,8 +24,9 @@ import { useSearchParams } from 'react-router-dom';
 const DepositsPage = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
-  const { loans } = useLendingContext();
+  const { loans, liquidityInfo } = useLendingContext();
   const { totalCDPDebt } = useCDP();
+  const { lpTokens } = useSwapContext();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchParams] = useSearchParams();
@@ -75,6 +77,24 @@ const DepositsPage = () => {
       total += totalTokenValue;
     }
 
+    // Add lending pool value (mUSDST deposits)
+    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
+      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
+      total += lendingPoolValue;
+    }
+
+    // Add LP token values
+    if (lpTokens && lpTokens.length > 0) {
+      lpTokens.forEach((lpToken) => {
+        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
+          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
+          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
+          const lpTokenValue = balance * priceValue;
+          total += lpTokenValue;
+        }
+      });
+    }
+
     const lendingPoolDebt = loans?.totalAmountOwed 
       ? parseFloat(formatUnits((() => { 
           try { 
@@ -100,7 +120,7 @@ const DepositsPage = () => {
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
     setTotalBalance(netBalance);
-  }, [tokens, loans, totalCDPDebt]);
+  }, [tokens, loans, totalCDPDebt, liquidityInfo, lpTokens]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
