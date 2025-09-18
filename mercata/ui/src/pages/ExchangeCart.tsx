@@ -29,9 +29,9 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
       return initialTab;
     }
     try {
-      return localStorage.getItem('exchangeCart-activeTab') || 'bridge';
+      return localStorage.getItem('exchangeCart-activeTab') || 'usdc';
     } catch {
-      return 'bridge';
+      return 'usdc';
     }
   });
   const navigate = useNavigate();
