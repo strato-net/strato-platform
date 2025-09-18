@@ -533,3 +533,17 @@ export interface SwapStateCleanupConfig {
   setToAsset: (asset: any) => void;
   setExchangeRate: (rate: string) => void;
 }
+
+export interface SafetyModuleData {
+  totalAssets: string;
+  totalShares: string;
+  userShares: string;
+  userCooldownStart: string;
+  cooldownSeconds: string;
+  unstakeWindow: string;
+  exchangeRate: string;
+  canRedeem: boolean;
+  cooldownActive: boolean;
+  cooldownTimeRemaining: string;
+  unstakeWindowTimeRemaining: string;
+}
