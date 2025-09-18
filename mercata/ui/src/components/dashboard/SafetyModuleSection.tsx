@@ -36,6 +36,7 @@ const SafetyModuleSection = () => {
     fetchTokens(signal);
     refreshSafetyInfo(signal);
     fetchUsdstBalance(userAddress);
+    console.log(safetyInfo);
   };
 
   // Fetch on userAddress change only, with abort controller
@@ -192,10 +193,12 @@ const SafetyModuleSection = () => {
     const days = Math.floor(totalSeconds / 86400);
     const hours = Math.floor((totalSeconds % 86400) / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const leftoverSeconds = totalSeconds % 60;
 
-    if (days > 0) return `${days}d ${hours}h ${minutes}m`;
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
+    if (days > 0) return `${days}d ${hours}h ${minutes}m ${leftoverSeconds}s`;
+    if (hours > 0) return `${hours}h ${minutes}m ${leftoverSeconds}s`;
+    if (minutes > 0) return `${minutes}m ${leftoverSeconds}s`;
+    return `${leftoverSeconds}s`;
   };
 
   return (
@@ -272,10 +275,6 @@ const SafetyModuleSection = () => {
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
-                  </div>
-                  {/* Approval Info */}
-                  <div className="text-sm text-blue-600 mt-1">
-                    ℹ️ Staking requires two transactions: approval + stake
                   </div>
                   {/* Fee Warning */}
                   {(() => {
@@ -545,7 +544,7 @@ const SafetyModuleSection = () => {
                     {loading ? (
                       <span className="text-gray-400 animate-pulse">Loading...</span>
                     ) : safetyInfo?.exchangeRate ? (
-                      "1 sUSDST = " + formatUnits(safetyInfo?.exchangeRate || 0, 18) + " USDST"
+                      "1 sUSDST ≈ " + formatUnits(safetyInfo?.exchangeRate || 0, 18) + " USDST"
                     ) : (
                       "1 sUSDST = 1 USDST"
                     )}
@@ -570,7 +569,7 @@ const SafetyModuleSection = () => {
                   <span className="font-medium text-sm sm:text-base">
                     {safetyInfo?.cooldownSeconds ? 
                       formatTimeRemaining(safetyInfo.cooldownSeconds) : 
-                      "3 days"
+                      "N/A"
                     }
                   </span>
                 </div>
@@ -579,7 +578,7 @@ const SafetyModuleSection = () => {
                   <span className="font-medium text-sm sm:text-base">
                     {safetyInfo?.unstakeWindow ? 
                       formatTimeRemaining(safetyInfo.unstakeWindow) : 
-                      "2 days"
+                      "N/A"
                     }
                   </span>
                 </div>
