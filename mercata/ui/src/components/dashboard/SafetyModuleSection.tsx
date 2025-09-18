@@ -36,7 +36,6 @@ const SafetyModuleSection = () => {
     fetchTokens(signal);
     refreshSafetyInfo(signal);
     fetchUsdstBalance(userAddress);
-    console.log(safetyInfo);
   };
 
   // Fetch on userAddress change only, with abort controller

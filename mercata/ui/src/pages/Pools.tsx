@@ -38,13 +38,13 @@ const Pools = () => {
                     <span className="hidden sm:inline">Lending Pools</span>
                     <span className="sm:hidden">Lending</span>
                   </TabsTrigger>
-                  <TabsTrigger value="safety" className="text-xs sm:text-sm">
-                    <span className="hidden sm:inline">Safety Module</span>
-                    <span className="sm:hidden">Safety</span>
-                  </TabsTrigger>
                   <TabsTrigger value="swap" className="text-xs sm:text-sm">
                     <span className="hidden sm:inline">Swap Pools</span>
                     <span className="sm:hidden">Swap</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="safety" className="text-xs sm:text-sm">
+                    <span className="hidden sm:inline">Safety Module</span>
+                    <span className="sm:hidden">Safety</span>
                   </TabsTrigger>
                   <TabsTrigger value="liquidations" className="text-xs sm:text-sm">
                     <span className="hidden sm:inline">Liquidations</span>
@@ -54,11 +54,11 @@ const Pools = () => {
                 <TabsContent value="lending">
                   <LendingPoolSection />
                 </TabsContent>
-                <TabsContent value="safety">
-                  <SafetyModuleSection />
-                </TabsContent>
                 <TabsContent value="swap">
                   <SwapPoolsSection />
+                </TabsContent>
+                <TabsContent value="safety">
+                  <SafetyModuleSection />
                 </TabsContent>
                 <TabsContent value="liquidations">
                   <LiquidationsSection />

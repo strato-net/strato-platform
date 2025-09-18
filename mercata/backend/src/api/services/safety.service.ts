@@ -57,12 +57,7 @@ export const getSafetyModuleInfo = async (
   const config = getSafetyModuleConfig();
   const safetyModuleAddress = config.safetyModule.address;
   const sTokenAddress = config.sToken.address;
-  
-  console.log("🔍 SafetyModule Debug - Contract addresses:");
-  console.log("  SafetyModule:", safetyModuleAddress);
-  console.log("  sToken:", sTokenAddress);
-  console.log("  UserAddress:", userAddress);
-  
+
   try {
     // Note: We need to query multiple sources for complete SafetyModule data:
     // 1. SafetyModule contract config (COOLDOWN_SECONDS, UNSTAKE_WINDOW, etc.)
@@ -90,7 +85,6 @@ export const getSafetyModuleInfo = async (
         }
       );
       safetyModuleData = response1.data || [];
-      console.log("📊 SafetyModule Config:", safetyModuleData);
     } catch (error) {
       console.warn("SafetyModule contract not found or not deployed:", error);
     }
@@ -111,7 +105,6 @@ export const getSafetyModuleInfo = async (
       );
       const tokenData = response2.data || [];
       usdstContractBalance = tokenData?.[0]?.balances || [];
-      console.log("💰 USDST Balance of SafetyModule:", usdstContractBalance);
     } catch (error) {
       console.warn("USDST balance of SafetyModule query failed:", error);
     }
@@ -129,7 +122,6 @@ export const getSafetyModuleInfo = async (
         }
       );
       sTokenTotalSupply = response3.data || [];
-      console.log("🪙 sToken Total Supply:", sTokenTotalSupply);
     } catch (error) {
       console.warn("sToken total supply query failed:", error);
     }
@@ -149,7 +141,6 @@ export const getSafetyModuleInfo = async (
       );
       const tokenData = response4.data || [];
       userTokenBalance = tokenData?.[0]?.balances || [];
-      console.log("👤 User sUSDST Balance:", userTokenBalance);
     } catch (error) {
       console.warn("sUSDST token balance query failed:", error);
     }
@@ -167,14 +158,12 @@ export const getSafetyModuleInfo = async (
         }
       );
       cooldownData = response5.data || [];
-      console.log("⏰ User Cooldown Data:", cooldownData);
     } catch (error) {
       console.warn("SafetyModule cooldown data query failed:", error);
     }
 
     // Extract data from responses
     const safetyModule = safetyModuleData?.[0] || {};
-    console.log("🔍 SafetyModule Contract Data:", safetyModule);
     
     // Get totalAssets from SafetyModule's USDST balance (nested structure)
     const totalAssets = usdstContractBalance?.[0]?.balance || "0";
@@ -189,14 +178,6 @@ export const getSafetyModuleInfo = async (
     // Get user-specific data (nested structure)
     const userShares = userTokenBalance?.[0]?.balance || "0";
     const cooldownStart = cooldownData?.[0]?.value || "0";
-    
-    console.log("📈 Extracted Values:");
-    console.log("  totalAssets (USDST in SafetyModule):", totalAssets);
-    console.log("  totalShares (sToken totalSupply):", totalShares);
-    console.log("  userShares (user sToken balance):", userShares);
-    console.log("  cooldownSeconds:", cooldownSeconds);
-    console.log("  unstakeWindow:", unstakeWindow);
-    console.log("  cooldownStart:", cooldownStart);
 
     // Calculate exchange rate (assets per share)
     const exchangeRate = totalShares !== "0" && BigInt(totalShares) > 0n 
