@@ -23,6 +23,7 @@ import {
   setGlobalPaused,
   getGlobalPaused,
   getAllCollateralConfigs,
+  getBadDebt,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -352,6 +353,20 @@ class CDPController {
     try {
       const { accessToken, address: userAddress } = req;
       const result = await getAllCollateralConfigs(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getBadDebt(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await getBadDebt(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

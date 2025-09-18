@@ -63,6 +63,11 @@ export interface TransactionResponse {
   hash: string;                           // Transaction hash
 }
 
+export interface BadDebt {
+  asset: string;                          // Asset address
+  badDebt: string;                        // Raw integer string (wei format, 18 decimals)
+}
+
 export const cdpService = {
   // Get user's CDP positions/vaults
   async getVaults(): Promise<VaultData[]> {
@@ -237,5 +242,20 @@ export const cdpService = {
     return response.data;
   },
 
+  // Get bad debt for all assets
+  async getBadDebt(): Promise<BadDebt[]> {
+    // Return dummy data directly instead of hitting the backend
+    // TODO: Replace with real backend call when ready
+    return [
+      {
+        asset: "93fb7295859b2d70199e0a4883b7c320cf874e6c", // ETHST (STRATO Ether)
+        badDebt: "5000000000000000000000" // 5,000 USDST in wei (18 decimals)
+      },
+      {
+        asset: "3d351a4a339f6eef7371b0b1b025b3a434ad0399", // USDCST (STRATO USDC)
+        badDebt: "8920000000000000000000" // 8,920 USDST in wei (18 decimals)
+      }
+    ];
+  },
 
 };

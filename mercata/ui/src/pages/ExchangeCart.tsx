@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import CDPBorrowWidget from '@/components/cdp/MintWidget';
 import VaultsList from '@/components/cdp/VaultsList';
 import LiquidationsView from '@/components/cdp/LiquidationsView';
+import BadDebtView from '@/components/cdp/BadDebtView';
 import BridgeWidget from '@/components/bridge/BridgeWidget';
 import SwapWidget from '@/components/swap/SwapWidget';
 import MintWidget from '../components/mint/MintWidget'; // Bridge deposit widget
@@ -20,8 +21,8 @@ interface ExchangeCartProps {
 }
 
 const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initialTab }) => {
-  const [showLiquidations, setShowLiquidations] = useState(false);
   const [usdcActiveTab, setUsdcActiveTab] = useState('deposit');
+  const [borrowActiveTab, setBorrowActiveTab] = useState('vaults');
   // Use localStorage to persist tab state across re-renders, but prioritize initialTab if provided
   const [activeTab, setActiveTab] = useState(() => {
     // If initialTab is provided, use it instead of localStorage
@@ -68,6 +69,16 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
 
   return (
     <div className="w-full bg-white shadow-md rounded-2xl p-4 space-y-5 font-sans">
+      <style>{`
+        .custom-tabs .ant-tabs-tab {
+          justify-content: center !important;
+        }
+        .custom-tabs .ant-tabs-tab-btn {
+          justify-content: center !important;
+          text-align: center !important;
+          width: 100% !important;
+        }
+      `}</style>
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="cdp">Borrow</TabsTrigger>
@@ -77,31 +88,57 @@ const ExchangeCart: React.FC<ExchangeCartProps> = ({ onVaultActionSuccess, initi
         </TabsList>
         
         <TabsContent value="cdp">
-          {showLiquidations ? (
-            <LiquidationsView onBack={() => setShowLiquidations(false)} />
-          ) : (
-            <div className="space-y-6">
-              {/* Liquidations Button */}
-              <div className="flex justify-end">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowLiquidations(true)}
-                  className="text-red-600 border-red-200 hover:bg-red-50"
-                >
-                  Liquidations
-                </Button>
-              </div>
-              
-              <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
-                <CDPBorrowWidget onSuccess={handleBorrowSuccess} />
-              </div>
-              <VaultsList 
-                refreshTrigger={vaultsRefreshTrigger} 
-                onVaultActionSuccess={handleVaultActionSuccess}
-              />
+          <div className="w-full">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Borrow</h2>
             </div>
-          )}
+            <div className="w-full bg-white/90 p-1.5 rounded-xl border border-gray-200 shadow-sm">
+              <AntdTabs
+                activeKey={borrowActiveTab}
+                items={[
+                  {
+                    key: 'vaults',
+                    label: 'Vaults',
+                  },
+                  {
+                    key: 'bad-debt',
+                    label: 'Bad Debt',
+                  },
+                  {
+                    key: 'liquidations',
+                    label: 'Liquidations',
+                  },
+                ]}
+                onChange={(value) => setBorrowActiveTab(value)}
+                className="custom-tabs"
+                style={{
+                  '--ant-primary-color': '#3b82f6',
+                  '--ant-primary-color-hover': '#2563eb',
+                } as React.CSSProperties}
+              />
+              <div className="bg-white rounded-xl p-4 shadow-sm mt-4">
+                {borrowActiveTab === 'vaults' ? (
+                  <div className="space-y-6">
+                    <div className="border-2 border-gray-300 rounded-xl p-4 pb-[60px] flex flex-col">
+                      <CDPBorrowWidget onSuccess={handleBorrowSuccess} />
+                    </div>
+                    <VaultsList 
+                      refreshTrigger={vaultsRefreshTrigger} 
+                      onVaultActionSuccess={handleVaultActionSuccess}
+                    />
+                  </div>
+                ) : borrowActiveTab === 'bad-debt' ? (
+                  <div>
+                    <BadDebtView />
+                  </div>
+                ) : (
+                  <div>
+                    <LiquidationsView />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </TabsContent>
         
         <TabsContent value="bridge">
