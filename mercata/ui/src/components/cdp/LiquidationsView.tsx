@@ -9,7 +9,7 @@ import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 
 interface LiquidationsViewProps {
-  onBack: () => void;
+  // Props can be added here if needed in the future
 }
 
 // Format large numbers for display
@@ -67,7 +67,7 @@ const formatWeiToDecimal = (weiString: string, decimals: number): string => {
   return `${quotient}.${trimmedDecimal}`;
 };
 
-const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
+const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -307,11 +307,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack}>
-            ← Back to Borrow
-          </Button>
-        </div>
         <Card>
           <CardContent className="p-6">
             <div className="text-center">Loading liquidatable positions...</div>
@@ -334,14 +329,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           -moz-appearance: textfield;
         }
       `}</style>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack}>
-          ← Back to Borrow
-        </Button>
-        <div /> {/* Spacer for center alignment */}
-      </div>
-
       {/* Main Card */}
       <Card>
         <CardHeader>

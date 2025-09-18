@@ -217,6 +217,10 @@ interface AssetConfig {
   isPaused: boolean;
   isSupported: boolean;
 }
+interface BadDebt {
+  asset: string;
+  badDebt: string;
+}
 
 export const getVaults = async (
   accessToken: string,
@@ -1153,4 +1157,27 @@ export const getAllCollateralConfigs = async (
 ): Promise<AssetConfig[]> => {
   // This is the same as getSupportedAssets but with a different name for clarity
   return getSupportedAssets(accessToken, userAddress);
+};
+
+export const getBadDebt = async (
+  accessToken: string,
+  userAddress: string
+): Promise<BadDebt[]> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  // Return dummy bad debt data
+  return [
+    {
+      asset: "1234567890123456789012345678901234567890", // Mock WBTC address
+      badDebt: "2500000000000000000000" // 2,500 USDST in wei (18 decimals)
+    },
+    {
+      asset: "2345678901234567890123456789012345678901", // Mock WETH address
+      badDebt: "15750000000000000000000" // 15,750 USDST in wei (18 decimals)
+    },
+    {
+      asset: "3456789012345678901234567890123456789012", // Mock USDC address
+      badDebt: "8920000000000000000000" // 8,920 USDST in wei (18 decimals)
+    }
+  ];
 };
