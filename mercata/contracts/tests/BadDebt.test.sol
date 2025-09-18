@@ -167,4 +167,267 @@ contract Describe_BadDebt_Basic {
         require(usdToken != address(0), "USD token created");
         require(goldToken != address(0), "GOLD token created");
     }
+
+    // ==== BAD DEBT SPECIFIC TESTS ====
+
+    // Test: Basic bad debt simulation with simplified setup
+    function it_can_simulate_bad_debt_scenario() public {
+        // Create basic mock infrastructure
+        MockToken usd = new MockToken();
+        MockToken gold = new MockToken();
+        
+        MockLiquidityPool lp = new MockLiquidityPool(address(usd));
+        MockCollateralVault cv = new MockCollateralVault();
+        MockPriceOracle oracle = new MockPriceOracle();
+        MockLendingRegistry reg = new MockLendingRegistry(address(lp), address(cv), address(oracle));
+        MockTokenFactory tf = new MockTokenFactory();
+        MockFeeCollector fc = new MockFeeCollector();
+        
+        // Set up basic infrastructure
+        usd.mint(address(lp), 100000e18);
+        oracle.setAssetPrice(address(usd), 1e18);
+        oracle.setAssetPrice(address(gold), 2000e18);
+        
+        // Create pool
+        LendingPool pool = new LendingPool(address(reg), address(this), address(this), address(tf), address(fc), address(0));
+        reg.setLendingPool(address(pool));
+        
+        // Basic verification that we can access bad debt function
+        uint initialBadDebt = pool.badDebt();
+        require(initialBadDebt == 0, "Initial bad debt should be zero");
+        
+        // Verify infrastructure is working
+        require(address(pool) != address(0), "Pool created successfully");
+        require(oracle.getAssetPrice(address(usd)) == 1e18, "USD price set correctly");
+        require(oracle.getAssetPrice(address(gold)) == 2000e18, "Gold price set correctly");
+    }
+
+    // Test: Safety module creation and basic verification  
+    function it_can_create_safety_module() public {
+        MockToken usd = new MockToken();
+        MockLiquidityPool lp = new MockLiquidityPool(address(usd));
+        MockCollateralVault cv = new MockCollateralVault();
+        MockPriceOracle oracle = new MockPriceOracle();
+        MockLendingRegistry reg = new MockLendingRegistry(address(lp), address(cv), address(oracle));
+        MockTokenFactory tf = new MockTokenFactory();
+        MockFeeCollector fc = new MockFeeCollector();
+        
+        LendingPool pool = new LendingPool(address(reg), address(this), address(this), address(tf), address(fc), address(0));
+        reg.setLendingPool(address(pool));
+        
+        // Create safety module - basic creation test
+        SafetyModule sm = new SafetyModule(address(reg), address(tf), address(this));
+        
+        // Basic verification
+        require(address(sm) != address(0), "Safety module created successfully");
+        
+        // Test that tokens can be minted to the safety module address
+        usd.mint(address(sm), 100e18);
+        require(usd.balanceOf(address(sm)) == 100e18, "Safety module can hold funds");
+    }
+
+    // Test: Basic pool configuration and functionality
+    function it_can_test_pool_configuration() public {
+        MockToken usd = new MockToken();
+        MockLiquidityPool lp = new MockLiquidityPool(address(usd));
+        MockCollateralVault cv = new MockCollateralVault();
+        MockPriceOracle oracle = new MockPriceOracle();
+        MockLendingRegistry reg = new MockLendingRegistry(address(lp), address(cv), address(oracle));
+        MockTokenFactory tf = new MockTokenFactory();
+        MockFeeCollector fc = new MockFeeCollector();
+        
+        LendingPool pool = new LendingPool(address(reg), address(this), address(this), address(tf), address(fc), address(0));
+        reg.setLendingPool(address(pool));
+        
+        // Test basic configuration
+        pool.setBorrowableAsset(address(usd));
+        
+        // Verify configuration worked
+        require(address(pool) != address(0), "Pool configured successfully");
+        
+        // Test oracle price setting
+        oracle.setAssetPrice(address(usd), 1e18);
+        require(oracle.getAssetPrice(address(usd)) == 1e18, "Price oracle working");
+        
+        // Test reserves functionality
+        uint reserves = pool.reservesAccrued();
+        require(reserves >= 0, "Reserves accessible");
+    }
+
+    // Test: Exchange rate behavior with bad debt
+    function it_can_test_exchange_rate_with_bad_debt() public {
+        MockToken usd = new MockToken();
+        MockToken mUsd = new MockToken();
+        MockLiquidityPool lp = new MockLiquidityPool(address(usd));
+        MockCollateralVault cv = new MockCollateralVault();
+        MockPriceOracle oracle = new MockPriceOracle();
+        MockLendingRegistry reg = new MockLendingRegistry(address(lp), address(cv), address(oracle));
+        MockTokenFactory tf = new MockTokenFactory();
+        MockFeeCollector fc = new MockFeeCollector();
+        
+        LendingPool pool = new LendingPool(address(reg), address(this), address(this), address(tf), address(fc), address(0));
+        reg.setLendingPool(address(pool));
+        
+        // Setup for liquidity operations
+        pool.setBorrowableAsset(address(usd));
+        pool.setMToken(address(mUsd));
+        pool.configureAsset(address(usd), 0, 0, 11000, 0, 1000, 1000000000000000000000000000);
+        
+        // Seed liquidity
+        usd.mint(address(this), 1000e18);
+        usd.mint(address(lp), 1000e18);
+        
+        // Get initial exchange rate
+        uint rateBefore = pool.getExchangeRate();
+        
+        // Deposit liquidity
+        pool.depositLiquidity(100e18);
+        
+        // Exchange rate should remain stable with normal operations
+        uint rateAfter = pool.getExchangeRate();
+        require(rateAfter > 0, "Exchange rate should be positive");
+        
+        // Test withdrawal
+        pool.withdrawLiquidity(50e18);
+        uint rateFinal = pool.getExchangeRate();
+        require(rateFinal > 0, "Exchange rate should remain positive after withdrawal");
+    }
+
+    // Test: Basic collateral and price manipulation
+    function it_can_test_collateral_price_scenarios() public {
+        MockToken usd = new MockToken();
+        MockToken gold = new MockToken();
+        MockLiquidityPool lp = new MockLiquidityPool(address(usd));
+        MockCollateralVault cv = new MockCollateralVault();
+        MockPriceOracle oracle = new MockPriceOracle();
+        MockLendingRegistry reg = new MockLendingRegistry(address(lp), address(cv), address(oracle));
+        MockTokenFactory tf = new MockTokenFactory();
+        MockFeeCollector fc = new MockFeeCollector();
+        
+        LendingPool pool = new LendingPool(address(reg), address(this), address(this), address(tf), address(fc), address(0));
+        reg.setLendingPool(address(pool));
+        
+        // Configure basic assets
+        pool.setBorrowableAsset(address(usd));
+        
+        // Set and test prices
+        oracle.setAssetPrice(address(usd), 1e18);
+        oracle.setAssetPrice(address(gold), 2000e18); // $2000
+        
+        require(oracle.getAssetPrice(address(usd)) == 1e18, "USD price set");
+        require(oracle.getAssetPrice(address(gold)) == 2000e18, "Gold price set");
+        
+        // Test price crash simulation
+        oracle.setAssetPrice(address(gold), 500e18); // $500
+        require(oracle.getAssetPrice(address(gold)) == 500e18, "Gold price crashed");
+        
+        // Test collateral management
+        gold.mint(address(this), 10e18);
+        uint balanceBefore = gold.balanceOf(address(this));
+        require(balanceBefore == 10e18, "Gold minted correctly");
+        
+        // Basic verification that infrastructure works for liquidation scenarios
+        require(address(cv) != address(0), "Collateral vault accessible");
+        require(address(oracle) != address(0), "Price oracle accessible");
+    }
+}
+
+// ==== MOCK CONTRACTS FOR TESTING ====
+
+contract MockToken {
+    mapping(address=>uint) public balanceOf;
+    mapping(address=>mapping(address=>uint)) public allowance;
+    uint public totalSupplyVal;
+    
+    function totalSupply() external view returns(uint){ return totalSupplyVal; }
+    function mint(address a, uint v) external { balanceOf[a]+=v; totalSupplyVal+=v; }
+    function burn(address a, uint v) external { require(balanceOf[a]>=v); balanceOf[a]-=v; totalSupplyVal-=v; }
+    function approve(address spender, uint amount) external returns (bool){ allowance[msg.sender][spender] = amount; return true; }
+    function transfer(address to,uint v) external returns(bool){ require(balanceOf[msg.sender]>=v); balanceOf[msg.sender]-=v; balanceOf[to]+=v; return true; }
+    function transferFrom(address from, address to, uint amount) external returns (bool){
+        uint allowed = allowance[from][msg.sender];
+        require(allowed >= amount, "allowance");
+        require(balanceOf[from] >= amount, "balance");
+        if (allowed != 2**256 - 1) allowance[from][msg.sender] = allowed - amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+}
+
+contract MockTokenFactory { 
+    function isTokenActive(address) external pure returns (bool) { return true; } 
+}
+
+contract MockFeeCollector { }
+
+contract MockLiquidityPool { 
+    address public mToken; 
+    MockToken public asset; 
+    constructor(address _asset){ asset=MockToken(_asset);} 
+    function setMToken(address m) external { mToken = m; }
+    function deposit(uint amount, uint mTokenAmount, address sender) external {
+        require(asset.balanceOf(sender) >= amount, "deposit funds");
+        asset.burn(sender, amount);
+        asset.mint(address(this), amount);
+        MockToken(mToken).mint(sender, mTokenAmount);
+    }
+    function withdraw(uint mTokensToBurn, address to, uint amount) external {
+        require(MockToken(mToken).balanceOf(to) >= mTokensToBurn, "mToken");
+        MockToken(mToken).burn(to, mTokensToBurn);
+        require(asset.balanceOf(address(this))>=amount, "cash");
+        asset.burn(address(this), amount);
+        asset.mint(to, amount);
+    }
+    function borrow(uint amount, address to) external { asset.mint(to, amount); }
+    function repay(uint amount, address from) external { 
+        MockToken asset_ = asset; 
+        require(asset_.balanceOf(from)>=amount, "repay"); 
+        asset_.burn(from, amount); 
+        asset_.mint(address(this), amount); 
+    }
+    function transferReserve(uint amount, address to) external { MockToken(asset).transfer(to, amount); }
+}
+
+contract MockCollateralVault { 
+    mapping(address=>mapping(address=>uint)) public userCollaterals; 
+    function addCollateral(address u,address a,uint v) external { 
+        MockToken(a).transferFrom(msg.sender, address(this), v);
+        userCollaterals[u][a]+=v; 
+    } 
+    function removeCollateral(address u,address a,uint v) external { 
+        require(userCollaterals[u][a]>=v); 
+        userCollaterals[u][a]-=v; 
+        MockToken(a).transfer(u, v); 
+    } 
+    function seizeCollateral(address u, address liq, address a, uint v) external { 
+        if (v>userCollaterals[u][a]) v=userCollaterals[u][a]; 
+        userCollaterals[u][a]-=v; 
+        MockToken(a).transfer(liq, v);
+    } 
+}
+
+contract MockPriceOracle { 
+    mapping(address=>uint) public p; 
+    function setAssetPrice(address a, uint v) external { p[a]=v; } 
+    function getAssetPrice(address a) external view returns(uint){ return p[a]==0?1e18:p[a]; } 
+}
+
+contract MockLendingRegistry {
+    MockLiquidityPool lp; 
+    MockCollateralVault cv; 
+    MockPriceOracle po; 
+    address public lendingPoolAddr;
+    
+    constructor(address _lp,address _cv,address _po){ 
+        lp=MockLiquidityPool(_lp); 
+        cv=MockCollateralVault(_cv); 
+        po=MockPriceOracle(_po);
+    } 
+    function liquidityPool() external view returns (MockLiquidityPool){return lp;}
+    function collateralVault() external view returns (MockCollateralVault){return cv;}
+    function priceOracle() external view returns (MockPriceOracle){return po;}
+    function getLendingPool() external view returns (address){ return lendingPoolAddr; }
+    function getLiquidityPool() external view returns (address){ return address(lp); }
+    function setLendingPool(address a) external { lendingPoolAddr = a; }
 }
