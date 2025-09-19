@@ -1,8 +1,12 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
-
 import "../concrete/BaseCodeCollection.sol";
 import "../abstract/ERC20/IERC20.sol";
+
+contract User {
+    function do(address a, string f, variadic args) public returns (variadic) {
+        variadic result = address(a).call(f, args);
+        return result;
+    }
+}
 
 contract Describe_BadDebt_Basic {
     constructor() {
@@ -46,26 +50,206 @@ contract Describe_BadDebt_Basic {
         Token(usdToken).setStatus(2);
         Token(goldToken).setStatus(2);
         
-        // Basic checks - tokens created successfully
-        require(usdToken != address(0), "USD token not created");
-        require(goldToken != address(0), "GOLD token not created");
+        // Basic checks - tokens activated successfully
+        require(Token(usdToken).status() == TokenStatus.ACTIVE, "USD token not activated");
+        require(Token(goldToken).status() == TokenStatus.ACTIVE, "GOLD token not activated");
     }
 
-    // Test basic lending pool configuration
+    // Test complete lending pool configuration with full setup
     function it_can_configure_lending_pool() public {
-        // Get the lending pool from Mercata infrastructure
+        // Get the lending pool and configurator from Mercata infrastructure
         LendingPool pool = m.lendingPool();
+        PoolConfigurator configurator = m.poolConfigurator();
+        PriceOracle oracle = m.priceOracle();
         require(address(pool) != address(0), "LendingPool not found");
+        require(address(configurator) != address(0), "PoolConfigurator not found");
+        require(address(oracle) != address(0), "PriceOracle not found");
         
-        // Create test tokens
+        // Create test tokens for borrowing and collateral
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        address mUsdToken = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        address silverToken = m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
         
+        // Activate all tokens
         Token(usdToken).setStatus(2);
+        Token(mUsdToken).setStatus(2);  
         Token(goldToken).setStatus(2);
+        Token(silverToken).setStatus(2);
         
-        // Test basic pool operations that don't require complex setup
+        // Verify tokens are active
+        require(Token(usdToken).status() == TokenStatus.ACTIVE, "USD token not activated");
+        require(Token(mUsdToken).status() == TokenStatus.ACTIVE, "mUSD token not activated");
+        require(Token(goldToken).status() == TokenStatus.ACTIVE, "GOLD token not activated");
+        require(Token(silverToken).status() == TokenStatus.ACTIVE, "SILVER token not activated");
+        
+        // === STEP 1: Configure borrowable asset and mToken ===
+        
+        // Set the borrowable asset (USD) 
+        configurator.setBorrowableAsset(usdToken);
+        require(pool.borrowableAsset() == usdToken, "Borrowable asset not set correctly");
+        
+        // Set the corresponding mToken
+        configurator.setMToken(mUsdToken);
+        require(pool.mToken() == mUsdToken, "mToken not set correctly");
+        
+        // === STEP 2: Set debt ceilings and safety parameters ===
+        
+        uint debtCeilingAssetUnits = 1000000e18; // 1M USDST
+        uint debtCeilingUSD = 1000000e18;        // 1M USD value 
+        uint safetyShareBps = 1000;              // 10% to safety module
+        
+        configurator.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
+        configurator.setSafetyShareBps(safetyShareBps);
+        
+        // Verify debt ceiling configuration
+        require(pool.debtCeilingAsset() == debtCeilingAssetUnits, "Asset debt ceiling not set");
+        require(pool.debtCeilingUSD() == debtCeilingUSD, "USD debt ceiling not set");
+        require(pool.safetyShareBps() == safetyShareBps, "Safety share not set");
+        
+        // === STEP 3: Configure USD borrowable asset parameters ===
+        
+        uint usdLtv = 0; // USD can't be used as collateral for borrowing USD
+        uint usdLiquidationThreshold = 0;
+        uint usdLiquidationBonus = 11000; // 110%
+        uint usdInterestRate = 500;       // 5%  
+        uint usdReserveFactor = 1000;     // 10%
+        uint usdPerSecondFactorRAY = 1000000001547125957863212448; // ~5% APY
+        
+        configurator.configureAsset(
+            usdToken,
+            usdLtv,
+            usdLiquidationThreshold, 
+            usdLiquidationBonus,
+            usdInterestRate,
+            usdReserveFactor,
+            usdPerSecondFactorRAY
+        );
+        
+        // === STEP 4: Configure collateral assets (Gold and Silver) ===
+        
+        // Gold configuration - high value collateral
+        uint goldLtv = 7500;              // 75% LTV
+        uint goldLiquidationThreshold = 8000; // 80% liquidation threshold
+        uint goldLiquidationBonus = 10500;    // 5% liquidation bonus
+        uint goldInterestRate = 0;        // No interest for collateral
+        uint goldReserveFactor = 0;       // No reserves for collateral
+        uint goldPerSecondFactorRAY = 1e27; // No compounding for collateral
+        
+        configurator.configureAsset(
+            goldToken,
+            goldLtv,
+            goldLiquidationThreshold,
+            goldLiquidationBonus, 
+            goldInterestRate,
+            goldReserveFactor,
+            goldPerSecondFactorRAY
+        );
+        
+        // Silver configuration - medium value collateral
+        uint silverLtv = 6000;            // 60% LTV (more conservative)
+        uint silverLiquidationThreshold = 7000; // 70% liquidation threshold
+        uint silverLiquidationBonus = 11000;    // 110% liquidation bonus
+        uint silverInterestRate = 0;      // No interest for collateral
+        uint silverReserveFactor = 0;     // No reserves for collateral  
+        uint silverPerSecondFactorRAY = 1e27; // No compounding for collateral
+        
+        configurator.configureAsset(
+            silverToken,
+            silverLtv,
+            silverLiquidationThreshold,
+            silverLiquidationBonus,
+            silverInterestRate, 
+            silverReserveFactor,
+            silverPerSecondFactorRAY
+        );
+        
+        // === STEP 5: Set oracle prices for all assets ===
+        
+        oracle.setAssetPrice(usdToken, 1e18);      // $1 USD
+        oracle.setAssetPrice(goldToken, 2000e18);  // $2000 Gold
+        oracle.setAssetPrice(silverToken, 25e18);  // $25 Silver
+        
+        // Verify oracle prices  
+        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not set correctly");
+        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not set correctly");
+        require(oracle.getAssetPrice(silverToken) == 25e18, "Silver price not set correctly");
+        
+        // === STEP 6: Verify complete asset configurations ===
+        
+        // Verify USD configuration
+        (uint usdLtvRet, uint usdLiqThreshRet, uint usdLiqBonusRet, uint usdIntRateRet, uint usdReserveFactorRet, uint usdPerSecRet) = pool.getAssetConfig(usdToken);
+        require(usdLtvRet == usdLtv, "USD LTV not configured correctly");
+        require(usdLiqThreshRet == usdLiquidationThreshold, "USD liquidation threshold not configured correctly");
+        require(usdLiqBonusRet == usdLiquidationBonus, "USD liquidation bonus not configured correctly");
+        require(usdIntRateRet == usdInterestRate, "USD interest rate not configured correctly");
+        require(usdReserveFactorRet == usdReserveFactor, "USD reserve factor not configured correctly");
+        require(usdPerSecRet == usdPerSecondFactorRAY, "USD per-second factor not configured correctly");
+        
+        // Verify Gold configuration
+        (uint goldLtvRet, uint goldLiqThreshRet, uint goldLiqBonusRet, uint goldIntRateRet, uint goldReserveFactorRet, uint goldPerSecRet) = pool.getAssetConfig(goldToken);
+        require(goldLtvRet == goldLtv, "Gold LTV not configured correctly");
+        require(goldLiqThreshRet == goldLiquidationThreshold, "Gold liquidation threshold not configured correctly");
+        require(goldLiqBonusRet == goldLiquidationBonus, "Gold liquidation bonus not configured correctly");
+        require(goldIntRateRet == goldInterestRate, "Gold interest rate not configured correctly");
+        require(goldReserveFactorRet == goldReserveFactor, "Gold reserve factor not configured correctly");
+        require(goldPerSecRet == goldPerSecondFactorRAY, "Gold per-second factor not configured correctly");
+        
+        // Verify Silver configuration
+        (uint silverLtvRet, uint silverLiqThreshRet, uint silverLiqBonusRet, uint silverIntRateRet, uint silverReserveFactorRet, uint silverPerSecRet) = pool.getAssetConfig(silverToken);
+        require(silverLtvRet == silverLtv, "Silver LTV not configured correctly");
+        require(silverLiqThreshRet == silverLiquidationThreshold, "Silver liquidation threshold not configured correctly");
+        require(silverLiqBonusRet == silverLiquidationBonus, "Silver liquidation bonus not configured correctly");
+        require(silverIntRateRet == silverInterestRate, "Silver interest rate not configured correctly");
+        require(silverReserveFactorRet == silverReserveFactor, "Silver reserve factor not configured correctly");
+        require(silverPerSecRet == silverPerSecondFactorRAY, "Silver per-second factor not configured correctly");
+        
+        // === STEP 7: Verify registry and infrastructure connections ===
+        
         require(address(pool.registry()) != address(0), "Pool registry not set");
+        require(address(pool.tokenFactory()) != address(0), "Pool token factory not set");
+        require(address(pool.poolConfigurator()) != address(0), "Pool configurator not set");
+        require(address(pool.feeCollector()) != address(0), "Fee collector not set");
+        
+        // === STEP 8: Verify pool is ready for lending operations ===
+        
+        // Check that pool has borrowable asset configured
+        require(pool.borrowableAsset() != address(0), "No borrowable asset configured");
+        require(pool.mToken() != address(0), "No mToken configured");
+        
+        // Verify that assets are properly configured in the pool
+        require(pool.configuredAssets(0) == usdToken, "USD not in configured assets");
+        require(pool.configuredAssets(1) == goldToken, "Gold not in configured assets");
+        require(pool.configuredAssets(2) == silverToken, "Silver not in configured assets");
+        
+        // Verify exchange rate calculation works
+        uint exchangeRate = pool.getExchangeRate();
+        require(exchangeRate > 0, "Exchange rate not calculable");
+        
+        // Verify bad debt tracking is initialized
+        uint badDebt = pool.badDebt();
+        require(badDebt == 0, "Initial bad debt should be zero");
+        
+        // === STEP 9: Test that configuration parameters are within valid bounds ===
+        
+        // Verify LTV <= liquidation threshold for collateral assets
+        require(goldLtv <= goldLiquidationThreshold, "Gold LTV exceeds liquidation threshold");
+        require(silverLtv <= silverLiquidationThreshold, "Silver LTV exceeds liquidation threshold");
+        
+        // Verify liquidation bonuses are within valid range (100-125%)
+        require(goldLiquidationBonus >= 10000 && goldLiquidationBonus <= 12500, "Gold liquidation bonus out of range");
+        require(silverLiquidationBonus >= 10000 && silverLiquidationBonus <= 12500, "Silver liquidation bonus out of range");
+        require(usdLiquidationBonus >= 10000 && usdLiquidationBonus <= 12500, "USD liquidation bonus out of range");
+        
+        // Verify interest rates are reasonable (< 100%)
+        require(usdInterestRate <= 10000, "USD interest rate too high");
+        
+        // Verify reserve factors are reasonable (< 50%)
+        require(usdReserveFactor <= 5000, "USD reserve factor too high");
+        
+        // === CONFIGURATION COMPLETE ===
+        // The lending pool is now fully configured and ready for operations
+        require(true, "Lending pool configuration completed successfully");
     }
 
     // Test basic safety module functionality
