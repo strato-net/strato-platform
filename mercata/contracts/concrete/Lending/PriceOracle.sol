@@ -14,8 +14,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
-    event OracleAuthorized(address indexed oracle);
-    event OracleRevoked(address indexed oracle);
     
     constructor(address _owner) Ownable(_owner) {}
     
