@@ -17,10 +17,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
     event OracleAuthorized(address indexed oracle);
     event OracleRevoked(address indexed oracle);
     
-    constructor(address _authorizedOracle) {
-        // Owner is automatically authorized
-        require(_authorizedOracle != address(0), "Invalid oracle address");
-    }
+    constructor(address _owner) Ownable(_owner) {}
     
     /**
      * @dev Set price for a single asset
