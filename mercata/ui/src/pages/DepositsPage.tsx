@@ -26,7 +26,7 @@ const DepositsPage = () => {
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
   const { loans, liquidityInfo } = useLendingContext();
   const { totalCDPDebt } = useCDP();
-  const { lpTokens } = useSwapContext();
+  const { userPools } = useSwapContext();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [searchParams] = useSearchParams();
@@ -84,11 +84,11 @@ const DepositsPage = () => {
     }
 
     // Add LP token values
-    if (lpTokens && lpTokens.length > 0) {
-      lpTokens.forEach((lpToken) => {
-        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
-          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
+    if (userPools && userPools.length > 0) {
+      userPools.forEach((userPool) => {
+        if (userPool?.lpToken?.balance && userPool?.lpToken?.price) {
+          const balance = parseFloat(formatUnits(BigInt(userPool.lpToken.balance), 18));
+          const priceValue = parseFloat(formatUnits(BigInt(userPool.lpToken.price), 18));
           const lpTokenValue = balance * priceValue;
           total += lpTokenValue;
         }
@@ -120,7 +120,7 @@ const DepositsPage = () => {
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
     setTotalBalance(netBalance);
-  }, [tokens, loans, totalCDPDebt, liquidityInfo, lpTokens]);
+  }, [tokens, loans, totalCDPDebt, liquidityInfo, userPools]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {

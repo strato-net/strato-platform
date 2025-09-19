@@ -4,39 +4,38 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Settings } from "lucide-react";
 import { useSwapContext } from '@/context/SwapContext';
-import { LiquidityPool } from '@/interface';
+import { Pool } from '@/interface';
 import { formatBalance } from '@/utils/numberUtils';
 import SetPoolRatesModal from './SetPoolRatesModal';
 import CopyButton from '../ui/copy';
 
 const SwapPoolsTable = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [pools, setPools] = useState<LiquidityPool[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedPool, setSelectedPool] = useState<LiquidityPool | null>(null);
+  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [showSetRatesModal, setShowSetRatesModal] = useState(false);
 
-  const { fetchPools, enrichPools } = useSwapContext();
+  const { fetchPools } = useSwapContext();
 
   const fetchAndEnrichPools = useCallback(async () => {
     try {
       setLoading(true);
       const tempPools = await fetchPools();
-      const enrichedPools = enrichPools(tempPools);
-      setPools(enrichedPools);
+      setPools(tempPools);
     } catch (err) {
       console.error("Failed to fetch pools:", err);
     } finally {
       setLoading(false);
     }
-  }, [fetchPools, enrichPools]);
+  }, [fetchPools]);
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchAndEnrichPools]);
 
   const filteredPools = pools.filter(pool => 
-    pool._name?.toLowerCase().includes(searchQuery.toLowerCase())
+    pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (
@@ -86,7 +85,7 @@ const SwapPoolsTable = () => {
                             {pool.tokenA?.images?.[0]?.value ? (
                               <img
                                 src={pool.tokenA.images[0].value}
-                                alt={pool.tokenA.name || pool._name?.split('/')[0]}
+                                alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
                                 className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-white object-contain bg-white"
                               />
                             ) : (
@@ -94,7 +93,7 @@ const SwapPoolsTable = () => {
                                 className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white flex-shrink-0"
                                 style={{ backgroundColor: "#ef4444" }}
                               >
-                                {pool._name?.slice(0, 2)}
+                                {pool.poolName?.slice(0, 2)}
                               </div>
                             )}
                           </div>
@@ -102,7 +101,7 @@ const SwapPoolsTable = () => {
                             {pool.tokenB?.images?.[0]?.value ? (
                               <img
                                 src={pool.tokenB.images[0].value}
-                                alt={pool.tokenB.name || pool._name?.split('/')[1]}
+                                alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
                                 className="w-8 h-8 md:w-6 md:h-6 rounded-full border-2 border-white object-contain bg-white"
                               />
                             ) : (
@@ -110,14 +109,14 @@ const SwapPoolsTable = () => {
                                 className="w-8 h-8 md:w-6 md:h-6 rounded-full flex items-center justify-center text-xs text-white font-medium border-2 border-white flex-shrink-0"
                                 style={{ backgroundColor: "#ef4444" }}
                               >
-                                {pool._name?.split('/')[1]?.slice(0, 2)}
+                                {pool.poolName?.split('/')[1]?.slice(0, 2)}
                               </div>
                             )}
                           </div>
                         </div>
                         <div className="min-w-0">
-                          <div className="font-medium truncate">{pool._name}</div>
-                          <div className="text-sm text-gray-500 truncate">{pool._symbol}</div>
+                          <div className="font-medium truncate">{pool.poolName}</div>
+                          <div className="text-sm text-gray-500 truncate">{pool.poolSymbol}</div>
                         </div>
                       </div>
                     </td>

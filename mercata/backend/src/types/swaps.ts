@@ -109,6 +109,7 @@ export interface SwapToken {
   balance: string; // User balance
   price: string; // Token price
   poolBalance: string; // Pool balance of this token
+  images: Array<{ value: string }>; // Token images (filtered to exclude empty values)
 }
 
 /**
@@ -122,6 +123,7 @@ export interface LPToken {
   _totalSupply: string; // Total supply of LP tokens
   balance: string; // User LP token balance
   price: string; // LP token price
+  images: Array<{ value: string }>; // LP token images (filtered to exclude empty values)
 }
 
 /**
@@ -172,6 +174,7 @@ export interface RawToken {
   customDecimals: number;
   _totalSupply: string;
   balances: TokenBalance[];
+  images: Array<{ value: string }>;
 }
 
 /**
@@ -184,6 +187,7 @@ export interface RawLPToken {
   customDecimals: number;
   _totalSupply: string;
   balances: TokenBalance[];
+  images: Array<{ value: string }>;
 }
 
 /**
@@ -304,6 +308,10 @@ export function isRawToken(obj: any): obj is RawToken {
       typeof b.balance === 'string' &&
       b.user.length > 0 &&
       b.balance.length >= 0
+    ) &&
+    Array.isArray(obj.images) &&
+    obj.images.every((img: any) => 
+      typeof img.value === 'string'
     );
 }
 
@@ -328,6 +336,10 @@ export function isRawLPToken(obj: any): obj is RawLPToken {
       typeof b.balance === 'string' &&
       b.user.length > 0 &&
       b.balance.length >= 0
+    ) &&
+    Array.isArray(obj.images) &&
+    obj.images.every((img: any) => 
+      typeof img.value === 'string'
     );
 }
 

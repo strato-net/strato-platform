@@ -160,7 +160,6 @@ export const getTradingVolume24hForPools = async (
   const volumeMap = new Map<string, string>();
 
   validatedEvents.forEach(event => {
-    console.log("event", event);
     const poolAddress = event.address;
     const currentVolume = volumeMap.get(poolAddress) || "0";
     
@@ -247,7 +246,8 @@ export const buildSwapToken = (
   _totalSupply: token._totalSupply,
   balance: userBalance,
   price,
-  poolBalance
+  poolBalance,
+  images: token.images.filter(img => img.value && img.value.trim() !== "")
 });
 
 export const buildLPToken = (
@@ -261,7 +261,8 @@ export const buildLPToken = (
   customDecimals: lpToken.customDecimals,
   _totalSupply: lpToken._totalSupply,
   balance: userBalance,
-  price
+  price,
+  images: lpToken.images.filter(img => img.value && img.value.trim() !== "")
 });
 
 export const buildPoolList = (
@@ -336,7 +337,7 @@ export const fetchPoolBalances = async (accessToken: string, poolAddress: string
     params: {
       _owner: "eq." + constants.poolFactory,
       address: "eq." + poolAddress,
-      select: "tokenABalance,tokenBBalance,lpToken:lpToken_fkey(_totalSupply)"
+      select: "tokenABalance::text,tokenBBalance::text,lpToken:lpToken_fkey(_totalSupply::text)"
     }
   });
   

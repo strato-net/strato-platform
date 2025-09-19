@@ -28,6 +28,7 @@ export const SWAP_TOKEN_SELECT_FIELDS = [
   "_totalSupply::text",
   "customDecimals",
   `balances:${SWAP_CONTRACTS.Token}-_balances(user:key,balance:value::text)`,
+  `images:${SWAP_CONTRACTS.Token}-images(value)`,
 ] as const;
 
 /**

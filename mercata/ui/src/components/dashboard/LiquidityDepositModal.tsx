@@ -14,7 +14,7 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
-import { LiquidityPool } from '@/interface';
+import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 
 const formatNumber = (value: string | number): string => {
@@ -35,7 +35,7 @@ interface DepositFormValues {
 interface LiquidityDepositModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedPool: LiquidityPool | null;
+  selectedPool: Pool | null;
   onDepositSuccess: () => void;
   operationInProgressRef: React.MutableRefObject<boolean>;
 }
@@ -56,7 +56,7 @@ const LiquidityDepositModal = ({
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
-  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
+  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -196,7 +196,7 @@ const LiquidityDepositModal = ({
       handleClose();
       toast({
         title: "Success",
-        description: `${selectedPool._name} deposited successfully.`,
+        description: `${selectedPool.poolName} deposited successfully.`,
         variant: "success",
       });
     } catch (error) {
@@ -370,7 +370,7 @@ const LiquidityDepositModal = ({
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
           <DialogDescription>
-            Add liquidity to the {selectedPool?._name} pool.
+            Add liquidity to the {selectedPool?.poolName} pool.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
@@ -407,7 +407,7 @@ const LiquidityDepositModal = ({
                       {selectedPool.tokenA?.images?.[0]?.value ? (
                         <img
                           src={selectedPool.tokenA.images[0].value}
-                          alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                          alt={selectedPool.tokenA._name || selectedPool.poolName?.split('/')[0]}
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -415,10 +415,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool._name?.split('/')[0]?.slice(0, 2)}
+                          {selectedPool.poolName?.split('/')[0]?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[0]}</span>
+                      <span className="font-medium text-sm">{selectedPool.poolName?.split('/')[0]}</span>
                     </>
                   )}
                 </div>
@@ -522,7 +522,7 @@ const LiquidityDepositModal = ({
                       {selectedPool.tokenB?.images?.[0]?.value ? (
                         <img
                           src={selectedPool.tokenB.images[0].value}
-                          alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                          alt={selectedPool.tokenB._name || selectedPool.poolName?.split('/')[1]}
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -530,10 +530,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool._name?.split('/')[1]?.slice(0, 2)}
+                          {selectedPool.poolName?.split('/')[1]?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[1]}</span>
+                      <span className="font-medium text-sm">{selectedPool.poolName?.split('/')[1]}</span>
                     </>
                   )}
                 </div>
@@ -599,7 +599,7 @@ const LiquidityDepositModal = ({
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
               <span>Current pool ratio</span>
               <span className="font-medium">
-                {selectedPool && `1 ${selectedPool._name?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool._name?.split('/')[1]}`}
+                {selectedPool && `1 ${selectedPool.poolName?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.poolName?.split('/')[1]}`}
               </span>
             </div>
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">

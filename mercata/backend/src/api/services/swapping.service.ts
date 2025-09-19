@@ -309,8 +309,8 @@ export const removeLiquidity = async (
     method: "removeLiquidity",
     args: {
       lpTokenAmount,
-      minTokenBAmount,
-      minTokenAAmount,
+      minTokenBAmount: minTokenBAmount.toString(),
+      minTokenAAmount: minTokenAAmount.toString(),
       deadline
     },
   });
