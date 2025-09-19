@@ -24,6 +24,10 @@ import {
   getGlobalPaused,
   getAllCollateralConfigs,
   getBadDebt,
+  getJuniorNotes,
+  openJuniorNote,
+  topUpJuniorNote,
+  claimJuniorNote,
 } from "../services/cdp.service";
 import {
   validateDepositArgs,
@@ -34,6 +38,8 @@ import {
   validateRepayArgs,
   validateRepayAllArgs,
   validateLiquidateArgs,
+  validateOpenJuniorNoteArgs,
+  validateTopUpJuniorNoteArgs,
 } from "../validators/cdp.validator";
 
 class CDPController {
@@ -367,6 +373,65 @@ class CDPController {
     try {
       const { accessToken, address: userAddress } = req;
       const result = await getBadDebt(accessToken, userAddress as string);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getJuniorNotes(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, params } = req;
+      const { account } = params;
+      const result = await getJuniorNotes(accessToken, userAddress as string, account);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async openJuniorNote(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      validateOpenJuniorNoteArgs(body);
+      const result = await openJuniorNote(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async topUpJuniorNote(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress, body } = req;
+      validateTopUpJuniorNoteArgs(body);
+      const result = await topUpJuniorNote(accessToken, userAddress as string, body);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async claimJuniorNote(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const result = await claimJuniorNote(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

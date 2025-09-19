@@ -79,4 +79,16 @@ router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPControll
 // Get bad debt for all assets
 router.get("/bad-debt", authHandler.authorizeRequest(), CDPController.getBadDebt);
 
+// Get junior notes for specific account
+router.get("/bad-debt/juniors/:account", authHandler.authorizeRequest(), CDPController.getJuniorNotes);
+
+// Open junior note
+router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPController.openJuniorNote);
+
+// Top up junior note
+router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPController.topUpJuniorNote);
+
+// Claim junior note rewards
+router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
+
 export default router;

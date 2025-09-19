@@ -49,6 +49,7 @@ export const getCDPRegistry = async (
       "feeCollector", 
       "tokenFactory",
       "usdst",
+      "cdpReserve",
       "cdpEngine:cdpEngine_fkey(" +
         "address," +
         "registry," +
@@ -220,6 +221,7 @@ interface AssetConfig {
 interface BadDebt {
   asset: string;
   badDebt: string;
+  symbol?: string; // Token symbol (e.g., "WBTC", "ETHST")
 }
 
 export const getVaults = async (
@@ -1181,19 +1183,457 @@ export const getBadDebt = async (
 ): Promise<BadDebt[]> => {
   const registry = await getCDPRegistry(accessToken, userAddress);
   
-  // Return dummy bad debt data
-  return [
-    {
-      asset: "1234567890123456789012345678901234567890", // Mock WBTC address
-      badDebt: "2500000000000000000000" // 2,500 USDST in wei (18 decimals)
-    },
-    {
-      asset: "2345678901234567890123456789012345678901", // Mock WETH address
-      badDebt: "15750000000000000000000" // 15,750 USDST in wei (18 decimals)
-    },
-    {
-      asset: "3456789012345678901234567890123456789012", // Mock USDC address
-      badDebt: "8920000000000000000000" // 8,920 USDST in wei (18 decimals)
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  try {
+    console.log('Fetching real bad debt data from CDP Engine...');
+    
+    // Query the badDebt mapping from the CDP Engine contract
+    const { data } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-badDebtUSDST`,
+      {
+        params: {
+          select: "key,value"
+        }
+      }
+    );
+
+    console.log('Raw bad debt data from Cirrus:', data);
+
+    if (!data || data.length === 0) {
+      console.log('No bad debt entries found on-chain');
+      return [];
     }
-  ];
+
+    // Filter out zero bad debt entries
+    const nonZeroBadDebtEntries = data.filter((entry: any) => entry.value && entry.value !== "0");
+    
+    if (nonZeroBadDebtEntries.length === 0) {
+      console.log('No non-zero bad debt entries found');
+      return [];
+    }
+
+    console.log(`Found ${nonZeroBadDebtEntries.length} assets with non-zero bad debt, fetching symbols...`);
+
+    // Fetch token symbols for each asset with bad debt
+    const badDebtEntries: BadDebt[] = [];
+    
+    for (const entry of nonZeroBadDebtEntries) {
+      const assetAddress = entry.key;
+      const badDebtAmount = entry.value;
+      
+      try {
+        console.log(`Fetching symbol for asset: ${assetAddress}`);
+        
+        // Query the token contract's symbol
+        const symbolResponse = await cirrus.get(
+          accessToken,
+          `/BlockApps-Mercata-Token`,
+          {
+            params: {
+              select: "_symbol",
+              address: `eq.${assetAddress}`
+            }
+          }
+        );
+
+        let symbol = "UNKNOWN";
+        if (symbolResponse.data && symbolResponse.data.length > 0 && symbolResponse.data[0]._symbol) {
+          symbol = symbolResponse.data[0]._symbol;
+          console.log(`Found symbol for ${assetAddress}: ${symbol}`);
+        } else {
+          console.log(`No symbol found for ${assetAddress}, using UNKNOWN`);
+        }
+
+        badDebtEntries.push({
+          asset: assetAddress,
+          badDebt: badDebtAmount,
+          symbol: symbol
+        });
+
+      } catch (error: any) {
+        console.error(`Error fetching symbol for asset ${assetAddress}:`, error.message);
+        
+        // Still include the entry without symbol
+        badDebtEntries.push({
+          asset: assetAddress,
+          badDebt: badDebtAmount,
+          symbol: "UNKNOWN"
+        });
+      }
+    }
+
+    console.log(`Completed bad debt fetch with symbols:`, badDebtEntries);
+    return badDebtEntries;
+  } catch (error: any) {
+    console.error("Error fetching bad debt from Cirrus:", {
+      error: error.response?.data || error.message,
+      cdpEngine: registry.cdpEngine?.address
+    });
+    throw new Error("Failed to fetch bad debt data from blockchain");
+  }
+};
+
+interface JuniorNote {
+  owner: string;
+  capUSDST: string;
+  entryIndex: string;
+  claimableAmount: string; // Calculated using gas-free Cirrus queries
+}
+
+/**
+ * Calculate claimable amount using gas-free Cirrus queries
+ * Replicates the exact logic from CDPEngine.claimable() function
+ */
+export const getClaimableAmount = async (
+  accessToken: string,
+  userAddress: string,
+  account: string
+): Promise<string> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+  const reserveAddress = registry.cdpReserve;
+  const usdstAddress = registry.usdst;
+  
+  try {
+    // Get all required data via Cirrus queries (gas-free)
+    const [
+      juniorNoteData,
+      juniorIndexData,
+      prevReserveBalanceData,
+      totalJuniorOutstandingData,
+      reserveBalanceData
+    ] = await Promise.all([
+      // 1. Get the user's junior note
+      cirrus.get(accessToken, `/${CDPEngine}-juniorNotes`, {
+        params: {
+          select: "key,JuniorNote:value",
+          key: `eq.${account}`
+        }
+      }),
+      
+      // 2. Get current junior index
+      cirrus.get(accessToken, `/${CDPEngine}`, {
+        params: {
+          select: "juniorIndex::text",
+          address: `eq.${cdpEngineAddress}`
+        }
+      }),
+      
+      // 3. Get previous reserve balance
+      cirrus.get(accessToken, `/${CDPEngine}`, {
+        params: {
+          select: "prevReserveBalance::text",
+          address: `eq.${cdpEngineAddress}`
+        }
+      }),
+      
+      // 4. Get total junior outstanding
+      cirrus.get(accessToken, `/${CDPEngine}`, {
+        params: {
+          select: "totalJuniorOutstandingUSDST::text",
+          address: `eq.${cdpEngineAddress}`
+        }
+      }),
+      
+      // 5. Get current reserve balance from USDST contract
+      cirrus.get(accessToken, `/BlockApps-Mercata-Token-_balances`, {
+        params: {
+          select: "key,value::text", 
+          key: `eq.${reserveAddress}`,
+          address: `eq.${usdstAddress}`
+        }
+      })
+    ]);
+
+    // Parse junior note data
+    const noteData = juniorNoteData.data?.[0]?.JuniorNote;
+    if (!noteData || noteData.owner === "0000000000000000000000000000000000000000") {
+      return "0"; // No note exists
+    }
+
+    // Parse all the required values
+    const capUSDST = BigInt(noteData.capUSDST || "0");
+    const entryIndex = BigInt(noteData.entryIndex || "0");
+    const juniorIndex = BigInt(juniorIndexData.data?.[0]?.juniorIndex || "1000000000000000000000000000"); // Default to RAY (1e27)
+    const prevReserveBalance = BigInt(prevReserveBalanceData.data?.[0]?.prevReserveBalance || "0");
+    const totalJuniorOutstanding = BigInt(totalJuniorOutstandingData.data?.[0]?.totalJuniorOutstandingUSDST || "0");
+    const currentReserveBalance = BigInt(reserveBalanceData.data?.[0]?.value || "0");
+
+    // Replicate claimable() logic exactly
+    let effectiveIndex = juniorIndex === 0n ? 1000000000000000000000000000n : juniorIndex; // RAY = 1e27
+
+    // Check for new inflows and calculate index bump
+    if (currentReserveBalance > prevReserveBalance && totalJuniorOutstanding > 0n) {
+      const newInflows = currentReserveBalance - prevReserveBalance;
+      const indexBump = (newInflows * 1000000000000000000000000000n) / totalJuniorOutstanding; // * RAY / totalOutstanding
+      effectiveIndex += indexBump;
+    }
+
+    // Calculate entitlement using _entitlement logic
+    if (capUSDST === 0n) return "0";
+    if (effectiveIndex <= entryIndex) return "0";
+
+    // entitlement = (capUSDST * (effectiveIndex - entryIndex)) / RAY
+    const indexDiff = effectiveIndex - entryIndex;
+    let entitlement = (capUSDST * indexDiff) / 1000000000000000000000000000n; // Divide by RAY to convert back to wei
+
+    // Cap at remaining cap
+    if (entitlement > capUSDST) {
+      entitlement = capUSDST;
+    }
+
+    return entitlement.toString();
+  } catch (error: any) {
+    console.error("Failed to calculate claimable amount:", {
+      account,
+      error: error.response?.data || error.message
+    });
+    // Don't throw - return 0 to avoid breaking the UI
+    return "0";
+  }
+};
+
+export const getJuniorNotes = async (
+  accessToken: string,
+  userAddress: string,
+  account: string
+): Promise<JuniorNote | null> => {
+  const registry = await getCDPRegistry(accessToken, userAddress);
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  try {
+    // Query the juniorNotes mapping for the specific account
+    const { data } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-juniorNotes`,
+      {
+        params: {
+          select: "key,JuniorNote:value",
+          key: `eq.${account}`
+        }
+      }
+    );
+
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    const noteData = data[0]?.JuniorNote;
+    if (!noteData || noteData.owner === "0000000000000000000000000000000000000000") {
+      return null;
+    }
+
+    // Calculate claimable amount using gas-free Cirrus queries
+    let claimableAmount = "0";
+    try {
+      claimableAmount = await getClaimableAmount(accessToken, userAddress, account);
+    } catch (error) {
+      console.warn("Failed to calculate claimable amount, using 0:", error);
+    }
+
+    return {
+      owner: noteData.owner,
+      capUSDST: noteData.capUSDST || "0",
+      entryIndex: noteData.entryIndex || "0",
+      claimableAmount
+    };
+  } catch (error: any) {
+    console.error("Error fetching junior notes:", {
+      account,
+      error: error.response?.data || error.message
+    });
+    throw new Error("Error fetching junior notes data from Cirrus");
+  }
+};
+
+export const claimJuniorNote = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "claimJuniorNote");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const cdpEngineAddress = registry.cdpEngine.address;
+
+  const txData = {
+    type: "FUNCTION" as const,
+    payload: {
+      contractName: CDPEngine,
+      contractAddress: cdpEngineAddress,
+      method: "claimJunior",
+      args: {}
+    }
+  };
+
+  try {
+    const txResponse = await strato.post(accessToken, StratoPaths.transactionParallel, {
+      txs: [txData]
+    });
+
+    const result = txResponse.data?.[0];
+    if (result?.status !== "Success") {
+      throw new Error(`Transaction failed: ${result?.error || result?.status}`);
+    }
+
+    // claimJunior transaction was successful
+    // Frontend will use the pre-calculated claimable amount for display
+    return {
+      status: "success",
+      hash: result.hash || ""
+    };
+  } catch (error: any) {
+    console.error("Error claiming junior note:", {
+      userAddress,
+      error: error.response?.data || error.message
+    });
+    throw new Error("Error claiming junior note rewards");
+  }
+};
+
+export const topUpJuniorNote = async (
+  accessToken: string,
+  userAddress: string,
+  body: { amountUSDST: string }
+): Promise<{ status: string; hash: string; burnedUSDST?: string; capUSDST?: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "topUpJuniorNote");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  // Get the user's current junior note to confirm they have one
+  const juniorNote = await getJuniorNotes(accessToken, userAddress, userAddress);
+  if (!juniorNote) {
+    throw new Error("No existing junior note found to top up");
+  }
+
+  // Get bad debt information to find an asset with bad debt to top up
+  const badDebtData = await getBadDebt(accessToken, userAddress);
+  if (!badDebtData || badDebtData.length === 0) {
+    throw new Error("No bad debt found to top up for");
+  }
+  
+  // Use the first asset with bad debt for the top-up
+  const assetWithBadDebt = badDebtData.find(debt => parseFloat(debt.badDebt) > 0);
+  if (!assetWithBadDebt) {
+    throw new Error("No assets with bad debt available for top-up");
+  }
+
+  const { amountUSDST } = body;
+  const cdpEngineAddress = registry.cdpEngine.address;
+
+  const txData = {
+    type: "FUNCTION" as const,
+    payload: {
+      contractName: CDPEngine,
+      contractAddress: cdpEngineAddress,
+      method: "openJuniorNote",
+      args: {
+        asset: assetWithBadDebt.asset,
+        amountUSDST
+      }
+    }
+  };
+
+  try {
+    const txResponse = await strato.post(accessToken, StratoPaths.transactionParallel, {
+      txs: [txData]
+    });
+
+    const result = txResponse.data?.[0];
+    if (result?.status !== "Success") {
+      throw new Error(`Transaction failed: ${result?.error || result?.status}`);
+    }
+
+    // Extract return values from transaction result
+    const returnValues = result.data?.contents || [];
+    const burnedUSDST = returnValues[0] || "0";
+    const capUSDST = returnValues[1] || "0";
+
+    return {
+      status: "success",
+      hash: result.hash || "",
+      burnedUSDST,
+      capUSDST
+    };
+  } catch (error: any) {
+    console.error("Error topping up junior note:", {
+      amountUSDST,
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to top up junior note");
+  }
+};
+
+export const openJuniorNote = async (
+  accessToken: string,
+  userAddress: string,
+  body: { asset: string; amountUSDST: string }
+): Promise<{ status: string; hash: string; burnedUSDST?: string; capUSDST?: string }> => {
+  const registry = await getCDPRegistry(accessToken, userAddress, {}, "openJuniorNote");
+  
+  if (!registry?.cdpEngine) {
+    throw new Error("CDP Engine not found");
+  }
+
+  const { asset, amountUSDST } = body;
+  const cdpEngineAddress = registry.cdpEngine.address;
+
+  const txData = {
+    type: "FUNCTION" as const,
+    payload: {
+      contractName: CDPEngine,
+      contractAddress: cdpEngineAddress,
+      method: "openJuniorNote",
+      args: {
+        asset,
+        amountUSDST
+      }
+    }
+  };
+
+  try {
+    const txResponse = await strato.post(accessToken, StratoPaths.transactionParallel, {
+      txs: [txData]
+    });
+
+    const result = txResponse.data?.[0];
+    if (result?.status !== "Success") {
+      throw new Error(`Transaction failed: ${result?.error || result?.status}`);
+    }
+
+    // Extract return values from transaction result
+    const returnValues = result.data?.contents || [];
+    const burnedUSDST = returnValues[0] || "0";
+    const capUSDST = returnValues[1] || "0";
+
+    return {
+      status: "success",
+      hash: result.hash || "",
+      burnedUSDST,
+      capUSDST
+    };
+  } catch (error: any) {
+    console.error("Error opening junior note:", {
+      asset,
+      amountUSDST,
+      error: error.response?.data || error.message
+    });
+    throw new Error("Failed to open junior note");
+  }
 };
