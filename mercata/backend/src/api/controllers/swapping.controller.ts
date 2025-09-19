@@ -228,7 +228,9 @@ class SwappingController {
       validateSwapHistoryArgs(params);
       validateQueryParams(query);
 
-      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, query as Record<string, string | undefined>);
+      const page = query.page ? parseInt(query.page as string, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
+      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit);
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);

@@ -50,12 +50,13 @@ export const SWAP_POOL_SELECT_FIELDS = [
  * Fields for swap history selection in database queries
  */
 export const SWAP_HISTORY_SELECT_FIELDS = [
-  "id",
   "address",
+  "id",
+  "block_timestamp",
+  "sender",
   "tokenIn",
+  "tokenOut", 
   "amountIn::text",
   "amountOut::text",
-  "sender",
-  "block_timestamp",
-  "pool:pool_fkey(tokenA:tokenA_fkey(address,symbol),tokenB:tokenB_fkey(address,symbol))"
+  "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))"
 ] as const;

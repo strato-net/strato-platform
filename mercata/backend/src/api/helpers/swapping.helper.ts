@@ -1,27 +1,13 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { SwapToken, LPToken, RawPool, RawPoolFactory, RawToken, RawLPToken } from "../../types/swaps";
+import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, validatePoolWithTokenAddressesArray, validateSinglePoolWithBalances, validateSwapEventArray } from "../../types/swaps";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 
-const { Pool } = constants;
+const { Pool, PoolSwap, swapHistorySelectFields } = constants;
 
-export const getRawPoolData = async (
-  accessToken: string,
-  params: Record<string, string> = {}
-): Promise<RawPool[]> => {
-  const queryParams = {
-    _owner: "eq." + constants.poolFactory,
-    ...params
-  };
-
-  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, { params: queryParams });
-  
-  if (!Array.isArray(poolData)) {
-    throw new Error("Invalid pool data received from API");
-  }
-  
-  return poolData;
-};
+// ============================================================================
+// CALCULATION HELPERS
+// ============================================================================
 
 export const calculateImpliedPrice = (
   amountIn: string,
@@ -111,7 +97,12 @@ export const calculateLPTokenPrice = (
   return safeBigIntDivide(totalValueUSD * Q, supply, "LP token price calculation").toString();
 };
 
+// ============================================================================
+// DATA PROCESSING HELPERS
+// ============================================================================
+
 export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string): Record<string, string> => ({
+  _owner: "eq." + constants.poolFactory,
   ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
   select: rawParams.select || constants.swapSelectFields.join(","),
   ...(rawParams.select || !userAddress ? {} : {
@@ -124,15 +115,73 @@ export const buildPoolParams = (rawParams: Record<string, string | undefined>, u
   }),
 });
 
-export const extractTokenAddresses = (poolData: RawPool[]): string[] => [
+export const extractTokenAddresses = <T extends { tokenA: { address: string }; tokenB: { address: string } }>(poolData: T[]): string[] => [
   ...new Set([
-    ...poolData.map(p => p.tokenA?.address).filter(Boolean),
-    ...poolData.map(p => p.tokenB?.address).filter(Boolean)
+    ...poolData.map(p => p.tokenA.address),
+    ...poolData.map(p => p.tokenB.address)
   ])
 ];
 
+export const extractTokenAddressesFromTokens = (tokens: { address: string }[]): string[] => [
+  ...new Set(tokens.map(token => token.address))
+];
+
+/**
+ * Gets token balance for a specific user address
+ */
+export const getTokenBalance = (token: RawToken, userAddress: string): string => {
+  const balance = token.balances.find(b => b.user === userAddress);
+  return balance?.balance ?? "0";
+};
+
+export const getTradingVolume24hForPools = async (
+  accessToken: string,
+  poolAddresses: string[],
+  priceMap: Map<string, string>
+): Promise<Map<string, string>> => {
+  if (poolAddresses.length === 0) {
+    return new Map();
+  }
+
+  const { data: swapEvents } = await cirrus.get(accessToken, `/${PoolSwap}`, {
+    params: {
+      address: `in.(${poolAddresses.join(',')})`,
+      "pool._owner": `eq.${constants.poolFactory}`,
+      select: swapHistorySelectFields.join(','),
+      block_timestamp: `gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`,
+    }
+  });
+
+  if (!Array.isArray(swapEvents)) {
+    return new Map();
+  }
+
+  const validatedEvents = validateSwapEventArray(swapEvents);
+  const volumeMap = new Map<string, string>();
+
+  validatedEvents.forEach(event => {
+    console.log("event", event);
+    const poolAddress = event.address;
+    const currentVolume = volumeMap.get(poolAddress) || "0";
+    
+    const tokenInAddress = event.tokenIn;
+    const tokenInPrice = priceMap.get(tokenInAddress) || "0";
+    
+    const tokenInVolume = safeBigIntDivide(
+      safeBigInt(event.amountIn) * safeBigInt(tokenInPrice),
+      safeBigInt(10 ** 18),
+      "Volume calculation"
+    );
+    
+    const newVolume = safeBigInt(currentVolume) + tokenInVolume;
+    volumeMap.set(poolAddress, newVolume.toString());
+  });
+
+  return volumeMap;
+};
+
 export const calculatePoolMetrics = (
-  pool: RawPool, 
+  pool: RawGetPool, 
   tokenAPrice: string, 
   tokenBPrice: string, 
   volume24h: string, 
@@ -145,12 +194,12 @@ export const calculatePoolMetrics = (
   lpSharePercent: number;
 } => {
   const tokenAValue = safeBigIntDivide(
-    safeBigInt(pool.tokenABalance || "0") * safeBigInt(tokenAPrice), 
+    safeBigInt(pool.tokenABalance) * safeBigInt(tokenAPrice), 
     safeBigInt(10 ** 18), 
     "Token A value calculation"
   );
   const tokenBValue = safeBigIntDivide(
-    safeBigInt(pool.tokenBBalance || "0") * safeBigInt(tokenBPrice), 
+    safeBigInt(pool.tokenBBalance) * safeBigInt(tokenBPrice), 
     safeBigInt(10 ** 18), 
     "Token B value calculation"
   );
@@ -163,11 +212,11 @@ export const calculatePoolMetrics = (
   const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
   
   const lpTokenPrice = calculateLPTokenPrice(
-    pool.tokenABalance || "0",
-    pool.tokenBBalance || "0",
+    pool.tokenABalance,
+    pool.tokenBBalance,
     tokenAPrice,
     tokenBPrice,
-    pool.lpToken?._totalSupply || "0"
+    pool.lpToken._totalSupply
   );
   
   return { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent };
@@ -181,32 +230,129 @@ export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string):
   };
 };
 
+// ============================================================================
+// BUILDER HELPERS
+// ============================================================================
+
 export const buildSwapToken = (
-  token: RawToken | null, 
+  token: RawToken, 
   price: string, 
   poolBalance: string, 
   userBalance: string
 ): SwapToken => ({
-  address: token?.address || "",
-  _name: token?._name || "",
-  _symbol: token?._symbol || "",
-  customDecimals: token?.customDecimals || 18,
-  _totalSupply: token?._totalSupply || "0",
+  address: token.address,
+  _name: token._name,
+  _symbol: token._symbol,
+  customDecimals: token.customDecimals,
+  _totalSupply: token._totalSupply,
   balance: userBalance,
   price,
   poolBalance
 });
 
 export const buildLPToken = (
-  lpToken: RawLPToken | null, 
+  lpToken: RawLPToken, 
   price: string, 
   userBalance: string
 ): LPToken => ({
-  address: lpToken?.address || "",
-  _name: lpToken?._name || "",
-  _symbol: lpToken?._symbol || "",
-  customDecimals: lpToken?.customDecimals || 18,
-  _totalSupply: lpToken?._totalSupply || "0",
+  address: lpToken.address,
+  _name: lpToken._name,
+  _symbol: lpToken._symbol,
+  customDecimals: lpToken.customDecimals,
+  _totalSupply: lpToken._totalSupply,
   balance: userBalance,
   price
+});
+
+export const buildPoolList = (
+  pools: RawGetPool[],
+  priceMap: Map<string, string>,
+  volumeMap: Map<string, string>,
+  factoryData: RawPoolFactory | undefined,
+  userAddress: string | undefined
+) => {
+  return pools.map((pool: RawGetPool) => {
+    const tokenAPrice = priceMap.get(pool.tokenA.address) || "0";
+    const tokenBPrice = priceMap.get(pool.tokenB.address) || "0";
+    const volume24h = volumeMap.get(pool.address) || "0";
+    
+    const { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent } = 
+      calculatePoolMetrics(pool, tokenAPrice, tokenBPrice, volume24h, factoryData);
+    
+    const { aToB: oracleAToBRatio, bToA: oracleBToARatio } = 
+      calculateOracleRatios(tokenAPrice, tokenBPrice);
+    
+    const tokenABalance = getTokenBalance(pool.tokenA, userAddress || "");
+    const tokenBBalance = getTokenBalance(pool.tokenB, userAddress || "");
+    const lpTokenBalance = getTokenBalance(pool.lpToken, userAddress || "");
+    
+    const symbolA = pool.tokenA._symbol;
+    const symbolB = pool.tokenB._symbol;
+    
+    return {
+      address: pool.address,
+      poolName: `${symbolA}-${symbolB}`,
+      poolSymbol: `${symbolA}-${symbolB}`,
+      tokenA: buildSwapToken(pool.tokenA, tokenAPrice, pool.tokenABalance, tokenABalance),
+      tokenB: buildSwapToken(pool.tokenB, tokenBPrice, pool.tokenBBalance, tokenBBalance),
+      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance),
+      totalLiquidityUSD,
+      tradingVolume24h: volume24h,
+      apy: apy.toFixed(2),
+      aToBRatio: pool.aToBRatio,
+      bToARatio: pool.bToARatio,
+      oracleAToBRatio,
+      oracleBToARatio,
+      swapFeeRate,
+      lpSharePercent,
+    };
+  });
+};
+
+// ============================================================================
+// API HELPERS
+// ============================================================================
+
+/**
+ * Fetches pool token addresses for a given pool
+ */
+export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: string): Promise<{ tokenA: string; tokenB: string }> => {
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params: {
+      _owner: "eq." + constants.poolFactory,
+      address: "eq." + poolAddress,
+      select: "tokenA,tokenB"
+    }
+  });
+  
+  return validatePoolWithTokenAddressesArray(poolData);
+};
+
+/**
+ * Fetches pool balances and LP token supply for removeLiquidity operations
+ */
+export const fetchPoolBalances = async (accessToken: string, poolAddress: string) => {
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params: {
+      _owner: "eq." + constants.poolFactory,
+      address: "eq." + poolAddress,
+      select: "tokenABalance,tokenBBalance,lpToken:lpToken_fkey(_totalSupply)"
+    }
+  });
+  
+  return validateSinglePoolWithBalances(poolData);
+};
+
+// ============================================================================
+// TRANSACTION HELPERS
+// ============================================================================
+
+/**
+ * Builds a token approval transaction
+ */
+export const buildTokenApprovalTx = (tokenAddress: string, spender: string, amount: string) => ({
+  contractName: "Token",
+  contractAddress: tokenAddress,
+  method: "approve",
+  args: { spender, value: amount }
 });
