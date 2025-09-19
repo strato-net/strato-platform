@@ -37,7 +37,7 @@ const Dashboard = () => {
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
  
   const { totalCDPDebt, loading: cdpLoading } = useCDP();
-  const { poolsLoading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+  const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
 
 
   // Add visibility states to prevent flashing
@@ -53,7 +53,7 @@ const Dashboard = () => {
     // Remove the timeout to prevent loading flash
     fetchTokens();
     refreshLoans();
-    fetchLpTokensPositions();
+    fetchUserPositions();
 
     // Mark data as initialized after a brief delay to ensure proper rendering
     const initTimer = setTimeout(() => {
@@ -119,12 +119,12 @@ const Dashboard = () => {
     }
 
     // Add LP token values (exact same as MyPoolParticipationSection formatValue function)
-    if (lpTokens && lpTokens.length > 0) {
-      lpTokens.forEach((lpToken) => {
-        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
+    if (userPools && userPools.length > 0) {
+      userPools.forEach((userPool) => {
+        if (userPool?.lpToken?.balance && userPool?.lpToken?.price) {
           // Use exact same formatValue logic as MyPoolParticipationSection (lines 31-39)
-          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
+          const balance = parseFloat(formatUnits(BigInt(userPool.lpToken.balance), 18));
+          const priceValue = parseFloat(formatUnits(BigInt(userPool.lpToken.price), 18));
           const lpTokenValue = balance * priceValue;
           total += lpTokenValue;
         }
@@ -161,7 +161,7 @@ const Dashboard = () => {
     
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens, loans, liquidityInfo, lpTokens, totalCDPDebt, cdpLoading]);
+  }, [tokens, loans, liquidityInfo, userPools, totalCDPDebt, cdpLoading]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -251,10 +251,10 @@ const Dashboard = () => {
 
               <div className="mb-8">
                 <MyPoolParticipationSection 
-                  loadingLpTokens={loadingLpTokens} 
+                  loadingUserPools={loadingUserPools} 
                   loadingLiquidity={loadingLiquidity} 
                   liquidityInfo={liquidityInfo} 
-                  lpTokens={lpTokens}
+                  userPools={userPools}
                   shouldPreventFlash={true}
                 /> 
               </div>

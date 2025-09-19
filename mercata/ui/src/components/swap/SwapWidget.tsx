@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
-import { LiquidityPool, SwappableToken } from "@/interface";
+import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
@@ -41,7 +41,7 @@ const isValidInputAmount = (amount: string): boolean => {
   return amount && amount !== "." && amount !== "0." && !isNaN(Number(amount));
 };
 
-const calculateExchangeRates = (pool: LiquidityPool | null, fromAsset: SwappableToken | null) => {
+const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
   if (!pool || !fromAsset?.address) return { exchangeRate: "0", oracleExchangeRate: "0" };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
@@ -95,9 +95,9 @@ const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolea
 // COMPONENT INTERFACES
 // ============================================================================
 interface TokenSelectorProps {
-  asset?: SwappableToken;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
+  asset?: SwapToken;
+  onSelect: (asset: SwapToken) => void;
+  tokens: SwapToken[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -174,16 +174,16 @@ export const TokenSelector = React.memo(TokenSelectorComponent);
 interface TokenInputProps {
   amount: string;
   onChange: (value: string) => void;
-  asset?: SwappableToken;
+  asset?: SwapToken;
   wrongAmount: boolean;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
+  onSelect: (asset: SwapToken) => void;
+  tokens: SwapToken[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   label: string;
   onFocus: () => void;
   isFromInput: boolean;
-  pool: LiquidityPool;
+  pool: Pool;
   poolLoading: boolean;
   showMaxButton: boolean;
   onMaxClick: () => void;
@@ -213,9 +213,9 @@ const TokenInput = ({
   const poolBalance = useMemo(() => {
     if (!pool || !asset) return "0";
     return pool.tokenA?.address === asset.address
-      ? pool.tokenABalance || "0"
+      ? pool.tokenA.poolBalance || "0"
       : pool.tokenB?.address === asset.address
-        ? pool.tokenBBalance || "0"
+        ? pool.tokenB.poolBalance || "0"
         : "0";
   }, [pool, asset?.address]);
       
@@ -307,8 +307,8 @@ interface SwapDialogProps {
   onOpenChange: (open: boolean) => void;
   fromAmount: string;
   toAmount: string;
-  fromAsset?: SwappableToken;
-  toAsset?: SwappableToken;
+  fromAsset?: SwapToken;
+  toAsset?: SwapToken;
   exchangeRate: string;
   onConfirm: () => void;
   isLoading: boolean;
@@ -592,15 +592,15 @@ const SwapWidget = () => {
 
     // Check if pool has liquidity
     const inputPoolBalance = pool.tokenA?.address === inputAsset.address
-      ? pool.tokenABalance || "0"
+      ? pool.tokenA.poolBalance || "0"
       : pool.tokenB?.address === inputAsset.address
-        ? pool.tokenBBalance || "0"
+        ? pool.tokenB.poolBalance || "0"
         : "0";
 
     const outputPoolBalance = pool.tokenA?.address === outputAsset.address
-      ? pool.tokenABalance || "0"
+      ? pool.tokenA.poolBalance || "0"
       : pool.tokenB?.address === outputAsset.address
-        ? pool.tokenBBalance || "0"
+        ? pool.tokenB.poolBalance || "0"
         : "0";
 
     // If either pool balance is 0, no liquidity available - don't clear amounts, just don't calculate
@@ -734,7 +734,7 @@ const SwapWidget = () => {
   // ========================================================================
   // VALIDATION HELPERS
   // ========================================================================
-  const getAvailableBalance = (asset: SwappableToken | null) => {
+  const getAvailableBalance = (asset: SwapToken | null) => {
     if (!asset) return 0n;
     let balance = BigInt(asset.balance || "0");
     if (asset.address === usdstAddress) {

@@ -2,10 +2,9 @@ import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { PoolFormValues } from '@/interface';
+import { CreatePoolParams } from '@/interface';
 import { Loader2, Info, Droplets } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useSwapContext } from '@/context/SwapContext';
@@ -18,7 +17,7 @@ const CreatePoolForm = () => {
   
   const loading = swapLoading || tokenLoading;
   
-  const form = useForm<PoolFormValues>({
+  const form = useForm<CreatePoolParams>({
     defaultValues: {
       tokenA: '',
       tokenB: '',
@@ -32,7 +31,7 @@ const CreatePoolForm = () => {
     getActiveTokens();
   }, [getActiveTokens]);
 
-  const onSubmit = async (data: PoolFormValues) => {
+  const onSubmit = async (data: CreatePoolParams) => {
     if (data.tokenA === data.tokenB) {
       toast({
         title: 'Invalid Pool Configuration',

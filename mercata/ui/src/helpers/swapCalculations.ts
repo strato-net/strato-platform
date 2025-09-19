@@ -1,4 +1,4 @@
-import { LiquidityPool } from "@/interface";
+import { Pool } from "@/interface";
 
 /**
  * Calculate swap output amount using AMM formula
@@ -6,7 +6,7 @@ import { LiquidityPool } from "@/interface";
  */
 export const calculateSwapOutput = (
   inputAmount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): string => {
   if (!inputAmount || inputAmount === "0" || !pool) return "0";
@@ -20,8 +20,8 @@ export const calculateSwapOutput = (
 
   // Get reserves based on swap direction
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   // Validate reserves
   if (inputReserve <= 0n || outputReserve <= 0n) {
@@ -41,7 +41,7 @@ export const calculateSwapOutput = (
  */
 export const calculateSwapInput = (
   outputAmount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): string => {
   if (!outputAmount || outputAmount === "0" || !pool) return "0";
@@ -51,8 +51,8 @@ export const calculateSwapInput = (
 
   // Get reserves based on swap direction
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   // Validate reserves
   if (inputReserve <= 0n || outputReserve <= 0n) {
@@ -92,15 +92,15 @@ export const calculateSwapInput = (
  */
 export const hasSufficientLiquidity = (
   amount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): boolean => {
   if (!amount || amount === "0" || !pool) return false;
 
   const amountBigInt = BigInt(amount);
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
 };

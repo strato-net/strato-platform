@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getPools,
+  getSwapableTokens,
+  getSwapableTokenPairs,
   createPool,
   addLiquidityDualToken,
   addLiquiditySingleToken,
@@ -71,81 +73,95 @@ class SwappingController {
   }
 
   // Creators
-  static async create(req: Request, res: Response, next: NextFunction) {
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, body } = req;
       validateCreatePoolsArgs(body);
 
       const result = await createPool(accessToken, body);
-      res.status(200).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
     }
   }
 
   // Liquidity
-  static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateAddLiquidityDualTokenArgs(body);
+  static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateAddLiquidityDualTokenArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const liquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const liquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await addLiquidityDualToken(accessToken, liquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await addLiquidityDualToken(accessToken, liquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateAddLiquiditySingleTokenArgs(body);
+  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateAddLiquiditySingleTokenArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const liquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const liquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await addLiquiditySingleToken(accessToken, liquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await addLiquiditySingleToken(accessToken, liquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  static async removeLiquidity(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateRemoveLiquidityArgs(body);
+  static async removeLiquidity(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateRemoveLiquidityArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const removeLiquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const removeLiquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await removeLiquidity(accessToken, removeLiquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await removeLiquidity(accessToken, removeLiquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
   // Swaps
-  static async swap(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body } = req;
-    validateSwapArgs(body);
+  static async swap(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSwapArgs(body);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const result = await swap(accessToken, { ...body, deadline });
-    res.status(200).json(result);
-    return next();
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await swap(accessToken, { ...body, deadline });
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
   // Helpers
-  static async getLPTokens(
+  static async getUserLiquidityPools(
     req: Request,
     res: Response,
     next: NextFunction
@@ -172,21 +188,9 @@ class SwappingController {
   ): Promise<void> {
     try {
       const { accessToken, address } = req;
-      const pools = await getPools(accessToken, address);
+      const tokens = await getSwapableTokens(accessToken, address);
 
-      const tokenMap = new Map();
-      
-      pools.forEach((pool: any) => {
-        [pool.tokenA, pool.tokenB].forEach((token: any) => {
-          if (!tokenMap.has(token.address)) {
-            tokenMap.set(token.address, token);
-          }
-        });
-      });
-
-      const uniqueTokens = Array.from(tokenMap.values());
-
-      res.status(RestStatus.OK).json(uniqueTokens);
+      res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);
     }
@@ -201,29 +205,9 @@ class SwappingController {
       const { accessToken, params, address } = req;
       validateTokenAddressArgs(params);
 
-      const poolA = await getPools(accessToken, address, {
-        tokenA: "eq." + params.tokenAddress,
-      });
+      const tokens = await getSwapableTokenPairs(accessToken, params.tokenAddress, address);
 
-      const poolB = await getPools(accessToken, address, {
-        tokenB: "eq." + params.tokenAddress,
-      });
-
-      const tokens = [
-        ...poolA.map((pool: any) => pool.tokenB),
-        ...poolB.map((pool: any) => pool.tokenA),
-      ].filter(Boolean);
-
-      const tokenMap = new Map();
-      tokens.forEach((token: any) => {
-        if (!tokenMap.has(token.address)) {
-          tokenMap.set(token.address, token);
-        }
-      });
-
-      const uniqueTokenPairs = Array.from(tokenMap.values());
-
-      res.status(RestStatus.OK).json(uniqueTokenPairs);
+      res.status(RestStatus.OK).json(tokens);
     } catch (error) {
       next(error);
     }
@@ -258,7 +242,9 @@ class SwappingController {
       validateSwapHistoryArgs(params);
       validateQueryParams(query);
 
-      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, query as Record<string, string | undefined>);
+      const page = query.page ? parseInt(query.page as string, 10) : 1;
+      const limit = query.limit ? parseInt(query.limit as string, 10) : 10;
+      const swapHistory = await getSwapHistory(accessToken, params.poolAddress, page, limit);
       res.status(RestStatus.OK).json(swapHistory);
     } catch (error) {
       next(error);

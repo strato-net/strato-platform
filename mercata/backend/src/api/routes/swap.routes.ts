@@ -8,14 +8,14 @@ const router = Router();
 // Get all pools (with optional filtering)
 router.get("/swap-pools", authHandler.authorizeRequest(true), SwappingController.getAll);
 
-// Get all swappable tokens across all pools
-router.get("/swap-pools/tokens", authHandler.authorizeRequest(true), SwappingController.getSwapableTokens);
+// Get all swappable tokens across all pools (requires authentication for user balances)
+router.get("/swap-pools/tokens", authHandler.authorizeRequest(), SwappingController.getSwapableTokens);
 
-// Get token pairs that can be swapped with a specific token
-router.get("/swap-pools/tokens/:tokenAddress", authHandler.authorizeRequest(true), SwappingController.getSwapableTokenPairs);
+// Get token pairs that can be swapped with a specific token (requires authentication for user balances)
+router.get("/swap-pools/tokens/:tokenAddress", authHandler.authorizeRequest(), SwappingController.getSwapableTokenPairs);
 
 // Get user's LP token positions (pools they have liquidity in)
-router.get("/swap-pools/positions", authHandler.authorizeRequest(true), SwappingController.getLPTokens);
+router.get("/swap-pools/positions", authHandler.authorizeRequest(), SwappingController.getUserLiquidityPools);
 
 // Get specific pool by token pair addresses
 router.get("/swap-pools/:tokenAddress1/:tokenAddress2", authHandler.authorizeRequest(true), SwappingController.getPoolByTokenPair);

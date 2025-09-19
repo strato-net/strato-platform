@@ -5,13 +5,23 @@ FROM base AS builder
 
 WORKDIR /build
 
-COPY package*.json ./
+# Copy shared types package first
+COPY packages/shared-types/ ./packages/shared-types/
 
-RUN npm ci
+# Build shared types package
+WORKDIR /build/packages/shared-types
+RUN npm ci && npm run build
 
-COPY tsconfig.json ./
+# Copy backend package files
+WORKDIR /build
+COPY backend/package*.json ./
 
-COPY src/ ./src/
+# Install backend dependencies and ensure shared-types is properly linked
+RUN npm ci && npm install ./packages/shared-types
+
+COPY backend/tsconfig.json ./
+
+COPY backend/src/ ./src/
 
 RUN npm run build
 
@@ -20,7 +30,7 @@ FROM base
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY backend/package*.json ./
 
 RUN npm ci --omit=dev
 
