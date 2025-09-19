@@ -411,10 +411,29 @@ contract Describe_BadDebt_Basic {
         );
 
         require(pool.badDebt() != 0, "Bad debt should be nonzero after *bad debt* liquidation");
+        log("ar badDebt: "+string(pool.badDebt()));
 
         LoanInfo memory loan = pool.getUserLoan(address(user1));
         require(loan.scaledDebt == 0, "User loan should be zero after bad debt liquidation");
         require(loan.lastUpdated == 0, "User loan last updated should be zero after bad debt liquidation");
+    }
+
+    function it_as_can_cover_bad_debt() public {
+        SafetyModule sm = m.safetyModule();
+        LendingPool pool = m.lendingPool();
+
+        uint smAssets = sm.totalAssets();
+        uint toCover = smAssets * sm.MAX_SLASH_BPS() / 10000;
+        require(
+            pool.badDebt() < smAssets,
+            "Bad debt should be less than USDST balance of SM" // (for this test case)
+        );
+        sm.coverShortfall(toCover);
+        require(pool.badDebt() == 0, "Bad debt should be 0 after cover shortfall");
+
+        // Note: These initial values for comparison should be taken separetly if you reorder the tests
+        require(pool.getExchangeRate() == 1e18, "Lending Exchange rate should be unaffected 1e18 after cover shortfall");
+        require(sm.exchangeRate() < 1e18, "SM Exchange rate should fall to less than 1e18 after cover shortfall");
     }
 
 }
