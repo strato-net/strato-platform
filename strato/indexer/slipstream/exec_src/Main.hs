@@ -84,6 +84,20 @@ main = do
                 PRIMARY KEY (address)
             )|]
       migrateCirrus
+        [r|CREATE TABLE IF NOT EXISTS "history@storage" (
+                address text,
+                block_hash text,
+                block_timestamp text,
+                block_number text,
+                transaction_hash text NOT NULL,
+                transaction_sender text,
+                creator text,
+                root text,
+                application text,
+                contract_name text,
+                data jsonb
+            )|]
+      migrateCirrus
         [r|CREATE TABLE IF NOT EXISTS contract (
                 address text,
                 creator text,
@@ -100,8 +114,12 @@ main = do
                 block_number text,
                 transaction_hash text NOT NULL,
                 transaction_sender text,
+                root text,
+                collection_name text,
+                collection_type text,
                 key jsonb,
                 value jsonb,
+                PRIMARY KEY (address, collection_name, key),
                 CONSTRAINT contract_record FOREIGN KEY (address) REFERENCES storage (address)
             )|]
       migrateCirrus
@@ -113,9 +131,6 @@ main = do
                 transaction_hash text NOT NULL,
                 transaction_sender text,
                 event_index integer NOT NULL,
-                creator text,
-                application text,
-                contract_name text,
                 event_name text,
                 attributes jsonb,
                 PRIMARY KEY (transaction_hash, event_index),
