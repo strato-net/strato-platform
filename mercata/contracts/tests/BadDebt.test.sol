@@ -398,7 +398,7 @@ contract Describe_BadDebt_Basic {
         require(IERC20(usdToken).balanceOf(address(this)) == 1000e18, "Token balance mismatch");
         
         // Verify safety module exists in deployment
-        require(address(m.safetyModule) != address(0), "Safety module address is zero");
+        require(address(m.safetyModule()) != address(0), "Safety module address is zero");
     }
 
     // Test: Pool configuration using actual deployment
@@ -425,7 +425,8 @@ contract Describe_BadDebt_Basic {
         // Get actual infrastructure
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
-        
+        PoolConfigurator configurator = m.poolConfigurator();
+
         // Create test tokens
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         address mUsdToken = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
@@ -434,11 +435,11 @@ contract Describe_BadDebt_Basic {
         Token(mUsdToken).setStatus(2);
         
         // Configure the borrowable asset in the actual pool
-        pool.setBorrowableAsset(usdToken);
-        pool.setMToken(mUsdToken);
+        configurator.setBorrowableAsset(usdToken);
+        configurator.setMToken(mUsdToken);
         
         // Configure asset parameters (LTV, liquidation threshold, etc.)
-        pool.configureAsset(usdToken, 0, 0, 11000, 0, 1000, 1000000000000000000000000000);
+        configurator.configureAsset(usdToken, 0, 0, 11000, 0, 1000, 1000000000000000000000000000);
         
         // Mint test tokens
         Token(usdToken).mint(address(this), 10000e18);
@@ -502,7 +503,7 @@ contract Describe_BadDebt_Basic {
         CollateralVault cv = m.collateralVault();
         LiquidityPool lp = m.liquidityPool();
         PriceOracle oracle = m.priceOracle();
-        SafetyModule sm = m.safetyModule;
+        SafetyModule sm = m.safetyModule();
         
         // Create tokens for testing
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
@@ -528,7 +529,7 @@ contract Describe_BadDebt_Basic {
         
         // Verify infrastructure can handle bad debt scenarios
         require(address(pool) != address(0), "Pool handles bad debt scenario");
-        require(address(m.safetyModule) != address(0), "Safety module available for bad debt coverage");
+        require(address(sm) != address(0), "Safety module available for bad debt coverage");
         require(address(cv) != address(0), "CollateralVault operational");
         require(address(lp) != address(0), "LiquidityPool operational");
         
@@ -541,7 +542,7 @@ contract Describe_BadDebt_Basic {
     function it_at_can_test_safety_module_bad_debt_coverage() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
-        SafetyModule sm = m.safetyModule;
+        SafetyModule sm = m.safetyModule();
         PriceOracle oracle = m.priceOracle();
         
         // Create tokens for testing
@@ -568,7 +569,7 @@ contract Describe_BadDebt_Basic {
         
         require(testUsdBalance >= simulatedBadDebt, "Test has sufficient USD for coverage simulation");
         require(testSmTokenBalance > 0, "Test has additional coverage tokens");
-        require(address(m.safetyModule) != address(0), "Safety module operational for bad debt coverage");
+        require(address(m.safetyModule()) != address(0), "Safety module operational for bad debt coverage");
         
         // Test bad debt tracking
         uint badDebt = pool.badDebt();
@@ -701,7 +702,7 @@ contract Describe_BadDebt_Basic {
     function it_ax_can_test_bad_debt_recovery_mechanisms() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
-        SafetyModule sm = pool.safetyModule();
+        SafetyModule sm = m.safetyModule();
         PriceOracle oracle = m.priceOracle();
         
         // Create tokens
@@ -730,7 +731,7 @@ contract Describe_BadDebt_Basic {
         require(recoveryBalance > 0, "Additional recovery tokens available");
         
         // Verify recovery mechanisms are in place
-        require(address(m.safetyModule) != address(0), "Safety module available for recovery");
+        require(address(sm) != address(0), "Safety module available for recovery");
         require(initialBadDebt >= 0, "Bad debt tracking enables recovery planning");
         
         // Test that recovery can be initiated
