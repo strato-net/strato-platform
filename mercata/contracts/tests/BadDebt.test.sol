@@ -1,5 +1,6 @@
 import "../concrete/BaseCodeCollection.sol";
 import "../abstract/ERC20/IERC20.sol";
+import "../concrete/Tokens/Token.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -14,6 +15,14 @@ contract Describe_BadDebt_Basic {
 
     Mercata m;
 
+    address USDST;
+
+    address mUSDST;
+    address sUSDST;
+
+    address GOLDST;
+    address SILVST;
+
     function beforeAll() public {
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
@@ -27,32 +36,45 @@ contract Describe_BadDebt_Basic {
     }
 
     function it_ab_checks_that_lending_pool_is_set() public {
+        // via indirect reference
         require(address(m.collateralVault().registry().lendingPool()) != address(0), "CollateralVault's LendingPool address is 0");
         require(address(m.liquidityPool().registry().lendingPool()) != address(0), "LiquidityPool's LendingPool address is 0");
     }
 
     // Test basic token creation functionality
-    function it_ac_can_create_tokens() public {
-        address t = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        require(t != address(0), "Failed to create Token");
+    function it_ac_can_create_and_activate_tokens() public {
+        // Create test token for borrowing
+        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        require(address(USDST) != address(0), "Failed to create USDST token");
+
+        // Create test tokens for lending
+        mUSDST = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
+        sUSDST = m.tokenFactory().createToken("sUSDST", "sUSDST Token", [], [], [], "msSDST", 0, 18);
+        require(address(mUSDST) != address(0), "Failed to create mUSDST token");
+        require(address(sUSDST) != address(0), "Failed to create sUSDST token");
+        
+        // Create test tokens for collateral
+        GOLDST = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        SILVST= m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
+        require(address(GOLDST) != address(0), "Failed to create GOLDST token");
+        require(address(SILVST) != address(0), "Failed to create SILVST token");
     }
 
-    // Test that we can create lending pools
-    function it_ad_can_create_lending_infrastructure() public {
-        // Create tokens for testing
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        require(usdToken != address(0), "Failed to create USD token");
-        
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        require(goldToken != address(0), "Failed to create GOLD token");
-        
+    // Test token activation functionality
+    function it_ad_can_activate_tokens() public {
         // Set tokens to active status
-        Token(usdToken).setStatus(2);
-        Token(goldToken).setStatus(2);
+        Token(USDST).setStatus(2);
+        Token(mUSDST).setStatus(2);
+        Token(sUSDST).setStatus(2);
+        Token(GOLDST).setStatus(2);
+        Token(SILVST).setStatus(2);
         
         // Basic checks - tokens activated successfully
-        require(Token(usdToken).status() == TokenStatus.ACTIVE, "USD token not activated");
-        require(Token(goldToken).status() == TokenStatus.ACTIVE, "GOLD token not activated");
+        require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
+        require(Token(mUSDST).status() == TokenStatus.ACTIVE, "mUSDST token not activated");
+        require(Token(sUSDST).status() == TokenStatus.ACTIVE, "sUSDST token not activated");
+        require(Token(GOLDST).status() == TokenStatus.ACTIVE, "GOLDST token not activated");
+        require(Token(SILVST).status() == TokenStatus.ACTIVE, "SILVST token not activated");
     }
 
     // Test complete lending pool configuration with full setup
@@ -65,38 +87,20 @@ contract Describe_BadDebt_Basic {
         require(address(configurator) != address(0), "PoolConfigurator not found");
         require(address(oracle) != address(0), "PriceOracle not found");
         
-        // Create test tokens for borrowing and collateral
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address mUsdToken = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        address silverToken = m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
-        
-        // Activate all tokens
-        Token(usdToken).setStatus(2);
-        Token(mUsdToken).setStatus(2);  
-        Token(goldToken).setStatus(2);
-        Token(silverToken).setStatus(2);
-        
-        // Verify tokens are active
-        require(Token(usdToken).status() == TokenStatus.ACTIVE, "USD token not activated");
-        require(Token(mUsdToken).status() == TokenStatus.ACTIVE, "mUSD token not activated");
-        require(Token(goldToken).status() == TokenStatus.ACTIVE, "GOLD token not activated");
-        require(Token(silverToken).status() == TokenStatus.ACTIVE, "SILVER token not activated");
-        
         // === STEP 1: Configure borrowable asset and mToken ===
         
         // Set the borrowable asset (USD) 
-        configurator.setBorrowableAsset(usdToken);
-        require(pool.borrowableAsset() == usdToken, "Borrowable asset not set correctly");
+        configurator.setBorrowableAsset(USDST);
+        require(pool.borrowableAsset() == USDST, "Borrowable asset not set correctly");
         
         // Set the corresponding mToken
-        configurator.setMToken(mUsdToken);
-        require(pool.mToken() == mUsdToken, "mToken not set correctly");
+        configurator.setMToken(mUSDST);
+        require(pool.mToken() == mUSDST, "mToken not set correctly");
         
         // === STEP 2: Set debt ceilings and safety parameters ===
         
-        uint debtCeilingAssetUnits = 1000000e18; // 1M USDST
-        uint debtCeilingUSD = 1000000e18;        // 1M USD value 
+        uint debtCeilingAssetUnits = 10000000e18; // 10M USDST
+        uint debtCeilingUSD = 10000000e18;        // 10M USD value 
         uint safetyShareBps = 1000;              // 10% to safety module
         
         configurator.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
@@ -109,7 +113,7 @@ contract Describe_BadDebt_Basic {
         
         // === STEP 3: Configure USD borrowable asset parameters ===
         
-        uint usdLtv = 0; // USD can't be used as collateral for borrowing USD
+        uint usdLtv = 0; // USDST can't be used as collateral for borrowing USDST
         uint usdLiquidationThreshold = 0;
         uint usdLiquidationBonus = 11000; // 110%
         uint usdInterestRate = 500;       // completely irrelevant, plucked from smd
@@ -117,7 +121,7 @@ contract Describe_BadDebt_Basic {
         uint usdPerSecondFactorRAY = 1000000001547125956666413085; // plucked from smd
         
         configurator.configureAsset(
-            usdToken,
+            USDST,
             usdLtv,
             usdLiquidationThreshold, 
             usdLiquidationBonus,
@@ -137,7 +141,7 @@ contract Describe_BadDebt_Basic {
         uint goldPerSecondFactorRAY = 1e27; // No compounding for collateral
         
         configurator.configureAsset(
-            goldToken,
+            GOLDST,
             goldLtv,
             goldLiquidationThreshold,
             goldLiquidationBonus, 
@@ -155,7 +159,7 @@ contract Describe_BadDebt_Basic {
         uint silverPerSecondFactorRAY = 1e27; // No compounding for collateral
         
         configurator.configureAsset(
-            silverToken,
+            SILVST,
             silverLtv,
             silverLiquidationThreshold,
             silverLiquidationBonus,
@@ -164,21 +168,10 @@ contract Describe_BadDebt_Basic {
             silverPerSecondFactorRAY
         );
         
-        // === STEP 5: Set oracle prices for all assets ===
-        
-        oracle.setAssetPrice(usdToken, 1e18);      // $1 USD
-        oracle.setAssetPrice(goldToken, 2000e18);  // $2000 Gold
-        oracle.setAssetPrice(silverToken, 25e18);  // $25 Silver
-        
-        // Verify oracle prices  
-        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not set correctly");
-        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not set correctly");
-        require(oracle.getAssetPrice(silverToken) == 25e18, "Silver price not set correctly");
-        
-        // === STEP 6: Verify complete asset configurations ===
+        // === STEP 5: Verify complete asset configurations ===
         
         // Verify USD configuration
-        (uint usdLtvRet, uint usdLiqThreshRet, uint usdLiqBonusRet, uint usdIntRateRet, uint usdReserveFactorRet, uint usdPerSecRet) = pool.getAssetConfig(usdToken);
+        (uint usdLtvRet, uint usdLiqThreshRet, uint usdLiqBonusRet, uint usdIntRateRet, uint usdReserveFactorRet, uint usdPerSecRet) = pool.getAssetConfig(USDST);
         require(usdLtvRet == usdLtv, "USD LTV not configured correctly");
         require(usdLiqThreshRet == usdLiquidationThreshold, "USD liquidation threshold not configured correctly");
         require(usdLiqBonusRet == usdLiquidationBonus, "USD liquidation bonus not configured correctly");
@@ -187,7 +180,7 @@ contract Describe_BadDebt_Basic {
         require(usdPerSecRet == usdPerSecondFactorRAY, "USD per-second factor not configured correctly");
         
         // Verify Gold configuration
-        (uint goldLtvRet, uint goldLiqThreshRet, uint goldLiqBonusRet, uint goldIntRateRet, uint goldReserveFactorRet, uint goldPerSecRet) = pool.getAssetConfig(goldToken);
+        (uint goldLtvRet, uint goldLiqThreshRet, uint goldLiqBonusRet, uint goldIntRateRet, uint goldReserveFactorRet, uint goldPerSecRet) = pool.getAssetConfig(GOLDST);
         require(goldLtvRet == goldLtv, "Gold LTV not configured correctly");
         require(goldLiqThreshRet == goldLiquidationThreshold, "Gold liquidation threshold not configured correctly");
         require(goldLiqBonusRet == goldLiquidationBonus, "Gold liquidation bonus not configured correctly");
@@ -196,7 +189,7 @@ contract Describe_BadDebt_Basic {
         require(goldPerSecRet == goldPerSecondFactorRAY, "Gold per-second factor not configured correctly");
         
         // Verify Silver configuration
-        (uint silverLtvRet, uint silverLiqThreshRet, uint silverLiqBonusRet, uint silverIntRateRet, uint silverReserveFactorRet, uint silverPerSecRet) = pool.getAssetConfig(silverToken);
+        (uint silverLtvRet, uint silverLiqThreshRet, uint silverLiqBonusRet, uint silverIntRateRet, uint silverReserveFactorRet, uint silverPerSecRet) = pool.getAssetConfig(SILVST);
         require(silverLtvRet == silverLtv, "Silver LTV not configured correctly");
         require(silverLiqThreshRet == silverLiquidationThreshold, "Silver liquidation threshold not configured correctly");
         require(silverLiqBonusRet == silverLiquidationBonus, "Silver liquidation bonus not configured correctly");
@@ -204,41 +197,33 @@ contract Describe_BadDebt_Basic {
         require(silverReserveFactorRet == silverReserveFactor, "Silver reserve factor not configured correctly");
         require(silverPerSecRet == silverPerSecondFactorRAY, "Silver per-second factor not configured correctly");
         
-        // === STEP 7: Verify registry and infrastructure connections ===
+        // === STEP 6: Verify registry and infrastructure connections ===
         
         require(address(pool.registry()) != address(0), "Pool registry not set");
         require(address(pool.tokenFactory()) != address(0), "Pool token factory not set");
         require(address(pool.poolConfigurator()) != address(0), "Pool configurator not set");
         require(address(pool.feeCollector()) != address(0), "Fee collector not set");
         
-        // === STEP 8: Verify pool is ready for lending operations ===
+        // === STEP 7: Verify pool is ready for lending operations ===
         
         // Check that pool has borrowable asset configured
         require(pool.borrowableAsset() != address(0), "No borrowable asset configured");
         require(pool.mToken() != address(0), "No mToken configured");
         
         // Verify that assets are properly configured in the pool
-        require(pool.configuredAssets(0) == usdToken, "USD not in configured assets");
-        require(pool.configuredAssets(1) == goldToken, "Gold not in configured assets");
-        require(pool.configuredAssets(2) == silverToken, "Silver not in configured assets");
-        
-        // Verify exchange rate calculation works
-        uint exchangeRate = pool.getExchangeRate();
-        require(exchangeRate > 0, "Exchange rate not calculable");
+        require(pool.configuredAssets(0) == USDST, "USDST not correctly configured in configured assets");
+        require(pool.configuredAssets(1) == GOLDST, "GOLDST not correctly configured in configured assets");
+        require(pool.configuredAssets(2) == SILVST, "SILVST not correctly configured in configured assets");
         
         // Verify bad debt tracking is initialized
         uint badDebt = pool.badDebt();
         require(badDebt == 0, "Initial bad debt should be zero");
         
-        // === STEP 9: Test that configuration parameters are within valid bounds ===
+        // === STEP 8: Test that configuration parameters are within valid bounds ===
         
         // Verify LTV <= liquidation threshold for collateral assets
         require(goldLtv <= goldLiquidationThreshold, "Gold LTV exceeds liquidation threshold");
         require(silverLtv <= silverLiquidationThreshold, "Silver LTV exceeds liquidation threshold");
-        
-        // === CONFIGURATION COMPLETE ===
-        // The lending pool is now fully configured and ready for operations
-        require(true, "Lending pool configuration completed successfully");
     }
 
     function it_af_persists_accross_tests() public {
@@ -246,8 +231,28 @@ contract Describe_BadDebt_Basic {
         require(pool.configuredAssets(0) != address(0), "No persistent configured assets");
     }
 
+    // Verify exchange rate calculation works
+    function it_ag_can_verify_exchange_rate_calculation() public {   //TODO letters
+        LendingPool pool = m.lendingPool();
+        uint exchangeRate = pool.getExchangeRate();
+        require(exchangeRate > 0, "Exchange rate not calculable");
+    }
+
+    function it_ah_can_set_oracle_prices() public {
+        PriceOracle oracle = m.priceOracle();
+        
+        oracle.setAssetPrice(USDST, 1e18);      // $1 USD
+        oracle.setAssetPrice(GOLDST, 2000e18);  // $2000 Gold
+        oracle.setAssetPrice(SILVST, 25e18);  // $25 Silver
+        
+        // Verify oracle prices  
+        require(oracle.getAssetPrice(USDST) == 1e18, "USD price not set correctly");
+        require(oracle.getAssetPrice(GOLDST) == 2000e18, "Gold price not set correctly");
+        require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
+    }
+
     // Test basic safety module functionality
-    function it_ag_can_access_safety_module() public {
+    function it_ai_can_access_safety_module() public { // TODO letters
         // Get the safety module from lending infrastructure
         LendingPool pool = m.lendingPool();
         require(address(pool) != address(0), "LendingPool not found");
@@ -264,7 +269,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test collateral vault basic functionality
-    function it_ah_can_access_collateral_vault() public {
+    function it_aj_can_access_collateral_vault() public {
         CollateralVault cv = m.collateralVault();
         require(address(cv) != address(0), "CollateralVault not found");
         
@@ -273,7 +278,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test liquidity pool basic functionality
-    function it_ai_can_access_liquidity_pool() public {
+    function it_ak_can_access_liquidity_pool() public {
         LiquidityPool lp = m.liquidityPool();
         require(address(lp) != address(0), "LiquidityPool not found");
         
@@ -282,7 +287,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test price oracle basic functionality
-    function it_aj_can_access_price_oracle() public {
+    function it_al_can_access_price_oracle() public {
         PriceOracle oracle = m.priceOracle();
         require(address(oracle) != address(0), "PriceOracle not found");
         
@@ -296,7 +301,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test token minting and basic operations
-    function it_ak_can_mint_tokens() public {
+    function it_am_can_mint_tokens() public {
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         Token(usdToken).setStatus(2);
         
@@ -308,7 +313,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test basic collateral management
-    function it_al_can_manage_collateral() public {
+    function it_an_can_manage_collateral() public {
         // Create tokens
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
         Token(goldToken).setStatus(2);
@@ -324,7 +329,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test basic infrastructure setup for bad debt scenarios
-    function it_am_can_setup_bad_debt_infrastructure() public {
+    function it_ao_can_setup_bad_debt_infrastructure() public {
         // Create tokens that would be used in bad debt scenarios
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
@@ -350,7 +355,7 @@ contract Describe_BadDebt_Basic {
     // ==== BAD DEBT SPECIFIC TESTS ====
 
     // Test: Basic bad debt simulation using actual Mercata deployment
-    function it_an_can_simulate_bad_debt_scenario() public {
+    function it_ap_can_simulate_bad_debt_scenario() public {
         // Create test tokens using the actual TokenFactory
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
@@ -385,7 +390,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Safety module functionality using actual deployment
-    function it_ao_can_test_safety_module_functionality() public {
+    function it_aq_can_test_safety_module_functionality() public {
         // Test basic safety module access
         // Note: SafetyModule might be initialized after LendingPool in deployment
         
@@ -402,7 +407,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Pool configuration using actual deployment
-    function it_ap_can_test_pool_configuration_with_actual_deployment() public {
+    function it_ar_can_test_pool_configuration_with_actual_deployment() public {
         // Get actual pool from deployment
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
@@ -421,7 +426,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Exchange rate behavior with bad debt using actual deployment
-    function it_aq_can_test_exchange_rate_with_bad_debt_actual_deployment() public {
+    function it_as_can_test_exchange_rate_with_bad_debt_actual_deployment() public {
         // Get actual infrastructure
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
@@ -456,7 +461,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Collateral and price scenarios using actual deployment
-    function it_ar_can_test_collateral_price_scenarios_actual_deployment() public {
+    function it_at_can_test_collateral_price_scenarios_actual_deployment() public {
         // Get actual infrastructure components
         PriceOracle oracle = m.priceOracle();
         CollateralVault cv = m.collateralVault();
@@ -497,7 +502,7 @@ contract Describe_BadDebt_Basic {
     // ==== COMPREHENSIVE BAD DEBT SCENARIOS ====
 
     // Test: Complete bad debt scenario with liquidation failure
-    function it_as_can_simulate_complete_bad_debt_liquidation_failure() public {
+    function it_au_can_simulate_complete_bad_debt_liquidation_failure() public {
         // Setup infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -539,7 +544,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Safety module coverage of bad debt
-    function it_at_can_test_safety_module_bad_debt_coverage() public {
+    function it_av_can_test_safety_module_bad_debt_coverage() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         SafetyModule sm = m.safetyModule();
@@ -577,7 +582,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Exchange rate impact during bad debt events
-    function it_au_can_test_exchange_rate_impact_during_bad_debt() public {
+    function it_aw_can_test_exchange_rate_impact_during_bad_debt() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
@@ -612,7 +617,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Extreme price volatility and bad debt accumulation
-    function it_av_can_test_extreme_price_volatility_bad_debt() public {
+    function it_ax_can_test_extreme_price_volatility_bad_debt() public {
         // Get infrastructure
         PriceOracle oracle = m.priceOracle();
         LendingPool pool = m.lendingPool();
@@ -653,7 +658,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Multiple asset bad debt scenario
-    function it_aw_can_test_multiple_asset_bad_debt_scenario() public {
+    function it_ay_can_test_multiple_asset_bad_debt_scenario() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -699,7 +704,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Bad debt recovery mechanisms
-    function it_ax_can_test_bad_debt_recovery_mechanisms() public {
+    function it_az_can_test_bad_debt_recovery_mechanisms() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         SafetyModule sm = m.safetyModule();
@@ -740,7 +745,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Liquidation threshold breach scenarios
-    function it_ay_can_test_liquidation_threshold_breach_scenarios() public {
+    function it_ba_can_test_liquidation_threshold_breach_scenarios() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -781,7 +786,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Cascading liquidation scenarios
-    function it_az_can_test_cascading_liquidation_scenarios() public {
+    function it_bb_can_test_cascading_liquidation_scenarios() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
