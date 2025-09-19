@@ -7,7 +7,11 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 # Copy shared types package first
 COPY packages/shared-types/ ./packages/shared-types/
+# Build shared types package
+WORKDIR /app/packages/shared-types
+RUN npm ci && npm run build
 # Copy UI package files
+WORKDIR /app
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci
 

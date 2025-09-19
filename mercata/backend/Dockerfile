@@ -8,10 +8,16 @@ WORKDIR /build
 # Copy shared types package first
 COPY packages/shared-types/ ./packages/shared-types/
 
+# Build shared types package
+WORKDIR /build/packages/shared-types
+RUN npm ci && npm run build
+
 # Copy backend package files
+WORKDIR /build
 COPY backend/package*.json ./
 
-RUN npm ci
+# Install backend dependencies and ensure shared-types is properly linked
+RUN npm ci && npm install ./packages/shared-types
 
 COPY backend/tsconfig.json ./
 
