@@ -1,57 +1,19 @@
 // ============================================================================
 // SWAP-SPECIFIC INTERFACES
 // ============================================================================
-// This file contains all swapping-related types and interfaces for the UI
-// Imported from backend types to ensure consistency
+// This file contains UI-specific swap interfaces that extend the shared types
 
-// Import types for use in interface definitions
+// Import shared types for use in UI-specific interface definitions
 import type {
-  // Core swap types
   SwapHistoryEntry,
   SwapParams,
   SetPoolRatesParams,
-  
-  // Pool and token types
   Pool,
   SwapToken,
-} from '../../../backend/src/types';
+} from '@shared/swap-types';
 
-// Re-export all swap-related types from backend
-export type {
-  // Core swap types
-  SwapHistoryEntry,
-  SwapHistoryResponse,
-  SwapParams,
-  LiquidityParams,
-  SingleTokenLiquidityParams,
-  RemoveLiquidityParams,
-  CreatePoolParams,
-  SetPoolRatesParams,
-  TransactionResponse,
-  
-  // Pool and token types
-  Pool,
-  SwapToken,
-  LPToken,
-  PoolList,
-  
-  // Raw data types (for internal use)
-  RawToken,
-  RawLPToken,
-  RawGetPool,
-  RawSwapEvent,
-  RawPoolFactory,
-  
-  // Validation types
-  PoolWithTokens,
-  PoolWithTokenA,
-  PoolWithTokenB,
-  PoolWithTokenAddresses,
-  PoolWithBalances,
-  
-  // Token balance type
-  TokenBalance,
-} from '../../../backend/src/types';
+// Re-export all shared swap types (handled by interface/index.tsx)
+export * from '@shared/swap-types';
 
 // ============================================================================
 // UI-SPECIFIC SWAP INTERFACES

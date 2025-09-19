@@ -38,7 +38,7 @@ import {
   validatePoolWithTokenAArray,
   validatePoolWithTokenBArray,
   validateSinglePoolFactory
-} from "../../types/swaps";
+} from "@shared/swap-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
 

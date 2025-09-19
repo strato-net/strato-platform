@@ -73,77 +73,91 @@ class SwappingController {
   }
 
   // Creators
-  static async create(req: Request, res: Response, next: NextFunction) {
+  static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { accessToken, body } = req;
       validateCreatePoolsArgs(body);
 
       const result = await createPool(accessToken, body);
-      res.status(200).json(result);
-      return next();
-    } catch (e) {
-      return next(e);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
     }
   }
 
   // Liquidity
-  static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateAddLiquidityDualTokenArgs(body);
+  static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateAddLiquidityDualTokenArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const liquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const liquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await addLiquidityDualToken(accessToken, liquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await addLiquidityDualToken(accessToken, liquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateAddLiquiditySingleTokenArgs(body);
+  static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateAddLiquiditySingleTokenArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const liquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const liquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await addLiquiditySingleToken(accessToken, liquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await addLiquiditySingleToken(accessToken, liquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
-  static async removeLiquidity(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body, params } = req;
-    validateRemoveLiquidityArgs(body);
+  static async removeLiquidity(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body, params } = req;
+      validateRemoveLiquidityArgs(body);
+      validatePoolAddressArgs(params);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const removeLiquidityParams = {
-      ...body,
-      poolAddress: params.poolAddress,
-      deadline
-    };
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const removeLiquidityParams = {
+        ...body,
+        poolAddress: params.poolAddress,
+        deadline
+      };
 
-    const result = await removeLiquidity(accessToken, removeLiquidityParams);
-    res.status(200).json(result);
-    return next();
+      const result = await removeLiquidity(accessToken, removeLiquidityParams);
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
   // Swaps
-  static async swap(req: Request, res: Response, next: NextFunction) {
-    const { accessToken, body } = req;
-    validateSwapArgs(body);
+  static async swap(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { accessToken, body } = req;
+      validateSwapArgs(body);
 
-    const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-    const result = await swap(accessToken, { ...body, deadline });
-    res.status(200).json(result);
-    return next();
+      const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
+      const result = await swap(accessToken, { ...body, deadline });
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
   }
 
   // Helpers
