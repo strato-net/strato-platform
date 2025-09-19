@@ -94,4 +94,27 @@ export function validateLiquidateArgs(args: any) {
   if (error) {
     throw new Error("CDP Liquidate Argument Validation Error: " + error.message);
   }
+}
+
+export function validateOpenJuniorNoteArgs(args: any) {
+  const schema = Joi.object({
+    asset: validateAddressField("asset"),
+    amountUSDST: numericStringField("amountUSDST"),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("CDP Open Junior Note Argument Validation Error: " + error.message);
+  }
+}
+
+export function validateTopUpJuniorNoteArgs(args: any) {
+  const schema = Joi.object({
+    amountUSDST: numericStringField("amountUSDST"),
+  });
+  
+  const { error } = schema.validate(args);
+  if (error) {
+    throw new Error("CDP Top Up Junior Note Argument Validation Error: " + error.message);
+  }
 } 

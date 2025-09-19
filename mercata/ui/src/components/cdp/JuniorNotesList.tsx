@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { MoreVertical, RefreshCw } from "lucide-react";
-import { cdpService } from "@/services/cdpService";
+import { cdpService, JuniorNote } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { useUser } from "@/context/UserContext";
 import { usdstAddress } from "@/lib/constants";
+import CopyableHash from "../common/CopyableHash";
 
 // Convert wei string to decimal for display
 const formatWeiToDecimal = (weiString: string, decimals: number): string => {
@@ -51,15 +53,8 @@ const formatNumber = (num: number | string, decimals: number = 2): string => {
   return value.toFixed(decimals);
 };
 
-interface JuniorNote {
-  id: string;                    // Unique identifier
-  asset: string;                 // Collateral asset address
-  assetSymbol: string;           // Asset symbol (e.g., "ETH", "WBTC")
-  owner: string;                 // Owner address
-  capUSDST: string;              // Remaining cap in wei (18 decimals)
-  entryIndex: string;            // Entry index in RAY format (27 decimals)
-  claimableAmount: string;       // Currently claimable amount in wei (18 decimals)
-  createdAt: string;             // Creation timestamp
+interface UserJuniorNote extends JuniorNote {
+  claimableAmount: string;       // Currently claimable amount in wei (18 decimals) - calculated from backend data
 }
 
 interface JuniorNotesListProps {
@@ -68,16 +63,17 @@ interface JuniorNotesListProps {
 }
 
 const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNoteActionSuccess }) => {
-  const [notes, setNotes] = useState<JuniorNote[]>([]);
+  const [note, setNote] = useState<UserJuniorNote | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
+  const { userAddress } = useUser();
   
-  // State for active action and input amounts for each note
-  const [activeActions, setActiveActions] = useState<Record<string, 'claim' | 'topup' | null>>({});
-  const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
-  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
+  // State for active action and input amounts for the note
+  const [activeAction, setActiveAction] = useState<'claim' | 'topup' | null>(null);
+  const [inputAmount, setInputAmount] = useState<string>("");
+  const [actionLoading, setActionLoading] = useState<boolean>(false);
 
   // Get user's USDST balance for top-up validation
   const getUsdstBalance = (): string => {
@@ -89,6 +85,12 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
 
   // Fetch junior notes from backend
   const fetchJuniorNotes = useCallback(async (showRefreshing = false) => {
+    if (!userAddress) {
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     if (showRefreshing) {
       setRefreshing(true);
     } else {
@@ -96,50 +98,24 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
     }
     
     try {
-      // For now, use dummy data since backend endpoints aren't implemented
-      // In real implementation: const fetchedNotes = await cdpService.getJuniorNotes();
+      // Fetch the user's junior note from the backend
+      const fetchedNote = await cdpService.getJuniorNotes(userAddress);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (fetchedNote) {
+        // Use the real claimable amount from the backend
+        const userNote: UserJuniorNote = {
+          ...fetchedNote,
+          claimableAmount: fetchedNote.claimableAmount || "0"
+        };
+        setNote(userNote);
+      } else {
+        setNote(null);
+      }
       
-      // Dummy data - simulate multiple junior notes
-      const dummyNotes: JuniorNote[] = [
-        {
-          id: "note-1",
-          asset: "0x93fb7295859b2d70199e0a4883b7c320cf874e6c",
-          assetSymbol: "ETH",
-          owner: "0x1234567890123456789012345678901234567890",
-          capUSDST: "2200000000000000000000", // 2,200 USDST remaining
-          entryIndex: "1000000000000000000000000000", // 1e27 RAY
-          claimableAmount: "150000000000000000000", // 150 USDST claimable
-          createdAt: "2024-01-15T10:30:00Z"
-        },
-        {
-          id: "note-2", 
-          asset: "0x1234567890123456789012345678901234567890",
-          assetSymbol: "WBTC",
-          owner: "0x1234567890123456789012345678901234567890",
-          capUSDST: "550000000000000000000", // 550 USDST remaining
-          entryIndex: "1050000000000000000000000000", // 1.05e27 RAY
-          claimableAmount: "75000000000000000000", // 75 USDST claimable
-          createdAt: "2024-01-20T14:45:00Z"
-        }
-      ];
-      
-      setNotes(dummyNotes);
-      
-      // Initialize state for each note
-      const initialActiveActions: Record<string, null> = {};
-      const initialAmounts: Record<string, string> = {};
-      const initialLoading: Record<string, boolean> = {};
-      dummyNotes.forEach(note => {
-        initialActiveActions[note.id] = null;
-        initialAmounts[note.id] = "";
-        initialLoading[note.id] = false;
-      });
-      setActiveActions(initialActiveActions);
-      setInputAmounts(initialAmounts);
-      setActionLoading(initialLoading);
+      // Reset action states
+      setActiveAction(null);
+      setInputAmount("");
+      setActionLoading(false);
       
     } catch (error) {
       console.error("Failed to fetch junior notes:", error);
@@ -148,44 +124,43 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
         description: "Failed to load junior notes. Please try again.",
         variant: "destructive",
       });
+      setNote(null);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [toast]);
+  }, [userAddress, toast]);
 
   // Handle dropdown action selection
-  const handleActionSelect = (noteId: string, action: 'claim' | 'topup') => {
-    const currentAction = activeActions[noteId];
-    
-    if (currentAction === action) {
+  const handleActionSelect = (action: 'claim' | 'topup') => {
+    if (activeAction === action) {
       // If selecting the same action, hide the input/button
-      setActiveActions(prev => ({ ...prev, [noteId]: null }));
-      setInputAmounts(prev => ({ ...prev, [noteId]: "" }));
+      setActiveAction(null);
+      setInputAmount("");
     } else {
       // Show the selected action input/button
-      setActiveActions(prev => ({ ...prev, [noteId]: action }));
-      setInputAmounts(prev => ({ ...prev, [noteId]: "" })); // Reset input amount
+      setActiveAction(action);
+      setInputAmount(""); // Reset input amount
     }
   };
 
   // Handle input amount changes for top-up
-  const handleInputChange = (noteId: string, value: string) => {
-    setInputAmounts(prev => ({ ...prev, [noteId]: value }));
+  const handleInputChange = (value: string) => {
+    setInputAmount(value);
   };
 
   // Handle MAX button for top-up
-  const handleMaxClick = (noteId: string) => {
+  const handleMaxClick = () => {
     const balance = getUsdstBalance();
     if (balance && parseFloat(balance) > 0) {
       const formattedBalance = formatWeiToDecimal(balance, 18);
-      setInputAmounts(prev => ({ ...prev, [noteId]: formattedBalance }));
+      setInputAmount(formattedBalance);
     }
   };
 
   // Check if amount exceeds balance for top-up
-  const isAmountAboveMax = (noteId: string): boolean => {
-    const currentAmount = parseFloat(inputAmounts[noteId] || "0");
+  const isAmountAboveMax = (): boolean => {
+    const currentAmount = parseFloat(inputAmount || "0");
     const balance = getUsdstBalance();
     if (!balance) return false;
     
@@ -194,13 +169,11 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
   };
 
   // Handle actions (claim or top-up)
-  const handleAction = async (noteId: string, action: 'claim' | 'topup') => {
-    const note = notes.find(n => n.id === noteId);
+  const handleAction = async (action: 'claim' | 'topup') => {
     if (!note) return;
 
     if (action === 'topup') {
-      const amount = inputAmounts[noteId];
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!inputAmount || parseFloat(inputAmount) <= 0) {
         toast({
           title: "Invalid Amount",
           description: "Please enter a valid top-up amount",
@@ -209,7 +182,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
         return;
       }
 
-      if (isAmountAboveMax(noteId)) {
+      if (isAmountAboveMax()) {
         toast({
           title: "Insufficient Balance",
           description: "Amount exceeds your USDST balance",
@@ -219,29 +192,59 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
       }
     }
 
-    setActionLoading(prev => ({ ...prev, [noteId]: true }));
+    setActionLoading(true);
     
     try {
-      // Simulate API calls
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       if (action === 'claim') {
-        const claimableAmount = parseFloat(formatWeiToDecimal(note.claimableAmount, 18));
-        toast({
-          title: "Claim Successful",
-          description: `Claimed ${formatNumber(claimableAmount)} USDST from ${note.assetSymbol} note`,
-        });
+        // Call the backend to claim junior note rewards
+        const result = await cdpService.claimJuniorNote();
+        
+        if (result.status === "success") {
+          toast({
+            title: "Claim Successful",
+            description: (
+              <div className="space-y-2">
+                <p>Transaction completed successfully</p>
+                <CopyableHash 
+                  hash={result.hash}
+                  truncate={true}
+                  truncateLength={12}
+                />
+              </div>
+            ),
+          });
+        } else {
+          throw new Error("Claim transaction failed");
+        }
       } else {
-        const topupAmount = parseFloat(inputAmounts[noteId]);
-        toast({
-          title: "Top-up Successful", 
-          description: `Added ${formatNumber(topupAmount)} USDST to ${note.assetSymbol} note`,
-        });
+        // Top-up functionality
+        const topupAmount = parseFloat(inputAmount);
+        const amountInWei = (BigInt(Math.floor(topupAmount * 1e6)) * BigInt(1e12)).toString(); // Convert to 18 decimals
+        
+        const result = await cdpService.topUpJuniorNote(amountInWei);
+        
+        if (result.status === "success") {
+          toast({
+            title: "Top-up Successful",
+            description: (
+              <div className="space-y-2">
+                <p>Added {formatNumber(topupAmount)} USDST to Junior Note</p>
+                <CopyableHash 
+                  hash={result.hash}
+                  truncate={true}
+                  truncateLength={12}
+                />
+              </div>
+            ),
+          });
+        } else {
+          throw new Error("Top-up transaction failed");
+        }
       }
 
       // Clear the input and reset states after successful action
-      setInputAmounts(prev => ({ ...prev, [noteId]: "" }));
-      setActiveActions(prev => ({ ...prev, [noteId]: null }));
+      setInputAmount("");
+      setActiveAction(null);
       
       // Refresh notes data
       await fetchJuniorNotes();
@@ -259,7 +262,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
         variant: "destructive",
       });
     } finally {
-      setActionLoading(prev => ({ ...prev, [noteId]: false }));
+      setActionLoading(false);
     }
   };
 
@@ -280,6 +283,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
+            <RefreshCw className="h-6 w-6 animate-spin mr-2 text-blue-500" />
             <div className="text-gray-500">Loading junior notes...</div>
           </div>
         </CardContent>
@@ -287,7 +291,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
     );
   }
 
-  if (notes.length === 0) {
+  if (!note) {
     return (
       <Card className="w-full">
         <CardHeader>
@@ -318,14 +322,19 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           Your Junior Notes
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              Active
+            </Badge>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -340,130 +349,117 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
           }
         `}</style>
         <div className="space-y-4">
-          {notes.map((note) => {
-            const remainingCap = parseFloat(formatWeiToDecimal(note.capUSDST, 18));
-            const claimableAmount = parseFloat(formatWeiToDecimal(note.claimableAmount, 18));
-            const hasClaimable = claimableAmount > 0;
-            const activeAction = activeActions[note.id];
-            const inputAmount = inputAmounts[note.id] || "";
-            const isLoading = actionLoading[note.id];
-            
-            return (
-              <div
-                key={note.id}
-                className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-xs font-semibold text-green-700">
-                      {note.assetSymbol.slice(0, 2)}
+          <div className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-xs font-semibold text-green-700">
+                  JN
+                </div>
+                <div>
+                  <h4 className="font-semibold">Junior Note</h4>
+                  <Badge variant="secondary" className="mt-1">Active</Badge>
+                </div>
+              </div>
+              
+              {/* 3-dot options menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    onClick={() => handleActionSelect('claim')}
+                    disabled={parseFloat(note.claimableAmount) <= 0}
+                  >
+                    Claim Rewards
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleActionSelect('topup')}>
+                    Top-up Note
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Remaining Cap</p>
+                <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(note.capUSDST, 18)))} USDST</p>
+                <p className="text-xs text-gray-400">Max rewards left</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Claimable Now</p>
+                <p className={`font-semibold ${parseFloat(note.claimableAmount) > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                  {formatNumber(parseFloat(formatWeiToDecimal(note.claimableAmount, 18)))} USDST
+                </p>
+                <p className="text-xs text-gray-400">
+                  {parseFloat(note.claimableAmount) > 0 ? 'Ready to claim' : 'No rewards'} • Gas-free calculation
+                </p>
+              </div>
+            </div>
+
+            {/* Conditional Action Input/Button */}
+            {activeAction && (
+              <div className="mt-4 pt-4 border-t">
+                {activeAction === 'topup' ? (
+                  <div>
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-500">
+                        Transaction Fee: 0.02 USDST
+                      </p>
                     </div>
-                    <div>
-                      <h4 className="font-semibold">{note.assetSymbol} Junior Note</h4>
-                      <Badge variant="secondary" className="mt-1">Active</Badge>
-                    </div>
-                  </div>
-                  
-                  {/* 3-dot options menu */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem 
-                        onClick={() => handleActionSelect(note.id, 'claim')}
-                        disabled={!hasClaimable}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Top-up amount"
+                        value={inputAmount}
+                        onChange={(e) => handleInputChange(e.target.value)}
+                        className={`flex-1 ${
+                          isAmountAboveMax()
+                            ? 'text-red-600 bg-red-50 border-red-300'
+                            : ''
+                        }`}
+                        type="number"
+                        step="any"
+                      />
+                      <Button 
+                        variant="outline"
+                        size="sm" 
+                        className="min-w-[50px]"
+                        onClick={handleMaxClick}
                       >
-                        Claim Rewards
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleActionSelect(note.id, 'topup')}>
-                        Top-up Note
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <p className="text-xs text-gray-500 mb-1">Remaining Cap</p>
-                    <p className="font-semibold">{formatNumber(remainingCap)} USDST</p>
-                    <p className="text-xs text-gray-400">Max rewards left</p>
+                        MAX
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="min-w-[80px]"
+                        onClick={() => handleAction('topup')}
+                        disabled={actionLoading || isAmountAboveMax() || !inputAmount || parseFloat(inputAmount) <= 0}
+                      >
+                        {actionLoading ? "Adding..." : "Top-up"}
+                      </Button>
+                    </div>
                   </div>
+                ) : (
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Claimable Now</p>
-                    <p className={`font-semibold ${hasClaimable ? 'text-green-600' : 'text-gray-600'}`}>
-                      {formatNumber(claimableAmount)} USDST
-                    </p>
-                    <p className="text-xs text-gray-400">{hasClaimable ? 'Ready to claim' : 'No rewards'}</p>
-                  </div>
-                </div>
-
-
-                {/* Conditional Action Input/Button */}
-                {activeAction && (
-                  <div className="mt-4 pt-4 border-t">
-                    {activeAction === 'topup' ? (
-                      <div>
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500">
-                            Transaction Fee: 0.02 USDST
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="Top-up amount"
-                            value={inputAmount}
-                            onChange={(e) => handleInputChange(note.id, e.target.value)}
-                            className={`flex-1 ${
-                              isAmountAboveMax(note.id)
-                                ? 'text-red-600 bg-red-50 border-red-300'
-                                : ''
-                            }`}
-                            type="number"
-                            step="any"
-                          />
-                          <Button 
-                            variant="outline"
-                            size="sm" 
-                            className="min-w-[50px]"
-                            onClick={() => handleMaxClick(note.id)}
-                          >
-                            MAX
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="min-w-[80px]"
-                            onClick={() => handleAction(note.id, 'topup')}
-                            disabled={isLoading || isAmountAboveMax(note.id) || !inputAmount || parseFloat(inputAmount) <= 0}
-                          >
-                            {isLoading ? "Adding..." : "Top-up"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="mb-2">
-                          <p className="text-xs text-gray-500">
-                            Transaction Fee: 0.01 USDST
-                          </p>
-                        </div>
-                        <Button 
-                          className="w-full" 
-                          onClick={() => handleAction(note.id, 'claim')}
-                          disabled={isLoading || !hasClaimable}
-                        >
-                          {isLoading ? "Claiming..." : `Claim ${formatNumber(claimableAmount)} USDST`}
-                        </Button>
-                      </div>
-                    )}
+                    <div className="mb-2">
+                      <p className="text-xs text-gray-500">
+                        Transaction Fee: 0.01 USDST
+                      </p>
+                    </div>
+                    <Button 
+                      className="w-full" 
+                      onClick={() => handleAction('claim')}
+                      disabled={actionLoading || parseFloat(note.claimableAmount) <= 0}
+                    >
+                      {actionLoading ? "Claiming..." : `Claim ${formatNumber(parseFloat(formatWeiToDecimal(note.claimableAmount, 18)))} USDST`}
+                    </Button>
                   </div>
                 )}
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

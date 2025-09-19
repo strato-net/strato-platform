@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
+import { cdpService, AssetConfig } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
@@ -215,16 +215,21 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
 
     setLoading(true);
     try {
-      // For now, we'll create a placeholder transaction
-      // In the real implementation, this would call the backend
-      // const result = await cdpService.openJuniorNote(selectedAsset.asset, burnAmount);
+      // Convert amount to wei (18 decimals)
+      const amountWei = (BigInt(Math.floor(burnAmountDecimal * 1e18))).toString();
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Call the backend API
+      const result = await cdpService.openJuniorNote(selectedAsset.asset, amountWei);
+      
+      // Extract return values from the transaction result
+      const burnedUSDST = result.burnedUSDST ? 
+        parseFloat((BigInt(result.burnedUSDST) / BigInt(1e18)).toString()) : burnAmountDecimal;
+      const capUSDST = result.capUSDST ? 
+        parseFloat((BigInt(result.capUSDST) / BigInt(1e18)).toString()) : calculateExpectedCap();
       
       toast({
-        title: "Junior Note Opened",
-        description: `Burned ${formatNumber(burnAmountDecimal)} USDST for ~${formatNumber(calculateExpectedCap())} USDST cap`,
+        title: "Junior Note Opened Successfully",
+        description: `Burned ${formatNumber(burnedUSDST)} USDST for ${formatNumber(capUSDST)} USDST cap`,
       });
 
       // Reset form
@@ -236,9 +241,21 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
       }
     } catch (error) {
       console.error("Failed to open junior note:", error);
+      
+      // Extract error message for better user feedback
+      let errorMessage = "Failed to open junior note. Please try again.";
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === 'object' && error !== null && 'response' in error) {
+        const axiosError = error as { response?: { data?: { message?: string } } };
+        if (axiosError.response?.data?.message) {
+          errorMessage = axiosError.response.data.message;
+        }
+      }
+      
       toast({
         title: "Transaction Failed",
-        description: "Failed to open junior note. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
