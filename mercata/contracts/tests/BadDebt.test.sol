@@ -10,10 +10,19 @@ contract User {
 }
 
 contract Describe_BadDebt_Basic {
+
+    struct LoanInfo {
+        uint scaledDebt;     // user debt in index-scaled units
+        uint lastUpdated;    // optional metadata
+    }
+
     constructor() {
     }
 
     Mercata m;
+
+    User user1;
+    User user2;
 
     address USDST;
 
@@ -278,9 +287,8 @@ contract Describe_BadDebt_Basic {
     }
 
     function it_ak_can_simulate_users() public {
-        User adminUser = new User();
-        User user1 = new User();
-        User user2 = new User();
+        user1 = new User();
+        user2 = new User();
 
         Token(USDST).mint(address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
@@ -291,196 +299,125 @@ contract Describe_BadDebt_Basic {
         user2.do(USDST, "transfer", address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(user2)) == 0, "User2 should have 0 USDST after transfer out");
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
+        Token(USDST).burn(address(this), 1000e18);
     }
 
-    // Test basic collateral management
-    function it_zf_can_manage_collateral() public {
-        // Create tokens
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        Token(goldToken).setStatus(2);
-        
-        // Mint tokens
-        Token(goldToken).mint(address(this), 100e18);
-        
-        // Get collateral vault
-        CollateralVault cv = m.collateralVault();
-        
-        // Basic verification that collateral vault is accessible
-        require(address(cv) != address(0), "CollateralVault address is zero");
+    function it_al_can_configure_safety_module() public {
+        SafetyModule sm = m.safetyModule();
+
+        uint cooldown = 1;
+        uint window = 432000;
+        uint maxSlashBps = 3000;
+        sm.setParams(cooldown, window, maxSlashBps);
+
+        require(sm.COOLDOWN_SECONDS() == cooldown, "Cooldown seconds not set correctly");
+        require(sm.UNSTAKE_WINDOW() == window, "Unstake window not set correctly");
+        require(sm.MAX_SLASH_BPS() == maxSlashBps, "Max slash BPS not set correctly");
+
+        log("al x");
+        sm.setTokens(sUSDST, USDST);
+
+        log("al y");
+        require(sm.asset() == USDST, "Asset not set correctly");
+        require(sm.sToken() == sUSDST, "sToken not set correctly");
+
+        log("al z");
+        require(address(sm.lendingPool()) == address(m.lendingPool()), "Lending pool not set correctly");
+        log("al a");
+        require(address(sm.lendingRegistry()) == address(m.lendingRegistry()), "Lending registry not set correctly");
+        log("al b");
+        require(address(sm.tokenFactory()) == address(m.tokenFactory()), "Token factory not set correctly");
+        log("al c");
     }
 
-    // Test basic infrastructure setup for bad debt scenarios
-    function it_zg_can_setup_bad_debt_infrastructure() public {
-        // Create tokens that would be used in bad debt scenarios
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        
-        Token(usdToken).setStatus(2);
-        Token(goldToken).setStatus(2);
-        
-        // Get infrastructure components
-        PriceOracle oracle = m.priceOracle();
+    function it_am_can_accept_liquidity_deposits() public {
         LendingPool pool = m.lendingPool();
-        CollateralVault cv = m.collateralVault();
-        LiquidityPool lp = m.liquidityPool();
-        
-        // Verify all components exist and are accessible
-        require(address(oracle) != address(0), "Oracle address is zero");
-        require(address(pool) != address(0), "LendingPool address is zero");
-        require(address(cv) != address(0), "CollateralVault address is zero");
-        require(address(lp) != address(0), "LiquidityPool address is zero");
-        require(usdToken != address(0), "USD token address is zero");
-        require(goldToken != address(0), "GOLD token address is zero");
+
+        Token(USDST).mint(address(this), 1000000e18);
+        require(IERC20(USDST).balanceOf(address(this)) == 1000000e18, "USDST balance should be 1000000e18 after mint");
+
+        require(pool.getExchangeRate() == 1e18, "Exchange rate should be 1e18 initially");
+
+        IERC20(USDST).approve(address(m.liquidityPool()), 1000000e18);
+        log("am a");
+        pool.depositLiquidity(1000000e18);
+        log("am b");
+        require(IERC20(USDST).balanceOf(address(this)) == 0, "USDST balance should be 0 after deposit");
+        require(IERC20(mUSDST).balanceOf(address(this)) == 1000000e18, "mUSDST balance should be 1000000e18 after 1:1 deposit");
     }
 
-    // ==== BAD DEBT SPECIFIC TESTS ====
+    function it_an_can_accept_safety_module_deposits() public {
+        SafetyModule sm = m.safetyModule();
 
-    // Test: Basic bad debt simulation using actual Mercata deployment
-    function it_zh_can_simulate_bad_debt_scenario() public {
-        // Create test tokens using the actual TokenFactory
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
+        // Mint USDST
+        Token(USDST).mint(address(this), 1000e18);
+        require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "USDST balance should be 1000e18 after mint");
         
-        // Set tokens to active status
-        Token(usdToken).setStatus(2);
-        Token(goldToken).setStatus(2);
-
-        
-        // Get actual infrastructure components
-        LendingPool pool = m.lendingPool();
-        PriceOracle oracle = m.priceOracle();
-
-        // Verify infrastructure is working with actual deployment
-        require(address(pool) != address(0), "Pool address is zero");
-        require(address(oracle) != address(0), "Oracle address is zero");
-        
-        // Verify AdminRegistry access and admin status  
-        AdminRegistry adminReg = m.adminRegistry();
-        require(address(adminReg) != address(0), "AdminRegistry address is zero");
-        bool isAdmin = adminReg.isAdminAddress(address(this));
-        require(isAdmin, "Test contract is not admin");
-
-        oracle.setAssetPrice(usdToken, 1e18);
-        oracle.setAssetPrice(goldToken, 2000e18);
-        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not 1e18");
-        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not 2000e18");
-
-        // Basic verification that we can access bad debt function
-        uint initialBadDebt = pool.badDebt();
-        require(initialBadDebt == 0, "Initial bad debt should be zero");
+        // Stake USDST in SafetyModule
+        IERC20(USDST).approve(address(sm), 1000e18);
+        sm.stake(1000e18, 0);
+        require(IERC20(USDST).balanceOf(address(this)) == 0, "USDST balance should be 0 after stake");
+        require(IERC20(sUSDST).balanceOf(address(this)) == 1000e18, "sUSDST balance should be 1000e18 after stake");
     }
 
-    // Test: Safety module functionality using actual deployment
-    function it_zi_can_test_safety_module_functionality() public {
-        // Test basic safety module access
-        // Note: SafetyModule might be initialized after LendingPool in deployment
-        
-        // Create test tokens
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(usdToken).setStatus(2);
-        
-        // Test that we can mint tokens for testing
-        Token(usdToken).mint(address(this), 1000e18);
-        require(IERC20(usdToken).balanceOf(address(this)) == 1000e18, "Token balance mismatch");
-        
-        // Verify safety module exists in deployment
-        require(address(m.safetyModule()) != address(0), "Safety module address is zero");
-    }
-
-    // Test: Pool configuration using actual deployment
-    function it_zj_can_test_pool_configuration_with_actual_deployment() public {
-        // Get actual pool from deployment
-        LendingPool pool = m.lendingPool();
-        PriceOracle oracle = m.priceOracle();
-        
-        // Create test tokens
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(usdToken).setStatus(2);
-        
-        // Test oracle price setting with actual oracle
-        oracle.setAssetPrice(usdToken, 1e18);
-        require(oracle.getAssetPrice(usdToken) == 1e18, "Price oracle working with actual deployment");
-        
-        // Test reserves functionality with actual pool
-        uint reserves = pool.reservesAccrued();
-        require(reserves >= 0, "Reserves value is negative");
-    }
-
-    // Test: Exchange rate behavior with bad debt using actual deployment
-    function it_zk_can_test_exchange_rate_with_bad_debt_actual_deployment() public {
-        // Get actual infrastructure
-        LendingPool pool = m.lendingPool();
-        LiquidityPool lp = m.liquidityPool();
-        PoolConfigurator configurator = m.poolConfigurator();
-
-        // Create test tokens
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address mUsdToken = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
-        
-        Token(usdToken).setStatus(2);
-        Token(mUsdToken).setStatus(2);
-        
-        // Configure the borrowable asset in the actual pool
-        configurator.setBorrowableAsset(usdToken);
-        configurator.setMToken(mUsdToken);
-        
-        // Configure asset parameters (LTV, liquidation threshold, etc.)
-        configurator.configureAsset(usdToken, 0, 0, 11000, 0, 1000, 1000000000000000000000000000);
-        
-        // Mint test tokens
-        Token(usdToken).mint(address(this), 10000e18);
-        Token(usdToken).mint(address(lp), 10000e18);
-        
-        // Get initial exchange rate from actual pool
-        uint rateBefore = pool.getExchangeRate();
-        require(rateBefore > 0, "Initial exchange rate should be positive");
-        
-        // Test that exchange rate remains stable with normal operations
-        // Note: Actual deposit/withdrawal would require more complex setup
-        // For now, verify the rate calculation works
-        require(rateBefore > 0, "Exchange rate is zero or negative");
-    }
-
-    // Test: Collateral and price scenarios using actual deployment
-    function it_zl_can_test_collateral_price_scenarios_actual_deployment() public {
-        // Get actual infrastructure components
-        PriceOracle oracle = m.priceOracle();
+    function it_ao_can_accept_collateral_vault_deposits() public {
         CollateralVault cv = m.collateralVault();
         LendingPool pool = m.lendingPool();
+
+        Token(GOLDST).mint(address(user1), 1e18);
+        require(IERC20(GOLDST).balanceOf(address(user1)) == 1e18, "GOLDST balance should be 1e18 after mint");
         
-        // Create test tokens
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        
-        Token(usdToken).setStatus(2);
-        Token(goldToken).setStatus(2);
-        
-        // Note: Asset configuration would normally be done through PoolConfigurator
-        // For testing purposes, we focus on price scenario simulation
-        
-        // Set initial prices using actual oracle
-        oracle.setAssetPrice(usdToken, 1e18);      // $1 USD
-        oracle.setAssetPrice(goldToken, 2000e18);  // $2000 Gold
-        
-        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not 1e18");
-        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not 2000e18");
-        
-        // Test price crash simulation
-        oracle.setAssetPrice(goldToken, 500e18); // $500 (75% crash)
-        require(oracle.getAssetPrice(goldToken) == 500e18, "Gold price not 500e18 after crash");
-        
-        // Test collateral management with actual vault
-        Token(goldToken).mint(address(this), 10e18);
-        uint balanceBefore = IERC20(goldToken).balanceOf(address(this));
-        require(balanceBefore == 10e18, "Gold token balance not 10e18");
-        
-        // Verify actual infrastructure components are accessible
-        require(address(cv) != address(0), "CollateralVault address is zero");
-        require(address(oracle) != address(0), "PriceOracle address is zero");
-        require(address(pool) != address(0), "LendingPool address is zero");
+        user1.do(GOLDST, "approve", address(cv), 1e18);
+        user1.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+
+        require(cv.userCollaterals(address(user1), GOLDST) == 1e18, "GOLDST balance should be 1e18 after supply collateral");
     }
-    
-    // ==== COMPREHENSIVE BAD DEBT SCENARIOS ====
+
+    function it_ap_can_accept_borrows() public {
+        LendingPool pool = m.lendingPool();
+
+        (uint ltv, uint foo, uint bar, uint bin, uint baz, uint snap) = pool.getAssetConfig(GOLDST);
+        uint price = m.priceOracle().getAssetPrice(GOLDST);
+
+        uint amount = price * ltv / (1e18 * 10000); // 1500
+        
+        user1.do(address(pool), "borrow", amount * 1e18);
+    }
+
+    function it_aq_can_tank_gold_price() public {
+        PriceOracle oracle = m.priceOracle();
+        LendingPool pool = m.lendingPool();
+
+        uint price = oracle.getAssetPrice(GOLDST);
+
+        uint newPrice = price / 2;
+
+        oracle.setAssetPrice(GOLDST, newPrice);
+
+        require(oracle.getAssetPrice(GOLDST) == newPrice, "GOLDST price should be 1000e18 after set price");
+
+        uint healthFactor = pool.getHealthFactor(address(user1));
+        log("healthFactor: "+string(healthFactor));
+        require(healthFactor < 1e18, "Health factor should be less than 1e18 after set price");
+    }
+
+    function it_ar_can_liquidate_borrower() public {
+        LendingPool pool = m.lendingPool();
+
+        pool.liquidationCallAll(GOLDST, address(user1));
+        require(
+            pool.getHealthFactor(address(user1)) < 1e18,
+            "Health factor should be less than 1e18 after *bad debt* liquidation"
+        );
+
+        require(pool.badDebt() != 0, "Bad debt should be nonzero after *bad debt* liquidation");
+
+        LoanInfo memory loan = pool.getUserLoan(address(user1));
+        require(loan.scaledDebt == 0, "User loan should be zero after bad debt liquidation");
+        require(loan.lastUpdated == 0, "User loan last updated should be zero after bad debt liquidation");
+    }
+
+    // ==== AI SLOP TESTS ====
 
     // Test: Complete bad debt scenario with liquidation failure
     function it_zm_can_simulate_complete_bad_debt_liquidation_failure() public {
