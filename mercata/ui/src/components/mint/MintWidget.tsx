@@ -413,10 +413,13 @@ const MintWidget: React.FC = () => {
         )}
         <PercentageButtons
           value={amount}
-          maxValue={externalTokenBalance?.formatted || "0"}
+          maxValue={safeParseUnits(
+            externalTokenBalance?.formatted || "0",
+            parseInt(selectedMintToken?.externalDecimals || "18")
+          ).toString()}
           onChange={setAmount}
           className="mt-2"
-          decimals={externalTokenBalance?.decimals || parseInt(selectedMintToken?.externalDecimals || "18")}
+          decimals={parseInt(selectedMintToken?.externalDecimals || "18")}
         />
       </div>
 
