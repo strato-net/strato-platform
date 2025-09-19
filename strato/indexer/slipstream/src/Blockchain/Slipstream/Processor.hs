@@ -160,8 +160,8 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       application = actionApplication,
       contractname = aiName,
       eventInfo = Nothing,
-      collectionname = collection,
-      collectiontype = ttype,
+      collection_name = collection,
+      collection_type = ttype,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
@@ -241,12 +241,12 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap, abs', rm) | VME.CodeCollectionAdded cc cp cr ap abs' rm <- messages]
+        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ _ <- messages]
       delegatecalls =
         [d | VME.DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap, abstracts', _) -> do
+  fkeys <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap) -> do
         $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
         multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
@@ -268,17 +268,7 @@ processTheMessages messages = do
             -- Create collection tables
             deferredForeignKeysForCollections <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
             
-            deferredForeignKeys <- case (_contractType c) of
-              AbstractType -> do
-                abstractfkeys <- createAbstractTable c nameParts abstracts' cc
-                createHistoryTable' True c cc nameParts
-                $logInfoS "processTheMessages/deferredForeignKeys/abstractfkeys" $ T.pack $ show abstractfkeys
-                return abstractfkeys
-              _ -> do
-                indexfkeys <- createIndexTable c cc nameParts
-                $logInfoS "processTheMessages/deferredForeignKeys/indexfkeys" $ T.pack $ show indexfkeys
-                createHistoryTable' False c cc nameParts
-                return indexfkeys
+            deferredForeignKeys <- createIndexTable c cc nameParts
 
             $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
             $logInfoS "processTheMessages/deferredForeignKeysForCollections" $ T.pack $ show deferredForeignKeysForCollections
@@ -348,17 +338,15 @@ processTheMessages messages = do
   mapOutput Right . outputDataDedup $ do
     forM_ insertsByCodeHash $ \ins -> do
       insertIndexTable $ indexInsert ins
-      insertAbstractTable (abstractInserts ins)-- not historic
-      unless ((length (collectionInserts ins) < 1)) $
+      unless (null $ collectionInserts ins) $
         insertCollectionTable $ collectionInserts ins
 
     forM_ delegatecalls insertDelegatecall
 
       --updating the foreign keys from null
     forM_ insertsByCodeHash $ \ins -> do
-      updateForeignKeysFromNULLAbstract (abstractInserts ins) -- not historic
       updateForeignKeysFromNULLIndex (indexInsert ins)
-      unless ((length (collectionInserts ins) < 1)) $
+      unless (null $ collectionInserts ins) $
         updateForeignKeysFromNULLArray (collectionInserts ins)
 
     forM_ concatFkeys $ \deferredForeignKey -> do
@@ -375,10 +363,7 @@ processTheMessages messages = do
         processedEventArrays = concatMap aggEventToCollectionRows processedEvents
          -- TODO: Remove arrays once marketplace switches over to using event
          -- array tables
-        processedEventsWithoutArrays = processedEvents
-        
-    -- Insert the events into the event tables
-    mapOutput Right . outputData $ insertEventTables processedEventArrays processedEventsWithoutArrays
+        -- processedEventsWithoutArrays = processedEvents
 
     -- Insert the events into the global 'events' table
     mapOutput Right . outputData $ pipeInsertGlobalEventTable processedEvents

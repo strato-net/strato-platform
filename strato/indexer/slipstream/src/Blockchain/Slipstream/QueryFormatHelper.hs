@@ -6,6 +6,7 @@ module Blockchain.Slipstream.QueryFormatHelper where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
+import Data.Text (Text)
 import qualified Data.Text as T
 
 -- TODO: Refactor this type before someone external sees it
@@ -152,6 +153,37 @@ tableShortName (EventTableName _ _ n e) = n <> "-" <> e
 tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
 tableShortName (AbstractTableName _ _ n) = n
 
+-- discard app if org is null
+constructTableNameParameters :: Text -> Text -> Text -> (Text, Text, Text)
+constructTableNameParameters crtr app contract
+  | T.null crtr = ("", "", contract)
+  | app == contract = (crtr, "", contract)
+  | otherwise = (crtr, app, contract)
+
+historyTableName :: Text -> Text -> Text -> TableName
+historyTableName creator a n = uncurry3 HistoryTableName $ constructTableNameParameters creator a n
+
+indexTableName :: Text -> Text -> Text -> TableName
+indexTableName creator a n = uncurry3 IndexTableName $ constructTableNameParameters creator a n
+
+collectionTableName :: Text -> Text -> Text -> Text -> TableName
+collectionTableName creator a n m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in CollectionTableName c' a' n' m
+
+eventTableName :: Text -> Text -> Text -> Text -> TableName
+eventTableName creator a n e =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventTableName c' a' n' e
+
+eventCollectionTableName :: Text -> Text -> Text -> Text -> Text -> TableName
+eventCollectionTableName creator a n e m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventCollectionTableName c' a' n' e m
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (x, y, z) = f x y z
+
 tableNameCreator :: TableName -> T.Text
 tableNameCreator (IndexTableName c _ _) = c
 tableNameCreator (CollectionTableName c _ _ _) = c
@@ -175,6 +207,16 @@ tableNameContractName (HistoryTableName _ _ n) = n
 tableNameContractName (EventTableName _ _ n _) = n
 tableNameContractName (EventCollectionTableName _ _ n _ _) = n
 tableNameContractName (AbstractTableName _ _ n) = n
+
+tableNameCollectionName :: TableName -> T.Text
+tableNameCollectionName (CollectionTableName _ _ _ c) = c
+tableNameCollectionName (EventCollectionTableName _ _ _ _ c) = c
+tableNameCollectionName _ = ""
+
+tableNameEventName :: TableName -> T.Text
+tableNameEventName (EventTableName _ _ _ e) = e
+tableNameEventName (EventCollectionTableName _ _ _ e _) = e
+tableNameEventName _ = ""
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char
