@@ -135,7 +135,6 @@ instance ASN1Object PrivateKey where
         : Start (Container Context 0)
         : OID [1, 3, 132, 0, 10]
         : End (Container Context 0)
-        : End Sequence
         : xs
       ) = case (importPrivateKey str) of
       Nothing -> Left "could not asn1decode privkey"

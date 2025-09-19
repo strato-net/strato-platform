@@ -4,15 +4,15 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { poolFactory } from "../../config/config";
-import { getInputPrice, getRequiredInput, calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice } from "../helpers/swapping.helper";
-import { getPool as getLendingRegistry } from "./lending.service";
+import { calculateImpliedPrice, calculateLPFees24h, calculatePoolAPY, calculateLPTokenPrice, getRawPoolData } from "../helpers/swapping.helper";
+import { getOraclePrices } from "./oracle.service";
 import { SwapHistoryEntry } from "../../types";
 
-const { poolSelectFields, Pool, PoolFactory, Token, PriceOracle, PoolSwap, swapHistorySelectFields } = constants;
+const { poolSelectFields, Pool, PoolFactory, Token, PoolSwap, swapHistorySelectFields } = constants;
 
 export const getPools = async (
   accessToken: string,
-  address: string | undefined,
+  userAddress: string | undefined,
   rawParams: Record<string, string | undefined> = {}
 ) => {
   const params = {
@@ -20,40 +20,40 @@ export const getPools = async (
       Object.entries(rawParams).filter(([_, v]) => v !== undefined)
     ),
     select: rawParams.select || poolSelectFields.join(","),
-    ...(rawParams.select
+    ...(rawParams.select || !userAddress
       ? {}
       : {
           "lpToken.balances.value": "gt.0",
-          "lpToken.balances.key": `eq.${address}`,
+          "lpToken.balances.key": `eq.${userAddress}`,
           "tokenA.balances.value": "gt.0",
-          "tokenA.balances.key": `eq.${address}`,
+          "tokenA.balances.key": `eq.${userAddress}`,
           "tokenB.balances.value": "gt.0",
-          "tokenB.balances.key": `eq.${address}`,
+          "tokenB.balances.key": `eq.${userAddress}`,
         }),
-      _owner: "eq." + constants.poolFactory,
   };
 
-  // DEBUG: log Cirrus query parameters to verify filters
-  if (process.env.DEBUG_GET_POOLS === 'true') {
-    console.log('[getPools] params →', params);
-  }
+  // Get pool data and factory data in parallel
+  const [poolData, { data: factoryData }] = await Promise.all([
+    getRawPoolData(accessToken, params),
+    cirrus.get(accessToken, `/${constants.PoolFactory}`, {
+      params: {
+        address: "eq." + poolFactory,
+        select: "swapFeeRate,lpSharePercent"
+      }
+    })
+  ]);
 
-  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
-    params,
-  });
+  // Extract token addresses for oracle price filtering
+  const tokenAddresses = [...new Set([
+    ...poolData.map((p: any) => p.tokenA?.address).filter(Boolean),
+    ...poolData.map((p: any) => p.tokenB?.address).filter(Boolean)
+  ])];
 
-  // Fetch oracle prices
-  const { oracle: { prices } } = await getLendingRegistry(accessToken, undefined, {
-    select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
+  // Fetch oracle prices for specific tokens
+  const priceMap = await getOraclePrices(accessToken, {
+    select: "asset:key,price:value::text",
+    key: `in.(${tokenAddresses.join(',')})`
   });
-  
-  const priceMap = new Map<string, string>(
-    Array.isArray(prices) 
-      ? prices
-          .map((p: any) => [p.key, p.value])
-          .filter(([key, value]) => key && typeof value === 'string') as [string, string][]
-      : []
-  );
 
   const poolAddresses = poolData.map((pool: any) => pool.address);
   const volumeMap = await getTradingVolume24hForPools(accessToken, poolAddresses, priceMap);
@@ -75,20 +75,48 @@ export const getPools = async (
     );
     
     const tradingVolume24h = volumeMap.get(pool.address) || "0";
-    const swapFeeRate = pool.swapFeeRate || 30;
-    const lpSharePercent = pool.lpSharePercent || 7000;
+    const factorySwapFeeRate = factoryData?.[0]?.swapFeeRate || 30;
+    const factoryLpSharePercent = factoryData?.[0]?.lpSharePercent || 7000;
+    const swapFeeRate = pool.swapFeeRate === 0 ? factorySwapFeeRate : pool.swapFeeRate;
+    const lpSharePercent = pool.lpSharePercent === 0 ? factoryLpSharePercent : pool.lpSharePercent;
     
     const fees24h = calculateLPFees24h(tradingVolume24h, swapFeeRate, lpSharePercent);
     const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
     
+    // Calculate oracle exchange rate (A to B) with proper decimal precision
+    const oracleAToBRatio = tokenAPrice !== "0" && tokenBPrice !== "0" 
+      ? (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18)
+      : "0";
+    
+    // Calculate oracle exchange rate (B to A) with proper decimal precision
+    const oracleBToARatio = tokenAPrice !== "0" && tokenBPrice !== "0"
+      ? (Number(tokenBPrice) / Number(tokenAPrice)).toFixed(18)
+      : "0";
+    
+    // Extract user balance from balances array for each token
+    const tokenABalance = pool.tokenA?.balances?.[0]?.balance || "0";
+    const tokenBBalance = pool.tokenB?.balances?.[0]?.balance || "0";
+    
     return {
       ...pool,
+      tokenA: {
+        ...pool.tokenA,
+        balance: tokenABalance // Add direct balance property for convenience
+      },
+      tokenB: {
+        ...pool.tokenB,
+        balance: tokenBBalance // Add direct balance property for convenience
+      },
       tokenAPrice,
       tokenBPrice,
       lpTokenPrice,
       totalLiquidityUSD,
       tradingVolume24h,
-      apy: apy.toFixed(2)
+      apy: apy.toFixed(2),
+      oracleAToBRatio: oracleAToBRatio.toString(),
+      oracleBToARatio: oracleBToARatio.toString(),
+      swapFeeRate,
+      lpSharePercent,
     };
   });
 };
@@ -338,62 +366,6 @@ export const swap = async (
   } catch (error) {
     throw error;
   }
-};
-
-export const calculateSwap = async (
-  accessToken: string,
-  calculateSwapParams: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-  }
-) => {
-  const { poolAddress, isAToB, amountIn } = calculateSwapParams;
-  
-  const pools = await getPools(accessToken, undefined, {
-    address: "eq." + poolAddress,
-    select: "tokenABalance,tokenBBalance,swapFeeRate",
-  });
-
-  if (!pools || pools.length === 0) {
-    throw new Error("No pools found for the given address");
-  }
-
-  const pool = pools[0];
-  const fee = (BigInt(amountIn) * BigInt(pool.swapFeeRate)) / BigInt(10000);
-  const netInput = BigInt(amountIn) - fee;
-  const [inputReserve, outputReserve] = isAToB 
-    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
-    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
-
-  return getInputPrice(netInput, inputReserve, outputReserve);
-};
-
-export const calculateSwapReverse = async (
-  accessToken: string,
-  calculateSwapReverseParams: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-  }
-) => {
-  const { poolAddress, isAToB, amountIn } = calculateSwapReverseParams;
-  
-  const pools = await getPools(accessToken, undefined, {
-    address: "eq." + poolAddress,
-    select: "tokenABalance,tokenBBalance",
-  });
-
-  if (!pools || pools.length === 0) {
-    throw new Error("No pools found for the given address");
-  }
-
-  const pool = pools[0];
-  const [inputReserve, outputReserve] = isAToB 
-    ? [BigInt(pool.tokenABalance), BigInt(pool.tokenBBalance)]
-    : [BigInt(pool.tokenBBalance), BigInt(pool.tokenABalance)];
-
-  return getRequiredInput(BigInt(amountIn), inputReserve, outputReserve);
 };
 
 export const getTradingVolume24hForPools = async (

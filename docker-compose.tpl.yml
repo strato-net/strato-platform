@@ -243,6 +243,7 @@ services:
     build: .
     environment:
       - NODE_HOST=${NODE_HOST}
+      - STRATO_HOSTNAME=${STRATO_HOSTNAME}
     image: ${PROMETHEUS_IMAGE:-<REPO_URL>prometheus:<VERSION>}
     volumes:
     - prometheusdata:/prometheus

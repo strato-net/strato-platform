@@ -17,6 +17,7 @@ dependencies:
   - common-log
   - evm-solidity
   - hflags
+  - monad-alter
   - raw-strings-qq
   - resourcet
 
@@ -39,7 +40,6 @@ library:
     - lens
     - lrucache
     - kafka-monad
-    - monad-alter
     - persistent
     - postgresql-typed
     - prometheus-client

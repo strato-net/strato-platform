@@ -28,7 +28,6 @@ import GHC.Stack
 import GHC.TypeLits
 import IdentityProvider.Client
 import SQLM
-import SelectAccessible ()
 import Servant
 import Servant.Client
 

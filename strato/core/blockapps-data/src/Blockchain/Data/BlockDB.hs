@@ -75,7 +75,7 @@ getBlock h = do
 
   case entBlkL of
     [] -> return Nothing
-    lst -> return $ Just . entityVal . head $ lst
+    (x:_) -> return . Just $ entityVal x
   where
     actions = E.select $
       E.from $ \bdRef -> do

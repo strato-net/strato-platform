@@ -47,7 +47,7 @@ library:
   - quickcheck-instances
   - regex-compat
   - resourcet
-  - secp256k1-haskell # remove
+  - blockapps-secp256k1-haskell # remove
   - servant-docs
   - strato-conf
   - strato-model

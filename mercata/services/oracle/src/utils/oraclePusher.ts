@@ -2,7 +2,7 @@ import { apiPost } from './apiClient';
 import { oauthClient } from './oauth';
 import { logError, logInfo } from './logger';
 import { TransactionResult, CallListArg } from '../types';
-import { checkUSDSTBalance } from './balanceChecker';
+import { checkBalances } from './balanceChecker';
 import { GAS_PARAMS, TIMEOUTS, RETRY_DELAYS } from './constants';
 
 export async function getUpdateInterval(): Promise<number> {
@@ -62,8 +62,8 @@ function extractTransactionHash(data: any): string {
 export async function pushAssetPrices(assets: string[], prices: number[]): Promise<TransactionResult> {
     logInfo('OraclePusher', 'Submitting prices');
     
-    // Check USDST balance before submitting
-    await checkUSDSTBalance();
+    // Check balances before submitting
+    await checkBalances();
     
     const callListArgs: CallListArg[] = [{
         contract: { address: process.env.PRICE_ORACLE_ADDRESS!, name: "PriceOracle" },
@@ -127,4 +127,4 @@ async function waitForTransaction(txHash: string): Promise<TransactionResult> {
     }
     
     throw new Error(`Transaction timeout after ${TIMEOUTS.WAIT}ms`);
-} 
+}

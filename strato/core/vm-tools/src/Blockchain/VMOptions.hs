@@ -36,6 +36,6 @@ defineFlag "queryBlocks" (10000 :: Int) "Number of blocks to query from SQL to p
 defineFlag "transactionRootVerification" False "Flag to turn transaction root verification or/off"
 defineFlag "startingBlock" (-1 :: Integer) "block in kafka to start running the VM on"
 defineFlag "svmDev" (False :: Bool) "Whether to crash on SolidVM exceptions"
-defineFlag "svmTrace" (True :: Bool) "Whether to have verbose logging in SolidVM"
+defineFlag "svmTrace" (False :: Bool) "Whether to have verbose logging in SolidVM"
 defineFlag "strictGas" (True :: Bool) "Whether to restrict transactions to approximately 2 second gas timeout"
 defineFlag "strictGasLimit" (400000 :: Integer) "The maximum amount of gas that can be used for a transaction in strict mode"

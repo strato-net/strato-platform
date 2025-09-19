@@ -14,6 +14,8 @@ module SolidVM.Model.CodeCollection.Import
     ItemImport,
     FileImportF (..),
     FileImport,
+    extractItemImport,
+    extractFileImport,
   )
 where
 
@@ -52,6 +54,10 @@ data ItemImportF a
 
 makeLenses ''ItemImportF
 
+extractItemImport :: ItemImportF a -> a
+extractItemImport (Named _ x) = x
+extractItemImport (Aliased _ _ x) = x
+
 instance Binary a => Binary (ItemImportF a)
 
 instance ToJSON a => ToJSON (ItemImportF a)
@@ -81,6 +87,11 @@ data FileImportF a
   deriving (Eq, Show, Generic, Functor, NFData, Foldable, Traversable)
 
 makeLenses ''FileImportF
+
+extractFileImport :: FileImportF a -> a
+extractFileImport (Simple _ x) = x
+extractFileImport (Qualified _ _ x) = x
+extractFileImport (Braced _ _ x) = x
 
 instance Binary a => Binary (FileImportF a)
 

@@ -182,13 +182,13 @@ contract Describe_Mercata {
         output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
     }
 
-    function it_can_store_variadic_args() {
+    function it_can_execute_issues() {
         User adminUser = new User();
         AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
         User u = new User();
         bool didExecute = false;
         try {
-            (bool didExecute2, string issueId) = u.do(address(admin), "createIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
+            (bool didExecute2, string issueId) = u.do(address(admin), "castVoteOnIssue", this, "performIssue", 7, true, address(0xdeadbeef), "what");
             didExecute = didExecute2;
         } catch {
 
@@ -245,9 +245,7 @@ contract Describe_Mercata {
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
-        (bool didntDoIt2, ) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
-        require(!didntDoIt2, "Contract was created before enough votes were cast");
-        (bool didIt, address blob) = u.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
+        (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         string blobOutput = blob.call("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }

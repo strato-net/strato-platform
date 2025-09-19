@@ -36,7 +36,7 @@ import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.StateDiff
-import Blockchain.Stream.Action (Action)
+import Blockchain.Stream.VMEvent
 import qualified Data.ByteString as B
 import qualified Data.DList as DL
 import Data.Map (Map)
@@ -92,13 +92,12 @@ data BlockVerificationFailure = BlockVerificationFailure
   } deriving (Eq, Show)
 
 data VmOutEvent
-  = OutAction Action
+  = OutVMEvents [VMEvent]
   | OutBlock OutputBlock
   | OutIndexEvent IndexEvent
   | OutStateDiff StateDiff
   | OutLog LogDB
   | OutEvent [EventDB]
-  | OutTXR TransactionResult
   | OutASM (Map Address AddressStateModification)
   | OutJSONRPC String B.ByteString
   | OutBlockVerificationFailure [BlockVerificationFailure]
@@ -107,14 +106,13 @@ data VmOutEvent
   | OutPreprepareResponse PreprepareDecision
 
 data VmOutEventBatch = OutBatch
-  { outActions :: DL.DList Action,
+  { outVMEvents :: DL.DList [VMEvent],
     outExecResults :: DL.DList ExecResults,
     outBlocks :: DL.DList OutputBlock,
     outIndexEvents :: DL.DList IndexEvent,
     outStateDiffs :: DL.DList StateDiff,
     outLogs :: DL.DList LogDB,
     outEvents :: DL.DList EventDB,
-    outTXRs :: DL.DList TransactionResult,
     outASMs :: DL.DList (Map Address AddressStateModification),
     outJSONRPCs :: DL.DList (String, B.ByteString),
     outBlockVerificationFailure :: [BlockVerificationFailure],
@@ -135,7 +133,6 @@ newOutBatch =
     DL.empty
     DL.empty
     DL.empty
-    DL.empty
     []
     DL.empty
     DL.empty
@@ -143,13 +140,12 @@ newOutBatch =
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
-  OutAction a -> b {outActions = outActions b `DL.snoc` a}
+  OutVMEvents a -> b {outVMEvents = outVMEvents b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}
   OutLog a -> b {outLogs = outLogs b `DL.snoc` a}
   OutEvent a -> b {outEvents = outEvents b `DL.append` DL.fromList a}
-  OutTXR a -> b {outTXRs = outTXRs b `DL.snoc` a}
   OutASM a -> b {outASMs = outASMs b `DL.snoc` a}
   OutJSONRPC x y -> b {outJSONRPCs = outJSONRPCs b `DL.snoc` (x, y)}
   OutBlockVerificationFailure bvf -> b {outBlockVerificationFailure = bvf}

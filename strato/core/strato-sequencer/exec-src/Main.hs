@@ -97,7 +97,8 @@ main = do
 
   let seqCfg =
         SequencerConfig
-          { depBlockDBCacheSize = flags_depblockcachesize,
+          { dependentBlockDB = error "Dependent Block DB not initialized",
+            depBlockDBCacheSize = flags_depblockcachesize,
             depBlockDBPath = flags_depblockdbpath,
             seenTransactionDBSize = flags_txdedupwindow,
             blockstanbulBlockPeriod = BlockPeriod $ fromIntegral flags_blockstanbul_block_period_ms / 1000.0,

@@ -30,15 +30,20 @@ const config = {
   bridge: {
     address: process.env.BRIDGE_ADDRESS,
   },
+  usdst: {
+    address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
+    minBalance: BigInt(20) * BigInt(1e18),
+  },
   safe: {
     address: process.env.SAFE_ADDRESS,
-    safeOwnerAddress: process.env.SAFE_OWNER_ADDRESS,
-    safeOwnerPrivateKey: process.env.SAFE_OWNER_PRIVATE_KEY,
+    safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
+    safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
   },
   voucher: {
     contractAddress:
       process.env.VOUCHER_CONTRACT_ADDRESS ||
       "000000000000000000000000000000000000100e",
+    mintCount: 10,
   },
   polling: {
     bridgeInInterval: 1 * 60 * 1000, // 5 minutes (was 100 seconds)
@@ -97,8 +102,8 @@ const requiredEnvVars = [
   "OPENID_DISCOVERY_URL",
   "BRIDGE_ADDRESS",
   "SAFE_ADDRESS",
-  "SAFE_OWNER_ADDRESS",
-  "SAFE_OWNER_PRIVATE_KEY",
+  "SAFE_PROPOSER_ADDRESS",
+  "SAFE_PROPOSER_PRIVATE_KEY",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);

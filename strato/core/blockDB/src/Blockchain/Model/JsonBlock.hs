@@ -87,7 +87,9 @@ parseHexStr :: (Integral a) => Parser String -> Parser a
 parseHexStr = fmap readHexStr
 
 readHexStr :: Integral a => String -> a
-readHexStr = fst . head . readHex
+readHexStr s = case readHex s of
+  [] -> error $ "readHexStr: Could not read hex from string " ++ s
+  (x:_) -> fst x
 
 instance FromJSON RawTransaction' where
   parseJSON (Object t) = do
@@ -521,10 +523,13 @@ instance FromJSON AddressStateRef' where
     kind <- s .: "kind"
     if kind /= ("AddressStateRef" :: String)
       then fail "JSON is not AddressStateRef"
-      else
-        asrToAsrPrime'
-          <$> ( AddressStateRef . Address . fst . head . readHex <$> s .: "address"
-                  <*> s .: "nonce"
+      else do
+        addr <- s .: "address"
+        case readHex addr of
+          [] -> fail $ "parseJSON AddressStateRef': Could not read address from string " ++ addr
+          (a:_) -> asrToAsrPrime' <$>
+              ( AddressStateRef (Address $ fst a)
+                  <$> s .: "nonce"
                   <*> (LabeledError.read "FromJSON/AddressRef'" <$> (s .: "balance"))
                   <*> s .: "contractRoot"
                   -- <*> s .: "code"

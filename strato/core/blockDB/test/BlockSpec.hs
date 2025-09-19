@@ -341,8 +341,8 @@ unsafeExtractTX file = do
   rawInput <- readFile file
   let input = C8.pack rawInput
   return $ case Ae.eitherDecode input :: Either String [Transaction'] of
-    Right txs -> head txs
-    Left _ -> undefined
+    Right (tx:_) -> tx
+    _ -> undefined
 
 matchingHash :: Spec
 matchingHash = it "doesnt mutate the hash" $ do
@@ -378,10 +378,14 @@ eventualHashIdempotency :: Spec
 eventualHashIdempotency = it "converged to a hash" $ do
   tx <- unsafeExtractTX "test/testdata/single_contract_tx.json"
   let hashes = map (transactionHash . tPrimeToT) . take 3 . maybeStar rt $ tx
-  hashes `shouldBe` replicate 3 (head hashes)
+  case hashes of
+    [] -> hashes `shouldNotBe` hashes
+    (h:_) -> hashes `shouldBe` replicate 3 h
 
 eventualFromIdempotency :: Spec
 eventualFromIdempotency = it "converged to a from" $ do
   tx <- unsafeExtractTX "test/testdata/single_contract_tx.json"
   let froms = map (whoSignedThisTransaction . tPrimeToT) . take 3 . maybeStar rt $ tx
-  froms `shouldBe` replicate 3 (head froms)
+  case froms of
+    [] -> froms `shouldNotBe` froms
+    (f:_) -> froms `shouldBe` replicate 3 f

@@ -15,6 +15,7 @@
 
 module Blockchain.Sequencer.Monad
   ( MonadBlockstanbul,
+    Modification(..),
     SequencerContext (..),
     SequencerConfig (..),
     SequencerM,
@@ -25,6 +26,9 @@ module Blockchain.Sequencer.Monad
     createFirstTimer,
     createNewTimer,
     fuseChannels,
+    seenTransactionDB,
+    blockstanbulContext,
+    latestRoundNumber
   )
 where
 
@@ -79,8 +83,7 @@ import Prelude hiding (round)
 data Modification a = Modification a | Deletion deriving (Show)
 
 data SequencerContext = SequencerContext
-  { _dependentBlockDB :: DependentBlockDB,
-    _seenTransactionDB :: !SeenTransactionDB,
+  { _seenTransactionDB :: !SeenTransactionDB,
     _blockstanbulContext :: Maybe BlockstanbulContext,
     _latestRoundNumber :: IORef RoundNumber
   }
@@ -105,7 +108,8 @@ newtype BlockPeriod = BlockPeriod {unBlockPeriod :: NominalDiffTime}
 newtype RoundPeriod = RoundPeriod {unRoundPeriod :: NominalDiffTime}
 
 data SequencerConfig = SequencerConfig
-  { depBlockDBCacheSize :: Int,
+  { dependentBlockDB :: DependentBlockDB,
+    depBlockDBCacheSize :: Int,
     depBlockDBPath :: String,
     seenTransactionDBSize :: Int,
     blockstanbulBlockPeriod :: BlockPeriod,
@@ -121,11 +125,11 @@ data SequencerConfig = SequencerConfig
 
 type SequencerM = StateT SequencerContext (ReaderT SequencerConfig (KafkaM (ResourceT (LoggingT IO))))
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => HasDependentBlockDB m where
-  getDependentBlockDB = use dependentBlockDB
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT SequencerConfig m) where
+  access _ = asks dependentBlockDB
 
-instance MonadState SequencerContext m => Mod.Accessible LDB.DB m where
-  access _ = use dependentBlockDB
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
+  access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
 
 class HasNamespace a where
   type NSKey a
@@ -171,51 +175,51 @@ deleteInLDB p k = do
   db <- Mod.access Mod.Proxy
   LDB.delete db LDB.defaultWriteOptions (namespaced p k)
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Address `A.Alters` X509CertInfoState) m where
+instance (MonadIO m, Mod.Accessible LDB.DB m) => (Address `A.Alters` X509CertInfoState) m where
   lookup = lookupInLDB
   insert p k v = insertInLDB p k v
   delete p k = deleteInLDB p k
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => A.Selectable Address X509CertInfoState m where
+instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState SequencerM where
   select = A.lookup
 
-instance (MonadIO m, MonadLogger m, MonadState SequencerContext m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
+instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
   lookup _ k = lookupDependentBlockDB k
   insert _ k v = insertDependentBlockDB k v
   delete _ k = deleteDependentBlockDB k
 
-instance (Monad m, MonadState SequencerContext m) => Mod.Modifiable SeenTransactionDB m where
+instance Monad m => Mod.Modifiable SeenTransactionDB (StateT SequencerContext m) where
   get _ = use seenTransactionDB
   put _ = modify' . (.~) seenTransactionDB
 
-instance MonadState SequencerContext m => Mod.Accessible (IORef RoundNumber) m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (IORef RoundNumber) (StateT SequencerContext m) where
   access _ = use latestRoundNumber
 
-instance MonadReader SequencerConfig m => Mod.Accessible (TMChan RoundNumber) m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible (TMChan RoundNumber) (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulTimeouts
 
-instance MonadReader SequencerConfig m => Mod.Accessible BlockPeriod m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible BlockPeriod (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulBlockPeriod
 
-instance MonadReader SequencerConfig m => Mod.Accessible RoundPeriod m where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RoundPeriod (ReaderT SequencerConfig m) where
   access _ = asks blockstanbulRoundPeriod
 
-instance Mod.Accessible View SequencerM where
+instance {-# OVERLAPPING #-} Mod.Accessible View SequencerM where
   access _ = currentView
 
-instance Mod.Accessible RBDB.RedisConnection SequencerM where
+instance {-# OVERLAPPING #-} Monad m => Mod.Accessible RBDB.RedisConnection (ReaderT SequencerConfig m) where
   access _ = asks redisConn
 
-instance MonadState SequencerContext m => (Keccak256 `A.Alters` ()) m where
+instance Monad m => (Keccak256 `A.Alters` ()) (StateT SequencerContext m) where
   lookup _ = genericLookupSeenTransactionDB
   insert _ = genericInsertSeenTransactionDB
   delete _ = genericDeleteSeenTransactionDB
 
-instance (Monad m, MonadState SequencerContext m) => HasBlockstanbulContext m where
+instance Monad m => HasBlockstanbulContext (StateT SequencerContext m) where
   getBlockstanbulContext = use blockstanbulContext
   putBlockstanbulContext = modify' . (.~) (blockstanbulContext . _Just)
 
-instance (MonadIO m, MonadLogger m, Mod.Accessible RBDB.RedisConnection m, MonadReader SequencerConfig m) => Mod.Modifiable BestSequencedBlock m where
+instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT SequencerConfig m) where
   get _ =
     RBDB.withRedisBlockDB getBestSequencedBlockInfo <&> \case
       Nothing -> BestSequencedBlock (unsafeCreateKeccak256FromWord256 0) (-1) []
@@ -225,13 +229,17 @@ instance (MonadIO m, MonadLogger m, Mod.Accessible RBDB.RedisConnection m, Monad
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
+instance (MonadIO m, MonadLogger m, Mod.Modifiable BestSequencedBlock m) => Mod.Modifiable BestSequencedBlock (StateT SequencerContext m) where
+  get   = lift . Mod.get
+  put p = lift . Mod.put p
+
 -- If there is no vault client (i.e. in hspec tests), the HasVault instance will use this key,
 -- I know, it's ugly...the SequencerSpec test uses SequencerM itself, so this was a lot
 -- easier than making a whole new SequencerM definition just to get a different HasVault instance
 testPriv :: PrivateKey
 testPriv = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "testPriv" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-instance (Monad m, MonadIO m, MonadLogger m, MonadReader SequencerConfig m) => HasVault m where
+instance (MonadIO m, MonadLogger m) => HasVault (ReaderT SequencerConfig m) where
   sign mesg = do
     mVc <- asks vaultClient
     case mVc of
@@ -240,6 +248,11 @@ instance (Monad m, MonadIO m, MonadLogger m, MonadReader SequencerConfig m) => H
 
   getPub = error "called getPub in SequencerM, but this should never happen"
   getShared _ = error "called getShared in SequencerM, but this should never happen"
+
+instance (MonadIO m, HasVault m) => HasVault (StateT SequencerContext m) where
+  sign      = lift . sign
+  getPub    = lift getPub
+  getShared = lift . getShared
 
 waitOnVault :: (Show a, MonadIO m, MonadLogger m) => m (Either a b) -> m b
 waitOnVault action = do
@@ -257,17 +270,15 @@ waitOnVault action = do
 runSequencerM :: SequencerConfig -> Maybe BlockstanbulContext -> SequencerM a -> (LoggingT IO) a
 runSequencerM c mbc m = do
   liftIO $ createDirectoryIfMissing False $ dbDir "h"
-  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) . flip runReaderT c $ do
-    dbCS <- asks depBlockDBCacheSize
-    dbPath <- asks depBlockDBPath
-    stxSize <- asks seenTransactionDBSize
-    depBlock <- LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
+  a <- runResourceT . runKafkaMConfigured (kafkaClientId c) $ do
+    let dbCS = depBlockDBCacheSize c
+        dbPath = depBlockDBPath c
+        stxSize = seenTransactionDBSize c
+    depBlock <- DependentBlockDB <$> LDB.open dbPath LDB.defaultOptions {LDB.createIfMissing = True, LDB.cacheSize = dbCS}
     latestRound <- liftIO $ newIORef 0
-    runStateT
-      m
+    flip runReaderT c{dependentBlockDB = depBlock} $ runStateT m
       SequencerContext
-        { _dependentBlockDB = depBlock,
-          _seenTransactionDB = mkSeenTxDB stxSize,
+        { _seenTransactionDB = mkSeenTxDB stxSize,
           _blockstanbulContext = mbc,
           _latestRoundNumber = latestRound
         }

@@ -10,7 +10,7 @@ import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiAmount } from "@/utils/numberUtils";
 import { bridgeContractService } from "@/lib/bridge/contractService";
 
-const DepositTransactionDetails = () => {
+const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [depositStatus, setDepositStatus] = useState<number | null>(null);
@@ -33,7 +33,7 @@ const DepositTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = 'eq.false';
+        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
@@ -126,7 +126,7 @@ const DepositTransactionDetails = () => {
       key: "token",
       render: (_: any, record: any) => (
         <div className="flex flex-col gap-1">
-          <span className="text-sm text-gray-700">{record.stratoTokenSymbol || '-'}</span>
+          <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : record.stratoTokenSymbol || '-'}</span>
         </div>
       ),
       width: 150,

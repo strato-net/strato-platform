@@ -134,13 +134,16 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Alters` AddressStat
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` AddressState) m where
+instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` AddressState) (ReaderT SetupDBs m) where
   select _ = getAddressStateMaybe
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m where
   lookup _ = genericLookupCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   insert _ = genericInsertCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
   delete _ = genericDeleteCodeDB $ fmap codeDB $ Mod.access Mod.Proxy
+ 
+instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
+  select _ _ = pure Nothing
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
   select _ = error "SetupDBM select @X509Certificate"

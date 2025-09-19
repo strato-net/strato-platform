@@ -10,6 +10,7 @@
 
 module Blockchain.GenesisBlock
   ( initializeGenesisBlock
+  , populateStorageDBs'
   )
 where
 
@@ -215,6 +216,28 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
+  let pub sd vmes = do
+        commitSqlDiffs sd
+        void $ produceVMEvents vmes
+  populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub
+
+populateStorageDBs' ::
+  ( MonadIO m,
+    MonadLogger m,
+    HasCodeDB m,
+    HasStateDB m,
+    HasHashDB m,
+    HasStorageDB m,
+    Selectable Ad.Address AddressState m
+  ) =>
+  (Keccak256 -> Maybe (Map Text Text)) ->
+  GenesisInfo ->
+  Block ->
+  Maybe Word256 ->
+  MP.StateRoot ->
+  (StateDiff.StateDiff -> [VMEvent] -> m ()) ->
+  m ()
+populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub = do
   mSR <- A.lookup (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
@@ -249,8 +272,7 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
     vmEvents <- squashMap (toAction addressEvents) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
-    commitSqlDiffs (mkStateDiff fullAccountDiffs)
-    void $ produceVMEvents vmEvents
+    pub (mkStateDiff fullAccountDiffs) vmEvents
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 

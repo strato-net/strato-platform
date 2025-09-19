@@ -2,6 +2,7 @@ import "./LendingRegistry.sol";
 import "./CollateralVault.sol";
 import "./LiquidityPool.sol";
 import "./PriceOracle.sol";
+import "./SafetyModule.sol";
 import "../Admin/FeeCollector.sol";
 import "../Tokens/TokenFactory.sol";
 
@@ -30,7 +31,10 @@ contract record LendingPool is Ownable {
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
     event DebtCeilingsUpdated(uint assetUnits, uint usdValue);
     event IndexAccrued(uint oldIndex, uint newIndex, uint dt, uint rateBps, uint interestDelta, uint reservesAccruedAfter);
-    event ReservesSwept(uint amount, address to);
+    event ReservesSweptTreasury(uint amount, address to);
+    event ReservesSweptSafety(uint amount, address to);
+    event BadDebtRecognized(uint amount);     // global, no borrower index
+    event BadDebtCovered(uint cover, uint remainingBadDebt);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -63,9 +67,14 @@ contract record LendingPool is Ownable {
     uint public totalScaledDebt; // sum of all users' scaled debt
     uint public reservesAccrued; // protocol reserves accrued in underlying units
 
+    // ── Shortfall / bad debt (global only)
+    uint public badDebt;                      // base units of borrowableAsset
+
     // ── System-wide debt ceilings ─────────────────────────────────────────────────────
     uint public debtCeilingAsset; // cap in underlying asset units (18d); 0 disables
     uint public debtCeilingUSD;   // cap in USD 1e18; 0 disables
+
+    uint  public safetyShareBps;      // % of reserves to SM on sweep, e.g. 2000 = 20%
 
    // Loan Management - One loan per user
     mapping(address => LoanInfo) public record userLoan; // user => single loan
@@ -85,18 +94,20 @@ contract record LendingPool is Ownable {
     TokenFactory public tokenFactory;
     address public poolConfigurator;
     FeeCollector public feeCollector;
-
+    SafetyModule public safetyModule;                 
+ 
     // ═══════════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR & MODIFIERS
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory, address _feeCollector) Ownable(initialOwner) {
+    constructor(address _registry, address _poolConfigurator, address initialOwner, address _tokenFactory, address _feeCollector, address _safetyModule) Ownable(initialOwner) {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
         poolConfigurator = _poolConfigurator;
         tokenFactory = TokenFactory(_tokenFactory);
         feeCollector = FeeCollector(_feeCollector);
+        safetyModule = SafetyModule(_safetyModule);
         borrowIndex = RAY;
         lastAccrual = uint(block.timestamp);
     }
@@ -423,8 +434,7 @@ contract record LendingPool is Ownable {
 
         // Underlying amount based on current exchange rate
         uint exchangeRate = getExchangeRate();
-        uint underlyingAmount = (userShares * 1e18) / 1e18; // placeholder to keep form
-        underlyingAmount = (userShares * exchangeRate) / 1e18;
+        uint underlyingAmount = (userShares * exchangeRate) / 1e18;
 
         // Ensure pool has liquidity
         address asset = borrowableAsset;
@@ -574,6 +584,27 @@ contract record LendingPool is Ownable {
         // Transfer collateral to liquidator
         CollateralVault(_collateralVault()).seizeCollateral(borrower, msg.sender, collateralAsset, collateralToSeize);
 
+            // If no collateral remains and loan still has debt → recognize it as bad debt
+        if (_getTotalCollateralValueForHealth(borrower) == 0) {
+            LoanInfo storage ln = userLoan[borrower];
+            uint scaled = ln.scaledDebt;
+            if (scaled > 0) {
+                uint baseBad = (scaled * borrowIndex) / RAY; // convert to base
+
+                // Stop interest accrual on this chunk
+                totalScaledDebt -= scaled;
+
+                // Zero the user loan
+                ln.scaledDebt = 0;
+                delete userLoan[borrower];
+
+                // Bump global bad debt
+                badDebt += baseBad;
+
+                emit BadDebtRecognized(baseBad);
+            }
+        }
+
         // cash ↑, debt ↓ (after _accrue and debt reduction)
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
         emit Liquidated(borrower, borrowableAsset, debtToCover, collateralAsset, collateralToSeize);
@@ -695,7 +726,16 @@ contract record LendingPool is Ownable {
         require(reserveFactor <= 5000, "Reserve factor too high"); // Max 50%
         require(perSecondFactorRAY >= RAY, "Invalid per-second factor");
 
-        _accrue();
+        bool isBorrowAsset = (asset == borrowableAsset);
+        bool canAccrue =
+            isBorrowAsset &&
+            assetConfigs[asset].perSecondFactorRAY > 0 &&
+            borrowIndex != 0 &&
+            lastAccrual != 0;
+
+        if (canAccrue) {
+            _accrue();
+        }
         
         // If this is a new asset, add it to configuredAssets array
         if (assetConfigs[asset].ltv == 0 && assetConfigs[asset].liquidationThreshold == 0) {
@@ -746,7 +786,7 @@ contract record LendingPool is Ownable {
         uint debt = _totalDebt(); // index-based system debt
 
         // Suppliers' claimable underlying excludes protocol reserves
-        uint underlying = cash + debt;
+        uint underlying = cash + debt + badDebt;  // ← add recognized receivable
         if (reservesAccrued < underlying) {
             underlying -= reservesAccrued;
         } else {
@@ -828,6 +868,11 @@ contract record LendingPool is Ownable {
     function setFeeCollector(address _feeCollector) external onlyPoolConfigurator {
         feeCollector = FeeCollector(_feeCollector);
     }
+
+    function setSafetyModule(address _safetyModule) external onlyPoolConfigurator {
+        safetyModule = SafetyModule(_safetyModule);
+    }
+
     /**
      * @notice Set the single borrowable asset
      * @param _asset The asset that can be borrowed
@@ -860,20 +905,42 @@ contract record LendingPool is Ownable {
         emit DebtCeilingsUpdated(assetUnits, usdValue);
     }
 
+     // Setter function for updating the share of reserves for safety module
+     function setSafetyShareBps(uint bps) external onlyPoolConfigurator {
+        require(bps <= 10000, "LP:bad bps");
+        safetyShareBps = bps;
+    }
+
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
     function sweepReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0 || reservesAccrued == 0) return;
-        _accrue();
+        _accrue(); 
+
         uint cash = IERC20(borrowableAsset).balanceOf(address(_liquidityPool()));
         uint toSend = amount;
         if (toSend > reservesAccrued) toSend = reservesAccrued;
         if (toSend > cash) toSend = cash;
+        if (toSend == 0) return;
 
-        if (toSend > 0 && address(feeCollector) != address(0)) {
-            LiquidityPool(_liquidityPool()).transferReserve(toSend, address(feeCollector));
-            reservesAccrued -= toSend;
-            emit ReservesSwept(toSend, address(feeCollector));
+        uint toSafety = (toSend * safetyShareBps) / 10000;
+        uint toTreas  = toSend - toSafety;
+
+        // Pay SM directly from LiquidityPool
+        if (toSafety > 0 && address(safetyModule) != address(0)) {
+            LiquidityPool(_liquidityPool()).transferReserve(toSafety, address(safetyModule));
+            // Optional: if you want a log inside SM, you could later have governance call SM.notifyReward(toSafety).
+            // Not required for accounting; SM.totalAssets() reads its balance directly.
         }
+
+        // Pay treasury/feeCollector as usual
+        if (toTreas > 0 && address(feeCollector) != address(0)) {
+            LiquidityPool(_liquidityPool()).transferReserve(toTreas, address(feeCollector));
+        }
+
+        reservesAccrued -= toSend;
+
+        emit ReservesSweptSafety(toSafety, address(safetyModule)); 
+        emit ReservesSweptTreasury(toTreas, address(feeCollector)); 
     }
     
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -1017,5 +1084,44 @@ contract record LendingPool is Ownable {
         uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
         if (price == 0) return 0;
         return (debt * price) / 1e18;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // BAD DEPT  FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    function recognizeBadDebt(address borrower) external onlyPoolConfigurator {
+        _accrue();
+        if (_getTotalCollateralValueForHealth(borrower) > 0) return;
+
+        LoanInfo storage ln = userLoan[borrower];
+        uint scaled = ln.scaledDebt;
+        if (scaled == 0) return;
+
+        uint baseBad = (scaled * borrowIndex) / RAY;
+
+        totalScaledDebt -= scaled;
+        ln.scaledDebt = 0;
+        delete userLoan[borrower];
+
+        badDebt += baseBad;
+
+        emit BadDebtRecognized(baseBad);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+    }
+
+    function coverShortfall(uint amount) external {
+        require(msg.sender == address(safetyModule), "LP:not SM");
+        require(amount > 0, "LP:zero");
+
+        // Cash already moved to LiquidityPool by SM in the same tx.
+        uint cover = amount <= badDebt ? amount : badDebt;
+        if (cover > 0) {
+            badDebt -= cover;
+            emit BadDebtCovered(cover, badDebt);
+        }
+
+        // Any excess cash simply improves liquidity until swept to reserves
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 } 

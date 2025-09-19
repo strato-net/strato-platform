@@ -11,7 +11,7 @@ const BridgeWidget = () => {
   const [activeTab, setActiveTab] = useState('bridgeIn');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { loadNetworksAndTokens } = useBridgeContext();
+  const { loadNetworksAndTokens, setTargetTransactionTab } = useBridgeContext();
 
   // Load networks on component mount
   useEffect(() => {
@@ -45,7 +45,12 @@ const BridgeWidget = () => {
           variant="ghost"
           size="sm"
           className="flex items-center gap-2"
-          onClick={() => navigate("/dashboard/bridge-transactions")}
+          onClick={() => {
+            // Set the target tab based on the current active tab
+            const targetTab = activeTab === 'bridgeIn' ? 'DepositRecorded' : 'WithdrawalInitiated';
+            setTargetTransactionTab(targetTab);
+            navigate("/dashboard/bridge-transactions");
+          }}
         >
           <History className="h-4 w-4" />
           View Transactions

@@ -232,7 +232,7 @@ export async function initializeSafeForChain(chainId: number) {
   const rpcUrl = getChainRpcUrl(chainId);
   const protocolKit = await Safe.init({
     provider: rpcUrl,
-    signer: config.safe.safeOwnerPrivateKey || "",
+    signer: config.safe.safeProposerPrivateKey || "",
     safeAddress: config.safe.address || "",
   });
   const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId) });
@@ -254,7 +254,7 @@ export async function createWithdrawalProposals(
 
   const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
-  const relayer = config.safe.safeOwnerAddress || "";
+  const relayer = config.safe.safeProposerAddress || "";
   let currentNonce = Number(await retry(
     () => apiKit.getNextNonce(safeAddress),
     { logPrefix: "SafeService" }

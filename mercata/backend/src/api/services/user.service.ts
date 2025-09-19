@@ -1,4 +1,4 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { bloc, cirrus, eth, strato } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -107,5 +107,133 @@ export const removeAdmin = async (
     return { status, hash };
   } catch (error) {
     throw error;
+  }
+};
+
+// Remove an admin from the registry
+export const castVoteOnIssue = async (
+  accessToken: string,
+  target: string,
+  func: string, 
+  args: string[],
+): Promise<{ status: string; hash: string }> => {
+  try {
+    let flattenedArgs: any = args;
+    if (args.length === 1) {
+      flattenedArgs = args[0];
+    }
+    const tx = buildFunctionTx({
+      contractName: extractContractName(AdminRegistry),
+      contractAddress: adminRegistry,
+      method: "castVoteOnIssue",
+      args: {
+        _target: target,
+        _func: func,
+        _args: flattenedArgs,
+      },
+    });
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const getOpenIssues = async (
+  accessToken: string,
+): Promise<object> => {
+  try {
+    const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
+      params: {
+        select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value),executed:${AdminRegistry}-IssueExecuted(*)`,
+        ['votes.value']: 'neq.',
+        ['executed.limit']: 10,
+        ['executed.order']: 'block_timestamp.desc',
+      },
+    });
+
+    if (response.status !== 200) {
+      return {};
+    }
+
+    if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
+      return {};
+    }
+
+    const { admins, votes, thresholds, executed } = response.data[0];
+
+    const issueIds = new Set(votes.map((v: any) => v.issueId));
+
+    const issuesResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+      params: {
+        issueId: `in.(${[...issueIds].join(',')})`
+      },
+    });
+
+    return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
+  } catch (error) {
+    return [];
+  }
+};
+
+export const contractSearch = async (
+  accessToken: string,
+  search: string,
+): Promise<object> => {
+  try {
+    const accountResponse = await eth.get(accessToken, "/account", {
+      params: {
+        search
+      },
+    });
+
+    const storageResponse = await eth.get(accessToken, "/storage", {
+      params: {
+        search
+      },
+    });
+
+    if (storageResponse.status !== 200) {
+      return {};
+    }
+
+    let responseData: any[] = [];
+
+    if (accountResponse.data && Array.isArray(storageResponse.data)) {
+      responseData = [ ...responseData, ...accountResponse.data];
+    }
+
+    if (storageResponse.data && Array.isArray(storageResponse.data)) {
+      responseData = [ ...responseData, ...storageResponse.data];
+    }
+
+    return responseData;
+  } catch (error) {
+    return [];
+  }
+};
+
+export const getContractDetails = async (
+  accessToken: string,
+  address: string,
+): Promise<object> => {
+  try {
+    const response = await bloc.get(accessToken, `/contracts/contract/${address}/details`);
+
+    if (response.status !== 200) {
+      return {};
+    }
+
+    if (!response.data) {
+      return {};
+    }
+
+    return response.data;
+  } catch (error) {
+    return {};
   }
 };

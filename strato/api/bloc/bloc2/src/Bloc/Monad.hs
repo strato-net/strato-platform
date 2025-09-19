@@ -27,7 +27,6 @@ module Bloc.Monad
   )
 where
 
-import Bloc.API.Transaction
 import BlockApps.Logging
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
@@ -55,7 +54,6 @@ data BlocEnv = BlocEnv
     txSizeLimit :: Int,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Address Nonce,
-    txTBQueue :: TBQueue (Maybe Text, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
     useWalletsByDefault :: Bool
@@ -64,7 +62,7 @@ data BlocEnv = BlocEnv
 --------------------------------------------------------------------------------
 
 blocVaultWrapper ::
-  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+  (MonadIO m, MonadLogger m, Accessible VaultData m, HasCallStack) =>
   ClientM x ->
   m x
 blocVaultWrapper client' = do

@@ -80,6 +80,8 @@ export interface BridgeTransactionResponse {
   totalCount: number;
 }
 
+export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | 'RedemptionInitiated' | 'USDSTDeposit';
+
 export type BridgeContextType = {
   loading: boolean;
   error: string | null;
@@ -89,6 +91,9 @@ export type BridgeContextType = {
   selectedNetwork: string | null;
   selectedToken: Token | null;
   selectedMintToken: Token | null;
+  // Navigation state for bridge transactions
+  targetTransactionTab: BridgeTransactionTab | null;
+  setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
   bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   redeemOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {

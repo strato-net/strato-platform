@@ -12,6 +12,11 @@ const HealthImpactDisplay = ({
   showWarning = true, 
   className = "" 
 }: HealthImpactDisplayProps) => {
+  const gettingWorse =
+    Number.isFinite(healthImpact.currentHealthFactor) &&
+    Number.isFinite(healthImpact.newHealthFactor) &&
+    healthImpact.newHealthFactor < healthImpact.currentHealthFactor;
+  const shouldWarn = showWarning && !healthImpact.isHealthy && gettingWorse;
   return (
     <div className={`space-y-3 p-4 bg-gray-50 rounded-lg ${className}`}>
       <h4 className="text-sm font-medium text-gray-700">
@@ -55,7 +60,7 @@ const HealthImpactDisplay = ({
             {healthImpact.healthImpact.toFixed(2)}
           </span>
         </div>
-        {showWarning && !healthImpact.isHealthy && (
+        {shouldWarn && (
           <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
             ⚠️ Warning: This action would make your position
             unhealthy and vulnerable to liquidation.

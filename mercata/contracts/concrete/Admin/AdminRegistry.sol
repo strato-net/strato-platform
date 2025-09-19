@@ -39,28 +39,54 @@ contract record AdminRegistry {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        require(adminMap[msg.sender] != 0 || adminMap[_target] != 0, "Only an admin can call castVoteOnIssue");
-        address sender = msg.sender;
-        if (adminMap[msg.sender] == 0) {
-            sender = _target;
-            _target = msg.sender;
-        }
-        string issueId = _getIssueId(_target, _func, _args);
-        require(votesMap[issueId][sender] == 0, "Cannot cast multiple votes for the same issue");
+        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
+            address sender = msg.sender;
+            if (adminMap[msg.sender] == 0) {
+                sender = _target;
+                _target = msg.sender;
+            }
+            string issueId = _getIssueId(_target, _func, _args);
+            require(votesMap[issueId][sender] == 0, "Cannot cast multiple votes for the same issue");
 
-        try {
-            _createIssue(issueId, _target, _func, _args);
-        } catch {
+            try {
+                _createIssue(issueId, _target, _func, _args);
+            } catch {
 
-        }
+            }
 
-        if (_shouldExecute(issueId, _target, _func, _args)) {
-            variadic ret = _executeIssue(issueId, _target, _func, _args);
-            return (true, ret);
+            if (_shouldExecute(issueId, _target, _func, _args)) {
+                variadic ret = _executeIssue(issueId, _target, _func, _args);
+                return (true, ret);
+            } else {
+                votes[issueId].push(sender);
+                votesMap[issueId][sender] = votes[issueId].length;
+                emit IssueVoted(sender, issueId, _target, _func, _args);
+                return (false, issueId);
+            }
         } else {
-            votes[issueId].push(sender);
-            votesMap[issueId][sender] = votes[issueId].length;
-            emit IssueVoted(sender, issueId, _target, _func, _args);
+            try {
+                if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
+                    string issueId = _getIssueId(_target, _func, _args);
+                    variadic ret = _executeIssue(issueId, _target, _func, _args);
+                    return (true, ret);
+                }
+            } catch {
+
+            }
+            address sender = msg.sender;
+            address target = _target;
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
+            if (!whitelist[target][_func][sender]) {
+                sender = _target;
+                target = msg.sender;
+            }
+            string issueId = _getIssueId(target, _func, _args);
+            if (whitelist[target][_func][sender]) {
+                variadic ret = _executeIssue(issueId, target, _func, _args);
+                return (true, ret);
+            } else {
+                _createIssue(issueId, target, _func, _args);
+            }
             return (false, issueId);
         }
     }
@@ -73,38 +99,11 @@ contract record AdminRegistry {
             uint issueVotes = votes[_issueId].length;
             uint votingThresholdBps = votingThresholds[_target][_func];
             if (votingThresholdBps > 0) {
-                return 10000 * (issueVotes + 1) > votingThresholdBps * admins.length;
+                return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
             } else {
-                return 3 * (issueVotes + 1) > 2 * admins.length;
+                return 3 * (issueVotes + 1) >= 2 * admins.length;
             }
         }
-    }
-
-    function createIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        try {
-            if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
-                string issueId = _getIssueId(_target, _func, _args);
-                variadic ret = _executeIssue(issueId, _target, _func, _args);
-                return (true, ret);
-            }
-        } catch {
-
-        }
-        address sender = msg.sender;
-        address target = _target;
-        require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only a whitelisted account can call createIssue");
-        if (!whitelist[target][_func][sender]) {
-            sender = _target;
-            target = msg.sender;
-        }
-        string issueId = _getIssueId(target, _func, _args);
-        if (whitelist[target][_func][sender]) {
-            variadic ret = _executeIssue(issueId, target, _func, _args);
-            return (true, ret);
-        } else {
-            _createIssue(issueId, target, _func, _args);
-        }
-        return (false, issueId);
     }
 
     function _createIssue(string _issueId, address _target, string _func, variadic _args) internal {

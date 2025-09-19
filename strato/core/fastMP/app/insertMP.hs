@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeOperators #-}
 
 --import Control.Monad.IO.Class
@@ -42,10 +43,9 @@ main = do
   -- let input = map (\[x, y] -> KV (map c2n $ BC.unpack x) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ y)) c
   let input =
         map
-          ( \lst ->
-              if length lst < 2
-                then error "input list should contain exactly 2 elements"
-                else KV (map c2n $ BC.unpack (head lst)) $ Right (RLPString . LabeledError.b16Decode "insertMP.hs" $ (lst !! 1))
+          ( \case
+              (x0:x1:_) -> KV (map c2n $ BC.unpack x0) $ Right (RLPString $ LabeledError.b16Decode "insertMP.hs" x1)
+              _ -> error "input list should contain exactly 2 elements"
           )
           c
 

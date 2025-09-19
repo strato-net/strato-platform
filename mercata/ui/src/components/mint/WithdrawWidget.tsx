@@ -14,8 +14,8 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { safeParseUnits } from "@/utils/numberUtils";
-import { usdstAddress } from "@/lib/constants";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { usdstAddress, WITHDRAW_USDST_FEE } from "@/lib/constants";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 
 const DECIMAL_PATTERN = /^\d*\.?\d*$/;
@@ -71,10 +71,27 @@ const WithdrawWidget: React.FC = () => {
     fetchRedeemableTokens(networkConfig.chainId);
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
+  const maxAmount = useMemo(() => {
+    // Calculate max available USDST (balance minus fee)
+    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+    const feeBigInt = safeParseUnits(WITHDRAW_USDST_FEE, 18);
+    const availableUsdst = usdstBalanceBigInt > feeBigInt ? usdstBalanceBigInt - feeBigInt : 0n;
+    var maxAllowed = availableUsdst;
+    
+    // Zero maxPerTx means no limit
+    if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx != "0") {
+      // Compare with token's max per transaction limit
+      const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerTx, 18);
+      maxAllowed = availableUsdst < tokenMaxBigInt ? availableUsdst : tokenMaxBigInt;
+    }
+
+    return formatBalance(maxAllowed, undefined, 18, 2, 2);
+  }, [selectedMintToken, usdstBalance]);
+
   const validateAmount = (value: string) => {
     if (!value) { setAmountError(""); return true; }
     const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0) {
+    if (!Number.isFinite(n) || n <= 0 || n > Number(maxAmount)) {
       setAmountError("Please enter a valid amount");
       return false;
     }
@@ -130,7 +147,7 @@ const WithdrawWidget: React.FC = () => {
       const beforeWei = BigInt(currentUsdst || "0");
       const before = Number((beforeWei / 10n ** 18n).toString());
       const v = Number(amount || "0");
-      const after = Math.max(0, before - (Number.isFinite(v) ? v : 0));
+      const after = Math.max(0, before - v - Number(WITHDRAW_USDST_FEE));
       return { before, after };
     } catch {
       return { before: 0, after: 0 };
@@ -139,9 +156,6 @@ const WithdrawWidget: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Withdraw USDST</h2>
-      </div>
       <BridgeWalletStatus />
       <div className="flex items-center gap-4">
         <div className="flex-1 space-y-1.5">
@@ -196,17 +210,24 @@ const WithdrawWidget: React.FC = () => {
           className={amountError ? "border-red-500" : ""}
           disabled={!isConnected}
         />
+        <span className="text-xs text-gray-500">
+        {selectedMintToken && `Max: ${maxAmount} USDST`}
+        </span>
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
       </div>
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
         <div className="flex items-center justify-between">
+          <span>Transaction Fee</span>
+          <span className="font-medium">{WITHDRAW_USDST_FEE} USDST</span>
+        </div>
+        <div className="flex items-center justify-between">
           <span>USDST Balance</span>
-          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} → {balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}{amountError? "" : " → " + balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
         <div className="flex items-center justify-between">
           <span>Outcome</span>
-          <span className="font-medium">{amount || "0.00"} {selectedMintToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "externalal network"}</span>
+          <span className="font-medium">{amount || "0.00"} {selectedMintToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "external network"}</span>
         </div>
       </div>
 

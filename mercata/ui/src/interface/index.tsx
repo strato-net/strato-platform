@@ -334,6 +334,8 @@ export interface LiquidityPool {
   totalLiquidityUSD?: string;
   tradingVolume24h?: string;
   apy?: string;
+  oracleAToBRatio?: string;
+  oracleBToARatio?: string;
   _name?: string;
   _symbol?: string;
 }
@@ -493,7 +495,6 @@ export interface SwapPollingConfig {
   fromAmount: string; 
   editingField: 'from' | 'to' | null;
   getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  calculateSwap: (params: any) => Promise<any>;
   setPool: (pool: any) => void; 
   setToAsset: (asset: any) => void; 
   setToAmount: (amount: string) => void; 
@@ -507,7 +508,8 @@ export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
   getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  setPool: (pool: any) => void;
+  fetchUsdstBalance?: (userAddress: string) => Promise<void>;
+  userAddress?: string;
   interval?: number;
 }
 
@@ -522,7 +524,6 @@ export interface SwapCalculationConfig {
   fromAsset: any;
   fromAmount: string;
   editingField: 'from' | 'to' | null;
-  calculateSwap: (params: any) => Promise<string>;
   setToAmount: (amount: string) => void;
   lastCalculatedFromRef: React.MutableRefObject<string>;
 }
@@ -531,4 +532,18 @@ export interface SwapStateCleanupConfig {
   poolData: any;
   setToAsset: (asset: any) => void;
   setExchangeRate: (rate: string) => void;
+}
+
+export interface SafetyModuleData {
+  totalAssets: string;
+  totalShares: string;
+  userShares: string;
+  userCooldownStart: string;
+  cooldownSeconds: string;
+  unstakeWindow: string;
+  exchangeRate: string;
+  canRedeem: boolean;
+  cooldownActive: boolean;
+  cooldownTimeRemaining: string;
+  unstakeWindowTimeRemaining: string;
 }

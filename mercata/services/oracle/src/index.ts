@@ -44,13 +44,9 @@ process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
 const app = express();
 const PORT = process.env.HEALTH_PORT || 3000;
 
-app.get('/health', (req, res) => {
-    const status = healthMonitor.getStatus();
-    const statusCode = healthMonitor.isHealthy() ? 200 : 503;
-    res.status(statusCode).json({
-        ...status,
-        version: packageJson.version
-    });
+app.get("/health", async (_, res) => {
+    const errorFileExists = await healthMonitor.errorFileExists();
+    res.status(errorFileExists ? 500 : 200).json({status: !errorFileExists, message: 'pong'})
 });
 
 app.listen(PORT, () => {

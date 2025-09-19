@@ -8,6 +8,7 @@
 
 module Handlers.BlkLast
   ( API,
+    GetLastBlocks(..),
     getBlkLastClient,
     server,
   )
@@ -20,12 +21,14 @@ import Blockchain.Data.Transaction
 import Blockchain.Model.JsonBlock
 import Control.Arrow ((&&&), (***))
 import Control.Monad.Composable.SQL
+import Control.Monad.Trans.Class
 import Data.Int
 import qualified Data.Map as Map
 import qualified Database.Esqueleto.Legacy as E
 import Servant
 import Servant.Client
 import Settings
+import UnliftIO
 
 type API =
   "block" :> "last"
@@ -35,15 +38,18 @@ type API =
 getBlkLastClient :: Integer -> ClientM [Block']
 getBlkLastClient = client (Proxy @API)
 
-server :: HasSQL m => ServerT API m
+server :: (Monad m, GetLastBlocks m) => ServerT API m
 server = getBlkLast
 
 ---------------------
 
-class HasSQL m => GetLastBlocks m where
+class GetLastBlocks m where
   getLastBlocks :: Integer -> m [Block]
 
-instance HasSQL m => GetLastBlocks m where
+instance (Monad m, GetLastBlocks m, MonadTrans t) => GetLastBlocks (t m) where
+  getLastBlocks = lift . getLastBlocks
+
+instance {-# OVERLAPPING #-} MonadUnliftIO m => GetLastBlocks (SQLM m) where
   getLastBlocks n = do
     blks <- fmap (map (E.entityKey &&& E.entityVal)) . sqlQuery $ E.select $ E.from $ \a -> do
       E.limit $ max 1 $ min (fromIntegral n :: Int64) appFetchLimit
@@ -74,7 +80,7 @@ instance HasSQL m => GetLastBlocks m where
 
     return $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ps) (get' k  ss) (get' k txs)) blks
 
-getBlkLast :: GetLastBlocks m => Integer -> m [Block']
+getBlkLast :: (Monad m, GetLastBlocks m) => Integer -> m [Block']
 getBlkLast n = do
   blks <- getLastBlocks n
   pure $ flip Block' "" <$> blks

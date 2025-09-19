@@ -26,6 +26,7 @@ library:
   - bytestring
   - common-log
   - containers
+  - data-default
   - deepseq
   - esqueleto
   - ethereum-rlp
@@ -65,7 +66,7 @@ tests:
       - hspec
       - labeled-error
       - lens-family
-      - secp256k1-haskell
+      - blockapps-secp256k1-haskell
       - strato-model
       - strato-redis-blockdb
       - text

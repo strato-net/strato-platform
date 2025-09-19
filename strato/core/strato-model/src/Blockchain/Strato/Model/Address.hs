@@ -126,7 +126,9 @@ instance AS.ToJSONKey Address where
       t = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
-  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
+  parseJSON (String s) = case readHex . drop0x $ T.unpack s of
+    [] -> fail $ "Could not parse Address from string " ++ T.unpack s
+    (x:_) -> pure . Address $ fst x
     where
       drop0x ('0' : 'x' : cs) = cs
       drop0x ('0' : 'X' : cs) = cs

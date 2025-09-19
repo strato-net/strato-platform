@@ -366,15 +366,17 @@ hashOne64 k salt = with k $ \ptr ->
 
 -- | Compute a 32-bit hash of a list of 'Storable' instances.
 hashList32 :: Storable a => [a] -> Word32 -> IO Word32
-hashList32 xs salt =
+hashList32 [] _ = error "hashList32: empty list"
+hashList32 xs@(x:_) salt =
   withArrayLen xs $ \len ptr ->
-    alignedHash ptr (fromIntegral (len * sizeOf (head xs))) salt
+    alignedHash ptr (fromIntegral (len * sizeOf x)) salt
 
 -- | Compute a 64-bit hash of a list of 'Storable' instances.
 hashList64 :: Storable a => [a] -> Word64 -> IO Word64
-hashList64 xs salt =
+hashList64 [] _ = error "hashList64: empty list"
+hashList64 xs@(x:_) salt =
   withArrayLen xs $ \len ptr ->
-    alignedHash2 ptr (fromIntegral (len * sizeOf (head xs))) salt
+    alignedHash2 ptr (fromIntegral (len * sizeOf x)) salt
 
 unsafeUseAsCStringLen :: SB.ByteString -> (CString -> Int -> IO a) -> IO a
 unsafeUseAsCStringLen (PS fp o l) action =

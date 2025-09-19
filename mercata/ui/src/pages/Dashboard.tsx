@@ -13,9 +13,11 @@ import { useLendingMetrics } from "@/hooks/useLendingMetrics";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
+import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { useCDP } from "@/context/CDPContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -33,7 +35,10 @@ const Dashboard = () => {
   const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
-  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+ 
+  const { totalCDPDebt, loading: cdpLoading } = useCDP();
+  const { poolsLoading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -76,41 +81,87 @@ const Dashboard = () => {
   useEffect(() => {
     if (!tokens || tokens.length === 0) return;
 
+    // Wait for CDP data to load before calculating
+    if (cdpLoading) return;
+
     let total = 0;
     let cataTotal = 0;
 
+    // Calculate token deposit values (exact same as AssetsList component)
     for (let i = 0; i < tokens.length; i++) {
-
       const token = tokens[i];
       const rawPrice = token?.price || "0";
       const rawBalance = token?.balance || "0";
       const rawCollateralBalance = token?.collateralBalance || "0";
-
-      const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-      const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
-      const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance), 18));
       const name = token?._name || "";
       const symbol = token?._symbol || "";
 
-      // Calculate total value including both balance and collateral
-      const totalTokenValue = (balance + collateralBalance) * price;
-      total += totalTokenValue;
+      // Use exact same calculation as AssetsList component (line 186)
+      if (rawPrice && (rawBalance || rawCollateralBalance)) {
+        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
+        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
+        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
+        
+        // Same calculation as AssetsList: price * (balance + collateralBalance)
+        const totalTokenValue = price * (balance + collateralBalance);
+        total += totalTokenValue;
 
-      if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-        cataTotal += totalTokenValue;
+        if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
+          cataTotal += totalTokenValue;
+        }
       }
     }
 
-    // Get USDST borrowed from loans data
-    const usdstBorrowed = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
+    // Add lending pool value (matching MyPoolParticipationSection display)
+    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
+      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
+      total += lendingPoolValue;
+    }
+
+    // Add LP token values (exact same as MyPoolParticipationSection formatValue function)
+    if (lpTokens && lpTokens.length > 0) {
+      lpTokens.forEach((lpToken) => {
+        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
+          // Use exact same formatValue logic as MyPoolParticipationSection (lines 31-39)
+          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
+          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
+          const lpTokenValue = balance * priceValue;
+          total += lpTokenValue;
+        }
+      });
+    }
+
+    // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
+    const lendingPoolDebt = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits((() => { 
+          try { 
+            const bi = BigInt(loans.totalAmountOwed); 
+            return bi <= 1n ? 0n : bi; 
+          } catch { 
+            return 0n; 
+          } 
+        })(), 18))
       : 0;
 
-    // Net Balance = All deposits (including supplied) - USDST Borrowed
-    const netBalance = total - usdstBorrowed;
+    // CDP vault debt
+    const cdpDebt = totalCDPDebt
+      ? parseFloat(formatUnits((() => {
+          try {
+            const bi = BigInt(totalCDPDebt);
+            return bi <= 1n ? 0n : bi;
+          } catch {
+            return 0n;
+          }
+        })(), 18))
+      : 0;
+
+    // Net balance calculation includes both debt types
+    const totalDebt = lendingPoolDebt + cdpDebt;
+    const netBalance = total - totalDebt;
+    
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens, loans]);
+  }, [tokens, loans, liquidityInfo, lpTokens, totalCDPDebt, cdpLoading]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -148,11 +199,33 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Borrowed"
-              value={loans?.totalAmountOwed 
-                ? `${parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18)).toFixed(2)} USDST`
-                : "0.00 USDST"
-              }
+              title="Total Borrowed"
+              value={(() => {
+                const lendingDebt = loans?.totalAmountOwed 
+                  ? parseFloat(formatUnits((() => { 
+                      try { 
+                        const bi = BigInt(loans.totalAmountOwed); 
+                        return bi <= 1n ? 0n : bi; 
+                      } catch { 
+                        return 0n; 
+                      } 
+                    })(), 18))
+                  : 0;
+                
+                const cdpDebt = totalCDPDebt
+                  ? parseFloat(formatUnits((() => {
+                      try {
+                        const bi = BigInt(totalCDPDebt);
+                        return bi <= 1n ? 0n : bi;
+                      } catch {
+                        return 0n;
+                      }
+                    })(), 18))
+                  : 0;
+                
+                const total = lendingDebt + cdpDebt;
+                return `${total.toFixed(2)} USDST`;
+              })()}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />

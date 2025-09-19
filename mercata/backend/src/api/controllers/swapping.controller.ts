@@ -7,8 +7,6 @@ import {
   addLiquiditySingleToken,
   removeLiquidity,
   swap,
-  calculateSwap,
-  calculateSwapReverse,
   getSwapHistory,
   setPoolRates,
 } from "../services/swapping.service";
@@ -23,7 +21,6 @@ import {
   validateRemoveLiquidityArgs,
   validateSwapArgs,
   validateQueryParams,
-  validateCalculateSwapArgs,
   validateSwapHistoryArgs,
   validateSetPoolRatesArgs,
 } from "../validators/swapping.validator";
@@ -147,32 +144,6 @@ class SwappingController {
     return next();
   }
 
-  // Calculators
-  static async calculateSwap(req: Request, res: Response, next: NextFunction): Promise<void> {
-    const { accessToken, query } = req;
-    validateCalculateSwapArgs(query);
-    
-    const poolAddress = query.poolAddress as string;
-    const isAToB = query.isAToB === "true";
-    const amountIn = query.amountIn as string;
-    const reverse = query.reverse as string;
-    const isReverse = reverse === "true";
-
-    if (isReverse) {
-      const price = await calculateSwapReverse(
-        accessToken,
-        { poolAddress, isAToB, amountIn }
-      );
-      res.status(RestStatus.OK).json(price);
-    } else {
-      const price = await calculateSwap(
-        accessToken,
-        { poolAddress, isAToB, amountIn }
-      );
-      res.status(RestStatus.OK).json(price);
-    }
-  }
-
   // Helpers
   static async getLPTokens(
     req: Request,
@@ -264,10 +235,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params } = req;
+      const { accessToken, params, address } = req;
       validateTokenPairArgs(params);
 
-      const pools = await getPools(accessToken, undefined, {
+      const pools = await getPools(accessToken, address, {
         tokenA: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });

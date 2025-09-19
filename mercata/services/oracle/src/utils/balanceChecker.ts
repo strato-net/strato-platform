@@ -4,6 +4,29 @@ import { logError } from './logger';
 import { healthMonitor } from './healthMonitor';
 import { CONSTANTS } from './constants';
 
+async function fetchVoucherBalance(): Promise<bigint> {
+    const accessToken = await oauthClient().getAccessToken();
+    const userAddr = await oauthClient().getUserAddress();
+
+    const response = await apiGet(
+        `${process.env.STRATO_NODE_URL}/cirrus/search/BlockApps-Mercata-Voucher-_balances`,
+        {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            params: {
+                key: `eq.${userAddr}`,
+                select: 'balance:value::text'
+            },
+            timeout: 10000
+        },
+        { logPrefix: 'BalanceChecker' }
+    );
+
+    return BigInt(response.data[0]?.balance || '0');
+}
+
 async function fetchUSDSTBalance(): Promise<bigint> {
     const accessToken = await oauthClient().getAccessToken();
     const userAddr = await oauthClient().getUserAddress();
@@ -29,24 +52,30 @@ async function fetchUSDSTBalance(): Promise<bigint> {
 }
 
 /**
- * Checks USDST balance and marks service unhealthy if below threshold
- * @throws {Error} If balance is critically low (below gas fee)
+ * Checks Voucher and USDST balance and marks service unhealthy if below threshold
+ * @throws {Error} If total transactions possible are below threshold
  */
-export async function checkUSDSTBalance(): Promise<void> {
-    const balance = await fetchUSDSTBalance();
-    const balanceUSD = Number(balance) / 1e18;
+export async function checkBalances(): Promise<void> {
+    const voucherBalance = await fetchVoucherBalance();
+    const usdstBalance = await fetchUSDSTBalance();
     
-    if (balance < CONSTANTS.GAS_FEE_USDST) {
-        const gasFeeUSD = Number(CONSTANTS.GAS_FEE_USDST) / 1e18;
-        const error = `USDST balance is critically low (less than ${gasFeeUSD} USDST gas fee)`;
-        healthMonitor.recordFailure(error);
-        logError('BalanceChecker', new Error(error));
-        process.exit(1); // Stop the service immediately
-    }
+    // Calculate total possible transactions using both balances
+    const voucherTransactions = voucherBalance / CONSTANTS.GAS_FEE_VOUCHER;
+    const usdstTransactions = usdstBalance / CONSTANTS.GAS_FEE_USDST;
+    const totalTransactions = voucherTransactions + usdstTransactions;
     
-    if (balance < CONSTANTS.MIN_USDST_BALANCE) {
-        const error = `Low USDST balance: ${balanceUSD} USDST (minimum: 10 USDST). Service will continue but may fail on next transaction.`;
-        healthMonitor.recordFailure(error);
+    const voucherBalanceUSD = Number(voucherBalance) / 1e18;
+    const usdstBalanceUSD = Number(usdstBalance) / 1e18;
+    
+    // Check if total transactions are below minimum threshold
+    if (totalTransactions < CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
+        const error = `Total possible transactions (${totalTransactions}) below minimum threshold (${CONSTANTS.MIN_TRANSACTIONS_THRESHOLD}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
+        await healthMonitor.appendToErrorFile(error);
         logError('BalanceChecker', new Error(error));
+        
+        // Exit if critically low (less than 1 transaction possible)
+        if (totalTransactions < BigInt(1)) {
+            process.exit(1);
+        }
     }
 }

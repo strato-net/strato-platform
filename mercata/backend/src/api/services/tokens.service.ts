@@ -5,9 +5,37 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
+import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine } = constants;
+
+// Helper function to get CDP collateral for a user
+const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
+  try {
+    // Use direct vault query instead of going through registry (more efficient and avoids the vault missing error)
+    const { data: userVaults } = await cirrus.get(
+      accessToken,
+      `/${CDPEngine}-vaults`,
+      {
+        params: {
+          select: "user:key,asset:key2,Vault:value",
+          key: `eq.${userAddress.toLowerCase()}`
+        }
+      }
+    );
+      
+    const cdpCollateralMap = new Map<string, string>(
+      (userVaults || []).map((v: any) => [v.asset, v.Vault.collateral || "0"])
+    );
+    
+    return cdpCollateralMap;
+  } catch (error) {
+    // Graceful fallback - return empty map if CDP data unavailable
+    console.warn(`❌ [CDP] Failed to fetch CDP collateral data:`, error);
+    return new Map();
+  }
+};
 
 // Get all tokens
 export const getTokens = async (
@@ -84,6 +112,7 @@ export const getBalance = async (
   rawParams: Record<string, string | undefined> = {}
 ) => {
   try {
+
     // Filter out undefined
     let params = {
       ...Object.fromEntries(
@@ -111,29 +140,54 @@ export const getBalance = async (
     }
 
     // Fetch collateral vault balances for the user
+    
     const collateralData = await getLendingRegistry(accessToken, undefined, {
       select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`,
       "collateralVault.userCollaterals.key": `eq.${address}`
     });
 
     const userCollaterals = collateralData.collateralVault?.userCollaterals || [];
-    const collateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c.amount]));
+    const lendingCollateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c.amount]));
 
+    // Fetch CDP collateral for the user
+    const cdpCollateralMap = await getCDPCollateralForUser(accessToken, address);
+
+    // Combine both collateral types
+    
+    const combinedCollateralMap = new Map();
+    // Add lending collateral
+    lendingCollateralMap.forEach((amount, asset) => {
+      combinedCollateralMap.set(asset, amount);
+    });
+    // Add CDP collateral (sum if exists)
+    cdpCollateralMap.forEach((amount, asset) => {
+      const existing = combinedCollateralMap.get(asset) || "0";
+      const sum = (BigInt(existing) + BigInt(amount)).toString();
+      combinedCollateralMap.set(asset, sum);
+    });
     const lendingInfo = await getLendingRegistry(accessToken, undefined, {
       select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
     });
   
     const rawPrices = lendingInfo.oracle?.prices || [];
+    
     const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 
-    return response.data
-      .map((token: any) => ({
-        ...token,
-        price: priceMap.get(token.address) || "0",
-        collateralBalance: collateralMap.get(token.address) || "0",
-      }))
+    
+    const finalTokens = response.data
+      .map((token: any) => {
+        const collateralBalance = combinedCollateralMap.get(token.address) || "0";
+        
+        return {
+          ...token,
+          price: priceMap.get(token.address) || "0",
+          collateralBalance: collateralBalance,
+        };
+      })
       .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
+    return finalTokens;
   } catch (error) {
+    console.error(`❌ [BALANCE] Error in getBalance for user ${address}:`, error);
     throw error;
   }
 };

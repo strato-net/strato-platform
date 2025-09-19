@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE FlexibleInstances   #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MonoLocalBinds      #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RankNTypes          #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -180,9 +181,9 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
       return ret
 
 stratoP2PServer ::
-  (MonadP2P n, RunsServer n (LoggingT IO)) =>
-  PeerRunner n (LoggingT IO) () ->
-  LoggingT IO ()
+  (MonadIO m, MonadLogger m, MonadP2P n, RunsServer n m) =>
+  PeerRunner n m () ->
+  m ()
 stratoP2PServer runner = labelTheThread "stratoP2PServer" $ do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen

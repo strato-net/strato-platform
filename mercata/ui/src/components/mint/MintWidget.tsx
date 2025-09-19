@@ -63,7 +63,7 @@ const MintWidget: React.FC = () => {
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
-  const [autoDeposit, setAutoDeposit] = useState<boolean>(true);
+  const [autoDeposit, setAutoDeposit] = useState<boolean>(false);
   const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ amount: "", loading: false });
   const inFlightRef = useRef(false);
 
@@ -141,7 +141,7 @@ const MintWidget: React.FC = () => {
   const validateAmount = (value: string) => {
     if (!value) { setErrors(e => ({ ...e, amount: "" })); return true; }
     const num = parseFloat(value);
-    if (isNaN(num) || num <= 0) {
+    if (isNaN(num) || num <= 0 || num > Number(externalTokenBalance?.formatted)) {
       setErrors(e => ({ ...e, amount: "Enter a valid amount" }));
       return false;
     }
@@ -334,9 +334,6 @@ const MintWidget: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900">Get USDST</h2>
-      </div>
       <BridgeWalletStatus />
 
       <div className="flex items-center gap-4">
@@ -416,17 +413,20 @@ const MintWidget: React.FC = () => {
         )}
         <PercentageButtons
           value={amount}
-          maxValue={externalTokenBalance?.formatted || "0"}
+          maxValue={safeParseUnits(
+            externalTokenBalance?.formatted || "0",
+            parseInt(selectedMintToken?.externalDecimals || "18")
+          ).toString()}
           onChange={setAmount}
           className="mt-2"
-          decimals={externalTokenBalance?.decimals || parseInt(selectedMintToken?.externalDecimals || "18")}
+          decimals={parseInt(selectedMintToken?.externalDecimals || "18")}
         />
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700">
+      {/* <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" className="accent-blue-600" checked={autoDeposit} onChange={e => setAutoDeposit(e.target.checked)} />
         Automatically deposit minted USDST into lending pool
-      </label>
+      </label> */}
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3">
         {autoDeposit && (
@@ -453,7 +453,7 @@ const MintWidget: React.FC = () => {
           disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
-          {isLoading ? "Processing..." : "Mint USDST"}
+          {isLoading ? "Processing..." : "Get USDST"}
         </Button>
       </div>
 

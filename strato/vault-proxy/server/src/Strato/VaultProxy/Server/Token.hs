@@ -12,6 +12,7 @@ import Control.Monad
 import Control.Monad.Catch
 import qualified Control.Monad.Catch as C
 import Control.Monad.IO.Class
+import Data.Base64.Types as B64
 import Data.ByteString.Base64 as B64
 import Data.Cache as C
 import Data.Cache.Internal as C
@@ -38,7 +39,7 @@ instance HasVirginTokenCall IO where
     uri <- URI.mkURI $ token_endpoint additionalOauth
     --Encode all of the parameters, get ready to send to server
     let (url, _) = fromJust (useHttpsURI $ uri)
-        authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
+        authHeadr = R.header "Authorization" $ TE.encodeUtf8 $ T.concat [T.pack "Basic ", B64.extractBase64 . B64.encodeBase64 $ TE.encodeUtf8 $ T.concat [clientId, ":", clientSecret]]
         contType = R.header "Content-Type" $ TE.encodeUtf8 $ T.pack "application/x-www-form-urlencoded"
         urlEncodedPart = ReqBodyUrlEnc $ "grant_type" =: ("client_credentials" :: String)
     --Connect to the server

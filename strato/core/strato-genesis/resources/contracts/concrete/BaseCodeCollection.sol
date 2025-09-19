@@ -17,7 +17,7 @@ import "./Pools/Pool.sol";
 import "./Pools/PoolFactory.sol";
 
 //Admin
-import "Admin/FeeCollector.sol";
+// import "Admin/FeeCollector.sol";
 
 //Redemption
 //import "Redemptions/RedemptionService.sol";
@@ -35,17 +35,16 @@ import "Lending/LiquidityPool.sol";
 import "Lending/PoolConfigurator.sol";
 import "Lending/PriceOracle.sol";
 import "Lending/RateStrategy.sol";
+import "Lending/SafetyModule.sol";
 
 //Bridging
 import "./Bridge/MercataBridge.sol";
-
-//Fee Collector
-import "Admin/FeeCollector.sol";
 
 //CDP
 import "CDP/CDPRegistry.sol";
 import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
+import "CDP/CDPReserve.sol";
 
 //TODO
 contract record Mercata {
@@ -65,6 +64,8 @@ contract record Mercata {
     CDPEngine public cdpEngine;
     CDPVault public cdpVault;   
     CDPRegistry public cdpRegistry;
+    CDPReserve public cdpReserve;
+    SafetyModule public safetyModule;
 
     constructor() public {
         // Create AdminRegistry first
@@ -85,10 +86,11 @@ contract record Mercata {
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(address(adminRegistry)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector));
-           
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
+          
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0);
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
+        safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
         Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services
@@ -99,7 +101,8 @@ contract record Mercata {
         cdpRegistry = new CDPRegistry(this);
         cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
         cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
-        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector));
+        cdpReserve = new CDPReserve(address(cdpRegistry), address(adminRegistry));
+        cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);

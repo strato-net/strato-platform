@@ -15,8 +15,8 @@ export async function validateBridgeConfig(): Promise<boolean> {
     "OPENID_DISCOVERY_URL",
     "BRIDGE_ADDRESS",
     "SAFE_ADDRESS",
-    "SAFE_OWNER_ADDRESS",
-    "SAFE_OWNER_PRIVATE_KEY",
+    "SAFE_PROPOSER_ADDRESS",
+    "SAFE_PROPOSER_PRIVATE_KEY",
   ];
 
   requiredEnvVars.forEach((varName) => {
@@ -93,18 +93,18 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
-  if (config.safe.safeOwnerAddress) {
-    if (!/^(0x)?[a-fA-F0-9]{40}$/.test(config.safe.safeOwnerAddress)) {
+  if (config.safe.safeProposerAddress) {
+    if (!/^(0x)?[a-fA-F0-9]{40}$/.test(config.safe.safeProposerAddress)) {
       errors.push(
-        `Invalid Safe owner address format: ${config.safe.safeOwnerAddress}`,
+        `Invalid Safe proposer address format: ${config.safe.safeProposerAddress}`,
       );
     }
   }
 
-  if (config.safe.safeOwnerPrivateKey) {
-    if (!/^[a-fA-F0-9]{64}$/.test(config.safe.safeOwnerPrivateKey)) {
+  if (config.safe.safeProposerPrivateKey) {
+    if (!/^[a-fA-F0-9]{64}$/.test(config.safe.safeProposerPrivateKey)) {
       errors.push(
-        `Invalid Safe owner private key format: ${config.safe.safeOwnerPrivateKey.substring(0, 10)}...`,
+        `Invalid Safe proposer private key format: ${config.safe.safeProposerPrivateKey.substring(0, 10)}...`,
       );
     }
   }

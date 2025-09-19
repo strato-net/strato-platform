@@ -4,13 +4,26 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
-import { PriceHistoryEntry, PriceHistoryResponse } from "../../types";
+import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "../../types";
 
 const {
   PriceOracle,
   PriceOracleEvents,
   PriceOracleBatchUpdateEvents,
 } = constants;
+
+export const getOraclePrices = async (
+  accessToken: string,
+  params: Record<string, string> = { select: "asset:key,price:value::text" }
+): Promise<OraclePriceMap> => {
+  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, { params });
+
+  const prices = rawPrices as OraclePriceEntry[];
+
+  return new Map(
+    prices?.filter((p: OraclePriceEntry) => p.asset && p.price).map((p: OraclePriceEntry) => [p.asset, p.price]) || []
+  );
+};
 
 export const getPrice = async (
   accessToken: string,

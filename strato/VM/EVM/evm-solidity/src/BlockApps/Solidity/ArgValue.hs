@@ -111,7 +111,9 @@ argValueToValue defs theType argVal = case theType of
                 return value
             )
             hm
-        let initialValueType = argValueToType $ snd . head $ KM.toList hm
+        let initialValueType = case KM.toList hm of
+              [] -> error "initialValueType: Empty list"
+              (x:_) -> argValueToType $ snd x
             isUniform = foldl (\b av -> b && argValueToType av == initialValueType) True hm
         when (any isLeft mp) $ do
           Left "argValueToValue: Could not parse object into a Mapping"
@@ -167,7 +169,12 @@ argValueToValue defs theType argVal = case theType of
             )
             $ V.toList xs
         Right $ ValueVariadic listOfVals
-      o -> Left . Text.pack $ "argValueToValue: Expected TypeVariadic to be an array, but got: " ++ show o
+      v -> do
+        let inferredType = argValueToType v
+            value = argValueToValue defs inferredType v
+        case value of
+          Right v' -> return v'
+          _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
 argValueToSimpleValue theType argVal = case theType of

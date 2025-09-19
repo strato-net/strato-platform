@@ -14,6 +14,16 @@ interface UserContextType {
   logout: () => void;
   refreshAuth: () => void;
   loading: boolean;
+  openIssues: object;
+  openIssuesLoading: boolean;
+  getOpenIssues: () => Promise<void>;
+  contractSearchResults: object[];
+  contractSearchResultsLoading: boolean;
+  contractSearch: (search: string) => Promise<void>;
+  contractDetailsResults: object;
+  contractDetailsResultsLoading: boolean;
+  getContractDetails: (address: string) => Promise<void>;
+  castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -24,6 +34,12 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [userName, setUserName] = useState<string | null>(null)
   const [loading, setLoading] = useState<boolean>(true);
+  const [openIssues, setOpenIssues] = useState<object>({})
+  const [openIssuesLoading, setOpenIssuesLoading] = useState<boolean>(false);
+  const [contractSearchResults, setContractSearchResults] = useState<object[]>([])
+  const [contractSearchResultsLoading, setContractSearchResultsLoading] = useState<boolean>(false)
+  const [contractDetailsResults, setContractDetailsResults] = useState<object>({});
+  const [contractDetailsResultsLoading, setContractDetailsResultsLoading] = useState<boolean>(false);
 
   const checkAuthenticationStatus = async (initialCheck = false) => {
     try {
@@ -79,6 +95,54 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
+    try {
+      await api.post('/user/admin/vote', {target, func, args});
+    } catch (error) {
+    } finally {
+      const response = await getOpenIssues();
+      return response;
+    }
+  };
+
+  const getOpenIssues = async () => {
+    try {
+      setOpenIssuesLoading(true);
+      try {
+        const response = await api.get('/user/admin/issues');
+        setOpenIssues(response?.data || {});
+      } catch (error) {
+      }
+    } finally {
+      setOpenIssuesLoading(false);
+    }
+  };
+
+  const contractSearch = async (search: string) => {
+    try {
+      setContractSearchResultsLoading(true);
+      try {
+        const response = await api.get(`/user/admin/contract/search?search=${search}`);
+        setContractSearchResults(response?.data || []);
+      } catch (error) {
+      }
+    } finally {
+      setContractSearchResultsLoading(false);
+    }
+  };
+
+  const getContractDetails = async (address: string) => {
+    try {
+      setContractDetailsResultsLoading(true);
+      try {
+        const response = await api.get(`/user/admin/contract/details?address=${address}`);
+        setContractDetailsResults(response?.data || {});
+      } catch (error) {
+      }
+    } finally {
+      setContractDetailsResultsLoading(false);
+    }
+  };
 
   const refreshAuth = () => {
     checkAuthenticationStatus();
@@ -105,7 +169,21 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     logout,
     refreshAuth,
     loading,
-  }), [userAddress, isLoggedIn, isAdmin, loading, userName]);
+    openIssuesLoading,
+    openIssues,
+    getOpenIssues,
+    castVoteOnIssue,
+    contractSearch,
+    contractSearchResults,
+    contractSearchResultsLoading,
+    getContractDetails,
+    contractDetailsResults,
+    contractDetailsResultsLoading,
+  }), [userAddress, isLoggedIn, isAdmin, loading, userName,
+    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue,
+    contractSearch, contractSearchResults, contractSearchResultsLoading,
+    getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
+  ]);
 
   return (
     <UserContext.Provider value={contextValue}>

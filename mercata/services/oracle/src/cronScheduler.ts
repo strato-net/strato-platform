@@ -147,7 +147,7 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
         // Mark service as unhealthy if any source fails
         if (failedSources.length > 0) {
             const error = `Source failures for feed ${feed.name}: [${failedSources.join(', ')}]`;
-            healthMonitor.recordFailure(error);
+            logError('CronScheduler', new Error(error));
         }
 
         // Calculate average prices for each asset across sources

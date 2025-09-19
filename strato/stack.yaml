@@ -68,7 +68,8 @@ packages:
 - libs/type-lits
 
 #removing for now, too hard to keep this up to date when making large changes elsewhere
-#- simulator/strato-lite
+#- simulator/strato-lite #macos
+#- simulator/strato      #macos
 
 - tools/blockapps-tools
 - tools/convoke
@@ -111,7 +112,9 @@ extra-deps:
 - lens-family-th-0.5.2.1@sha256:24338a7a9bb8c8bca0d5e713ce62df066058bad6c15e6eb609593fd7fe93b3cf,1294
 - monadIO-0.11.1.0@sha256:2407c8aee3a74f3eba897f7c87f702f502394aec8cd412f3d2334cc353f54f13,964
 - pairing-1.1.0@sha256:3082ceef0e970114202675b565bf015e01186b01c9a722b0bdfc75475fecb9ce,5270
+- patch-0.0.8.4@sha256:00904a2f2e6b9bef71b12a5200bc047d6e108af3ad74954eed1795e419949bed,3368
 - safe-0.3.21
+- saltine-0.2.2.0
 - semver-range-0.2.8@sha256:44918080c220cf67b6e7c8ad16f01f3cfe1ac69d4f72e528e84d566348bb23c3,1941
 - servant-options-0.1.0.0@sha256:39f50166a68006250e79370372f553ca476f14d06d93fa0c401050253aeba803,914
 - wai-extra-3.1.14@sha256:1b093366842dc0057cebb4a23dbf9a29269321d70fd242c7695ce0bbd80d32fb,8056
@@ -122,14 +125,23 @@ extra-deps:
 - git: https://github.com/sdiehl/elliptic-curve
   commit: 445e196a550e36e0f25bd4d9d6a38676b4cf2be8
 
-
+#- gi-javascriptcore-4.0.29@sha256:7bb28449655efa0774e530969ad594ee0caa36b4772d900e31ffca4a7dab260b,905             #macos
+#- gi-javascriptcore4-4.0.29@sha256:3ea53cdb3d7bb2b36916ca47a66ede923a5579e6d2c62bfc15585fc5f529d0b2,4031           #macos
+#- gi-webkit2-4.0.32@sha256:42356461f28f9ea09fdbbbf166ba3d63638d109b65922610a7a4d89dc6bcc1d1,12728                  #macos
+#- haskell-gi-base-0.26.9                                                                                           #macos
+#- jsaddle-warp-0.9.9.2@sha256:85c592bd70640766e9b5fa33bc07d04c8cc312f678d0e2bb2e7333d5f88282b7,3374                #macos
+#- jsaddle-webkit2gtk-0.9.9.3@sha256:586d1ebb776de4b64cea600f52276268b97a083c2424187160cb7e226b923b9e,1669          #macos
+#- jsaddle-wkwebview-0.9.9.0@sha256:07e0e12b960225fcef4e8cf158e9e1de8f07e962b9bbfa8a2eabf03ce60693ed,1974           #macos
+#- reflex-0.9.3.3@sha256:a9ea57dc29765968a8dc3e1c50dbe247a9dfbede1af54aa97c9fe86df3eed186,12222                     #macos
+#- reflex-dom-0.6.3.4@sha256:d8065389600029e1ef6d34f3e9374e89e281f3db6273ce3aef9850313a08f525,6291                  #macos
+#- reflex-dom-core-0.8.1.3@sha256:91d1aa7530e710cbe2070ce17f6c55d2f1a46c6431ee377a2f9a148ce1fcef17,8121             #macos
+#- webkit2gtk3-javascriptcore-0.14.4.6@sha256:22367cdb45453e8094483814cc81c569af7028781e299e0ff66cff572cb424e6,2299 #macos
 
 #- git: https://github.com/blockapps/milena
 #  commit: 39dad725837f8d67721f3ac0f87a047ce36b2889
 
-
 flags:
-  secp256k1-haskell:
+  blockapps-secp256k1-haskell:
     ecdh: true
     recovery: true
 
@@ -141,7 +153,7 @@ nix:
 
 notify-if-nix-on-path: false
 
-resolver: lts-22.4 #also duplicated in docker section below
+resolver: lts-23.14 #also duplicated in docker section below
 compiler-check: newer-minor
 extra-include-dirs:
 - /usr/local/include
@@ -167,6 +179,7 @@ ghc-options:
 
 docker:
   enable: false
-  image: "strato-buildbase:lts-22.4"
+  image: "strato-buildbase:lts-23.14"
   set-user: true
   run-args: ["--ulimit=nofile=60000"]
+  # stack-exe: image  # uncomment when building on arm-based Linux, if getting 'exec /opt/host/bin/stack: exec format error'

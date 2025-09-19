@@ -3,6 +3,7 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE FlexibleContexts    #-}
 {-# LANGUAGE LambdaCase          #-}
+{-# LANGUAGE MonoLocalBinds      #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE PolyKinds           #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -74,7 +75,8 @@ import           UnliftIO.Exception
 --      skipEntries 2 [1..20] => [14,7,10,13,16,19]
 --      skipEntries 3 [1..20] => [15,9,13,17]
 skipEntries :: Int -> [a] -> [a]
-skipEntries n xs = if null xs then [] else head xs : helper (tail xs)
+skipEntries _ []     = []
+skipEntries n (x:xs) = x : helper xs
   where
     helper xs' = case drop n xs' of
       (y : ys) -> y : helper ys
@@ -231,7 +233,7 @@ handleEvents peer = awaitForever $ \case
 
     currentSyncTask <- fmap (fromMaybe $ error "no current sync task") $ lift $ getCurrentSyncTask (pPeerHost peer)
     let maxBlockNumber :: Integer
-        maxBlockNumber = maximum $ map (BlockHeader.number . blockBlockData) blocks'
+        maxBlockNumber = maximum . (0:) $ map (BlockHeader.number . blockBlockData) blocks'
 
     WorldBestBlock (BestBlock _ worldNumber) <- lift $ Mod.get (Proxy @WorldBestBlock)
 

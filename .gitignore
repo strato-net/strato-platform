@@ -30,6 +30,7 @@ strato/tools/genesis-builder/certs.json
 strato/haddock
 strato/hpc
 *.cabal
+!strato/simulator/strato-obelisk/**/*.cabal
 *~
 bridge_image_tag*
 

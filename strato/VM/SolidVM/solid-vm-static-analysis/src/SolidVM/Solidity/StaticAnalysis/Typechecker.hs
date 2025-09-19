@@ -1397,6 +1397,9 @@ byteArgs x = intType' x
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = topType' x
 
+logArgs :: SourceAnnotation Text -> Type'
+logArgs x = topType' x
+
 sha256Args :: SourceAnnotation Text -> Type'
 sha256Args x = topType' x
 
@@ -1503,6 +1506,7 @@ getVarType' "byte" ctx = pure $ Function (byteArgs ctx) (intType' ctx) ctx [] []
 getVarType' "push" ctx = pure $ Function (topType' ctx) (Product [] ctx) ctx [] [] False
 getVarType' "identity" ctx = pure $ Function (topType' ctx) (topType' ctx) ctx [] [] False
 getVarType' "keccak256" ctx = pure $ Function (keccak256Args ctx) (stringType' ctx) ctx [] [] False
+getVarType' "log" ctx = pure $ Function (logArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "sha256" ctx = pure $ Function (sha256Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "ripemd160" ctx = pure $ Function (ripemd160Args ctx) (stringType' ctx) ctx [] [] False
 getVarType' "modExp" ctx = pure $ Function (modexpArgs ctx) (intType' ctx) ctx [] [] False
@@ -1538,15 +1542,13 @@ getVarType' name ctx = do
         Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
         _ -> getVarTypeByName' (stringToLabel name) ctx
     Nothing -> do
-      let ls = filter (userDefinedHelper name) [_varType x | x <- (M.elems (_storageDefs c))]
-      if length ls > 0
-        then do
-          let ls2 = head (filter (userDefinedHelper name . _varType) [x | x <- (M.elems (_storageDefs c))])
-          case _varInitialVal ls2 of
-            Just _ -> pure $ (Static (head ls) ctx)
-            _ -> pure $ (Static (SVMType.actual (head ls)) ctx)
-        else do
-          getVarTypeByName' (stringToLabel name) ctx
+      case filter (userDefinedHelper name . _varType) [x | x <- (M.elems (_storageDefs c))] of
+        (l:_) ->
+          let vt = _varType l
+           in case _varInitialVal l of
+                Just _ -> pure $ (Static vt ctx)
+                _ -> pure $ (Static (SVMType.actual vt) ctx)
+        [] -> getVarTypeByName' (stringToLabel name) ctx
 
 userDefinedHelper :: String -> Type -> Bool
 userDefinedHelper nam (SVMType.UserDefined a _) = if a == nam then True else False
@@ -2013,13 +2015,13 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) = do
   if M.member nam (_userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
     then do
       case args of
-        OrderedArgs es -> do
+        OrderedArgs (e:_) -> do
           let check = case M.lookup nam (_userDefined c) of
-                Just "uint" -> intType' x ~> tcExpr (head es)
-                Just "int" -> intType' x ~> tcExpr (head es)
-                Just "string" -> stringType' x ~> tcExpr (head es)
-                Just "bool" -> boolType' x ~> tcExpr (head es)
-                Just "bytes" -> bytesType' x ~> tcExpr (head es)
+                Just "uint" -> intType' x ~> tcExpr e
+                Just "int" -> intType' x ~> tcExpr e
+                Just "string" -> stringType' x ~> tcExpr e
+                Just "bool" -> boolType' x ~> tcExpr e
+                Just "bytes" -> bytesType' x ~> tcExpr e
                 _ -> pure . bottom $ "type not supported for user defined types" <$ x
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           check !> (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
@@ -2038,8 +2040,8 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
   if (M.member nam $ _userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False)
     then do
       case args of
-        OrderedArgs es -> do
-          expressionResult <- tcExpr (head es)
+        OrderedArgs (e:_) -> do
+          expressionResult <- tcExpr e
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           let check =
                 ( case expressionResult of

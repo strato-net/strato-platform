@@ -9,7 +9,7 @@ import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiAmount } from '@/utils/numberUtils';
 import { bridgeContractService } from '@/lib/bridge/contractService';
 
-const WithdrawTransactionDetails = () => {
+const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [withdrawalStatus, setWithdrawalStatus] = useState<number | null>(null);
@@ -31,7 +31,7 @@ const WithdrawTransactionDetails = () => {
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = 'eq.false';
+        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
         
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
@@ -127,7 +127,7 @@ const WithdrawTransactionDetails = () => {
         const symbol = record?.stratoTokenSymbol || '-';
         return (
           <div className="flex flex-col gap-1">
-            <span className="text-sm text-gray-700">{symbol}</span>
+            <span className="text-sm text-gray-700">{mintUSDST ? 'USDST' : symbol}</span>
           </div>
         );
       },

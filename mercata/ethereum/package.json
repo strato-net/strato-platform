@@ -9,7 +9,10 @@
     "deployWithProxy:mainnet": "npx hardhat run scripts/deployWithProxy.js --network mainnet",
 
     "verify:sepolia": "hardhat verify --network sepolia",
-    "verify:mainnet": "hardhat verify --network mainnet"
+    "verify:mainnet": "hardhat verify --network mainnet",
+
+    "scan:sepolia": "npx hardhat run scripts/scanTokenConfig.js --network sepolia",
+    "scan:mainnet": "npx hardhat run scripts/scanTokenConfig.js --network mainnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",

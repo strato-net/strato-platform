@@ -62,6 +62,7 @@ async function main() {
     console.log(`CDP Registry: ${deployedContract.managers.cdpRegistry}`);
     console.log(`CDP Engine: ${deployedContract.managers.cdpEngine}`);
     console.log(`CDP Vault: ${deployedContract.managers.cdpVault}`);
+    console.log(`Safety Module: ${deployedContract.managers.safetyModule}`);
     console.log('===================================\n');
     
     // Return the deployed contract address for scripting
@@ -87,6 +88,7 @@ async function main() {
       CDP_REGISTRY: deployedContract.managers.cdpRegistry,
       CDP_ENGINE: deployedContract.managers.cdpEngine,
       CDP_VAULT: deployedContract.managers.cdpVault,
+      SAFETY_MODULE: deployedContract.managers.safetyModule,
       MERCATA_CORE: deployedContract.address,
     };
     Object.entries(envLines).forEach(([k, v]) => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import DashboardSidebar from '../components/dashboard/DashboardSidebar';
 import MobileSidebar from '../components/dashboard/MobileSidebar';
@@ -15,18 +15,37 @@ import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
+import { useCDP } from '@/context/CDPContext';
+import { useSwapContext } from '@/context/SwapContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
+import { useSearchParams } from 'react-router-dom';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
-  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens } = useUserTokens();
-  const { loans } = useLendingContext();
+  const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
+  const { loans, liquidityInfo } = useLendingContext();
+  const { totalCDPDebt } = useCDP();
+  const { lpTokens } = useSwapContext();
   const [totalBalance, setTotalBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+
+  const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
 
   // Add visibility state to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
+
+  // Handle vault action success with debounced refresh
+  const handleVaultActionSuccess = () => {
+    // Use a longer delay to ensure transaction is processed and tab state is preserved
+    setTimeout(() => {
+      fetchTokens();
+      if (userAddress) {
+        fetchUsdstBalance(userAddress);
+      }
+    }, 1000); // Longer delay to ensure smooth UX
+  };
 
   useEffect(() => {
     // Set mounted state immediately to prevent flash
@@ -58,15 +77,50 @@ const DepositsPage = () => {
       total += totalTokenValue;
     }
 
-    // Get USDST borrowed from loans data
-    const usdstBorrowed = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
+    // Add lending pool value (mUSDST deposits)
+    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
+      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
+      total += lendingPoolValue;
+    }
+
+    // Add LP token values
+    if (lpTokens && lpTokens.length > 0) {
+      lpTokens.forEach((lpToken) => {
+        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
+          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
+          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
+          const lpTokenValue = balance * priceValue;
+          total += lpTokenValue;
+        }
+      });
+    }
+
+    const lendingPoolDebt = loans?.totalAmountOwed 
+      ? parseFloat(formatUnits((() => { 
+          try { 
+            const bi = BigInt(loans.totalAmountOwed); 
+            return bi <= 1n ? 0n : bi; 
+          } catch { 
+            return 0n; 
+          } 
+        })(), 18))
       : 0;
 
-    // Net Balance = All deposits (including supplied) - USDST Borrowed
-    const netBalance = total - usdstBorrowed;
+    const cdpDebt = totalCDPDebt
+      ? parseFloat(formatUnits((() => {
+          try {
+            const bi = BigInt(totalCDPDebt);
+            return bi <= 1n ? 0n : bi;
+          } catch {
+            return 0n;
+          }
+        })(), 18))
+      : 0;
+
+    const totalDebt = lendingPoolDebt + cdpDebt;
+    const netBalance = total - totalDebt;
     setTotalBalance(netBalance);
-  }, [tokens, loans]);
+  }, [tokens, loans, totalCDPDebt, liquidityInfo, lpTokens]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -115,7 +169,7 @@ const DepositsPage = () => {
                   color="bg-blue-500"
                 />
               </div>
-              <ExchangeCart />
+              <ExchangeCart onVaultActionSuccess={handleVaultActionSuccess} initialTab={initialTab} />
             </div>
             <div className="flex-1 min-w-0 max-w-full">
               {/* Render AssetsList when data is loaded */}

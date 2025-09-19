@@ -40,12 +40,9 @@ import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
-import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.SyncDB
 import Blockchain.Timing
@@ -54,21 +51,18 @@ import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
-import Control.Lens hiding (Context)
 import Control.Monad
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
-import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
-import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
 
@@ -127,7 +121,7 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
+initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
@@ -155,7 +149,7 @@ outputBlockToContextBestBlockInfo block =
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries evs = do
   let names = map getNames evs
-      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+      numberedNames = map (\case [] -> []; x@(x0:_) -> numberIt (length x) x0) $ group $ sort names
 
   $logInfoS "logEventSummaries" . T.pack $
     "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
@@ -181,47 +175,11 @@ routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutAction act) = do
-  let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
-      extractCodeCollectionAddedMessages a =
-        case ( a ^. Action.src,
-               a ^. Action.name,
-               OMap.assocs $ a ^. Action.actionData
-             ) of
-          (Just c, Just n, actionDatas) ->
-            let cp = SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-                  if _actionDataCodeHash == cp
-                    then Just _actionDataCreator
-                    else Nothing
-                cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-                abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
-                contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                                  --  . (constructor .~ Nothing)
-                                                   . (modifiers .~ M.empty)
-                                                   )
-                cc' = emptyCodeCollection & contracts .~ contracts'
-             in Just $
-                  CodeCollectionAdded
-                    { codeCollection = const () <$> cc',
-                      codePtr = cp,
-                      creator = cn,
-                      application = n,
-                      abstracts = abstracts',
-                      recordMappings = []
-                    }
-          _ -> Nothing
-      ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-      dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
-      actionEvents = [NewAction act']
-      vmes = ccEvents ++ dcEvents ++ actionEvents
-  void . produceVMEvents $ toList vmes
+sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = void . produceVMEvents $ [NewTransactionResult tr]
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $

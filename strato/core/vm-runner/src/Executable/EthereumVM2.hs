@@ -71,6 +71,8 @@ handleVmEvents = awaitForever $ \InBatch {..} -> do
     nds <- catMaybes <$> traverse (A.lookup (A.Proxy @MP.NodeData)) srs
     pure $! OutMPNodesResponse o nds
   yieldMany $! mpResps
+  let toSR = MP.StateRoot . Keccak256.keccak256ToByteString . Keccak256.rlpHash
+  lift . for_ mpNodesResps $ A.insertMany (A.Proxy @MP.NodeData) . M.fromList . map (toSR &&& id)
 
   rpcResps <- lift $ do
     bbHash <- maybe Keccak256.zeroHash fst <$> getChainBestBlock Nothing
