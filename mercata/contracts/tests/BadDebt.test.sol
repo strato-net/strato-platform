@@ -35,8 +35,21 @@ contract Describe_BadDebt_Basic {
         require(address(m) != address(0), "address is 0");
     }
 
-    function it_ab_checks_that_lending_pool_is_set() public {
+    function it_ab_checks_that_contracts_are_set() public {
+        require(address(m.priceOracle()) != address(0), "PriceOracle address is 0");
+        require(address(m.collateralVault()) != address(0), "CollateralVault address is 0");
+        require(address(m.liquidityPool()) != address(0), "LiquidityPool address is 0");
+        require(address(m.lendingPool()) != address(0), "LendingPool address is 0");
+        require(address(m.poolConfigurator()) != address(0), "PoolConfigurator address is 0");
+        require(address(m.lendingRegistry()) != address(0), "LendingRegistry address is 0");
+        require(address(m.tokenFactory()) != address(0), "TokenFactory address is 0");
+        require(address(m.feeCollector()) != address(0), "FeeCollector address is 0");
+        require(address(m.adminRegistry()) != address(0), "AdminRegistry address is 0");
+        require(address(m.safetyModule()) != address(0), "SafetyModule address is 0");
+
         // via indirect reference
+        require(address(m.collateralVault().registry()) != address(0), "CollateralVault registry not set");
+        require(address(m.liquidityPool().registry()) != address(0), "LiquidityPool registry not set");
         require(address(m.collateralVault().registry().lendingPool()) != address(0), "CollateralVault's LendingPool address is 0");
         require(address(m.liquidityPool().registry().lendingPool()) != address(0), "LiquidityPool's LendingPool address is 0");
     }
@@ -251,69 +264,37 @@ contract Describe_BadDebt_Basic {
         require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
     }
 
-    // Test basic safety module functionality
-    function it_ai_can_access_safety_module() public { // TODO letters
-        // Get the safety module from lending infrastructure
-        LendingPool pool = m.lendingPool();
-        require(address(pool) != address(0), "LendingPool not found");
-        
-        // Test that safety module is configured - check if it might be zero
-        SafetyModule sm = pool.safetyModule();
-        if (address(sm) == address(0)) {
-            // SafetyModule might not be initialized yet, which is okay for basic tests
-            require(true, "SafetyModule not yet initialized, which is acceptable");
-        } else {
-            // Basic safety module checks - simplified
-            require(address(sm) != address(0), "SafetyModule address is zero");
-        }
+    function it_ai_can_display_logs() public {
+        log("Hello, world! We're at " + string(address(m)));
     }
 
-    // Test collateral vault basic functionality
-    function it_aj_can_access_collateral_vault() public {
-        CollateralVault cv = m.collateralVault();
-        require(address(cv) != address(0), "CollateralVault not found");
-        
-        // Test basic collateral vault properties
-        require(address(cv.registry()) != address(0), "CollateralVault registry not set");
-    }
-
-    // Test liquidity pool basic functionality
-    function it_ak_can_access_liquidity_pool() public {
-        LiquidityPool lp = m.liquidityPool();
-        require(address(lp) != address(0), "LiquidityPool not found");
-        
-        // Test basic liquidity pool properties
-        require(address(lp.registry()) != address(0), "LiquidityPool registry not set");
-    }
-
-    // Test price oracle basic functionality
-    function it_al_can_access_price_oracle() public {
-        PriceOracle oracle = m.priceOracle();
-        require(address(oracle) != address(0), "PriceOracle not found");
-        
-        // Create a test token
-        address testToken = m.tokenFactory().createToken("TESTST", "Test Token", [], [], [], "TESTST", 0, 18);
-        Token(testToken).setStatus(2);
-        
-        // Test basic oracle functionality - simplified to avoid internal errors
-        // Just verify the oracle exists and can be called
-        require(address(oracle) != address(0), "Price oracle address is zero");
-    }
-
-    // Test token minting and basic operations
-    function it_am_can_mint_tokens() public {
-        address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        Token(usdToken).setStatus(2);
-        
+    // Test token minting and burn operations
+    function it_aj_can_mint_and_burn_tokens() public {
         // Test minting - simplified
-        Token(usdToken).mint(address(this), 1000e18);
-        
-        // Basic verification that token exists and is functional
-        require(usdToken != address(0), "Token creation failed");
+        Token(USDST).mint(address(this), 1000e18);
+        require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Should have 1000 USDST after mint");
+        Token(USDST).burn(address(this), 1000e18);
+        require(IERC20(USDST).balanceOf(address(this)) == 0, "Should have 0 USDST after burn");
+    }
+
+    function it_ak_can_simulate_users() public {
+        User adminUser = new User();
+        User user1 = new User();
+        User user2 = new User();
+
+        Token(USDST).mint(address(this), 1000e18);
+        IERC20(USDST).transfer(address(user1), 1000e18);
+        require(IERC20(USDST).balanceOf(address(user1)) == 1000e18, "User1 should have 1000 USDST after receipt");
+        user1.do(USDST, "transfer", address(user2), 1000e18);
+        require(IERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST after transfer out");
+        require(IERC20(USDST).balanceOf(address(user2)) == 1000e18, "User2 should have 1000 USDST after receipt");
+        user2.do(USDST, "transfer", address(this), 1000e18);
+        require(IERC20(USDST).balanceOf(address(user2)) == 0, "User2 should have 0 USDST after transfer out");
+        require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
     }
 
     // Test basic collateral management
-    function it_an_can_manage_collateral() public {
+    function it_zf_can_manage_collateral() public {
         // Create tokens
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
         Token(goldToken).setStatus(2);
@@ -329,7 +310,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test basic infrastructure setup for bad debt scenarios
-    function it_ao_can_setup_bad_debt_infrastructure() public {
+    function it_zg_can_setup_bad_debt_infrastructure() public {
         // Create tokens that would be used in bad debt scenarios
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
@@ -355,7 +336,7 @@ contract Describe_BadDebt_Basic {
     // ==== BAD DEBT SPECIFIC TESTS ====
 
     // Test: Basic bad debt simulation using actual Mercata deployment
-    function it_ap_can_simulate_bad_debt_scenario() public {
+    function it_zh_can_simulate_bad_debt_scenario() public {
         // Create test tokens using the actual TokenFactory
         address usdToken = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         address goldToken = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
@@ -390,7 +371,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Safety module functionality using actual deployment
-    function it_aq_can_test_safety_module_functionality() public {
+    function it_zi_can_test_safety_module_functionality() public {
         // Test basic safety module access
         // Note: SafetyModule might be initialized after LendingPool in deployment
         
@@ -407,7 +388,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Pool configuration using actual deployment
-    function it_ar_can_test_pool_configuration_with_actual_deployment() public {
+    function it_zj_can_test_pool_configuration_with_actual_deployment() public {
         // Get actual pool from deployment
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
@@ -426,7 +407,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Exchange rate behavior with bad debt using actual deployment
-    function it_as_can_test_exchange_rate_with_bad_debt_actual_deployment() public {
+    function it_zk_can_test_exchange_rate_with_bad_debt_actual_deployment() public {
         // Get actual infrastructure
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
@@ -461,7 +442,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Collateral and price scenarios using actual deployment
-    function it_at_can_test_collateral_price_scenarios_actual_deployment() public {
+    function it_zl_can_test_collateral_price_scenarios_actual_deployment() public {
         // Get actual infrastructure components
         PriceOracle oracle = m.priceOracle();
         CollateralVault cv = m.collateralVault();
@@ -502,7 +483,7 @@ contract Describe_BadDebt_Basic {
     // ==== COMPREHENSIVE BAD DEBT SCENARIOS ====
 
     // Test: Complete bad debt scenario with liquidation failure
-    function it_au_can_simulate_complete_bad_debt_liquidation_failure() public {
+    function it_zm_can_simulate_complete_bad_debt_liquidation_failure() public {
         // Setup infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -544,7 +525,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Safety module coverage of bad debt
-    function it_av_can_test_safety_module_bad_debt_coverage() public {
+    function it_zn_can_test_safety_module_bad_debt_coverage() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         SafetyModule sm = m.safetyModule();
@@ -582,7 +563,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Exchange rate impact during bad debt events
-    function it_aw_can_test_exchange_rate_impact_during_bad_debt() public {
+    function it_zo_can_test_exchange_rate_impact_during_bad_debt() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
@@ -617,7 +598,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Extreme price volatility and bad debt accumulation
-    function it_ax_can_test_extreme_price_volatility_bad_debt() public {
+    function it_zp_can_test_extreme_price_volatility_bad_debt() public {
         // Get infrastructure
         PriceOracle oracle = m.priceOracle();
         LendingPool pool = m.lendingPool();
@@ -658,7 +639,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Multiple asset bad debt scenario
-    function it_ay_can_test_multiple_asset_bad_debt_scenario() public {
+    function it_zq_can_test_multiple_asset_bad_debt_scenario() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -704,7 +685,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Bad debt recovery mechanisms
-    function it_az_can_test_bad_debt_recovery_mechanisms() public {
+    function it_zr_can_test_bad_debt_recovery_mechanisms() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         SafetyModule sm = m.safetyModule();
@@ -745,7 +726,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Liquidation threshold breach scenarios
-    function it_ba_can_test_liquidation_threshold_breach_scenarios() public {
+    function it_zs_can_test_liquidation_threshold_breach_scenarios() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -786,7 +767,7 @@ contract Describe_BadDebt_Basic {
     }
 
     // Test: Cascading liquidation scenarios
-    function it_bb_can_test_cascading_liquidation_scenarios() public {
+    function it_zt_can_test_cascading_liquidation_scenarios() public {
         // Get infrastructure
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
