@@ -17,7 +17,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
     event OracleAuthorized(address indexed oracle);
     event OracleRevoked(address indexed oracle);
     
-    constructor(address _authorizedOracle) {
+    constructor(address _authorizedOracle) Ownable(_authorizedOracle) {
         // Owner is automatically authorized
         require(_authorizedOracle != address(0), "Invalid oracle address");
     }

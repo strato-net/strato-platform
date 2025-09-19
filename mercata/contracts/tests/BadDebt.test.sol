@@ -81,7 +81,7 @@ contract Describe_BadDebt_Basic {
             require(true, "SafetyModule not yet initialized, which is acceptable");
         } else {
             // Basic safety module checks - simplified
-            require(address(sm) != address(0), "SafetyModule exists");
+            require(address(sm) != address(0), "SafetyModule address is zero");
         }
     }
 
@@ -114,7 +114,7 @@ contract Describe_BadDebt_Basic {
         
         // Test basic oracle functionality - simplified to avoid internal errors
         // Just verify the oracle exists and can be called
-        require(address(oracle) != address(0), "Price oracle accessible");
+        require(address(oracle) != address(0), "Price oracle address is zero");
     }
 
     // Test token minting and basic operations
@@ -126,7 +126,7 @@ contract Describe_BadDebt_Basic {
         Token(usdToken).mint(address(this), 1000e18);
         
         // Basic verification that token exists and is functional
-        require(usdToken != address(0), "Token creation and minting works");
+        require(usdToken != address(0), "Token creation failed");
     }
 
     // Test basic collateral management
@@ -142,7 +142,7 @@ contract Describe_BadDebt_Basic {
         CollateralVault cv = m.collateralVault();
         
         // Basic verification that collateral vault is accessible
-        require(address(cv) != address(0), "Collateral management infrastructure accessible");
+        require(address(cv) != address(0), "CollateralVault address is zero");
     }
 
     // Test basic infrastructure setup for bad debt scenarios
@@ -161,12 +161,12 @@ contract Describe_BadDebt_Basic {
         LiquidityPool lp = m.liquidityPool();
         
         // Verify all components exist and are accessible
-        require(address(oracle) != address(0), "Oracle accessible");
-        require(address(pool) != address(0), "LendingPool accessible");
-        require(address(cv) != address(0), "CollateralVault accessible");
-        require(address(lp) != address(0), "LiquidityPool accessible");
-        require(usdToken != address(0), "USD token created");
-        require(goldToken != address(0), "GOLD token created");
+        require(address(oracle) != address(0), "Oracle address is zero");
+        require(address(pool) != address(0), "LendingPool address is zero");
+        require(address(cv) != address(0), "CollateralVault address is zero");
+        require(address(lp) != address(0), "LiquidityPool address is zero");
+        require(usdToken != address(0), "USD token address is zero");
+        require(goldToken != address(0), "GOLD token address is zero");
     }
 
     // ==== BAD DEBT SPECIFIC TESTS ====
@@ -180,23 +180,30 @@ contract Describe_BadDebt_Basic {
         // Set tokens to active status
         Token(usdToken).setStatus(2);
         Token(goldToken).setStatus(2);
+
         
         // Get actual infrastructure components
         LendingPool pool = m.lendingPool();
         PriceOracle oracle = m.priceOracle();
+
+        // Verify infrastructure is working with actual deployment
+        require(address(pool) != address(0), "Pool address is zero");
+        require(address(oracle) != address(0), "Oracle address is zero");
         
-        // Set up prices
-        oracle.setAssetPrice(usdToken, 1e18);     // $1 USD
-        oracle.setAssetPrice(goldToken, 2000e18); // $2000 Gold
-        
+        // Verify AdminRegistry access and admin status  
+        AdminRegistry adminReg = m.adminRegistry();
+        require(address(adminReg) != address(0), "AdminRegistry address is zero");
+        bool isAdmin = adminReg.isAdminAddress(address(this));
+        require(isAdmin, "Test contract is not admin");
+
+        oracle.setAssetPrice(usdToken, 1e18);
+        oracle.setAssetPrice(goldToken, 2000e18);
+        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not 1e18");
+        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not 2000e18");
+
         // Basic verification that we can access bad debt function
         uint initialBadDebt = pool.badDebt();
         require(initialBadDebt == 0, "Initial bad debt should be zero");
-        
-        // Verify infrastructure is working with actual deployment
-        require(address(pool) != address(0), "Pool created successfully");
-        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price set correctly");
-        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price set correctly");
     }
 
     // Test: Safety module functionality using actual deployment
@@ -210,10 +217,10 @@ contract Describe_BadDebt_Basic {
         
         // Test that we can mint tokens for testing
         Token(usdToken).mint(address(this), 1000e18);
-        require(IERC20(usdToken).balanceOf(address(this)) == 1000e18, "Test tokens minted successfully");
+        require(IERC20(usdToken).balanceOf(address(this)) == 1000e18, "Token balance mismatch");
         
         // Verify safety module exists in deployment
-        require(address(m.safetyModule) != address(0), "Safety module exists in deployment");
+        require(address(m.safetyModule) != address(0), "Safety module address is zero");
     }
 
     // Test: Pool configuration using actual deployment
@@ -232,7 +239,7 @@ contract Describe_BadDebt_Basic {
         
         // Test reserves functionality with actual pool
         uint reserves = pool.reservesAccrued();
-        require(reserves >= 0, "Reserves accessible from actual pool");
+        require(reserves >= 0, "Reserves value is negative");
     }
 
     // Test: Exchange rate behavior with bad debt using actual deployment
@@ -266,7 +273,7 @@ contract Describe_BadDebt_Basic {
         // Test that exchange rate remains stable with normal operations
         // Note: Actual deposit/withdrawal would require more complex setup
         // For now, verify the rate calculation works
-        require(rateBefore > 0, "Exchange rate calculation works with actual deployment");
+        require(rateBefore > 0, "Exchange rate is zero or negative");
     }
 
     // Test: Collateral and price scenarios using actual deployment
@@ -290,22 +297,22 @@ contract Describe_BadDebt_Basic {
         oracle.setAssetPrice(usdToken, 1e18);      // $1 USD
         oracle.setAssetPrice(goldToken, 2000e18);  // $2000 Gold
         
-        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price set correctly");
-        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price set correctly");
+        require(oracle.getAssetPrice(usdToken) == 1e18, "USD price not 1e18");
+        require(oracle.getAssetPrice(goldToken) == 2000e18, "Gold price not 2000e18");
         
         // Test price crash simulation
         oracle.setAssetPrice(goldToken, 500e18); // $500 (75% crash)
-        require(oracle.getAssetPrice(goldToken) == 500e18, "Gold price crashed correctly");
+        require(oracle.getAssetPrice(goldToken) == 500e18, "Gold price not 500e18 after crash");
         
         // Test collateral management with actual vault
         Token(goldToken).mint(address(this), 10e18);
         uint balanceBefore = IERC20(goldToken).balanceOf(address(this));
-        require(balanceBefore == 10e18, "Gold tokens minted for collateral testing");
+        require(balanceBefore == 10e18, "Gold token balance not 10e18");
         
         // Verify actual infrastructure components are accessible
-        require(address(cv) != address(0), "Actual CollateralVault accessible");
-        require(address(oracle) != address(0), "Actual PriceOracle accessible");
-        require(address(pool) != address(0), "Actual LendingPool accessible");
+        require(address(cv) != address(0), "CollateralVault address is zero");
+        require(address(oracle) != address(0), "PriceOracle address is zero");
+        require(address(pool) != address(0), "LendingPool address is zero");
     }
     
     // ==== COMPREHENSIVE BAD DEBT SCENARIOS ====
@@ -338,7 +345,7 @@ contract Describe_BadDebt_Basic {
         oracle.setAssetPrice(goldToken, 100e18); // Gold crashes to $100 (95% crash)
         
         // Verify price crash simulation
-        require(oracle.getAssetPrice(goldToken) == 100e18, "Price crash simulated correctly");
+        require(oracle.getAssetPrice(goldToken) == 100e18, "Gold price not 100e18 after crash");
         require(oracle.getAssetPrice(usdToken) == 1e18, "USD price stable");
         
         // Verify infrastructure can handle bad debt scenarios
