@@ -1,19 +1,25 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { SwapToken } from "../../types/swaps";
+import { SwapToken, LPToken, RawPool, RawPoolFactory, RawToken, RawLPToken } from "../../types/swaps";
+import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 
 const { Pool } = constants;
 
 export const getRawPoolData = async (
   accessToken: string,
   params: Record<string, string> = {}
-) => {
+): Promise<RawPool[]> => {
   const queryParams = {
     _owner: "eq." + constants.poolFactory,
     ...params
   };
 
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, { params: queryParams });
+  
+  if (!Array.isArray(poolData)) {
+    throw new Error("Invalid pool data received from API");
+  }
+  
   return poolData;
 };
 
@@ -22,21 +28,17 @@ export const calculateImpliedPrice = (
   amountOut: string,
   isAToB: boolean
 ): string => {
-  try {
-    const inBig = BigInt(amountIn);
-    const outBig = BigInt(amountOut);
-    
-    if (!inBig || !outBig) return '0.00';
-    
-    // Always calculate as TokenB/TokenA
-    const price = isAToB 
-      ? (outBig * 10n**18n) / inBig  // A→B: out/in
-      : (inBig * 10n**18n) / outBig; // B→A: in/out
-    
-    return (Number(price) / 1e18).toFixed(6);
-  } catch {
-    return '0.00';
-  }
+  const inBig = safeBigInt(amountIn);
+  const outBig = safeBigInt(amountOut);
+  
+  if (inBig === 0n || outBig === 0n) return '0.00';
+  
+  // Always calculate as TokenB/TokenA
+  const price = isAToB 
+    ? safeBigIntDivide(outBig * 10n**18n, inBig, "A to B price calculation")  // A→B: out/in
+    : safeBigIntDivide(inBig * 10n**18n, outBig, "B to A price calculation"); // B→A: in/out
+  
+  return (Number(price) / 1e18).toFixed(6);
 };
 
 /**
@@ -94,25 +96,24 @@ export const calculateLPTokenPrice = (
   tokenBPrice: string,
   lpTokenTotalSupply: string
 ): string => {
-  const toBig = (v: string) => (v ? BigInt(v) : 0n);
-  const aBal = toBig(tokenABalance);
-  const bBal = toBig(tokenBBalance);
-  const aPrice = toBig(tokenAPrice);
-  const bPrice = toBig(tokenBPrice);
-  const supply = toBig(lpTokenTotalSupply);
+  const aBal = safeBigInt(tokenABalance);
+  const bBal = safeBigInt(tokenBBalance);
+  const aPrice = safeBigInt(tokenAPrice);
+  const bPrice = safeBigInt(tokenBPrice);
+  const supply = safeBigInt(lpTokenTotalSupply);
 
   if (supply === 0n) return "0";
   if ((aBal === 0n && bBal === 0n) || (aPrice === 0n && bPrice === 0n)) return "0";
 
   const Q = 10n ** 18n;
-  const totalValueUSD = (aBal * aPrice + bBal * bPrice) / Q; // both prices are 1e18-scaled
+  const totalValueUSD = safeBigIntDivide(aBal * aPrice + bBal * bPrice, Q, "Total value USD calculation"); // both prices are 1e18-scaled
 
-  return ((totalValueUSD * Q) / supply).toString();
+  return safeBigIntDivide(totalValueUSD * Q, supply, "LP token price calculation").toString();
 };
 
-export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string) => ({
+export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string): Record<string, string> => ({
   ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
-  select: rawParams.select || constants.poolSelectFields.join(","),
+  select: rawParams.select || constants.swapSelectFields.join(","),
   ...(rawParams.select || !userAddress ? {} : {
     "lpToken.balances.value": "gt.0",
     "lpToken.balances.key": `eq.${userAddress}`,
@@ -123,16 +124,36 @@ export const buildPoolParams = (rawParams: Record<string, string | undefined>, u
   }),
 });
 
-export const extractTokenAddresses = (poolData: any[]) => [
+export const extractTokenAddresses = (poolData: RawPool[]): string[] => [
   ...new Set([
     ...poolData.map(p => p.tokenA?.address).filter(Boolean),
     ...poolData.map(p => p.tokenB?.address).filter(Boolean)
   ])
 ];
 
-export const calculatePoolMetrics = (pool: any, tokenAPrice: string, tokenBPrice: string, volume24h: string, factoryData: any) => {
-  const tokenAValue = (BigInt(pool.tokenABalance || "0") * BigInt(tokenAPrice)) / BigInt(10 ** 18);
-  const tokenBValue = (BigInt(pool.tokenBBalance || "0") * BigInt(tokenBPrice)) / BigInt(10 ** 18);
+export const calculatePoolMetrics = (
+  pool: RawPool, 
+  tokenAPrice: string, 
+  tokenBPrice: string, 
+  volume24h: string, 
+  factoryData?: RawPoolFactory
+): {
+  totalLiquidityUSD: string;
+  apy: number;
+  lpTokenPrice: string;
+  swapFeeRate: number;
+  lpSharePercent: number;
+} => {
+  const tokenAValue = safeBigIntDivide(
+    safeBigInt(pool.tokenABalance || "0") * safeBigInt(tokenAPrice), 
+    safeBigInt(10 ** 18), 
+    "Token A value calculation"
+  );
+  const tokenBValue = safeBigIntDivide(
+    safeBigInt(pool.tokenBBalance || "0") * safeBigInt(tokenBPrice), 
+    safeBigInt(10 ** 18), 
+    "Token B value calculation"
+  );
   const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
   
   const swapFeeRate = pool.swapFeeRate || factoryData?.swapFeeRate || 30;
@@ -152,7 +173,7 @@ export const calculatePoolMetrics = (pool: any, tokenAPrice: string, tokenBPrice
   return { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent };
 };
 
-export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string) => {
+export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string): { aToB: string; bToA: string } => {
   if (tokenAPrice === "0" || tokenBPrice === "0") return { aToB: "0", bToA: "0" };
   return {
     aToB: (Number(tokenAPrice) / Number(tokenBPrice)).toFixed(18),
@@ -160,7 +181,12 @@ export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string) 
   };
 };
 
-export const buildSwapToken = (token: any, price: string, poolBalance: string, userBalance: string): SwapToken => ({
+export const buildSwapToken = (
+  token: RawToken | null, 
+  price: string, 
+  poolBalance: string, 
+  userBalance: string
+): SwapToken => ({
   address: token?.address || "",
   _name: token?._name || "",
   _symbol: token?._symbol || "",
@@ -171,7 +197,11 @@ export const buildSwapToken = (token: any, price: string, poolBalance: string, u
   poolBalance
 });
 
-export const buildLPToken = (lpToken: any, price: string, userBalance: string) => ({
+export const buildLPToken = (
+  lpToken: RawLPToken | null, 
+  price: string, 
+  userBalance: string
+): LPToken => ({
   address: lpToken?.address || "",
   _name: lpToken?._name || "",
   _symbol: lpToken?._symbol || "",

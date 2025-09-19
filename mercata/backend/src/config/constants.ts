@@ -1,5 +1,10 @@
 import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
-import { poolConstants } from "./poolConstants";
+import { 
+  SWAP_CONTRACTS, 
+  SWAP_TOKEN_SELECT_FIELDS, 
+  SWAP_POOL_SELECT_FIELDS, 
+  SWAP_HISTORY_SELECT_FIELDS 
+} from "./swapConstants";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -27,9 +32,7 @@ export const constants = (() => {
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const Event = "event";
-  
-  const poolConsts = poolConstants();
-  
+    
   const tokenSelectFields = [
     "address",
     "_name",
@@ -99,18 +102,6 @@ export const constants = (() => {
       `prices:${PriceOracle}-prices(asset:key,value::text)` +
     ")",
   ];
-
-  const swapHistorySelectFields = [
-    "address",
-    "id",
-    "block_timestamp",
-    "sender",
-    "tokenIn",
-    "tokenOut", 
-    "amountIn::text",
-    "amountOut::text",
-    "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))",
-  ];
   
   const priceHistorySelectFields = [
     "address",
@@ -146,10 +137,15 @@ export const constants = (() => {
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
-    ...poolConsts,
+    // Swap constants
+    Pool: SWAP_CONTRACTS.Pool,
+    PoolFactory: SWAP_CONTRACTS.PoolFactory,
+    PoolSwap: SWAP_CONTRACTS.PoolSwap,
+    swapTokenSelectFields: SWAP_TOKEN_SELECT_FIELDS,
+    swapSelectFields: SWAP_POOL_SELECT_FIELDS,
+    swapHistorySelectFields: SWAP_HISTORY_SELECT_FIELDS,
     registrySelectFields,
     cdpRegistrySelectFields,
-    swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
     GAS_FEE: 0.01,
