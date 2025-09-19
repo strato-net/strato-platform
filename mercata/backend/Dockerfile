@@ -32,7 +32,10 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-RUN npm ci --omit=dev
+# Copy the built shared-types package from builder stage
+COPY --from=builder /build/packages/shared-types ./packages/shared-types
+
+RUN npm ci --omit=dev && npm install ./packages/shared-types
 
 COPY --from=builder /build/dist ./dist
 
