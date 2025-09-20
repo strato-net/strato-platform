@@ -39,6 +39,7 @@ export const requestWithdrawal = async (
 
   const amount = BigInt(stratoTokenAmount);
   const requiredApprove = amount + (mintUSDST ? txFeeWei : 0n);
+  const requiredUSDST = mintUSDST ? 0n : txFeeWei;
   const addresses = mintUSDST ? [constants.USDST] : [approveToken, constants.USDST];
 
   const [balances, assetCount] = await Promise.all([
@@ -47,6 +48,7 @@ export const requestWithdrawal = async (
   ]);
 
   ensure((balances.get(approveToken) ?? 0n) >= requiredApprove, "Insufficient token balance");
+  ensure(requiredUSDST === 0n || (balances.get(constants.USDST) ?? 0n) >= requiredUSDST, "Insufficient USDST for gas");
   ensure(assetCount > 0, mintUSDST ? "Asset not enabled for USDST minting" : "Asset not enabled for wrapping");
 
   const tx = await buildFunctionTx(actions, userAddress, accessToken);
