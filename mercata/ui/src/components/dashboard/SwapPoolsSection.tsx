@@ -211,8 +211,8 @@ const SwapPoolsSection = () => {
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
-                        disabled={![{ balance: pool.lpToken.balance }]?.length}
-                        title={![{ balance: pool.lpToken.balance }]?.length ? "No stake in this pool" : "Withdraw"}
+                        disabled={BigInt(pool.lpToken.balance || "0") === BigInt(0)}
+                        title={BigInt(pool.lpToken.balance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
