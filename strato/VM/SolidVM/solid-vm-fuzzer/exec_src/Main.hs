@@ -20,11 +20,13 @@ import Control.Monad (forever, void)
 import Control.Monad.Catch (MonadCatch, MonadThrow)
 import Control.Monad.IO.Class
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Logger (MonadLogger, LoggingT, runStdoutLoggingT, filterLogger, runLoggingT)
 import Data.Aeson as Aeson
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Char8 as C8
 import Data.Default (def)
 import Data.Foldable (asum, find, traverse_)
+import Data.List ()
 import Data.Maybe (fromMaybe)
 import Data.Source.Map
 import qualified Data.Map.Strict as M
@@ -33,6 +35,7 @@ import Data.Source.Severity
 import qualified Data.Set as S
 import qualified Data.Text as T
 import Data.Text.Encoding (encodeUtf8)
+import qualified System.Log.FastLogger as FL
 import Debugger
 import Debugger.Options ()
 import HFlags
@@ -41,8 +44,8 @@ import SolidVM.Solidity.StaticAnalysis
 import System.IO (hSetEncoding, utf8)
 import UnliftIO
 
-newtype Cli a = Cli { runCli :: IO a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadUnliftIO, MonadThrow, MonadCatch)
+newtype Cli a = Cli (LoggingT IO a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadUnliftIO, MonadThrow, MonadCatch, MonadLogger)
 
 instance {-# OVERLAPPING #-} A.Selectable FilePath (Either String String) Cli where
   select _ filePath =
@@ -66,7 +69,7 @@ main = do
     [] -> putStrLn "No arguments given" >> help
     ["help"] -> help
     [_] -> putStrLn "No input files given"
-    (mode:files) -> (\(j, fs) -> runOp mode j $ SourceMap fs) =<< addFiles files
+    (mode:files) -> (\(j, fs) -> runStdoutLoggingT $ runOp mode j $ SourceMap fs) =<< addFiles files
   where help = putStrLn "Usage: solid-vm-cli (parse|compile|analyze|test) filename [filenames]"
         addFiles [] = pure (False, [])
         addFiles ("json":fs) = (True,) . snd <$> addFiles fs
@@ -78,7 +81,7 @@ main = do
         stringJson = decode' . BL.fromStrict . encodeUtf8 . T.pack
         printJSON :: ToJSON a => a -> IO ()
         printJSON = putStrLn' . encode
-        runOp mode j srcMap = case mode of
+        runOp mode j srcMap = liftIO $ case mode of
           "parse" -> case parse srcMap of
             Right _ -> if j
                          then putStrLn "[]"
@@ -86,23 +89,28 @@ main = do
             Left xs -> if j
                          then printJSON xs
                          else putStrLn "Parse errors:" >> traverse_ print xs
-          "test" -> runCli (fuzz Nothing srcMap) >>= \xs ->
-              if j
-                then printJSON xs
-                else traverse_ (\case
-                        FuzzerSuccess (SourceAnnotation _ _ (testName, _)) ->
-                          putStrLn . T.unpack $ "✅ " <> testName <> " succeeded"
-                        FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
-                          putStrLn . T.unpack $ "❌ " <> testName <> " failed: " <> msg
-                      ) xs
-          "compile" -> runCli (compile srcMap) >>= \case
+          "test" -> do
+            -- Use simple logging that strips timestamps - just run directly
+            runLoggingT 
+              (filterLogger (\source _ -> 
+                source `elem` ["test-result", "test-suite", "test-contract"]) $
+                fuzzWithLogging Nothing srcMap >>= \xs ->
+                  if j
+                    then liftIO $ printJSON xs
+                    else pure ()) -- Results are now logged immediately during execution
+              (\_ _ _ msg -> do
+                let bs = FL.fromLogStr msg
+                C8.hPutStr stdout bs
+                C8.hPutStr stdout "\n"
+                hFlush stdout)
+          "compile" -> runStdoutLoggingT (compile srcMap) >>= \case
             Right cc -> if j
                           then printJSON cc
                           else pure ()
             Left xs -> if j
                          then printJSON xs
                          else putStrLn "Compilation errors:" >> traverse_ print xs
-          "analyze" -> runCli (analyze srcMap) >>= \case
+          "analyze" -> runStdoutLoggingT (analyze srcMap) >>= \case
             [] -> if j
                     then putStrLn "[]"
                     else pure ()
@@ -134,7 +142,7 @@ main = do
                               Just resp -> atomically $ writeTQueue q resp
                             loop
                 void . runConcurrently . asum $ map Concurrently
-                  [ void $ runCli (fuzz (Just dSettings) srcMap')
+                  [ void $ runStdoutLoggingT (fuzz (Just dSettings) srcMap')
                   , loop
                   , forever $ handleOutput dSettings >>= atomically . writeTQueue q
                   , forever $ atomically (readTQueue q) >>= printJSON
@@ -149,6 +157,7 @@ main = do
                 . unSourceMap
         analyze src = compile src >>= \eCC -> pure $ runDetectors parse (const eCC) id src
         fuzz dSettings = runFuzzer dSettings compile
+        fuzzWithLogging dSettings = runFuzzerWithLogging dSettings compile
         handleInput :: DebugSettings -> JsonRpcMessage -> IO (Maybe JsonRpcMessage)
         handleInput dSettings (Rpc i m _ v) = case m of
           "pause" -> Nothing <$ pause dSettings

@@ -19,6 +19,7 @@ library:
   - containers
   - debugger
   - exceptions
+  - format
   - lens
   - monad-alter
   - QuickCheck
@@ -42,13 +43,16 @@ executables:
     dependencies:
       - aeson
       - bytestring
+      - common-log
       - containers
       - data-default
       - debugger
       - exceptions
+      - fast-logger
       - hflags
       - lens
       - monad-alter
+      - monad-logger
       - solid-vm-compiler
       - solid-vm-fuzzer
       - solid-vm-model

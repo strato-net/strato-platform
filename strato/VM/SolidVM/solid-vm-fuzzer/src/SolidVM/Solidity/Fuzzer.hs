@@ -10,6 +10,7 @@
 
 module SolidVM.Solidity.Fuzzer
   ( runFuzzer,
+    runFuzzerWithLogging,
     module SolidVM.Solidity.Fuzzer.Types,
   )
 where
@@ -41,6 +42,7 @@ import SolidVM.Model.Type (Type)
 import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Fuzzer.Types
 import Test.QuickCheck
+import Text.Tools ()
 import UnliftIO
 
 defaultFuzzerRuns :: Integer
@@ -98,6 +100,39 @@ runFuzzer dSettings compile src = compile src >>= \case
                         Just <$> prop bh addr fName f
                     | otherwise -> pure Nothing
 
+runFuzzerWithLogging :: (MonadUnliftIO m, MonadCatch m, MonadLogger m, A.Selectable FilePath (Either String String) m) =>
+  Maybe DebugSettings ->
+  (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
+  SourceMap ->
+  m [FuzzerTestAndResult]
+runFuzzerWithLogging dSettings compile src = compile src >>= \case
+  Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
+  Right cc -> do
+    let args = FuzzerArgs src "" [] "" [] Nothing
+    -- Note: Using evalMemContextM directly without runNoLoggingT to allow logging, and avoid fancy banners
+    evalMemContextM dSettings . flip runReaderT args $ do
+      fmap concat . for (M.toList $ _contracts cc) $ \(cName, c) ->
+        if not (describePrefix `T.isPrefixOf` labelToText cName)
+          then pure []
+          else case _funcArgs <$> _constructor c of
+            Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
+            _ -> do
+              fuzzContractWithNumbers cName (_contractContext c) $ \bh addr -> do
+                _ <- for (M.lookup "beforeAll" $ _functions c) $ testWithNumber 0 bh addr "beforeAll"
+                
+                let testFunctions = [(fName, f) | (fName, f) <- M.toList $ _functions c,
+                                     testPrefix `T.isPrefixOf` labelToText fName || propertyPrefix `T.isPrefixOf` labelToText fName]
+                
+                fmap catMaybes . flip traverse (zip [1..] testFunctions) $ \(testNum, (fName, f)) -> fmap (fmap (withTestName $ T.pack fName)) $
+                  if
+                      | testPrefix `T.isPrefixOf` labelToText fName -> do
+                          _ <- for (M.lookup "beforeEach" $ _functions c) $ testWithNumber 0 bh addr "beforeEach"
+                          Just <$> testWithNumber testNum bh addr fName f
+                      | propertyPrefix `T.isPrefixOf` labelToText fName -> do
+                          _ <- for (M.lookup "beforeEach" $ _functions c) $ testWithNumber 0 bh addr "beforeEach"
+                          Just <$> propWithNumber testNum bh addr fName f
+                      | otherwise -> pure Nothing
+
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True
 accessible (Just Public)   = True
@@ -114,7 +149,15 @@ test bh addr fName f =
   if accessible $ _funcVisibility f
     then if null $ _funcArgs f
            then if emptyOrBool $ _funcVals f
-                  then fuzzFunction bh addr (_funcContext f) fName []
+                  then do
+                    result <- fuzzFunction bh addr (_funcContext f) fName []
+                    -- Log the test result immediately
+                    case result of
+                      FuzzerSuccess (SourceAnnotation _ _ _) ->
+                        $logInfoS "test-result" $ "✅ Unit test succeeded"
+                      FuzzerFailure _ (SourceAnnotation _ _ msg) ->
+                        $logInfoS "test-result" $ "❌ Unit test failed: " <> msg
+                    pure result
                   else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
            else pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ _funcContext f
     else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
@@ -155,7 +198,15 @@ prop bh addr fName f =
     then if null $ _funcArgs f
            then pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ _funcContext f
            else if emptyOrBool $ _funcVals f
-                  then runProp
+                  then do
+                    result <- runProp
+                    -- Log the property test result immediately
+                    case result of
+                      FuzzerSuccess (SourceAnnotation _ _ _) ->
+                        $logInfoS "test-result" $ "✅ Property test succeeded"
+                      FuzzerFailure _ (SourceAnnotation _ _ msg) ->
+                        $logInfoS "test-result" $ "❌ Property test failed: " <> msg
+                    pure result
                   else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
     else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
   where
@@ -191,6 +242,73 @@ fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArg
   case erException createResults of
     Just e -> exception [] $ svmErr e
     Nothing -> f (txArgs ^. createArgs . argsBlockData) contractAddress
+
+fuzzContractWithNumbers :: VMBase m => SolidString -> SourceAnnotation a -> (BlockHeader -> Address -> FuzzerM m [FuzzerTestAndResult]) -> FuzzerM m [FuzzerTestAndResult]
+fuzzContractWithNumbers = fuzzContract
+
+testWithNumber :: VMBase m => Int -> BlockHeader -> Address -> SolidString -> Func -> FuzzerM m FuzzerResult
+testWithNumber testNum bh addr fName f =
+  if accessible $ _funcVisibility f
+    then if null $ _funcArgs f
+           then if emptyOrBool $ _funcVals f
+                  then do
+                    let testName = T.drop (T.length testPrefix) (labelToText fName)
+                        testDisplay = if testNum > 0 
+                                     then show testNum ++ ". " ++ T.unpack testName
+                                     else T.unpack testName
+                    -- Emit a preface line before executing the test so the test label appears before traces
+                    $logInfoS "test-result" $ T.pack $ "▶ " ++ testDisplay
+                    -- Execute the test
+                    result <- fuzzFunction bh addr (_funcContext f) fName []
+                    
+                    -- Log the test result AFTER execution but show it cleanly
+                    case result of
+                      FuzzerSuccess (SourceAnnotation _ _ _) ->
+                        $logInfoS "test-result" $ T.pack $ "  ✅ " ++ testDisplay
+                      FuzzerFailure _ (SourceAnnotation _ _ msg) ->
+                        $logInfoS "test-result" $ T.pack $ "  ❌ " ++ testDisplay ++ " - " ++ T.unpack msg
+                    pure result
+                  else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
+           else pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ _funcContext f
+    else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
+
+propWithNumber :: VMBase m => Int -> BlockHeader -> Address -> SolidString -> Func -> FuzzerM m FuzzerResult
+propWithNumber testNum bh addr fName f =
+  if accessible $ _funcVisibility f
+    then if null $ _funcArgs f
+           then pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ _funcContext f
+           else if emptyOrBool $ _funcVals f
+                  then do
+                    result <- runProp
+                    -- Log the property test result immediately with number
+                    let testName = T.drop (T.length propertyPrefix) (labelToText fName)
+                        testDisplay = if testNum > 0 
+                                     then show testNum ++ ". " ++ T.unpack testName
+                                     else T.unpack testName
+                    -- Emit a preface line before running property iterations so label appears before traces
+                    $logInfoS "test-result" $ T.pack $ "▶ " ++ testDisplay
+                    case result of
+                      FuzzerSuccess (SourceAnnotation _ _ _) ->
+                        $logInfoS "test-result" $ T.pack $ "  ✅ " ++ testDisplay
+                      FuzzerFailure _ (SourceAnnotation _ _ msg) ->
+                        $logInfoS "test-result" $ T.pack $ "  ❌ " ++ testDisplay ++ " - " ++ T.unpack msg
+                    pure result
+                  else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
+    else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
+  where
+    runProp :: VMBase m => FuzzerM m FuzzerResult
+    runProp = do
+      n <- asks $ fromMaybe defaultFuzzerRuns . view fuzzerArgsMaxRuns
+      runPropNTimes n
+    runPropNTimes :: VMBase m => Integer -> FuzzerM m FuzzerResult
+    runPropNTimes n | n <= 0 = success $ _funcContext f
+    runPropNTimes n = do
+      args <- liftIO . generateArgs $ indexedTypeType . snd <$> _funcArgs f
+      $logInfoS "runPropNTimes/generateArgs" $ "(" <> T.intercalate ", " args <> ")"
+      r <- fuzzFunction bh addr (_funcContext f) fName args
+      case r of
+        FuzzerSuccess _ -> runPropNTimes $ n - 1
+        _ -> pure r
 
 fuzzFunction :: VMBase m => BlockHeader -> Address -> SourceAnnotation a -> SolidString -> [T.Text] -> FuzzerM m FuzzerResult
 fuzzFunction bh contractAddress ctx fName args = local ((fuzzerArgsFuncName .~ fName) . (fuzzerArgsCallArgs .~ args)) $ do
