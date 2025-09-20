@@ -407,7 +407,7 @@ const LiquidityDepositModal = ({
                       {selectedPool.tokenA?.images?.[0]?.value ? (
                         <img
                           src={selectedPool.tokenA.images[0].value}
-                          alt={selectedPool.tokenA._name || selectedPool.poolName?.split('/')[0]}
+                          alt={selectedPool.tokenA._name || selectedPool.tokenA._symbol}
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -415,10 +415,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool.poolName?.split('/')[0]?.slice(0, 2)}
+                          {selectedPool.tokenA._symbol?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool.poolName?.split('/')[0]}</span>
+                      <span className="font-medium text-sm">{selectedPool.tokenA._symbol}</span>
                     </>
                   )}
                 </div>
@@ -530,10 +530,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool.poolName?.split('/')[1]?.slice(0, 2)}
+                          {selectedPool.tokenB._symbol?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool.poolName?.split('/')[1]}</span>
+                      <span className="font-medium text-sm">{selectedPool.tokenB._symbol}</span>
                     </>
                   )}
                 </div>
@@ -599,7 +599,7 @@ const LiquidityDepositModal = ({
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
               <span>Current pool ratio</span>
               <span className="font-medium">
-                {selectedPool && `1 ${selectedPool.poolName?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.poolName?.split('/')[1]}`}
+                {selectedPool && `1 ${selectedPool.tokenA._symbol} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.tokenB._symbol}`}
               </span>
             </div>
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
