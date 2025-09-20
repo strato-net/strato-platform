@@ -260,8 +260,9 @@ export const stakeSafetyModule = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -278,8 +279,9 @@ export const startCooldownSafetyModule = async (
     args: {},
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -307,8 +309,9 @@ export const redeemSafetyModule = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
