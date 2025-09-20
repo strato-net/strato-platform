@@ -16,10 +16,10 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body, address } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result = await requestWithdrawal(accessToken, body, address, false);
+      const result = await requestWithdrawal(accessToken, body, userAddress as string, false);
 
       res.json({
         success: true,
@@ -36,10 +36,10 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body, address } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result = await requestWithdrawal(accessToken, body, address, true);
+      const result = await requestWithdrawal(accessToken, body, userAddress as string, true);
 
       res.json({
         success: true,
@@ -112,12 +112,12 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address } = req;
+      const { accessToken, address: userAddress } = req;
       const { type } = req.params;
       const queryParams = validateRawParams(req.query);
       
       const validatedType = validateTransactionType(type);
-      const result = await getBridgeTransactions(accessToken, validatedType, address, queryParams);
+      const result = await getBridgeTransactions(accessToken, validatedType, userAddress, queryParams);
       res.json(result);
     } catch (error: any) {
       next(error);

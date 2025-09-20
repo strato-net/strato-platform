@@ -224,14 +224,15 @@ export const getSwapHistory = async (
 
 export const createPool = async (
   accessToken: string,
-  body: CreatePoolParams
+  body: CreatePoolParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: constants.poolFactory,
     method: "createPool",
     args: body,
-  });
+  }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -240,13 +241,14 @@ export const createPool = async (
 
 export const addLiquidityDualToken = async (
   accessToken: string,
-  params: LiquidityParams
+  params: LiquidityParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, tokenBAmount, maxTokenAAmount, deadline } = params;
   
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
-  
-  const tx = buildFunctionTx([
+
+  const tx = await buildFunctionTx([
     buildTokenApprovalTx(pool.tokenA, poolAddress, maxTokenAAmount),
     buildTokenApprovalTx(pool.tokenB, poolAddress, tokenBAmount),
     {
@@ -255,21 +257,22 @@ export const addLiquidityDualToken = async (
       method: "addLiquidity",
       args: { tokenBAmount, maxTokenAAmount, deadline }
     }
-  ]);
+  ], userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
 
 export const addLiquiditySingleToken = async (
   accessToken: string,
-  params: SingleTokenLiquidityParams
+  params: SingleTokenLiquidityParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, singleTokenAmount, isAToB, deadline } = params;
   
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
   const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
   
-  const tx = buildFunctionTx([
+  const tx = await buildFunctionTx([
     buildTokenApprovalTx(depositTokenAddress, poolAddress, singleTokenAmount),
     {
       contractName: extractContractName(Pool),
@@ -277,14 +280,15 @@ export const addLiquiditySingleToken = async (
       method: "addLiquiditySingleToken",
       args: { isAToB, amountIn: singleTokenAmount, deadline }
     }
-  ]);
+  ], userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
 
 export const removeLiquidity = async (
   accessToken: string,
-  removeLiquidityParams: RemoveLiquidityParams
+  removeLiquidityParams: RemoveLiquidityParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, lpTokenAmount, deadline } = removeLiquidityParams;
 
@@ -303,7 +307,7 @@ export const removeLiquidity = async (
   const minTokenAAmount = (tokenAAmount * 99n) / 100n;
   const minTokenBAmount = (tokenBAmount * 99n) / 100n;
   
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(Pool),
     contractAddress: poolAddress,
     method: "removeLiquidity",
@@ -313,7 +317,7 @@ export const removeLiquidity = async (
       minTokenAAmount: minTokenAAmount.toString(),
       deadline
     },
-  });
+  }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -322,7 +326,8 @@ export const removeLiquidity = async (
 
 export const swap = async (
   accessToken: string,
-  swapParams: SwapParams
+  swapParams: SwapParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, isAToB, amountIn, minAmountOut, deadline } = swapParams;
 
@@ -330,7 +335,7 @@ export const swap = async (
 
   const tokenAddress = isAToB ? pool.tokenA : pool.tokenB;
 
-  const tx = buildFunctionTx([
+  const tx = await buildFunctionTx([
     buildTokenApprovalTx(tokenAddress, poolAddress, amountIn),
     {
       contractName: extractContractName(Pool),
@@ -343,7 +348,7 @@ export const swap = async (
         deadline,
       },
     }
-  ]);
+  ], userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };
@@ -352,12 +357,13 @@ export const swap = async (
 
 export const setPoolRates = async (
   accessToken: string,
-  setPoolRatesParams: SetPoolRatesParams
+  setPoolRatesParams: SetPoolRatesParams,
+  userAddress: string
 ): Promise<TransactionResponse> => {
   const { poolAddress, swapFeeRate, lpSharePercent } = setPoolRatesParams;
 
   // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
     contractAddress: poolFactory,
     method: "setPoolFeeParameters",
@@ -366,7 +372,7 @@ export const setPoolRates = async (
       newSwapFeeRate: swapFeeRate.toString(),
       newLpSharePercent: lpSharePercent.toString(),
     },
-  });
+  }, userAddress, accessToken);
 
   return executeTransaction(accessToken, tx);
 };

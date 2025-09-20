@@ -194,15 +194,16 @@ export const getBalance = async (
 
 export const createToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(TokenFactory),
       contractAddress: tokenFactory,
       method: "createToken",
       args: usc(body),
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -219,10 +220,11 @@ export const createToken = async (
 
 export const transferToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transfer",
@@ -230,7 +232,7 @@ export const transferToken = async (
         to: body.to,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -248,10 +250,11 @@ export const transferToken = async (
 // Approve an allowance for a spender
 export const approveToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "approve",
@@ -259,7 +262,7 @@ export const approveToken = async (
         spender: body.spender,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -274,10 +277,11 @@ export const approveToken = async (
 // Transfer tokens on behalf of another address
 export const transferFromToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transferFrom",
@@ -286,7 +290,7 @@ export const transferFromToken = async (
         to: body.to,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -300,17 +304,18 @@ export const transferFromToken = async (
 
 export const setTokenStatus = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address as string,
       method: "setStatus",
       args: {
         newStatus: body.status,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

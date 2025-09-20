@@ -1,4 +1,4 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
 import { 
   SWAP_CONTRACTS, 
   SWAP_TOKEN_SELECT_FIELDS, 
@@ -31,6 +31,7 @@ export const constants = (() => {
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
+  const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Event = "event";
     
   const tokenSelectFields = [
@@ -133,6 +134,7 @@ export const constants = (() => {
     CDPEngine,
     CDPVault,
     CDPRegistry,
+    Voucher,
     mercataBridge,
     Event,
     tokenSelectFields,
@@ -151,5 +153,6 @@ export const constants = (() => {
     GAS_FEE: 0.01,
     GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    voucher,
   };
 })();

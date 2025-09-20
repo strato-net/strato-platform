@@ -35,10 +35,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params, address } = req;
+      const { accessToken, params, address: userAddress } = req;
       validatePoolAddressArgs(params);
 
-      const pools = await getPools(accessToken, address, {
+      const pools = await getPools(accessToken, userAddress, {
         address: "eq." + params.poolAddress,
       });
 
@@ -58,12 +58,12 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query, address } = req;
+      const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
       const tokens = await getPools(
         accessToken,
-        address,
+        userAddress,
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(tokens);
@@ -75,10 +75,10 @@ class SwappingController {
   // Creators
   static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateCreatePoolsArgs(body);
 
-      const result = await createPool(accessToken, body);
+      const result = await createPool(accessToken, body, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -88,7 +88,7 @@ class SwappingController {
   // Liquidity
   static async addLiquidityDualToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { accessToken, body, params } = req;
+      const { accessToken, body, params, address: userAddress } = req;
       validateAddLiquidityDualTokenArgs(body);
       validatePoolAddressArgs(params);
 
@@ -99,7 +99,7 @@ class SwappingController {
         deadline
       };
 
-      const result = await addLiquidityDualToken(accessToken, liquidityParams);
+      const result = await addLiquidityDualToken(accessToken, liquidityParams, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -108,7 +108,7 @@ class SwappingController {
 
   static async addLiquiditySingleToken(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { accessToken, body, params } = req;
+      const { accessToken, body, params, address: userAddress } = req;
       validateAddLiquiditySingleTokenArgs(body);
       validatePoolAddressArgs(params);
 
@@ -119,7 +119,7 @@ class SwappingController {
         deadline
       };
 
-      const result = await addLiquiditySingleToken(accessToken, liquidityParams);
+      const result = await addLiquiditySingleToken(accessToken, liquidityParams, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -128,7 +128,7 @@ class SwappingController {
 
   static async removeLiquidity(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { accessToken, body, params } = req;
+      const { accessToken, body, params, address: userAddress } = req;
       validateRemoveLiquidityArgs(body);
       validatePoolAddressArgs(params);
 
@@ -139,7 +139,7 @@ class SwappingController {
         deadline
       };
 
-      const result = await removeLiquidity(accessToken, removeLiquidityParams);
+      const result = await removeLiquidity(accessToken, removeLiquidityParams, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -149,11 +149,11 @@ class SwappingController {
   // Swaps
   static async swap(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateSwapArgs(body);
 
       const deadline = Math.floor(Date.now() / 1000) + 60 * 5;
-      const result = await swap(accessToken, { ...body, deadline });
+      const result = await swap(accessToken, { ...body, deadline }, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
@@ -167,11 +167,11 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address } = req;
+      const { accessToken, address: userAddress } = req;
 
-      const userTokens = await getBalance(accessToken, address, {select: "address", value: "gt.0"});
+      const userTokens = await getBalance(accessToken, userAddress, {select: "address", value: "gt.0"});
       const userTokensAddresses = userTokens.map((token: any) => token.address);
-      const pools = await getPools(accessToken, address, {
+      const pools = await getPools(accessToken, userAddress, {
         lpToken: "in.(" + userTokensAddresses.join(",") + ")",
       });
 
@@ -187,8 +187,8 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address } = req;
-      const tokens = await getSwapableTokens(accessToken, address);
+      const { accessToken, address: userAddress } = req;
+      const tokens = await getSwapableTokens(accessToken, userAddress);
 
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
@@ -202,10 +202,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params, address } = req;
+      const { accessToken, params, address: userAddress } = req;
       validateTokenAddressArgs(params);
 
-      const tokens = await getSwapableTokenPairs(accessToken, params.tokenAddress, address);
+      const tokens = await getSwapableTokenPairs(accessToken, params.tokenAddress, userAddress);
 
       res.status(RestStatus.OK).json(tokens);
     } catch (error) {
@@ -219,10 +219,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, params, address } = req;
+      const { accessToken, params, address: userAddress } = req;
       validateTokenPairArgs(params);
 
-      const pools = await getPools(accessToken, address, {
+      const pools = await getPools(accessToken, userAddress, {
         tokenA: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
         tokenB: "in.(" + params.tokenAddress1 + "," + params.tokenAddress2 + ")",
       });
@@ -258,10 +258,10 @@ class SwappingController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateSetPoolRatesArgs(body);
 
-      const result = await setPoolRates(accessToken, body);
+      const result = await setPoolRates(accessToken, body, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);
