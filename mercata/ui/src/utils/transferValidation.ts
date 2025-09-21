@@ -51,9 +51,9 @@ export const computeMaxTransferable = (
   const vouchers = toWei(userVoucherBalance);
 
   // Require enough combined USDST + vouchers to cover fee
-  if (fee > 0n && usdst + vouchers < fee) {
+  if (fee > 0n && usdst + vouchers <= fee) {
     setError("Insufficient USDST + voucher balance for transaction fee");
-    return "0";
+    return token.toString();  // show full balance, not 0
   }
   setError("");
 

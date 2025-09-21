@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import DashboardSidebar from "../components/dashboard/DashboardSidebar";
 import DashboardHeader from "../components/dashboard/DashboardHeader";
 import MobileSidebar from "../components/dashboard/MobileSidebar";
@@ -44,14 +44,17 @@ const Transfer = () => {
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
 
-  const maxAmount = fromAsset ? computeMaxTransferable(
-    fromAsset.balance,
-    fromAsset.address === usdstAddress,
-    voucherBalance,
-    usdstBalance,
-    safeParseUnits(TRANSFER_FEE, 18).toString(),
-    setFeeError
-  ) : "0";
+  const maxAmount = useMemo(() => {
+    if (!fromAsset) return "0";
+    return computeMaxTransferable(
+      fromAsset.balance,
+      fromAsset.address === usdstAddress,
+      voucherBalance,
+      usdstBalance,
+      safeParseUnits(TRANSFER_FEE, 18).toString(),
+      setFeeError
+    );
+  }, [fromAsset, voucherBalance, usdstBalance]);
 
   const fetchUserTokens = useCallback(async () => {
     try {
@@ -236,7 +239,9 @@ const Transfer = () => {
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Transaction Fee</span>
-                <span className="font-medium">{TRANSFER_FEE} USDST</span>
+                <span className="font-medium">
+                  {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
+                </span>
               </div>
             </div>
 
