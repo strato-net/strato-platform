@@ -10,27 +10,6 @@ const DEFAULT_GAS_PARAMS = {
 
 const VOUCHER_TO_USDST_FACTOR = 100n; // 1 voucher = 0.01 USDST
 
-function formatUsd(weiAmount: bigint, precision = 4): string {
-  if (weiAmount === 0n) {
-    return "0";
-  }
-
-  const whole = weiAmount / constants.DECIMALS;
-  const fraction = weiAmount % constants.DECIMALS;
-
-  if (fraction === 0n) {
-    return whole.toString();
-  }
-
-  const fractionStr = fraction
-    .toString()
-    .padStart(18, "0")
-    .slice(0, precision)
-    .replace(/0+$/, "");
-
-  return fractionStr ? `${whole.toString()}.${fractionStr}` : whole.toString();
-}
-
 async function fetchBalance(
   accessToken: string,
   table: string,
@@ -60,29 +39,18 @@ async function ensureFeeCoverage(
 ): Promise<void> {
   if (txCount <= 0) return;
 
-  const feePerTxWei = constants.GAS_FEE_WEI;
-  const requiredWei = feePerTxWei * BigInt(txCount);
+  const requiredWei = constants.GAS_FEE_WEI * BigInt(txCount);
 
   const [voucherWei, usdstWei] = await Promise.all([
     fetchBalance(accessToken, `${constants.Voucher}-_balances`, constants.voucher, userAddress),
     fetchBalance(accessToken, `${constants.Token}-_balances`, constants.USDST, userAddress),
   ]);
 
-  const voucherAsUsdWei = voucherWei / VOUCHER_TO_USDST_FACTOR;
-  const totalAvailableWei = usdstWei + voucherAsUsdWei;
+  const totalAvailableWei = usdstWei + (voucherWei / VOUCHER_TO_USDST_FACTOR);
 
   if (totalAvailableWei >= requiredWei) return;
 
-  // Calculate how much USDST portion would be needed (vouchers used first)
-  const usdPortionNeeded = requiredWei > voucherAsUsdWei ? requiredWei - voucherAsUsdWei : 0n;
-  
-  // If you want partial, compute the max affordable txs and throw a clear error
-  const maxTx = Number(totalAvailableWei / feePerTxWei); // floor
-  throw new Error(
-    `Insufficient USDST + voucher balance for transaction fee. Required: ${formatUsd(requiredWei)} USDST, ` +
-    `Available: ${formatUsd(totalAvailableWei)} USDST (${formatUsd(usdstWei)} USDST + ${formatUsd(voucherAsUsdWei)} vouchers), ` +
-    `USDST portion needed: ${formatUsd(usdPortionNeeded)}, Max affordable txs: ${maxTx}`
-  );
+  throw new Error("Insufficient gas fee coverage");
 }
 
 export function buildDeployTx({
