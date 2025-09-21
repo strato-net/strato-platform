@@ -8,7 +8,7 @@ import { getPool as getLendingRegistry } from "./lending.service";
 import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher } = constants;
 
 // Helper function to get CDP collateral for a user
 const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
@@ -325,4 +325,25 @@ export const setTokenStatus = async (
   } catch (error) {
     throw error;
   }
+};
+
+export const getVoucherBalance = async (
+  accessToken: string,
+  userAddress: string
+): Promise<string> => {
+  const response = await cirrus.get(accessToken, `/${Voucher}-_balances`, {
+    params: {
+      address: `eq.${constants.voucher}`,
+      key: `eq.${userAddress}`,
+      select: "balance:value::text",
+    },
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`Error fetching voucher balance: ${response.statusText}`);
+  }
+
+  const rawValue = response.data?.[0]?.balance ?? "0";
+  const voucherAsUsdstWei = (BigInt(rawValue) * 100n).toString();
+  return voucherAsUsdstWei;
 };

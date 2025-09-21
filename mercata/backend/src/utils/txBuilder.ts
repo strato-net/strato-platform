@@ -10,27 +10,6 @@ const DEFAULT_GAS_PARAMS = {
 
 const VOUCHER_TO_USDST_FACTOR = 100n; // 1 voucher = 0.01 USDST
 
-function formatUsd(weiAmount: bigint, precision = 4): string {
-  if (weiAmount === 0n) {
-    return "0";
-  }
-
-  const whole = weiAmount / constants.DECIMALS;
-  const fraction = weiAmount % constants.DECIMALS;
-
-  if (fraction === 0n) {
-    return whole.toString();
-  }
-
-  const fractionStr = fraction
-    .toString()
-    .padStart(18, "0")
-    .slice(0, precision)
-    .replace(/0+$/, "");
-
-  return fractionStr ? `${whole.toString()}.${fractionStr}` : whole.toString();
-}
-
 async function fetchBalance(
   accessToken: string,
   table: string,
@@ -58,42 +37,20 @@ async function ensureFeeCoverage(
   userAddress: string,
   accessToken: string
 ): Promise<void> {
-  if (txCount <= 0) {
-    return;
-  }
+  if (txCount <= 0) return;
 
-  const gasFeeWei = constants.GAS_FEE_WEI * BigInt(txCount);
-  const totalRequiredWei = gasFeeWei;
+  const requiredWei = constants.GAS_FEE_WEI * BigInt(txCount);
 
-  const [voucherBalanceWei, usdstBalanceWei] = await Promise.all([
-    fetchBalance(
-      accessToken,
-      `${constants.Voucher}-_balances`,
-      constants.voucher,
-      userAddress
-    ),
-    fetchBalance(
-      accessToken,
-      `${constants.Token}-_balances`,
-      constants.USDST,
-      userAddress
-    ),
+  const [voucherWei, usdstWei] = await Promise.all([
+    fetchBalance(accessToken, `${constants.Voucher}-_balances`, constants.voucher, userAddress),
+    fetchBalance(accessToken, `${constants.Token}-_balances`, constants.USDST, userAddress),
   ]);
 
-  const voucherAsUsdSt = voucherBalanceWei / VOUCHER_TO_USDST_FACTOR;
-  const totalAvailableWei = usdstBalanceWei + voucherAsUsdSt;
+  const totalAvailableWei = usdstWei + (voucherWei / VOUCHER_TO_USDST_FACTOR);
 
-  if (totalAvailableWei >= totalRequiredWei) {
-    return;
-  }
+  if (totalAvailableWei >= requiredWei) return;
 
-  const errorMessage = [
-    "Insufficient USDST (including voucher balance) to cover estimated gas fees.",
-    `Required: ${formatUsd(totalRequiredWei)} USDST`,
-    `Available: ${formatUsd(totalAvailableWei)} USDST`,
-  ].join(" ");
-
-  throw new Error(errorMessage);
+  throw new Error("Insufficient gas fee coverage");
 }
 
 export function buildDeployTx({

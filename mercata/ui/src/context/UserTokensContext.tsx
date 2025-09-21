@@ -19,6 +19,7 @@ type UserTokensContextType = {
   usdstBalance: string;
   loadingUsdstBalance: boolean;
   fetchUsdstBalance: (userAddress: string, signal?: AbortSignal) => Promise<void>;
+  voucherBalance: string;
 };
 
 const UserTokensContext = createContext<UserTokensContextType | undefined>(
@@ -37,6 +38,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
+  const [voucherBalance, setVoucherBalance] = useState("0");
   const [loadingUsdstBalance, setLoadingUsdstBalance] = useState(false);
 
   const fetchUsdstBalance = useCallback(async (userAddress: string, signal?: AbortSignal) => {
@@ -44,16 +46,24 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
     
     setLoadingUsdstBalance(true);
     try {
-      const res = await api.get(
-        `/tokens/balance?address=eq.${usdstAddress}`,
-        { signal }
-      );
-      
+      const [usdstResponse, voucherResponse] = await Promise.all([
+        api.get(`/tokens/balance`, {
+          signal,
+          params: { address: `eq.${usdstAddress}` },
+        }),
+        api.get(`/vouchers/balance`, {
+          signal,
+        }),
+      ]);
+
       if (signal?.aborted) return;
-      
-      setUsdstBalance(res?.data?.[0]?.balance || "0");
+
+      setUsdstBalance(usdstResponse?.data?.[0]?.balance || "0");
+      setVoucherBalance(voucherResponse?.data?.balance || "0");
     } catch (err) {
-      return;
+      if (signal?.aborted) return;
+      setUsdstBalance("0");
+      setVoucherBalance("0");
     } finally {
       if (!signal?.aborted) {
         setLoadingUsdstBalance(false);
@@ -143,9 +153,10 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       // USDST balance
       usdstBalance,
       loadingUsdstBalance,
+      voucherBalance,
       fetchUsdstBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, loadingUsdstBalance, fetchUsdstBalance]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
   );
 
   return (
