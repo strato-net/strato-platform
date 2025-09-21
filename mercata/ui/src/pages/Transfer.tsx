@@ -8,12 +8,11 @@ import { Token } from "@/interface";
 
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatUnits, isAddress } from "ethers";
 import { useTokenContext } from "@/context/TokenContext";
 import { useToast } from "@/hooks/use-toast";
 import { usdstAddress, TRANSFER_FEE } from "@/lib/constants";
 import TransferConfirmationModal from "../components/TransferConfirmationModal";
-import { safeParseUnits, safeParseFloat, roundToDecimals, addCommasToInput, formatBalance } from "@/utils/numberUtils";
+import { safeParseUnits, roundToDecimals, addCommasToInput, formatBalance, formatUnits } from "@/utils/numberUtils";
 
 import {
   Popover,
@@ -21,11 +20,11 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
-import { validateRecipientAddress } from "@/utils/validationUtils";
+import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 
 const Transfer = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
   const { getUserTokensWithBalance, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -39,12 +38,20 @@ const Transfer = () => {
   const [fromAsset, setFromAsset] = useState<Token>();
   const [fromAmount, setFromAmount] = useState("");
   const [swapLoading, setSwapLoading] = useState<boolean>(false);
-  const [wrongAmount, setWrongAmount] = useState(false);
+  const [amountError, setAmountError] = useState("");
   const [tokenPopoverOpen, setTokenPopoverOpen] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("")
+  const [recipientError, setRecipientError] = useState("");
+  const [feeError, setFeeError] = useState("");
 
-  const maxAmount = fromAsset ? BigInt(fromAsset.balance) : 0n;
+  const maxAmount = fromAsset ? computeMaxTransferable(
+    fromAsset.balance,
+    fromAsset.address === usdstAddress,
+    voucherBalance,
+    usdstBalance,
+    safeParseUnits(TRANSFER_FEE, 18).toString(),
+    setFeeError
+  ) : "0";
 
   const fetchUserTokens = useCallback(async () => {
     try {
@@ -64,20 +71,6 @@ const Transfer = () => {
       fetchUsdstBalance(userAddress);
     }
   }, [userAddress, fetchUserTokens, fetchUsdstBalance]);
-
-  const handleTransferClick = () => {
-    if (!fromAsset || !recipient || !fromAmount || wrongAmount) return;
-    
-    // Check if amount is valid (not 0, not just ".", and is a valid number)
-    const isValidAmount = fromAmount && 
-                         fromAmount !== "." && 
-                         /^\d*\.?\d+$/.test(fromAmount) && 
-                         safeParseFloat(fromAmount) > 0;
-    
-    if (!isValidAmount) return;
-    
-    setShowConfirmModal(true);
-  };
 
   const handleConfirmTransfer = async () => {
     if (!fromAsset || !recipient || !fromAmount) return;
@@ -116,13 +109,6 @@ const Transfer = () => {
       setSwapLoading(false);
     }
   };
-
-  const handleRecipientAddress = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.trim();
-    setRecipient(value);
-    setErrorMessage(validateRecipientAddress(value, userAddress));
-  };
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,11 +178,11 @@ const Transfer = () => {
               <Input
                 type="text"
                 value={recipient}
-                onChange={handleRecipientAddress}
+                onChange={(e) => handleRecipientAddress(e, setRecipient, setRecipientError, userAddress)}
                 placeholder="..."
                 className="w-full p-2 border rounded"
               />
-              {errorMessage && <span className="text-red-600 text-sm">{errorMessage}</span>}
+              {recipientError && <span className="text-red-600 text-sm">{recipientError}</span>}
             </div>
 
             {/* Amount */}
@@ -209,16 +195,7 @@ const Transfer = () => {
                       type="button"
                       onClick={() => {
                         try {
-                          let max = maxAmount;
-                          const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-
-                          // If transferring USDST, subtract the fee
-                          if (fromAsset?.address === usdstAddress) {
-                            max = max > feeAmount ? max - feeAmount : 0n;
-                          }
-
-                          const raw = formatUnits(max, 18);
-                          // clamp to 18 decimals using utility function
+                          const raw = formatUnits(maxAmount);
                           const clampedAmount = roundToDecimals(raw, 18);
                           setFromAmount(clampedAmount);
                         } catch (error) {
@@ -237,88 +214,22 @@ const Transfer = () => {
                 inputMode="decimal"
                 value={addCommasToInput(fromAmount)}
                 onChange={(e) => {
-                  const value = e.target.value;
-                  // Strip commas for validation
-                  const v = value.replace(/,/g, "");
-                  
-                  // Only allow valid decimal input
-                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
-                    // Handle the case where user types just "."
-                    if (v === '.') {
-                      setFromAmount('0.');
-                      setWrongAmount(false);
-                    } else {
-                      // Preserve trailing decimal point if user just typed it
-                      let processedValue = v;
-                      if (!v.endsWith('.')) {
-                        // Only use roundToDecimals if there's no trailing decimal
-                        processedValue = roundToDecimals(v, 18);
-                      }
-                      setFromAmount(processedValue);
-                      
-                      // Only parse if we have a valid number (not just "." or empty)
-                      if (processedValue && processedValue !== "." && /^\d*\.?\d+$/.test(processedValue)) {
-                        const inputWei = safeParseUnits(processedValue, 18);
-                        setWrongAmount(inputWei <= 0n || inputWei > maxAmount);
-                      } else {
-                        setWrongAmount(false);
-                      }
-                    }
-                  }
+                  handleAmountInputChange(e.target.value, setFromAmount, setAmountError, maxAmount, 18);
                 }}
                 placeholder="0.00"
-                className={`w-full p-2 border rounded ${wrongAmount ? "border-red-500" : ""
+                className={`w-full p-2 border rounded ${amountError ? "border-red-500" : ""
                   }`}
               />
-              {wrongAmount && (
+              {amountError && (
                 <p className="text-red-600 text-sm">
-                  Amount must be greater than zero and no more than your
-                  available balance.
+                  {amountError}
                 </p>
               )}
-              {/* Fee validation warnings */}
-              {(() => {
-                const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-                const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-                const inputAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
-
-                // Check if transferring USDST and leaving enough for fee
-                const isUsdstMaxIssue = !loadingUsdstBalance && fromAsset?.address === usdstAddress &&
-                  inputAmountWei > usdstBalanceBigInt - feeAmount &&
-                  inputAmountWei <= usdstBalanceBigInt;
-
-                // Check if insufficient USDST for fee
-                const isInsufficientUsdstForFee = !loadingUsdstBalance && fromAsset?.address !== usdstAddress &&
-                  usdstBalanceBigInt < feeAmount;
-                
-                // Check if input amount is within 0.10 of USDST balance (low balance warning)
-                const lowBalanceThreshold = safeParseUnits("0.10", 18);
-                const remainingBalance = usdstBalanceBigInt - inputAmountWei - feeAmount;
-                const isLowBalanceWarning = fromAsset?.address === usdstAddress &&
-                  inputAmountWei > 0n &&
-                  remainingBalance >= 0n &&
-                  remainingBalance <= lowBalanceThreshold;
-
-                return (
-                  <>
-                    {isUsdstMaxIssue && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Insufficient balance for transaction fee ({TRANSFER_FEE} USDST)
-                      </p>
-                    )}
-                    {isInsufficientUsdstForFee && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Insufficient USDST balance for transaction fee ({TRANSFER_FEE} USDST)
-                      </p>
-                    )}
-                    {isLowBalanceWarning && (
-                      <p className="text-yellow-600 text-sm mt-1">
-                        Warning: Your USDST balance is running low. Add more funds now to avoid issues with future transactions.
-                      </p>
-                    )}
-                  </>
-                );
-              })()}
+              {feeError && (
+                <p className="text-red-600 text-sm">
+                  {feeError}
+                </p>
+              )}
             </div>
 
             {/* Transaction Fee Display */}
@@ -331,37 +242,15 @@ const Transfer = () => {
 
             <Button
               className="w-full"
-              onClick={handleTransferClick}
+              onClick={() => setShowConfirmModal(true)}
               disabled={
                 !fromAsset ||
                 !recipient ||
                 !fromAmount ||
-                wrongAmount ||
-                swapLoading ||
-                !!errorMessage ||
-                // Check if amount is invalid (just ".", or not a valid number, or 0)
-                (fromAmount === "." || !/^\d*\.?\d+$/.test(fromAmount) || safeParseFloat(fromAmount) === 0) ||
-                (() => {
-                  const feeAmount = safeParseUnits(TRANSFER_FEE, 18);
-                  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-
-                  // Check if user has enough USDST for fee
-                  if (usdstBalanceBigInt < feeAmount) {
-                    return true;
-                  }
-
-                  // Check if transferring USDST and leaving enough for fee
-                  if (fromAsset?.address === usdstAddress) {
-                    const fromAmountWei = fromAmount && fromAmount !== "." && /^\d*\.?\d+$/.test(fromAmount) ? safeParseUnits(fromAmount, 18) : 0n;
-                    const balance = BigInt(fromAsset.balance || "0");
-
-                    if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
-                      return true;
-                    }
-                  }
-
-                  return false;
-                })()
+                !!amountError ||
+                !!recipientError ||
+                !!feeError ||
+                swapLoading
               }
             >
               {swapLoading ? <span>Processing…</span> : "Transfer"}

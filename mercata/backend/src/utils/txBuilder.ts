@@ -58,42 +58,31 @@ async function ensureFeeCoverage(
   userAddress: string,
   accessToken: string
 ): Promise<void> {
-  if (txCount <= 0) {
-    return;
-  }
+  if (txCount <= 0) return;
 
-  const gasFeeWei = constants.GAS_FEE_WEI * BigInt(txCount);
-  const totalRequiredWei = gasFeeWei;
+  const feePerTxWei = constants.GAS_FEE_WEI;
+  const requiredWei = feePerTxWei * BigInt(txCount);
 
-  const [voucherBalanceWei, usdstBalanceWei] = await Promise.all([
-    fetchBalance(
-      accessToken,
-      `${constants.Voucher}-_balances`,
-      constants.voucher,
-      userAddress
-    ),
-    fetchBalance(
-      accessToken,
-      `${constants.Token}-_balances`,
-      constants.USDST,
-      userAddress
-    ),
+  const [voucherWei, usdstWei] = await Promise.all([
+    fetchBalance(accessToken, `${constants.Voucher}-_balances`, constants.voucher, userAddress),
+    fetchBalance(accessToken, `${constants.Token}-_balances`, constants.USDST, userAddress),
   ]);
 
-  const voucherAsUsdSt = voucherBalanceWei / VOUCHER_TO_USDST_FACTOR;
-  const totalAvailableWei = usdstBalanceWei + voucherAsUsdSt;
+  const voucherAsUsdWei = voucherWei / VOUCHER_TO_USDST_FACTOR;
+  const totalAvailableWei = usdstWei + voucherAsUsdWei;
 
-  if (totalAvailableWei >= totalRequiredWei) {
-    return;
-  }
+  if (totalAvailableWei >= requiredWei) return;
 
-  const errorMessage = [
-    "Insufficient USDST (including voucher balance) to cover estimated gas fees.",
-    `Required: ${formatUsd(totalRequiredWei)} USDST`,
-    `Available: ${formatUsd(totalAvailableWei)} USDST`,
-  ].join(" ");
-
-  throw new Error(errorMessage);
+  // Calculate how much USDST portion would be needed (vouchers used first)
+  const usdPortionNeeded = requiredWei > voucherAsUsdWei ? requiredWei - voucherAsUsdWei : 0n;
+  
+  // If you want partial, compute the max affordable txs and throw a clear error
+  const maxTx = Number(totalAvailableWei / feePerTxWei); // floor
+  throw new Error(
+    `Insufficient USDST + voucher balance for transaction fee. Required: ${formatUsd(requiredWei)} USDST, ` +
+    `Available: ${formatUsd(totalAvailableWei)} USDST (${formatUsd(usdstWei)} USDST + ${formatUsd(voucherAsUsdWei)} vouchers), ` +
+    `USDST portion needed: ${formatUsd(usdPortionNeeded)}, Max affordable txs: ${maxTx}`
+  );
 }
 
 export function buildDeployTx({

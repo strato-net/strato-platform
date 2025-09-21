@@ -52,7 +52,7 @@ const InfoTooltip = ({ children, content }: { children: React.ReactNode; content
 
 const UsdstBalanceBox: React.FC = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, loadingUsdstBalance, fetchUsdstBalance } =
+  const { usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance } =
     useUserTokens();
   const { getToken } = useTokenContext();
   const location = useLocation();
@@ -192,6 +192,11 @@ const UsdstBalanceBox: React.FC = () => {
               ) : (
                 `${formatCurrency(formatWeiAmount(usdstBalance))} USDST`
               )}
+            </p>
+            <p className="text-xs text-gray-500 truncate">
+              {loadingUsdstBalance
+                ? "Calculating voucher credits…"
+                : `${formatCurrency(formatWeiAmount(voucherBalance,20))} USDST in vouchers`}
             </p>
           </div>
           <Button

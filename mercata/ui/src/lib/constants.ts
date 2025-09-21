@@ -1,5 +1,6 @@
 export const usdstAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
 export const safetyModuleAddress = "0000000000000000000000000000000000001015"
+export const DECIMAL = 18
 
 // ============================================
 // Input Validation Patterns
@@ -15,6 +16,7 @@ export const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 // ============================================
 // Transaction fees
 // ============================================
+export const VOUCHER_TO_USDST_FACTOR = 100n; // 1 voucher (1e18) = 0.01 USDST (1e16)
 export const SWAP_FEE = "0.02"; // USDST fee for swap transactions
 export const TRANSFER_FEE = "0.01"; // USDST fee for transfer transactions
 export const BORROW_FEE = "0.01"; // USDST fee for borrow transactions

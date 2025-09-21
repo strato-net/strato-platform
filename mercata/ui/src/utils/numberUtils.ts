@@ -196,4 +196,6 @@ export const formatCurrency = (value: string | number): string => {
   });
 };
 
+export const toWei = (s: string): bigint => BigInt(s || "0");
+
 export { formatUnits } from "ethers";
