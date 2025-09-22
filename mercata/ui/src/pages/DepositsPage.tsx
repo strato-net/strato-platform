@@ -26,8 +26,8 @@ import { useSearchParams } from 'react-router-dom';
 const DepositsPage = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
-  const { loans, liquidityInfo } = useLendingContext();
-  const { totalCDPDebt } = useCDP();
+  const { loans, liquidityInfo, refreshLoans } = useLendingContext();
+  const { totalCDPDebt, refreshVaults } = useCDP();
   const { userPools } = useSwapContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -50,6 +50,8 @@ const DepositsPage = () => {
     // Use a longer delay to ensure transaction is processed and tab state is preserved
     setTimeout(() => {
       fetchTokens();
+      refreshLoans(); 
+      refreshVaults(); 
       if (userAddress) {
         fetchUsdstBalance(userAddress);
       }
