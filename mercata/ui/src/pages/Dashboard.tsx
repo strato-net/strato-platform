@@ -14,10 +14,12 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
+import { useSafetyContext } from "@/context/SafetyContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -31,13 +33,21 @@ const Dashboard = () => {
     averageInterestRate, 
   } = useLendingMetrics();
   const { loans } = useLendingContext();
-  const [totalBalance, setTotalBalance] = useState<number>(0)
-  const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
- 
-  const { totalCDPDebt, loading: cdpLoading } = useCDP();
+
+  const { totalCDPDebt } = useCDP();
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
+  const { safetyInfo } = useSafetyContext();
+
+  // Use centralized net balance calculation hook
+  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
+    tokens,
+    loans,
+    liquidityInfo,
+    totalCDPDebt,
+    safetyInfo
+  });
 
 
   // Add visibility states to prevent flashing
@@ -78,90 +88,7 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (!tokens || tokens.length === 0) return;
-
-    // Wait for CDP data to load before calculating
-    if (cdpLoading) return;
-
-    let total = 0;
-    let cataTotal = 0;
-
-    // Calculate token deposit values (exact same as AssetsList component)
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      const rawPrice = token?.price || "0";
-      const rawBalance = token?.balance || "0";
-      const rawCollateralBalance = token?.collateralBalance || "0";
-      const name = token?._name || "";
-      const symbol = token?._symbol || "";
-
-      // Use exact same calculation as AssetsList component (line 186)
-      if (rawPrice && (rawBalance || rawCollateralBalance)) {
-        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
-        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
-        
-        // Same calculation as AssetsList: price * (balance + collateralBalance)
-        const totalTokenValue = price * (balance + collateralBalance);
-        total += totalTokenValue;
-
-        if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-          cataTotal += totalTokenValue;
-        }
-      }
-    }
-
-    // Add lending pool value (matching MyPoolParticipationSection display)
-    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
-      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
-      total += lendingPoolValue;
-    }
-
-    // Add LP token values (exact same as MyPoolParticipationSection formatValue function)
-    if (userPools && userPools.length > 0) {
-      userPools.forEach((userPool) => {
-        if (userPool?.lpToken?.balance && userPool?.lpToken?.price) {
-          // Use exact same formatValue logic as MyPoolParticipationSection (lines 31-39)
-          const balance = parseFloat(formatUnits(BigInt(userPool.lpToken.balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(userPool.lpToken.price), 18));
-          const lpTokenValue = balance * priceValue;
-          total += lpTokenValue;
-        }
-      });
-    }
-
-    // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
-    const lendingPoolDebt = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits((() => { 
-          try { 
-            const bi = BigInt(loans.totalAmountOwed); 
-            return bi <= 1n ? 0n : bi; 
-          } catch { 
-            return 0n; 
-          } 
-        })(), 18))
-      : 0;
-
-    // CDP vault debt
-    const cdpDebt = totalCDPDebt
-      ? parseFloat(formatUnits((() => {
-          try {
-            const bi = BigInt(totalCDPDebt);
-            return bi <= 1n ? 0n : bi;
-          } catch {
-            return 0n;
-          }
-        })(), 18))
-      : 0;
-
-    // Net balance calculation includes both debt types
-    const totalDebt = lendingPoolDebt + cdpDebt;
-    const netBalance = total - totalDebt;
-    
-    setTotalBalance(netBalance);
-    setCataBalance(cataTotal);
-  }, [tokens, loans, liquidityInfo, userPools, totalCDPDebt, cdpLoading]);
+  // Net balance calculation is now handled by the useNetBalance hook above
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -200,32 +127,7 @@ const Dashboard = () => {
 
             <AssetSummary
               title="Total Borrowed"
-              value={(() => {
-                const lendingDebt = loans?.totalAmountOwed 
-                  ? parseFloat(formatUnits((() => { 
-                      try { 
-                        const bi = BigInt(loans.totalAmountOwed); 
-                        return bi <= 1n ? 0n : bi; 
-                      } catch { 
-                        return 0n; 
-                      } 
-                    })(), 18))
-                  : 0;
-                
-                const cdpDebt = totalCDPDebt
-                  ? parseFloat(formatUnits((() => {
-                      try {
-                        const bi = BigInt(totalCDPDebt);
-                        return bi <= 1n ? 0n : bi;
-                      } catch {
-                        return 0n;
-                      }
-                    })(), 18))
-                  : 0;
-                
-                const total = lendingDebt + cdpDebt;
-                return `${total.toFixed(2)} USDST`;
-              })()}
+              value={`${totalBorrowed.toFixed(2)} USDST`}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
