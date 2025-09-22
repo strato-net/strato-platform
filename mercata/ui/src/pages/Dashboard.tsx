@@ -84,10 +84,12 @@ const Dashboard = () => {
     // Wait for CDP data to load before calculating
     if (cdpLoading) return;
 
+    console.log("🔵 [DASHBOARD] Starting net balance calculation...");
     let total = 0;
     let cataTotal = 0;
 
     // Calculate token deposit values (exact same as AssetsList component)
+    console.log("🔵 [DASHBOARD] Processing tokens:", tokens.length);
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
       const rawPrice = token?.price || "0";
@@ -106,30 +108,36 @@ const Dashboard = () => {
         const totalTokenValue = price * (balance + collateralBalance);
         total += totalTokenValue;
 
+        console.log(`🔵 [DASHBOARD] Token: ${symbol} (${name})`);
+        console.log(`🔵   - Price: $${price.toFixed(4)}`);
+        console.log(`🔵   - Balance: ${balance.toFixed(6)}`);
+        console.log(`🔵   - Collateral: ${collateralBalance.toFixed(6)}`);
+        console.log(`🔵   - Token Value: $${totalTokenValue.toFixed(2)}`);
+        console.log(`🔵   - Running Total: $${total.toFixed(2)}`);
+
         if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
           cataTotal += totalTokenValue;
         }
+      } else {
+        console.log(`🔵 [DASHBOARD] Skipped Token: ${symbol} (${name}) - No price or balance`);
       }
     }
+
+    console.log(`🔵 [DASHBOARD] Token subtotal: $${total.toFixed(2)}`);
 
     // Add lending pool value (matching MyPoolParticipationSection display)
     if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
       const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
       total += lendingPoolValue;
+      console.log(`🔵 [DASHBOARD] Lending pool value: $${lendingPoolValue.toFixed(2)}`);
+      console.log(`🔵 [DASHBOARD] Total after lending pool: $${total.toFixed(2)}`);
+    } else {
+      console.log(`🔵 [DASHBOARD] No lending pool value found`);
     }
 
-    // Add LP token values (exact same as MyPoolParticipationSection formatValue function)
-    if (userPools && userPools.length > 0) {
-      userPools.forEach((userPool) => {
-        if (userPool?.lpToken?.balance && userPool?.lpToken?.price) {
-          // Use exact same formatValue logic as MyPoolParticipationSection (lines 31-39)
-          const balance = parseFloat(formatUnits(BigInt(userPool.lpToken.balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(userPool.lpToken.price), 18));
-          const lpTokenValue = balance * priceValue;
-          total += lpTokenValue;
-        }
-      });
-    }
+    // Note: LP tokens are already included in the tokens list above
+    // No need to add them separately from userPools to avoid double counting
+    console.log(`🔵 [DASHBOARD] LP tokens already included in tokens list - skipping userPools to avoid double counting`);
 
     // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
     const lendingPoolDebt = loans?.totalAmountOwed 
@@ -155,13 +163,22 @@ const Dashboard = () => {
         })(), 18))
       : 0;
 
+    console.log(`🔵 [DASHBOARD] Lending pool debt: $${lendingPoolDebt.toFixed(2)}`);
+    console.log(`🔵 [DASHBOARD] CDP debt: $${cdpDebt.toFixed(2)}`);
+
     // Net balance calculation includes both debt types
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
     
+    console.log(`🔵 [DASHBOARD] ===== FINAL CALCULATION =====`);
+    console.log(`🔵 [DASHBOARD] Total assets: $${total.toFixed(2)}`);
+    console.log(`🔵 [DASHBOARD] Total debts: $${totalDebt.toFixed(2)}`);
+    console.log(`🔵 [DASHBOARD] NET BALANCE: $${netBalance.toFixed(2)}`);
+    console.log("🔵 [DASHBOARD] ===== END CALCULATION =====");
+    
     setTotalBalance(netBalance);
     setCataBalance(cataTotal);
-  }, [tokens, loans, liquidityInfo, userPools, totalCDPDebt, cdpLoading]);
+  }, [tokens, loans, liquidityInfo, totalCDPDebt, cdpLoading]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {

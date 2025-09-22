@@ -15,6 +15,7 @@ import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
+import { formatUnits as formatUnitsEthers } from 'ethers';
 import { useCDP } from '@/context/CDPContext';
 import { useSwapContext } from '@/context/SwapContext';
 import AssetsList from '@/components/dashboard/AssetsList';
@@ -59,42 +60,56 @@ const DepositsPage = () => {
   useEffect(() => {
     if (!tokens || tokens.length === 0) return;
 
+    console.log("🟢 [DEPOSITS] Starting net balance calculation...");
     let total = 0;
 
+    // Calculate token deposit values (same as Dashboard)
+    console.log("🟢 [DEPOSITS] Processing tokens:", tokens.length);
     for (let i = 0; i < tokens.length; i++) {
 
       const token = tokens[i];
       const rawPrice = token?.price || "0";
       const rawBalance = token?.balance || "0";
       const rawCollateralBalance = token?.collateralBalance || "0";
+      const name = token?._name || "";
+      const symbol = token?._symbol || "";
 
-      const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-      const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
-      const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance), 18));
+      // Use same condition as Dashboard: only process tokens with price AND (balance OR collateral)
+      if (rawPrice && (rawBalance || rawCollateralBalance)) {
+        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
+        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
+        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
 
-      // Calculate total value including both balance and collateral
-      const totalTokenValue = (balance + collateralBalance) * price;
-      total += totalTokenValue;
+        // Calculate total value including both balance and collateral (covers CDP collateral)
+        const totalTokenValue = (balance + collateralBalance) * price;
+        total += totalTokenValue;
+
+        console.log(`🟢 [DEPOSITS] Token: ${symbol} (${name})`);
+        console.log(`🟢   - Price: $${price.toFixed(4)}`);
+        console.log(`🟢   - Balance: ${balance.toFixed(6)}`);
+        console.log(`🟢   - Collateral: ${collateralBalance.toFixed(6)}`);
+        console.log(`🟢   - Token Value: $${totalTokenValue.toFixed(2)}`);
+        console.log(`🟢   - Running Total: $${total.toFixed(2)}`);
+      } else {
+        console.log(`🟢 [DEPOSITS] Skipped Token: ${symbol} (${name}) - No price or balance`);
+      }
     }
+
+    console.log(`🟢 [DEPOSITS] Token subtotal: $${total.toFixed(2)}`);
 
     // Add lending pool value (mUSDST deposits)
     if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
       const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
       total += lendingPoolValue;
+      console.log(`🟢 [DEPOSITS] Lending pool value: $${lendingPoolValue.toFixed(2)}`);
+      console.log(`🟢 [DEPOSITS] Total after lending pool: $${total.toFixed(2)}`);
     }
 
-    // Add LP token values
-    if (userPools && userPools.length > 0) {
-      userPools.forEach((userPool) => {
-        if (userPool?.lpToken?.balance && userPool?.lpToken?.price) {
-          const balance = parseFloat(formatUnits(BigInt(userPool.lpToken.balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(userPool.lpToken.price), 18));
-          const lpTokenValue = balance * priceValue;
-          total += lpTokenValue;
-        }
-      });
-    }
+    // Note: LP tokens are already included in the tokens list above
+    // No need to add them separately from userPools to avoid double counting
+    console.log(`🟢 [DEPOSITS] LP tokens already included in tokens list - skipping userPools to avoid double counting`);
 
+    // Calculate total debt (BOTH lending pool debt AND CDP vault debt)
     const lendingPoolDebt = loans?.totalAmountOwed 
       ? parseFloat(formatUnits((() => { 
           try { 
@@ -117,10 +132,21 @@ const DepositsPage = () => {
         })(), 18))
       : 0;
 
+    console.log(`🟢 [DEPOSITS] Lending pool debt: $${lendingPoolDebt.toFixed(2)}`);
+    console.log(`🟢 [DEPOSITS] CDP debt: $${cdpDebt.toFixed(2)}`);
+
+    // Net balance calculation includes both debt types
     const totalDebt = lendingPoolDebt + cdpDebt;
     const netBalance = total - totalDebt;
+    
+    console.log(`🟢 [DEPOSITS] ===== FINAL CALCULATION =====`);
+    console.log(`🟢 [DEPOSITS] Total assets: $${total.toFixed(2)}`);
+    console.log(`🟢 [DEPOSITS] Total debts: $${totalDebt.toFixed(2)}`);
+    console.log(`🟢 [DEPOSITS] NET BALANCE: $${netBalance.toFixed(2)}`);
+    console.log("🟢 [DEPOSITS] ===== END CALCULATION =====");
+    
     setTotalBalance(netBalance);
-  }, [tokens, loans, totalCDPDebt, liquidityInfo, userPools]);
+  }, [tokens, loans, totalCDPDebt, liquidityInfo]);
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
