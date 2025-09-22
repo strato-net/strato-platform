@@ -86,11 +86,11 @@ contract record Mercata {
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(address(adminRegistry)); 
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
           
         Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
-        safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
         Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services
