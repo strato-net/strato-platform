@@ -314,8 +314,10 @@ contract Describe_BadDebt_Basic {
         require(sm.UNSTAKE_WINDOW() == window, "Unstake window not set correctly");
         require(sm.MAX_SLASH_BPS() == maxSlashBps, "Max slash BPS not set correctly");
 
-        log("al x");
+        log("al w");
+        sm.syncFromRegistry(); // important, took some debugging to determine where in the process to do this
         sm.setTokens(sUSDST, USDST);
+        log("al x");
 
         log("al y");
         require(sm.asset() == USDST, "Asset not set correctly");

@@ -186,6 +186,15 @@ contract record PoolConfigurator is Ownable {
         pool.setFeeCollector(_feeCollector);
     }
 
+    /**
+     * @notice Set safety module address
+     * @param _safetyModule The safety module address
+     */
+    function setSafetyModule(address _safetyModule) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setSafetyModule(_safetyModule);
+    }
+
      // Setter function for borrowable asset
     function setBorrowableAsset(address asset) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
