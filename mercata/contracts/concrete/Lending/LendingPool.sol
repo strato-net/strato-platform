@@ -1114,12 +1114,19 @@ contract record LendingPool is Ownable {
         require(msg.sender == address(safetyModule), "LP:not SM");
         require(amount > 0, "LP:zero");
 
+        log('coverShortfall:          amount           badDebt            exchangeRate            totalSupply                cash            debt');
+        log("coverShortfall: "+string(amount)+" "+string(badDebt)+ " "+string(getExchangeRate())
+        +" " + string(IERC20(mToken).totalSupply()) + " " + string(IERC20(borrowableAsset).balanceOf(address(_liquidityPool()))) + " " + string(_totalDebt()));
+
         // Cash already moved to LiquidityPool by SM in the same tx.
         uint cover = amount <= badDebt ? amount : badDebt;
         if (cover > 0) {
             badDebt -= cover;
             emit BadDebtCovered(cover, badDebt);
         }
+
+        log("coverShortfall: "+string(amount)+" "+string(badDebt)+ "                     "+string(getExchangeRate())
+        + " " + string(IERC20(mToken).totalSupply()) + " " + string(IERC20(borrowableAsset).balanceOf(address(_liquidityPool()))) + " " + string(_totalDebt()));
 
         // Any excess cash simply improves liquidity until swept to reserves
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
