@@ -13,6 +13,7 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.Decide
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
+import           Blockchain.GenesisBlocks.Contracts.UserRegistry
 import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
 import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
 import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
@@ -225,6 +226,7 @@ supportedCollaterals = Set.toList
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
+  . insertUserRegistryContract []
   . insertDecideContract
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
@@ -990,18 +992,12 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 (CodeAtAccount
 
 validators :: [Validator]
 validators = [
-  Validator 0x0,
-  Validator 0x1,
-  Validator 0x2,
-  Validator 0x3
+  Validator 0x3dc1e4bdb54f6cce80c92d5d494160545a78db35 --Jamshid's machine
   ]
 
 admins :: [Address]
 admins = [
-  0x10000,
-  0x10001,
-  0x10002,
-  0x10003
+  0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
   ]
 
 descriptions :: M.Map Text Text
