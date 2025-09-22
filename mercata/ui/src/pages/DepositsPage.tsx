@@ -19,6 +19,7 @@ import { formatUnits as formatUnitsEthers } from 'ethers';
 import { useCDP } from '@/context/CDPContext';
 import { useSwapContext } from '@/context/SwapContext';
 import { useNetBalance } from '@/hooks/useNetBalance';
+import { useSafetyContext } from '@/context/SafetyContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 import { useSearchParams } from 'react-router-dom';
@@ -29,6 +30,7 @@ const DepositsPage = () => {
   const { loans, liquidityInfo, refreshLoans } = useLendingContext();
   const { totalCDPDebt, refreshVaults } = useCDP();
   const { userPools } = useSwapContext();
+  const { safetyInfo, refreshSafetyInfo } = useSafetyContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
   // Use centralized net balance calculation hook
@@ -36,7 +38,8 @@ const DepositsPage = () => {
     tokens,
     loans,
     liquidityInfo,
-    totalCDPDebt
+    totalCDPDebt,
+    safetyInfo
   });
   const [searchParams] = useSearchParams();
 
@@ -52,6 +55,7 @@ const DepositsPage = () => {
       fetchTokens();
       refreshLoans(); 
       refreshVaults(); 
+      refreshSafetyInfo();
       if (userAddress) {
         fetchUsdstBalance(userAddress);
       }

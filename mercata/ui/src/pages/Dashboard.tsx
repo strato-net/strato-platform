@@ -19,6 +19,7 @@ import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipati
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
+import { useSafetyContext } from "@/context/SafetyContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -37,13 +38,15 @@ const Dashboard = () => {
 
   const { totalCDPDebt } = useCDP();
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
+  const { safetyInfo } = useSafetyContext();
 
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
     tokens,
     loans,
     liquidityInfo,
-    totalCDPDebt
+    totalCDPDebt,
+    safetyInfo
   });
 
 

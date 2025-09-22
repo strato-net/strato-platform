@@ -7,6 +7,7 @@ interface UseNetBalanceProps {
   loans: any;
   liquidityInfo: any;
   totalCDPDebt: string;
+  safetyInfo?: any; 
 }
 
 interface NetBalanceResult {
@@ -19,7 +20,8 @@ export const useNetBalance = ({
   tokens,
   loans,
   liquidityInfo,
-  totalCDPDebt
+  totalCDPDebt,
+  safetyInfo
 }: UseNetBalanceProps): NetBalanceResult => {
   const [result, setResult] = useState<NetBalanceResult>({
     netBalance: 0,
@@ -65,6 +67,15 @@ export const useNetBalance = ({
       total += lendingPoolValue;
     }
 
+    // Add sUSDST (Safety Module) value  
+    if (safetyInfo?.userShares && safetyInfo?.exchangeRate) {
+      const userShares = parseFloat(formatUnits(BigInt(safetyInfo.userShares), 18));
+      const exchangeRate = parseFloat(formatUnits(BigInt(safetyInfo.exchangeRate), 18));
+      
+      const sUsdstValue = userShares * exchangeRate;
+      total += sUsdstValue;
+    }
+
     // Note: LP tokens are already included in the tokens list above
     // No need to add them separately from userPools to avoid double counting
 
@@ -101,7 +112,7 @@ export const useNetBalance = ({
       totalBorrowed: totalDebt
     });
 
-  }, [tokens, loans, liquidityInfo, totalCDPDebt]);
+  }, [tokens, loans, liquidityInfo, totalCDPDebt, safetyInfo]);
 
   return result;
 };
