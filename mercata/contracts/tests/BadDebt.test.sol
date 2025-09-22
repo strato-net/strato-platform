@@ -350,15 +350,17 @@ contract Describe_BadDebt_Basic {
     function it_ao_can_accept_safety_module_deposits() public {
         SafetyModule sm = m.safetyModule();
 
+        uint amount = 2000e18; // chosen to be big enough to cover the bad debt for the can_cover_bad_debt test
+
         // Mint USDST
-        Token(USDST).mint(address(this), 1000e18);
-        require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "USDST balance should be 1000e18 after mint");
+        Token(USDST).mint(address(this), amount);
+        require(IERC20(USDST).balanceOf(address(this)) == amount, "USDST balance should be 1000e18 after mint");
         
         // Stake USDST in SafetyModule
-        IERC20(USDST).approve(address(sm), 1000e18);
-        sm.stake(1000e18, 0);
+        IERC20(USDST).approve(address(sm), amount);
+        sm.stake(amount, 0);
         require(IERC20(USDST).balanceOf(address(this)) == 0, "USDST balance should be 0 after stake");
-        require(IERC20(sUSDST).balanceOf(address(this)) == 1000e18, "sUSDST balance should be 1000e18 after stake");
+        require(IERC20(sUSDST).balanceOf(address(this)) == amount, "sUSDST balance should be 1000e18 after stake");
     }
 
     function it_ap_can_accept_collateral_vault_deposits() public {
@@ -399,29 +401,43 @@ contract Describe_BadDebt_Basic {
 
         uint healthFactor = pool.getHealthFactor(address(user1));
         log("healthFactor: "+string(healthFactor));
+        log("            / "+string(1e18));
+
         require(healthFactor < 1e18, "Health factor should be less than 1e18 after set price");
     }
 
     function it_as_can_liquidate_borrower() public {
         LendingPool pool = m.lendingPool();
 
+        uint prior_balance = IERC20(USDST).balanceOf(address(this)); // to help with cleanup
+
+        // Liquidation requires USDST balance
+        Token(USDST).mint(address(this), 1000e18);
+        IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
+
+        // Perform Liquidation
         pool.liquidationCallAll(GOLDST, address(user1));
         require(
-            pool.getHealthFactor(address(user1)) < 1e18,
-            "Health factor should be less than 1e18 after *bad debt* liquidation"
+            pool.getHealthFactor(address(user1)) == 2**256-1,
+            "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
         );
 
         require(pool.badDebt() != 0, "Bad debt should be nonzero after *bad debt* liquidation");
-        log("ar badDebt: "+string(pool.badDebt()));
+        log("as badDebt: "+string(pool.badDebt()));
 
         LoanInfo memory loan = pool.getUserLoan(address(user1));
         require(loan.scaledDebt == 0, "User loan should be zero after bad debt liquidation");
         require(loan.lastUpdated == 0, "User loan last updated should be zero after bad debt liquidation");
+
+        // Cleanup; note that LiquidityPool approval is not cleaned
+        Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
     }
 
     function it_at_can_cover_bad_debt() public {
         SafetyModule sm = m.safetyModule();
         LendingPool pool = m.lendingPool();
+
+        log("at exchangeRate before: "+string(pool.getExchangeRate()));
 
         uint smAssets = sm.totalAssets();
         uint toCover = smAssets * sm.MAX_SLASH_BPS() / 10000;
@@ -429,9 +445,12 @@ contract Describe_BadDebt_Basic {
             pool.badDebt() < smAssets,
             "Bad debt should be less than USDST balance of SM" // (for this test case)
         );
+        log("at toCover: "+string(toCover));
         sm.coverShortfall(toCover);
         require(pool.badDebt() == 0, "Bad debt should be 0 after cover shortfall");
 
+        log("at exchangeRate after: "+string(pool.getExchangeRate()));
+        
         // Note: These initial values for comparison should be taken separetly if you reorder the tests
         require(pool.getExchangeRate() == 1e18, "Lending Exchange rate should be unaffected 1e18 after cover shortfall");
         require(sm.exchangeRate() < 1e18, "SM Exchange rate should fall to less than 1e18 after cover shortfall");
