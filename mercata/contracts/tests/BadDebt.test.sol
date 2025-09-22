@@ -99,8 +99,16 @@ contract Describe_BadDebt_Basic {
         require(Token(SILVST).status() == TokenStatus.ACTIVE, "SILVST token not activated");
     }
 
+    function it_ae_can_whitelist_tokens() public {
+        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.liquidityPool()));
+        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.liquidityPool()));
+
+        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.safetyModule()));
+        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.safetyModule()));
+    }
+
     // Test complete lending pool configuration with full setup
-    function it_ae_can_configure_lending_pool() public {
+    function it_af_can_configure_lending_pool() public {
         // Get the lending pool and configurator from Mercata infrastructure
         LendingPool pool = m.lendingPool();
         PoolConfigurator configurator = m.poolConfigurator();
@@ -248,19 +256,19 @@ contract Describe_BadDebt_Basic {
         require(silverLtv <= silverLiquidationThreshold, "Silver LTV exceeds liquidation threshold");
     }
 
-    function it_af_persists_accross_tests() public {
+    function it_ag_persists_accross_tests() public {
         LendingPool pool = m.lendingPool();
         require(pool.configuredAssets(0) != address(0), "No persistent configured assets");
     }
 
     // Verify exchange rate calculation works
-    function it_ag_can_verify_exchange_rate_calculation() public {   //TODO letters
+    function it_ah_can_verify_exchange_rate_calculation() public {   //TODO letters
         LendingPool pool = m.lendingPool();
         uint exchangeRate = pool.getExchangeRate();
         require(exchangeRate > 0, "Exchange rate not calculable");
     }
 
-    function it_ah_can_set_oracle_prices() public {
+    function it_ai_can_set_oracle_prices() public {
         PriceOracle oracle = m.priceOracle();
         
         oracle.setAssetPrice(USDST, 1e18);      // $1 USD
@@ -273,12 +281,12 @@ contract Describe_BadDebt_Basic {
         require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
     }
 
-    function it_ai_can_display_logs() public {
+    function it_aj_can_display_logs() public {
         log("Hello, world! We're at " + string(address(m)));
     }
 
     // Test token minting and burn operations
-    function it_aj_can_mint_and_burn_tokens() public {
+    function it_ak_can_mint_and_burn_tokens() public {
         // Test minting - simplified
         Token(USDST).mint(address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Should have 1000 USDST after mint");
@@ -286,7 +294,7 @@ contract Describe_BadDebt_Basic {
         require(IERC20(USDST).balanceOf(address(this)) == 0, "Should have 0 USDST after burn");
     }
 
-    function it_ak_can_simulate_users() public {
+    function it_al_can_simulate_users() public {
         user1 = new User();
         user2 = new User();
 
@@ -302,7 +310,7 @@ contract Describe_BadDebt_Basic {
         Token(USDST).burn(address(this), 1000e18);
     }
 
-    function it_al_can_configure_safety_module() public {
+    function it_am_can_configure_safety_module() public {
         SafetyModule sm = m.safetyModule();
 
         uint cooldown = 1;
@@ -314,25 +322,18 @@ contract Describe_BadDebt_Basic {
         require(sm.UNSTAKE_WINDOW() == window, "Unstake window not set correctly");
         require(sm.MAX_SLASH_BPS() == maxSlashBps, "Max slash BPS not set correctly");
 
-        log("al w");
         sm.syncFromRegistry(); // important, took some debugging to determine where in the process to do this
         sm.setTokens(sUSDST, USDST);
-        log("al x");
 
-        log("al y");
         require(sm.asset() == USDST, "Asset not set correctly");
         require(sm.sToken() == sUSDST, "sToken not set correctly");
 
-        log("al z");
         require(address(sm.lendingPool()) == address(m.lendingPool()), "Lending pool not set correctly");
-        log("al a");
         require(address(sm.lendingRegistry()) == address(m.lendingRegistry()), "Lending registry not set correctly");
-        log("al b");
         require(address(sm.tokenFactory()) == address(m.tokenFactory()), "Token factory not set correctly");
-        log("al c");
     }
 
-    function it_am_can_accept_liquidity_deposits() public {
+    function it_an_can_accept_liquidity_deposits() public {
         LendingPool pool = m.lendingPool();
 
         Token(USDST).mint(address(this), 1000000e18);
@@ -341,14 +342,12 @@ contract Describe_BadDebt_Basic {
         require(pool.getExchangeRate() == 1e18, "Exchange rate should be 1e18 initially");
 
         IERC20(USDST).approve(address(m.liquidityPool()), 1000000e18);
-        log("am a");
         pool.depositLiquidity(1000000e18);
-        log("am b");
         require(IERC20(USDST).balanceOf(address(this)) == 0, "USDST balance should be 0 after deposit");
         require(IERC20(mUSDST).balanceOf(address(this)) == 1000000e18, "mUSDST balance should be 1000000e18 after 1:1 deposit");
     }
 
-    function it_an_can_accept_safety_module_deposits() public {
+    function it_ao_can_accept_safety_module_deposits() public {
         SafetyModule sm = m.safetyModule();
 
         // Mint USDST
@@ -362,7 +361,7 @@ contract Describe_BadDebt_Basic {
         require(IERC20(sUSDST).balanceOf(address(this)) == 1000e18, "sUSDST balance should be 1000e18 after stake");
     }
 
-    function it_ao_can_accept_collateral_vault_deposits() public {
+    function it_ap_can_accept_collateral_vault_deposits() public {
         CollateralVault cv = m.collateralVault();
         LendingPool pool = m.lendingPool();
 
@@ -375,7 +374,7 @@ contract Describe_BadDebt_Basic {
         require(cv.userCollaterals(address(user1), GOLDST) == 1e18, "GOLDST balance should be 1e18 after supply collateral");
     }
 
-    function it_ap_can_accept_borrows() public {
+    function it_aq_can_accept_borrows() public {
         LendingPool pool = m.lendingPool();
 
         (uint ltv, uint foo, uint bar, uint bin, uint baz, uint snap) = pool.getAssetConfig(GOLDST);
@@ -386,7 +385,7 @@ contract Describe_BadDebt_Basic {
         user1.do(address(pool), "borrow", amount * 1e18);
     }
 
-    function it_aq_can_tank_gold_price() public {
+    function it_ar_can_tank_gold_price() public {
         PriceOracle oracle = m.priceOracle();
         LendingPool pool = m.lendingPool();
 
@@ -403,7 +402,7 @@ contract Describe_BadDebt_Basic {
         require(healthFactor < 1e18, "Health factor should be less than 1e18 after set price");
     }
 
-    function it_ar_can_liquidate_borrower() public {
+    function it_as_can_liquidate_borrower() public {
         LendingPool pool = m.lendingPool();
 
         pool.liquidationCallAll(GOLDST, address(user1));
@@ -420,7 +419,7 @@ contract Describe_BadDebt_Basic {
         require(loan.lastUpdated == 0, "User loan last updated should be zero after bad debt liquidation");
     }
 
-    function it_as_can_cover_bad_debt() public {
+    function it_at_can_cover_bad_debt() public {
         SafetyModule sm = m.safetyModule();
         LendingPool pool = m.lendingPool();
 
