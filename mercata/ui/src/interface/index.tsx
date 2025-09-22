@@ -363,6 +363,15 @@ export interface PollingReturn {
   error: any;
 }
 
+export interface PoolPollingConfig {
+  fromAsset: any;
+  toAsset: any;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
+  fetchUsdstBalance: (userAddress: string) => Promise<void>;
+  userAddress: string;
+  interval?: number;
+}
+
 export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;

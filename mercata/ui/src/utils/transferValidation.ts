@@ -3,11 +3,9 @@ import { isAddress } from "ethers";
 
 import {
   DECIMAL,
-  DECIMAL_PATTERN,
 } from "@/lib/constants";
 import {
   safeParseUnits,
-  toWei,
 } from "@/utils/numberUtils";
 
 
@@ -36,33 +34,31 @@ export const handleRecipientAddress = (
 };
 
 export const computeMaxTransferable = (
-  tokenBalance: string,
+  tokenBalanceWei: string,           // wei
   isUsdToken: boolean,
-  userVoucherBalance: string, // already in USDST-wei
-  userUsdstBalance: string,   // USDST-wei
-  gasFee: string,             // USDST-wei
+  userVoucherBalanceWei: string,     // wei
+  userUsdstBalanceWei: string,       // wei
+  gasFeeWei: string,                 // wei
   setError: Dispatch<SetStateAction<string>>
 ): string => {
-  const token = toWei(tokenBalance);
+  const token = BigInt(tokenBalanceWei || "0");
   if (token <= 0n) return "0";
 
-  const fee = toWei(gasFee);
-  const usdst = toWei(userUsdstBalance);
-  const vouchers = toWei(userVoucherBalance);
+  const fee = BigInt(gasFeeWei || "0");
+  const usdst = BigInt(userUsdstBalanceWei || "0");
+  const vouchers = BigInt(userVoucherBalanceWei || "0");
 
-  // Require enough combined USDST + vouchers to cover fee
-  if (fee > 0n && usdst + vouchers <= fee) {
+  // Enough means >=, not >
+  if (fee > 0n && (usdst + vouchers) < fee) {
     setError("Insufficient USDST + voucher balance for transaction fee");
-    return token.toString();  // show full balance, not 0
+    return token.toString();
   }
   setError("");
 
   if (!isUsdToken || fee === 0n) return token.toString();
 
-  // USDST pays only the part of the fee not already covered by vouchers
   const usdPortion = fee > vouchers ? fee - vouchers : 0n;
   const net = token - usdPortion;
-
   return net > 0n ? net.toString() : "0";
 };
 
@@ -74,8 +70,15 @@ export const handleAmountInputChange = (
   tokenDecimals: number = DECIMAL
 ): void => {
   const input = userInput.replace(/,/g, "").trim();
-  if (!DECIMAL_PATTERN.test(input)) return;
+  
+  // Check for valid number format first (most basic validation)
+  const basicPattern = /^\d*\.?\d*$/;
+  if (!basicPattern.test(input)) {
+    setError("Invalid input format");
+    return;
+  }
 
+  // Always set the amount after basic format validation
   if (!input) {
     setAmount("");
     setError("");
@@ -89,6 +92,15 @@ export const handleAmountInputChange = (
   }
 
   setAmount(input);
+  
+  // Check decimal places separately
+  if (input.includes('.')) {
+    const decimalPart = input.split('.')[1];
+    if (decimalPart && decimalPart.length > tokenDecimals) {
+      setError(`Maximum ${tokenDecimals} decimal places allowed`);
+      return;
+    }
+  }
 
   const amountWei = safeParseUnits(input, tokenDecimals);
   if (amountWei <= 0n) return setError("Amount must be greater than 0");

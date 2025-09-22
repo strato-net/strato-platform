@@ -115,41 +115,26 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
   const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
     setPoolLoading(true);
     try {
-      const res = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
-      const poolData = res.data?.[0] || null;
-      if (poolData) {
-        setPool(poolData);
-        
-        // Update asset balances from pool data
-        if (fromAsset && toAsset) {
-          // Update fromAsset balance from pool data
-          const fromTokenBalance = poolData.tokenA?.address === fromAsset.address 
-            ? poolData.tokenA?.balance 
-            : poolData.tokenB?.address === fromAsset.address 
-              ? poolData.tokenB?.balance 
-              : fromAsset.balance;
+      const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
+      const poolData: Pool | null = data?.[0] || null;
+      if (!poolData) return null;
 
-          if (fromTokenBalance !== fromAsset.balance) {
-            setFromAsset({ ...fromAsset, balance: fromTokenBalance || "0" });
-          }
+      setPool(poolData);
 
-          // Update toAsset balance from pool data
-          const toTokenBalance = poolData.tokenA?.address === toAsset.address 
-            ? poolData.tokenA?.balance 
-            : poolData.tokenB?.address === toAsset.address 
-              ? poolData.tokenB?.balance 
-              : toAsset.balance;
+      const read = (addr?: string) => {
+        if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
+        const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
+        return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
+      };
 
-          if (toTokenBalance !== toAsset.balance) {
-            setToAsset({ ...toAsset, balance: toTokenBalance || "0" });
-          }
-        }
-      }
+      setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+      setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+
       return poolData;
     } finally {
       setPoolLoading(false);
     }
-  }, [fromAsset, toAsset, setFromAsset, setToAsset]);
+  }, [setPool, setFromAsset, setToAsset]);
 
   const getPoolByAddress = useCallback(async (address: string) => {
     try {
