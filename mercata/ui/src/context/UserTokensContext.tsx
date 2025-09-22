@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useMemo, useCallback } from
 import { api, axios } from "@/lib/axios";
 import { Token } from "@/interface";
 import isEqual from "lodash.isequal";
-import { usdstAddress } from "@/lib/constants";
+import { usdstAddress, sUsdstAddress, mUsdstAddress } from "@/lib/constants";
 
 type UserTokensContextType = {
   activeTokens: Token[];
@@ -85,11 +85,15 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       const allTokens = response.data || [];
   
       const active = allTokens.filter((token: Token) => 
-        // filtering  musdst token out
-        token.token.status === '2' && token.address !== '000000000000000000000000000000000000100f'     
+        // filtering musdst and sUSDST tokens out
+        token.token.status === '2' && 
+        token.address !== mUsdstAddress &&
+        token.address !== sUsdstAddress     
       );
       const inactive = allTokens.filter((token: Token) => 
-        token.token.status !== '2' || token.address === '000000000000000000000000000000000000100f'
+        token.token.status !== '2' || 
+        token.address === mUsdstAddress ||
+        token.address === sUsdstAddress
       );
 
       setActiveTokens(prev => (isEqual(prev, active) ? prev : active));
