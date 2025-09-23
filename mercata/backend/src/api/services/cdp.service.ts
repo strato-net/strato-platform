@@ -237,6 +237,10 @@ export const getVaults = async (
   // Use efficient user-specific vault query
   const userVaults = await getUserVaults(accessToken, userAddress);
 
+  if (userVaults.length === 0) {
+    return [];
+  }
+
   const vaultPromises = userVaults.map(async (vaultEntry: any) => {
     const asset = vaultEntry.asset;
     const vault = vaultEntry.Vault;
@@ -259,13 +263,15 @@ export const getVaults = async (
     );
     const price = BigInt(priceEntry?.value || "0");
     
-    if (!config || !globalState || !vault) {
+    // Only skip if missing essential data (config or vault), but allow missing globalState
+    if (!config || !vault) {
       return null;
     }
     
     // Use the current rate accumulator from the indexed data
     // This is already up-to-date as it's updated on every transaction
-    const currentRateAccumulator = globalState.rateAccumulator;
+    // If no globalState, use default rate accumulator (RAY = 1e27, which means 1:1 scaling)
+    const currentRateAccumulator = globalState?.rateAccumulator || RAY;
     
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
@@ -306,7 +312,7 @@ export const getVaults = async (
       health: getHealthStatus(healthFactor),
       // Raw data for precision calculations
       scaledDebt: scaledDebt.toString(),
-      rateAccumulator: currentRateAccumulator,
+      rateAccumulator: currentRateAccumulator.toString(),
     };
   });
 
@@ -355,13 +361,13 @@ export const getVault = async (
     );
     const price = BigInt(priceEntry?.value || "0");
     
-    if (!config || !globalState || !vault) {
+    if (!config || !vault) {
       return null;
     }
     
     // Use the current rate accumulator from the indexed data
     // This is already up-to-date as it's updated on every transaction
-    const currentRateAccumulator = globalState.rateAccumulator;
+    const currentRateAccumulator = globalState?.rateAccumulator || RAY;
     
     const scaledDebt = BigInt(vault.scaledDebt || "0");
     const currentDebt = (scaledDebt * BigInt(currentRateAccumulator)) / RAY;
@@ -400,7 +406,7 @@ export const getVault = async (
       health: getHealthStatus(healthFactor),
       // Raw data for precision calculations
       scaledDebt: scaledDebt.toString(),
-      rateAccumulator: currentRateAccumulator,
+      rateAccumulator: currentRateAccumulator.toString(),
     };
 };
 
@@ -496,13 +502,13 @@ export const getMaxWithdraw = async (
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
 
-  if (!config || !globalState) {
-    throw new Error("Asset config or global state not found");
+  if (!config) {
+    throw new Error("Asset config not found");
   }
 
   // Calculate current debt (simulating _accrue effect)
   const scaledDebt = BigInt(vault.scaledDebt || "0");
-  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const currentRateAccumulator = BigInt(globalState?.rateAccumulator || RAY);
   const debt = (scaledDebt * currentRateAccumulator) / RAY;
 
   const collateralAmount = BigInt(vault.collateral || "0");
@@ -603,13 +609,13 @@ export const getMaxMint = async (
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
 
-  if (!config || !globalState) {
+  if (!config) {
     throw new Error("Asset config or global state not found");
   }
 
   // Calculate current debt (simulating _accrue effect)
   const scaledDebt = BigInt(vault.scaledDebt || "0");
-  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
+  const currentRateAccumulator = BigInt(globalState?.rateAccumulator || RAY);
   const currentDebt = (scaledDebt * currentRateAccumulator) / RAY;
 
   // Get price from oracle
@@ -651,7 +657,7 @@ export const getMaxMint = async (
 
   // Check debt ceiling constraint
   if (maxAmount > 0n && config.debtCeiling && BigInt(config.debtCeiling) > 0n) {
-    const assetDebtUSD = (BigInt(globalState.totalScaledDebt) * currentRateAccumulator) / RAY;
+    const assetDebtUSD = (BigInt(globalState?.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
     const debtCeiling = BigInt(config.debtCeiling);
     
     if (assetDebtUSD + maxAmount > debtCeiling) {
@@ -702,13 +708,13 @@ export const getAssetDebtInfo = async (
     (s: any) => s.asset.toLowerCase() === body.asset.toLowerCase()
   )?.CollateralGlobalState;
 
-  if (!config || !globalState) {
+  if (!config) {
     throw new Error("Asset config or global state not found");
   }
 
   // Calculate current total debt for this asset
-  const currentRateAccumulator = BigInt(globalState.rateAccumulator);
-  const currentTotalDebt = (BigInt(globalState.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
+  const currentRateAccumulator = BigInt(globalState?.rateAccumulator || RAY);
+  const currentTotalDebt = (BigInt(globalState?.totalScaledDebt || "0") * currentRateAccumulator) / RAY;
 
   return {
     currentTotalDebt: currentTotalDebt.toString(),
@@ -1172,7 +1178,6 @@ export const getBadDebt = async (
   }
 
   try {
-    console.log('Fetching real bad debt data from CDP Engine...');
     
     // Query the badDebt mapping from the CDP Engine contract
     const { data } = await cirrus.get(
@@ -1185,7 +1190,6 @@ export const getBadDebt = async (
       }
     );
 
-    console.log('Raw bad debt data from Cirrus:', data);
 
     if (!data || data.length === 0) {
       console.log('No bad debt entries found on-chain');
@@ -1200,7 +1204,6 @@ export const getBadDebt = async (
       return [];
     }
 
-    console.log(`Found ${nonZeroBadDebtEntries.length} assets with non-zero bad debt, fetching symbols...`);
 
     // Fetch token symbols for each asset with bad debt
     const badDebtEntries: BadDebt[] = [];
@@ -1210,7 +1213,6 @@ export const getBadDebt = async (
       const badDebtAmount = entry.value;
       
       try {
-        console.log(`Fetching symbol for asset: ${assetAddress}`);
         
         // Query the token contract's symbol
         const symbolResponse = await cirrus.get(
@@ -1227,7 +1229,6 @@ export const getBadDebt = async (
         let symbol = "UNKNOWN";
         if (symbolResponse.data && symbolResponse.data.length > 0 && symbolResponse.data[0]._symbol) {
           symbol = symbolResponse.data[0]._symbol;
-          console.log(`Found symbol for ${assetAddress}: ${symbol}`);
         } else {
           console.log(`No symbol found for ${assetAddress}, using UNKNOWN`);
         }
@@ -1250,7 +1251,6 @@ export const getBadDebt = async (
       }
     }
 
-    console.log(`Completed bad debt fetch with symbols:`, badDebtEntries);
     return badDebtEntries;
   } catch (error: any) {
     console.error("Error fetching bad debt from Cirrus:", {
