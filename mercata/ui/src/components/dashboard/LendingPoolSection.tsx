@@ -1,11 +1,13 @@
 import { formatUnits } from "ethers";
-import { CircleArrowDown, CircleArrowUp } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, HelpCircle } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { LENDING_DEPOSIT_FEE, LENDING_WITHDRAW_FEE } from "@/lib/constants";
@@ -25,6 +27,8 @@ const LendingPoolSection = () => {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [stakeMUSDST, setStakeMUSDST] = useState<boolean>(true);
+  const [includeStakedMUSDST, setIncludeStakedMUSDST] = useState<boolean>(false);
   const { toast } = useToast();
 
   const refreshLendingData = (signal?: AbortSignal) => {
@@ -197,6 +201,32 @@ const LendingPoolSection = () => {
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_DEPOSIT_FEE} USDST
                   </div>
+                  {/* Stake mUSDST Checkbox */}
+                  <div className="flex items-center space-x-2 mt-3">
+                    <Checkbox
+                      id="stake-musdst"
+                      checked={stakeMUSDST}
+                      onCheckedChange={(checked) => setStakeMUSDST(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="stake-musdst"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Stake my mUSDST to earn rewards
+                    </label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-sm">
+                          When providing liquidity to the pool, you'll receive equivalent mUSDST tokens.
+                          If this option is enabled, these tokens will be automatically staked in the rewards program.
+                          The longer the tokens are staked, the more rewards they accrue.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                   {/* Fee Warning */}
                   {(() => {
                     const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
@@ -316,6 +346,32 @@ const LendingPoolSection = () => {
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {LENDING_WITHDRAW_FEE} USDST
+                  </div>
+                  {/* Include Staked mUSDST Checkbox */}
+                  <div className="flex items-center space-x-2 mt-3">
+                    <Checkbox
+                      id="include-staked-musdst"
+                      checked={includeStakedMUSDST}
+                      onCheckedChange={(checked) => setIncludeStakedMUSDST(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="include-staked-musdst"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Include staked mUSDST
+                    </label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-sm">
+                          Some of your mUSDST tokens may be staked in the rewards program.
+                          When this option is enabled, you can withdraw assets that were staked as well.
+                          If disabled, only unstaked assets will be eligible for withdrawal.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   {/* Withdraw Amount Warning */}
                   {(() => {
@@ -489,7 +545,7 @@ const LendingPoolSection = () => {
                   <span className="font-medium text-sm sm:text-base">{liquidityInfo?.borrowAPY ? `${liquidityInfo.borrowAPY}%` : "N/A"}</span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST</span>
+                  <span className="text-gray-500 text-sm sm:text-base">Your mUSDST (Total)</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
@@ -497,6 +553,44 @@ const LendingPoolSection = () => {
                       </span>
                     ) : liquidityInfo?.withdrawable?.userBalance ? (
                       formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                  <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
+                  <span className="font-medium text-xs sm:text-sm sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.withdrawable?.userBalance ? (
+                      (() => {
+                        // Mock: 60% of total is staked (this would come from backend)
+                        const totalBalance = BigInt(liquidityInfo.withdrawable.userBalance || "0");
+                        const stakedBalance = (totalBalance * 60n) / 100n;
+                        return formatBalance(stakedBalance.toString(), undefined, 18, 2, 2);
+                      })()
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                  <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
+                  <span className="font-medium text-xs sm:text-sm sm:text-right">
+                    {loadingLiquidity ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : liquidityInfo?.withdrawable?.userBalance ? (
+                      (() => {
+                        // Mock: 40% of total is unstaked (this would come from backend)
+                        const totalBalance = BigInt(liquidityInfo.withdrawable.userBalance || "0");
+                        const unstakedBalance = (totalBalance * 40n) / 100n;
+                        return formatBalance(unstakedBalance.toString(), undefined, 18, 2, 2);
+                      })()
                     ) : (
                       "0.00"
                     )}
