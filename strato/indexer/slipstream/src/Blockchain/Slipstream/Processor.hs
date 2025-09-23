@@ -42,7 +42,7 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
-import Control.Lens ((^.))
+import Control.Lens ((^.), (<&>))
 import Control.Monad (forM, forM_, unless, when)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
@@ -321,21 +321,53 @@ processTheMessages messages = do
 
     forM_ delegatecalls insertDelegatecall
 
-  when (not (null events')) $ do
-    -- Getting event entries that go into the parent abstract tables and event
-    -- array inserts
-    let processedEvents = concatMap getAllEvents events'
-        processedEventArrays = concatMap aggEventToCollectionRows processedEvents
-         -- TODO: Remove arrays once marketplace switches over to using event
-         -- array tables
-        -- processedEventsWithoutArrays = processedEvents
+  let processedEvents = concatMap getAllEvents events'
+      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
 
-    -- Insert the events into the global 'events' table
+  when (not (null events')) $ do
     mapOutput Right . outputData $ pipeInsertGlobalEventTable processedEvents
-    
-    -- If there are processed event arrays, update the foreign keys
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ insertCollectionTable processedEventArrays
+
+  let insertViews = insertsByCodeHash >>= \ins ->
+        let indexView = (\i ->
+              indexTableName
+                (E.creator i)
+                (E.application i)
+                (E.contractName i)
+              ) $ indexInsert ins
+            collViews = (\c ->
+              collectionTableName
+                (creator c)
+                (application c)
+                (contractname c)
+                (collection_name c)
+              ) <$> collectionInserts ins
+         in indexView : collViews
+      eventViews = (\e ->
+        eventTableName
+          (T.pack $ evContractCreator e)
+          (T.pack $ evContractApplication e)
+          (T.pack $ evContractName e)
+          (T.pack $ evName e)
+        ) . eventEvent <$> processedEvents
+      eventArrViews = mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
+        eventCollectionTableName
+          (creator e)
+          (application e)
+          (contractname e)
+          (collection_name e)
+          eName
+        ) processedEventArrays
+      delegateViews = (\Action.Delegatecall{..} ->
+        indexTableName
+          _delegatecallOrganization
+          _delegatecallApplication
+          _delegatecallContractName
+        ) <$> delegatecalls
+      allViews = insertViews ++ eventViews ++ eventArrViews ++ delegateViews
+
+  _ <- mapOutput Right . outputDataDedup $ traverse refreshMaterializedView allViews
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"

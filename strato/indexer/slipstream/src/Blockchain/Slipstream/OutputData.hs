@@ -30,6 +30,7 @@ module Blockchain.Slipstream.OutputData (
   insertIndexTable,
   insertDelegatecall,
   insertCollectionTable,
+  refreshMaterializedView,
   createFkeyFunctions,
   createIndexTable,
   createCollectionTable,
@@ -134,6 +135,7 @@ data SlipstreamQuery = CreateTable TableName TableColumns [Text] (Maybe (Text, T
                      | CreateFkeyFunction TableName TableName Text
                      | UpdateTable TableName (Zip TableColumns [Either Text (Maybe Value)])
                                              (Zip TableColumns [Either Text (Maybe Value)])
+                     | RefreshMaterializedView TableName
                      | NotifyPostgREST
                      deriving (Eq, Ord, Show)
 
@@ -202,7 +204,9 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mUc) = T.concat $
           ]
     _ -> [])
 slipstreamQueryText _ (CreateContractView tableName storageTableName storageCols contractCols cols) = T.concat $
-  [ "CREATE OR REPLACE VIEW "
+  [ "DROP MATERIALIZED VIEW IF EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , "; CREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -247,7 +251,9 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName storageCols
   , "';"
   ]
 slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols keyTypes) = T.concat $
-  [ "CREATE OR REPLACE VIEW "
+  [ "DROP MATERIALIZED VIEW IF EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , "; CREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -292,7 +298,9 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
   , "';"
   ]
 slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) = T.concat $
-  [ "CREATE OR REPLACE VIEW "
+  [ "DROP MATERIALIZED VIEW IF EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , "; CREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -337,7 +345,9 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
   , "';"
   ]
 slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCols keyTypes) = T.concat $
-  [ "CREATE OR REPLACE VIEW "
+  [ "DROP MATERIALIZED VIEW IF EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , "; CREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -501,6 +511,11 @@ slipstreamQueryText _ (UpdateTable tableName updateColsAndVals whereColsAndVals)
               (\((_,t),v) -> either id (fromMaybe "NULL" . (valueToSQLText t =<<)) v)
               <$> whereColsAndVals
           ]
+  , ";"
+  ]
+slipstreamQueryText _ (RefreshMaterializedView tableName) = T.concat
+  [ "REFRESH MATERIALIZED VIEW "
+  , tableNameToDoubleQuoteText tableName
   , ";"
   ]
 slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
@@ -822,6 +837,12 @@ insertCollectionTable maps = do
   -- Processing grouped data with another function if necessary
   let results = concatMap processGroupedData grouped
   yieldMany results
+
+refreshMaterializedView ::
+  OutputM m =>
+  TableName ->
+  ConduitM () SlipstreamQuery m ()
+refreshMaterializedView = yield . RefreshMaterializedView
 
 processGroupedData :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 processGroupedData rows@(row:_) =
