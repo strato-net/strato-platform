@@ -1,7 +1,6 @@
 import { apiGet } from './apiClient';
 import { oauthClient } from './oauth';
 import { logError } from './logger';
-import { healthMonitor } from './healthMonitor';
 import { CONSTANTS } from './constants';
 
 async function fetchVoucherBalance(): Promise<bigint> {
@@ -70,7 +69,6 @@ export async function checkBalances(): Promise<void> {
     // Check if total transactions are below minimum threshold
     if (totalTransactions < CONSTANTS.MIN_TRANSACTIONS_THRESHOLD) {
         const error = `Total possible transactions (${totalTransactions}) below minimum threshold (${CONSTANTS.MIN_TRANSACTIONS_THRESHOLD}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
-        await healthMonitor.appendToErrorFile(error);
         logError('BalanceChecker', new Error(error));
         
         // Exit if critically low (less than 1 transaction possible)
