@@ -5,14 +5,17 @@ FROM base AS deps
 WORKDIR /app
 # Add Python and build tools for native modules (node-gyp) only during dependency installation (required for arm64 builds)
 RUN apk add --no-cache python3 make g++
-COPY package.json package-lock.json ./
+# Copy shared types package first
+COPY packages/shared-types/ ../packages/shared-types/
+COPY ui/package*.json ./
 RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copy UI source code
+COPY ui/ .
 RUN npm run build
 
 # Production image, copy built assets and serve with a lightweight server

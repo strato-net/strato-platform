@@ -14,9 +14,12 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { useNetBalance } from "@/hooks/useNetBalance";
 import MyPoolParticipationSection from "@/components/dashboard/MyPoolParticipationSection";
 import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
+import { useCDP } from "@/context/CDPContext";
+import { useSafetyContext } from "@/context/SafetyContext";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -30,11 +33,22 @@ const Dashboard = () => {
     averageInterestRate, 
   } = useLendingMetrics();
   const { loans } = useLendingContext();
-  const [totalBalance, setTotalBalance] = useState<number>(0)
-  const [cataBalance, setCataBalance] = useState<number>(0);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { loadingLiquidity, liquidityInfo, refreshLoans } = useLendingContext();
-  const { loading: loadingLpTokens, lpTokens, fetchLpTokensPositions } = useSwapContext();
+
+  const { totalCDPDebt } = useCDP();
+  const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
+  const { safetyInfo } = useSafetyContext();
+
+  // Use centralized net balance calculation hook
+  const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
+    tokens,
+    loans,
+    liquidityInfo,
+    totalCDPDebt,
+    safetyInfo
+  });
+
 
   // Add visibility states to prevent flashing
   const [isComponentMounted, setIsComponentMounted] = useState(false);
@@ -49,7 +63,7 @@ const Dashboard = () => {
     // Remove the timeout to prevent loading flash
     fetchTokens();
     refreshLoans();
-    fetchLpTokensPositions();
+    fetchUserPositions();
 
     // Mark data as initialized after a brief delay to ensure proper rendering
     const initTimer = setTimeout(() => {
@@ -74,64 +88,7 @@ const Dashboard = () => {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (!tokens || tokens.length === 0) return;
-
-    let total = 0;
-    let cataTotal = 0;
-
-    // Calculate token deposit values (exact same as AssetsList component)
-    for (let i = 0; i < tokens.length; i++) {
-      const token = tokens[i];
-      const rawPrice = token?.price || "0";
-      const rawBalance = token?.balance || "0";
-      const rawCollateralBalance = token?.collateralBalance || "0";
-      const name = token?._name || "";
-      const symbol = token?._symbol || "";
-
-      // Use exact same calculation as AssetsList component (line 186)
-      if (rawPrice && (rawBalance || rawCollateralBalance)) {
-        const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
-        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
-        
-        // Same calculation as AssetsList: price * (balance + collateralBalance)
-        const totalTokenValue = price * (balance + collateralBalance);
-        total += totalTokenValue;
-
-        if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-          cataTotal += totalTokenValue;
-        }
-      }
-    }
-
-    // Add lending pool value (matching MyPoolParticipationSection display)
-    if ((liquidityInfo?.withdrawable as any)?.withdrawValue) {
-      const lendingPoolValue = parseFloat(formatUnits(BigInt((liquidityInfo.withdrawable as any).withdrawValue), 18));
-      total += lendingPoolValue;
-    }
-
-    // Add LP token values (exact same as MyPoolParticipationSection formatValue function)
-    if (lpTokens && lpTokens.length > 0) {
-      lpTokens.forEach((lpToken) => {
-        if (lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpTokenPrice) {
-          // Use exact same formatValue logic as MyPoolParticipationSection (lines 31-39)
-          const balance = parseFloat(formatUnits(BigInt(lpToken.lpToken.balances[0].balance), 18));
-          const priceValue = parseFloat(formatUnits(BigInt(lpToken.lpTokenPrice), 18));
-          const lpTokenValue = balance * priceValue;
-          total += lpTokenValue;
-        }
-      });
-    }
-
-    const usdstBorrowed = loans?.totalAmountOwed 
-    ? parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18))
-    : 0;
-
-    const netBalance = total - usdstBorrowed;
-    setTotalBalance(netBalance);
-    setCataBalance(cataTotal);
-  }, [tokens, loans, liquidityInfo, lpTokens]);
+  // Net balance calculation is now handled by the useNetBalance hook above
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
@@ -169,11 +126,8 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="Borrowed"
-              value={loans?.totalAmountOwed 
-                ? `${parseFloat(formatUnits((() => { try { const bi = BigInt(loans.totalAmountOwed); return bi <= 1n ? 0n : bi; } catch { return 0n; } })(), 18)).toFixed(2)} USDST`
-                : "0.00 USDST"
-              }
+              title="Total Borrowed"
+              value={`${totalBorrowed.toFixed(2)} USDST`}
               icon={<Shield className="text-white" size={18} />}
               color="bg-orange-500"
             />
@@ -199,10 +153,10 @@ const Dashboard = () => {
 
               <div className="mb-8">
                 <MyPoolParticipationSection 
-                  loadingLpTokens={loadingLpTokens} 
+                  loadingUserPools={loadingUserPools} 
                   loadingLiquidity={loadingLiquidity} 
                   liquidityInfo={liquidityInfo} 
-                  lpTokens={lpTokens}
+                  userPools={userPools}
                   shouldPreventFlash={true}
                 /> 
               </div>

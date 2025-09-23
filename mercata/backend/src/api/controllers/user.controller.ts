@@ -43,12 +43,12 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
+      const { accessToken, address: actorAddress } = req;
       const { userAddress } = req.body;
 
       validateUserAddress(userAddress);
 
-      const result = await addAdmin(accessToken, userAddress);
+      const result = await addAdmin(accessToken, actorAddress as string, userAddress);
       res.status(RestStatus.CREATED).json({ 
         message: "Admin added successfully", 
         userAddress,
@@ -67,12 +67,12 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
+      const { accessToken, address: actorAddress } = req;
       const { userAddress } = req.body;
 
       validateUserAddress(userAddress);
 
-      const result = await removeAdmin(accessToken, userAddress);
+      const result = await removeAdmin(accessToken, actorAddress as string, userAddress);
       res.status(RestStatus.OK).json({ 
         message: "Admin removed successfully", 
         userAddress,
@@ -91,12 +91,12 @@ class UserController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken } = req;
+      const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
 
       validateAddressField(target);
 
-      const result = await castVoteOnIssue(accessToken, target, func, args);
+      const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({ 
         message: "Admin removed successfully", 
         target,

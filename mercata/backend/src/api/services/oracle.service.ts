@@ -4,13 +4,26 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
-import { PriceHistoryEntry, PriceHistoryResponse } from "../../types";
+import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "../../types";
 
 const {
   PriceOracle,
   PriceOracleEvents,
   PriceOracleBatchUpdateEvents,
 } = constants;
+
+export const getOraclePrices = async (
+  accessToken: string,
+  params: Record<string, string> = { select: "asset:key,price:value::text" }
+): Promise<OraclePriceMap> => {
+  const { data: rawPrices } = await cirrus.get(accessToken, `/${PriceOracle}-prices`, { params });
+
+  const prices = rawPrices as OraclePriceEntry[];
+
+  return new Map(
+    prices?.filter((p: OraclePriceEntry) => p.asset && p.price).map((p: OraclePriceEntry) => [p.asset, p.price]) || []
+  );
+};
 
 export const getPrice = async (
   accessToken: string,
@@ -37,6 +50,7 @@ export const getPrice = async (
 
 export const setPrice = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
@@ -44,7 +58,7 @@ export const setPrice = async (
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(PriceOracle),
       contractAddress: priceOracle,
       method: "setAssetPrice",
@@ -52,7 +66,7 @@ export const setPrice = async (
         asset: body.token,
         price: body.price,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

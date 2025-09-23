@@ -10,4 +10,11 @@ export interface PriceHistoryEntry {
 export interface PriceHistoryResponse {
   data: PriceHistoryEntry[];
   totalCount: number;
-} 
+}
+
+export interface OraclePriceEntry {
+  asset: string;
+  price: string;
+}
+
+export type OraclePriceMap = Map<string, string>; 

@@ -21,6 +21,7 @@ router.use("/user", userRoutes);
 
 // ----- Token Routes -----
 router.get("/tokens/balance", authHandler.authorizeRequest(), TokensController.getBalance);
+router.get("/vouchers/balance", authHandler.authorizeRequest(), TokensController.getVoucherBalance);
 router.get("/config", ConfigController.getConfig);
 router.get("/tokens/:address", authHandler.authorizeRequest(true), TokensController.get);
 router.get("/tokens/", authHandler.authorizeRequest(true), TokensController.getAll);
