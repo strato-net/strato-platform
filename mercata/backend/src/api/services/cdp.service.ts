@@ -438,8 +438,9 @@ export const deposit = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -456,13 +457,15 @@ export const withdraw = async (
 
   const amountWei = body.amount;
 
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+  const builtTx = await buildFunctionTx({
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "withdraw",
       args: { asset: body.asset, amount: amountWei },
-    }))
+    }, userAddress, accessToken);
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -563,13 +566,15 @@ export const withdrawMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "withdrawMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "withdrawMax",
-      args: { asset: body.asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -737,13 +742,15 @@ export const mint = async (
   const amountWei = body.amount;
 
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mint",
+    args: { asset: body.asset, amountUSD: amountWei },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mint",
-      args: { asset: body.asset, amountUSD: amountWei },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -758,13 +765,15 @@ export const mintMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mintMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mintMax",
-      args: { asset: body.asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -803,8 +812,10 @@ export const repay = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -843,8 +854,9 @@ export const repayAll = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -887,8 +899,9 @@ export const liquidate = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1090,8 +1103,9 @@ export const setCollateralConfig = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1116,8 +1130,9 @@ export const setAssetPaused = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1141,8 +1156,9 @@ export const setGlobalPaused = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 

@@ -56,12 +56,14 @@ const TransferConfirmationModal = ({
           <div className="border-t pt-4 space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{TRANSFER_FEE} USDST</span>
+              <span className="font-medium">
+                {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher)
+              </span>
             </div>
             <div className="flex justify-between text-sm font-medium border-t pt-2">
               <span>Total</span>
               <span>
-                {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST fee
+                {fromAmount} {fromAsset?.token?._symbol || fromAsset?.token?._name} + {TRANSFER_FEE} USDST ({parseFloat(TRANSFER_FEE) * 100} voucher) fee
               </span>
             </div>
           </div>

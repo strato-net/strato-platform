@@ -120,3 +120,14 @@ export const waitOnCirrus = async (
     hash: statusInfo.hash,
   };
 };
+
+/**
+ * Executes a transaction and returns the result
+ */
+export const executeTransaction = async (accessToken: string, tx: any): Promise<{ status: string; hash: string }> => {
+  const { status, hash } = await postAndWaitForTx(accessToken, () =>
+    bloc.post(accessToken, StratoPaths.transactionParallel, tx)
+  );
+  
+  return { status, hash };
+};

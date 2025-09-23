@@ -29,7 +29,6 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/swap-pools/tokens": "Token Pair Error",
   "/swap-pools/positions": "LP Positions Error",
   "/swap": "Swap Transaction Error",
-  "/swap/quote": "Swap Quote Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
   
   // Bridge operations 

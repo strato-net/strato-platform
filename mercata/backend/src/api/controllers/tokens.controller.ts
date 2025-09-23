@@ -8,6 +8,7 @@ import {
   approveToken,
   transferFromToken,
   setTokenStatus,
+  getVoucherBalance,
 } from "../services/tokens.service";
 import {
   validateAddressArgs,
@@ -82,12 +83,12 @@ class TokensController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, query, address } = req;
+      const { accessToken, query, address: userAddress } = req;
       validateQueryParams(query);
 
       const balances = await getBalance(
         accessToken,
-        address,
+        userAddress,
         query as Record<string, string | undefined>
       );
       res.status(RestStatus.OK).json(balances);
@@ -98,7 +99,7 @@ class TokensController {
 
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
 
       const args = {
         ...body,
@@ -108,7 +109,7 @@ class TokensController {
       };
       validateCreateTokensArgs(args);
 
-      const result = await createToken(accessToken, args);
+      const result = await createToken(accessToken, userAddress as string, args);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -118,10 +119,10 @@ class TokensController {
 
   static async transfer(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateTransferItemArgs(body);
 
-      const result = await transferToken(accessToken, body);
+      const result = await transferToken(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -131,10 +132,10 @@ class TokensController {
 
   static async approve(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateApproveArgs(body);
 
-      const result = await approveToken(accessToken, body);
+      const result = await approveToken(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -144,10 +145,10 @@ class TokensController {
 
   static async transferFrom(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateTransferFromArgs(body);
 
-      const result = await transferFromToken(accessToken, body);
+      const result = await transferFromToken(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
@@ -157,14 +158,29 @@ class TokensController {
 
   static async setStatus(req: Request, res: Response, next: NextFunction) {
     try {
-      const { accessToken, body } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateSetStatusArgs(body);
 
-      const result = await setTokenStatus(accessToken, body);
+      const result = await setTokenStatus(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (e) {
       return next(e);
+    }
+  }
+
+  static async getVoucherBalance(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+
+      const balance = await getVoucherBalance(accessToken, userAddress);
+      res.status(RestStatus.OK).json({ balance });
+    } catch (error) {
+      next(error);
     }
   }
 }

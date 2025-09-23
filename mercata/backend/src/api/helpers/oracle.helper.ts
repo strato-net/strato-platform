@@ -27,8 +27,8 @@ export const createCompletePriceMap = async (
       const tokenBPrice = priceMap.get(pool.tokenB?.address) || 0;
       
       const lpTokenPrice = calculateLPTokenPrice(
-        pool.tokenABalance || "0",
-        pool.tokenBBalance || "0",
+        pool.tokenA.poolBalance || "0",
+        pool.tokenB.poolBalance || "0",
         tokenAPrice.toString(),
         tokenBPrice.toString(),
         pool.lpToken._totalSupply

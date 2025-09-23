@@ -9,20 +9,13 @@ import { formatUnits } from "ethers";
 import { useState } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import LPTokenDropdown from "./LPTokenDropdown";
-
-interface PoolParticipationProps {
-  liquidityInfo: any;
-  loadingLiquidity: any;
-  lpTokens: any;
-  loadingLpTokens: any;
-  shouldPreventFlash?: boolean;
-}
+import { PoolParticipationProps } from "@/interface";
 
 export default function MyPoolParticipationSection({ 
   liquidityInfo, 
   loadingLiquidity, 
-  lpTokens, 
-  loadingLpTokens,
+  userPools, 
+  loadingUserPools,
   shouldPreventFlash = false
 }: PoolParticipationProps) {
   
@@ -49,7 +42,7 @@ export default function MyPoolParticipationSection({
   };
 
   // Don't show loading indicator immediately if shouldPreventFlash is true
-  const shouldShowLoading = (loadingLiquidity || loadingLpTokens) && !shouldPreventFlash;
+  const shouldShowLoading = (loadingLiquidity || loadingUserPools) && !shouldPreventFlash;
 
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
@@ -96,10 +89,10 @@ export default function MyPoolParticipationSection({
             ) : null}
 
             {/* LP Token Rows */}
-            {lpTokens.length > 0 ? (
+            {userPools.length > 0 ? (
               <div className="space-y-2">
-                {lpTokens.map((lpToken, idx) => {
-                  const tokenAddress = lpToken?.lpToken?.address || `token-${idx}`;
+                {userPools.map((userPool, idx) => {
+                  const tokenAddress = userPool?.lpToken?.address || `token-${idx}`;
                   const isExpanded = expandedTokens.has(tokenAddress);
                   
                   return (
@@ -110,7 +103,7 @@ export default function MyPoolParticipationSection({
                         onClick={() => toggleTokenExpansion(tokenAddress)}
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-gray-700">{lpToken.lpToken._name}</span>
+                          <span className="font-semibold text-gray-700">{userPool.lpToken._name}</span>
                           {isExpanded ? (
                             <ChevronUp className="h-4 w-4 text-gray-500" />
                           ) : (
@@ -118,23 +111,23 @@ export default function MyPoolParticipationSection({
                           )}
                         </div>
                         <div className="text-center font-semibold text-gray-900">
-                          {lpToken?.lpToken?.balances[0]?.balance
-                            ? formatBalance(lpToken?.lpToken?.balances[0]?.balance,undefined,18,2,2)
+                          {userPool?.lpToken?.balance
+                            ? formatBalance(userPool?.lpToken?.balance,undefined,18,2,2)
                             : "0.00"}
                         </div>
                         <div className="text-center font-semibold text-gray-900">
-                          {lpToken?.apy ? `${lpToken.apy}%` : "N/A"}
+                          {userPool?.apy ? `${userPool.apy}%` : "N/A"}
                         </div>
                         <div className="text-right font-medium text-gray-900">
-                          {lpToken?.lpToken?._totalSupply
-                            ? `$${formatValue(lpToken?.lpToken?.balances[0].balance, lpToken?.lpTokenPrice)}`
+                          {userPool?.lpToken?._totalSupply
+                            ? `$${formatValue(userPool?.lpToken?.balance, userPool?.lpToken?.price)}`
                             : "$0.00"}
                         </div>
                       </div>
                       
                       {/* Dropdown with detailed breakdown */}
                       <LPTokenDropdown
-                        lpToken={lpToken}
+                        lpToken={userPool}
                         className="mb-2"
                         isExpanded={isExpanded}
                       />
@@ -142,7 +135,7 @@ export default function MyPoolParticipationSection({
                   );
                 })}
               </div>
-            ) : !liquidityInfo?.withdrawable && Array.isArray(lpTokens) && lpTokens.length === 0 ? (
+            ) : !liquidityInfo?.withdrawable && Array.isArray(userPools) && userPools.length === 0 ? (
               <div className="p-2 flex justify-center text-gray-500">No LP tokens found</div>
             ) : null}
           </>

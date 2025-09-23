@@ -66,12 +66,12 @@ smd:
 
 mercata-backend:
 	@echo Now building mercata-backend...
-	docker build -t ${REPO_URL}mercata-backend:${VERSION} ./mercata/backend
+	docker build -t ${REPO_URL}mercata-backend:${VERSION} -f ./mercata/backend/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-backend:${VERSION} ${REPO_AWS_ECR_URL}mercata-backend:${VERSION}
     	
 mercata-ui:
 	@echo Now building mercata-ui...
-	docker build -t ${REPO_URL}mercata-ui:${VERSION} ./mercata/ui
+	docker build -t ${REPO_URL}mercata-ui:${VERSION} -f ./mercata/ui/Dockerfile ./mercata
 	docker tag ${REPO_URL}mercata-ui:${VERSION} ${REPO_AWS_ECR_URL}mercata-ui:${VERSION}
 
 mercata-bridge:
