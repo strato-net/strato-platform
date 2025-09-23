@@ -24,10 +24,10 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-RUN npm ci --omit=dev
+# TODO: fix this hack - include the @shared as a runtime dependency, but omit the dev deps with npm ci --omit=dev
+COPY --from=builder packages/shared-types/ ../packages/shared-types/
 
-# TODO: fix this hack - include the @shared as runtime dep without rebuilding, but omit the dev deps still
-COPY --from=builder /build/node_modules/@shared/ ./node_modules/@shared/
+RUN npm ci
 
 COPY --from=builder /build/dist ./dist
 
