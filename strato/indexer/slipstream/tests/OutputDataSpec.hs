@@ -51,7 +51,7 @@ createInserts :: OutputM m
 createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    insertIndexTable $ (a,[])
+    insertIndexTable a
     -- insertHistoryTable $ [a]
 
 createInsertsCollection :: OutputM m
@@ -586,7 +586,7 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
      
 
     (_, cs1) <- runLoggingT . runConduit $ createIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
-    cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input) .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do

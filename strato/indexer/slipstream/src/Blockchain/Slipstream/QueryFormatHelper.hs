@@ -9,6 +9,15 @@ import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 
+data SqlType = SqlBool | SqlDecimal | SqlText | SqlJsonb | SqlSerial deriving (Eq, Ord, Show)
+
+sqlTypePostgres :: SqlType -> Text
+sqlTypePostgres SqlBool    = "bool"
+sqlTypePostgres SqlDecimal = "decimal"
+sqlTypePostgres SqlText    = "text"
+sqlTypePostgres SqlJsonb   = "jsonb"
+sqlTypePostgres SqlSerial  = "serial"
+
 -- TODO: Refactor this type before someone external sees it
 data TableName
   = IndexTableName
@@ -47,7 +56,7 @@ data TableName
       }
   deriving (Show, Eq, Ord)
 
-type TableColumns = [T.Text]
+type TableColumns = [(T.Text, SqlType)]
 
 tshow :: Show a => a -> T.Text
 tshow = T.pack . show
@@ -76,11 +85,17 @@ wrapParens = wrap "(" ")"
 wrapAndEscape :: [T.Text] -> T.Text
 wrapAndEscape = wrapParens . csv
 
+wrapEscapeSingle :: T.Text -> T.Text
+wrapEscapeSingle = wrapSingleQuotes . escapeSingleQuotes
+
+wrapEscapeDouble :: T.Text -> T.Text
+wrapEscapeDouble = wrapDoubleQuotes . escapeDoubleQuotes
+
 wrapAndEscapeSingle :: [T.Text] -> T.Text
-wrapAndEscapeSingle = wrapParens . csv . map (wrapSingleQuotes . escapeSingleQuotes)
+wrapAndEscapeSingle = wrapParens . csv . map wrapEscapeSingle
 
 wrapAndEscapeDouble :: [T.Text] -> T.Text
-wrapAndEscapeDouble = wrapParens . csv . map (wrapDoubleQuotes . escapeDoubleQuotes)
+wrapAndEscapeDouble = wrapParens . csv . map wrapEscapeDouble
 
 unwrapDoubleQuotes :: T.Text -> T.Text
 unwrapDoubleQuotes = T.dropAround (== '"')
