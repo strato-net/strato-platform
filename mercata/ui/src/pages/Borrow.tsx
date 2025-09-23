@@ -204,12 +204,7 @@ const Borrow = () => {
           variant: "success",
         });
       } else {
-        const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
-        let amountInWei = safeParseUnits(amount || "0");
-        if (amountInWei > totalOwedWei) {
-          amountInWei = totalOwedWei;
-        }
-        const res = await repayLoanFn({ amount: amountInWei.toString() } as any);
+        const res = await repayLoanFn({ amount: safeParseUnits(amount).toString() } as any);
         const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent)) : amount;
         toast({
           title: "Success",
@@ -258,6 +253,7 @@ const Borrow = () => {
                       borrowLoading={borrowLoading}
                       onBorrow={executeEmbeddedBorrow}
                       usdstBalance={usdstBalance}
+                      voucherBalance={voucherBalance}
                       collateralInfo={eligibleCollateral}
                       startPolling={startPolling}
                       stopPolling={stopPolling}
@@ -269,6 +265,7 @@ const Borrow = () => {
                       repayLoading={repayLoading}
                       onRepay={executeEmbeddedRepay}
                       usdstBalance={usdstBalance}
+                      voucherBalance={voucherBalance}
                     />
                   </TabsContent>
                 </Tabs>

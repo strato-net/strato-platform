@@ -192,18 +192,12 @@ const CollateralModal = ({
     return amountWei > 0n && amountWei <= BigInt(maxAmount);
   };
 
-  const isFeeSufficient = () => {
-    const feeAmount = safeParseUnits(transactionFee);
-    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-    return usdstBalanceBigInt >= feeAmount;
-  };
-
   const isDisabled = () => {
     return (
       safeParseUnits(amount || "0") === 0n ||
       loading ||
       !isAmountValid() ||
-      !isFeeSufficient() ||
+      !!feeError ||
       (!isSupply && !healthImpact.isHealthy)
     );
   };
