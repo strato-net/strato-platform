@@ -6,21 +6,14 @@ WORKDIR /app
 # Add Python and build tools for native modules (node-gyp) only during dependency installation (required for arm64 builds)
 RUN apk add --no-cache python3 make g++
 # Copy shared types package first
-COPY packages/shared-types/ ./packages/shared-types/
-# Build shared types package
-WORKDIR /app/packages/shared-types
-RUN npm ci && npm run build
-# Copy UI package files
-WORKDIR /app
-COPY ui/package.json ui/package-lock.json ./
+COPY packages/shared-types/ ../packages/shared-types/
+COPY ui/package*.json ./
 RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-# Copy shared types package
-COPY packages/shared-types/ ./packages/shared-types/
 # Copy UI source code
 COPY ui/ .
 RUN npm run build
