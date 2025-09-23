@@ -2,23 +2,23 @@ import React, { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
-import { cdpService, JuniorNote } from "@/services/cdpService";
+import { cdpService, JuniorNote as JuniorNoteType } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import CopyableHash from "../common/CopyableHash";
 
 
-interface UserJuniorNote extends JuniorNote {
+interface UserJuniorNote extends JuniorNoteType {
   claimableAmount: string;       // Currently claimable amount in wei (18 decimals) - calculated from backend data
 }
 
-interface JuniorNotesListProps {
+interface JuniorNoteProps {
   refreshTrigger?: number;
   onNoteActionSuccess?: () => void;
 }
 
-const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNoteActionSuccess }) => {
+const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuccess }) => {
   const [note, setNote] = useState<UserJuniorNote | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -29,8 +29,8 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
   const [showClaimButton, setShowClaimButton] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
 
-  // Fetch junior notes from backend
-  const fetchJuniorNotes = useCallback(async (showRefreshing = false) => {
+  // Fetch junior note from backend
+  const fetchJuniorNote = useCallback(async (showRefreshing = false) => {
     if (!userAddress) {
       setLoading(false);
       setRefreshing(false);
@@ -63,10 +63,10 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
       setActionLoading(false);
       
     } catch (error) {
-      console.error("Failed to fetch junior notes:", error);
+      console.error("Failed to fetch junior note:", error);
       toast({
         title: "Error",
-        description: "Failed to load junior notes. Please try again.",
+        description: "Failed to load junior note. Please try again.",
         variant: "destructive",
       });
       setNote(null);
@@ -115,8 +115,8 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
       // Hide claim button after successful action
       setShowClaimButton(false);
       
-      // Refresh notes data
-      await fetchJuniorNotes();
+      // Refresh note data
+      await fetchJuniorNote();
       
       // Call the callback to refresh other components
       if (onNoteActionSuccess) {
@@ -137,11 +137,11 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
 
 
   useEffect(() => {
-    fetchJuniorNotes();
-  }, [refreshTrigger, fetchJuniorNotes]);
+    fetchJuniorNote();
+  }, [refreshTrigger, fetchJuniorNote]);
 
   const handleRefresh = () => {
-    fetchJuniorNotes(true);
+    fetchJuniorNote(true);
   };
 
   if (loading) {
@@ -233,4 +233,4 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
   );
 };
 
-export default JuniorNotesList;
+export default JuniorNote;

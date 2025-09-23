@@ -2,15 +2,15 @@ import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import OpenJuniorNoteWidget from "./OpenJuniorNoteWidget";
-import JuniorNotesList from "./JuniorNotesList";
+import JuniorNote from "./JuniorNote";
 import { BadDebt } from "@/services/cdpService";
 
-interface JuniorNotesViewProps {
+interface JuniorNoteViewProps {
   badDebtData: BadDebt[];
   onBadDebtUpdate?: () => void; // Callback to refresh bad debt data
 }
 
-const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData, onBadDebtUpdate }) => {
+const JuniorNoteView: React.FC<JuniorNoteViewProps> = ({ badDebtData, onBadDebtUpdate }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Convert BadDebt array to Record<string, string> format for easier lookup
@@ -66,7 +66,7 @@ const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData, onBadDeb
         </TabsList>
         
         <TabsContent value="claim" className="space-y-4">
-          <JuniorNotesList 
+          <JuniorNote 
             refreshTrigger={refreshTrigger}
             onNoteActionSuccess={handleNoteActionSuccess}
           />
@@ -138,4 +138,4 @@ const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData, onBadDeb
   );
 };
 
-export default JuniorNotesView;
+export default JuniorNoteView;
