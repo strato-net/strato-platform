@@ -1180,12 +1180,13 @@ export const getBadDebt = async (
   try {
     
     // Query the badDebt mapping from the CDP Engine contract
+    // Use ::text to force Cirrus to return large numbers as strings instead of scientific notation
     const { data } = await cirrus.get(
       accessToken,
       `/${CDPEngine}-badDebtUSDST`,
       {
         params: {
-          select: "key,value"
+          select: "key,value::text"
         }
       }
     );
