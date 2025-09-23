@@ -353,7 +353,7 @@ export const calculateTotalCollateralValue = (
       const collateralValue = (
         totalAssetCollateral * 
         toBig(price)
-      ) / (DECIMALS * 10000n);
+      ) / (DECIMALS);
       totalValue += collateralValue;
     }
   }

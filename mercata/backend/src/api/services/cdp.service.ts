@@ -426,8 +426,9 @@ export const deposit = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -444,13 +445,15 @@ export const withdraw = async (
 
   const amountWei = body.amount;
 
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
+  const builtTx = await buildFunctionTx({
       contractName: extractContractName(CDPEngine),
       contractAddress: registry.cdpEngine.address,
       method: "withdraw",
       args: { asset: body.asset, amount: amountWei },
-    }))
+    }, userAddress, accessToken);
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -551,13 +554,15 @@ export const withdrawMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "withdrawMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "withdrawMax",
-      args: { asset: body.asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -725,13 +730,15 @@ export const mint = async (
   const amountWei = body.amount;
 
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mint",
+    args: { asset: body.asset, amountUSD: amountWei },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mint",
-      args: { asset: body.asset, amountUSD: amountWei },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -746,13 +753,15 @@ export const mintMax = async (
     throw new Error("CDP Engine not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(CDPEngine),
+    contractAddress: registry.cdpEngine.address,
+    method: "mintMax",
+    args: { asset: body.asset },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(CDPEngine),
-      contractAddress: registry.cdpEngine.address,
-      method: "mintMax",
-      args: { asset: body.asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -791,8 +800,10 @@ export const repay = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -831,8 +842,9 @@ export const repayAll = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -875,8 +887,9 @@ export const liquidate = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1009,59 +1022,23 @@ export const getMaxLiquidatable = async (
     return { maxAmount: "0" };
   }
 
-  // Get asset config
-  const config = registry.cdpEngine.collateralConfigs?.find(
-    (c: any) => c.asset.toLowerCase() === body.collateralAsset.toLowerCase()
-  )?.CollateralConfig;
-
+  // Get global state to calculate full debt amount
   const globalState = registry.cdpEngine.collateralGlobalStates?.find(
     (s: any) => s.asset.toLowerCase() === body.collateralAsset.toLowerCase()
   )?.CollateralGlobalState;
 
-  if (!config || !globalState) {
-    throw new Error("Asset configuration not found");
+  if (!globalState) {
+    throw new Error("Asset global state not found");
   }
 
-  // Get price
-  const priceEntry = registry.priceOracle?.prices?.find(
-    (p: any) => p.asset.toLowerCase() === body.collateralAsset.toLowerCase()
-  );
-  const price = BigInt(priceEntry?.value || "0");
-  
-  if (price <= 0n) {
-    throw new Error("Invalid asset price");
-  }
-
-  // Calculate max liquidation amount based on contract constraints
-  // This simulates the liquidate function logic from CDPEngine.sol
-  
+  // Return the full debt amount instead of calculating constraints
+  // The smart contract will safely handle all capping logic (debt, close factor, coverage)
+  // This eliminates frontend dust calculation issues
   const rateAccumulator = BigInt(globalState.rateAccumulator);
   const scaledDebt = BigInt(vaultData.scaledDebt);
-  const collateralAmount = BigInt(vaultData.collateralAmount);
-  const unitScale = BigInt(config.unitScale);
-  
-  // Calculate total debt in USD
   const totalDebtUSD = (scaledDebt * rateAccumulator) / RAY;
   
-  // Calculate close factor cap (max % of debt that can be liquidated)
-  const closeFactorCap = (totalDebtUSD * BigInt(config.closeFactorBps)) / 10000n;
-  
-  // Calculate collateral value in USD
-  const collateralUSD = (collateralAmount * price) / unitScale;
-  
-  // Calculate coverage cap (ensure collateral can cover repay + penalty)
-  const coverageCap = (collateralUSD * 10000n) / (10000n + BigInt(config.liquidationPenaltyBps));
-  
-  // Max liquidation amount is the minimum of all constraints
-  let maxAmount = totalDebtUSD;
-  if (maxAmount > closeFactorCap) maxAmount = closeFactorCap;
-  if (maxAmount > coverageCap) maxAmount = coverageCap;
-  
-  // Ensure we don't return more than available
-  if (maxAmount > totalDebtUSD) maxAmount = totalDebtUSD;
-  if (maxAmount < 0n) maxAmount = 0n;
-  
-  return { maxAmount: maxAmount.toString() };
+  return { maxAmount: totalDebtUSD.toString() };
 };
 
 // ----- Admin Service Methods (Owner Only) -----
@@ -1114,8 +1091,9 @@ export const setCollateralConfig = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1140,8 +1118,9 @@ export const setAssetPaused = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
@@ -1165,8 +1144,9 @@ export const setGlobalPaused = async (
     },
   };
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 

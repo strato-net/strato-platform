@@ -133,7 +133,7 @@ export function validateSwapHistoryArgs(args: any) {
 
 export function validateSetPoolRatesArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
     swapFeeRate: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
     lpSharePercent: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
   });

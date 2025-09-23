@@ -1,136 +1,61 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { LiquidityPool, SwappableToken, SwapHistoryEntry, SetPoolRatesData } from '@/interface';
+import { Pool, SwapHistoryEntry, SetPoolRatesParams, SwapToken, SwapContextType } from '@/interface';
 import {api} from '@/lib/axios';
 
-type SwapContextType = {
-  swappableTokens: SwappableToken[];
-  pairableTokens: SwappableToken[];
-  loading: boolean;
-  error: string | null;
-  // Current swap state
-  fromAsset: SwappableToken | undefined;
-  toAsset: SwappableToken | undefined;
-  pool: LiquidityPool | null;
-  setFromAsset: (asset: SwappableToken | undefined) => void;
-  setToAsset: (asset: SwappableToken | undefined) => void;
-  setPool: (pool: LiquidityPool | null) => void;
-  // Functions
-  refetchSwappableTokens: () => void;
-  fetchPairableTokens: (tokenAddress: string) => void;
-  createPool: (data: { tokenA: string; tokenB: string }) => Promise<void>;
-  calculateSwap: (params: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-    reverse?: boolean;
-    signal?: AbortSignal;
-  }) => Promise<string>;
-  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<LiquidityPool>;
-  getPoolByAddress: (address: string) => Promise<LiquidityPool>;
-  swap: (data: {  
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-    minAmountOut: string;
-  }) => Promise<void>;
-  fetchPools: () => Promise<LiquidityPool[]>;
-  addLiquidityDualToken: (data: {
-    poolAddress: string;
-    tokenBAmount: string;
-    maxTokenAAmount: string;
-  }) => Promise<void>;
-  addLiquiditySingleToken: (data: {
-    poolAddress: string;
-    singleTokenAmount: string;
-    isAToB: boolean;
-  }) => Promise<void>;
+// ============================================================================
+// TYPES
+// ============================================================================
 
-  removeLiquidity: (data: {
-    poolAddress: string;
-    lpTokenAmount: string;
-  }) => Promise<void>;
-  fetchTokenBalances: (pool: LiquidityPool, userAddress: string, usdstAddress: string) => Promise<{
-    tokenABalance: string;
-    tokenBBalance: string;
-    usdstBalance: string;
-  }>;
-  getTokenBalance: (tokenAddress: string) => Promise<string>;
-  enrichPools: (pools: LiquidityPool[]) => LiquidityPool[];
-  lpTokens: LiquidityPool[]
-  fetchLpTokensPositions: () => Promise<void>;
-  fetchSwapHistory: (poolAddress: string, params?: Record<string, string>) => Promise<{ data: SwapHistoryEntry[]; totalCount: number }>;
-  refreshSwapHistory: (params?: Record<string, string>) => Promise<void>;
-  swapHistory: SwapHistoryEntry[];
-  swapHistoryCount: number;
-  swapHistoryLoading: boolean;
-  isTransitioning: boolean;
-  setPoolRates: (data: SetPoolRatesData) => Promise<void>;
-};
+// SwapContextType is now imported from @/interface
 
 const SwapContext = createContext<SwapContextType | undefined>(undefined);
 
 export const SwapProvider = ({ children }: { children: ReactNode }) => {
-  const [swappableTokens, setSwappableTokens] = useState<SwappableToken[]>([]);
-  const [pairableTokens, setPairableTokens] = useState<SwappableToken[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+  // ============================================================================
+  // STATE
+  // ============================================================================
+  
+  // Token data
+  const [swappableTokens, setSwappableTokens] = useState<SwapToken[]>([]);
+  const [pairableTokens, setPairableTokens] = useState<SwapToken[]>([]);
+  const [userPools, setUserPools] = useState<Pool[]>([]);
+  
+  // Loading states
+  const [loading, setLoading] = useState<boolean>(false); // For POST operations
+  const [tokensLoading, setTokensLoading] = useState<boolean>(false);
+  const [pairablesLoading, setPairablesLoading] = useState<boolean>(false);
+  const [poolsLoading, setPoolsLoading] = useState<boolean>(false);
+  const [poolLoading, setPoolLoading] = useState<boolean>(false); // For live pool fetch/poll only
+  const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
+  
+  // Error state
   const [error, setError] = useState<string | null>(null);
-  const [lpTokens, setLpTokens] = useState<LiquidityPool[]>([])
+  
   // Current swap state
-  const [fromAsset, setFromAsset] = useState<SwappableToken | undefined>();
-  const [toAsset, setToAsset] = useState<SwappableToken | undefined>();
-  const [pool, setPool] = useState<LiquidityPool | null>(null);
+  const [fromAsset, setFromAsset] = useState<SwapToken | undefined>();
+  const [toAsset, setToAsset] = useState<SwapToken | undefined>();
+  const [pool, setPool] = useState<Pool | null>(null);
+  
+  // Swap history
   const [swapHistory, setSwapHistory] = useState<SwapHistoryEntry[]>([]);
   const [swapHistoryCount, setSwapHistoryCount] = useState(0);
-  const [swapHistoryLoading, setSwapHistoryLoading] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  const [lastHistoryPoolAddress, setLastHistoryPoolAddress] = useState<string | null>(null);
 
-  // refs to track current requests and prevent stale updates
+  // ============================================================================
+  // REFS
+  // ============================================================================
   const currentAssetPairRef = useRef<string>('');
   const historyAbortControllerRef = useRef<AbortController | null>(null);
 
-  // Handle asset transitions
+  // ============================================================================
+  // EFFECTS
+  // ============================================================================
+  
+  // Clear refs when pool changes
   useEffect(() => {
-    if (fromAsset?.address && toAsset?.address) {
-      const newAssetPair = `${fromAsset.address}-${toAsset.address}`;
-      currentAssetPairRef.current = newAssetPair;
-
-      if (historyAbortControllerRef.current) {
-        historyAbortControllerRef.current.abort();
-        historyAbortControllerRef.current = null;
-      }
-
-      setIsTransitioning(true);
-      setPool(null);                     // ✅ Clear pool immediately to prevent stale data
-      setSwapHistory([]);
-      setSwapHistoryCount(0);
-      setSwapHistoryLoading(false);
-      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
-    } else {
-      // If no assets selected, not transitioning
+    if (!pool?.address) {
       currentAssetPairRef.current = '';
-
-      // Cancel any ongoing history requests
-      if (historyAbortControllerRef.current) {
-        historyAbortControllerRef.current.abort();
-        historyAbortControllerRef.current = null;
-      }
-
-      setIsTransitioning(false);
-      setPool(null);
-      setSwapHistory([]);
-      setSwapHistoryCount(0);
-      setSwapHistoryLoading(false);
-      setLastHistoryPoolAddress(null);  // ✅ Clear history pool tracking
     }
-  }, [fromAsset?.address, toAsset?.address]);
-
-  // Clear transitioning state when we have pool and history fetch is complete
-  useEffect(() => {
-    if (isTransitioning && pool?.address && fromAsset?.address && toAsset?.address && !swapHistoryLoading && lastHistoryPoolAddress === pool.address) {
-      setIsTransitioning(false);
-    }
-  }, [isTransitioning, pool?.address, fromAsset?.address, toAsset?.address, swapHistoryLoading, lastHistoryPoolAddress, swapHistory.length]);
+  }, [pool?.address]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -141,89 +66,127 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
+  // ============================================================================
+  // FUNCTIONS
+  // ============================================================================
+  
+  // Token fetching
   const fetchSwappableTokens = useCallback(async () => {
-    setLoading(true);
+    setTokensLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>('/swap-pools/tokens');
+      const res = await api.get<SwapToken[]>('/swap-pools/tokens');
       setSwappableTokens(res.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch swappable tokens');
     } finally {
-      setLoading(false);
+      setTokensLoading(false);
     }
   }, []);
 
-  const fetchPairableTokens = useCallback(async (tokenAddress: string) => {
-    if (!tokenAddress) return;
+  const fetchPairableTokens = useCallback(async (tokenAddress: string): Promise<SwapToken[]> => {
+    if (!tokenAddress) return [];
 
-    setLoading(true);
+    setPairablesLoading(true);
     setError(null);
     try {
-      const res = await api.get<SwappableToken[]>(`/swap-pools/tokens/${tokenAddress}`);
-      setPairableTokens(res.data || []);
+      const res = await api.get<SwapToken[]>(`/swap-pools/tokens/${tokenAddress}`);
+      const tokens = res.data || [];
+      setPairableTokens(tokens);
+      return tokens;
     } catch (err) {
       setError(err.response?.data?.message || err.message || 'Failed to fetch pairable tokens');
+      return [];
     } finally {
-      setLoading(false);
+      setPairablesLoading(false);
     }
   }, []);
 
+  // Pool operations
   const createPool = useCallback(async (data: { tokenA: string; tokenB: string }) => {
     setLoading(true);
-    setError(null);
     try {
       await api.post('/swap-pools', data);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to create pool');
-      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const calculateSwap = useCallback(async ({
-    poolAddress,
-    isAToB,
-    amountIn,
-    reverse = false,
-    signal
-  }: {
-    poolAddress: string;
-    isAToB: boolean;
-    amountIn: string;
-    reverse?: boolean;
-    signal?: AbortSignal;
-  }) => {
-    const { data } = await api.get(
-      `/swap/quote?poolAddress=${poolAddress}&isAToB=${isAToB}&amountIn=${amountIn}&reverse=${reverse}`,
-      { signal }
-    );
-    return data;
-  }, []); 
-
   const getPoolByTokenPair = useCallback(async (tokenA: string, tokenB: string, signal?: AbortSignal) => {
-    const res = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
-    return res.data?.[0] || null;
-  }, []);
+    setPoolLoading(true);
+    try {
+      const { data } = await api.get(`/swap-pools/${tokenA}/${tokenB}`, { signal });
+      const poolData: Pool | null = data?.[0] || null;
+      if (!poolData) return null;
+
+      setPool(poolData);
+
+      const read = (addr?: string) => {
+        if (!addr) return { balance: "0", poolBalance: "0", price: "0" };
+        const token = poolData.tokenA?.address === addr ? poolData.tokenA : poolData.tokenB?.address === addr ? poolData.tokenB : null;
+        return token ? { balance: token.balance || "0", poolBalance: token.poolBalance || "0", price: token.price || "0" } : { balance: "0", poolBalance: "0", price: "0" };
+      };
+
+      setFromAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+      setToAsset(prev => prev ? { ...prev, ...read(prev.address) } : prev);
+
+      return poolData;
+    } finally {
+      setPoolLoading(false);
+    }
+  }, [setPool, setFromAsset, setToAsset]);
 
   const getPoolByAddress = useCallback(async (address: string) => {
-    const res = await api.get(`/swap-pools/${address}`);
-    return res.data || null;
+    try {
+      const res = await api.get(`/swap-pools/${address}`);
+      return res.data || null;
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch pool by address');
+      return null;
+    }
   }, []);
 
+  const setPoolRates = useCallback(async (data: SetPoolRatesParams) => {
+    setLoading(true);
+    try {
+      const response = await api.post('/swap-pools/set-rates', data);
+      return response.data;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchUserPositions = useCallback(async () => {
+    setPoolsLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/swap-pools/positions');
+      setUserPools(res?.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch LP positions');
+    } finally {
+      setPoolsLoading(false);
+    }
+  }, []);
+
+  // Swap operations
   const swap = useCallback(async (data: {
     poolAddress: string;
     isAToB: boolean;
     amountIn: string;
     minAmountOut: string;
   }) => {
-    const res = await api.post("/swap", data);
-    return res.data;
+    setLoading(true);
+    try {
+      const res = await api.post("/swap", data);
+      return res.data;
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const fetchPools = useCallback(async () => {
-    setLoading(true);
+    setPoolsLoading(true);
     setError(null);
     try {
       const res = await api.get('/swap-pools');
@@ -232,26 +195,23 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
       setError(err.response?.data?.message || err.message || 'Failed to fetch LP tokens');
       return [];
     } finally {
-      setLoading(false);
+      setPoolsLoading(false);
     }
   }, []);
 
+  // Liquidity operations
   const addLiquidityDualToken = useCallback(async (data: {
     poolAddress: string;
     tokenBAmount: string;
     maxTokenAAmount: string;
   }) => {
     setLoading(true);
-    setError(null);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity`, {
         tokenBAmount: data.tokenBAmount,
         maxTokenAAmount: data.maxTokenAAmount
       });
       return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to add dual token liquidity');
-      throw err;
     } finally {
       setLoading(false);
     }
@@ -263,43 +223,34 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     isAToB: boolean;
   }) => {
     setLoading(true);
-    setError(null);
     try {
       const response = await api.post(`/swap-pools/${data.poolAddress}/liquidity/single`, {
         singleTokenAmount: data.singleTokenAmount,
         isAToB: data.isAToB
       });
       return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to add single token liquidity');
-      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
-
-
 
   const removeLiquidity = useCallback(async (data: {
     poolAddress: string;
     lpTokenAmount: string;
   }) => {
     setLoading(true);
-    setError(null);
     try {
       const response = await api.delete(`/swap-pools/${data.poolAddress}/liquidity`, {
         data: { lpTokenAmount: data.lpTokenAmount }
       });
       return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to remove liquidity');
-      throw err;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const fetchTokenBalances = useCallback(async (pool: LiquidityPool, _userAddress: string, usdstAddress: string) => {
+  // Utility functions
+  const fetchTokenBalances = useCallback(async (pool: Pool, _userAddress: string, usdstAddress: string) => {
     const [balanceA, balanceB, balanceUsdst] = await Promise.all([
       api.get(`/tokens/balance?address=eq.${pool.tokenA.address}`),
       api.get(`/tokens/balance?address=eq.${pool.tokenB.address}`),
@@ -313,118 +264,64 @@ export const SwapProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  const getTokenBalance = useCallback(async (tokenAddress: string) => {
-    const res = await api.get(`/tokens/balance?address=eq.${tokenAddress}`);
-    return res.data[0]?.balance || "0";
-  }, []);
-
-  const fetchLpTokensPositions = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await api.get('/swap-pools/positions')
-      setLpTokens(res?.data || [])
-    } finally {
-      setLoading(false)
-    }
-  },[]);
-
-  const enrichPools = useCallback((pools: LiquidityPool[]) => {
-    return pools.map((pool: LiquidityPool) => ({
-      ...pool,
-      _name: `${pool.tokenA._name}/${pool.tokenB._name}`,
-      _symbol: `${pool.tokenA._symbol}/${pool.tokenB._symbol}`,
-    }));
-  }, []);
-
- const fetchSwapHistory = useCallback(async (poolAddress: string, params?: Record<string, string>): Promise<{ data: SwapHistoryEntry[]; totalCount: number }> => {
-  if (!poolAddress) return { data: [], totalCount: 0 };
-
-    // Fetch swap history with total count from the updated backend service
-  const response = await api.get(`/swap-history/${poolAddress}`, { params });
-
-    // Convert timestamp strings back to Date objects
-  const data = response.data.data.map((item: any) => ({
-    ...item,
-    timestamp: new Date(item.timestamp)
-  }));
-
-  return { data, totalCount: response.data.totalCount };
-}, []);
-
-const refreshSwapHistory = useCallback(
-  async (params?: Record<string, string>) => {
-    if (!pool?.address || !fromAsset?.address || !toAsset?.address) return;
-
-    // Cancel previous request
-    if (historyAbortControllerRef.current) {
-      historyAbortControllerRef.current.abort();
-    }
-
-    // Create new abort controller
-    historyAbortControllerRef.current = new AbortController();
-    const currentPoolAddress = pool.address;
-    const currentAssetPair = `${fromAsset.address}-${toAsset.address}`;
-
-    setSwapHistoryLoading(true);
-
-    try {
-      const { data, totalCount } = await fetchSwapHistory(currentPoolAddress, params);
-
-      // Only update state if this request is still for the current asset pair
-      if (currentAssetPairRef.current === currentAssetPair) {
-        setSwapHistory(data);               // ✅ Set new history
-        setSwapHistoryCount(totalCount);   // ✅ Set new count
-        setLastHistoryPoolAddress(currentPoolAddress); // ✅ Track which pool this history belongs to
+  // History operations
+  const refreshSwapHistory = useCallback(
+    async (params?: Record<string, string>) => {
+      const poolAddress = pool?.address;
+      if (!poolAddress) return;
+  
+      historyAbortControllerRef.current?.abort();
+      historyAbortControllerRef.current = new AbortController();
+  
+      currentAssetPairRef.current = poolAddress;
+      setSwapHistoryLoading(true);
+  
+      try {
+        const { data } = await api.get(`/swap-history/${poolAddress}`, { params });
+        
+        if (currentAssetPairRef.current !== poolAddress) return;
+        
+        setSwapHistory(data.data.map((item: any) => ({
+          ...item,
+          timestamp: new Date(item.timestamp)
+        })));
+        setSwapHistoryCount(data.totalCount);
+      } catch (err) {
+        if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') return;
+        
+        if (currentAssetPairRef.current === poolAddress) {
+          setSwapHistory([]);
+          setSwapHistoryCount(0);
+        }
+      } finally {
+        if (currentAssetPairRef.current === poolAddress) {
+          setSwapHistoryLoading(false);
+        }
       }
-      // Don't clear isTransitioning here - let the effect handle it
-    } catch (err) {
-      // Ignore aborted requests
-      if (err.name === 'AbortError' || err.code === 'ERR_CANCELED') {
-        return;
-      }
+    },
+    [pool?.address]
+  );
 
-      console.error("Failed to refresh swap history", err);
-
-      // Only update state if this request is still for the current asset pair
-      if (currentAssetPairRef.current === currentAssetPair) {
-        setSwapHistory([]);                // Optional fallback
-        setSwapHistoryCount(0);            // Optional fallback
-        setLastHistoryPoolAddress(currentPoolAddress); // ✅ Still track the pool even on error
-      }
-    } finally {
-      // Only update loading state if this request is still for the current asset pair
-      if (currentAssetPairRef.current === currentAssetPair) {
-        setSwapHistoryLoading(false);
-      }
-    }
-  },
-  [pool?.address, fromAsset?.address, toAsset?.address, fetchSwapHistory]
-);
-
-  const setPoolRates = useCallback(async (data: SetPoolRatesData) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await api.post('/swap-pools/set-rates', data);
-      return response.data;
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to update pool rates');
-      throw err;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // ============================================================================
+  // INITIALIZATION
+  // ============================================================================
   useEffect(() => {
     fetchSwappableTokens();
   }, [fetchSwappableTokens]);
 
+  // ============================================================================
+  // PROVIDER
+  // ============================================================================
   return (
     <SwapContext.Provider
       value={{
         swappableTokens,
         pairableTokens,
         loading,
+        tokensLoading,
+        pairablesLoading,
+        poolsLoading,
+        poolLoading,
         error,
         // Current swap state
         fromAsset,
@@ -437,7 +334,6 @@ const refreshSwapHistory = useCallback(
         refetchSwappableTokens: fetchSwappableTokens,
         fetchPairableTokens,
         createPool,
-        calculateSwap,
         getPoolByTokenPair,
         getPoolByAddress,
         swap,
@@ -446,16 +342,12 @@ const refreshSwapHistory = useCallback(
         addLiquiditySingleToken,
         removeLiquidity,
         fetchTokenBalances,
-        getTokenBalance,
-        enrichPools,
-        lpTokens,
-        fetchLpTokensPositions,
-        fetchSwapHistory,
+        userPools,
+        fetchUserPositions,
         refreshSwapHistory,
         swapHistory,
         swapHistoryCount,
         swapHistoryLoading,
-        isTransitioning,
         setPoolRates
       }}
     >

@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "(if [ \"$npm_config_omit\" != dev ]; then cd ../packages/shared-types && npm install && npm run build; fi)"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@hapi/joi": "^17.1.1",
+    "@shared/swap-types": "file:../packages/shared-types",
     "axios": "^1.0.11",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",

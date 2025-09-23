@@ -16,10 +16,17 @@ def cleanOldWorkspaces(Integer olderThanNumDays = 4, String diskRoot = '/', Bool
         (
           cd "\$f"
           pwd
+          IN_STRATO=false
+          if [ -d "strato" ]; then
+            cd strato
+            IN_STRATO=true
+          fi
           sudo stack --allow-different-user purge
           find . -name '.stack-work' -exec rm -r {} +
+          [ "\$IN_STRATO" = "true" ] && cd ..
           if [ -d "strato-worktree" ] ; then
             cd strato-worktree
+            cd strato || true
             sudo stack --allow-different-user purge
             find . -name '.stack-work' -exec rm -r {} +
           fi
