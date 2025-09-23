@@ -156,7 +156,6 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
   if (!note) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-center">
-        <div className="text-gray-500 mb-4">No junior note found</div>
         <div className="text-sm text-gray-400">Cover bad debt to participate in recovery rewards</div>
       </div>
     );
