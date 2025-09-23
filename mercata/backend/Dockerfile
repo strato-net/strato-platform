@@ -24,7 +24,7 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-# TODO: fix this hack - don't copy node_modules but only `npm ci --omit=dev` - the postinstall script in package.json is a culprit
+# TODO: use `npm ci --omit=dev` instead to build a slimmer image, but the postinstall script in package.json is currently a culprit
 COPY --from=builder packages/shared-types/ ../packages/shared-types/
 RUN npm ci
 
