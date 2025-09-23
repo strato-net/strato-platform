@@ -5,56 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { cdpService, BadDebt } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, AlertTriangle } from "lucide-react";
+import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import JuniorNotesView from "./JuniorNotesView";
 
-// Convert wei string to decimal for display (handles raw integer strings from backend)
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  // For non-zero remainder, show decimal places
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
-};
-
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  // For very large numbers, use scientific notation
-  if (value >= 1e21) {
-    return value.toExponential(2);
-  }
-  
-  // For large numbers, use K/M/B notation
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  // For normal numbers, limit decimal places
-  return value.toFixed(decimals);
-};
 
 const BadDebtView: React.FC = () => {
   const [badDebtData, setBadDebtData] = useState<BadDebt[]>([]);
@@ -81,7 +34,7 @@ const BadDebtView: React.FC = () => {
       
       // Calculate total bad debt
       const total = data.reduce((sum, item) => {
-        const debtAmount = parseFloat(formatWeiToDecimal(item.badDebt, 18));
+        const debtAmount = parseFloat(formatWeiToDecimalHP(item.badDebt, 18));
         return sum + debtAmount;
       }, 0);
       

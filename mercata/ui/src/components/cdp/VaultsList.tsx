@@ -9,6 +9,7 @@ import { cdpService, VaultData, TransactionResponse } from "@/services/cdpServic
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useOracleContext } from "@/context/OracleContext";
+import { formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
 // Calculate Health Factor: CR / LT (Liquidation Threshold)
@@ -23,59 +24,10 @@ const getHealthFactorColor = (healthFactor: number): string => {
   return "text-red-600"; // Danger - red
 };
 
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  // For very large numbers, use scientific notation
-  if (value >= 1e21) {
-    return value.toExponential(2);
-  }
-  
-  // For large numbers, use K/M/B notation
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  // For normal numbers, limit decimal places
-  return value.toFixed(decimals);
-};
-
 // Format percentage with reasonable precision
 const formatPercentage = (num: number, decimals: number = 2): string => {
   if (isNaN(num)) return '0.00%';
   return num.toFixed(decimals) + '%';
-};
-
-// Convert wei string to decimal for display (handles raw integer strings from backend)
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  // For non-zero remainder, show decimal places
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
 };
 
 interface VaultsListProps {
@@ -224,7 +176,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         
         if (userToken?.balance) {
           // Convert balance from wei to decimal format
-          return formatWeiToDecimal(userToken.balance, position.collateralAmountDecimals);
+          return formatWeiToDecimalHP(userToken.balance, position.collateralAmountDecimals);
         }
         
         // Fallback to 0 if no balance found
@@ -236,7 +188,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           // Use the backend endpoint that simulates the contract's withdrawMax logic
           const result = await cdpService.getMaxWithdraw(position.asset);
           // Convert from wei to decimal format
-          return formatWeiToDecimal(result.maxAmount, position.collateralAmountDecimals);
+          return formatWeiToDecimalHP(result.maxAmount, position.collateralAmountDecimals);
         } catch (error) {
           console.error("Failed to get max withdraw amount:", error);
           return "0";
@@ -248,7 +200,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           // Use the backend endpoint that calculates max borrowable amount (now without safety buffer)
           const result = await cdpService.getMaxMint(position.asset);
           // Convert from wei to decimal format (USDST is 18 decimals)
-          return formatWeiToDecimal(result.maxAmount, 18);
+          return formatWeiToDecimalHP(result.maxAmount, 18);
         } catch (error) {
           console.error("Failed to get max borrow amount:", error);
           return "0";
@@ -257,8 +209,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       
       case 'repay': {
         // Maximum repay is min(current debt, available USDST balance)
-        const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-        const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
+        const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
+        const availableUSDST = parseFloat(formatWeiToDecimalHP(activeTokens.find(token => 
           token.address.toLowerCase() === usdstAddress.toLowerCase()
         )?.balance || "0", 18));
         
@@ -309,10 +261,10 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     if (isNaN(amount) || amount <= 0) return null;
 
     // Convert wei strings to decimal numbers for calculations
-    const currentCollateral = parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals));
-    const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-    const currentCollateralUSD = parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18));
-    const currentDebtUSD = parseFloat(formatWeiToDecimal(position.debtValueUSD, 18));
+    const currentCollateral = parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals));
+    const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
+    const currentCollateralUSD = parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18));
+    const currentDebtUSD = parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18));
     
     // Get the actual token price from oracle
     const priceWei = getPrice(position.asset);
@@ -320,7 +272,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     
     if (priceWei) {
       // Convert price from wei (18 decimals) to decimal
-      pricePerUnit = parseFloat(formatWeiToDecimal(priceWei, 18));
+      pricePerUnit = parseFloat(formatWeiToDecimalHP(priceWei, 18));
     } else {
       // Fallback: calculate from current values if oracle price is not available
       if (currentCollateral > 0 && currentCollateralUSD > 0) {
@@ -383,16 +335,16 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       const debtFloorWei = BigInt(debtInfo.debtFloor);
       const debtCeilingWei = BigInt(debtInfo.debtCeiling);
       
-      // Convert borrow amount to wei (18 decimals)
-      const borrowAmountWei = BigInt(Math.floor(borrowAmountDecimal * 1e18));
+      // Convert borrow amount to wei (18 decimals) with exact precision
+      const borrowAmountWei = BigInt(formatDecimalToWeiHP(borrowAmountDecimal.toString(), 18));
 
       // Check debt ceiling constraint (total debt for this asset across all users)
       if (debtCeilingWei > 0n) {
         const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
         if (newAssetTotalDebtWei > debtCeilingWei) {
           const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
-          const availableRoom = parseFloat(formatWeiToDecimal(availableRoomWei.toString(), 18));
-          const debtCeilingDecimal = parseFloat(formatWeiToDecimal(debtCeilingWei.toString(), 18));
+          const availableRoom = parseFloat(formatWeiToDecimalHP(availableRoomWei.toString(), 18));
+          const debtCeilingDecimal = parseFloat(formatWeiToDecimalHP(debtCeilingWei.toString(), 18));
           
           toast({
             title: "Debt Ceiling Exceeded",
@@ -431,9 +383,9 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
             // Calculate how much more is needed to reach debt floor
             const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
             const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
-            const minRequired = parseFloat(formatWeiToDecimal(minRequiredWei.toString(), 18));
-            const debtFloorDecimal = parseFloat(formatWeiToDecimal(debtFloorWei.toString(), 18));
-            const currentDebt = parseFloat(formatWeiToDecimal(currentDebtWei.toString(), 18));
+            const minRequired = parseFloat(formatWeiToDecimalHP(minRequiredWei.toString(), 18));
+            const debtFloorDecimal = parseFloat(formatWeiToDecimalHP(debtFloorWei.toString(), 18));
+            const currentDebt = parseFloat(formatWeiToDecimalHP(currentDebtWei.toString(), 18));
             
             toast({
               title: "Below Debt Floor",
@@ -501,8 +453,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           if (maxStates[asset]) {
             const position = positions.find(p => p.asset === asset);
             if (position) {
-              const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
-              const availableUSDST = parseFloat(formatWeiToDecimal(activeTokens.find(token => 
+              const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
+              const availableUSDST = parseFloat(formatWeiToDecimalHP(activeTokens.find(token => 
                 token.address.toLowerCase() === usdstAddress.toLowerCase()
               )?.balance || "0", 18));
               
@@ -633,7 +585,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         `}</style>
         <div className="space-y-4">
           {positions.map((position, index) => {
-            const currentDebt = parseFloat(formatWeiToDecimal(position.debtAmount, 18));
+            const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
             const hasDebt = currentDebt > 0;
             const healthFactor = hasDebt 
               ? calculateHealthFactor(position.collateralizationRatio, position.liquidationRatio)
@@ -684,13 +636,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Collateral</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimal(position.collateralValueUSD, 18)))}</p>
+                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals)))} {position.symbol}</p>
+                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.collateralValueUSD, 18)))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Debt</p>
-                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(position.debtAmount, 18)))} USDST</p>
-                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimal(position.debtValueUSD, 18)))}</p>
+                  <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(position.debtAmount, 18)))} USDST</p>
+                  <p className="text-xs text-gray-400">${formatNumber(parseFloat(formatWeiToDecimalHP(position.debtValueUSD, 18)))}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Health Factor</p>

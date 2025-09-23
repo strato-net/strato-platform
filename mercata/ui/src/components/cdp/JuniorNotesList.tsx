@@ -5,48 +5,9 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, JuniorNote } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
+import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 import CopyableHash from "../common/CopyableHash";
 
-// Convert wei string to decimal for display
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, '');
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
-};
-
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  return value.toFixed(decimals);
-};
 
 interface UserJuniorNote extends JuniorNote {
   claimableAmount: string;       // Currently claimable amount in wei (18 decimals) - calculated from backend data
@@ -227,7 +188,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
         <div>
           <p className="text-xs text-gray-500 mb-1">Remaining Cap</p>
-          <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimal(note.capUSDST, 18)))} USDST</p>
+          <p className="font-semibold">{formatNumber(parseFloat(formatWeiToDecimalHP(note.capUSDST, 18)))} USDST</p>
           <p className="text-xs text-gray-400">Max rewards left</p>
         </div>
         <div>
@@ -241,7 +202,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
             onClick={handleClaimableClick}
             title={parseFloat(note.claimableAmount) > 0 ? "Click to claim rewards" : "No rewards available"}
           >
-            {formatNumber(parseFloat(formatWeiToDecimal(note.claimableAmount, 18)))} USDST
+            {formatNumber(parseFloat(formatWeiToDecimalHP(note.claimableAmount, 18)))} USDST
           </p>
           <p className="text-xs text-gray-400">
             {parseFloat(note.claimableAmount) > 0 ? 'Click to claim' : 'No rewards'} • Gas-free calculation
@@ -263,7 +224,7 @@ const JuniorNotesList: React.FC<JuniorNotesListProps> = ({ refreshTrigger, onNot
               onClick={handleClaimAction}
               disabled={actionLoading}
             >
-              {actionLoading ? "Claiming..." : `Claim ${formatNumber(parseFloat(formatWeiToDecimal(note.claimableAmount, 18)))} USDST`}
+              {actionLoading ? "Claiming..." : `Claim ${formatNumber(parseFloat(formatWeiToDecimalHP(note.claimableAmount, 18)))} USDST`}
             </Button>
           </div>
         </div>

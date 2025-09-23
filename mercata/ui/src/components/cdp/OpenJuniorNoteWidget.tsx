@@ -7,49 +7,9 @@ import { RefreshCw } from "lucide-react";
 import { cdpService, AssetConfig } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
-// Convert wei string to decimal for display
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, '');
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
-};
-
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  return value.toFixed(decimals);
-};
 
 interface OpenJuniorNoteWidgetProps {
   onSuccess?: () => void;
@@ -90,7 +50,7 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
     
     // Get minimum in wei, then convert to decimal string
     const minWei = userBalanceWei < badDebtWei ? userBalanceWei : badDebtWei;
-    return formatWeiToDecimal(minWei.toString(), 18);
+    return formatWeiToDecimalHP(minWei.toString(), 18);
   }, [selectedAsset, assetBadDebt, getUsdstBalance]);
 
   // Calculate expected cap (burn amount + premium)
@@ -192,8 +152,8 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
 
     if (isAmountAboveMax()) {
       const maxAmount = parseFloat(calculateMaxBurnAmount());
-      const userBalance = parseFloat(formatWeiToDecimal(getUsdstBalance(), 18));
-      const badDebt = parseFloat(formatWeiToDecimal(assetBadDebt[selectedAsset.asset] || "0", 18));
+      const userBalance = parseFloat(formatWeiToDecimalHP(getUsdstBalance(), 18));
+      const badDebt = parseFloat(formatWeiToDecimalHP(assetBadDebt[selectedAsset.asset] || "0", 18));
       
       let limitingFactor = "";
       if (userBalance <= badDebt) {
@@ -212,28 +172,19 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
 
     setLoading(true);
     try {
-      // Convert amount to wei (18 decimals)
-      // For MAX amounts, we need to convert back to wei from the exact decimal string
-      let amountWei: string;
-      if (isMaxEnabled) {
-        // burnAmount is the exact decimal string from formatWeiToDecimal, convert back to wei
-        const burnAmountParts = burnAmount.split('.');
-        const wholePart = burnAmountParts[0] || "0";
-        const decimalPart = (burnAmountParts[1] || "").padEnd(18, '0').slice(0, 18);
-        amountWei = (BigInt(wholePart) * BigInt(10 ** 18) + BigInt(decimalPart)).toString();
-      } else {
-        // For manual amounts, convert decimal to wei
-        amountWei = (BigInt(Math.floor(burnAmountDecimal * 1e18))).toString();
-      }
+      // Convert amount to wei (18 decimals) with exact precision
+      const amountWei = isMaxEnabled 
+        ? formatDecimalToWeiHP(burnAmount, 18) // burnAmount is already a string from formatWeiToDecimalHP
+        : formatDecimalToWeiHP(burnAmountDecimal.toString(), 18); // Convert number to string for exact precision
       
       // Call the backend API
       const result = await cdpService.openJuniorNote(selectedAsset.asset, amountWei);
       
-      // Extract return values from the transaction result
+      // Extract return values from the transaction result using exact precision conversion
       const burnedUSDST = result.burnedUSDST ? 
-        parseFloat((BigInt(result.burnedUSDST) / BigInt(1e18)).toString()) : burnAmountDecimal;
+        parseFloat(formatWeiToDecimalHP(result.burnedUSDST, 18)) : burnAmountDecimal;
       const capUSDST = result.capUSDST ? 
-        parseFloat((BigInt(result.capUSDST) / BigInt(1e18)).toString()) : calculateExpectedCap();
+        parseFloat(formatWeiToDecimalHP(result.capUSDST, 18)) : calculateExpectedCap();
       
       toast({
         title: "Bad Debt Coverage Successful",
@@ -322,13 +273,13 @@ const OpenJuniorNoteWidget: React.FC<OpenJuniorNoteWidgetProps> = ({ onSuccess, 
             {supportedAssets
               .sort((a, b) => {
                 // Sort by bad debt amount (greatest to least)
-                const badDebtA = parseFloat(formatWeiToDecimal(assetBadDebt[a.asset] || "0", 18));
-                const badDebtB = parseFloat(formatWeiToDecimal(assetBadDebt[b.asset] || "0", 18));
+                const badDebtA = parseFloat(formatWeiToDecimalHP(assetBadDebt[a.asset] || "0", 18));
+                const badDebtB = parseFloat(formatWeiToDecimalHP(assetBadDebt[b.asset] || "0", 18));
                 return badDebtB - badDebtA; // Descending order
               })
               .map((asset) => {
               const badDebtAmount = assetBadDebt[asset.asset] || "0";
-              const badDebtDecimal = parseFloat(formatWeiToDecimal(badDebtAmount, 18));
+              const badDebtDecimal = parseFloat(formatWeiToDecimalHP(badDebtAmount, 18));
               const isSelected = selectedAsset?.asset === asset.asset;
               const hasRealBadDebt = badDebtDecimal > 0;
               
