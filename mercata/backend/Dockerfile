@@ -24,9 +24,8 @@ WORKDIR /app
 
 COPY backend/package*.json ./
 
-# TODO: fix this hack - include the @shared as a runtime dependency, but omit the dev deps with npm ci --omit=dev
+# TODO: fix this hack - don't copy node_modules but only `npm ci --omit=dev` - the postinstall script in package.json is a culprit
 COPY --from=builder packages/shared-types/ ../packages/shared-types/
-
 RUN npm ci
 
 COPY --from=builder /build/dist ./dist
