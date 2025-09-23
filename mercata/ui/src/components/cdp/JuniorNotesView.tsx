@@ -7,9 +7,10 @@ import { BadDebt } from "@/services/cdpService";
 
 interface JuniorNotesViewProps {
   badDebtData: BadDebt[];
+  onBadDebtUpdate?: () => void; // Callback to refresh bad debt data
 }
 
-const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData }) => {
+const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData, onBadDebtUpdate }) => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Convert BadDebt array to Record<string, string> format for easier lookup
@@ -60,8 +61,8 @@ const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData }) => {
       {/* Action Tabs */}
       <Tabs defaultValue="claim" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="claim">My Junior Notes</TabsTrigger>
-          <TabsTrigger value="open">Open Note</TabsTrigger>
+          <TabsTrigger value="claim">My Junior Note</TabsTrigger>
+          <TabsTrigger value="open">Cover Bad Debt</TabsTrigger>
         </TabsList>
         
         <TabsContent value="claim" className="space-y-4">
@@ -75,6 +76,7 @@ const JuniorNotesView: React.FC<JuniorNotesViewProps> = ({ badDebtData }) => {
           <OpenJuniorNoteWidget 
             onSuccess={handleNoteOpened} 
             assetBadDebt={assetBadDebtMap}
+            onBadDebtCovered={onBadDebtUpdate}
           />
         </TabsContent>
       </Tabs>
