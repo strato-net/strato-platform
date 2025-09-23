@@ -6,7 +6,7 @@ import { cdpService, BadDebt } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { RefreshCw, AlertTriangle } from "lucide-react";
 import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
-import JuniorNotesView from "./JuniorNotesView";
+import JuniorNoteView from "./JuniorNoteView";
 
 
 const BadDebtView: React.FC = () => {
@@ -128,8 +128,8 @@ const BadDebtView: React.FC = () => {
       </Card>
 
 
-      {/* Junior Notes Section */}
-      <JuniorNotesView 
+      {/* Junior Note Section */}
+      <JuniorNoteView 
         badDebtData={badDebtData} 
         onBadDebtUpdate={() => fetchBadDebtData(true)}
       />
