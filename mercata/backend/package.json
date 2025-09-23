@@ -7,7 +7,7 @@
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "ts-node-dev --respawn --transpile-only src/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "postinstall": "cd ../packages/shared-types && npm install && npm run build"
   },
   "keywords": [],
   "author": "",
