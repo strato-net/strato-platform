@@ -36,12 +36,13 @@ library:
     - cross-monitoring
     - deepseq
     - extra
+    - filepath
     - format
     - lens
-    - lrucache
     - kafka-monad
+    - network
     - persistent
-    - postgresql-typed
+    - postgresql-simple
     - prometheus-client
     - solid-vm-model
     - scientific
@@ -68,7 +69,7 @@ executables:
       - kafka-monad
       - persistent-postgresql
       - process-monitor
-      - postgresql-typed
+      - postgresql-simple
       - slipstream
       - sql-monad
       - transformers

@@ -10,8 +10,6 @@
 
 import BlockApps.Init
 import BlockApps.Logging
-import Blockchain.Slipstream.Globals
-import Blockchain.Slipstream.GlobalsColdStorage
 import Blockchain.Slipstream.MessageConsumer
 import Blockchain.Slipstream.Options
 import Blockchain.Slipstream.OutputData
@@ -20,32 +18,16 @@ import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
-import Data.Set as S (empty)
 import Data.String
-import Database.Persist.Postgresql
-import Database.PostgreSQL.Typed
+import Blockchain.Slipstream.PostgresqlTypedShim
 import HFlags
 import Instrumentation
 import Network.Wai.Handler.Warp
 import Network.Wai.Middleware.Prometheus
 
-import Text.Printf
 import Text.RawString.QQ
-
-workerConnStr :: ConnectionString
-workerConnStr =
-  BC.pack $
-    printf
-      "host=%s port=%d user=%s password=%s dbname=%s"
-      flags_pghost
-      flags_pgport
-      flags_pguser
-      flags_password
-      flags_database
 
 connectToCirrus :: MonadIO m => m PGConnection
 connectToCirrus = liftIO $ pgConnect cirrusInfo
@@ -59,8 +41,7 @@ main = do
   runLoggingT
     . runResourceT
     . runKafkaM ("slipstream" :: KafkaClientId) (fromString flags_kafkahost, fromIntegral flags_kafkaport)
-    . withPostgresqlConn workerConnStr
-    $ \workerConn -> do
+    $ do
       $logInfoS "main" "Welcome to Slipstream!!!!"
       void . liftIO . forkIO . run 10777 $ metricsApp
       $logInfoS "main" "Serving metrics on port 10777"
@@ -74,7 +55,7 @@ main = do
                 block_hash text,
                 block_timestamp text,
                 block_number text,
-                transaction_hash text NOT NULL,
+                transaction_hash text,
                 transaction_sender text,
                 creator text,
                 root text,
@@ -89,7 +70,7 @@ main = do
                 block_hash text,
                 block_timestamp text,
                 block_number text,
-                transaction_hash text NOT NULL,
+                transaction_hash text,
                 transaction_sender text,
                 creator text,
                 root text,
@@ -107,12 +88,12 @@ main = do
                 CONSTRAINT contract_storage FOREIGN KEY (address) REFERENCES storage (address)
             )|]
       migrateCirrus
-        [r|CREATE TABLE IF NOT EXISTS record (
+        [r|CREATE TABLE IF NOT EXISTS mapping (
                 address text,
                 block_hash text,
                 block_timestamp text,
                 block_number text,
-                transaction_hash text NOT NULL,
+                transaction_hash text,
                 transaction_sender text,
                 root text,
                 collection_name text,
@@ -120,30 +101,47 @@ main = do
                 key jsonb,
                 value jsonb,
                 PRIMARY KEY (address, collection_name, key),
-                CONSTRAINT contract_record FOREIGN KEY (address) REFERENCES storage (address)
+                CONSTRAINT contract_mapping FOREIGN KEY (address) REFERENCES storage (address)
             )|]
       migrateCirrus
         [r|CREATE TABLE IF NOT EXISTS event (
+                id serial NOT NULL,
                 address text,
                 block_hash text,
                 block_timestamp text,
                 block_number text,
-                transaction_hash text NOT NULL,
+                transaction_hash text,
                 transaction_sender text,
-                event_index integer NOT NULL,
+                event_index integer,
+                creator text,
+                application text,
+                contract_name text,
                 event_name text,
                 attributes jsonb,
                 PRIMARY KEY (transaction_hash, event_index),
                 CONSTRAINT contract_event FOREIGN KEY (address) REFERENCES storage (address)
             )|]
+      migrateCirrus
+        [r|CREATE TABLE IF NOT EXISTS event_array (
+                address text,
+                block_hash text,
+                block_timestamp text,
+                block_number text,
+                transaction_hash text,
+                transaction_sender text,
+                event_name text,
+                event_index integer,
+                collection_name text,
+                collection_type text,
+                key jsonb,
+                value jsonb,
+                PRIMARY KEY (address, transaction_hash, event_index, collection_name, key),
+                CONSTRAINT event_array FOREIGN KEY (transaction_hash, event_index) REFERENCES event (transaction_hash, event_index)
+            )|]
 
-      -- There are three permanent connections/pools to postgres:
-      -- 1. The `workerConn` is from persistent-postgresql for the storage worker in the background
-      -- 2. `conn` connects slipstream to the cirrus database
-      -- 3. The `pool` in the BlocEnv connects slipstream to the bloc22 database
+      -- There are two permanent connections/pools to postgres:
+      -- 1. `conn` connects slipstream to the cirrus database
+      -- 2. The `pool` in the BlocEnv connects slipstream to the eth database
 
-      handle <- runSqlConn initStorage workerConn
-      gref <- newGlobals handle (CirrusHandle conn S.empty)
-
-      flip runReaderT gref . runSQLM $
+      runSQLM $
         getAndProcessMessages conn

@@ -68,10 +68,8 @@ diffNull (Action.EVMDiff m) = Map.null m
 diffNull (Action.SolidVMDiff m) = Map.null m
 
 data BatchedInserts = BatchedInserts
-  { indexInsert :: (E.ProcessedContract, [T.Text]),
-    abstractInserts :: [(E.ProcessedContract,[T.Text], TableName, TableColumns)],
-    historyInserts :: [E.ProcessedContract],
-    collectionInserts :: [ProcessedCollectionRow]
+  { indexInsert :: E.ProcessedContract
+  , collectionInserts :: [ProcessedCollectionRow]
   }
   deriving (Show)
 
@@ -210,13 +208,6 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
         extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
         extractKeys v                           = ([], v)
 
-getContractsFromPC :: E.ProcessedContract -> [Text]
-getContractsFromPC pc = Map.keys $ Map.filter isValueContract (E.contractData pc)
-  where
-    isValueContract :: Value -> Bool
-    isValueContract (ValueContract _) = True
-    isValueContract _ = False
-
 -- Function to duplicate each collection row for each parent, changing the contract name, and include the original
 duplicateForParentsAndIncludeOriginal :: [ProcessedCollectionRow] -> [(Text,Text,Text)] -> [ProcessedCollectionRow]
 duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateForSingle collections
@@ -246,40 +237,29 @@ processTheMessages messages = do
         [d | VME.DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . forM creates $ \(cc, cp, cr, ap) -> do
-        $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
-        multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
+  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cp, cr, ap) -> do
+    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+    multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
-        fmap concat $
-          forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
-            -- Here we will get the storageDefs attribute of the contract (c)
-            -- and iterate through the Map of (Text, VariableDecl) and look for
-            -- VariableDecls that have the last attribute (isRecord) true and
-            -- thetype are mappings We will then create a table for each of
-            -- these collections and add a foreign key to the main table
+    fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
+      -- Here we will get the storageDefs attribute of the contract (c)
+      -- and iterate through the Map of (Text, VariableDecl) and look for
+      -- VariableDecls that have the last attribute (isRecord) true and
+      -- thetype are mappings We will then create a table for each of
+      -- these collections and add a foreign key to the main table
 
-            let collectionNamesAndTypes = getCollectionsFromContract c
-            $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
+      let collectionNamesAndTypes = getCollectionsFromContract c
+      $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
 
-            let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
-            $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
-            multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
+      let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
+      $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
+      multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
-            -- Create collection tables
-            deferredForeignKeysForCollections <- concat <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
-            
-            deferredForeignKeys <- createIndexTable c cc nameParts
-
-            $logInfoS "processTheMessages/deferredForeignKeys" $ T.pack $ show deferredForeignKeys
-            $logInfoS "processTheMessages/deferredForeignKeysForCollections" $ T.pack $ show deferredForeignKeysForCollections
-
-
-            deferredForeignKeysForEvents <- createExpandEventTables c cc nameParts
-
-
-            return $ deferredForeignKeys ++ deferredForeignKeysForCollections ++ deferredForeignKeysForEvents
-
-  let concatFkeys = concat fkeys
+      -- Create collection tables
+      indexFkeys <- createIndexTable c cc nameParts
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts
+      pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
     forM changes $ \(_, actions) -> do
@@ -298,7 +278,6 @@ processTheMessages messages = do
                 cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name
             let indexContract = rowToInsert abiid row cont
-            let fkeysForThisContract = getContractsFromPC indexContract
             let mapNames = actionMappings row --recorded mappings
                 arrNames = actionArrays row --all
                 collectionNames = mapNames ++ arrNames
@@ -314,19 +293,18 @@ processTheMessages messages = do
                 $logInfoS "Row will be inserted into abstract table: " tableNameText
                 $logInfoS "cols: " $ T.pack (show cols)
                 
-                let result = (indexContract, fkeysForThisContract, tableName, (cr', ap', n'), cols)
+                let result = (indexContract, tableName, (cr', ap', n'), cols)
                 $logInfoS "result: " $ T.pack (show result)
                 pure (Just result)
             $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
             $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
-                parents' = map (\(_,_,_,p ,_)-> p) abstractColumns'
-                abstractColumns = map (\(a,b,c,_,e) -> (a,b,c,e)) abstractColumns'
+                parents' = map (\(_,_,p ,_)-> p) abstractColumns'
                 pCollections = processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
                 pCollectionsWithAbstracts = duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
-            pure . Right $ BatchedInserts (indexContract, fkeysForThisContract) abstractColumns [indexContract] pCollectionsWithAbstracts
+            pure . Right $ BatchedInserts indexContract pCollectionsWithAbstracts
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -343,19 +321,6 @@ processTheMessages messages = do
 
     forM_ delegatecalls insertDelegatecall
 
-      --updating the foreign keys from null
-    forM_ insertsByCodeHash $ \ins -> do
-      updateForeignKeysFromNULLIndex (indexInsert ins)
-      unless (null $ collectionInserts ins) $
-        updateForeignKeysFromNULLArray (collectionInserts ins)
-
-    forM_ concatFkeys $ \deferredForeignKey -> do
-      createForeignIndexesForJoins deferredForeignKey
-
-  when (any (not . null) fkeys) $ do
-    $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (sum $ map length fkeys) ++ " foreign key relationships"
-    mapOutput Right notifyPostgREST
-
   when (not (null events')) $ do
     -- Getting event entries that go into the parent abstract tables and event
     -- array inserts
@@ -370,7 +335,12 @@ processTheMessages messages = do
     
     -- If there are processed event arrays, update the foreign keys
     unless (null processedEventArrays) $
-      mapOutput Right . outputData $ updateForeignKeysFromNULLArray processedEventArrays
+      mapOutput Right . outputData $ insertCollectionTable processedEventArrays
+
+  when (not $ null fkeys) $ do
+    $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"
+    mapOutput Right . outputDataDedup $ createFkeyFunctions fkeys
+    mapOutput Right . outputData $ notifyPostgREST
 
   $logInfoS "processTheMessages" . T.pack $
     "Inserting " ++ show (length transactionResults) ++ " transaction results"
