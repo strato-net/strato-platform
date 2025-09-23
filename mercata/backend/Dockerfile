@@ -26,6 +26,9 @@ COPY backend/package*.json ./
 
 RUN npm ci --omit=dev
 
+# TODO: fix this hack - include the @shared as runtime dep without rebuilding, but omit the dev deps still
+COPY --from=builder /build/node_modules/@shared/ ./node_modules/@shared/
+
 COPY --from=builder /build/dist ./dist
 
 EXPOSE 3001
