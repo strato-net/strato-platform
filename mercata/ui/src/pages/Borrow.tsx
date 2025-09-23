@@ -21,7 +21,7 @@ import { useBalancePolling } from "@/hooks/useSmartPolling";
 
 const Borrow = () => {
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
   const [selectedAsset, setSelectedAsset] = useState<CollateralData | null>(null);
   const [borrowLoading, setBorrowLoading] = useState(false);
   const [modalState, setModalState] = useState<{
@@ -109,7 +109,7 @@ const Borrow = () => {
       setModalLoading(true);
       await supplyCollateral({
         asset: asset.address,
-        amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
+        amount: safeParseUnits(amount).toString(),
       });
       toast({
         title: "Supply Initiated",
@@ -138,7 +138,7 @@ const Borrow = () => {
       } else {
         await withdrawCollateral({
           asset: asset.address,
-          amount: safeParseUnits(amount, asset?.customDecimals ?? 18).toString(),
+          amount: safeParseUnits(amount).toString(),
         });
       }
       toast({
@@ -174,7 +174,7 @@ const Borrow = () => {
           variant: "success",
         });
       } else {
-        await borrowAssetFn({ amount: safeParseUnits(amount, 18).toString() });
+        await borrowAssetFn({ amount: safeParseUnits(amount).toString() });
         toast({
           title: "Borrow Initiated",
           description: `You borrowed ${amount} USDST`,
@@ -197,7 +197,7 @@ const Borrow = () => {
       setRepayLoading(true);
       if (amount === 'ALL') {
         const res = await repayAll();
-        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead), 18) : 'all';
+        const sent = res?.estimatedDebtAtRead ? formatUnits(BigInt(res.estimatedDebtAtRead)) : 'all';
         toast({
           title: "Success",
           description: `Successfully repaid ${sent} USDST`,
@@ -205,12 +205,12 @@ const Borrow = () => {
         });
       } else {
         const totalOwedWei = BigInt(loans?.totalAmountOwed || 0);
-        let amountInWei = safeParseUnits(amount || "0", 18);
+        let amountInWei = safeParseUnits(amount || "0");
         if (amountInWei > totalOwedWei) {
           amountInWei = totalOwedWei;
         }
         const res = await repayLoanFn({ amount: amountInWei.toString() } as any);
-        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent), 18) : amount;
+        const sent = res?.amountSent ? formatUnits(BigInt(res.amountSent)) : amount;
         toast({
           title: "Success",
           description: `Successfully repaid ${sent} USDST`,
@@ -307,6 +307,7 @@ const Borrow = () => {
               }
             }}
             usdstBalance={usdstBalance}
+            voucherBalance={voucherBalance}
             transactionFee={modalState.type === "supply" ? SUPPLY_COLLATERAL_FEE : WITHDRAW_COLLATERAL_FEE}
         />
       )}

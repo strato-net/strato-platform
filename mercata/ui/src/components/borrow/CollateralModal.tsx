@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +18,7 @@ import {
 } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
+import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 
 type ModalType = "supply" | "withdraw";
 
@@ -29,7 +30,8 @@ interface CollateralModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAction: (amount: string) => void;
-  usdstBalance?: string;
+  usdstBalance: string;
+  voucherBalance: string;
   transactionFee: string;
 }
 
@@ -41,11 +43,13 @@ const CollateralModal = ({
   isOpen,
   onClose,
   onAction,
-  usdstBalance = "0",
+  usdstBalance,
+  voucherBalance,
   transactionFee,
 }: CollateralModalProps) => {
   const [amount, setAmount] = useState<string>("");
-  const [displayAmount, setDisplayAmount] = useState("");
+  const [amountError, setAmountError] = useState<string>("");
+  const [feeError, setFeeError] = useState<string>("");
   const [riskLevel, setRiskLevel] = useState(0);
   const [healthImpact, setHealthImpact] = useState({
     currentHealthFactor: 0,
@@ -55,13 +59,15 @@ const CollateralModal = ({
   });
 
   const isSupply = type === "supply";
-  const maxAmount = isSupply 
-    ? BigInt(asset?.userBalance || 0)
-    : getMaxSafeWithdrawAmount(asset, loanData);
+  const maxAmount = useMemo(() => {
+    return isSupply 
+      ? computeMaxTransferable(asset?.userBalance || "0", false, voucherBalance, usdstBalance, safeParseUnits(transactionFee).toString(), setFeeError)
+      : computeMaxTransferable(getMaxSafeWithdrawAmount(asset, loanData).toString(), false, voucherBalance, usdstBalance, safeParseUnits(transactionFee).toString(), setFeeError)
+  }, [asset, loanData, isSupply, voucherBalance, usdstBalance, transactionFee]);
   
   // NEW: reflect on-chain 1 wei safety when there is outstanding debt
   const hasDebt = BigInt(loanData?.totalAmountOwed || "0") > 0n;
-  const maxDisplayAmount = (!isSupply && hasDebt && maxAmount > 0n) ? (maxAmount - 1n) : maxAmount;
+  const maxDisplayAmount = (!isSupply && hasDebt && BigInt(maxAmount) > 0n) ? (BigInt(maxAmount) - 1n) : BigInt(maxAmount);
 
   // Calculate risk level when amount changes
   useEffect(() => {
@@ -73,10 +79,9 @@ const CollateralModal = ({
 
       const totalBorrowedBigInt = BigInt(loanData.totalAmountOwed);
       const collateralValueBigInt = BigInt(loanData.totalCollateralValueUSD);
-      const tokenDecimals = asset?.customDecimals ?? 18;
-      const amountWei = safeParseUnits(amount || "0", tokenDecimals);
+      const amountWei = safeParseUnits(amount || "0");
       const assetPriceUSD = BigInt(asset?.assetPrice || "0");
-      const amountValueUSD = (amountWei * assetPriceUSD * BigInt(asset?.liquidationThreshold || 0)) / ((BigInt(10) ** BigInt(tokenDecimals)) * 10000n);
+      const amountValueUSD = (amountWei * assetPriceUSD * BigInt(asset?.liquidationThreshold || 0)) / ((BigInt(10) ** 18n) * 10000n);
 
       let newCollateralValue: bigint;
       if (isSupply) {
@@ -101,7 +106,7 @@ const CollateralModal = ({
 
   // Calculate health impact when amount changes
   useEffect(() => {
-    const amountWei = safeParseUnits(amount || "0", 18);
+    const amountWei = safeParseUnits(amount || "0");
     const impact = isSupply 
       ? calculateSupplyHealthImpact(amountWei, asset, loanData)
       : calculateWithdrawHealthImpact(amountWei, asset, loanData);
@@ -109,57 +114,46 @@ const CollateralModal = ({
   }, [amount, asset, loanData, isSupply]);
 
   const handleAction = () => {
-    const tokenDecimals = asset?.customDecimals ?? 18;
     try {
       if (!isSupply) {
-        const amtWei = safeParseUnits(amount || "0", tokenDecimals);
+        const amtWei = safeParseUnits(amount || "0");
         // If user selected at least the max, invoke on-chain max-withdraw to avoid drift issues
         if (amtWei >= maxDisplayAmount && maxDisplayAmount > 0n) {
           onAction('ALL');
           setAmount("");
-          setDisplayAmount("");
           return;
         }
       }
     } catch {}
     onAction(amount);
     setAmount("");
-    setDisplayAmount("");
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, "");
-    if (/^\d*\.?\d*$/.test(value)) {
-      setDisplayAmount(addCommasToInput(value));
-      setAmount(value);
-    }
+    setAmountError("");
   };
 
   // Clear input when modal closes
   useEffect(() => {
     if (!isOpen) {
       setAmount("");
-      setDisplayAmount("");
+      setAmountError("");
     }
   }, [isOpen]);
 
   const handlePercentageClick = (percent?: bigint) => {
-    const tokenDecimals = asset?.customDecimals ?? 18;
     // Use adjusted max for 100% when withdrawing with debt, to avoid dust surprises
     if (!isSupply && hasDebt && percent === 100n && maxDisplayAmount > 0n) {
-      const amountValue = formatUnits(maxDisplayAmount, tokenDecimals);
+      const amountValue = formatUnits(maxDisplayAmount);
       setAmount(amountValue);
-      setDisplayAmount(addCommasToInput(amountValue));
+      setAmountError("");
       return;
     }
-    const amountValue = formatUnits((maxAmount * percent) / 100n, tokenDecimals);
+    const amountValue = formatUnits((BigInt(maxAmount) * percent) / 100n);
     setAmount(amountValue);
-    setDisplayAmount(addCommasToInput(amountValue));
+    setAmountError("");
   };
 
   const handleClose = () => {
-    setDisplayAmount("");
     setAmount("");
+    setAmountError("")
     onClose();
   };
 
@@ -172,11 +166,10 @@ const CollateralModal = ({
   };
 
   const getBalanceValue = () => {
-         const tokenDecimals = asset?.customDecimals ?? 18;
      if (isSupply) {
-       return formatUnits(asset?.userBalance || 0, tokenDecimals);
+       return formatUnits(asset?.userBalance || 0);
      } else {
-       return formatUnits(asset?.collateralizedAmount || 0, tokenDecimals);
+       return formatUnits(asset?.collateralizedAmount || 0);
      }
   };
 
@@ -195,19 +188,19 @@ const CollateralModal = ({
   };
 
   const isAmountValid = () => {
-    const amountWei = safeParseUnits(amount || "0", 18);
-    return amountWei > 0n && amountWei <= maxAmount;
+    const amountWei = safeParseUnits(amount || "0");
+    return amountWei > 0n && amountWei <= BigInt(maxAmount);
   };
 
   const isFeeSufficient = () => {
-    const feeAmount = safeParseUnits(transactionFee, 18);
+    const feeAmount = safeParseUnits(transactionFee);
     const usdstBalanceBigInt = BigInt(usdstBalance || "0");
     return usdstBalanceBigInt >= feeAmount;
   };
 
   const isDisabled = () => {
     return (
-      safeParseUnits(amount || "0", 18) === 0n ||
+      safeParseUnits(amount || "0") === 0n ||
       loading ||
       !isAmountValid() ||
       !isFeeSufficient() ||
@@ -247,7 +240,7 @@ const CollateralModal = ({
             {!isSupply && (
               <div className="flex justify-between">
                 <span className="text-sm text-gray-500">Max withdrawable now</span>
-                <span className="font-medium">{formatUnits(maxDisplayAmount, asset?.customDecimals ?? 18)}</span>
+                <span className="font-medium">{formatUnits(maxDisplayAmount)}</span>
               </div>
             )}
           </div>
@@ -261,16 +254,15 @@ const CollateralModal = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const max = formatUnits(maxAmount, 18);
+                    const max = formatUnits(maxAmount);
                     setAmount(max);
-                    setDisplayAmount(addCommasToInput(max));
                   }}
                   className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition"
                 >
                   Max :
                 </button>
                 <span>
-                  {formatUnits(maxAmount, 18)} {asset?._symbol}
+                  {formatUnits(maxAmount)} {asset?._symbol}
                 </span>
               </div>
             </div>
@@ -278,21 +270,27 @@ const CollateralModal = ({
               <Input
                 placeholder="0.00"
                 className={`pr-8 ${
-                  safeParseUnits(amount || "0", asset?.customDecimals ?? 18) > maxAmount
+                  safeParseUnits(amount || "0") > BigInt(maxAmount)
                     ? "text-red-600"
                     : ""
                 }`}
-                value={displayAmount}
-                onChange={handleAmountChange}
+                value={addCommasToInput(amount)}
+                onChange={(e)=>{
+                  const value = e.target.value;
+                  handleAmountInputChange(value, setAmount, setAmountError, maxAmount);
+                }}
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
                 {asset?._symbol}
               </span>
             </div>
+            {amountError && (
+              <p className="text-red-600 text-sm">{amountError}</p>
+            )}
             <div className="flex gap-2">
               <Button
                 variant={
-                  safeParseUnits(amount || "0", 18) === (maxAmount * 10n) / 100n
+                  safeParseUnits(amount || "0") === (BigInt(maxAmount) * 10n) / 100n
                     ? "default"
                     : "outline"
                 }
@@ -304,7 +302,7 @@ const CollateralModal = ({
               </Button>
               <Button
                 variant={
-                  safeParseUnits(amount || "0", 18) === (maxAmount * 25n) / 100n
+                  safeParseUnits(amount || "0") === (BigInt(maxAmount) * 25n) / 100n
                     ? "default"
                     : "outline"
                 }
@@ -316,7 +314,7 @@ const CollateralModal = ({
               </Button>
               <Button
                 variant={
-                  safeParseUnits(amount || "0", 18) === (maxAmount * 50n) / 100n
+                  safeParseUnits(amount || "0") === (BigInt(maxAmount) * 50n) / 100n
                     ? "default"
                     : "outline"
                 }
@@ -328,7 +326,7 @@ const CollateralModal = ({
               </Button>
               <Button
                 variant={
-                  safeParseUnits(amount || "0", 18) === (maxAmount * 100n) / 100n
+                  safeParseUnits(amount || "0") === (BigInt(maxAmount) * 100n) / 100n
                     ? "default"
                     : "outline"
                 }
@@ -351,17 +349,14 @@ const CollateralModal = ({
           <div className="px-4 bg-gray-50 rounded-md">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-600">Transaction Fee</span>
-              <span className="font-medium">{transactionFee} USDST</span>
+              <span className="font-medium">{transactionFee} USDST ({parseFloat(transactionFee) * 100} voucher)</span>
             </div>
             {(() => {
-              const feeAmount = safeParseUnits(transactionFee, 18);
+              const feeAmount = safeParseUnits(transactionFee);
               const usdstBalanceBigInt = BigInt(usdstBalance || "0");
 
-              // Check if insufficient USDST for fee
-              const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-
               // Check if USDST balance is running low after fee
-              const lowBalanceThreshold = safeParseUnits("0.10", 18);
+              const lowBalanceThreshold = safeParseUnits("0.10");
               const remainingBalance = usdstBalanceBigInt - feeAmount;
               const isLowBalanceWarning =
                 remainingBalance >= 0n &&
@@ -369,13 +364,12 @@ const CollateralModal = ({
 
               return (
                 <>
-                  {isInsufficientUsdstForFee && (
+                  {feeError && (
                     <p className="text-yellow-600 text-sm mt-1">
-                      Insufficient USDST balance for transaction fee (
-                      {transactionFee} USDST)
+                      {feeError}
                     </p>
                   )}
-                  {isLowBalanceWarning && !isInsufficientUsdstForFee && (
+                  {isLowBalanceWarning && !feeError && (
                     <p className="text-yellow-600 text-sm mt-1">
                       Warning: Your USDST balance is running low. Add more funds
                       now to avoid issues with future transactions.
