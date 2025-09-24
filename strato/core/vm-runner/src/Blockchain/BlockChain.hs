@@ -81,6 +81,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
+import Control.Applicative ((<|>))
 import Control.Lens hiding (filtered)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -417,11 +418,12 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   feeResult' <- payFees b availableGas tAddr t proposer
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
+      combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
-        { erAction = (maybe id (\era ->
+        { erAction = combineA (\era ->
               (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
             . (events %~ (_events era Seq.><))
-          ) $ erAction feeResult) <$> erAction er
+          ) (erAction feeResult) $ erAction er
         , erTrace = erTrace feeResult ++ erTrace er
         , erLogs = erLogs feeResult ++ erLogs er
         , erEvents = erEvents feeResult ++ erEvents er

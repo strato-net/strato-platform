@@ -23,12 +23,18 @@ const SwapPoolsSection = () => {
   const operationInProgressRef = useRef(false);
 
   const { fetchPools, getPoolByAddress } = useSwapContext();
-  const { fetchUsdstBalance } = useUserTokens();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
   const { userAddress } = useUser();
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchPools]);
+
+  useEffect(() => {
+    if (userAddress) {
+      fetchUsdstBalance(userAddress);
+    }
+  }, [userAddress, fetchUsdstBalance]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -38,6 +44,7 @@ const SwapPoolsSection = () => {
           if (updatedPool) {
             setSelectedPool(updatedPool);
           }
+          await fetchUsdstBalance(userAddress);
         } catch (error) {
           console.error('Error polling pool:', error);
         }
@@ -53,7 +60,7 @@ const SwapPoolsSection = () => {
         }
       };
     }
-  }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress]);
+  }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress, fetchUsdstBalance]);
 
   const fetchAndEnrichPools = async () => {
     if (operationInProgressRef.current) return;
@@ -233,6 +240,8 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onDepositSuccess={handleDepositSuccess}
         operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
       />
 
       <LiquidityWithdrawModal
@@ -241,6 +250,8 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onWithdrawSuccess={handleWithdrawSuccess}
         operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
       />
     </div>
   );
