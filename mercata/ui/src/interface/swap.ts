@@ -1,56 +1,15 @@
 
+// Import shared types for use in UI-specific interface definitions
+import type {
+  SwapHistoryEntry,
+  SwapParams,
+  SetPoolRatesParams,
+  Pool,
+  SwapToken,
+} from '@shared/swap-types';
 import { SafetyModuleData } from '.';
-export interface SwapToken {
-  address: string;
-  _name: string;
-  _symbol: string;
-  _totalSupply: string;
-  customDecimals?: number;
-  price?: string;
-  images?: Array<{ value: string }>;
-}
 
-export interface Pool {
-  address: string;
-  tokenA: SwapToken;
-  tokenB: SwapToken;
-  lpToken: {
-    address: string;
-    _name: string;
-    _symbol: string;
-    balance: string;
-    price: string;
-    _totalSupply: string;
-  };
-  apy?: number;
-}
-
-export interface SwapParams {
-  poolAddress: string;
-  isAToB: boolean;
-  amountIn: string;
-  minAmountOut: string;
-}
-
-export interface SetPoolRatesParams {
-  poolAddress: string;
-  rateA: string;
-  rateB: string;
-}
-
-export interface SwapHistoryEntry {
-  id: string;
-  poolAddress: string;
-  tokenA: SwapToken;
-  tokenB: SwapToken;
-  amountIn: string;
-  amountOut: string;
-  isAToB: boolean;
-  timestamp: string;
-  transactionHash: string;
-}
-
-// ============================================================================
+export * from '@shared/swap-types';
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 

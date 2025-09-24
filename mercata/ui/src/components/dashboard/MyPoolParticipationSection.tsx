@@ -34,10 +34,10 @@ export default function MyPoolParticipationSection({
   };
 
   // Helper variables for sUSDST calculations
-  const hasSusdstBalance = safetyInfo?.userShares && BigInt(safetyInfo.userShares) > 0n;
-  const susdstExchangeRate = safetyInfo?.exchangeRate ? parseFloat(formatUnits(safetyInfo.exchangeRate, 18)) : 1;
-  const susdstApy = safetyInfo?.exchangeRate ? `${((susdstExchangeRate - 1) * 100).toFixed(2)}%` : "N/A";
-  const susdstValue = safetyInfo?.exchangeRate ? `$${formatValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
+  const sUSDSTBalance = safetyInfo?.userShares && BigInt(safetyInfo.userShares) > 0n;
+  const sUsdstExchangeRate = safetyInfo?.exchangeRate ? parseFloat(formatUnits(safetyInfo.exchangeRate, 18)) : 1;
+  const sUsdstApy = safetyInfo?.exchangeRate ? `${((sUsdstExchangeRate - 1) * 100).toFixed(2)}%` : "N/A";
+  const sUsdstValue = safetyInfo?.exchangeRate ? `$${formatValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
 
   const toggleTokenExpansion = (tokenAddress: string) => {
     const newExpanded = new Set(expandedTokens);
@@ -97,17 +97,17 @@ export default function MyPoolParticipationSection({
             ) : null}
 
             {/* SUSDST Row */}
-            {hasSusdstBalance && (
+            {sUSDSTBalance && (
               <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
                 <div className="font-semibold text-gray-700">sUSDST</div>
                 <div className="text-center font-semibold text-gray-900">
                   {formatBalance(safetyInfo.userShares, undefined, 18, 2, 2)}
                 </div>
                 <div className="text-center font-semibold text-gray-900">
-                  {susdstApy}
+                  {sUsdstApy}
                 </div>
                 <div className="text-right font-medium text-gray-900">
-                  {susdstValue}
+                  {sUsdstValue}
                 </div>
               </div>
             )}
