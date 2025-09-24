@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: MIT
 import "../../concrete/BaseCodeCollection.sol";
 
-contract Describe_CDPEngine {
+// Per‑vault state keyed by (user, asset)
+struct Vault {
+    uint collateral;  // raw token units
+    uint scaledDebt;  // index‑denominated debt
+}
+
+contract Describe_CDPEngine  {
     Mercata m;
     string[] emptyArray;
 
@@ -332,11 +338,10 @@ contract Describe_CDPEngine {
         );
         cdpEngine.deposit(collateralTokenAddress, depositAmount);
 
-        // Test debt floor enforcement 
-        uint256 configuredDebtFloor = DEBT_FLOOR; // 100e18 USD
+     
 
         // Try to mint below debt floor (should fail)
-        uint256 belowFloorAmount = configuredDebtFloor - 1; // 99.999... USD
+        uint256 belowFloorAmount = DEBT_FLOOR - 1; // 99.999... USD
 
         // This should fail with "CDPEngine: below debt floor"
         bool reverted = false;
@@ -351,39 +356,58 @@ contract Describe_CDPEngine {
 
     // // ============ REPAYMENT TESTS ============
 
-    // function it_cdp_engine_can_repay_debt() {
-    //     uint256 depositAmount = 2000e18;
-    //     uint256 mintAmount = 1000e18;
-    //     uint256 repayAmount = 500e18;
+    function it_cdp_engine_can_repay_debt() {
+        uint256 depositAmount = 2000e18;
+        uint256 mintAmount = 1000e18;
+        uint256 repayAmount = 500e18;
 
-    //     // Setup: deposit and mint
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
-    //     cdpEngine.mint(collateralTokenAddress, mintAmount);
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
 
-    //     // Repay partial debt
-    //     require(
-    //         ERC20(usdstAddress).approve(address(cdpEngine), repayAmount),
-    //         "USDST approval failed"
-    //     );
-    //     cdpEngine.repay(collateralTokenAddress, repayAmount);
+        // Get initial state before repayment
+        uint256 initialUSDSTBalance = ERC20(usdstAddress).balanceOf(address(this));
+        uint256 initialCR = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
 
-    //     // Verify repayment worked (debt should be reduced)
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
-    //     require(
-    //         cr > LIQUIDATION_RATIO,
-    //         "Position should remain healthy after repayment"
-    //     );
-    // }
+        // Repay partial debt
+        require(
+            ERC20(usdstAddress).approve(address(cdpEngine), repayAmount),
+            "USDST approval failed"
+        );
+        cdpEngine.repay(collateralTokenAddress, repayAmount);
+
+        // Verify repayment worked by checking changes
+        uint256 finalUSDSTBalance = ERC20(usdstAddress).balanceOf(address(this));
+        uint256 finalCR = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+
+        // USDST should be burned (balance decreased)
+        require(
+            finalUSDSTBalance == initialUSDSTBalance - repayAmount,
+            "USDST balance should decrease by repay amount"
+        );
+
+        require(
+            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == mintAmount - repayAmount,
+            "Debt should be reduced by repayment amount"
+        );
+        
+        
+
+        log(cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt);
+    }
 
     // function it_cdp_engine_can_repay_all_debt() {
     //     uint256 depositAmount = 2000e18;
