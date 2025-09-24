@@ -196,11 +196,64 @@ contract Describe_TokenPausable {
             token.pause();
             bool isPaused = Pausable(token).paused();
             require(isPaused, "Token should be paused in cycle");
-            
+
             // Unpause
             token.unpause();
             isPaused = Pausable(token).paused();
             require(!isPaused, "Token should be unpaused in cycle");
         }
+    }
+
+    function it_allows_allowList_users_to_transfer_when_paused() {
+        // Give both users some tokens first
+        uint256 initialAmount = 1000 * 10**18;
+        ERC20(token).transfer(address(user1), initialAmount);
+        ERC20(token).transfer(address(user2), initialAmount);
+
+        // Create allow list with user1
+        address[] memory allowList = new address[](1);
+        allowList[0] = address(user1);
+
+        // Pause with allow list
+        token.pause'(allowList);
+
+        // Check that user1 can transfer (they are on allow list)
+        uint256 transferAmount = 100 * 10**18;
+        bool user1Success = false;
+        try user1.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
+            user1Success = true;
+        } catch {
+            user1Success = false;
+        }
+        require(user1Success, "User1 should be able to transfer when on allow list");
+
+        // Check that user2 cannot transfer (they are NOT on allow list)
+        bool user2Success = false;
+        try user2.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
+            user2Success = true;
+        } catch {
+            user2Success = false;
+        }
+        require(!user2Success, "User2 should NOT be able to transfer when not on allow list");
+
+        // Unpause
+        token.unpause();
+
+        // Check that both users can transfer after unpause
+        user1Success = false;
+        try user1.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
+            user1Success = true;
+        } catch {
+            user1Success = false;
+        }
+        require(user1Success, "User1 should be able to transfer after unpause");
+
+        user2Success = false;
+        try user2.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
+            user2Success = true;
+        } catch {
+            user2Success = false;
+        }
+        require(user2Success, "User2 should be able to transfer after unpause");
     }
 }

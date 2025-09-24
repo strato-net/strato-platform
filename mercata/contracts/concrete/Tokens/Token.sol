@@ -95,7 +95,12 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     }
 
     function pause() external onlyOwner {
-        _pause();
+        address[] memory emptyList;
+        _pause'(emptyList);
+    }
+
+    function pause'(address[] allowList) external onlyOwner {
+        _pause'(allowList);
     }
 
     function unpause() external onlyOwner {
