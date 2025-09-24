@@ -16,6 +16,8 @@ contract Describe_LendingPool_Basic {
         uint lastUpdated;    // optional metadata
     }
 
+    uint INFINITY = 2 ** 256 - 1;
+
     constructor() {
     }
 
@@ -38,6 +40,31 @@ contract Describe_LendingPool_Basic {
     }
 
     function beforeEach() public {
+    }
+
+    /**
+     * @notice Define an inclusive range for a property test parameter
+     * @param value the value to define the range for
+     * @param min the minimum value of the range
+     * @param max the maximum value of the range
+     * @return the value clamped to within the range
+     */
+    function defineRange(uint value, uint min, uint max) public pure returns (uint) {
+        return value % (max - min + 1) + min;
+    }
+
+    /**
+     * @notice Ceiling division of a by b
+     * @param a the numerator
+     * @param b the denominator
+     * @return the result of the ceiling division
+     */
+    function ceilDiv(uint a, uint b) public pure returns (uint) {
+        return (a + b - 1) / b;
+    }
+
+    function require_equal(uint observed, uint expected, string memory message) public {
+        require(observed == expected, message + " Got: " + string(observed) + ", expected: " + string(expected));
     }
 
     function it_aa_can_deploy_Mercata() public {
@@ -393,7 +420,7 @@ contract Describe_LendingPool_Basic {
 
     /// @param x fraction on 1e18 scale (1e18 = 100%) of ltv to borrow, cropped to range [1, 1e18]
     function property_accepts_borrows(uint x) public {
-        x = x % (1e18) + 1; // define acceptable range [1, 1e18]
+        x = defineRange(x, 1, 1e18); // define acceptable range [1, 1e18]
 
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
@@ -442,59 +469,6 @@ contract Describe_LendingPool_Basic {
         );
     }
 
-    function it_as_can_borrow_max_after_borrow() public {
-        //TODO
-        revert("TODO");
-    }
-
-    function it_at_can_accept_repays() public {
-        //TODO
-        revert("TODO");
-    }
-
-    function it_au_can_accept_repay_all() public {
-        //TODO
-        revert("TODO");
-
-        // Assert no dust left on the loan balance
-    }
-
-    function it_av_can_accept_repay_all_after_repay() public {
-        //TODO
-        revert("TODO");
-
-        // Assert no dust left on the loan balance
-    }
-
-    function it_aw_can_deposit_liquidity_max() public {
-        //TODO
-        revert("TODO");
-    }
-
-    function it_ax_can_withdraw_liquidity_partial() public {
-        //TODO
-        revert("TODO");
-    }
-
-    function it_ay_can_withdraw_liquidity_max_after_partial() public {
-        //TODO
-        revert("TODO");
-
-        // Assert no dust mUSDST left
-    }
-
-    function it_az_can_withdraw_liquidity_max() public {
-        //TODO
-        revert("TODO");
-
-        // Assert no dust mUSDST left
-    }
-
-    function it_az_gives_correct_health_factors() public {
-        // TODO multiple scenarios
-        revert("TODO");
-    }
-
     function it_ba_can_tank_gold_price() public {
         PriceOracle oracle = m.priceOracle();
         LendingPool pool = m.lendingPool();
@@ -511,8 +485,6 @@ contract Describe_LendingPool_Basic {
         require(oracle.getAssetPrice(GOLDST) == newPrice, "GOLDST price should be 1000e18 after set price");
 
         uint healthFactor = pool.getHealthFactor(address(user1));
-        log("healthFactor: "+string(healthFactor));
-        log("            / "+string(1e18));
 
         require(healthFactor < 1e18, "Health factor should be less than 1e18 after set price");
     }
@@ -534,7 +506,6 @@ contract Describe_LendingPool_Basic {
         );
 
         require(pool.badDebt() != 0, "Bad debt should be nonzero after *bad debt* liquidation");
-        log("as badDebt: "+string(pool.badDebt()));
 
         LoanInfo memory loan = pool.getUserLoan(address(user1));
         require(loan.scaledDebt == 0, "User loan should be zero after bad debt liquidation");
@@ -544,39 +515,213 @@ contract Describe_LendingPool_Basic {
         Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
     }
 
-    function it_ca_calculates_interest_correctly() public {
+    function it_bs_can_borrow_max_after_borrow() public {
+        CollateralVault cv = m.collateralVault();
+        LendingPool pool = m.lendingPool();
+
+        User user = new User();
+
+        Token(GOLDST).mint(address(user), 1e18);
+
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+
+        (uint ltv, uint foo, uint bar, uint bin, uint baz, uint snap) = pool.getAssetConfig(GOLDST);
+        uint price = m.priceOracle().getAssetPrice(GOLDST);
+        uint maxAmount = price * ltv / 10000;
+
+        // Borrow 10%
+        user.do(address(pool), "borrow", maxAmount * 1000/10000);
+        require_equal(pool.getUserDebt(address(user)), maxAmount * 1000/10000, "Wrong user debt after borrow.");
+
+        // Borrow rest
+        user.do(address(pool), "borrowMax");
+        require_equal(pool.getUserDebt(address(user)), maxAmount, "Wrong user debt after borrowMax.");
+    }
+
+    function it_bt_can_accept_repays() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+
+        // Borrow
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", address(GOLDST), 1e18);
+        user.do(address(pool), "borrowMax");
+
+        uint priorDebt = pool.getUserDebt(address(user));
+
+        // Repay
+        uint repayAmount = 100e18;
+        user.do(USDST, "approve", address(lp), repayAmount);
+        user.do(address(pool), "repay", repayAmount);
+
+        require(pool.getUserDebt(address(user)) == priorDebt - repayAmount, "Repayment unsuccessful");
+    }
+
+    function it_bu_can_accept_repay_all() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+
+        // Borrow
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", address(GOLDST), 1e18);
+        user.do(address(pool), "borrowMax");
+
+        // Repay all
+        user.do(USDST, "approve", address(lp), INFINITY); // Yes, we actually do this in the mercata backend
+        user.do(address(pool), "repayAll");
+
+        // Assert no dust left on the loan balance
+        require(pool.getUserDebt(address(user)) == 0, "Repayment unsuccessful");
+    }
+
+    function it_bv_can_accept_repay_all_after_repay() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+
+        // Borrow
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", address(GOLDST), 1e18);
+        user.do(address(pool), "borrowMax");
+
+        uint priorDebt = pool.getUserDebt(address(user));
+
+        // Repay
+        uint repayAmount = 100e18;
+        user.do(USDST, "approve", address(lp), repayAmount);
+        user.do(address(pool), "repay", repayAmount);
+
+        require(pool.getUserDebt(address(user)) == priorDebt - repayAmount, "Repayment unsuccessful");
+
+        // Repay all
+        user.do(USDST, "approve", address(lp), INFINITY); // Yes, we actually do this in the mercata backend
+        user.do(address(pool), "repayAll");
+
+        // Assert no dust left on the loan balance
+        require(pool.getUserDebt(address(user)) == 0, "Repay all unsuccessful");
+    }
+
+    /// @param usdstBalance amount of USDST to deposit; range [1, INFINITY]
+    function property_bw_can_deposit_liquidity_max(uint usdstBalance) public {
+        usdstBalance = defineRange(usdstBalance, 1, INFINITY);
+
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+        Token(USDST).mint(address(user), usdstBalance);
+        uint depositAmount = usdstBalance; // No special function to call for max deposit
+        uint expectedMUSDST = usdstBalance * 1e18 / pool.getExchangeRate();
+
+        // Deposit
+        user.do(USDST, "approve", address(lp), INFINITY);
+        user.do(address(pool), "depositLiquidity", depositAmount);
+
+        require(IERC20(mUSDST).balanceOf(address(user)) == expectedMUSDST, "Deposit unsuccessful");
+    }
+
+    User user3;
+    function it_bx_can_withdraw_liquidity_partial() public {
+        LendingPool pool = m.lendingPool();
+        LiquidityPool lp = m.liquidityPool();
+
+        user3 = new User();
+        uint usdstBalance = 1000e18;
+        Token(USDST).mint(address(user3), usdstBalance);
+        user3.do(USDST, "approve", address(lp), usdstBalance);
+        user3.do(address(pool), "depositLiquidity", usdstBalance);
+
+        uint withdrawalAmount = IERC20(mUSDST).balanceOf(address(user3)) * pool.getExchangeRate() / 1e18 * 1000/10000; // 10% of the dollar value
+
+        // Expected mUSDST balance after withdrawal
+        uint expectedMUSDST = IERC20(mUSDST).balanceOf(address(user3)) - ceilDiv(withdrawalAmount * 1e18, pool.getExchangeRate());
+
+        user3.do(address(pool), "withdrawLiquidity", withdrawalAmount);
+
+        require_equal(IERC20(USDST).balanceOf(address(user3)), withdrawalAmount, "Wrong USDST balance after withdrawal.");
+        require_equal(IERC20(mUSDST).balanceOf(address(user3)), expectedMUSDST, "Wrong mUSDST balance after withdrawal");
+    }
+
+    function it_by_can_withdraw_liquidity_max_after_partial() public {
+        LendingPool pool = m.lendingPool();
+        LiquidityPool lp = m.liquidityPool();
+
+        user3.do(USDST, "approve", address(lp), INFINITY); // Yes, we actually do this in the mercata backend
+        user3.do(address(pool), "withdrawLiquidityAll");
+
+        // Assert no dust mUSDST left
+        require(IERC20(mUSDST).balanceOf(address(user3)) == 0, "Withdrawal unsuccessful");
+    }
+
+    function property_bz_can_withdraw_liquidity_max(uint depositAmount) public {
+        depositAmount = defineRange(depositAmount, 1, INFINITY);
+        
+        LendingPool pool = m.lendingPool();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+        Token(USDST).mint(address(user), depositAmount);
+        user.do(USDST, "approve", address(lp), depositAmount);
+        user.do(address(pool), "depositLiquidity", depositAmount);
+
+        user.do(USDST, "approve", address(lp), INFINITY); // Yes, we actually do this in the mercata backend
+        user.do(address(pool), "withdrawLiquidityAll");
+
+        // Assert no dust mUSDST left
+        require(IERC20(mUSDST).balanceOf(address(user)) == 0, "Withdrawal unsuccessful");
+    }
+
+    function it_cz_gives_correct_health_factors() public {
+        // TODO multiple scenarios
+        revert("TODO");
+    }
+
+    function it_da_calculates_interest_correctly() public {
         // TODO probably multiple test cases, but we'll need to run the clock
         revert("Clock Winding for solid-vm-cli needed");
     }
 
-    function it_da_lets_admin_sweep_reserves() public {
+    function it_ea_lets_admin_sweep_reserves() public {
         // TODO
         revert("TODO");
     }
 
-    function it_ea_handles_50_pct_liquidation() public {
+    function it_fa_handles_50_pct_liquidation() public {
         // TODO
         revert("TODO");
     }
 
-    function it_eb_handles_100_pct_liquidation() public {
+    function it_fb_handles_100_pct_liquidation() public {
         // TODO
         revert("TODO");
 
         // Assert no dust left on the loan balance
     }
     
-    function it_ec_prevents_self_liquidation() public {
+    function it_fc_prevents_self_liquidation() public {
         // TODO
         revert("TODO");
     }
     
-    function it_ed_prevents_liquidation_of_healthy_positions() public {
+    function it_fd_prevents_liquidation_of_healthy_positions() public {
         // TODO
         revert("TODO");
     }
     
-    function it_fa_handles_multiple_collateral_cross_liquidation() public {
+    function it_ga_handles_multiple_collateral_cross_liquidation() public {
         // TODO other multi collateral scenarios
         revert("TODO");
     }
