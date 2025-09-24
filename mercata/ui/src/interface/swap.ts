@@ -1,19 +1,54 @@
-// ============================================================================
-// SWAP-SPECIFIC INTERFACES
-// ============================================================================
-// This file contains UI-specific swap interfaces that extend the shared types
 
-// Import shared types for use in UI-specific interface definitions
-import type {
-  SwapHistoryEntry,
-  SwapParams,
-  SetPoolRatesParams,
-  Pool,
-  SwapToken,
-} from '@shared/swap-types';
+import { SafetyModuleData } from '.';
+export interface SwapToken {
+  address: string;
+  _name: string;
+  _symbol: string;
+  _totalSupply: string;
+  customDecimals?: number;
+  price?: string;
+  images?: Array<{ value: string }>;
+}
 
-// Re-export all shared swap types (handled by interface/index.tsx)
-export * from '@shared/swap-types';
+export interface Pool {
+  address: string;
+  tokenA: SwapToken;
+  tokenB: SwapToken;
+  lpToken: {
+    address: string;
+    _name: string;
+    _symbol: string;
+    balance: string;
+    price: string;
+    _totalSupply: string;
+  };
+  apy?: number;
+}
+
+export interface SwapParams {
+  poolAddress: string;
+  isAToB: boolean;
+  amountIn: string;
+  minAmountOut: string;
+}
+
+export interface SetPoolRatesParams {
+  poolAddress: string;
+  rateA: string;
+  rateB: string;
+}
+
+export interface SwapHistoryEntry {
+  id: string;
+  poolAddress: string;
+  tokenA: SwapToken;
+  tokenB: SwapToken;
+  amountIn: string;
+  amountOut: string;
+  isAToB: boolean;
+  timestamp: string;
+  transactionHash: string;
+}
 
 // ============================================================================
 // UI-SPECIFIC SWAP INTERFACES
@@ -135,6 +170,8 @@ export interface PoolParticipationProps {
   userPools: Pool[];
   loadingUserPools: boolean;
   shouldPreventFlash?: boolean;
+  safetyInfo?: SafetyModuleData | null;
+  loadingSafety?: boolean;
 }
 
 /**
