@@ -75,7 +75,9 @@ contract record PoolFactory is Ownable {
     /// @param _tokenFactory The address of the token factory
     /// @param _adminRegistry The address of the admin registry
     /// @param _feeCollector The address of the fee collector
-    constructor(address initialOwner, address _tokenFactory, address _adminRegistry, address _feeCollector) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _tokenFactory, address _adminRegistry, address _feeCollector) external onlyOwner {
         require(_adminRegistry != address(0), "Zero admin registry address");
         require(_tokenFactory  != address(0), "Zero token factory address");
         require(_feeCollector  != address(0), "Zero fee collector address");

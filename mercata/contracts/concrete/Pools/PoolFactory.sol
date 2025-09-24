@@ -16,6 +16,7 @@
 import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Admin/AdminRegistry.sol";
+import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 

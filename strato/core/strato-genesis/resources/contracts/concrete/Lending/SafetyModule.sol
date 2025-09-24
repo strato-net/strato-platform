@@ -42,7 +42,9 @@ contract record SafetyModule is Ownable {
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
 
-    constructor(address _lendingRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
         require(_lendingRegistry != address(0)  && _tokenFactory != address(0), "SM:zero addr");
         lendingRegistry = LendingRegistry(_lendingRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
@@ -74,6 +76,8 @@ contract record SafetyModule is Ownable {
         _syncFromRegistry();
     }
 
+    /// @dev call this before setTokens()
+    /// @dev call this after the LendingPool configuration, particularly `poolConfigurator.setBorrowableAsset(USDST)`
     function _syncFromRegistry() internal {
         address _lendingPool = lendingRegistry.getLendingPool();
         address _liquidityPool = lendingRegistry.getLiquidityPool();
@@ -266,6 +270,7 @@ contract record SafetyModule is Ownable {
     }
 
     /// @notice set the tokens - typically one-time
+    /// @dev call this after syncFromRegistry() so that lendingPool is set
     function setTokens(address _sToken, address _asset) external onlyOwner {
         require(_sToken != address(0), "Invalid sToken address");
         require(_asset != address(0), "Invalid underlyingAsset address");

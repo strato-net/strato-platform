@@ -17,7 +17,9 @@ contract record CollateralVault is Ownable {
     // user => asset => amount
     mapping(address => mapping(address => uint)) public record userCollaterals;
 
-    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _registry) external onlyOwner {
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
     }
