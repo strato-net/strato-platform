@@ -1,6 +1,6 @@
-import "../concrete/BaseCodeCollection.sol";
-import "../abstract/ERC20/IERC20.sol";
-import "../concrete/Tokens/Token.sol";
+import "../../concrete/BaseCodeCollection.sol";
+import "../../abstract/ERC20/IERC20.sol";
+import "../../concrete/Tokens/Token.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -50,10 +50,7 @@ contract Describe_BadDebt_Basic {
     User user3;
 
     address USDST;
-
     address ETHST;
-    address GOLDST;
-    address SILVST;
 
     // CDP-specific variables
     uint vaultId1;  // For tracking CDP vaults created in tests
@@ -93,7 +90,16 @@ contract Describe_BadDebt_Basic {
         CDPReserve reserve = m.cdpReserve();
         CDPVault vault = m.cdpVault();
         log("   Reserve USDST: " + string(IERC20(USDST).balanceOf(address(reserve)) / 1e18));
-        log("   Vault ETHST: " + string(IERC20(ETHST).balanceOf(address(vault)) / 1e18));
+        
+        // Debug vault balance check
+        if (address(ETHST) != address(0)) {
+            uint vaultBalance = IERC20(ETHST).balanceOf(address(vault));
+            log("   Vault ETHST: " + string(vaultBalance / 1e18));
+            log("   Debug - Vault address: " + string(address(vault)));
+            log("   Debug - ETHST address: " + string(address(ETHST)));
+        } else {
+            log("   Vault ETHST: ETHST not set");
+        }
         
         // Token total supplies (removed due to compilation errors)
         log("📊 Token Total Supplies:");
@@ -231,41 +237,26 @@ contract Describe_BadDebt_Basic {
         
     }
 
-    // Test basic token creation functionality
-    function it_ac_can_create_and_activate_tokens() public {
-        // Create test token for borrowing
-        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
-        require(address(USDST) != address(0), "Failed to create USDST token");
-
-        // Create test tokens for lending - NOT NEEDED FOR CDP
-        // mUSDST = m.tokenFactory().createToken("mUSDST", "mUSDST Token", [], [], [], "mUSDST", 0, 18);
-        // sUSDST = m.tokenFactory().createToken("sUSDST", "sUSDST Token", [], [], [], "msSDST", 0, 18);
-        // require(address(mUSDST) != address(0), "Failed to create mUSDST token");
-        // require(address(sUSDST) != address(0), "Failed to create sUSDST token");
+    // // Test basic token creation functionality
+    // function it_ac_can_create_and_activate_tokens() public {
+    //     USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+    //     require(address(USDST) != address(0), "Failed to create USDST token");
+    //     Token(USDST).setStatus(2); // Activate USDST
+    //     require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
         
-        // Create test tokens for collateral
-        GOLDST = m.tokenFactory().createToken("GOLDST", "GOLDST Token", [], [], [], "GOLDST", 0, 18);
-        SILVST= m.tokenFactory().createToken("SILVST", "SILVST Token", [], [], [], "SILVST", 0, 18);
-        require(address(GOLDST) != address(0), "Failed to create GOLDST token");
-        require(address(SILVST) != address(0), "Failed to create SILVST token");
-    }
+    //     ETHST = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
+    //     require(address(ETHST) != address(0), "Failed to create ETHST token");
+    //     Token(ETHST).setStatus(2); // Activate ETHST
+    //     require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
+    // }
 
-    // Test token activation functionality
-    function it_ad_can_activate_tokens() public {
-        // Set tokens to active status
-        Token(USDST).setStatus(2);
-        // Token(mUSDST).setStatus(2);  // NOT NEEDED FOR CDP
-        // Token(sUSDST).setStatus(2);  // NOT NEEDED FOR CDP
-        Token(GOLDST).setStatus(2);
-        Token(SILVST).setStatus(2);
-        
-        // Basic checks - tokens activated successfully
-        require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
-        // require(Token(mUSDST).status() == TokenStatus.ACTIVE, "mUSDST token not activated");  // NOT NEEDED FOR CDP
-        // require(Token(sUSDST).status() == TokenStatus.ACTIVE, "sUSDST token not activated");  // NOT NEEDED FOR CDP
-        require(Token(GOLDST).status() == TokenStatus.ACTIVE, "GOLDST token not activated");
-        require(Token(SILVST).status() == TokenStatus.ACTIVE, "SILVST token not activated");
-    }
+    // // Test token activation functionality
+    // function it_ad_can_activate_tokens() public {
+    //     // Set tokens to active status
+    //     // Tokens are already activated in the creation function
+    //     require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
+    //     require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
+    // }
 
     // NOT NEEDED FOR CDP - tokens are whitelisted for lending pool, not CDP
     /*
@@ -450,13 +441,11 @@ contract Describe_BadDebt_Basic {
         PriceOracle oracle = m.priceOracle();
         
         oracle.setAssetPrice(USDST, 1e18);      // $1 USD
-        oracle.setAssetPrice(GOLDST, 2000e18);  // $2000 Gold
-        oracle.setAssetPrice(SILVST, 25e18);  // $25 Silver
+        oracle.setAssetPrice(ETHST, 3000e18);   // $3000 ETH (initial price)
         
         // Verify oracle prices  
         require(oracle.getAssetPrice(USDST) == 1e18, "USD price not set correctly");
-        require(oracle.getAssetPrice(GOLDST) == 2000e18, "Gold price not set correctly");
-        require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
+        require(oracle.getAssetPrice(ETHST) == 3000e18, "ETH price not set correctly");
     }
 
     function it_aj_can_display_logs() public {
@@ -477,14 +466,18 @@ contract Describe_BadDebt_Basic {
         require(address(user1) != address(0), "User1 not created");
         require(address(user2) != address(0), "User2 not created");
 
+        // Get users' current balances (they may have USDST from previous operations)
+        uint user1InitialBalance = IERC20(USDST).balanceOf(address(user1));
+        uint user2InitialBalance = IERC20(USDST).balanceOf(address(user2));
+        
         Token(USDST).mint(address(this), 1000e18);
         IERC20(USDST).transfer(address(user1), 1000e18);
-        require(IERC20(USDST).balanceOf(address(user1)) == 1000e18, "User1 should have 1000 USDST after receipt");
+        require(IERC20(USDST).balanceOf(address(user1)) == user1InitialBalance + 1000e18, "User1 should have additional 1000 USDST after receipt");
         user1.do(USDST, "transfer", address(user2), 1000e18);
-        require(IERC20(USDST).balanceOf(address(user1)) == 0, "User1 should have 0 USDST after transfer out");
-        require(IERC20(USDST).balanceOf(address(user2)) == 1000e18, "User2 should have 1000 USDST after receipt");
+        require(IERC20(USDST).balanceOf(address(user1)) == user1InitialBalance, "User1 should be back to initial balance after transfer out");
+        require(IERC20(USDST).balanceOf(address(user2)) == user2InitialBalance + 1000e18, "User2 should have additional 1000 USDST after receipt");
         user2.do(USDST, "transfer", address(this), 1000e18);
-        require(IERC20(USDST).balanceOf(address(user2)) == 0, "User2 should have 0 USDST after transfer out");
+        require(IERC20(USDST).balanceOf(address(user2)) == user2InitialBalance, "User2 should be back to initial balance after transfer out");
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Admin should have 1000 USDST after receipt");
         Token(USDST).burn(address(this), 1000e18);
     }
@@ -673,18 +666,31 @@ contract Describe_BadDebt_Basic {
         user2 = new User();
         user3 = new User();
         
-        // Create ETHST token first (needed for configuration)
+        // Create USDST token first (needed for CDP operations)
+        USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
+        require(address(USDST) != address(0), "Failed to create USDST token");
+        Token(USDST).setStatus(2); // Activate USDST
+        require(Token(USDST).status() == TokenStatus.ACTIVE, "USDST token not activated");
+        
+        // Create ETHST token (needed for configuration)
         ETHST = m.tokenFactory().createToken("ETHST", "ETHST Token", [], [], [], "ETHST", 0, 18);
         require(address(ETHST) != address(0), "Failed to create ETHST token");
         Token(ETHST).setStatus(2); // Activate ETHST
         require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
+        log("✅ Using custom tokens - USDST: " + string(address(USDST)) + ", ETHST: " + string(address(ETHST)));
         
         // Grant CDPEngine mint/burn rights on USDST
         Token(USDST).addWhitelist(address(m.adminRegistry()), "mint", address(engine));
         Token(USDST).addWhitelist(address(m.adminRegistry()), "burn", address(engine));
+        Token(USDST).mint(address(user2), 100000000000000000000000000000000);
         
         // Set TokenFactory in CDPRegistry
         registry.setTokenFactory(address(m.tokenFactory()));
+        
+        // Set our newly created USDST token in the registry
+        registry.setUSDST(address(USDST));
+        require(address(registry.usdst()) == address(USDST), "USDST not set correctly in registry");
+        log("✅ USDST token set in registry: " + string(address(USDST)));
         
         // Set initial ETHST price in oracle (needed for CDP operations)
         PriceOracle oracle = m.priceOracle();
@@ -739,8 +745,13 @@ contract Describe_BadDebt_Basic {
         
         // Set ETHST price to $3,000 (may have been changed by previous tests)
         uint ethstPrice = 3000e18; // $3,000 with 18 decimals
+        log("Setting ETHST price to: " + string(ethstPrice / 1e18));
         oracle.setAssetPrice(ETHST, ethstPrice);
-        require(oracle.getAssetPrice(ETHST) == ethstPrice, "ETHST price not set correctly");
+        log("Price set, now checking...");
+        
+        uint retrievedPrice = oracle.getAssetPrice(ETHST);
+        log("Retrieved ETHST price: " + string(retrievedPrice / 1e18));
+        require(retrievedPrice == ethstPrice, "ETHST price not set correctly");
         
         // Mint 10 ETHST to user1 (amount from setupCDPTest.js)
         uint ethstAmount = 10e18; // 10 ETHST
@@ -764,12 +775,16 @@ contract Describe_BadDebt_Basic {
         log("Vault ETHST balance: " + string(vaultBalance / 1e18));
         
         log("✅ User1 deposited 10 ETHST as collateral (~$30,000 value)");
-        _snapshot(); // Snapshot after collateral deposit
+        // _snapshot(); // Snapshot after collateral deposit
     }
 
     // Mint USDST against ETHST collateral
     function it_ah_can_borrow_against_collateral() public {
         CDPEngine engine = m.cdpEngine();
+        
+        // Debug: Check CDPEngine address
+        log("CDPEngine address: " + string(address(engine)));
+        require(address(engine) != address(0), "CDPEngine address is zero");
         
         // Get user1's USDST balance before minting
         uint balanceBefore = IERC20(USDST).balanceOf(address(user1));
@@ -779,6 +794,11 @@ contract Describe_BadDebt_Basic {
         
         // User1 needs to approve CDP Engine to handle USDST (for potential burn operations)
         user1.do(USDST, "approve", address(engine), 1000000e18); // Large approval
+        
+        // Debug: Check if ETHST is properly configured
+        log("About to mint USDST against ETHST collateral...");
+        log("ETHST address: " + string(address(ETHST)));
+        log("Amount to mint: " + string(usdstToMint / 1e18) + " USDST");
         
         // User1 mints USDST against ETHST collateral
         user1.do(address(engine), "mint", ETHST, usdstToMint);
@@ -793,7 +813,7 @@ contract Describe_BadDebt_Basic {
         
         log("✅ User1 minted 15,000 USDST against ETHST collateral");
         log("📊 Collateralization ratio: 200% (healthy)");
-        _snapshot(); // Snapshot after minting USDST
+        // _snapshot(); // Snapshot after minting USDST
     }
 
     // Crash ETHST price to make CDP undercollateralized
@@ -827,7 +847,7 @@ contract Describe_BadDebt_Basic {
         log("📉 ETHST price crashed from $3,000 to $100");
         log("⚠️  Position now severely undercollateralized: $1,000 collateral vs $15,000 debt");
         log("📊 Collateralization ratio: 6.67% (below 150% liquidation threshold)");
-        _snapshot(); // Snapshot after price crash
+        // _snapshot(); // Snapshot after price crash
     }
 
     // Liquidate the undercollateralized CDP to create bad debt
@@ -839,9 +859,10 @@ contract Describe_BadDebt_Basic {
         uint initialReserveBalance = IERC20(USDST).balanceOf(address(reserve));
         log("💰 Initial reserve balance: " + string(initialReserveBalance / 1e18) + " USDST");
         
-        // Give user2 USDST for liquidation (transfer from user1)
-        uint liquidationAmount = 50000e18; // 50,000 USDST (much larger than debt)
-        user1.do(USDST, "transfer", address(user2), liquidationAmount);
+        // Give user2 USDST for liquidation (mint directly to user2)
+        // Use exact amount from setupCDPTest.js - 50,000 USDST (much larger than 15,000 debt)
+        uint liquidationAmount = 50000e18; // 50,000 USDST (matches setupCDPTest.js)
+        Token(USDST).mint(address(user2), liquidationAmount);
         require(IERC20(USDST).balanceOf(address(user2)) >= liquidationAmount, "User2 should have USDST for liquidation");
         
         // User2 approves CDP Engine to spend USDST for liquidation
@@ -872,7 +893,7 @@ contract Describe_BadDebt_Basic {
         
         log("✅ Liquidation completed - bad debt should be created");
         log("📊 Expected bad debt: ~14,000 USDST ($15,000 debt - $1,000 collateral)");
-        _snapshot(); // Snapshot after liquidation and bad debt creation
+        // _snapshot(); // Snapshot after liquidation and bad debt creation
     }
 
     // Test junior notes system for bad debt recovery
@@ -887,27 +908,28 @@ contract Describe_BadDebt_Basic {
         // Part 2: Open junior notes from multiple users
         log("📝 Opening junior notes...");
         
-        // Give users USDST for burning in junior notes
-        user1.do(USDST, "transfer", address(user2), 4000e18); // 4,000 USDST to user2
-        user1.do(USDST, "transfer", address(user3), 1000e18); // 1,000 USDST to user3
+        // Give users USDST for burning in junior notes (mint directly)
+        // Match exact amounts from testJuniorNotes.js constants
+        Token(USDST).mint(address(user2), 5000e18); // 5,000 USDST to user2 (TRANSFER_TO_ACC2)
+        Token(USDST).mint(address(user3), 2000e18); // 2,000 USDST to user3 (TRANSFER_TO_ACC3)
         
         // User1 opens note: 2,000 USDST burn → ~2,200 USDST cap (with 10% premium)
-        user1.do(USDST, "approve", address(engine), 2000e18);
-        user1.do(address(engine), "openJuniorNote", ETHST, 2000e18);
+        user1.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
+        user1.do(address(engine), "openJuniorNote", ETHST, 2000e18); // ACC1_BURN
         log("✅ User1 opened junior note: 2,000 USDST → ~2,200 USDST cap");
         
         // User2 opens note: 1,500 USDST burn → ~1,650 USDST cap
-        user2.do(USDST, "approve", address(engine), 1500e18);
-        user2.do(address(engine), "openJuniorNote", ETHST, 1500e18);
+        user2.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
+        user2.do(address(engine), "openJuniorNote", ETHST, 1500e18); // ACC2_BURN
         log("✅ User2 opened junior note: 1,500 USDST → ~1,650 USDST cap");
         
         // User3 opens note: 500 USDST burn → ~550 USDST cap
-        user3.do(USDST, "approve", address(engine), 500e18);
-        user3.do(address(engine), "openJuniorNote", ETHST, 500e18);
+        user3.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
+        user3.do(address(engine), "openJuniorNote", ETHST, 500e18); // ACC3_BURN
         log("✅ User3 opened junior note: 500 USDST → ~550 USDST cap");
         
         log("📊 Total notes outstanding: ~4,400 USDST cap from 4,000 USDST burned");
-        _snapshot(); // Snapshot after opening all junior notes
+        // _snapshot(); // Snapshot after opening all junior notes
         
         // Part 3: Simulate reserve inflows (as in testJuniorNotes.js)
         log("💰 Testing reserve inflows & pro-rata recovery...");
@@ -961,7 +983,7 @@ contract Describe_BadDebt_Basic {
         log("✅ Junior notes system tested successfully");
         log("📊 Total inflows: 4,000 USDST (1,000 + 700 + 2,000 + 300)");
         log("🎯 Pro-rata distribution and indexing tested across multiple users");
-        _snapshot(); // Final snapshot after junior notes testing
+        // _snapshot(); // Final snapshot after junior notes testing
     }
 
 } 
