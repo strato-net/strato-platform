@@ -222,7 +222,7 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCol
       , c
       , "' "
       , case t of
-          SqlDecimal -> "AND (s.data->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
+          SqlDecimal -> "AND (s.data->>'" <> c <> "') ~ '^\\s*-?\\d+(\\.\\d*)?\\s*$' "
           SqlBool -> "AND jsonb_typeof(s.data->'" <> c <> "') = 'boolean' "
           _ -> ""
       , case t of
@@ -278,7 +278,7 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
       , c
       , "' "
       , case t of
-          SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
+          SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+(\\.\\d*)?\\s*$' "
           SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'boolean' "
           _ -> ""
       , case t of
@@ -335,7 +335,7 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
       , c
       , "' "
       , case t of
-          SqlDecimal -> "AND (e.attributes->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
+          SqlDecimal -> "AND (e.attributes->>'" <> c <> "') ~ '^\\s*-?\\d+(\\.\\d*)?\\s*$' "
           SqlBool -> "AND jsonb_typeof(e.attributes->'" <> c <> "') = 'boolean' "
           _ -> ""
       , case t of
@@ -391,7 +391,7 @@ slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCol
       , c
       , "' "
       , case t of
-          SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
+          SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+(\\.\\d*)?\\s*$' "
           SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'boolean' "
           _ -> ""
       , case t of
