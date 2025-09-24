@@ -1,6 +1,12 @@
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
-import "./User.sol";
+
+contract User {
+    function do(address a, string f, variadic args) public returns (variadic) {
+        variadic result = address(a).call(f, args);
+        return result;
+    }
+}
 
 contract record TestERC20 is ERC20, Ownable {
     constructor(string _name, string _symbol, address _owner) ERC20(_name, _symbol) Ownable(_owner) {
