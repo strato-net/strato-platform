@@ -404,9 +404,6 @@ contract Describe_CDPEngine  {
             "Debt should be reduced by repayment amount"
         );
         
-        
-
-        log(cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt);
     }
 
     // function it_cdp_engine_can_repay_all_debt() {
