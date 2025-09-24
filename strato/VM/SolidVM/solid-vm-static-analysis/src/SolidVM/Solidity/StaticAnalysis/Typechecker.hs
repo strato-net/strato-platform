@@ -1167,8 +1167,8 @@ functionHelper cc c funcName f@Func {..} =
               _ -> bottom $ "Function `receive` must be External and Payable, but has not been declared so " <$ _funcContext
             else
               if (funcName == "fallback")
-                then case (_funcArgs, _funcVals, _funcVisibility) of
-                  ([], [], Just External) ->
+                then case (_funcVisibility) of
+                  Just External ->
                     let r =
                           R cc c (Just f) (Just funcName) Nothing $
                             map
@@ -1191,22 +1191,6 @@ functionHelper cc c funcName f@Func {..} =
                             <$> (catMaybes $ sequence . swap <$> _funcVals)
                         argVals = M.fromList $ args ++ vals
                      in runReader (statementsHelper argVals stmts) r
-                  ([fArg], _, _) ->
-                    bottom $
-                      ( T.concat
-                          [ "Function `fallback` must take no arguments, but has been given ",
-                            T.pack $ show fArg
-                          ]
-                      )
-                        <$ _funcContext
-                  (_, [fVal], _) ->
-                    bottom $
-                      ( T.concat
-                          [ "Function `fallback` must have no return values, but has been given ",
-                            T.pack $ show fVal
-                          ]
-                      )
-                        <$ _funcContext
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               let r =

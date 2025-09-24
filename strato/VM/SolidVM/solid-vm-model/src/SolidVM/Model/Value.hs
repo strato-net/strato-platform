@@ -176,6 +176,7 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger {} n = SInteger n
 coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
+coerceFromInt _ SBool {} n = SBool $ n /= 0
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
 coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
