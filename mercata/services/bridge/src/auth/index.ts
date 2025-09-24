@@ -3,6 +3,7 @@ import { config } from "../config";
 import { logError } from "../utils/logger";
 import { strato } from "../utils/api";
 
+
 // Validation function to check config at runtime
 const validateConfig = () => {
   if (!config.auth?.clientId) {
@@ -40,7 +41,7 @@ const CACHED_DATA: {
 
 let cachedUserAddress: string | null = null;
 
-const TOKEN_LIFETIME_RESERVE_SECONDS = 120; // Reserve 2 minutes for token expiration check
+const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
 
 // Add singleton pattern for OAuth initialization
 let oauthInitialized = false;
@@ -74,7 +75,7 @@ export const getBAUserToken = async (): Promise<string> => {
   if (
     userTokenData &&
     userTokenData.token &&
-    userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_RESERVE_SECONDS
+    userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_THRESHOLD_SECONDS
   ) {
     return userTokenData.token;
   }
