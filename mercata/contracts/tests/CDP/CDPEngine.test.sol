@@ -3,11 +3,11 @@ import "../../concrete/BaseCodeCollection.sol";
 
 // Per‑vault state keyed by (user, asset)
 struct Vault {
-    uint collateral;  // raw token units
-    uint scaledDebt;  // index‑denominated debt
+    uint collateral; // raw token units
+    uint scaledDebt; // index‑denominated debt
 }
 
-contract Describe_CDPEngine  {
+contract Describe_CDPEngine {
     Mercata m;
     string[] emptyArray;
 
@@ -18,6 +18,7 @@ contract Describe_CDPEngine  {
     CDPVault cdpVault;
     CDPRegistry cdpRegistry;
     CDPReserve cdpReserve;
+    PriceOracle priceOracle;
     Token collateralToken;
     Token usdst;
 
@@ -42,6 +43,7 @@ contract Describe_CDPEngine  {
         cdpVault = m.cdpVault();
         cdpRegistry = m.cdpRegistry();
         cdpReserve = m.cdpReserve();
+        priceOracle = PriceOracle(address(cdpRegistry.priceOracle()));
 
         //  Create a mock USDST and set it in the registry
         // This replaces the hardcoded address with a working token
@@ -73,9 +75,6 @@ contract Describe_CDPEngine  {
         usdstAddress = mockUSDSTAddress;
 
         // Set up price oracle
-        PriceOracle priceOracle = PriceOracle(
-            address(cdpRegistry.priceOracle())
-        );
         priceOracle.setAssetPrice(usdstAddress, 1e18); // $1.00 in 18 decimals
     }
 
@@ -114,9 +113,6 @@ contract Describe_CDPEngine  {
 
         // CRITICAL: Set price for collateral token in the price oracle
         // Without this, CDPEngine will fail with "Price not available"
-        PriceOracle priceOracle = PriceOracle(
-            address(cdpRegistry.priceOracle())
-        );
         priceOracle.setAssetPrice(collateralTokenAddress, 5e18); // $5.00 per token (18 decimals)
     }
 
@@ -264,7 +260,7 @@ contract Describe_CDPEngine  {
     // // ============ MINTING TESTS ============
 
     function it_cdp_engine_can_mint_usdst() {
-        uint256 depositAmount = 2000e18; // $10000 worth at $1 price
+        uint256 depositAmount = 2000e18; // $10000 worth at $5 price
         uint256 mintAmount = 1000e18; // $1000 USDST (safe with 150% ratio)
 
         // Deposit collateral first
@@ -338,8 +334,6 @@ contract Describe_CDPEngine  {
         );
         cdpEngine.deposit(collateralTokenAddress, depositAmount);
 
-     
-
         // Try to mint below debt floor (should fail)
         uint256 belowFloorAmount = DEBT_FLOOR - 1; // 99.999... USD
 
@@ -351,7 +345,6 @@ contract Describe_CDPEngine  {
             reverted = true;
         }
         require(reverted, "Should revert when minting below debt floor");
-
     }
 
     // // ============ REPAYMENT TESTS ============
@@ -373,7 +366,9 @@ contract Describe_CDPEngine  {
         cdpEngine.mint(collateralTokenAddress, mintAmount);
 
         // Get initial state before repayment
-        uint256 initialUSDSTBalance = ERC20(usdstAddress).balanceOf(address(this));
+        uint256 initialUSDSTBalance = ERC20(usdstAddress).balanceOf(
+            address(this)
+        );
         uint256 initialCR = cdpEngine.collateralizationRatio(
             address(this),
             collateralTokenAddress
@@ -406,188 +401,284 @@ contract Describe_CDPEngine  {
         
     }
 
-    // function it_cdp_engine_can_repay_all_debt() {
-    //     uint256 depositAmount = 2000e18;
-    //     uint256 mintAmount = 1000e18;
+    function it_cdp_engine_can_repay_all_debt() {
+        uint256 depositAmount = 2000e18;
+        uint256 mintAmount = 1000e18;
 
-    //     // Setup: deposit and mint
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
-    //     cdpEngine.mint(collateralTokenAddress, mintAmount);
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
 
-    //     // Approve enough for repayment including potential fees
-    //     require(
-    //         ERC20(usdstAddress).approve(
-    //             address(cdpEngine),
-    //             mintAmount + 100e18
-    //         ),
-    //         "USDST approval failed"
-    //     );
-    //     cdpEngine.repayAll(collateralTokenAddress);
+        // Approve enough for repayment including potential fees
+        require(
+            ERC20(usdstAddress).approve(
+                address(cdpEngine),
+                mintAmount + 100e18
+            ),
+            "USDST approval failed"
+        );
 
-    //     // Check CR is infinite (no debt)
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
-    //     require(cr == 2 ** 256 - 1, "CR should be max when no debt");
-    // }
+        require(
+            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == mintAmount,
+            "Debt should be equal to mint amount when all debt is repaid"
+        );
+
+        require(
+            cdpEngine.vaults(address(this), collateralTokenAddress).collateral == depositAmount,
+             "Collateral should be equal to deposit amount when all debt is repaid"
+        );
+
+        cdpEngine.repayAll(collateralTokenAddress);
+
+        // Check CR is infinite (no debt)
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+        require(cr == 2 ** 256 - 1, "CR should be max when no debt");
+
+        require(
+            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == 0,
+            "Debt should be 0 when all debt is repaid"
+        );
+    }
 
     // // ============ COLLATERALIZATION RATIO TESTS ============
 
-    // function it_cdp_engine_calculates_collateralization_ratio() {
-    //     uint256 depositAmount = 3000e18; // $3000 at $1 price
-    //     uint256 mintAmount = 1500e18; // $1500 debt
+    function it_cdp_engine_calculates_collateralization_ratio() {
+        uint256 depositAmount = 3000e18; // $15000 at $5 price
+        uint256 mintAmount = 1500e18; // $1500 debt
 
-    //     // Setup: deposit and mint
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
-    //     cdpEngine.mint(collateralTokenAddress, mintAmount);
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
 
-    //     // Check CR
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
+        // Check CR
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
 
-    //     // Expected CR = 3000 / 1500 = 2.0 = 200% = 2e18 WAD
-    //     require(
-    //         cr >= 190e16 && cr <= 210e16,
-    //         "CR should be approximately 200%"
-    //     ); // Allow some variance for fees
-    // }
+        // Expected CR = 15000 / 1500 = 10 =  10e18 WAD
+        uint256 price = priceOracle.getAssetPrice(collateralTokenAddress);
+        uint256 expectedCR = (depositAmount * price / mintAmount);
 
-    // function it_cdp_engine_returns_max_cr_when_no_debt() {
-    //     uint256 depositAmount = 1000e18;
+        require(
+            cr == expectedCR,
+            "CR should be  10"
+        );
+    }
 
-    //     // Deposit without minting
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
+    function it_cdp_engine_returns_max_cr_when_no_debt() {
+        uint256 depositAmount = 1000e18;
 
-    //     // Check CR (should be max uint when no debt)
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
-    //     require(cr == 2 ** 256 - 1, "CR should be max when no debt");
-    // }
+        // Deposit without minting
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+
+        // Check CR (should be max uint when no debt)
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+        require(cr == 2 ** 256 - 1, "CR should be max when no debt");
+    }
 
     // // ============ WITHDRAWAL WITH DEBT TESTS ============
 
-    // function it_cdp_engine_prevents_unsafe_withdrawal() {
-    //     uint256 depositAmount = 2000e18;
-    //     uint256 mintAmount = 1200e18; // Close to liquidation threshold
+    function it_cdp_engine_allows_safe_withdrawal_with_debt() {
+        uint256 depositAmount = 2000e18;
+        uint256 mintAmount = 1200e18; 
 
-    //     // Setup: deposit and mint to get close to liquidation ratio
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
-    //     cdpEngine.mint(collateralTokenAddress, mintAmount);
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
 
-    //     // Verify position is currently safe
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
-    //     require(cr > LIQUIDATION_RATIO, "Position should be safe initially");
+        // Verify position is currently safe
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+        require(cr > LIQUIDATION_RATIO, "Position should be safe initially");
 
-    //     // Test a safe withdrawal
-    //     uint256 safeWithdrawAmount = 100e18;
-    //     cdpEngine.withdraw(collateralTokenAddress, safeWithdrawAmount);
+        // Test a safe withdrawal
+        uint256 safeWithdrawAmount = 100e18;
+        cdpEngine.withdraw(collateralTokenAddress, safeWithdrawAmount);
 
-    //     // Verify withdrawal worked
-    //     require(
-    //         cdpVault.userCollaterals(address(this), collateralTokenAddress) ==
-    //             depositAmount - safeWithdrawAmount,
-    //         "Safe withdrawal should work"
-    //     );
-    // }
+        // Verify withdrawal worked
+        require(
+            cdpVault.userCollaterals(address(this), collateralTokenAddress) ==
+                depositAmount - safeWithdrawAmount,
+            "Safe withdrawal should work"
+        );
+    }
 
-    // function it_cdp_engine_withdraw_max_with_debt_respects_liquidation_ratio() {
-    //     uint256 depositAmount = 3000e18;
-    //     uint256 mintAmount = 1500e18;
+    function it_cdp_engine_prevents_unsafe_withdrawal() {
+        uint256 depositAmount = 2000e18;
+        uint256 mintAmount = 1200e18;
 
-    //     // Setup: deposit and mint
-    //     require(
-    //         ERC20(collateralTokenAddress).approve(
-    //             address(cdpVault),
-    //             depositAmount
-    //         ),
-    //         "Collateral approval failed"
-    //     );
-    //     cdpEngine.deposit(collateralTokenAddress, depositAmount);
-    //     cdpEngine.mint(collateralTokenAddress, mintAmount);
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
 
-    //     // Withdraw max
-    //     uint256 withdrawnAmount = cdpEngine.withdrawMax(collateralTokenAddress);
+        // Verify position is currently safe
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+        require(cr > LIQUIDATION_RATIO, "Position should be safe initially");
 
-    //     require(
-    //         withdrawnAmount > 0,
-    //         "Should be able to withdraw some collateral"
-    //     );
-    //     require(
-    //         withdrawnAmount < depositAmount,
-    //         "Should not withdraw all collateral when debt exists"
-    //     );
+        // Calculate withdrawal amount that would make position unsafe
+        uint256 currentCollateral = cdpVault.userCollaterals(
+            address(this),
+            collateralTokenAddress
+        );
+        uint256 currentDebt = cdpEngine
+            .vaults(address(this), collateralTokenAddress)
+            .scaledDebt;
 
-    //     // Verify position is still safe
-    //     uint256 cr = cdpEngine.collateralizationRatio(
-    //         address(this),
-    //         collateralTokenAddress
-    //     );
-    //     require(
-    //         cr >= LIQUIDATION_RATIO,
-    //         "CR should be at or above liquidation ratio after withdrawMax"
-    //     );
-    // }
+        // Calculate minimum collateral needed to maintain liquidation ratio
+        // minCollateral = debt * liquidationRatio / price
+        uint256 price = priceOracle.getAssetPrice(collateralTokenAddress);
+        uint256 minCollateral = (currentDebt * LIQUIDATION_RATIO) / price;
+
+        // Try to withdraw more than allowed (leaving less than minimum collateral)
+        uint256 unsafeWithdrawAmount = currentCollateral - minCollateral + 1;
+
+        // This should revert
+        bool reverted = false;
+        try {
+            cdpEngine.withdraw(collateralTokenAddress, unsafeWithdrawAmount); 
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Unsafe withdrawal should have been prevented");
+    }
+
+    function it_cdp_engine_withdraw_max_with_debt_respects_liquidation_ratio() {
+        uint256 depositAmount = 3000e18;
+        uint256 mintAmount = 1500e18;
+
+        // Setup: deposit and mint
+        require(
+            ERC20(collateralTokenAddress).approve(
+                address(cdpVault),
+                depositAmount
+            ),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount);
+        cdpEngine.mint(collateralTokenAddress, mintAmount);
+
+        // Withdraw max
+        uint256 withdrawnAmount = cdpEngine.withdrawMax(collateralTokenAddress);
+
+        require(
+            withdrawnAmount > 0,
+            "Should be able to withdraw some collateral"
+        );
+        require(
+            withdrawnAmount < depositAmount,
+            "Should not withdraw all collateral when debt exists"
+        );
+
+        // Verify position is exactly at liquidation threshold (withdrew maximum possible)
+        uint256 cr = cdpEngine.collateralizationRatio(
+            address(this),
+            collateralTokenAddress
+        );
+        require(
+            cr == LIQUIDATION_RATIO,
+            "CR should equal liquidation ratio after withdrawMax (withdrew maximum safe amount)"
+        );
+    }
 
     // // ============ PAUSE FUNCTIONALITY TESTS ============
 
-    // function it_cdp_engine_can_pause_asset() {
-    //     // Pause the asset
-    //     cdpEngine.setPaused(collateralTokenAddress, true);
+    function it_cdp_engine_can_pause_asset() {
+        // First verify operations work when not paused
+        uint256 depositAmount = 1000e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), depositAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, depositAmount); // Should work
 
-    //     // Verify the pause function exists and works
-    //     require(
-    //         address(cdpEngine) != address(0),
-    //         "CDPEngine should exist for pause functionality"
-    //     );
-    // }
+        // Pause the asset
+        cdpEngine.setPaused(collateralTokenAddress, true);
 
-    // function it_cdp_engine_can_pause_globally() {
-    //     // Pause globally
-    //     cdpEngine.setPausedGlobal(true);
+        // Verify that paused operations are blocked
+        bool depositReverted = false;
+        try {
+            cdpEngine.deposit(collateralTokenAddress, 100e18);
+        } catch {
+            depositReverted = true;
+        }
+        require(depositReverted, "Deposit should be blocked when asset is paused");
 
-    //     // Check global pause
-    //     require(cdpEngine.globalPaused(), "Engine should be globally paused");
+        bool mintReverted = false;
+        try {
+            cdpEngine.mint(collateralTokenAddress, 100e18);
+        } catch {
+            mintReverted = true;
+        }
+        require(mintReverted, "Mint should be blocked when asset is paused");
 
-    //     // Unpause for other tests
-    //     cdpEngine.setPausedGlobal(false);
-    //     require(!cdpEngine.globalPaused(), "Engine should be unpaused");
-    // }
+        // Unpause and verify operations work again
+        cdpEngine.setPaused(collateralTokenAddress, false);
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), 100e18),
+            "Additional collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, 100e18); // Should work again
+    }
+
+    function it_cdp_engine_can_pause_globally() {
+        // Pause globally
+        cdpEngine.setPausedGlobal(true);
+
+        // Check global pause
+        require(cdpEngine.globalPaused(), "Engine should be globally paused");
+
+        // Unpause for other tests
+        cdpEngine.setPausedGlobal(false);
+        require(!cdpEngine.globalPaused(), "Engine should be unpaused");
+    }
 
     // // ============ FEE ROUTING TESTS ============
 
