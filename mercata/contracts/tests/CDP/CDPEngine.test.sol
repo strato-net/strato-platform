@@ -7,6 +7,14 @@ struct Vault {
     uint scaledDebt; // index‑denominated debt
 }
 
+// User contract for multi-user testing
+contract User {
+    function do(address a, string f, variadic args) public returns (variadic) {
+        variadic result = address(a).call(f, args);
+        return result;
+    }
+}
+
 contract Describe_CDPEngine {
     Mercata m;
     string[] emptyArray;
@@ -21,6 +29,10 @@ contract Describe_CDPEngine {
     PriceOracle priceOracle;
     Token collateralToken;
     Token usdst;
+
+    // Test users for liquidation tests
+    User userA;
+    User userB;
 
     // Test constants
     uint256 WAD = 1e18;
@@ -37,6 +49,10 @@ contract Describe_CDPEngine {
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
+
+        // Create test users
+        userA = new User();
+        userB = new User();
 
         // Get CDP components
         cdpEngine = m.cdpEngine();
@@ -62,6 +78,9 @@ contract Describe_CDPEngine {
 
         // Give ourselves some USDST for testing BEFORE transferring ownership
         mockUSDST.mint(address(this), 100000e18);
+         // Mint USDST to users for liquidation testing
+        mockUSDST.mint(address(userA), 100000e18);
+        mockUSDST.mint(address(userB), 100000e18);
 
         // Grant CDPEngine mint and burn access to the mock USDST
         // Since Token uses onlyOwner for mint/burn, we transfer ownership to CDPEngine
@@ -95,8 +114,12 @@ contract Describe_CDPEngine {
         // Activate collateral token
         collateralToken.setStatus(2); // ACTIVE
 
-        // Mint collateral tokens to test contract
+        // Mint collateral tokens to test contract and users
         collateralToken.mint(address(this), 10000e18);
+        collateralToken.mint(address(userA), 10000e18);
+        collateralToken.mint(address(userB), 10000e18);
+        
+       
 
         // Configure collateral asset in CDP engine
         cdpEngine.setCollateralAssetParams(
@@ -680,53 +703,112 @@ contract Describe_CDPEngine {
         require(!cdpEngine.globalPaused(), "Engine should be unpaused");
     }
 
-    // // ============ FEE ROUTING TESTS ============
+    // ============ LIQUIDATION TESTS ============
 
-    // function it_cdp_engine_can_set_fee_to_reserve_bps() {
-    //     uint256 newFeeBps = 3000; // 30% to reserve
+    function it_cdp_engine_can_liquidate_unhealthy_position() {
+        // Setup: UserB creates a position close to liquidation threshold
+        uint256 depositAmount = 2000e18; // 2000 tokens × $5 = $10,000 collateral value
+        uint256 mintAmount = 5000e18;    // $6,000 debt = 166% CR ($10,000/$6,000), close to 150% threshold
 
-    //     // Set fee routing
-    //     cdpEngine.setFeeToReserveBps(newFeeBps);
+        // UserB approves and deposits collateral using do function
+        userB.do(collateralTokenAddress, "approve", address(cdpVault), depositAmount);
+        userB.do(address(cdpEngine), "deposit", collateralTokenAddress, depositAmount);
+        
+        // UserB mints USDST
+        userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
 
-    //     // Verify setting
-    //     require(
-    //         cdpEngine.feeToReserveBps() == newFeeBps,
-    //         "Fee to reserve BPS should be updated"
-    //     );
-    // }
+        // Verify position is initially safe
+        uint256 initialCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        // log("Initial CR", initialCR);
+        // log("Liquidation Ratio", LIQUIDATION_RATIO);
+        require(initialCR >= LIQUIDATION_RATIO, "Position should be safe initially");
 
-    // // ============ BAD DEBT AND JUNIOR NOTE TESTS ============
+        // Price crash: Drop collateral price from $5 to $1.5 (70% drop)
+        uint256 currentPrice = priceOracle.getAssetPrice(collateralTokenAddress);
+        uint256 newPrice = currentPrice * 7 / 10;
+        priceOracle.setAssetPrice(collateralTokenAddress, newPrice);
 
-    // function it_cdp_engine_can_set_junior_premium() {
-    //     uint256 newPremiumBps = 1500; // 15% premium
+        // Verify position is now unsafe
+        uint256 newCR = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        // log("New CR after price drop", newCR / WAD);
+        require(newCR < LIQUIDATION_RATIO, "Position should be underwater after price drop");
 
-    //     // Set junior premium
-    //     cdpEngine.setJuniorPremium(newPremiumBps);
+        // Get state before liquidation
+        uint256 userBDebtBefore = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        uint256 userBCollateralBefore = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
+        uint256 userAUSDSTBefore = ERC20(usdstAddress).balanceOf(address(userA));
+        uint256 userACollateralBefore = ERC20(collateralTokenAddress).balanceOf(address(userA));
 
-    //     // Verify setting
-    //     require(
-    //         cdpEngine.juniorPremiumBps() == newPremiumBps,
-    //         "Junior premium BPS should be updated"
-    //     );
-    // }
+        // UserA liquidates UserB's position
+        uint256 debtToCover = 500e18; // Liquidate part of the debt
+        
+        // UserA executes liquidation using do function
+        userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), debtToCover);
 
-    // function it_cdp_engine_tracks_bad_debt() {
-    //     // Initially no bad debt
-    //     require(
-    //         cdpEngine.badDebtUSDST(collateralTokenAddress) == 0,
-    //         "Should have no bad debt initially"
-    //     );
+        // Get state after liquidation
+        uint256 userBDebtAfter = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        uint256 userBCollateralAfter = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
+        uint256 userAUSDSTAfter = ERC20(usdstAddress).balanceOf(address(userA));
+        uint256 userACollateralAfter = ERC20(collateralTokenAddress).balanceOf(address(userA));
 
-    //     // Bad debt would be created through liquidations in real scenarios
-    //     // For testing, we verify the tracking mechanism exists
-    // }
+        // Calculate expected changes
+        uint256 userBDebtReduced = userBDebtBefore - userBDebtAfter;
+        uint256 userBCollateralSeized = userBCollateralBefore - userBCollateralAfter;
+        uint256 userAUSDSTBurned = userAUSDSTBefore - userAUSDSTAfter;
+        uint256 userACollateralReceived = userACollateralAfter - userACollateralBefore;
+        
+        // Verify exact liquidation mechanics
+        require(userAUSDSTBurned == debtToCover, "UserA should have burned exactly debtToCover USDST");
+        require(userBDebtReduced <= debtToCover, "UserB debt reduction should not exceed amount covered");
+        require(userBCollateralSeized == userACollateralReceived, "UserB collateral seized should equal UserA collateral received");
+        
+        // Calculate expected collateral seized (debt + penalty)
+        uint256 penaltyAmount = (userAUSDSTBurned * LIQUIDATION_PENALTY_BPS) / 10000;
+        uint256 totalRepayWithPenalty = userAUSDSTBurned + penaltyAmount;
+        uint256 liquidationPrice = priceOracle.getAssetPrice(collateralTokenAddress);
+        uint256 expectedCollateralSeized = (totalRepayWithPenalty * 1e18) / liquidationPrice;
+        
+        require(
+            userBCollateralSeized == expectedCollateralSeized,
+            "UserB collateral seized should equal (debt + penalty) / price"
+        );
 
-    // function it_cdp_engine_can_view_claimable_junior_amounts() {
-    //     // Initially no junior notes
-    //     uint256 claimable = cdpEngine.claimable(address(this));
-    //     require(claimable == 0, "Should have no claimable amount initially");
-    // }
+        // log("UserB debt reduced", userBDebtReduced);
+        // log("UserB collateral seized", userBCollateralSeized);
+        // log("Expected collateral seized", expectedCollateralSeized);
+        // log("UserA USDST burned", userAUSDSTBurned);
+        // log("Penalty amount", penaltyAmount);
+    }
 
+    function it_cdp_engine_prevents_liquidation_of_healthy_position() {
+        // Setup: UserB creates a safe position
+        uint256 depositAmount = 3000e18;
+        uint256 mintAmount = 1000e18; // Conservative LTV
+
+        // UserB creates position using do function
+        userB.do(collateralTokenAddress, "approve", address(cdpVault), depositAmount);
+        userB.do(address(cdpEngine), "deposit", collateralTokenAddress, depositAmount);
+        userB.do(address(cdpEngine), "mint", collateralTokenAddress, mintAmount);
+
+        // Verify position is safe
+        uint256 cr = cdpEngine.collateralizationRatio(address(userB), collateralTokenAddress);
+        require(cr > LIQUIDATION_RATIO, "Position should be safe");
+
+        // UserA tries to liquidate (should fail)
+        uint256 debtToCover = 100e18;
+        
+        bool liquidationReverted = false;
+        try {
+            userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), debtToCover);
+        } catch {
+            liquidationReverted = true;
+        }
+        
+        require(liquidationReverted, "Liquidation of healthy position should revert");
+    }
+
+ 
+    
     // // ============ REGISTRY MANAGEMENT TESTS ============
 
     // function it_cdp_engine_can_update_registry() {
