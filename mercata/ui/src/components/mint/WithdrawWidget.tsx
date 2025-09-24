@@ -15,10 +15,9 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
-import { usdstAddress, WITHDRAW_USDST_FEE } from "@/lib/constants";
+import { WITHDRAW_USDST_FEE } from "@/lib/constants";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
-
-const DECIMAL_PATTERN = /^\d*\.?\d*$/;
 
 const WithdrawWidget: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -37,11 +36,12 @@ const WithdrawWidget: React.FC = () => {
   } = useBridgeContext();
 
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
 
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
+  const [feeError, setFeeError] = useState<string>("");
 
   // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
   const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
@@ -58,6 +58,13 @@ const WithdrawWidget: React.FC = () => {
     loadNetworksAndTokens();
   }, [loadNetworksAndTokens]);
 
+  // Fetch USDST balance on mount
+  useEffect(() => {
+    if (isConnected && address) {
+      fetchUsdstBalance(address);
+    }
+  }, [isConnected, address, fetchUsdstBalance]);
+
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) setSelectedNetwork(availableNetworks[0].chainName);
   }, [selectedNetwork, availableNetworks, setSelectedNetwork]);
@@ -72,49 +79,28 @@ const WithdrawWidget: React.FC = () => {
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
   const maxAmount = useMemo(() => {
-    // Calculate max available USDST (balance minus fee)
-    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-    const feeBigInt = safeParseUnits(WITHDRAW_USDST_FEE, 18);
-    const availableUsdst = usdstBalanceBigInt > feeBigInt ? usdstBalanceBigInt - feeBigInt : 0n;
-    var maxAllowed = availableUsdst;
+    const usdstBalanceWei = usdstBalance || "0";
+    const maxTransferable = computeMaxTransferable(usdstBalanceWei, true, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_USDST_FEE).toString(), setFeeError);
     
-    // Zero maxPerTx means no limit
-    if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx != "0") {
-      // Compare with token's max per transaction limit
+    // Apply token max per transaction limit if it exists
+    if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx !== "0") {
       const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerTx, 18);
-      maxAllowed = availableUsdst < tokenMaxBigInt ? availableUsdst : tokenMaxBigInt;
+      const maxTransferableBigInt = BigInt(maxTransferable);
+      const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
+      return finalMax.toString();
     }
-
-    return formatBalance(maxAllowed, undefined, 18, 2, 2);
-  }, [selectedMintToken, usdstBalance]);
-
-  const validateAmount = (value: string) => {
-    if (!value) { setAmountError(""); return true; }
-    const n = Number(value);
-    if (!Number.isFinite(n) || n <= 0 || n > Number(maxAmount)) {
-      setAmountError("Please enter a valid amount");
-      return false;
-    }
-    setAmountError("");
-    return true;
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const v = e.target.value;
-    if (DECIMAL_PATTERN.test(v)) {
-      setAmount(v);
-      validateAmount(v);
-    }
-  };
+    
+    return maxTransferable;
+  }, [selectedMintToken, usdstBalance, voucherBalance]);
 
   const handleWithdraw = async () => {
     if (!selectedMintToken || !selectedNetwork || !address) return;
-    if (!validateAmount(amount)) return;
+    if (!amount || amountError) return;
     setIsLoading(true);
     try {
       const selectedNetworkConfig = availableNetworks.find((n) => n.chainName === selectedNetwork);
       const externalChainId = selectedNetworkConfig?.chainId || "";
-      const stratoTokenAmount = safeParseUnits(amount, 18).toString();
+      const stratoTokenAmount = safeParseUnits(amount).toString();
       const res = await redeemOut({
         stratoTokenAmount,
         externalRecipient: address,
@@ -206,20 +192,21 @@ const WithdrawWidget: React.FC = () => {
           inputMode="decimal"
           placeholder="0.00"
           value={amount}
-          onChange={handleAmountChange}
+          onChange={(e) => handleAmountInputChange(e.target.value, setAmount, setAmountError, maxAmount, 18)}
           className={amountError ? "border-red-500" : ""}
           disabled={!isConnected}
         />
         <span className="text-xs text-gray-500">
-        {selectedMintToken && `Max: ${maxAmount} USDST`}
+        {selectedMintToken && `Max: ${formatBalance(maxAmount, undefined, 18, 2, 2)} USDST`}
         </span>
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+        {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
       </div>
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
         <div className="flex items-center justify-between">
           <span>Transaction Fee</span>
-          <span className="font-medium">{WITHDRAW_USDST_FEE} USDST</span>
+          <span className="font-medium">{WITHDRAW_USDST_FEE} USDST ({parseFloat(WITHDRAW_USDST_FEE) * 100} voucher)</span>
         </div>
         <div className="flex items-center justify-between">
           <span>USDST Balance</span>
@@ -232,7 +219,7 @@ const WithdrawWidget: React.FC = () => {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedMintToken || !amount || !!amountError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
+        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedMintToken || !amount || !!amountError || !!feeError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
           {isLoading ? "Processing..." : "Withdraw"}
         </Button>
       </div>
