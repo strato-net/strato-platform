@@ -356,8 +356,8 @@ processTheMessages messages = do
           (creator e)
           (application e)
           (contractname e)
-          (collection_name e)
           eName
+          (collection_name e)
         ) processedEventArrays
       delegateViews = (\Action.Delegatecall{..} ->
         indexTableName

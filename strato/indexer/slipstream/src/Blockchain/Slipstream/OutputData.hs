@@ -45,7 +45,10 @@ module Blockchain.Slipstream.OutputData (
   getArraysFromEvents,
   getAllEvents,
   processParents,
-  dbQueryCatchError
+  dbQueryCatchError,
+  storageTableName,
+  globalEventTableName,
+  initialSlipstreamQueries
   ) where
 
 
@@ -114,27 +117,24 @@ instance Ord ForeignKeyInfo where
         compare (tableName x, columnNames x, foreignTableName x, foreignColumnNames x)
                 (tableName y, columnNames y, foreignTableName y, foreignColumnNames y)
 
-data OnConflict = OnConflict
+data TableConstraint = Unique Text Text
+                     | Foreign Text [Text] TableName [Text]
+                     deriving (Eq, Ord, Show)
+
+data OnConflict = DoNothing
+                | OnConflict
   { conflictCols       :: [Text]
   , conflictUpdateCols :: [Text]
   , extraSQL           :: Maybe Text
   } deriving (Eq, Ord, Show)
 
-type family Zip a b where
-  Zip [a] [b] = [(a, b)]
-
-data SlipstreamQuery = CreateTable TableName TableColumns [Text] (Maybe (Text, Text))
+data SlipstreamQuery = CreateTable TableName TableColumns [Text] (Maybe TableConstraint)
                      | CreateContractView TableName TableName [Text] [Text] TableColumns
                      | CreateCollectionView TableName [Text] [Text] TableColumns
                      | CreateEventView TableName [Text] [Text] TableColumns (Maybe [Text])
                      | CreateEventArrayView TableName [Text] [Text] TableColumns
                      | InsertTable TableName TableColumns [[Maybe Value]] (Maybe OnConflict)
-                     | InsertTableWithUC TableName TableColumns [[Maybe Value]] (Maybe (Text, [Text]))
-                     | AlterTableAddColumns TableName TableColumns
-                     | AlterTableAddForeignKey Text ForeignKeyInfo
-                     | CreateFkeyFunction TableName TableName Text
-                     | UpdateTable TableName (Zip TableColumns [Either Text (Maybe Value)])
-                                             (Zip TableColumns [Either Text (Maybe Value)])
+                     | CreateFkeyFunction TableName TableName Text SqlType
                      | RefreshMaterializedView TableName
                      | NotifyPostgREST
                      deriving (Eq, Ord, Show)
@@ -143,29 +143,34 @@ slipstreamQueryPostgres :: SlipstreamQuery -> Text
 slipstreamQueryPostgres = slipstreamQueryText sqlTypePostgres
 
 slipstreamQueryText :: (SqlType -> Text) -> SlipstreamQuery -> Text
-slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mUc) = T.concat $
-  [ "CREATE TABLE IF NOT EXISTS ",
-    tableNameToDoubleQuoteText tableName,
-    " (",
-    case tableName of
-      EventTableName{} -> case sqlTypeText SqlSerial of
-        "" -> ""
-        serial -> "id " <> serial <> " NOT NULL, "
-      _ -> "",
-    csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeText t) <$> cols,
-    case pk of
+slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mTC) = T.concat $
+  [ "CREATE TABLE IF NOT EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , " ("
+  , csv $ (\(c,t) -> wrapEscapeDouble c <> " " <> sqlTypeText t
+                   <> case t of SqlSerial -> " NOT NULL"; _ -> "") <$> cols
+  , case pk of
       [] -> ""
-      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk,
-    case mUc of
+      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk
+  , case mTC of
       Nothing -> ""
-      Just (n, uc) -> T.concat
-        [
-          ", CONSTRAINT ",
-          wrapDoubleQuotes $ escapeQuotes n,
-          " UNIQUE ",
-          uc
-        ],
-    ");"
+      Just (Unique n uc) -> T.concat
+        [ ", CONSTRAINT "
+        , wrapEscapeDouble n
+        , " UNIQUE "
+        , uc
+        ]
+      Just (Foreign n lCols ftName fCols) -> T.concat
+        [ ", CONSTRAINT "
+        , wrapEscapeDouble n
+        , " FOREIGN KEY "
+        , wrapAndEscapeDouble lCols
+        , " REFERENCES "
+        , tableNameToDoubleQuoteText ftName
+        , " "
+        , wrapAndEscapeDouble fCols
+        ]
+  , ");"
   ] ++ (case tableName of
     HistoryTableName c a n ->
       let normalTableName = indexTableName c a n
@@ -203,10 +208,10 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mUc) = T.concat $
             "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();"
           ]
     _ -> [])
-slipstreamQueryText _ (CreateContractView tableName storageTableName storageCols contractCols cols) = T.concat $
+slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCols contractCols cols) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , "; CREATE MATERIALIZED VIEW "
+  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -241,19 +246,28 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName storageCols
       , "\""
       ]) <$> cols)
   , " FROM "
-  , tableNameToDoubleQuoteText storageTableName
+  , tableNameToDoubleQuoteText storageTableName'
   , " s INNER JOIN contract c ON s.address = c.address WHERE c.creator = '"
   , tableNameCreator tableName
   , "' AND c.application = '"
   , tableNameApplication tableName
   , "' AND c.contract_name = '"
   , tableNameContractName tableName
-  , "';"
+  , "' WITH NO DATA;\n"
+  , "CREATE UNIQUE INDEX \""
+  , tableNameToText tableName
+  , "_index\"\n  ON "
+  , tableNameToDoubleQuoteText tableName
+  , "(address);\n"
+  , "COMMIT;\n"
+  , "REFRESH MATERIALIZED VIEW "
+  , tableNameToDoubleQuoteText tableName
+  , ";"
   ]
 slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols keyTypes) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , "; CREATE MATERIALIZED VIEW "
+  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -295,12 +309,22 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
   , tableNameContractName tableName
   , "' AND s.collection_name = '"
   , tableNameCollectionName tableName
-  , "';"
+  , "' WITH NO DATA;\n"
+  , "CREATE UNIQUE INDEX \""
+  , tableNameToText tableName
+  , "_index\"\n  ON "
+  , tableNameToDoubleQuoteText tableName
+  , wrapAndEscapeDouble $ ["address", "collection_name"] ++ (fst <$> keyTypes)
+  , ";\n"
+  , "COMMIT;\n"
+  , "REFRESH MATERIALIZED VIEW "
+  , tableNameToDoubleQuoteText tableName
+  , ";"
   ]
 slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , "; CREATE MATERIALIZED VIEW "
+  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -342,12 +366,21 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
   , tableNameContractName tableName
   , "' AND e.event_name = '"
   , tableNameEventName tableName
-  , "';"
+  , "' WITH NO DATA;\n"
+  , "CREATE UNIQUE INDEX \""
+  , tableNameToText tableName
+  , "_index\"\n  ON "
+  , tableNameToDoubleQuoteText tableName
+  , "(transaction_hash, event_index);\n"
+  , "COMMIT;\n"
+  , "REFRESH MATERIALIZED VIEW "
+  , tableNameToDoubleQuoteText tableName
+  , ";"
   ]
 slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCols keyTypes) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , "; CREATE MATERIALIZED VIEW "
+  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -389,7 +422,17 @@ slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCol
   , tableNameContractName tableName
   , "' AND s.collection_name = '"
   , tableNameCollectionName tableName
-  , "';"
+  , "' WITH NO DATA;\n"
+  , "CREATE UNIQUE INDEX \""
+  , tableNameToText tableName
+  , "_index\"\n  ON "
+  , tableNameToDoubleQuoteText tableName
+  , wrapAndEscapeDouble $ ["address", "transaction_hash", "event_index", "collection_name"] ++ (fst <$> keyTypes)
+  , ";\n"
+  , "COMMIT;\n"
+  , "REFRESH MATERIALIZED VIEW "
+  , tableNameToDoubleQuoteText tableName
+  , ";"
   ]
 slipstreamQueryText _ (InsertTable tableName cols valss mOnConflict) = T.concat $
   [ "INSERT INTO ",
@@ -403,6 +446,7 @@ slipstreamQueryText _ (InsertTable tableName cols valss mOnConflict) = T.concat 
       <$> valss
   ] ++ (case mOnConflict of
     Nothing -> []
+    Just DoNothing -> ["\n ON CONFLICT DO NOTHING;"]
     Just (OnConflict conflictCols conflictUpdateCols mExtraSQL) ->
       [ "\n ON CONFLICT ",
         wrapAndEscapeDouble conflictCols,
@@ -411,49 +455,7 @@ slipstreamQueryText _ (InsertTable tableName cols valss mOnConflict) = T.concat 
         maybe "" (", " <>) mExtraSQL,
         ";"
       ])
-slipstreamQueryText _ (InsertTableWithUC tableName cols valss mOnConflict) = T.concat
-  [ "INSERT INTO ",
-    tableNameToDoubleQuoteText tableName,
-    " ",
-    wrapAndEscapeDouble $ fst <$> cols,
-    "\n  VALUES ",
-    csv $ wrapParens . csv . map
-      (\((_,t),v) -> fromMaybe "NULL" $ valueToSQLText t =<< v)
-      . zip cols
-      <$> valss,
-    "\n ON CONFLICT ",
-    case mOnConflict of
-      Just (constraintName, conflictUpdateCols) ->
-        T.concat
-              [ "ON CONSTRAINT ",
-                wrapDoubleQuotes $ escapeQuotes constraintName,
-                " DO UPDATE SET ",
-                tableUpsert conflictUpdateCols,
-                ";"
-              ]
-      _ -> "DO NOTHING;",
-    ";"
-  ]
-slipstreamQueryText sqlTypeText (AlterTableAddColumns tableName cols) = T.concat
-  [ "ALTER TABLE ",
-    tableNameToDoubleQuoteText tableName,
-    T.intercalate "," $ (\(c,t) -> " ADD COLUMN IF NOT EXISTS " <> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeText t) <$> cols,
-    ";"
-  ]
-slipstreamQueryText _ (AlterTableAddForeignKey fkName ForeignKeyInfo{..}) = T.concat
-  [ "ALTER TABLE "
-  , tableNameToDoubleQuoteText tableName
-  , " ADD CONSTRAINT "
-  , wrapDoubleQuotes fkName
-  , " FOREIGN KEY "
-  , wrapAndEscapeDouble columnNames
-  , " REFERENCES "
-  , tableNameToDoubleQuoteText foreignTableName
-  , " "
-  , wrapAndEscapeDouble foreignColumnNames
-  , ";"
-  ]
-slipstreamQueryText _ (CreateFkeyFunction srcTable dstTable colName) = T.concat
+slipstreamQueryText _ (CreateFkeyFunction srcTable dstTable colName colType) = T.concat
   [ "CREATE OR REPLACE FUNCTION \""
   , colName
   , "_fkey\"(\n  lp "
@@ -464,14 +466,31 @@ slipstreamQueryText _ (CreateFkeyFunction srcTable dstTable colName) = T.concat
   , "  SELECT v.*\n  FROM "
   , tableNameToDoubleQuoteText dstTable
   , " AS v\n"
-  , "  WHERE v.address = COALESCE(\n"
-  , "           (lp).\""
-  , colName
-  , "\"::text,\n"
-  , "           (lp).\""
-  , colName
-  , "\"\n"
-  , "         )\n"
+  , case colType of
+      SqlJsonb -> T.concat
+        [ "  WHERE v.address = COALESCE(\n"
+        , "    (lp).\""
+        , colName
+        , "\"->>'address',\n"
+        , "    CASE WHEN jsonb_typeof((lp).\""
+        , colName
+        , "\") = 'string'\n"
+        , "         THEN btrim((lp).\""
+        , colName
+        , "\"::text, '\"')\n"
+        , "    END\n"
+        , "  )\n"
+        ]
+      _ -> T.concat
+        [ "  WHERE v.address = COALESCE(\n"
+        , "    (lp).\""
+        , colName
+        , "\"::text,\n"
+        , "    (lp).\""
+        , colName
+        , "\"\n"
+        , "  )\n"
+        ]
   , "  LIMIT 1;\n"
   , "$$;\n\n"
   , "GRANT EXECUTE ON FUNCTION \""
@@ -483,38 +502,8 @@ slipstreamQueryText _ (CreateFkeyFunction srcTable dstTable colName) = T.concat
   , tableNameToDoubleQuoteText dstTable
   , " TO postgres;"
   ]
-slipstreamQueryText _ (UpdateTable tableName updateColsAndVals whereColsAndVals) = T.concat
-  [ "UPDATE "
-  , tableNameToDoubleQuoteText tableName
-  , "\n  SET "
-  , case updateColsAndVals of
-      [((col,t),v)] -> T.concat
-        [ wrapEscapeDouble col
-        , " = "
-        , either id (fromMaybe "NULL" . (valueToSQLText t =<<)) v
-        ]
-      _ ->
-        let updateCols = fst $ unzip updateColsAndVals
-         in T.concat
-              [ wrapAndEscapeDouble $ fst <$> updateCols
-              , " = "
-              , wrapParens . csv $
-                (\((_,t),v) -> either id (fromMaybe "NULL" . (valueToSQLText t =<<)) v)
-                <$> updateColsAndVals
-              ]
-  , "\n  WHERE "
-  , let whereCols = fst $ unzip whereColsAndVals
-     in T.concat
-          [ wrapAndEscapeDouble $ fst <$> whereCols
-          , " = "
-          , wrapParens . csv $
-              (\((_,t),v) -> either id (fromMaybe "NULL" . (valueToSQLText t =<<)) v)
-              <$> whereColsAndVals
-          ]
-  , ";"
-  ]
 slipstreamQueryText _ (RefreshMaterializedView tableName) = T.concat
-  [ "REFRESH MATERIALIZED VIEW "
+  [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "
   , tableNameToDoubleQuoteText tableName
   , ";"
   ]
@@ -711,19 +700,18 @@ createIndexTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m [(TableName, TableName, Text)]
+  ConduitM () SlipstreamQuery m [(TableName, TableName, Text, SqlType)]
 createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
-      storageTableName = indexTableName "" "" "storage"
-      histTableName = historyTableName creator a n
-      storageHistoryTableName = historyTableName "" "" "storage"
+      -- histTableName = historyTableName creator a n
+      -- storageHistoryTableName = historyTableName "" "" "storage"
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "application", "contract_name"]
-      cols' = (\(x, v, _) -> (x, v)) <$> cols
-      fcols = mapMaybe (\(x, _, mf) -> (\f -> (tableName, indexTableName creator a f, x)) <$> mf) cols
+      cols' = (\(x, t, _) -> (x, t)) <$> cols
+      fcols = mapMaybe (\(x, t, mf) -> (\f -> (tableName, indexTableName creator a f, x, t)) <$> mf) cols
   yieldMany
     [ CreateContractView tableName storageTableName (fst <$> baseColumns) contractCols cols'
-    , CreateContractView histTableName storageHistoryTableName (fst <$> baseColumns) contractCols cols'
+    -- , CreateContractView histTableName storageHistoryTableName (fst <$> baseColumns) contractCols cols'
     ]
   pure fcols
 
@@ -733,7 +721,7 @@ createCollectionTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, [SVMType.Type], SVMType.Type) ->
-  ConduitM () SlipstreamQuery m (Maybe (TableName, TableName, Text))
+  ConduitM () SlipstreamQuery m (Maybe (TableName, TableName, Text, SqlType))
 createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator a n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
@@ -741,7 +729,7 @@ createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType)
       mappingCols = fst <$> baseMappingColumns
   yield $ CreateCollectionView tableName mappingCols [] keyNames
   pure $ case getTableColumnAndType False cc [("value", valueType)] of
-    [(x, _, Just f)] -> Just (tableName, indexTableName creator a f, x)
+    [(x, _, Just f)] -> Just (tableName, indexTableName creator a f, x, SqlJsonb)
     _ -> Nothing
 
 createEventArrayTable ::
@@ -749,7 +737,7 @@ createEventArrayTable ::
   (Text, Text, Text, Text) ->
   CodeCollectionF () ->
   (Text, SVMType.Type) ->
-  ConduitM () SlipstreamQuery m (Maybe (TableName, TableName, Text))
+  ConduitM () SlipstreamQuery m (Maybe (TableName, TableName, Text, SqlType))
 createEventArrayTable (creator, a, n, e) cc (arr, arrType) = do
   let tableName = eventCollectionTableName creator a n e arr
       cols = (fst <$> eventBaseColumnsQuery) ++
@@ -761,7 +749,7 @@ createEventArrayTable (creator, a, n, e) cc (arr, arrType) = do
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ CreateEventArrayView tableName cols ["creator", "application", "contract_name"] [("key", SqlText)]
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
-    [(x, _, Just f)] -> Just (tableName, indexTableName creator a f, x)
+    [(x, _, Just f)] -> Just (tableName, indexTableName creator a f, x, SqlJsonb)
     _ -> Nothing
 
 insertIndexTable ::
@@ -771,9 +759,7 @@ insertIndexTable ::
 insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
-          let storageTableName = indexTableName "" "" "storage"
-              storageHistoryTableName = historyTableName "" "" "storage"
-              contractTableName = indexTableName "" "" "contract"
+          let contractTableName = indexTableName "" "" "contract"
               keySt = baseColumns ++ [("creator", SqlText), ("application", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
               contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
               baseVals =
@@ -801,8 +787,7 @@ insertIndexTable cs =
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
-             , InsertTable storageHistoryTableName keySt [valsForSQL] Nothing
-             , InsertTable contractTableName contractKeySt [contractValsForSQL] Nothing
+             , InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
              ]
    in yieldMany $ processContract cs'
 
@@ -819,7 +804,7 @@ insertDelegatecall (Delegatecall s _ c a n) = do
           ValueString a,
           ValueString n
         ]
-   in yield $ InsertTable contractTableName contractKeySt [contractValsForSQL] Nothing
+   in yield $ InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
 
 insertCollectionTable ::
   OutputM m =>
@@ -853,9 +838,9 @@ processGroupedData [] = []
 
 createFkeyFunctions ::
   OutputM m =>
-  [(TableName, TableName, Text)] ->
+  [(TableName, TableName, Text, SqlType)] ->
   ConduitM () SlipstreamQuery m ()
-createFkeyFunctions rows = yieldMany $ (\(a,b,c) -> CreateFkeyFunction a b c) <$> rows
+createFkeyFunctions rows = yieldMany $ (\(a,b,c,d) -> CreateFkeyFunction a b c d) <$> rows
 
 eventBaseColumnsQuery :: [(Text, SqlType)]
 eventBaseColumnsQuery =
@@ -990,13 +975,7 @@ insertEventArrayTableQuery ms =
     let ms' = mapMaybe (\m -> (\k -> (m, k, collectionDataValue m)) <$> listToMaybe (collectionDataKeys m)) ms
      in flip map ms' $ \case
           (x,k,v) ->
-            let tableName =
-                  eventCollectionTableName
-                    (creator x)
-                    (application x)
-                    (contractname x)
-                    (maybe "" fst $ eventInfo x)
-                    (collection_name x)
+            let tableName = indexTableName "" "" "event_array"
                 keySt = baseEventCollectionColumns ++ [("key", SqlJsonb), ("value", SqlJsonb)]
                 baseVals =
                   [ ValueAddress . address,
@@ -1006,12 +985,14 @@ insertEventArrayTableQuery ms =
                     ValueString . T.pack . keccak256ToHex . transactionHash,
                     ValueAddress . transactionSender,
                     ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
+                    ValueString . creator,
+                    ValueString . application,
                     ValueString . contractname,
                     ValueString . collection_name,
                     ValueString . collection_type
                   ]
                 vals = map (Just . SimpleValue . ($ x)) baseVals ++ [Just k, Just v]
-             in [InsertTable tableName keySt [vals] . Just $ OnConflict [] [] Nothing]
+             in [InsertTable tableName keySt [vals] $ Just DoNothing]
 
 -- Creates tables for all event declarations, stores table name in
 -- globals{createdEvents}
@@ -1020,7 +1001,7 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
-  ConduitM () SlipstreamQuery m [(TableName, TableName, Text)]
+  ConduitM () SlipstreamQuery m [(TableName, TableName, Text, SqlType)]
 createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
   where
     go (evName, ev) = createEventTable nameParts evName ev cc
@@ -1031,7 +1012,7 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
-  ConduitM () SlipstreamQuery m [(TableName, TableName, Text)]
+  ConduitM () SlipstreamQuery m [(TableName, TableName, Text, SqlType)]
 createEventTable (creator, a, n) evName ev cc = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
@@ -1039,7 +1020,7 @@ createEventTable (creator, a, n) evName ev cc = do
       isEvent = True
       evLogToPair (EventLog n' _ t') = (n', t')
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
-      fcols = mapMaybe (\(x, _, mf) -> (\f -> (eventTable, indexTableName creator a f, x)) <$> mf) cols
+      fcols = mapMaybe (\(x, t, mf) -> (\f -> (eventTable, indexTableName creator a f, x, t)) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
       indexedFields = map (wrapDoubleQuotes . escapeQuotes . fst)
                     . filter snd
@@ -1160,7 +1141,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , SimpleValue $ ValueString eventName
         , attributesMap
         ]
-  in InsertTable (IndexTableName "" "" "event") columns [values] Nothing
+  in InsertTable globalEventTableName columns [values] Nothing
 
 getAllEvents ::
   AggregateEvent ->
@@ -1271,3 +1252,108 @@ valueToSQLText t v =
           _ -> "::text)"
         _ -> ""
    in (\w -> pref <> w <> suff) <$> v'
+
+storageTableName :: TableName
+storageTableName = indexTableName "" "" "storage"
+
+globalEventTableName :: TableName
+globalEventTableName = indexTableName "" "" "event"
+
+initialSlipstreamQueries :: [SlipstreamQuery]
+initialSlipstreamQueries =
+  [ CreateTable
+      storageTableName
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("transaction_hash", SqlText)
+      , ("transaction_sender", SqlText)
+      , ("creator", SqlText)
+      , ("root", SqlText)
+      , ("application", SqlText)
+      , ("contract_name", SqlText)
+      , ("data", SqlJsonb)
+      ]
+      ["address"]
+      Nothing
+  , CreateTable
+      (historyTableName "" "" "storage")
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("transaction_hash", SqlText)
+      , ("transaction_sender", SqlText)
+      , ("creator", SqlText)
+      , ("root", SqlText)
+      , ("application", SqlText)
+      , ("contract_name", SqlText)
+      , ("data", SqlJsonb)
+      ]
+      []
+      Nothing
+  , CreateTable
+      (indexTableName "" "" "contract")
+      [ ("address", SqlText)
+      , ("creator", SqlText)
+      , ("application", SqlText)
+      , ("contract_name", SqlText)
+      ]
+      ["address", "creator", "application", "contract_name"]
+      (Just $ Foreign "contract_storage" ["address"] storageTableName ["address"])
+  , CreateTable
+      (indexTableName "" "" "mapping")
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("transaction_hash", SqlText)
+      , ("transaction_sender", SqlText)
+      , ("root", SqlText)
+      , ("collection_name", SqlText)
+      , ("collection_type", SqlText)
+      , ("key", SqlJsonb)
+      , ("value", SqlJsonb)
+      ]
+      ["address", "collection_name", "key"]
+      (Just $ Foreign "contract_mapping" ["address"] storageTableName ["address"])
+  , CreateTable
+      globalEventTableName
+      [ ("id", SqlSerial)
+      , ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("transaction_hash", SqlText)
+      , ("transaction_sender", SqlText)
+      , ("event_index", SqlDecimal)
+      , ("creator", SqlText)
+      , ("application", SqlText)
+      , ("contract_name", SqlText)
+      , ("event_name", SqlText)
+      , ("attributes", SqlJsonb)
+      ]
+      ["transaction_hash", "event_index"]
+      (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
+  , CreateTable
+      (indexTableName "" "" "event_array")
+      [ ("address", SqlText)
+      , ("block_hash", SqlText)
+      , ("block_timestamp", SqlText)
+      , ("block_number", SqlText)
+      , ("transaction_hash", SqlText)
+      , ("transaction_sender", SqlText)
+      , ("event_name", SqlText)
+      , ("event_index", SqlDecimal)
+      , ("creator", SqlText)
+      , ("application", SqlText)
+      , ("contract_name", SqlText)
+      , ("collection_name", SqlText)
+      , ("collection_type", SqlText)
+      , ("key", SqlJsonb)
+      , ("value", SqlJsonb)
+      ]
+      ["address", "transaction_hash", "event_index", "collection_name", "key"]
+      (Just $ Foreign "event_event_array" ["transaction_hash", "event_index"] globalEventTableName ["transaction_hash", "event_index"])
+  ]
