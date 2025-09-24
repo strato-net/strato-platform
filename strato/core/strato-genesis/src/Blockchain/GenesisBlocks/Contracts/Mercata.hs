@@ -36,6 +36,7 @@ filesToEmbed = [
   "contracts/concrete/Lending/SafetyModule.sol",
   "contracts/concrete/Pools/Pool.sol",
   "contracts/concrete/Pools/PoolFactory.sol",
+  "contracts/concrete/Proxy/Proxy.sol",
   "contracts/concrete/Rewards/RewardsManager.sol",
   "contracts/concrete/Tokens/Token.sol",
   "contracts/concrete/Tokens/TokenAccess.sol",

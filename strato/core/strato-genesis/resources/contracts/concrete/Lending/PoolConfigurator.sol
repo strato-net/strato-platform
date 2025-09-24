@@ -11,11 +11,13 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolConfigurator is Ownable {
    
-    LendingRegistry public immutable registry;
+    LendingRegistry public registry;
 
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
 
-    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _registry) external onlyOwner {
         require(_registry != address(0), "Invalid registry");
         registry = LendingRegistry(_registry);
     }
