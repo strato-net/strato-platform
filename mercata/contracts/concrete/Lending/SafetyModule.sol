@@ -41,7 +41,9 @@ contract record SafetyModule is Ownable {
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
 
-    constructor(address _lendingRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
         require(_lendingRegistry != address(0)  && _tokenFactory != address(0), "SM:zero addr");
         lendingRegistry = LendingRegistry(_lendingRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
