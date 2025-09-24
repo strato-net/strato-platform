@@ -455,11 +455,15 @@ contract Describe_LendingPool_Basic {
     function it_au_can_accept_repay_all() public {
         //TODO
         revert("TODO");
+
+        // Assert no dust left on the loan balance
     }
 
     function it_av_can_accept_repay_all_after_repay() public {
         //TODO
         revert("TODO");
+
+        // Assert no dust left on the loan balance
     }
 
     function it_aw_can_deposit_liquidity_max() public {
@@ -475,6 +479,15 @@ contract Describe_LendingPool_Basic {
     function it_ay_can_withdraw_liquidity_max_after_partial() public {
         //TODO
         revert("TODO");
+
+        // Assert no dust mUSDST left
+    }
+
+    function it_az_can_withdraw_liquidity_max() public {
+        //TODO
+        revert("TODO");
+
+        // Assert no dust mUSDST left
     }
 
     function it_az_gives_correct_health_factors() public {
@@ -529,6 +542,43 @@ contract Describe_LendingPool_Basic {
 
         // Cleanup; note that LiquidityPool approval is not cleaned
         Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
+    }
+
+    function it_ca_calculates_interest_correctly() public {
+        // TODO probably multiple test cases, but we'll need to run the clock
+        revert("Clock Winding for solid-vm-cli needed");
+    }
+
+    function it_da_lets_admin_sweep_reserves() public {
+        // TODO
+        revert("TODO");
+    }
+
+    function it_ea_handles_50_pct_liquidation() public {
+        // TODO
+        revert("TODO");
+    }
+
+    function it_eb_handles_100_pct_liquidation() public {
+        // TODO
+        revert("TODO");
+
+        // Assert no dust left on the loan balance
+    }
+    
+    function it_ec_prevents_self_liquidation() public {
+        // TODO
+        revert("TODO");
+    }
+    
+    function it_ed_prevents_liquidation_of_healthy_positions() public {
+        // TODO
+        revert("TODO");
+    }
+    
+    function it_fa_handles_multiple_collateral_cross_liquidation() public {
+        // TODO other multi collateral scenarios
+        revert("TODO");
     }
 
 
