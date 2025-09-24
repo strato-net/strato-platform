@@ -55,8 +55,10 @@ async function fetchUSDSTBalance(): Promise<bigint> {
  * @throws {Error} If total transactions possible are below threshold
  */
 export async function checkBalances(): Promise<void> {
-    const voucherBalance = await fetchVoucherBalance();
-    const usdstBalance = await fetchUSDSTBalance();
+    const [voucherBalance, usdstBalance] = await Promise.all([
+        fetchVoucherBalance(),
+        fetchUSDSTBalance()
+    ]);
     
     // Calculate total possible transactions using both balances
     const voucherTransactions = voucherBalance / CONSTANTS.GAS_FEE_VOUCHER;

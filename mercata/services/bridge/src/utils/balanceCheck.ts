@@ -43,8 +43,10 @@ const fetchUSDSTBalance = async (): Promise<bigint> => {
  */
 export const checkBalances = async (): Promise<void> => {
   try {
-    const voucherBalance = await fetchVoucherBalance();
-    const usdstBalance = await fetchUSDSTBalance();
+    const [voucherBalance, usdstBalance] = await Promise.all([
+      fetchVoucherBalance(),
+      fetchUSDSTBalance()
+    ]);
     
     // Calculate total possible transactions using both balances
     const voucherTransactions = voucherBalance / config.balance.gasFeeVoucher;
