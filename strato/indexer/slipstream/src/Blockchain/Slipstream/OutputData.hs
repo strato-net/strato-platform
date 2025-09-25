@@ -195,13 +195,13 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mTC) = T.concat $
             "END;\n",
             "$$ LANGUAGE plpgsql;\n\n",
             -- Create trigger for insert operations
-            "CREATE TRIGGER \"after_insert_on_",
+            "CREATE OR REPLACE TRIGGER \"after_insert_on_",
             tableNameToText normalTableName, "\"",
             "\nAFTER INSERT ON ",
             tableNameToDoubleQuoteText normalTableName,
             "\nFOR EACH ROW EXECUTE PROCEDURE ", triggerFunctionName, "();\n\n",
             -- Create trigger for update operations
-            "CREATE TRIGGER \"after_update_on_",
+            "CREATE OR REPLACE TRIGGER \"after_update_on_",
             tableNameToText normalTableName, "\"",
             "\nAFTER UPDATE ON ",
             tableNameToDoubleQuoteText normalTableName,
@@ -223,7 +223,7 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCol
       , "' "
       , case t of
           SqlDecimal -> "AND (s.data->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
-          SqlBool -> "AND jsonb_typeof(s.data->'" <> c <> "') = 'boolean' "
+          SqlBool -> "AND jsonb_typeof(s.data->'" <> c <> "') = 'string' "
           _ -> ""
       , case t of
           SqlJsonb -> "THEN (s.data->'"
@@ -232,7 +232,7 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCol
       , "')"
       , case t of
           SqlDecimal -> "::numeric"
-          SqlBool -> "::boolean"
+          SqlBool -> " <> 'false'"
           _ -> ""
       , " ELSE "
       , case t of
@@ -279,7 +279,7 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
       , "' "
       , case t of
           SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
-          SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'boolean' "
+          SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'string' "
           _ -> ""
       , case t of
           SqlJsonb -> "THEN (s.key->'"
@@ -288,7 +288,7 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
       , "')"
       , case t of
           SqlDecimal -> "::numeric"
-          SqlBool -> "::boolean"
+          SqlBool -> " <> 'false'"
           _ -> ""
       , " ELSE "
       , case t of
@@ -336,7 +336,7 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
       , "' "
       , case t of
           SqlDecimal -> "AND (e.attributes->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
-          SqlBool -> "AND jsonb_typeof(e.attributes->'" <> c <> "') = 'boolean' "
+          SqlBool -> "AND jsonb_typeof(e.attributes->'" <> c <> "') = 'string' "
           _ -> ""
       , case t of
           SqlJsonb -> "THEN (e.attributes->'"
@@ -345,7 +345,7 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
       , "')"
       , case t of
           SqlDecimal -> "::numeric"
-          SqlBool -> "::boolean"
+          SqlBool -> " <> 'false'"
           _ -> ""
       , " ELSE "
       , case t of
@@ -392,7 +392,7 @@ slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCol
       , "' "
       , case t of
           SqlDecimal -> "AND (s.key->>'" <> c <> "') ~ '^\\s*-?\\d+\\s*$' "
-          SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'boolean' "
+          SqlBool -> "AND jsonb_typeof(s.key->'" <> c <> "') = 'string' "
           _ -> ""
       , case t of
           SqlJsonb -> "THEN (s.key->'"
@@ -401,7 +401,7 @@ slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCol
       , "')"
       , case t of
           SqlDecimal -> "::numeric"
-          SqlBool -> "::boolean"
+          SqlBool -> " <> 'false'"
           _ -> ""
       , " ELSE "
       , case t of
@@ -827,7 +827,9 @@ refreshMaterializedView ::
   OutputM m =>
   TableName ->
   ConduitM () SlipstreamQuery m ()
-refreshMaterializedView = yield . RefreshMaterializedView
+refreshMaterializedView tn = case tableNameContractName tn of
+  "" -> pure ()
+  _ -> yield $ RefreshMaterializedView tn
 
 processGroupedData :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 processGroupedData rows@(row:_) =
