@@ -30,6 +30,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
   const [existingVaultCollateral, setExistingVaultCollateral] = useState<string>("0"); // Wei format
   const [existingVaultDebt, setExistingVaultDebt] = useState<string>("0"); // Wei format
+  const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
 
@@ -155,6 +156,15 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         setSupportedAssets(assets);
         if (assets.length > 0) {
           setDepositAsset(assets[0]); // Set first asset as default
+        }
+
+        // Check global pause status
+        try {
+          const globalPauseStatus = await cdpService.getGlobalPaused();
+          setIsGlobalPaused(globalPauseStatus.isPaused);
+        } catch (error) {
+          console.error("Failed to fetch global pause status:", error);
+          setIsGlobalPaused(true); // Default to not paused if we can't fetch
         }
 
         // Fetch real asset prices for all supported assets
@@ -882,6 +892,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         onClick={handleCreateVault}
         disabled={
           loading || 
+          isGlobalPaused ||
           !depositAsset || 
           (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
           getAssetPrice() <= 0 ||
@@ -891,6 +902,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       >
         {(() => {
           if (loading) return "Processing...";
+          if (isGlobalPaused) return "Deposit/Borrow paused by admin at this time";
           if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
           if (getAssetPrice() <= 0) return "Price data required";
           if (!depositAsset) return "Select asset";
