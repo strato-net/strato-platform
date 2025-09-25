@@ -489,6 +489,8 @@ contract Describe_BadDebt_Basic {
 
         configurator.writeOffBadDebtWithHaircut(pool.badDebt(), "Admin shouldn't actually do this before SM cover");
         require(pool.badDebt() == 0, "Bad debt should be 0 after write off bad debt with haircut");
+
+        require(pool.getExchangeRate() < 1e18, "Exchange rate should fall due to mUSDST haircut");
     }
 
 }
