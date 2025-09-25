@@ -1,7 +1,3 @@
-// ============================================================================
-// SWAP-SPECIFIC INTERFACES
-// ============================================================================
-// This file contains UI-specific swap interfaces that extend the shared types
 
 // Import shared types for use in UI-specific interface definitions
 import type {
@@ -11,11 +7,9 @@ import type {
   Pool,
   SwapToken,
 } from '@shared/swap-types';
+import { SafetyModuleData } from '.';
 
-// Re-export all shared swap types (handled by interface/index.tsx)
 export * from '@shared/swap-types';
-
-// ============================================================================
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 
@@ -135,6 +129,8 @@ export interface PoolParticipationProps {
   userPools: Pool[];
   loadingUserPools: boolean;
   shouldPreventFlash?: boolean;
+  safetyInfo?: SafetyModuleData | null;
+  loadingSafety?: boolean;
 }
 
 /**

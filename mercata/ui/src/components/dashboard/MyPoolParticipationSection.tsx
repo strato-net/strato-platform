@@ -16,7 +16,9 @@ export default function MyPoolParticipationSection({
   loadingLiquidity, 
   userPools, 
   loadingUserPools,
-  shouldPreventFlash = false
+  shouldPreventFlash = false,
+  safetyInfo,
+  loadingSafety = false
 }: PoolParticipationProps) {
   
   const [expandedTokens, setExpandedTokens] = useState<Set<string>>(new Set());
@@ -31,6 +33,12 @@ export default function MyPoolParticipationSection({
     return value.toFixed(2);
   };
 
+  // Helper variables for sUSDST calculations
+  const sUSDSTBalance = safetyInfo?.userShares && BigInt(safetyInfo.userShares) > 0n;
+  const sUsdstExchangeRate = safetyInfo?.exchangeRate ? parseFloat(formatUnits(safetyInfo.exchangeRate, 18)) : 1;
+  const sUsdstApy = safetyInfo?.exchangeRate ? `${((sUsdstExchangeRate - 1) * 100).toFixed(2)}%` : "N/A";
+  const sUsdstValue = safetyInfo?.exchangeRate ? `$${formatValue(safetyInfo.userShares, safetyInfo.exchangeRate)}` : "$0.00";
+
   const toggleTokenExpansion = (tokenAddress: string) => {
     const newExpanded = new Set(expandedTokens);
     if (newExpanded.has(tokenAddress)) {
@@ -42,7 +50,7 @@ export default function MyPoolParticipationSection({
   };
 
   // Don't show loading indicator immediately if shouldPreventFlash is true
-  const shouldShowLoading = (loadingLiquidity || loadingUserPools) && !shouldPreventFlash;
+  const shouldShowLoading = (loadingLiquidity || loadingUserPools || loadingSafety) && !shouldPreventFlash;
 
   return (
     <Card className="rounded-2xl shadow-sm w-full mb-6">
@@ -87,6 +95,22 @@ export default function MyPoolParticipationSection({
                 </div>
               </div>
             ) : null}
+
+            {/* SUSDST Row */}
+            {sUSDSTBalance && (
+              <div className="grid grid-cols-4 items-center bg-gray-50 px-4 py-3 rounded-md mb-2">
+                <div className="font-semibold text-gray-700">sUSDST</div>
+                <div className="text-center font-semibold text-gray-900">
+                  {formatBalance(safetyInfo.userShares, undefined, 18, 2, 2)}
+                </div>
+                <div className="text-center font-semibold text-gray-900">
+                  {sUsdstApy}
+                </div>
+                <div className="text-right font-medium text-gray-900">
+                  {sUsdstValue}
+                </div>
+              </div>
+            )}
 
             {/* LP Token Rows */}
             {userPools.length > 0 ? (
