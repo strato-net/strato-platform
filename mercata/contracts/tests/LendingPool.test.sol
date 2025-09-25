@@ -67,11 +67,11 @@ contract Describe_LendingPool_Basic {
         require(observed == expected, message + " Got: " + string(observed) + ", expected: " + string(expected));
     }
 
-    function it_aa_can_deploy_Mercata() public {
+    function it_lending_aa_can_deploy_Mercata() public {
         require(address(m) != address(0), "address is 0");
     }
 
-    function it_ab_checks_that_contracts_are_set() public {
+    function it_lending_ab_checks_that_contracts_are_set() public {
         require(address(m.priceOracle()) != address(0), "PriceOracle address is 0");
         require(address(m.collateralVault()) != address(0), "CollateralVault address is 0");
         require(address(m.liquidityPool()) != address(0), "LiquidityPool address is 0");
@@ -91,7 +91,7 @@ contract Describe_LendingPool_Basic {
     }
 
     // Test basic token creation functionality
-    function it_ac_can_create_and_activate_tokens() public {
+    function it_lending_ac_can_create_and_activate_tokens() public {
         // Create test token for borrowing
         USDST = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
         require(address(USDST) != address(0), "Failed to create USDST token");
@@ -110,7 +110,7 @@ contract Describe_LendingPool_Basic {
     }
 
     // Test token activation functionality
-    function it_ad_can_activate_tokens() public {
+    function it_lending_ad_can_activate_tokens() public {
         // Set tokens to active status
         Token(USDST).setStatus(2);
         Token(mUSDST).setStatus(2);
@@ -126,7 +126,7 @@ contract Describe_LendingPool_Basic {
         require(Token(SILVST).status() == TokenStatus.ACTIVE, "SILVST token not activated");
     }
 
-    function it_ae_can_whitelist_tokens() public {
+    function it_lending_ae_can_whitelist_tokens() public {
         Token(mUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.liquidityPool()));
         Token(mUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.liquidityPool()));
 
@@ -135,7 +135,7 @@ contract Describe_LendingPool_Basic {
     }
 
     // Test complete lending pool configuration with full setup
-    function it_af_can_configure_lending_pool() public {
+    function it_lending_af_can_configure_lending_pool() public {
         // Get the lending pool and configurator from Mercata infrastructure
         LendingPool pool = m.lendingPool();
         PoolConfigurator configurator = m.poolConfigurator();
@@ -283,19 +283,19 @@ contract Describe_LendingPool_Basic {
         require(silverLtv <= silverLiquidationThreshold, "Silver LTV exceeds liquidation threshold");
     }
 
-    function it_ag_persists_accross_tests() public {
+    function it_lending_ag_persists_accross_tests() public {
         LendingPool pool = m.lendingPool();
         require(pool.configuredAssets(0) != address(0), "No persistent configured assets");
     }
 
     // Verify exchange rate calculation works
-    function it_ah_can_verify_initial_exchange_rate() public {
+    function it_lending_ah_can_verify_initial_exchange_rate() public {
         LendingPool pool = m.lendingPool();
         uint exchangeRate = pool.getExchangeRate();
         require(exchangeRate == 1e18, "Exchange rate not 1:1");
     }
 
-    function it_ai_can_set_oracle_prices() public {
+    function it_lending_ai_can_set_oracle_prices() public {
         PriceOracle oracle = m.priceOracle();
         
         oracle.setAssetPrice(USDST, 1e18);      // $1 USD
@@ -308,12 +308,12 @@ contract Describe_LendingPool_Basic {
         require(oracle.getAssetPrice(SILVST) == 25e18, "Silver price not set correctly");
     }
 
-    function it_aj_can_display_logs() public {
+    function it_lending_aj_can_display_logs() public {
         log("Hello, world! We're at " + string(address(m)));
     }
 
     // Test token minting and burn operations
-    function it_ak_can_mint_and_burn_tokens() public {
+    function it_lending_ak_can_mint_and_burn_tokens() public {
         // Test minting - simplified
         Token(USDST).mint(address(this), 1000e18);
         require(IERC20(USDST).balanceOf(address(this)) == 1000e18, "Should have 1000 USDST after mint");
@@ -321,7 +321,7 @@ contract Describe_LendingPool_Basic {
         require(IERC20(USDST).balanceOf(address(this)) == 0, "Should have 0 USDST after burn");
     }
 
-    function it_al_can_simulate_users() public {
+    function it_lending_al_can_simulate_users() public {
         user1 = new User();
         user2 = new User();
 
@@ -337,7 +337,7 @@ contract Describe_LendingPool_Basic {
         Token(USDST).burn(address(this), 1000e18);
     }
 
-    function it_am_can_configure_safety_module() public {
+    function it_lending_am_can_configure_safety_module() public {
         SafetyModule sm = m.safetyModule();
 
         uint cooldown = 1;
@@ -360,7 +360,7 @@ contract Describe_LendingPool_Basic {
         require(address(sm.tokenFactory()) == address(m.tokenFactory()), "Token factory not set correctly");
     }
 
-    function it_an_can_accept_liquidity_deposits() public {
+    function it_lending_an_can_accept_liquidity_deposits() public {
         LendingPool pool = m.lendingPool();
 
         Token(USDST).mint(address(this), 1000000e18);
@@ -374,7 +374,7 @@ contract Describe_LendingPool_Basic {
         require(IERC20(mUSDST).balanceOf(address(this)) == 1000000e18, "mUSDST balance should be 1000000e18 after 1:1 deposit");
     }
 
-    function it_ao_can_accept_safety_module_deposits() public {
+    function it_lending_ao_can_accept_safety_module_deposits() public {
         SafetyModule sm = m.safetyModule();
 
         uint amount = 2000e18; // chosen to be big enough to cover the bad debt for the can_cover_bad_debt test
@@ -390,7 +390,7 @@ contract Describe_LendingPool_Basic {
         require(IERC20(sUSDST).balanceOf(address(this)) == amount, "sUSDST balance should be 1000e18 after stake");
     }
 
-    function it_ap_can_accept_collateral_vault_deposits() public {
+    function it_lending_ap_can_accept_collateral_vault_deposits() public {
         CollateralVault cv = m.collateralVault();
         LendingPool pool = m.lendingPool();
 
@@ -403,7 +403,7 @@ contract Describe_LendingPool_Basic {
         require(cv.userCollaterals(address(user1), GOLDST) == 1e18, "GOLDST balance should be 1e18 after supply collateral");
     }
 
-    function it_aq_can_accept_borrows() public {
+    function it_lending_aq_can_accept_borrows() public {
         LendingPool pool = m.lendingPool();
 
         uint priorDebt = pool.getUserDebt(address(user1)); // used for invariant; should be 0 unless this test is reordered
@@ -419,7 +419,7 @@ contract Describe_LendingPool_Basic {
     }
 
     /// @param x fraction on 1e18 scale (1e18 = 100%) of ltv to borrow, cropped to range [1, 1e18]
-    function property_accepts_borrows(uint x) public {
+    function property_lending_accepts_borrows(uint x) public {
         x = defineRange(x, 1, 1e18); // define acceptable range [1, 1e18]
 
         LendingPool pool = m.lendingPool();
@@ -469,7 +469,7 @@ contract Describe_LendingPool_Basic {
         );
     }
 
-    function it_ba_can_tank_gold_price() public {
+    function it_lending_ba_can_tank_gold_price() public {
         PriceOracle oracle = m.priceOracle();
         LendingPool pool = m.lendingPool();
 
@@ -489,7 +489,7 @@ contract Describe_LendingPool_Basic {
         require(healthFactor < 1e18, "Health factor should be less than 1e18 after set price");
     }
 
-    function it_bb_can_liquidate_borrower() public {
+    function it_lending_bb_can_liquidate_borrower() public {
         LendingPool pool = m.lendingPool();
 
         uint prior_balance = IERC20(USDST).balanceOf(address(this)); // to help with cleanup
@@ -515,7 +515,7 @@ contract Describe_LendingPool_Basic {
         Token(USDST).burn(address(this), IERC20(USDST).balanceOf(address(this)) - prior_balance);
     }
 
-    function it_bs_can_borrow_max_after_borrow() public {
+    function it_lending_bs_can_borrow_max_after_borrow() public {
         CollateralVault cv = m.collateralVault();
         LendingPool pool = m.lendingPool();
 
@@ -532,14 +532,15 @@ contract Describe_LendingPool_Basic {
 
         // Borrow 10%
         user.do(address(pool), "borrow", maxAmount * 1000/10000);
+        require_equal(IERC20(USDST).balanceOf(address(user)), maxAmount * 1000/10000, "Wrong USDST balance after borrow.");
         require_equal(pool.getUserDebt(address(user)), maxAmount * 1000/10000, "Wrong user debt after borrow.");
 
         // Borrow rest
         user.do(address(pool), "borrowMax");
-        require_equal(pool.getUserDebt(address(user)), maxAmount, "Wrong user debt after borrowMax.");
+        require_equal(pool.getUserDebt(address(user)), IERC20(USDST).balanceOf(address(user)), "User debt doesn't equal USDST balance after borrowMax.");
     }
 
-    function it_bt_can_accept_repays() public {
+    function it_lending_bt_can_accept_repays() public {
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
         LiquidityPool lp = m.liquidityPool();
@@ -562,7 +563,7 @@ contract Describe_LendingPool_Basic {
         require(pool.getUserDebt(address(user)) == priorDebt - repayAmount, "Repayment unsuccessful");
     }
 
-    function it_bu_can_accept_repay_all() public {
+    function it_lending_bu_can_accept_repay_all() public {
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
         LiquidityPool lp = m.liquidityPool();
@@ -583,7 +584,7 @@ contract Describe_LendingPool_Basic {
         require(pool.getUserDebt(address(user)) == 0, "Repayment unsuccessful");
     }
 
-    function it_bv_can_accept_repay_all_after_repay() public {
+    function it_lending_bv_can_accept_repay_all_after_repay() public {
         LendingPool pool = m.lendingPool();
         CollateralVault cv = m.collateralVault();
         LiquidityPool lp = m.liquidityPool();
@@ -614,7 +615,7 @@ contract Describe_LendingPool_Basic {
     }
 
     /// @param usdstBalance amount of USDST to deposit; range [1, INFINITY]
-    function property_bw_can_deposit_liquidity_max(uint usdstBalance) public {
+    function property_lending_bw_can_deposit_lending_liquidity_max(uint usdstBalance) public {
         usdstBalance = defineRange(usdstBalance, 1, INFINITY);
 
         LendingPool pool = m.lendingPool();
@@ -634,7 +635,7 @@ contract Describe_LendingPool_Basic {
     }
 
     User user3;
-    function it_bx_can_withdraw_liquidity_partial() public {
+    function it_lending_bx_can_withdraw_liquidity_partial() public {
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
 
@@ -655,7 +656,7 @@ contract Describe_LendingPool_Basic {
         require_equal(IERC20(mUSDST).balanceOf(address(user3)), expectedMUSDST, "Wrong mUSDST balance after withdrawal");
     }
 
-    function it_by_can_withdraw_liquidity_max_after_partial() public {
+    function it_lending_by_can_withdraw_liquidity_max_after_partial() public {
         LendingPool pool = m.lendingPool();
         LiquidityPool lp = m.liquidityPool();
 
@@ -666,7 +667,7 @@ contract Describe_LendingPool_Basic {
         require(IERC20(mUSDST).balanceOf(address(user3)) == 0, "Withdrawal unsuccessful");
     }
 
-    function property_bz_can_withdraw_liquidity_max(uint depositAmount) public {
+    function property_lending_bz_can_withdraw_liquidity_max(uint depositAmount) public {
         depositAmount = defineRange(depositAmount, 1, INFINITY);
         
         LendingPool pool = m.lendingPool();
@@ -684,52 +685,259 @@ contract Describe_LendingPool_Basic {
         require(IERC20(mUSDST).balanceOf(address(user)) == 0, "Withdrawal unsuccessful");
     }
 
-    function it_cz_gives_correct_health_factors() public {
-        // TODO multiple scenarios
-        revert("TODO");
+    function it_lending_cz_gives_correct_health_factors() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        User user = new User();
+        uint collateralAmount = 1e18;
+        Token(SILVST).mint(address(user), collateralAmount);
+
+        // No Loan takes precedence over no collateral
+        require(pool.getHealthFactor(address(user)) == INFINITY, "Health factor should be 0 before supply collateral");
+
+        user.do(SILVST, "approve", address(cv), collateralAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), collateralAmount);
+        require(pool.getHealthFactor(address(user)) == INFINITY, "Health factor should be inf before borrowMax");
+
+        user.do(address(pool), "borrowMax");
+        (uint ltv, uint liquidationThreshold, uint liquidationBonus, uint _, uint reserveFactor, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        require_equal(pool.getHealthFactor(address(user)), liquidationThreshold * 1e18 / ltv, "Health factor incorrect after borrowMax.");
+
+        uint repayAmount = 1e18;
+        user.do(USDST, "approve", address(lp), repayAmount);
+        user.do(address(pool), "repay", repayAmount);
+        require(pool.getHealthFactor(address(user)) > liquidationThreshold * 1e18 / ltv, "Health factor should be improved after repay");
+
+        user.do(USDST, "approve", address(lp), INFINITY);
+        user.do(address(pool), "repayAll");
+        require(pool.getHealthFactor(address(user)) == INFINITY, "Health factor should be inf after repayAll");
     }
 
-    function it_da_calculates_interest_correctly() public {
+    /// @dev please implement following clock winding implementation for solid-vm-cli
+    function imagine_it_lending_da_calculates_interest_correctly() public {
         // TODO probably multiple test cases, but we'll need to run the clock
         revert("Clock Winding for solid-vm-cli needed");
     }
 
-    function it_ea_lets_admin_sweep_reserves() public {
-        // TODO
-        revert("TODO");
+    /// @dev please enable following clock winding implementation for solid-vm-cli
+    function imagine_it_lending_ea_lets_admin_sweep_reserves_partially() public {
+        revert("Clock Winding for solid-vm-cli needed");
+
+        LendingPool pool = m.lendingPool();
+        PoolConfigurator configurator = m.poolConfigurator();
+
+        uint amount = 100e18;
+        require(amount <= pool.reservesAccrued(), "Amount should be greater than reserves accrued");
+
+        configurator.sweepReserves(amount);
+
+        uint toSafety = amount * pool.safetyShareBps() / 10000;
+        uint fees = amount - toSafety;
+
+        require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
+        require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
     }
 
-    function it_fa_handles_50_pct_liquidation() public {
-        // TODO
-        revert("TODO");
+    /// @dev please enable following clock winding implementation for solid-vm-cli
+    function imagine_it_lending_eb_lets_admin_sweep_reserves_precisely() public {
+        revert("Clock Winding for solid-vm-cli needed");
+
+        LendingPool pool = m.lendingPool();
+        PoolConfigurator configurator = m.poolConfigurator();
+
+        uint amount = pool.reservesAccrued();
+        configurator.sweepReserves(amount);
+
+        uint toSafety = amount * pool.safetyShareBps() / 10000;
+        uint fees = amount - toSafety;
+
+        require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
+        require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
     }
 
-    function it_fb_handles_100_pct_liquidation() public {
-        // TODO
-        revert("TODO");
+    /// @dev please enable following clock winding implementation for solid-vm-cli
+    function imagine_it_lending_ec_lets_admin_sweep_reserves_insufficiently() public {
+        revert("Clock Winding for solid-vm-cli needed");
+
+        LendingPool pool = m.lendingPool();
+        PoolConfigurator configurator = m.poolConfigurator();
+
+        uint amount = pool.reservesAccrued() + 100e18;
+        configurator.sweepReserves(amount);
+
+        uint toSafety = pool.reservesAccrued() * pool.safetyShareBps() / 10000;
+        uint fees = pool.reservesAccrued() - toSafety;
+
+        require_equal(IERC20(USDST).balanceOf(address(m.feeCollector())), fees, "Wrong FeeCollector balance after sweep");
+        require_equal(IERC20(USDST).balanceOf(address(m.safetyModule())), toSafety, "Wrong SafetyModule balance after sweep");
+    }
+
+    function property_lending_fa_handles_50_pct_liquidation(uint a_collatAmount, uint b_collatStartPrice) public {
+        a_collatAmount = defineRange(a_collatAmount, 1e14, INFINITY);
+        b_collatStartPrice = defineRange(b_collatStartPrice, 1e14, INFINITY);
+
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        oracle.setAssetPrice(SILVST, b_collatStartPrice);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), a_collatAmount);
+        user.do(SILVST, "approve", address(cv), a_collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), a_collatAmount);
+        user.do(address(pool), "borrowMax");
+
+        (uint c_ltv, uint d_liquidationThreshold, uint liquidationBonus, uint _, uint foo, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        oracle.setAssetPrice(SILVST, b_collatStartPrice * c_ltv / d_liquidationThreshold * 99/100);
+
+        require(pool.getHealthFactor(address(user)) < 1e18, "Health factor should be less than 1e18 before liquidation");
+
+        // Liquidate
+        Token(USDST).mint(address(this), pool.getUserDebt(address(user))); // more than enough to liquidate
+        IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
+        pool.liquidationCallAll(address(SILVST), address(user));
+
+        require(cv.userCollaterals(address(user), address(SILVST)) < a_collatAmount, "Collateral " + string(cv.userCollaterals(address(user), address(SILVST))) + " should be less than the original amount " + string(a_collatAmount) + " after liquidation");
+
+        require(pool.getHealthFactor(address(user)) >= 1e18, "Health factor should be at least 1e18 after liquidation");
+
+        require_equal(pool.getUserDebt(address(user)), ceilDiv(IERC20(USDST).balanceOf(address(user)), 2), "User debt should be halved after 50% liquidation.");
+    }
+
+    function property_lending_fb_handles_100_pct_liquidation(uint a_collatAmount, uint b_collatStartPrice) public {
+        a_collatAmount = defineRange(a_collatAmount, 1e14, INFINITY);
+        b_collatStartPrice = defineRange(b_collatStartPrice, 1e14, INFINITY);
+
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        oracle.setAssetPrice(SILVST, b_collatStartPrice);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), a_collatAmount);
+        user.do(SILVST, "approve", address(cv), a_collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), a_collatAmount);
+        user.do(address(pool), "borrowMax");
+
+        (uint c_ltv, uint d_liquidationThreshold, uint liquidationBonus, uint _, uint foo, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        oracle.setAssetPrice(SILVST, b_collatStartPrice * c_ltv / d_liquidationThreshold * 94/100);
+
+        require(pool.getHealthFactor(address(user)) < 1e18, "Health factor should be less than 1e18 before liquidation");
+
+        // Liquidate
+        Token(USDST).mint(address(this), pool.getUserDebt(address(user)));
+        IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
+        pool.liquidationCallAll(address(SILVST), address(user));
+
+        require(cv.userCollaterals(address(user), address(SILVST)) < a_collatAmount, "Collateral " + string(cv.userCollaterals(address(user), address(SILVST))) + " should be less than the original amount " + string(a_collatAmount) + " after liquidation");
+
+        require(pool.getHealthFactor(address(user)) >= 1e18, "Health factor should be at least 1e18 after liquidation");
 
         // Assert no dust left on the loan balance
+        require(pool.getUserDebt(address(user)) == 0, "User debt should be zero after 100% liquidation");
     }
     
-    function it_fc_prevents_self_liquidation() public {
-        // TODO
-        revert("TODO");
-    }
-    
-    function it_fd_prevents_liquidation_of_healthy_positions() public {
-        // TODO
-        revert("TODO");
-    }
-    
-    function it_ga_handles_multiple_collateral_cross_liquidation() public {
-        // TODO other multi collateral scenarios
-        revert("TODO");
-    }
+    function it_lending_fc_prevents_self_liquidation() public {
+        uint a_collatAmount = 20e18;
+        uint b_collatStartPrice = 50e18;
 
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        oracle.setAssetPrice(SILVST, b_collatStartPrice);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), a_collatAmount);
+        user.do(SILVST, "approve", address(cv), a_collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), a_collatAmount);
+        user.do(address(pool), "borrowMax");
+
+        (uint c_ltv, uint d_liquidationThreshold, uint liquidationBonus, uint _, uint foo, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        oracle.setAssetPrice(SILVST, b_collatStartPrice * c_ltv / d_liquidationThreshold * 94/100);
+
+        require(pool.getHealthFactor(address(user)) < 1e18, "Health factor should be less than 1e18 before liquidation");
+
+        // Liquidate
+        Token(USDST).mint(address(user), pool.getUserDebt(address(user)));
+        user.do(USDST, "approve", address(lp), INFINITY);
+        try user.do(address(pool), "liquidationCallAll", address(SILVST), address(user)) {revert("Liquidation should fail");}
+        catch {/* expected */}
+    }
+    
+    function it_lending_fd_prevents_liquidation_of_healthy_positions() public {
+        uint a_collatAmount = 20e18;
+        uint b_collatStartPrice = 50e18;
+
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        oracle.setAssetPrice(SILVST, b_collatStartPrice);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), a_collatAmount);
+        user.do(SILVST, "approve", address(cv), a_collatAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), a_collatAmount);
+        user.do(address(pool), "borrowMax");
+
+        (uint c_ltv, uint d_liquidationThreshold, uint liquidationBonus, uint _, uint foo, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        oracle.setAssetPrice(SILVST, b_collatStartPrice * c_ltv / d_liquidationThreshold * 101/100);
+
+        require(pool.getHealthFactor(address(user)) > 1e18, "Health factor should be greater than 1e18 before liquidation attempt");
+        require(pool.getHealthFactor(address(user)) < d_liquidationThreshold * 1e18 / c_ltv, "Health factor should be less than LT/LTV before liquidation attempt");
+
+        // Liquidate
+        Token(USDST).mint(address(this), pool.getUserDebt(address(user))); // more than enough to liquidate
+        IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
+        try pool.liquidationCallAll(address(SILVST), address(user)) {revert("Liquidation should fail");}
+        catch {/* expected */}
+    }
+    
+    function it_lending_ga_handles_multiple_collateral_cross_liquidation() public {
+        LendingPool pool = m.lendingPool();
+        PriceOracle oracle = m.priceOracle();
+        CollateralVault cv = m.collateralVault();
+        LiquidityPool lp = m.liquidityPool();
+
+        uint goldAmount = 1e18;
+        uint goldStartPrice = 2000e18;
+        uint silverAmount = 30e18;
+        uint silverPrice = 50e18;
+
+        oracle.setAssetPrice(GOLDST, goldStartPrice);
+        oracle.setAssetPrice(SILVST, silverPrice);
+
+        User user = new User();
+        Token(SILVST).mint(address(user), silverAmount);
+        Token(GOLDST).mint(address(user), goldAmount);
+        user.do(SILVST, "approve", address(cv), silverAmount);
+        user.do(GOLDST, "approve", address(cv), goldAmount);
+        user.do(address(pool), "supplyCollateral", address(SILVST), silverAmount);
+        user.do(address(pool), "supplyCollateral", address(GOLDST), goldAmount);
+        user.do(address(pool), "borrowMax");
+
+        (uint c_ltv, uint d_liquidationThreshold, uint liquidationBonus, uint _, uint foo, uint perSecondFactorRAY) = pool.getAssetConfig(SILVST);
+        oracle.setAssetPrice(address(GOLDST), 1000e18);
+
+        uint healthFactorAfterDip = pool.getHealthFactor(address(user));
+        require(healthFactorAfterDip < 1e18, "Health factor should be less than 1e18 before liquidation");
+
+        // Liquidate
+        Token(USDST).mint(address(this), pool.getUserDebt(address(user)));
+        IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
+        pool.liquidationCall(address(SILVST), address(user), 300e18); // not the asset who fell in price
+
+        require(cv.userCollaterals(address(user), address(SILVST)) < silverAmount, "Silver collateral should be decreased");
+        require(cv.userCollaterals(address(user), address(GOLDST)) == goldAmount, "Gold collateral should be unaffected");
+    }
 
 }
-
-
-
-
-
