@@ -171,7 +171,6 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
         });
       }
     } catch (error) {
-      // Network/API error - global interceptor should handle this, but add fallback
       console.error('Liquidation failed:', error);
       toast({ 
         title: "Liquidation Failed", 

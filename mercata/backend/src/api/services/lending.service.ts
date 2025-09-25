@@ -375,7 +375,7 @@ export const liquidityAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
-        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,` +
+        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
@@ -435,6 +435,7 @@ export const liquidityAndBalance = async (
   const totalScaledDebtStr = registry.lendingPool?.totalScaledDebt || "0";
   const reservesAccruedStr = registry.lendingPool?.reservesAccrued || "0";
   const lastAccrualStr     = registry.lendingPool?.lastAccrual     || "0";
+  const badDebtStr         = registry.lendingPool?.badDebt         || "0";
 
   const interestRateBps = borrowableAssetConfig?.interestRate || 0;
 
@@ -464,7 +465,8 @@ export const liquidityAndBalance = async (
     availableLiquidity,
     systemTotalDebt,
     reservesAccruedStr.toString(),
-    totalMTokenSupply
+    totalMTokenSupply,
+    badDebtStr.toString()
   );
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
