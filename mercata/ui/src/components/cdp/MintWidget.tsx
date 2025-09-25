@@ -31,6 +31,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [existingVaultCollateral, setExistingVaultCollateral] = useState<string>("0"); // Wei format
   const [existingVaultDebt, setExistingVaultDebt] = useState<string>("0"); // Wei format
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
+  const [isAssetPaused, setIsAssetPaused] = useState<boolean>(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
 
@@ -232,6 +233,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       if (!depositAsset) {
         setExistingVaultCollateral("0");
         setExistingVaultDebt("0");
+        setIsAssetPaused(false);
         return;
       }
 
@@ -245,10 +247,20 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           setExistingVaultCollateral("0");
           setExistingVaultDebt("0");
         }
+
+        // Check if this specific asset is paused
+        try {
+          const assetConfig = await cdpService.getAssetConfig(depositAsset.asset);
+          setIsAssetPaused(assetConfig?.isPaused || false);
+        } catch (error) {
+          console.error("Failed to fetch asset pause status:", error);
+          setIsAssetPaused(true); // Default to not paused if we can't fetch
+        }
       } catch (error) {
         console.log("No existing vault found for asset:", depositAsset.symbol);
-        setExistingVaultCollateral("0");
-        setExistingVaultDebt("0");
+        setExistingVaultCollateral("?");
+        setExistingVaultDebt("?");
+        setIsAssetPaused(false);
       }
     };
 
@@ -401,6 +413,9 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
   // Check if projected CR is below liquidation threshold (dangerous)
   const isPositionDangerous = projectedCR > 0 && projectedCR < liquidationRatio;
+  
+  // Check if any pause conditions are active
+  const isAnyPaused = isGlobalPaused || isAssetPaused;
   
   // Check if there's no more borrowing room due to being at liquidation threshold
   // This should trigger when user has collateral (existing or being deposited) but no borrowing power
@@ -892,7 +907,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         onClick={handleCreateVault}
         disabled={
           loading || 
-          isGlobalPaused ||
+          isAnyPaused ||
           !depositAsset || 
           (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
           getAssetPrice() <= 0 ||
@@ -903,6 +918,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         {(() => {
           if (loading) return "Processing...";
           if (isGlobalPaused) return "Deposit/Borrow paused by admin at this time";
+          if (isAssetPaused) return `Deposit/Borrow for ${depositAsset?.symbol} paused by admin at this time`;
           if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
           if (getAssetPrice() <= 0) return "Price data required";
           if (!depositAsset) return "Select asset";
