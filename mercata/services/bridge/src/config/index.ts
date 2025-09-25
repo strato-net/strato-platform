@@ -53,7 +53,7 @@ const config = {
   balance: {
     gasFeeUSDST: BigInt(process.env.GAS_FEE_USDST || '1') * BigInt(1e16),
     gasFeeVoucher: BigInt(process.env.GAS_FEE_VOUCHER || '100') * BigInt(1e16),
-    minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '500'),
+    minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '200'),
   },
   strato: {
     gas: {

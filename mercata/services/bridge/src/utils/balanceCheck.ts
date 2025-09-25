@@ -58,7 +58,7 @@ export const checkBalances = async (): Promise<void> => {
     
     // Check if total transactions are below minimum threshold
     if (totalTransactions < config.balance.minTransactionsThreshold) {
-      const error = `Total possible transactions (${totalTransactions}) below minimum threshold (${config.balance.minTransactionsThreshold}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
+      const error = `WARNING: Total possible transactions (${totalTransactions}) below minimum threshold (${config.balance.minTransactionsThreshold}). Voucher: ${voucherBalanceUSD} (${voucherTransactions} txs), USDST: ${usdstBalanceUSD} (${usdstTransactions} txs)`;
       logError('BalanceChecker', new Error(error));
       
       // Exit if critically low (less than 1 transaction possible)
