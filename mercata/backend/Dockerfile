@@ -5,13 +5,15 @@ FROM base AS builder
 
 WORKDIR /build
 
-COPY package*.json ./
+COPY packages/shared-types/ ../packages/shared-types/
+
+COPY backend/package*.json ./
 
 RUN npm ci
 
-COPY tsconfig.json ./
+COPY backend/tsconfig.json ./
 
-COPY src/ ./src/
+COPY backend/src/ ./src/
 
 RUN npm run build
 
@@ -20,9 +22,11 @@ FROM base
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY backend/package*.json ./
 
-RUN npm ci --omit=dev
+# TODO: use `npm ci --omit=dev` instead to build a slimmer image, but the postinstall script in package.json is currently a culprit
+COPY --from=builder packages/shared-types/ ../packages/shared-types/
+RUN npm ci
 
 COPY --from=builder /build/dist ./dist
 

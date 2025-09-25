@@ -87,9 +87,12 @@ class OAuthUtil {
         password,
         scope: this.scope,
       };
-
-      const result = await this.oauth2.getToken(tokenParams) as OAuthTokenResult;
-
+      let result
+      try {
+        result = await this.oauth2.getToken(tokenParams) as OAuthTokenResult;
+      } catch (error: any) {
+        throw new Error(`Error obtaining token. Result: ${result}; Error: ${error?.message}`);
+      }
       // Ensure all numeric values are properly converted
       const tokenData = {
         ...result.token,

@@ -27,8 +27,8 @@ export const createCompletePriceMap = async (
       const tokenBPrice = priceMap.get(pool.tokenB?.address) || 0;
       
       const lpTokenPrice = calculateLPTokenPrice(
-        pool.tokenABalance || "0",
-        pool.tokenBBalance || "0",
+        pool.tokenA.poolBalance || "0",
+        pool.tokenB.poolBalance || "0",
         tokenAPrice.toString(),
         tokenBPrice.toString(),
         pool.lpToken._totalSupply
@@ -45,7 +45,7 @@ export const createCompletePriceMap = async (
   // Add mToken price
   try {
     const lendingData = await getLendingRegistry(accessToken, undefined, {
-      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,borrowIndex,totalScaledDebt,reservesAccrued),liquidityPool:liquidityPool_fkey(address)"
+      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,borrowIndex,totalScaledDebt,reservesAccrued,badDebt),liquidityPool:liquidityPool_fkey(address)"
     });
     const { borrowableAsset, mToken } = lendingData.lendingPool || {};
     
@@ -71,13 +71,15 @@ export const createCompletePriceMap = async (
         const borrowIndexStr     = lendingData.lendingPool?.borrowIndex     || "0";
         const totalScaledDebtStr = lendingData.lendingPool?.totalScaledDebt || "0";
         const reservesAccruedStr = lendingData.lendingPool?.reservesAccrued || "0";
+        const badDebtStr         = lendingData.lendingPool?.badDebt || "0";
         const systemTotalDebt = ((BigInt(totalScaledDebtStr) * BigInt(borrowIndexStr)) / (10n ** 27n)).toString();
 
         const exchangeRate = exchangeRateFromComponents(
           availableLiquidity,
           systemTotalDebt,
           reservesAccruedStr,
-          totalMTokenSupply
+          totalMTokenSupply,
+          badDebtStr
         );
         
         // mToken price = borrowable asset price * exchange rate

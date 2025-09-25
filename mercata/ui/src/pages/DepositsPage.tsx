@@ -15,7 +15,11 @@ import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { formatUnits } from 'viem';
+import { formatUnits as formatUnitsEthers } from 'ethers';
 import { useCDP } from '@/context/CDPContext';
+import { useSwapContext } from '@/context/SwapContext';
+import { useNetBalance } from '@/hooks/useNetBalance';
+import { useSafetyContext } from '@/context/SafetyContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 import { useSearchParams } from 'react-router-dom';
@@ -23,10 +27,20 @@ import { useSearchParams } from 'react-router-dom';
 const DepositsPage = () => {
   const { userAddress } = useUser();
   const { activeTokens: tokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, fetchTokens, fetchAllActiveTokens, fetchUsdstBalance } = useUserTokens();
-  const { loans } = useLendingContext();
-  const { totalCDPDebt } = useCDP();
-  const [totalBalance, setTotalBalance] = useState<number>(0);
+  const { loans, liquidityInfo, refreshLoans } = useLendingContext();
+  const { totalCDPDebt, refreshVaults } = useCDP();
+  const { userPools } = useSwapContext();
+  const { safetyInfo, refreshSafetyInfo } = useSafetyContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  
+  // Use centralized net balance calculation hook
+  const { netBalance: totalBalance } = useNetBalance({
+    tokens,
+    loans,
+    liquidityInfo,
+    totalCDPDebt,
+    safetyInfo
+  });
   const [searchParams] = useSearchParams();
 
   const initialTab = searchParams.get('tab') === 'convert' ? 'usdc' : undefined;
@@ -39,6 +53,9 @@ const DepositsPage = () => {
     // Use a longer delay to ensure transaction is processed and tab state is preserved
     setTimeout(() => {
       fetchTokens();
+      refreshLoans(); 
+      refreshVaults(); 
+      refreshSafetyInfo();
       if (userAddress) {
         fetchUsdstBalance(userAddress);
       }
@@ -54,53 +71,7 @@ const DepositsPage = () => {
     fetchAllActiveTokens();
   }, [userAddress, fetchTokens, fetchAllActiveTokens]);
 
-  useEffect(() => {
-    if (!tokens || tokens.length === 0) return;
-
-    let total = 0;
-
-    for (let i = 0; i < tokens.length; i++) {
-
-      const token = tokens[i];
-      const rawPrice = token?.price || "0";
-      const rawBalance = token?.balance || "0";
-      const rawCollateralBalance = token?.collateralBalance || "0";
-
-      const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
-      const balance = parseFloat(formatUnits(BigInt(rawBalance), 18));
-      const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance), 18));
-
-      // Calculate total value including both balance and collateral
-      const totalTokenValue = (balance + collateralBalance) * price;
-      total += totalTokenValue;
-    }
-
-    const lendingPoolDebt = loans?.totalAmountOwed 
-      ? parseFloat(formatUnits((() => { 
-          try { 
-            const bi = BigInt(loans.totalAmountOwed); 
-            return bi <= 1n ? 0n : bi; 
-          } catch { 
-            return 0n; 
-          } 
-        })(), 18))
-      : 0;
-
-    const cdpDebt = totalCDPDebt
-      ? parseFloat(formatUnits((() => {
-          try {
-            const bi = BigInt(totalCDPDebt);
-            return bi <= 1n ? 0n : bi;
-          } catch {
-            return 0n;
-          }
-        })(), 18))
-      : 0;
-
-    const totalDebt = lendingPoolDebt + cdpDebt;
-    const netBalance = total - totalDebt;
-    setTotalBalance(netBalance);
-  }, [tokens, loans, totalCDPDebt]);
+  // Net balance calculation is now handled by the useNetBalance hook above
 
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {

@@ -196,4 +196,103 @@ export const formatCurrency = (value: string | number): string => {
   });
 };
 
+export const toWei = (s: string): bigint => BigInt(s || "0");
+
+/**
+ * Convert wei string to decimal for display with high precision (handles raw integer strings from backend)
+ * This function properly handles BigInt conversion and decimal trimming, preserving all significant digits
+ */
+export const formatWeiToDecimalHP = (weiString: string, decimals: number): string => {
+  if (!weiString || weiString === '0') return '0';
+  
+  const wei = BigInt(weiString);
+  const divisor = BigInt(10) ** BigInt(decimals);
+  const quotient = wei / divisor;
+  const remainder = wei % divisor;
+  
+  if (remainder === 0n) {
+    return quotient.toString();
+  }
+  
+  // For non-zero remainder, show decimal places
+  const decimalPart = remainder.toString().padStart(decimals, '0');
+  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
+  
+  if (trimmedDecimal === '') {
+    return quotient.toString();
+  }
+  
+  return `${quotient}.${trimmedDecimal}`;
+};
+
+/**
+ * Format large numbers for display with K/M/B notation
+ * Handles very large numbers with scientific notation
+ */
+export const formatNumber = (num: number | string, decimals: number = 2): string => {
+  const value = typeof num === 'string' ? parseFloat(num) : num;
+  if (isNaN(value)) return '0';
+  
+  // For very large numbers, use scientific notation
+  if (value >= 1e21) {
+    return value.toExponential(2);
+  }
+  
+  // For large numbers, use K/M/B notation
+  if (value >= 1e9) {
+    return (value / 1e9).toFixed(1) + 'B';
+  }
+  if (value >= 1e6) {
+    return (value / 1e6).toFixed(1) + 'M';
+  }
+  if (value >= 1e3) {
+    return (value / 1e3).toFixed(1) + 'K';
+  }
+  
+  // For normal numbers, limit decimal places
+  return value.toFixed(decimals);
+};
+
+/**
+ * Convert decimal string to wei with exact precision (no floating point arithmetic)
+ * Always preserves full precision by using string manipulation and BigInt arithmetic
+ * 
+ * @param decimal - The decimal value as string (required for exact precision)
+ * @param decimals - The number of decimal places for the token (default: 18)
+ * @returns Wei amount as string
+ */
+export const formatDecimalToWeiHP = (
+  decimal: string, 
+  decimals: number = 18
+): string => {
+  if (!decimal || decimal === '0' || decimal === '') return '0';
+  
+  // Remove any leading/trailing whitespace
+  const cleanDecimal = decimal.trim();
+  
+  // Handle negative numbers
+  const isNegative = cleanDecimal.startsWith('-');
+  const absoluteDecimal = isNegative ? cleanDecimal.slice(1) : cleanDecimal;
+  
+  // Split into whole and decimal parts
+  const parts = absoluteDecimal.split('.');
+  const wholePart = parts[0] || "0";
+  const decimalPart = parts[1] || "";
+  
+  // Validate input - only digits allowed
+  if (!/^\d+$/.test(wholePart) || (decimalPart && !/^\d+$/.test(decimalPart))) {
+    throw new Error(`Invalid decimal string: ${decimal}`);
+  }
+  
+  // Pad or truncate decimal part to exact precision
+  const paddedDecimalPart = decimalPart.padEnd(decimals, '0').slice(0, decimals);
+  
+  // Convert to wei using BigInt arithmetic
+  const wholeWei = BigInt(wholePart) * (BigInt(10) ** BigInt(decimals));
+  const decimalWei = BigInt(paddedDecimalPart);
+  const totalWei = wholeWei + decimalWei;
+  
+  return isNegative ? `-${totalWei.toString()}` : totalWei.toString();
+};
+
 export { formatUnits } from "ethers";

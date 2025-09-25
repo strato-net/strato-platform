@@ -14,7 +14,7 @@ import { useUser } from '@/context/UserContext';
 import { formatUnits } from 'ethers';
 import { useSwapContext } from '@/context/SwapContext';
 import { usdstAddress, DEPOSIT_FEE } from "@/lib/constants";
-import { LiquidityPool } from '@/interface';
+import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 
 const formatNumber = (value: string | number): string => {
@@ -35,9 +35,11 @@ interface DepositFormValues {
 interface LiquidityDepositModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedPool: LiquidityPool | null;
+  selectedPool: Pool | null;
   onDepositSuccess: () => void;
   operationInProgressRef: React.MutableRefObject<boolean>;
+  usdstBalance: string;
+  voucherBalance: string;
 }
 
 const LiquidityDepositModal = ({ 
@@ -45,18 +47,19 @@ const LiquidityDepositModal = ({
   onClose, 
   selectedPool, 
   onDepositSuccess,
-  operationInProgressRef 
+  operationInProgressRef,
+  usdstBalance,
+  voucherBalance
 }: LiquidityDepositModalProps) => {
   const [token1Amount, setToken1Amount] = useState('');
   const [token2Amount, setToken2Amount] = useState('');
   const [depositLoading, setDepositLoading] = useState(false);
   const [tokenABalance, setTokenABalance] = useState('');
   const [tokenBBalance, setTokenBBalance] = useState('');
-  const [usdstBalance, setUsdstBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
 
-  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools, enrichPools } = useSwapContext();
+  const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
   const { userAddress } = useUser();
 
@@ -75,7 +78,6 @@ const LiquidityDepositModal = ({
         const balances = await fetchTokenBalances(selectedPool, userAddress, usdstAddress);
         setTokenABalance(balances.tokenABalance);
         setTokenBBalance(balances.tokenBBalance);
-        setUsdstBalance(balances.usdstBalance);
         setBalanceLoading(false);
       } catch (error) {
         toast({
@@ -196,7 +198,7 @@ const LiquidityDepositModal = ({
       handleClose();
       toast({
         title: "Success",
-        description: `${selectedPool._name} deposited successfully.`,
+        description: `${selectedPool.poolName} deposited successfully.`,
         variant: "success",
       });
     } catch (error) {
@@ -231,12 +233,28 @@ const LiquidityDepositModal = ({
       
       if (tokenAIsUSDST) {
         const fee = safeParseUnits(DEPOSIT_FEE, 18);
-        availableTokenA = tokenABalanceWei > fee ? tokenABalanceWei - fee : BigInt(0);
+        const voucherBalanceWei = BigInt(voucherBalance || "0");
+        if (voucherBalanceWei >= fee) {
+          // User has enough vouchers, no need to subtract fee
+          availableTokenA = tokenABalanceWei;
+        } else {
+          // User needs to use some USDST for fee
+          const remainingFee = fee - voucherBalanceWei;
+          availableTokenA = tokenABalanceWei > remainingFee ? tokenABalanceWei - remainingFee : BigInt(0);
+        }
       }
       
       if (tokenBIsUSDST) {
         const fee = safeParseUnits(DEPOSIT_FEE, 18);
-        availableTokenB = tokenBBalanceWei > fee ? tokenBBalanceWei - fee : BigInt(0);
+        const voucherBalanceWei = BigInt(voucherBalance || "0");
+        if (voucherBalanceWei >= fee) {
+          // User has enough vouchers, no need to subtract fee
+          availableTokenB = tokenBBalanceWei;
+        } else {
+          // User needs to use some USDST for fee
+          const remainingFee = fee - voucherBalanceWei;
+          availableTokenB = tokenBBalanceWei > remainingFee ? tokenBBalanceWei - remainingFee : BigInt(0);
+        }
       }
       
       // Calculate maximum possible deposit based on current pool ratio
@@ -276,10 +294,18 @@ const LiquidityDepositModal = ({
 
       if (isUSDST) {
         const fee = safeParseUnits(DEPOSIT_FEE, 18);
-        if (maxBigInt > fee) {
-          maxBigInt = maxBigInt - fee;
+        const voucherBalanceWei = BigInt(voucherBalance || "0");
+        if (voucherBalanceWei >= fee) {
+          // User has enough vouchers, no need to subtract fee
+          maxBigInt = BigInt(balance || "0");
         } else {
-          maxBigInt = BigInt(0);
+          // User needs to use some USDST for fee
+          const remainingFee = fee - voucherBalanceWei;
+          if (maxBigInt > remainingFee) {
+            maxBigInt = maxBigInt - remainingFee;
+          } else {
+            maxBigInt = BigInt(0);
+          }
         }
       }
 
@@ -345,8 +371,14 @@ const LiquidityDepositModal = ({
   const isConfirmButtonDisabled = () => {
     if (depositLoading) return true;
     
-    // Check USDST balance for transaction fee
-    if (BigInt(usdstBalance || "0") < safeParseUnits("0.3", 18)) return true;
+    // Check USDST + voucher balance for transaction fee
+    const feeAmount = safeParseUnits(DEPOSIT_FEE, 18);
+    const usdstBalanceBigInt = BigInt(usdstBalance || "0");
+    const voucherBalanceBigInt = BigInt(voucherBalance || "0");
+    
+    if (feeAmount > 0n && (usdstBalanceBigInt + voucherBalanceBigInt) < feeAmount) {
+      return true;
+    }
     
     // Check based on deposit mode
     switch (depositMode) {
@@ -370,7 +402,7 @@ const LiquidityDepositModal = ({
         <DialogHeader>
           <DialogTitle>Deposit Liquidity</DialogTitle>
           <DialogDescription>
-            Add liquidity to the {selectedPool?._name} pool.
+            Add liquidity to the {selectedPool?.poolName} pool.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(handleDepositSubmit)} className="space-y-4">
@@ -407,7 +439,7 @@ const LiquidityDepositModal = ({
                       {selectedPool.tokenA?.images?.[0]?.value ? (
                         <img
                           src={selectedPool.tokenA.images[0].value}
-                          alt={selectedPool.tokenA.name || selectedPool._name?.split('/')[0]}
+                          alt={selectedPool.tokenA._name || selectedPool.tokenA._symbol}
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -415,10 +447,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool._name?.split('/')[0]?.slice(0, 2)}
+                          {selectedPool.tokenA._symbol?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[0]}</span>
+                      <span className="font-medium text-sm">{selectedPool.tokenA._symbol}</span>
                     </>
                   )}
                 </div>
@@ -444,14 +476,14 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenA.address === usdstAddress && token1Amount && 
-               safeParseUnits(token1Amount, 18) > BigInt(tokenABalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
+               (BigInt(tokenABalance || "0") - safeParseUnits(token1Amount, 18) + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token1Amount, 18) <= BigInt(tokenABalance || "0") && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+               (BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && (
+                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenA.address === usdstAddress && token1Amount) {
@@ -522,7 +554,7 @@ const LiquidityDepositModal = ({
                       {selectedPool.tokenB?.images?.[0]?.value ? (
                         <img
                           src={selectedPool.tokenB.images[0].value}
-                          alt={selectedPool.tokenB.name || selectedPool._name?.split('/')[1]}
+                          alt={selectedPool.tokenB._name || selectedPool.poolName?.split('/')[1]}
                           className="w-6 h-6 rounded-full object-cover"
                         />
                       ) : (
@@ -530,10 +562,10 @@ const LiquidityDepositModal = ({
                           className="w-6 h-6 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {selectedPool._name?.split('/')[1]?.slice(0, 2)}
+                          {selectedPool.tokenB._symbol?.slice(0, 2)}
                         </div>
                       )}
-                      <span className="font-medium text-sm">{selectedPool._name?.split('/')[1]}</span>
+                      <span className="font-medium text-sm">{selectedPool.tokenB._symbol}</span>
                     </>
                   )}
                 </div>
@@ -559,14 +591,14 @@ const LiquidityDepositModal = ({
                 <p className="text-red-600 text-sm mt-1">Insufficient balance</p>
               )}
               {selectedPool?.tokenB.address === usdstAddress && token2Amount &&
-               safeParseUnits(token2Amount, 18) > BigInt(tokenBBalance || "0") - safeParseUnits(DEPOSIT_FEE, 18) && 
+               (BigInt(tokenBBalance || "0") - safeParseUnits(token2Amount, 18) + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && 
                safeParseUnits(token2Amount, 18) <= BigInt(tokenBBalance || "0") && (
                 <p className="text-yellow-600 text-sm mt-1">Insufficient balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {selectedPool?.tokenA.address !== usdstAddress && 
                selectedPool?.tokenB.address !== usdstAddress && 
-               BigInt(usdstBalance || "0") < safeParseUnits(DEPOSIT_FEE, 18) && (
-                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
+               (BigInt(usdstBalance || "0") + BigInt(voucherBalance || "0")) < safeParseUnits(DEPOSIT_FEE, 18) && (
+                <p className="text-yellow-600 text-sm mt-1">Insufficient USDST + voucher balance for transaction fee ({DEPOSIT_FEE} USDST)</p>
               )}
               {(() => {
                 if (selectedPool?.tokenB.address === usdstAddress && token2Amount) {
@@ -599,12 +631,12 @@ const LiquidityDepositModal = ({
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
               <span>Current pool ratio</span>
               <span className="font-medium">
-                {selectedPool && `1 ${selectedPool._name?.split('/')[0]} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool._name?.split('/')[1]}`}
+                {selectedPool && `1 ${selectedPool.tokenA._symbol} = ${formatNumber(selectedPool.aToBRatio)} ${selectedPool.tokenB._symbol}`}
               </span>
             </div>
             <div className="flex justify-between items-center text-sm mt-2 text-gray-500">
               <span>Transaction fee</span>
-              <span>{DEPOSIT_FEE} USDST</span>
+              <span>{DEPOSIT_FEE} USDST ({parseFloat(DEPOSIT_FEE) * 100} voucher)</span>
             </div>
             {selectedPool && BigInt(selectedPool.lpToken._totalSupply) === BigInt(0) && (
               <div className="flex justify-between items-center mt-2 text-sm text-gray-500">

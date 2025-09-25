@@ -1,19 +1,14 @@
 import { formatBalance } from "@/utils/numberUtils";
-
-interface LPTokenDropdownProps {
-  lpToken: any;
-  className?: string;
-  isExpanded: boolean;
-}
+import { LPTokenDropdownProps } from "@/interface";
 
 export default function LPTokenDropdown({ lpToken, className = "", isExpanded }: LPTokenDropdownProps) {
-  const userShare = lpToken?.lpToken?._totalSupply && lpToken?.lpToken?.balances?.[0]?.balance
-    ? Number((BigInt(lpToken.lpToken.balances[0].balance) * 10000n) / BigInt(lpToken.lpToken._totalSupply)) / 100
+  const userShare = lpToken?.lpToken?._totalSupply && lpToken?.lpToken?.balance
+    ? Number((BigInt(lpToken.lpToken.balance) * 10000n) / BigInt(lpToken.lpToken._totalSupply)) / 100
     : 0;
 
-  const tokenQuantities = lpToken?.lpToken?.balances?.[0]?.balance && lpToken?.lpToken?._totalSupply ? {
-    tokenA: ((BigInt(lpToken.lpToken.balances[0].balance) * BigInt(lpToken.tokenABalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString(),
-    tokenB: ((BigInt(lpToken.lpToken.balances[0].balance) * BigInt(lpToken.tokenBBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString()
+  const tokenQuantities = lpToken?.lpToken?.balance && lpToken?.lpToken?._totalSupply ? {
+    tokenA: ((BigInt(lpToken.lpToken.balance) * BigInt(lpToken.tokenA.poolBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString(),
+    tokenB: ((BigInt(lpToken.lpToken.balance) * BigInt(lpToken.tokenB.poolBalance || "0")) / BigInt(lpToken.lpToken._totalSupply)).toString()
   } : { tokenA: "0", tokenB: "0" };
 
   return (
@@ -51,7 +46,7 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                 </div>
                 <div className="text-xs text-gray-500">
                   {formatBalance(
-                    (BigInt(tokenQuantities.tokenA) * BigInt(lpToken.tokenAPrice || "0")) / BigInt(10 ** 18),
+                    (BigInt(tokenQuantities.tokenA) * BigInt(lpToken.tokenA.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
                   )}
                 </div>
@@ -84,7 +79,7 @@ export default function LPTokenDropdown({ lpToken, className = "", isExpanded }:
                 </div>
                 <div className="text-xs text-gray-500">
                   {formatBalance(
-                    (BigInt(tokenQuantities.tokenB) * BigInt(lpToken.tokenBPrice || "0")) / BigInt(10 ** 18),
+                    (BigInt(tokenQuantities.tokenB) * BigInt(lpToken.tokenB.price || "0")) / BigInt(10 ** 18),
                     undefined, 18, 2, 2, true
                   )}
                 </div>

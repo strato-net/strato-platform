@@ -1,29 +1,31 @@
-import { useState, useEffect } from "react";
-import { formatUnits } from "ethers";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BORROW_FEE } from "@/lib/constants";
-import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat } from "@/utils/numberUtils";
+import { safeParseUnits, addCommasToInput, formatWeiAmount, safeParseFloat, formatUnits } from "@/utils/numberUtils";
 import { NewLoanData, CollateralData, HealthImpactData } from "@/interface";
 import { calculateBorrowHealthImpact } from "@/utils/lendingUtils";
 import RiskLevelProgress from "@/components/ui/RiskLevelProgress";
 import HealthImpactDisplay from "@/components/ui/HealthImpactDisplay";
 import PercentageButtons from "../ui/PercentageButtons";
 import { useLendingContext } from "@/context/LendingContext";
+import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 
 interface BorrowFormProps {
   loans: NewLoanData | null;
   borrowLoading: boolean;
   onBorrow: (amount: string) => void;
   usdstBalance: string;
+  voucherBalance: string;
   collateralInfo: CollateralData[] | null;
   startPolling?: () => void;
   stopPolling?: () => void;
 }
 
-const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
+const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalance, collateralInfo, startPolling, stopPolling }: BorrowFormProps) => {
   const [borrowAmount, setBorrowAmount] = useState<string>("");
-  const [borrowDisplayAmount, setBorrowDisplayAmount] = useState("");
+  const [borrowAmountError, setBorrowAmountError] = useState<string>("");
+  const [feeError, setFeeError] = useState<string>("");
   const [riskLevel, setRiskLevel] = useState(0);
   const [healthImpact, setHealthImpact] = useState<HealthImpactData>({
     currentHealthFactor: 0,
@@ -32,6 +34,10 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     isHealthy: true,
   });
   const { borrowMax } = useLendingContext();
+
+  const maxAmount = useMemo(() => {
+    return computeMaxTransferable(loans?.maxAvailableToBorrowUSD, false, voucherBalance, usdstBalance, safeParseUnits(BORROW_FEE).toString(), setFeeError);
+  }, [voucherBalance, usdstBalance, loans?.maxAvailableToBorrowUSD]);
 
   // Calculate risk level for borrow form
   useEffect(() => {
@@ -62,21 +68,6 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     }
   };
 
-  const handleBorrowAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value.replace(/,/g, '');
-    if (/^\d*\.?\d*$/.test(value)) {
-      setBorrowDisplayAmount(addCommasToInput(value));
-      setBorrowAmount(value);
-      handlePollingUpdate(value);
-    }
-  };
-
-  const handleBorrowPercentage = (percentageAmount: string) => {
-    setBorrowAmount(percentageAmount);
-    setBorrowDisplayAmount(addCommasToInput(percentageAmount));
-    handlePollingUpdate(percentageAmount);
-  };
-
   const handleBorrow = async () => {
     const maxWei = BigInt(loans?.maxAvailableToBorrowUSD || 0);
     const wei = safeParseUnits(borrowAmount || "0", 18);
@@ -85,14 +76,16 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
     if (maxWei > 0n && (wei >= maxWei || (maxWei > 0n && wei >= (maxWei - 1n)))) {
       onBorrow('ALL');
       setBorrowAmount("");
-      setBorrowDisplayAmount("");
+      setBorrowAmountError("");
+      setFeeError("");
       handlePollingUpdate("");
       return;
     }
 
     onBorrow(borrowAmount);
     setBorrowAmount("");
-    setBorrowDisplayAmount("");
+    setBorrowAmountError("");
+    setFeeError("");
     handlePollingUpdate("");
   };
 
@@ -150,7 +143,8 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
                   await borrowMax();
                   // After borrowMax, clear input and rely on refresh from parent
                   setBorrowAmount("");
-                  setBorrowDisplayAmount("");
+                  setBorrowAmountError("");
+                  setFeeError("");
                   handlePollingUpdate("");
                 } catch {
                   // noop
@@ -169,16 +163,22 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
           <Input
             placeholder="0.00"
             className={`pr-16 ${safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ? 'text-red-600' : ''}`}
-            value={borrowDisplayAmount}
-            onChange={handleBorrowAmountChange}
+            value={addCommasToInput(borrowAmount)}
+            onChange={(e)=>{
+              const value = e.target.value;
+              handleAmountInputChange(value, setBorrowAmount, setBorrowAmountError, maxAmount);
+            }}
           />
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">USDST</span>
         </div>
+        {borrowAmountError && (
+          <p className="text-red-600 text-sm">{borrowAmountError}</p>
+        )}
         <PercentageButtons
           value={borrowAmount}
-          maxValue={loans?.maxAvailableToBorrowUSD || "0"}
+          maxValue={maxAmount}
           onChange={(val) => {
-            handleBorrowPercentage(val);
+            setBorrowAmount(val);
           }}
           className="mt-2"
         />
@@ -192,19 +192,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         <HealthImpactDisplay healthImpact={healthImpact} showWarning={false} className="mb-4" />
         <div className="flex justify-between text-sm mb-2">
           <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{BORROW_FEE} USDST</span>
+          <span className="font-medium">{BORROW_FEE} USDST ({parseFloat(BORROW_FEE) * 100} voucher)</span>
         </div>
-        {(() => {
-          const feeAmount = safeParseUnits(BORROW_FEE, 18);
-          const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-          const isInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-
-          return isInsufficientUsdstForFee ? (
-            <p className="text-yellow-600 text-sm mt-1">
-              Insufficient USDST balance for transaction fee ({BORROW_FEE} USDST)
-            </p>
-          ) : null;
-        })()}
+        {feeError && (
+          <p className="text-yellow-600 text-sm mt-1">{feeError}</p>
+        )}
       </div>
 
       {/* Borrow Button */}
@@ -212,14 +204,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
         onClick={handleBorrow}
         disabled={
           !borrowAmount ||
-          safeParseUnits(borrowAmount, 18) <= 0n ||
+          !!borrowAmountError ||
+          !!feeError ||
+          safeParseUnits(borrowAmount || "0") <= 0n ||
           borrowLoading ||
-          safeParseUnits(borrowAmount || "0", 18) > BigInt(loans?.maxAvailableToBorrowUSD || 0) ||
-          (() => {
-            const feeAmount = safeParseUnits(BORROW_FEE, 18);
-            const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-            return usdstBalanceBigInt < feeAmount;
-          })()
+          safeParseUnits(borrowAmount || "0") > BigInt(maxAmount)
         }
         className="w-full"
       >
@@ -231,7 +220,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, collateralIn
 
       {/* Conditional Warning Messages */}
       {(() => {
-        const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18);
+        const availableToBorrowFormatted = formatUnits(loans?.maxAvailableToBorrowUSD || 0);
         const isZeroAvailable = safeParseFloat(availableToBorrowFormatted) === 0;
         
         // collateralInfo already contains only eligible collateral (balance > 0)
