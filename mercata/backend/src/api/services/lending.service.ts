@@ -497,7 +497,7 @@ export const liquidityAndBalance = async (
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
   // Get exchange rate from Cirrus events instead of calculating manually
-  const exchangeRate = await getExchangeRateFromCirrus(accessToken, borrowableAsset);
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
