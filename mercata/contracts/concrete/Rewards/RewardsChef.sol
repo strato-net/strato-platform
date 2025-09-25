@@ -4,6 +4,29 @@ pragma solidity ^0.8.0;
 import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
 
+// ═════════════════════════════════════════════════════════════════════════
+// DATA STRUCTURES
+// ═════════════════════════════════════════════════════════════════════════
+
+struct UserInfo {
+    uint256 amount;      // How many LP tokens the user has provided.
+    uint256 rewardDebt;  // Reward debt
+}
+
+struct BonusPeriod {
+    uint256 startTimestamp;   // When this bonus period begins
+    uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
+}
+
+struct PoolInfo {
+    address lpToken;             // The LP Token added to the stake pool
+    uint256 allocPoint;          // How many allocation points assigned to
+                          // this pool.  Importance of the pool.
+    uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
+    uint256 accPerToken;         // Accumulated CATA per share (per token)
+    BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
+}
+
 /**
  * RewardsChef - A staking contract that allows creating pools for various LP
  * tokens, where users earn CATA token rewards over time for staking their LP
@@ -136,28 +159,6 @@ contract record RewardsChef is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // DATA STRUCTURES
-    // ═════════════════════════════════════════════════════════════════════════
-
-    struct UserInfo {
-        uint256 amount;      // How many LP tokens the user has provided.
-        uint256 rewardDebt;  // Reward debt
-    }
-
-    struct BonusPeriod {
-        uint256 startTimestamp;   // When this bonus period begins
-        uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
-    }
-
-    struct PoolInfo {
-        address lpToken;             // The LP Token added to the stake pool
-        uint256 allocPoint;          // How many allocation points assigned to
-	                             // this pool.  Importance of the pool.
-        uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
-        uint256 accPerToken;         // Accumulated CATA per share (per token)
-        BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
-    }
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
