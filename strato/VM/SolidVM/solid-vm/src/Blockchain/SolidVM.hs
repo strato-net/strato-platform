@@ -590,7 +590,18 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
               SVMType.Array _ _ -> return ()
               _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
-  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack ctrName) (T.pack parentName')
+  when (fnCalltype == CC.DelegateCall) $ do
+    (codeContractName, codeContractParentName) <- do
+      ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) ccToGet
+      let n = case ch of
+                SolidVMCode n' _ -> n'
+                CodeAtAccount _ n' -> n'
+                _ -> ""
+      resolveCodePtrParent ch >>= \case -- CodePtr's parent
+        Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
+        _ -> pure (n, "")
+    (_, _, codeContractCreator) <- getCreator ccToGet
+    addDelegatecall from to' (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
   ((ctrName, parentName'),) <$> logFunctionCall valList to contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
