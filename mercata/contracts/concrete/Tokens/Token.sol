@@ -1,4 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Admin/AdminRegistry.sol";
 import "./TokenMetadata.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../Rewards/RewardsManager.sol";
@@ -50,6 +51,18 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         _;
     }
 
+    modifier whenNotPausedOrOwner() {
+        if (paused()) {
+            // paused → only owner can still act.
+            try {
+                _checkOwner();
+            } catch {
+                return _checkAdmin(msg.sig, msg.data);
+            }
+        }
+        _;
+    }
+
     constructor(
         string _name,
         string _description,
@@ -95,12 +108,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     }
 
     function pause() external onlyOwner {
-        address[] memory emptyList;
-        _pause'(emptyList);
-    }
-
-    function pause'(address[] allowList) external onlyOwner {
-        _pause'(allowList);
+        _pause();
     }
 
     function unpause() external onlyOwner {
@@ -128,8 +136,14 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         return customDecimals;
     }
 
-    function _transfer(address from, address to, uint256 amount) internal override whenNotPaused {
-        super._transfer(from, to, amount);
+    function transfer(address to, uint256 amount) public override whenNotPausedOrOwner returns (bool) {
+        _transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) public override whenNotPausedOrOwner returns (bool) {
+        _transfer(from, to, amount);
+        return true;
     }
 
     function _update(address from, address to, uint256 value) internal override {

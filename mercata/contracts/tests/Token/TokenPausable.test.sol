@@ -11,39 +11,33 @@ contract Describe_TokenPausable {
     constructor() {
     }
 
-    Mercata m;
     Token token;
     User user1;
     User user2;
+    User adminUser;
 
     function beforeAll() {
         // Create test users
         user1 = new User();
         user2 = new User();
-
-        // Create full Mercata infrastructure
-        m = new Mercata();
-        require(address(m) != address(0), "Mercata address is 0");
+        adminUser = new User();
     }
 
     function beforeEach() {
-        // Deploy a fresh test token for each test
-        address tokenAddress = m.tokenFactory().createToken(
+        // Create a fresh test token directly with initial balance
+        token = new Token(
             "Test Token",
             "Test token for pausable operations",
             [],
             [],
             [],
             "TEST",
-            0, // Start with 0 supply like BaseCodeCollection test
-            18
+            1000000 * 10**18, // Initial supply
+            18,
+            address(this) // Token creator/owner
         );
         
-        require(tokenAddress != address(0), "Token address is 0");
-        token = Token(tokenAddress);
-        
-        // Mint some tokens to this test contract for testing
-        token.mint(address(this), 1000000 * 10**18);
+        require(address(token) != address(0), "Token contract not deployed");
     }
 
     function it_starts_unpaused() {
@@ -118,15 +112,21 @@ contract Describe_TokenPausable {
         bool isPaused = Pausable(token).paused();
         require(isPaused, "Token should be paused");
         
-        // Try to transfer tokens - should fail
+        // Owner can still transfer when paused (whenNotPausedOrOwner modifier)
+        // So let's test with a non-owner user
         uint256 transferAmount = 1000 * 10**18;
+        
+        // First give user1 some tokens
+        ERC20(token).transfer(address(user1), transferAmount);
+        
+        // Now try to have user1 transfer - this should fail since user1 is not owner/admin
         bool success = false;
-        try ERC20(token).transfer(address(user2), transferAmount) {
+        try user1.do(address(token), "transfer(address,uint256)", address(user2), transferAmount) {
             success = true;
         } catch {
             success = false;
         }
-        require(!success, "Transfer should fail when token is paused");
+        require(!success, "Non-owner transfer should fail when token is paused");
     }
 
     function it_blocks_transferFrom_when_paused() {
@@ -142,7 +142,7 @@ contract Describe_TokenPausable {
         bool isPaused = Pausable(token).paused();
         require(isPaused, "Token should be paused");
         
-        // Try transferFrom - should fail
+        // Try transferFrom - should fail since user2 is not owner/admin
         uint256 transferAmount = 500 * 10**18;
         bool success = false;
         try user2.do(address(token), "transferFrom(address,address,uint256)", address(user1), address(user2), transferAmount) {
@@ -189,6 +189,24 @@ contract Describe_TokenPausable {
         require(finalBalance == initialBalance - burnAmount, "Burn should work even when paused");
     }
 
+    function it_allows_owner_transfer_when_paused() {
+        // Pause the token
+        token.pause();
+        bool isPaused = Pausable(token).paused();
+        require(isPaused, "Token should be paused");
+        
+        // Owner should still be able to transfer when paused (whenNotPausedOrOwner modifier)
+        uint256 transferAmount = 1000 * 10**18;
+        
+        // Owner transfers to user1 - should succeed even when paused
+        // This test just verifies the transfer doesn't revert
+        ERC20(token).transfer(address(user1), transferAmount);
+        
+        // Verify user1 received the tokens
+        uint256 user1Balance = ERC20(token).balanceOf(address(user1));
+        require(user1Balance == transferAmount, "Owner transfer should work when paused");
+    }
+
     function it_supports_multiple_pause_unpause_cycles() {
         // Test multiple pause/unpause cycles
         for (uint i = 0; i < 3; i++) {
@@ -204,56 +222,66 @@ contract Describe_TokenPausable {
         }
     }
 
-    function it_allows_allowList_users_to_transfer_when_paused() {
-        // Give both users some tokens first
-        uint256 initialAmount = 1000 * 10**18;
-        ERC20(token).transfer(address(user1), initialAmount);
-        ERC20(token).transfer(address(user2), initialAmount);
-
-        // Create allow list with user1
-        address[] memory allowList = new address[](1);
-        allowList[0] = address(user1);
-
-        // Pause with allow list
-        token.pause'(allowList);
-
-        // Check that user1 can transfer (they are on allow list)
-        uint256 transferAmount = 100 * 10**18;
-        bool user1Success = false;
-        try user1.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
-            user1Success = true;
+    function it_allows_whitelisted_user_to_transfer_when_paused() {
+        // Create AdminRegistry with this contract as admin
+        AdminRegistry adminRegistry = new AdminRegistry([this]);
+        
+        // Create TokenFactory with AdminRegistry as owner
+        TokenFactory tokenFactory = new TokenFactory(address(adminRegistry));
+        
+        // Create a new token through TokenFactory
+        address tokenAddress = tokenFactory.createTokenWithInitialOwner(
+            "Admin Token",
+            "Token for testing admin functionality",
+            [],
+            [],
+            [],
+            "ADMIN",
+            1000000 * 10**18,
+            18,
+            this
+        );
+        
+        Token adminToken = Token(tokenAddress);
+        require(address(adminToken) != address(0), "Admin token not created");
+        
+        // Have AdminRegistry give user1 some tokens
+        uint256 transferAmount = 1000 * 10**18;
+        ERC20(adminToken).transfer(address(user1), transferAmount);
+        
+        // Pause the token using AdminRegistry
+        adminToken.pause();
+        bool isPaused = Pausable(adminToken).paused();
+        require(isPaused, "Admin token should be paused");
+        
+        // Try to have user1 transfer - should fail since not whitelisted
+        bool success = false;
+        try user1.do(address(adminToken), "transfer(address,uint256)", address(user2), transferAmount) {
+            success = true;
         } catch {
-            user1Success = false;
+            success = false;
         }
-        require(user1Success, "User1 should be able to transfer when on allow list");
+        require(!success, "Non-whitelisted user should not be able to transfer when paused");
+        
+        // Now whitelist user1 for transfer function using the token's addWhitelist function
+        (bool didExecute, variadic ret) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminToken), "transfer", address(user1));
+        require(didExecute, "Failed to add whitelist");
 
-        // Check that user2 cannot transfer (they are NOT on allow list)
-        bool user2Success = false;
-        try user2.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
-            user2Success = true;
+        // Check if whitelist was set correctly
+        bool isWhitelisted = adminRegistry.whitelist(address(adminToken), "transfer", address(user1));
+        require(isWhitelisted, "User1 should be whitelisted for transfer");
+        
+        // Now user1 should be able to transfer when paused
+        success = false;
+        try user1.do(address(adminToken), "transfer()", address(user2), transferAmount) {
+            success = true;
         } catch {
-            user2Success = false;
+            success = false;
         }
-        require(!user2Success, "User2 should NOT be able to transfer when not on allow list");
-
-        // Unpause
-        token.unpause();
-
-        // Check that both users can transfer after unpause
-        user1Success = false;
-        try user1.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
-            user1Success = true;
-        } catch {
-            user1Success = false;
-        }
-        require(user1Success, "User1 should be able to transfer after unpause");
-
-        user2Success = false;
-        try user2.do(address(token), "transfer(address,uint256)", address(this), transferAmount) {
-            user2Success = true;
-        } catch {
-            user2Success = false;
-        }
-        require(user2Success, "User2 should be able to transfer after unpause");
+        require(success, "Whitelisted user should be able to transfer when paused");
+        
+        // Verify the transfer actually happened
+        uint256 user2Balance = ERC20(adminToken).balanceOf(address(user2));
+        require(user2Balance == transferAmount, "Whitelisted transfer should work when paused");
     }
 }
