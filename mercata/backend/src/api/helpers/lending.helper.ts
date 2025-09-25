@@ -35,16 +35,21 @@ export const exchangeRateFromComponents = (
   cash: string,            // ERC20(borrowable).balanceOf(LiquidityPool)
   totalDebt: string,       // system debt in underlying
   reservesAccrued: string, // protocol reserves
-  mTokenSupply: string
+  mTokenSupply: string,
+  badDebt: string
 ): string => {
   const cashN = BigInt(cash || "0");
   const debtN = BigInt(totalDebt || "0");
   const resN  = BigInt(reservesAccrued || "0");
   const supN  = BigInt(mTokenSupply || "0");
-  if (supN === 0n) return (10n ** 18n).toString();
-  let underlying = cashN + debtN;
+  const badN = BigInt(badDebt || "0");
+
+  const oneToOne = (10n ** 18n).toString();
+
+  if (supN === 0n) return oneToOne;
+  let underlying = cashN + debtN + badN;
   underlying = resN < underlying ? (underlying - resN) : cashN; // floor at cash
-  if (underlying === 0n) return (10n ** 18n).toString();
+  if (underlying === 0n) return oneToOne;
   return ((underlying * (10n ** 18n)) / supN).toString();
 };
 

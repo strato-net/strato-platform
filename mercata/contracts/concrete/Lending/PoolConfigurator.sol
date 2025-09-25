@@ -188,7 +188,16 @@ contract record PoolConfigurator is Ownable {
         pool.setFeeCollector(_feeCollector);
     }
 
-     // Setter function for borrowable asset
+    /**
+     * @notice Set safety module address
+     * @param _safetyModule The safety module address
+     */
+    function setSafetyModule(address _safetyModule) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setSafetyModule(_safetyModule);
+    }
+
+    // Setter function for borrowable asset
     function setBorrowableAsset(address asset) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
         LendingPool pool = LendingPool(registry.getLendingPool());
@@ -222,4 +231,23 @@ contract record PoolConfigurator is Ownable {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.sweepReserves(amount);
     }
+
+    /// @notice Forwarder to write off bad debt without funding (haircut depositors)
+    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.writeOffBadDebtWithHaircut(amount, reason);
+    }
+
+    /// @notice Forwarder to write off bad debt using protocol reserves
+    function writeOffBadDebtFromReserves(uint amount) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.writeOffBadDebtFromReserves(amount);
+    }
+
+    /// @notice Forwarder to recognize a borrower's remaining loan as bad debt and sweep any residual collateral
+    function recognizeBadDebt(address borrower) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.recognizeBadDebt(borrower);
+    }
+
 } 

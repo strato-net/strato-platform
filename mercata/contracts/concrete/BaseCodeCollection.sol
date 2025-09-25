@@ -26,6 +26,7 @@ import "./Pools/PoolFactory.sol";
 
 //Rewards
 import "./Rewards/RewardsManager.sol";
+import "./Rewards/RewardsChef.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
@@ -65,7 +66,7 @@ contract record Mercata {
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
     CDPEngine public cdpEngine;
-    CDPVault public cdpVault;   
+    CDPVault public cdpVault;
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
@@ -130,7 +131,6 @@ contract record Mercata {
         lendingPool.initialize(address(lendingRegistry), address(poolConfigurator), address(tokenFactory), address(feeCollector), address(safetyModule));
         Ownable(lendingPool).transferOwnership(address(adminRegistry));
           
-        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
         Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,11 +20,14 @@ import {
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
-import { DECIMAL_PATTERN, BRIDGE_OUT_FEE } from "@/lib/constants";
+import { BRIDGE_OUT_FEE, usdstAddress } from "@/lib/constants";
+import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
+import { useUserTokens } from "@/context/UserTokensContext";
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
   const { toast } = useToast();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
 
   const {
     bridgeOut: bridgeOutAPI,
@@ -41,6 +44,7 @@ const BridgeOut: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [feeError, setFeeError] = useState<string>("");
 
   // Use the useBalance hook from context
   const {
@@ -51,6 +55,11 @@ const BridgeOut: React.FC = () => {
 
   const tokenBalance = balanceData?.formatted || "0";
 
+  const maxAmount = useMemo(() => {
+    const tokenBalanceWei = balanceData?.balance?.toString() || "0";
+    return computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
+  }, [balanceData?.balance, selectedToken?.stratoToken, voucherBalance, usdstBalance]);
+
   // Set initial network selection
   useEffect(() => {
     if (!selectedNetwork && availableNetworks.length) {
@@ -58,44 +67,12 @@ const BridgeOut: React.FC = () => {
     }
   }, [availableNetworks, selectedNetwork]);
 
-  // Validate amount against balance and token limits
-  const validateAmount = (value: string): boolean => {
-    if (!value) {
-      setAmountError("");
-      return true;
+  // Fetch USDST balance on mount
+  useEffect(() => {
+    if (isConnected && address) {
+      fetchUsdstBalance(address);
     }
-    const n = Number(value);
-    const bal = Number(tokenBalance);
-    if (Number.isNaN(n)) {
-      setAmountError("Please enter a valid number");
-      return false;
-    }
-    if (n <= 0) {
-      setAmountError("Amount must be greater than 0");
-      return false;
-    }
-    if (n > bal) {
-      setAmountError(
-        `Insufficient balance. Maximum: ${tokenBalance} ${selectedToken?.stratoTokenSymbol ?? ""}`,
-      );
-      return false;
-    }
-    setAmountError("");
-    return true;
-  };
-
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    if (DECIMAL_PATTERN.test(value)) {
-      setAmount(value);
-      validateAmount(value);
-    }
-  };
-
-  const handlePercentageClick = (p: string) => {
-    setAmount(p);
-    validateAmount(p);
-  };
+  }, [isConnected, address, fetchUsdstBalance]);
 
   const showConfirmModal = () => {
     if (!selectedToken?.stratoToken || !address) {
@@ -114,7 +91,6 @@ const BridgeOut: React.FC = () => {
       });
       return;
     }
-    if (!validateAmount(amount)) return;
     setIsModalOpen(true);
   };
 
@@ -149,6 +125,7 @@ const BridgeOut: React.FC = () => {
           description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
         });
         await refetchBalance();
+        await fetchUsdstBalance(address);
         setAmount("");
       } else {
         throw new Error("Failed to initiate transfer");
@@ -232,15 +209,18 @@ const BridgeOut: React.FC = () => {
           placeholder={isConnected ? "0.00" : "Connect wallet to enter amount"}
           className={`w-full ${amountError ? "border-red-500 focus:ring-red-400" : ""}`}
           value={amount}
-          onChange={handleAmountChange}
+          onChange={(e) => {
+            handleAmountInputChange(e.target.value, setAmount, setAmountError, maxAmount, 18);
+          }}
           disabled={!isConnected}
         />
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
+        {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
         {isConnected && (
           <PercentageButtons
             value={amount}
-            maxValue={safeParseUnits(tokenBalance, 18).toString()}
-            onChange={handlePercentageClick}
+            maxValue={maxAmount}
+            onChange={(value) => handleAmountInputChange(value, setAmount, setAmountError, maxAmount, 18)}
             className="mt-2"
           />
         )}
@@ -304,7 +284,7 @@ const BridgeOut: React.FC = () => {
       <div className="bg-gray-50 p-4 rounded-lg space-y-2">
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{BRIDGE_OUT_FEE} USDST</span>
+          <span className="font-medium">{BRIDGE_OUT_FEE} USDST ({parseFloat(BRIDGE_OUT_FEE) * 100} voucher)</span>
         </div>
       </div>
 
