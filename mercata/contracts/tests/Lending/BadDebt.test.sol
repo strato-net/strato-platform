@@ -16,6 +16,8 @@ contract Describe_BadDebt_Basic {
         uint lastUpdated;    // optional metadata
     }
 
+    uint INFINITY = 2 ** 256 - 1;
+
     constructor() {
     }
 
@@ -418,7 +420,7 @@ contract Describe_BadDebt_Basic {
         // Perform Liquidation
         pool.liquidationCallAll(GOLDST, address(user1));
         require(
-            pool.getHealthFactor(address(user1)) == 2**256-1,
+            pool.getHealthFactor(address(user1)) == INFINITY,
             "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
         );
 
@@ -442,8 +444,8 @@ contract Describe_BadDebt_Basic {
         uint smAssets = sm.totalAssets();
         uint toCover = smAssets * sm.MAX_SLASH_BPS() / 10000;
         require(
-            pool.badDebt() < smAssets,
-            "Bad debt should be less than USDST balance of SM" // (for this test case)
+            pool.badDebt() < toCover,
+            "Bad debt should be less than 1 cover from USDST balance of SM" // (for this test case)
         );
         log("at toCover: "+string(toCover));
         sm.coverShortfall(toCover);
@@ -454,6 +456,39 @@ contract Describe_BadDebt_Basic {
         // Note: These initial values for comparison should be taken separetly if you reorder the tests
         require(pool.getExchangeRate() == 1e18, "Lending Exchange rate should be unaffected 1e18 after cover shortfall");
         require(sm.exchangeRate() < 1e18, "SM Exchange rate should fall to less than 1e18 after cover shortfall");
+    }
+
+    function it_ba_can_write_off_bad_debt() public {
+        SafetyModule sm = m.safetyModule();
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+        PriceOracle oracle = m.priceOracle();
+        PoolConfigurator configurator = m.poolConfigurator();
+
+        uint initialGoldBalance = IERC20(GOLDST).balanceOf(address(this));
+
+        User user = new User();
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", GOLDST, 1e18);
+        user.do(address(pool), "borrowMax");
+
+        uint amountBorrowed = pool.getUserDebt(address(user));
+
+        // 90% fall in price of GOLDST
+        oracle.setAssetPrice(GOLDST, oracle.getAssetPrice(GOLDST) * 10/100);
+
+        require(pool.getHealthFactor(address(user)) < 1e18, "Health factor should be less than 1e18 after price fall");
+
+        // Liquidate
+        Token(USDST).mint(address(this), amountBorrowed); // enough to cover the debt
+        IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
+        pool.liquidationCallAll(GOLDST, address(user));
+
+        require(pool.badDebt() > 0, "Bad debt should be > 0 after liquidation");
+
+        configurator.writeOffBadDebtWithHaircut(pool.badDebt(), "Admin shouldn't actually do this before SM cover");
+        require(pool.badDebt() == 0, "Bad debt should be 0 after write off bad debt with haircut");
     }
 
 }
