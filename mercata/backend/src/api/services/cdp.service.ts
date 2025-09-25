@@ -184,6 +184,26 @@ const getTokenInfo = async (
   };
 };
 
+// Helper function to check if a single token is active (status === 2 and in factory)
+const isTokenActive = async (
+  accessToken: string,
+  tokenAddress: string
+): Promise<boolean> => {
+  const tokenData = await cirrus.get(accessToken, `/${Token}`, {
+    params: {
+      address: `eq.${tokenAddress}`,
+      select: "status",
+    }
+  });
+
+  const token = tokenData.data?.[0];
+  
+  return (
+    token?.status !== undefined &&
+    Number(token.status) === 2
+  );
+};
+
 
 
 interface VaultData {
@@ -1008,12 +1028,24 @@ export const getSupportedAssets = async (
   }
 
   const configEntries = registry.cdpEngine.collateralConfigs || [];
-  const configPromises = configEntries.map(async (entry: any) => {
-    return getAssetConfig(accessToken, userAddress, entry.asset);
+  if (configEntries.length === 0) return [];
+
+  // Check each asset individually and filter to only active tokens
+  const activeConfigPromises = configEntries.map(async (entry: any) => {
+    const isActive = await isTokenActive(accessToken, entry.asset);
+    return isActive ? entry : null;
   });
   
+  const activeConfigEntries = (await Promise.all(activeConfigPromises))
+    .filter((entry: any) => entry !== null);
+
+  // Build asset configs for active tokens
+  const configPromises = activeConfigEntries.map(async (entry: any) => 
+    getAssetConfig(accessToken, userAddress, entry.asset)
+  );
+  
   const configs = await Promise.all(configPromises);
-  return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null && !c.isPaused);
+  return configs.filter((config: AssetConfig | null): config is AssetConfig => config !== null);
 };
 
 export const getMaxLiquidatable = async (
