@@ -227,14 +227,15 @@ contract record CDPEngine is Ownable {
         require(amount > 0, "CDPEngine: Invalid amount");
         Vault storage vault = vaults[msg.sender][asset];
         require(vault.collateral >= amount, "CDPEngine: Insufficient collateral");
+        if (vault.scaledDebt > 0) {
+            uint assetPrice = PriceOracle(_cdpPriceOracle()).getAssetPrice(asset);
+            require(assetPrice > 0, "CDPEngine: Invalid price");
+            require((vault.collateral - amount) * assetPrice / vault.scaledDebt >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Insufficient collateral");
+        }
         // Always accrue before reading debt/CR sensitive values
         _accrue(asset);
         // Optimistically reduce collateral, then validate CR if debt remains
         vault.collateral -= amount;
-        if (vault.scaledDebt > 0) {
-            uint crAfter = collateralizationRatio(msg.sender, asset);
-            require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
-        }
         // Perform custody move after checks
         CDPVault(_cdpVault()).withdraw(msg.sender, asset, amount);
         emit Withdrawn(msg.sender, asset, amount);
