@@ -940,4 +940,40 @@ contract Describe_LendingPool_Basic {
         require(cv.userCollaterals(address(user), address(GOLDST)) == goldAmount, "Gold collateral should be unaffected");
     }
 
+    function it_lending_ha_supports_individual_LR_setters_thru_configurator() public {
+        PoolConfigurator configurator = m.poolConfigurator();
+        LendingRegistry registry = m.lendingRegistry();
+
+        address lendingPool = address(registry.lendingPool());
+        address liquidityPool = address(registry.liquidityPool());
+        address collateralVault = address(registry.collateralVault());
+        address rateStrategy = address(registry.rateStrategy());
+        address priceOracle = address(registry.priceOracle());
+
+        configurator.setLendingPool(address(this));
+        configurator.setLiquidityPool(address(this));
+        configurator.setCollateralVault(address(this));
+        configurator.setRateStrategy(address(this));
+        configurator.setPriceOracle(address(this));
+
+        require(address(registry.lendingPool()) == address(this), "Lending pool should be set");
+        require(address(registry.liquidityPool()) == address(this), "Liquidity pool should be set");
+        require(address(registry.collateralVault()) == address(this), "Collateral vault should be set");
+        require(address(registry.rateStrategy()) == address(this), "Rate strategy should be set");
+        require(address(registry.priceOracle()) == address(this), "Price oracle should be set");
+
+        // reset to original values
+        configurator.setLendingPool(lendingPool);
+        configurator.setLiquidityPool(liquidityPool);
+        configurator.setCollateralVault(collateralVault);
+        configurator.setRateStrategy(rateStrategy);
+        configurator.setPriceOracle(priceOracle);
+
+        require(address(registry.lendingPool()) == lendingPool, "Lending pool should be reset");
+        require(address(registry.liquidityPool()) == liquidityPool, "Liquidity pool should be reset");
+        require(address(registry.collateralVault()) == collateralVault, "Collateral vault should be reset");
+        require(address(registry.rateStrategy()) == rateStrategy, "Rate strategy should be reset");
+        require(address(registry.priceOracle()) == priceOracle, "Price oracle should be reset");
+    }
+
 }

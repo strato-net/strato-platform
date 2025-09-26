@@ -464,7 +464,8 @@ contract Describe_Pool {
         require(address(pool.tokenA()) == tokenAAddress, "tokenA() should return correct address");
         require(address(pool.tokenB()) == tokenBAddress, "tokenB() should return correct address");
         require(address(pool.lpToken()) != address(0), "lpToken() should return valid address");
-        require(Ownable(pool).owner() == address(m.poolFactory()), "owner() should return factory address");
+        require(Ownable(pool).owner() == address(Ownable(m.poolFactory()).owner()), "owner() should return admin registry address");
+        require(pool.poolFactory() == m.poolFactory(), "poolFactory() should return factory address");
         require(ERC20(pool.lpToken()).totalSupply() > 0, "LP token totalSupply() should be positive");
         
         // Test balances
@@ -749,7 +750,8 @@ contract Describe_Pool {
         require(pool.zapSwapFeesEnabled() == true, "zapSwapFeesEnabled should be accessible");
         
         // Test that owner is PoolFactory
-        require(Ownable(pool).owner() == address(m.poolFactory()), "Pool owner should be PoolFactory");
+        require(pool.poolFactory() == m.poolFactory(), "Pool owner should be PoolFactory");
+        require(Ownable(pool).owner() == Ownable(m.poolFactory()).owner(), "Pool owner should be PoolFactory");
     }
 
     // ============ ERROR CONDITION TESTS ============

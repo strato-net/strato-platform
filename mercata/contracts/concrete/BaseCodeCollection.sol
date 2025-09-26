@@ -81,30 +81,34 @@ contract record Mercata {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(tokenFactory), "createTokenWithInitialOwner", address(poolFactory));
 
         // Create Lending related contracts
-        lendingRegistry = new LendingRegistry(this);
+        lendingRegistry = new LendingRegistry(address(adminRegistry));
         collateralVault = new CollateralVault(address(lendingRegistry), address(adminRegistry));
         liquidityPool = new LiquidityPool(address(lendingRegistry), address(adminRegistry));
         rateStrategy = new RateStrategy();
         priceOracle = new PriceOracle(address(adminRegistry));
-        poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
+        poolConfigurator = new PoolConfigurator(address(lendingRegistry), address(adminRegistry));
         safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
         lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
 
-        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator));
+        // Allow poolConfigurator to set the lendingRegistry components
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLendingPool", address(poolConfigurator));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLiquidityPool", address(poolConfigurator));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setCollateralVault", address(poolConfigurator));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setRateStrategy", address(poolConfigurator));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setPriceOracle", address(poolConfigurator));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setAllComponents", address(poolConfigurator));
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
-        Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services
-        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry));
+        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry)); // TODO: set relayer address correctly
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
-        cdpRegistry = new CDPRegistry(this);
+        cdpRegistry = new CDPRegistry(address(adminRegistry));
         cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
         cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
         cdpReserve = new CDPReserve(address(cdpRegistry), address(adminRegistry));
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
-        Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
     }

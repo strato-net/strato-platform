@@ -221,6 +221,28 @@ contract record PoolConfigurator is Ownable {
         pool.setSafetyShareBps(bps);
     }
 
+    // Individual setters for the LendingRegistry
+    function setLendingPool(address _lendingPool) external onlyOwner {
+        require(_lendingPool != address(0), "Invalid lendingPool address");
+        registry.setLendingPool(_lendingPool);
+    }
+    function setLiquidityPool(address _liquidityPool) external onlyOwner {
+        require(_liquidityPool != address(0), "Invalid liquidityPool address");
+        registry.setLiquidityPool(_liquidityPool);
+    }
+    function setCollateralVault(address _collateralVault) external onlyOwner {
+        require(_collateralVault != address(0), "Invalid collateralVault address");
+        registry.setCollateralVault(_collateralVault);
+    }
+    function setRateStrategy(address _rateStrategy) external onlyOwner {
+        require(_rateStrategy != address(0), "Invalid rateStrategy address");
+        registry.setRateStrategy(_rateStrategy);
+    }
+    function setPriceOracle(address _priceOracle) external onlyOwner {
+        require(_priceOracle != address(0), "Invalid priceOracle address");
+        registry.setPriceOracle(_priceOracle);
+    }
+
     /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
