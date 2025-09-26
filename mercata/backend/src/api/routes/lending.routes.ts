@@ -1,6 +1,7 @@
 import { Router } from "express";
 import authHandler from "../middleware/authHandler";
 import LendingController from "../controllers/lending.controller";
+import SafetyController from "../controllers/safety.controller";
 
 const router = Router();
 
@@ -70,5 +71,21 @@ router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingCont
 
 // Set debt ceilings for protocol risk management
 router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
+
+// ----- SafetyModule -----
+// Get SafetyModule info (total assets, user shares, cooldown status, etc.)
+router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
+
+// Stake USDST to receive sUSDST shares
+router.post("/safety/stake", authHandler.authorizeRequest(), SafetyController.stake);
+
+// Start cooldown period for unstaking
+router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController.startCooldown);
+
+// Redeem specific amount of sUSDST shares for USDST (after cooldown + within window)
+router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.redeem);
+
+// Redeem all sUSDST shares for USDST (after cooldown + within window)
+router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
 
 export default router; 

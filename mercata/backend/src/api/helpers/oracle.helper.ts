@@ -3,7 +3,7 @@ import { constants } from "../../config/constants";
 import { getPools } from "../services/swapping.service";
 import { getPool as getLendingRegistry } from "../services/lending.service";
 import { calculateLPTokenPrice } from "./swapping.helper";
-import { exchangeRateFromComponents } from "./lending.helper";
+import { getExchangeRateFromCirrus } from "../services/lending.service";
 
 const { Token } = constants;
 
@@ -27,8 +27,8 @@ export const createCompletePriceMap = async (
       const tokenBPrice = priceMap.get(pool.tokenB?.address) || 0;
       
       const lpTokenPrice = calculateLPTokenPrice(
-        pool.tokenABalance || "0",
-        pool.tokenBBalance || "0",
+        pool.tokenA.poolBalance || "0",
+        pool.tokenB.poolBalance || "0",
         tokenAPrice.toString(),
         tokenBPrice.toString(),
         pool.lpToken._totalSupply
@@ -42,43 +42,19 @@ export const createCompletePriceMap = async (
     console.error("Error calculating LP token prices:", error);
   }
 
-  // Add mToken price
+  // Add mToken price using exchange rate from Cirrus events
   try {
     const lendingData = await getLendingRegistry(accessToken, undefined, {
-      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken,borrowIndex,totalScaledDebt,reservesAccrued),liquidityPool:liquidityPool_fkey(address)"
+      select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken),liquidityPool:liquidityPool_fkey(address)"
     });
     const { borrowableAsset, mToken } = lendingData.lendingPool || {};
     
-    if (borrowableAsset && mToken && lendingData.liquidityPool?.address) {
+    if (borrowableAsset && mToken) {
       const borrowableAssetPrice = priceMap.get(borrowableAsset) || "0";
       
       if (borrowableAssetPrice !== "0") {
-        // Get token data to calculate exchange rate
-        const tokenParams = {
-          address: `in.(${borrowableAsset},${mToken})`,
-          select: `address,_totalSupply::text,balances:${Token}-_balances(user:key,balance:value::text)`,
-          "balances.key": `in.(${lendingData.liquidityPool.address})`
-        };
-        
-        const tokenResponse = await cirrus.get(accessToken, "/" + Token, { params: tokenParams });
-        const tokenData = tokenResponse.data || [];
-        
-        const borrowableToken = tokenData.find((token: any) => token.address === borrowableAsset);
-        const mTokenInfo = tokenData.find((token: any) => token.address === mToken);
-        
-        const totalMTokenSupply = mTokenInfo?._totalSupply || "0";
-        const availableLiquidity = borrowableToken?.balances?.find((b: any) => b.user === lendingData.liquidityPool.address)?.balance || "0";
-        const borrowIndexStr     = lendingData.lendingPool?.borrowIndex     || "0";
-        const totalScaledDebtStr = lendingData.lendingPool?.totalScaledDebt || "0";
-        const reservesAccruedStr = lendingData.lendingPool?.reservesAccrued || "0";
-        const systemTotalDebt = ((BigInt(totalScaledDebtStr) * BigInt(borrowIndexStr)) / (10n ** 27n)).toString();
-
-        const exchangeRate = exchangeRateFromComponents(
-          availableLiquidity,
-          systemTotalDebt,
-          reservesAccruedStr,
-          totalMTokenSupply
-        );
+        // Get exchange rate from Cirrus events instead of calculating manually
+        const exchangeRate = await getExchangeRateFromCirrus(accessToken);
         
         // mToken price = borrowable asset price * exchange rate
         const mTokenPrice = (BigInt(borrowableAssetPrice.toString()) * BigInt(exchangeRate)) / BigInt(10 ** 18);

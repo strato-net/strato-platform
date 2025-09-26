@@ -7,7 +7,7 @@ import CRSlider from "./CRSlider";
 import { cdpService, AssetConfig, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
 import { useUserTokens } from "@/context/UserTokensContext";
-import { formatBalance as formatBalanceUtil } from "@/utils/numberUtils";
+import { formatBalance as formatBalanceUtil, formatWeiToDecimalHP, formatNumber, formatDecimalToWeiHP } from "@/utils/numberUtils";
 import { api } from "@/lib/axios";
 
 interface BorrowWidgetProps {
@@ -49,7 +49,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (assetPriceUSD <= 0) return 0;
     
     // Get existing vault data (converted from wei to decimal)
-    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18));
     const newDepositAmount = parseFloat(depositAmount || "0");
     
     // Calculate total collateral in tokens
@@ -67,7 +67,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (totalCollateralValueUSD <= 0) return 0;
     
     // Get existing debt and new borrow amount
-    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
     const newBorrowAmount = parseFloat(borrowAmount || "0");
     const totalDebt = existingDebtDecimal + newBorrowAmount;
     
@@ -93,7 +93,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (totalCollateralValueUSD <= 0) return 0;
     
     // Get existing debt
-    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
     
     // Calculate max borrowable USD based on total collateral and liquidation ratio
     const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100; // Convert percentage to decimal
@@ -118,60 +118,10 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     return userToken?.balance || "0";
   };
 
-  // Format large numbers for display
-  const formatNumber = (num: number | string, decimals: number = 2): string => {
-    const value = typeof num === 'string' ? parseFloat(num) : num;
-    if (isNaN(value)) return '0';
-    
-    // For very large numbers, use scientific notation
-    if (value >= 1e21) {
-      return value.toExponential(2);
-    }
-    
-    // For large numbers, use K/M/B notation
-    if (value >= 1e9) {
-      return (value / 1e9).toFixed(1) + 'B';
-    }
-    if (value >= 1e6) {
-      return (value / 1e6).toFixed(1) + 'M';
-    }
-    if (value >= 1e3) {
-      return (value / 1e3).toFixed(1) + 'K';
-    }
-    
-    // For normal numbers, limit decimal places
-    return value.toFixed(decimals);
-  };
-
   // Format percentage with reasonable precision
   const formatPercentage = (num: number, decimals: number = 2): string => {
     if (isNaN(num)) return '0.00%';
     return num.toFixed(decimals) + '%';
-  };
-
-
-  // Convert wei string to decimal for display (handles raw integer strings from backend)
-  const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-    if (!weiString || weiString === '0') return '0';
-    
-    const wei = BigInt(weiString);
-    const divisor = BigInt(10) ** BigInt(decimals);
-    const quotient = wei / divisor;
-    const remainder = wei % divisor;
-    
-    if (remainder === 0n) {
-      return quotient.toString();
-    }
-    
-    // For non-zero remainder, show decimal places
-    const decimalPart = remainder.toString().padStart(decimals, '0');
-    const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
-    
-    if (trimmedDecimal === '') {
-      return quotient.toString();
-    }
-    
-    return `${quotient}.${trimmedDecimal}`;
   };
 
   const maxBorrowable = calculateMaxBorrowable();
@@ -182,7 +132,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   // Check if current amounts are above their respective max values
   const isDepositAmountAboveMax = (): boolean => {
     if (!depositAsset || !userDepositBalance) return false;
-    const maxDepositAmount = parseFloat(formatWeiToDecimal(userDepositBalance, 18));
+    const maxDepositAmount = parseFloat(formatWeiToDecimalHP(userDepositBalance, 18));
     const currentDepositAmount = parseFloat(depositAmount || "0");
     return currentDepositAmount > maxDepositAmount;
   };
@@ -217,7 +167,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               const priceResponse = await api.get(`/oracle/price?asset=${asset.asset}`);
               if (priceResponse.data?.price) {
                 // Convert price from wei format (18 decimals) to regular number
-                prices[asset.asset] = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
+                prices[asset.asset] = parseFloat(formatWeiToDecimalHP(priceResponse.data.price, 18));
               }
             } catch (assetPriceError) {
               // If 404, it means the asset is not in the oracle
@@ -362,7 +312,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const decimals = 18;
         
         // Convert from wei to decimal format for display in input
-        const formattedBalance = formatWeiToDecimal(userDepositBalance, decimals);
+        const formattedBalance = formatWeiToDecimalHP(userDepositBalance, decimals);
         setDepositAmount(formattedBalance);
       } else {
         setDepositAmount("");
@@ -380,7 +330,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     
     if (depositAsset && userDepositBalance && parseFloat(userDepositBalance) > 0) {
       // Convert balance to decimal for comparison
-      const formattedBalance = formatWeiToDecimal(userDepositBalance, 18);
+      const formattedBalance = formatWeiToDecimalHP(userDepositBalance, 18);
       maxDepositAmount = parseFloat(formattedBalance);
       isTypingMaxAmount = Math.abs(currentAmount - maxDepositAmount) < 0.000001;
     }
@@ -413,8 +363,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (assetPriceUSD <= 0) return;
     
     // Get existing vault data and new deposit
-    const existingCollateralDecimal = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18));
-    const existingDebtDecimal = parseFloat(formatWeiToDecimal(existingVaultDebt, 18));
+    const existingCollateralDecimal = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18));
+    const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
     const newDepositAmount = parseFloat(depositAmount || "0");
     
     // Calculate total collateral value
@@ -445,7 +395,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   // Check if there's no more borrowing room due to being at liquidation threshold
   // This should trigger when user has collateral (existing or being deposited) but no borrowing power
   const isAtLiquidationThreshold = useCallback((): boolean => {
-    const hasExistingCollateral = parseFloat(formatWeiToDecimal(existingVaultCollateral, 18)) > 0;
+    const hasExistingCollateral = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18)) > 0;
     const hasDepositInput = parseFloat(depositAmount || "0") > 0;
     const hasAnyCollateral = hasExistingCollateral || hasDepositInput;
     return maxBorrowable <= 0 && hasAnyCollateral;
@@ -473,7 +423,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       try {
         const priceResponse = await api.get(`/oracle/price?asset=${depositAsset.asset}`);
         if (priceResponse.data?.price) {
-          const newPrice = parseFloat(formatWeiToDecimal(priceResponse.data.price, 18));
+          const newPrice = parseFloat(formatWeiToDecimalHP(priceResponse.data.price, 18));
           setAssetPrices(prev => ({
             ...prev,
             [depositAsset.asset]: newPrice
@@ -501,8 +451,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       const debtFloorWei = BigInt(debtInfo.debtFloor);
       const debtCeilingWei = BigInt(debtInfo.debtCeiling);
       
-      // Convert borrow amount to wei (18 decimals)
-      const borrowAmountWei = BigInt(Math.floor(borrowAmountDecimal * 1e18));
+      // Convert borrow amount to wei (18 decimals) with exact precision
+      const borrowAmountWei = BigInt(formatDecimalToWeiHP(borrowAmountDecimal.toString(), 18));
       
 
       // Check debt ceiling constraint (total debt for this asset across all users)
@@ -510,8 +460,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const newAssetTotalDebtWei = currentAssetTotalDebtWei + borrowAmountWei;
         if (newAssetTotalDebtWei > debtCeilingWei) {
           const availableRoomWei = debtCeilingWei > currentAssetTotalDebtWei ? debtCeilingWei - currentAssetTotalDebtWei : 0n;
-          const availableRoom = parseFloat(formatWeiToDecimal(availableRoomWei.toString(), 18));
-          const debtCeilingDecimal = parseFloat(formatWeiToDecimal(debtCeilingWei.toString(), 18));
+          const availableRoom = parseFloat(formatWeiToDecimalHP(availableRoomWei.toString(), 18));
+          const debtCeilingDecimal = parseFloat(formatWeiToDecimalHP(debtCeilingWei.toString(), 18));
           
           toast({
             title: "Debt Ceiling Exceeded",
@@ -554,9 +504,9 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           // Calculate how much more is needed to reach debt floor
           const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
           const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
-          const minRequired = parseFloat(formatWeiToDecimal(minRequiredWei.toString(), 18));
-          const debtFloorDecimal = parseFloat(formatWeiToDecimal(debtFloorWei.toString(), 18));
-          const currentDebt = parseFloat(formatWeiToDecimal(currentDebtWei.toString(), 18));
+          const minRequired = parseFloat(formatWeiToDecimalHP(minRequiredWei.toString(), 18));
+          const debtFloorDecimal = parseFloat(formatWeiToDecimalHP(debtFloorWei.toString(), 18));
+          const currentDebt = parseFloat(formatWeiToDecimalHP(currentDebtWei.toString(), 18));
           
           toast({
             title: "Below Debt Floor",
@@ -882,7 +832,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             onCRChange={handleCRChange}
             disabled={!depositAsset}
             hasCollateral={
-              parseFloat(formatWeiToDecimal(existingVaultCollateral, 18)) > 0 || 
+              parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18)) > 0 || 
               parseFloat(depositAmount || "0") > 0
             }
           />
@@ -903,7 +853,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             </div>
             <span className="text-sm text-red-700 font-medium">
               Warning: Position is at liquidation threshold ({formatPercentage(liquidationRatio, 0)}). 
-              This position can be liquidated. Consider increasing collateral or reducing borrow amount.
+              Consider increasing collateral or reducing borrow amount.
             </span>
           </div>
         </div>

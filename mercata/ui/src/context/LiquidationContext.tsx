@@ -33,7 +33,7 @@ type LiquidationContextType = {
   error: string | null;
   fetchLiquidatable: (signal?: AbortSignal) => Promise<void>;
   fetchWatchlist: (signal?: AbortSignal) => Promise<void>;
-  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string) => Promise<void>;
+  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string) => Promise<any>;
   refreshData: () => Promise<void>;
 };
 
@@ -85,19 +85,28 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     setError(null);
     try {
+      let response;
       if (collateralAsset && repayAmount) {
         // Extended liquidation with specific collateral and amount
-        await api.post(`/lend/liquidate/${id}`, {
+        response = await api.post(`/lend/liquidate/${id}`, {
           collateralAsset,
           repayAmount,
         });
       } else {
         // Simple liquidation (existing behavior)
-        await api.post(`/lend/liquidate/${id}`);
+        response = await api.post(`/lend/liquidate/${id}`);
       }
-      // Refresh data after successful liquidation
-      await refreshData();
+      
+      // Only refresh data if the transaction was successful
+      if (response.data && response.data.status && response.data.status.toLowerCase() === 'success') {
+        await refreshData();
+      }
+      
+      return response.data;
     } catch (err) {
+      // Re-throw the error so the component can handle it
+      // The global axios interceptor will show the error toast
+      throw err;
     } finally {
       setLoading(false);
     }

@@ -26,6 +26,7 @@ import "./Pools/PoolFactory.sol";
 
 //Rewards
 import "./Rewards/RewardsManager.sol";
+import "./Rewards/RewardsChef.sol";
 
 //Lending
 import "Lending/CollateralVault.sol";
@@ -62,7 +63,7 @@ contract record Mercata {
     AdminRegistry public adminRegistry;
     RewardsManager public rewardsManager;
     CDPEngine public cdpEngine;
-    CDPVault public cdpVault;   
+    CDPVault public cdpVault;
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
@@ -84,13 +85,13 @@ contract record Mercata {
         collateralVault = new CollateralVault(address(lendingRegistry), address(adminRegistry));
         liquidityPool = new LiquidityPool(address(lendingRegistry), address(adminRegistry));
         rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(address(adminRegistry)); 
+        priceOracle = new PriceOracle(address(adminRegistry));
         poolConfigurator = new PoolConfigurator(address(lendingRegistry), this);
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
-          
-        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator)); 
-        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
         safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
+        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
+
+        Ownable(lendingRegistry).transferOwnership(address(poolConfigurator));
+        poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
         Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
 
         // Create Services

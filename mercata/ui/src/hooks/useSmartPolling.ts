@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { parseUnits, formatUnits } from "ethers";
-import { PollingConfig, PollingReturn, PoolPollingConfig, ExchangeRateConfig, SwapCalculationConfig, SwapStateCleanupConfig } from "@/interface";
+import { PollingConfig, PollingReturn, PoolPollingConfig } from "@/interface";
 
 export const useSmartPolling = (config: PollingConfig): PollingReturn => {
   const { fetchFn, shouldPoll = () => true, onDataUpdate, interval = 10000, autoStart = false, transformData, onError, enabled = true } = config;
@@ -60,9 +59,6 @@ export const useSmartPolling = (config: PollingConfig): PollingReturn => {
 export const useBalancePolling = (userAddress: string, fetchBalance: (address: string) => Promise<any>, shouldPoll: (amount: string) => boolean = () => true) =>
   useSmartPolling({ fetchFn: () => fetchBalance(userAddress), shouldPoll, interval: 10000, onError: (error) => console.error("Balance polling error:", error) });
 
-export const useFormPolling = (fetchFn: () => Promise<any>, shouldPoll: (amount: string) => boolean = () => true, onDataUpdate?: (data: any) => void) =>
-  useSmartPolling({ fetchFn, shouldPoll, onDataUpdate, interval: 10000, onError: (error) => console.error("Form polling error:", error) });
-
 // Optimized focused hooks
 
 // Hook for managing pool data fetching and state
@@ -81,19 +77,3 @@ export const usePoolPolling = ({ fromAsset, toAsset, getPoolByTokenPair, fetchUs
     interval,
     onError: (error) => console.error("Pool polling error:", error)
   });
-
-// Hook for managing exchange rate calculations
-export const useExchangeRate = ({ poolData, fromAsset, setExchangeRate }: ExchangeRateConfig) =>
-  useEffect(() => {
-    const rate = poolData ? (poolData.tokenA?.address === fromAsset?.address ? poolData.aToBRatio : poolData.bToARatio) || "0" : "0";
-    setExchangeRate(rate);
-  }, [poolData, fromAsset?.address, setExchangeRate]);
-
-// Hook for managing swap state cleanup
-export const useSwapStateCleanup = ({ poolData, setToAsset, setExchangeRate }: SwapStateCleanupConfig) =>
-  useEffect(() => {
-    if (poolData === null) {
-      setToAsset(undefined);
-      setExchangeRate("0");
-    }
-  }, [poolData, setToAsset, setExchangeRate]);

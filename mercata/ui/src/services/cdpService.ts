@@ -63,6 +63,19 @@ export interface TransactionResponse {
   hash: string;                           // Transaction hash
 }
 
+export interface BadDebt {
+  asset: string;                          // Asset address
+  badDebt: string;                        // Raw integer string (wei format, 18 decimals)
+  symbol?: string;                        // Token symbol (e.g., "WBTC", "ETHST")
+}
+
+export interface JuniorNote {
+  owner: string;                          // Account that owns the note
+  capUSDST: string;                       // Remaining payout cap in wei (18 decimals)
+  entryIndex: string;                     // Earning baseline (RAY format, 27 decimals)
+  claimableAmount: string;                // Real-time claimable amount calculated via gas-free Cirrus queries
+}
+
 export const cdpService = {
   // Get user's CDP positions/vaults
   async getVaults(): Promise<VaultData[]> {
@@ -237,5 +250,52 @@ export const cdpService = {
     return response.data;
   },
 
+  // Get bad debt for all assets
+  async getBadDebt(): Promise<BadDebt[]> {
+    const response = await api.get("/cdp/bad-debt");
+    return response.data;
+  },
+
+  // Get junior notes for a specific account
+  async getJuniorNotes(account: string): Promise<JuniorNote | null> {
+    const response = await api.get(`/cdp/bad-debt/juniors/${account}`);
+    return response.data;
+  },
+
+  // Open junior note
+  async openJuniorNote(asset: string, amountUSDST: string): Promise<{ 
+    status: string; 
+    hash: string; 
+    burnedUSDST?: string; 
+    capUSDST?: string;
+  }> {
+    const response = await api.post("/cdp/bad-debt/open-junior-note", { 
+      asset, 
+      amountUSDST 
+    });
+    return response.data;
+  },
+
+  // Top up junior note
+  async topUpJuniorNote(amountUSDST: string): Promise<{ 
+    status: string; 
+    hash: string; 
+    burnedUSDST?: string; 
+    capUSDST?: string;
+  }> {
+    const response = await api.post("/cdp/bad-debt/top-up-junior-note", { 
+      amountUSDST 
+    });
+    return response.data;
+  },
+
+  // Claim junior note rewards
+  async claimJuniorNote(): Promise<{ 
+    status: string; 
+    hash: string;
+  }> {
+    const response = await api.post("/cdp/bad-debt/claim-junior-note");
+    return response.data;
+  },
 
 };

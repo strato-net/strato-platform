@@ -18,7 +18,6 @@ import {
   debtFromScaled,
   totalDebtFromScaled,
   previewBorrowIndexFromFlatApr,
-  exchangeRateFromComponents,
 } from "../helpers/lending.helper";
 
 const {
@@ -30,6 +29,42 @@ const {
   CollateralVault,
   PriceOracle,
 } = constants;
+
+/**
+ * Get the latest exchange rate for the lending pool from Cirrus events
+ */
+export const getExchangeRateFromCirrus = async (
+  accessToken: string,
+): Promise<string> => {
+  const oneToOne = (10n ** 18n).toString();
+  try {
+    // Query the most recent ExchangeRateUpdated event from the lending pool
+    const response = await cirrus.get(
+      accessToken,
+      `/${LendingPool}-ExchangeRateUpdated`,
+      {
+        params: {
+          select: "newRate::text,block_timestamp",
+          order: "block_timestamp.desc",
+          limit: "1"
+        }
+      }
+    );
+
+    const events = response?.data || [];
+    if (events.length === 0) {
+      return oneToOne; // Default 1:1 exchange rate
+    }
+
+    const latestEvent = events[0];
+    const exchangeRate = latestEvent?.newRate || oneToOne;
+
+    return exchangeRate;
+  } catch (error) {
+    console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
+    return oneToOne;
+  }
+};
 
 /**
  * Generic Cirrus fetch for the LendingRegistry row.
@@ -66,6 +101,7 @@ export const getPool = async (
 
 export const depositLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
@@ -95,13 +131,15 @@ export const depositLiquidity = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
@@ -109,35 +147,41 @@ export const withdrawLiquidity = async (
     throw new Error("Lending pool address not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawLiquidity",
+    args: { amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawLiquidity",
-      args: { amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const withdrawLiquidityAll = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawLiquidityAll",
+    args: {},
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawLiquidityAll",
-      args: {},
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const supplyCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -161,13 +205,15 @@ export const supplyCollateral = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const withdrawCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -176,18 +222,21 @@ export const withdrawCollateral = async (
     throw new Error("Lending pool address not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawCollateral",
+    args: { asset, amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawCollateral",
-      args: { asset, amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const borrow = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
@@ -196,35 +245,40 @@ export const borrow = async (
     throw new Error("Lending pool address not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "borrow",
+    args: { amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "borrow",
-      args: { amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const borrowMax = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "borrowMax",
+    args: {},
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "borrowMax",
-      args: {},
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const repay = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
@@ -254,8 +308,9 @@ export const repay = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   const result = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
   return { ...result, amountSent: amount };
 };
@@ -355,7 +410,7 @@ export const liquidityAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
-        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,` +
+        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
@@ -415,6 +470,7 @@ export const liquidityAndBalance = async (
   const totalScaledDebtStr = registry.lendingPool?.totalScaledDebt || "0";
   const reservesAccruedStr = registry.lendingPool?.reservesAccrued || "0";
   const lastAccrualStr     = registry.lendingPool?.lastAccrual     || "0";
+  const badDebtStr         = registry.lendingPool?.badDebt         || "0";
 
   const interestRateBps = borrowableAssetConfig?.interestRate || 0;
 
@@ -440,12 +496,8 @@ export const liquidityAndBalance = async (
   // System totals and exchange rate
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
-  const exchangeRate = exchangeRateFromComponents(
-    availableLiquidity,
-    systemTotalDebt,
-    reservesAccruedStr.toString(),
-    totalMTokenSupply
-  );
+  // Get exchange rate from Cirrus events instead of calculating manually
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
@@ -628,8 +680,9 @@ export const repayAll = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 
   return {
@@ -642,6 +695,7 @@ export const repayAll = async (
 
 export const executeLiquidation = async (
   accessToken: string,
+  userAddress: string,
   loanId: string,
   options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
@@ -753,7 +807,9 @@ export const executeLiquidation = async (
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
-  const tx = buildFunctionTx([
+  const repayAmountAtomic = repayAmount.toString();
+
+  const tx = await buildFunctionTx([
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
@@ -770,10 +826,10 @@ export const executeLiquidation = async (
       } : {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
-        debtToCover: repayAmount.toString(),
+        debtToCover: repayAmountAtomic,
       },
     },
-  ]);
+  ], userAddress, accessToken);
 
   try {
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -793,6 +849,7 @@ export const executeLiquidation = async (
 
 export const configureAsset = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
@@ -818,7 +875,7 @@ export const configureAsset = async (
   const poolConfiguratorAddress = registry._owner;
   if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
 
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: poolConfiguratorAddress,
     method: "configureAsset",
@@ -830,7 +887,7 @@ export const configureAsset = async (
       interestRate,
       reserveFactor,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -841,6 +898,7 @@ export const configureAsset = async (
 
 export const sweepReserves = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.amount) {
@@ -858,14 +916,14 @@ export const sweepReserves = async (
   const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
   if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
 
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: poolConfiguratorAddress,
     method: "sweepReserves",
     args: {
       amount,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -876,6 +934,7 @@ export const sweepReserves = async (
 
 export const setDebtCeilings = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.assetUnits || !body.usdValue) {
@@ -897,7 +956,7 @@ export const setDebtCeilings = async (
   const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
   if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
 
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
     contractAddress: poolConfiguratorAddress,
     method: "setDebtCeilings",
@@ -905,7 +964,7 @@ export const setDebtCeilings = async (
       assetUnits,
       usdValue,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1101,18 +1160,20 @@ export const listNearUnhealthyLoans = async (accessToken: string, margin: number
 
 export const withdrawCollateralMax = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawCollateralMax",
+    args: { asset },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawCollateralMax",
-      args: { asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };

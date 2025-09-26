@@ -8,19 +8,29 @@ import { getPool as getLendingRegistry } from "./lending.service";
 import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher } = constants;
 
 // Helper function to get CDP collateral for a user
 const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
   try {
-    // Use direct vault query instead of going through registry (more efficient and avoids the vault missing error)
+    // Get the CDPEngine address from registry to ensure we only query the correct instance
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPCollateralForUser");
+    
+    if (!registry?.cdpEngine) {
+      return new Map();
+    }
+
+    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+
+    // Use direct vault query with specific CDPEngine address
     const { data: userVaults } = await cirrus.get(
       accessToken,
       `/${CDPEngine}-vaults`,
       {
         params: {
           select: "user:key,asset:key2,Vault:value",
-          key: `eq.${userAddress.toLowerCase()}`
+          key: `eq.${userAddress.toLowerCase()}`,
+          address: `eq.${cdpEngineAddress}`
         }
       }
     );
@@ -194,15 +204,16 @@ export const getBalance = async (
 
 export const createToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(TokenFactory),
       contractAddress: tokenFactory,
       method: "createToken",
       args: usc(body),
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -219,10 +230,11 @@ export const createToken = async (
 
 export const transferToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transfer",
@@ -230,7 +242,7 @@ export const transferToken = async (
         to: body.to,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -248,10 +260,11 @@ export const transferToken = async (
 // Approve an allowance for a spender
 export const approveToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "approve",
@@ -259,7 +272,7 @@ export const approveToken = async (
         spender: body.spender,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -274,10 +287,11 @@ export const approveToken = async (
 // Transfer tokens on behalf of another address
 export const transferFromToken = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address || "",
       method: "transferFrom",
@@ -286,7 +300,7 @@ export const transferFromToken = async (
         to: body.to,
         value: body.value,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -300,17 +314,18 @@ export const transferFromToken = async (
 
 export const setTokenStatus = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(Token),
       contractAddress: body.address as string,
       method: "setStatus",
       args: {
         newStatus: body.status,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -320,4 +335,25 @@ export const setTokenStatus = async (
   } catch (error) {
     throw error;
   }
+};
+
+export const getVoucherBalance = async (
+  accessToken: string,
+  userAddress: string
+): Promise<string> => {
+  const response = await cirrus.get(accessToken, `/${Voucher}-_balances`, {
+    params: {
+      address: `eq.${constants.voucher}`,
+      key: `eq.${userAddress}`,
+      select: "balance:value::text",
+    },
+  });
+
+  if (response.status !== 200) {
+    throw new Error(`Error fetching voucher balance: ${response.statusText}`);
+  }
+
+  const rawValue = response.data?.[0]?.balance ?? "0";
+  const voucherAsUsdstWei = (BigInt(rawValue) * 100n).toString();
+  return voucherAsUsdstWei;
 };

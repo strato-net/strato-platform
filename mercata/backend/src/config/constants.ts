@@ -1,4 +1,10 @@
-import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry } from "./config";
+import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
+import { 
+  SWAP_CONTRACTS, 
+  SWAP_TOKEN_SELECT_FIELDS, 
+  SWAP_POOL_SELECT_FIELDS, 
+  SWAP_HISTORY_SELECT_FIELDS 
+} from "./swapConstants";
 
 export enum StratoPaths {
   transactionParallel = "/transaction/parallel?resolve=true",
@@ -16,9 +22,6 @@ export const constants = (() => {
   const LiquidityPool = `${CONTRACT_PREFIX}LiquidityPool`;
   const CollateralVault = `${CONTRACT_PREFIX}CollateralVault`;
   const PriceOracle = `${CONTRACT_PREFIX}PriceOracle`;
-  const PoolFactory = `${CONTRACT_PREFIX}PoolFactory`;
-  const Pool = `${CONTRACT_PREFIX}Pool`;
-  const PoolSwap = `${CONTRACT_PREFIX}Pool-Swap`;
   const PriceOracleEvents = `${CONTRACT_PREFIX}PriceOracle-PriceUpdated`;
   const PriceOracleBatchUpdateEvents = `${CONTRACT_PREFIX}PriceOracle-BatchPricesUpdated`;
   const LendingRegistry = `${CONTRACT_PREFIX}LendingRegistry`;
@@ -28,8 +31,9 @@ export const constants = (() => {
   const CDPEngine = `${CONTRACT_PREFIX}CDPEngine`;
   const CDPVault = `${CONTRACT_PREFIX}CDPVault`;
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
+  const Voucher = `${CONTRACT_PREFIX}Voucher`;
   const Event = "event";
-  
+    
   const tokenSelectFields = [
     "address",
     "_name",
@@ -43,25 +47,14 @@ export const constants = (() => {
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,
   ];
+
   const tokenBalanceSelectFields = [
     "address",
     "user:key",
     "balance:value::text",
     `token:${Token}(${tokenSelectFields.join(',')})`,
   ];
-  const poolSelectFields = [
-    "address",
-    "_owner",
-    "swapFeeRate",
-    "lpSharePercent",
-    "aToBRatio::text", 
-    "bToARatio::text",
-    `tokenA:tokenA_fkey(${tokenSelectFields.join(',')})`,
-    "tokenABalance::text",
-    `tokenB:tokenB_fkey(${tokenSelectFields.join(',')})`,
-    "tokenBBalance::text",
-    `lpToken:lpToken_fkey(${tokenSelectFields.join(',')})`,
-  ];
+
   const registrySelectFields = [
     "address",
     "lendingPool:lendingPool_fkey(" +
@@ -110,18 +103,6 @@ export const constants = (() => {
       `prices:${PriceOracle}-prices(asset:key,value::text)` +
     ")",
   ];
-
-  const swapHistorySelectFields = [
-    "address",
-    "id",
-    "block_timestamp",
-    "sender",
-    "tokenIn",
-    "tokenOut", 
-    "amountIn::text",
-    "amountOut::text",
-    "pool:BlockApps-Mercata-Pool(tokenA:tokenA_fkey(address,symbol:_symbol),tokenB:tokenB_fkey(address,symbol:_symbol))",
-  ];
   
   const priceHistorySelectFields = [
     "address",
@@ -144,9 +125,6 @@ export const constants = (() => {
     LiquidityPool,
     CollateralVault,
     PriceOracle,
-    PoolFactory,
-    Pool,
-    PoolSwap,
     PriceOracleEvents,
     PriceOracleBatchUpdateEvents,
     LendingRegistry,
@@ -156,18 +134,25 @@ export const constants = (() => {
     CDPEngine,
     CDPVault,
     CDPRegistry,
+    Voucher,
     mercataBridge,
     Event,
     tokenSelectFields,
     tokenBalanceSelectFields,
-    poolSelectFields,
+    // Swap constants
+    Pool: SWAP_CONTRACTS.Pool,
+    PoolFactory: SWAP_CONTRACTS.PoolFactory,
+    PoolSwap: SWAP_CONTRACTS.PoolSwap,
+    swapTokenSelectFields: SWAP_TOKEN_SELECT_FIELDS,
+    swapSelectFields: SWAP_POOL_SELECT_FIELDS,
+    swapHistorySelectFields: SWAP_HISTORY_SELECT_FIELDS,
     registrySelectFields,
     cdpRegistrySelectFields,
-    swapHistorySelectFields,
     priceHistorySelectFields,
     DECIMALS: 10n ** 18n,
     GAS_FEE: 0.01,
     GAS_FEE_WEI: 10n ** 16n, // 0.01 USDST in wei
     USDST: "937efa7e3a77e20bbdbd7c0d32b6514f368c1010",
+    voucher,
   };
 })();

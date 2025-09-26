@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
+    "postinstall": "(cd ../packages/shared-types && npm install && npm run build)",
     "preview": "vite preview"
   },
   "engines": {
@@ -44,6 +45,7 @@
     "@radix-ui/react-toggle-group": "^1.1.0",
     "@radix-ui/react-tooltip": "^1.1.4",
     "@rainbow-me/rainbowkit": "^2.2.7",
+    "@shared/swap-types": "file:../packages/shared-types",
     "@tanstack/react-query": "^5.56.2",
     "antd": "^5.25.4",
     "axios": "^1.0.11",

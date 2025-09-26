@@ -63,17 +63,18 @@ export const getAdmin = async (
 // Add a new admin to the registry
 export const addAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "addAdmin",
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -88,17 +89,18 @@ export const addAdmin = async (
 // Remove an admin from the registry
 export const removeAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "removeAdmin",
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -113,6 +115,7 @@ export const removeAdmin = async (
 // Remove an admin from the registry
 export const castVoteOnIssue = async (
   accessToken: string,
+  userAddress: string,
   target: string,
   func: string, 
   args: string[],
@@ -122,7 +125,7 @@ export const castVoteOnIssue = async (
     if (args.length === 1) {
       flattenedArgs = args[0];
     }
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "castVoteOnIssue",
@@ -131,7 +134,7 @@ export const castVoteOnIssue = async (
         _func: func,
         _args: flattenedArgs,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)

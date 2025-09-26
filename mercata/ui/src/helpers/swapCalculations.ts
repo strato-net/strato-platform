@@ -1,4 +1,4 @@
-import { LiquidityPool } from "@/interface";
+import { Pool } from "@/interface";
 
 /**
  * Calculate swap output amount using AMM formula
@@ -6,7 +6,7 @@ import { LiquidityPool } from "@/interface";
  */
 export const calculateSwapOutput = (
   inputAmount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): string => {
   if (!inputAmount || inputAmount === "0" || !pool) return "0";
@@ -20,8 +20,8 @@ export const calculateSwapOutput = (
 
   // Get reserves based on swap direction
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   // Validate reserves
   if (inputReserve <= 0n || outputReserve <= 0n) {
@@ -41,7 +41,7 @@ export const calculateSwapOutput = (
  */
 export const calculateSwapInput = (
   outputAmount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): string => {
   if (!outputAmount || outputAmount === "0" || !pool) return "0";
@@ -51,8 +51,8 @@ export const calculateSwapInput = (
 
   // Get reserves based on swap direction
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   // Validate reserves
   if (inputReserve <= 0n || outputReserve <= 0n) {
@@ -67,8 +67,9 @@ export const calculateSwapInput = (
   const numerator = inputReserve * outputAmountBigInt;
   const denominator = outputReserve - outputAmountBigInt;
   
-  // Add 1 to round up (to ensure user provides enough input)
-  const requiredInput = numerator / denominator + 1n;
+  // Ceil to beat on-chain floor
+  // a=11, b=5: ceil(11/5)=3. (11+5-1)/5 = 15/5 = 3.
+  const requiredInput = (numerator + denominator - 1n) / denominator;
 
   // Calculate total input including fee
   // If requiredInput is the net input, we need to calculate the gross input
@@ -80,7 +81,8 @@ export const calculateSwapInput = (
   
   const feeRate = BigInt(pool.swapFeeRate);
   const denominatorForFee = BigInt(10000) - feeRate;
-  const grossInput = (requiredInput * BigInt(10000)) / denominatorForFee;
+  // Ceil to beat on-chain floor
+  const grossInput = (requiredInput * BigInt(10000) + denominatorForFee - 1n) / denominatorForFee;
 
   return grossInput.toString();
 };
@@ -90,15 +92,15 @@ export const calculateSwapInput = (
  */
 export const hasSufficientLiquidity = (
   amount: string,
-  pool: LiquidityPool,
+  pool: Pool,
   isAToB: boolean
 ): boolean => {
   if (!amount || amount === "0" || !pool) return false;
 
   const amountBigInt = BigInt(amount);
   const [inputReserve, outputReserve] = isAToB
-    ? [BigInt(pool.tokenABalance || "0"), BigInt(pool.tokenBBalance || "0")]
-    : [BigInt(pool.tokenBBalance || "0"), BigInt(pool.tokenABalance || "0")];
+    ? [BigInt(pool.tokenA.poolBalance || "0"), BigInt(pool.tokenB.poolBalance || "0")]
+    : [BigInt(pool.tokenB.poolBalance || "0"), BigInt(pool.tokenA.poolBalance || "0")];
 
   return inputReserve > 0n && outputReserve > 0n && amountBigInt <= inputReserve;
 };

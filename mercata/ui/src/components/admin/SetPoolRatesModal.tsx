@@ -7,7 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, Settings, Percent, DollarSign } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { LiquidityPool } from '@/interface';
+import { Pool } from '@/interface';
 import { useState, useEffect } from 'react';
 import { useSwapContext } from '@/context/SwapContext';
 
@@ -19,7 +19,7 @@ interface SetPoolRatesFormValues {
 interface SetPoolRatesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  pool: LiquidityPool | null;
+  pool: Pool | null;
   onSuccess?: () => Promise<void>;
 }
 
@@ -78,7 +78,7 @@ const SetPoolRatesModal = ({
 
       toast({
         title: 'Pool Rates Updated',
-        description: `${pool._name} rates have been successfully updated`,
+        description: `${pool.poolName} rates have been successfully updated`,
       });
 
       if (onSuccess) {
@@ -110,7 +110,7 @@ const SetPoolRatesModal = ({
             Set Pool Rates
           </DialogTitle>
           <DialogDescription>
-            Configure swap fee rate and LP share percentage for {pool?._name}
+            Configure swap fee rate and LP share percentage for {pool?.poolName}
           </DialogDescription>
         </DialogHeader>
         

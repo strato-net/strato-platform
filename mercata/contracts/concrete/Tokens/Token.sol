@@ -1,4 +1,5 @@
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Admin/AdminRegistry.sol";
 import "./TokenMetadata.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../Rewards/RewardsManager.sol";
@@ -50,6 +51,18 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         _;
     }
 
+    modifier whenNotPausedOrOwner() {
+        if (paused()) {
+            try {
+                _checkOwner();
+            } catch {
+                AdminRegistry admin = AdminRegistry(Ownable(tokenFactory).owner());
+                require(admin.whitelist(address(this), "_transfer", _msgSender()));
+            }
+        }
+        _;
+    }
+
     constructor(
         string _name,
         string _description,
@@ -95,12 +108,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     }
 
     function pause() external onlyOwner {
-        address[] memory emptyList;
-        _pause'(emptyList);
-    }
-
-    function pause'(address[] allowList) external onlyOwner {
-        _pause'(allowList);
+        _pause();
     }
 
     function unpause() external onlyOwner {
@@ -128,7 +136,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         return customDecimals;
     }
 
-    function _transfer(address from, address to, uint256 amount) internal override whenNotPaused {
+    function _transfer(address from, address to, uint256 amount) internal override whenNotPausedOrOwner {
         super._transfer(from, to, amount);
     }
 
