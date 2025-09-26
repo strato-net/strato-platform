@@ -14,7 +14,7 @@ contract Describe_TokenPausable {
     Token lpToken1;
     User user1;
     User user2;
-    uint256 initLpTokensPerUser = 1000;
+    uint256 initLpTokensPerUser = 1000 * 1e18;
 
     RewardsChef chef;
     MockTimeProvider mockTime;
@@ -169,7 +169,7 @@ contract Describe_TokenPausable {
         uint256 allocationPoints = 100;
         uint256 multiplier = 1;
         uint256 poolId = 0;
-        uint256 amount = 10;
+        uint256 amount = 10 * 1e18;
 
         // given there is a pool
         chef.addPool(allocationPoints, address(lpToken1), multiplier);
@@ -197,6 +197,7 @@ contract Describe_TokenPausable {
 	// then accumulated reward per share is properly calculated
         uint256 expectedAccPerToken =
 	    (reward * chef.PRECISION_MULTIPLIER()) / lp1Supply;
+	require(expectedAccPerToken != 0, "expectedAccPerToken should not be zero");
         require(pool1.accPerToken == expectedAccPerToken, "accPerToken calculation mismatch");
     }
 

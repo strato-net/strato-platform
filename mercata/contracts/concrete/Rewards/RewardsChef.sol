@@ -173,7 +173,7 @@ contract record RewardsChef is Ownable {
     // precision. We multiply when storing rewards per token (accPerToken calculation) and
     // divide when calculating individual user rewards to get the actual reward amount.
     // This multiplier also propagates to rewardDebt calculations to maintain consistency.
-    uint256 public PRECISION_MULTIPLIER = 1e12;
+    uint256 public PRECISION_MULTIPLIER = 1e18;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
