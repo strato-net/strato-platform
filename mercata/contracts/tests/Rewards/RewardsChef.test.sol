@@ -1,13 +1,9 @@
 import "../../concrete/BaseCodeCollection.sol";
-
-contract User {
-    function do(address a, string f, variadic args) public returns (variadic) {
-        variadic result = address(a).call(f, args);
-        return result;
-    }
-}
+import "../Util.sol";
 
 contract Describe_TokenPausable {
+    using TestUtils for User;
+
     constructor() {
     }
 
@@ -109,6 +105,30 @@ contract Describe_TokenPausable {
         PoolInfo pool1 = chef.pools()[poolId];
         require(pool1.allocPoint == updatedAllocationPoints, "Allocation points should be updated");
         require(chef.totalAllocPoint() == updatedAllocationPoints, "Total allocation points should be updated");
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // USER INTERACTIONS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_allow_user_to_deposit_lp_tokens() {
+        // given
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10;
+
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // when
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+        // then
+        require(ERC20(lpToken1).balanceOf(address(chef)) == amount,
+		"Chef should have received the deposited LP tokens");
+        require(ERC20(lpToken1).balanceOf(address(user1)) == (initLpTokensPerUser - amount),
+		"User1 should not own LP token");
     }
 
 

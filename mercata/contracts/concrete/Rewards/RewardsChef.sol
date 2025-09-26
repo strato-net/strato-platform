@@ -371,7 +371,14 @@ contract record RewardsChef is Ownable {
             user.amount += _amount;
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+	// WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+	//
+	// This has to be set in variable and only then applied to
+	// user.rewardDebt, otherwise the solidvm throws!
+	uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
         emit Deposit(msg.sender, _pid, _amount);
     }
