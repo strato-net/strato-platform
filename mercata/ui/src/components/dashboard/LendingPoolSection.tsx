@@ -56,7 +56,7 @@ const LendingPoolSection = () => {
       const amountWei = safeParseUnits(depositAmount, 18);
       const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
       const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
-      
+
       if (amountWei <= 0n) return false;
       if (amountWei > availableWei) return false;
       if (amountWei + feeWei > availableWei) return false;
@@ -74,7 +74,7 @@ const LendingPoolSection = () => {
       const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
       const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
-      
+
       if (amountWei <= 0n) return false;
       if (amountWei > maxWithdrawableWei) return false; // Check against max withdrawable (considers both user balance and pool liquidity)
       if (usdstBalanceWei < feeWei) return false;
@@ -232,18 +232,18 @@ const LendingPoolSection = () => {
                     const availableWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
                     const feeWei = safeParseUnits(LENDING_DEPOSIT_FEE, 18);
                     const depositAmountWei = depositAmount ? safeParseUnits(depositAmount, 18) : 0n;
-                    
+
                     // Check if user has enough USDST for fee
                     const isInsufficientUsdstForFee = !loadingLiquidity && availableWei < feeWei;
-                    
+
                     // Check if deposit amount + fee exceeds available balance
                     const isInsufficientBalanceForDepositAndFee = !loadingLiquidity && depositAmountWei + feeWei > availableWei && depositAmountWei <= availableWei;
-                    
+
                     // Check if remaining balance after deposit and fee is low
                     const lowBalanceThreshold = safeParseUnits("0.10", 18);
                     const remainingBalance = availableWei - depositAmountWei - feeWei;
                     const isLowBalanceWarning = depositAmountWei > 0n && remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-                    
+
                     return (
                       <>
                         {isInsufficientBalanceForDepositAndFee && (
@@ -377,10 +377,10 @@ const LendingPoolSection = () => {
                   {(() => {
                     const withdrawAmountWei = withdrawAmount ? safeParseUnits(withdrawAmount, 18) : 0n;
                     const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
-                    
+
                     // Check if withdraw amount exceeds withdrawable limit
                     const isInsufficientWithdrawable = withdrawAmountWei > 0n && withdrawAmountWei > maxWithdrawableWei;
-                    
+
                     return isInsufficientWithdrawable ? (
                       <p className="text-red-600 text-sm mt-1">
                         Insufficient balance - amount exceeds withdrawable limit ({formatBalance(maxWithdrawableWei, "USDST", 18, 2)} available)
@@ -391,15 +391,15 @@ const LendingPoolSection = () => {
                   {(() => {
                     const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
                     const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
-                    
+
                     // Check if user has enough USDST for fee
                     const isInsufficientUsdstForFee = !loadingLiquidity && usdstBalanceWei < feeWei;
-                    
+
                     // Check if remaining balance after fee is low
                     const lowBalanceThreshold = safeParseUnits("0.10", 18);
                     const remainingBalance = usdstBalanceWei - feeWei;
                     const isLowBalanceWarning = remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-                    
+
                     return (
                       <>
                         {isInsufficientUsdstForFee && (

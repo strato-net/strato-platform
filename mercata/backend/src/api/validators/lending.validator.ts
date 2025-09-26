@@ -6,7 +6,7 @@ export function validateDepositLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Deposit Liquidity Argument Validation Error: " + error.message);
@@ -17,7 +17,7 @@ export function validateWithdrawLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Withdraw Liquidity Argument Validation Error: " + error.message);
