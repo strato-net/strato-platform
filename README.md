@@ -66,7 +66,7 @@
     and follow the steps to provide the OAuth credentials etc.
   - OPTION B (nix env): the compiled executables still require some of the dependencies at run time - we'll use the nix shell with same environment from build time:
     ```
-    nix-shell strato/nix/stack-integration.nix
+    nix-shell strato/nix/stack.nix
     ./start my_node_name
     ```
 - Wipe:
