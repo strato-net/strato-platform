@@ -7,35 +7,12 @@ import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/servi
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 
 interface LiquidationsViewProps {
-  onBack: () => void;
+  // Props can be added here if needed in the future
+  children?: never; // Placeholder to make interface non-empty
 }
-
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  // For very large numbers, use scientific notation
-  if (value >= 1e21) {
-    return value.toExponential(2);
-  }
-  
-  // For large numbers, use K/M/B notation
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  // For normal numbers, limit decimal places
-  return value.toFixed(decimals);
-};
 
 // Format percentage with reasonable precision
 const formatPercentage = (num: number, decimals: number = 2): string => {
@@ -43,31 +20,7 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   return num.toFixed(decimals) + '%';
 };
 
-// Convert wei string to decimal for display (handles raw integer strings from backend)
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  // For non-zero remainder, show decimal places
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
-};
-
-const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
+const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -115,7 +68,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         if (userAddress) {
           await fetchUsdstBalance(userAddress);
           const availableUsdstWei = BigInt(usdstBalance || "0");
-          const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
+          const availableUsdstDecimal = parseFloat(formatWeiToDecimalHP(availableUsdstWei.toString(), 18));
           setAvailableUsdstBalance(availableUsdstDecimal);
         }
         
@@ -186,7 +139,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         const backendMaxWei = result.maxAmount;
         
         // Convert backend max from wei to decimal (18 decimals for USDST)
-        const backendMaxDecimal = parseFloat(formatWeiToDecimal(backendMaxWei, 18));
+        const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
         
         
         // Check if balance is insufficient
@@ -288,7 +241,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           
           // Update the global USDST balance after fetching
           const updatedUsdstWei = BigInt(usdstBalance || "0");
-          const updatedUsdstDecimal = parseFloat(formatWeiToDecimal(updatedUsdstWei.toString(), 18));
+          const updatedUsdstDecimal = parseFloat(formatWeiToDecimalHP(updatedUsdstWei.toString(), 18));
           setAvailableUsdstBalance(updatedUsdstDecimal);
         }
       }
@@ -307,11 +260,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack}>
-            ← Back to Borrow
-          </Button>
-        </div>
         <Card>
           <CardContent className="p-6">
             <div className="text-center">Loading liquidatable positions...</div>
@@ -334,14 +282,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           -moz-appearance: textfield;
         }
       `}</style>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack}>
-          ← Back to Borrow
-        </Button>
-        <div /> {/* Spacer for center alignment */}
-      </div>
-
       {/* Main Card */}
       <Card>
         <CardHeader>
@@ -378,7 +318,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       </div>
                       <div>
                         <span className="text-gray-500">Borrowed</span>
-                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimal(vault.debtAmount, 18)))} USDST</div>
+                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                       </div>
                       <div>
                         <span className="text-gray-500">Health Factor</span>
@@ -406,8 +346,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                           </div>
                           <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
                         </div>
-                        <div>{formatNumber(parseFloat(formatWeiToDecimal(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                        <div>${formatNumber(parseFloat(formatWeiToDecimal(vault.collateralValueUSD, 18)))}</div>
+                        <div>{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                        <div>${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
                         <div className="text-green-600 font-medium">
                           {calculateExpectedProfit(vault, liquidationAmount)}
                         </div>

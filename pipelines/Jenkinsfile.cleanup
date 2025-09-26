@@ -176,6 +176,25 @@ pipeline {
           }
         }
         
+        stage('Cleanup test6') {
+          when {
+            beforeAgent true
+            expression {
+              if (nodesByLabel("test6").size() == 0) {
+                currentBuild.result = 'UNSTABLE'
+                return false
+              } else return true
+            }
+          }
+          agent { label "test6" }
+          steps {
+            script {
+              def diskspaceFreed = cleanOldWorkspaces(4, '/')
+              echo "Diskspace freed on test6: $diskspaceFreed kilobytes"
+            }
+          }
+        }
+        
         stage('Cleanup testsync1') {
           when {
             beforeAgent true

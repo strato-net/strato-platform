@@ -32,7 +32,6 @@ const config = {
   },
   usdst: {
     address: process.env.USDST_ADDRESS || '937efa7e3a77e20bbdbd7c0d32b6514f368c1010',
-    minBalance: BigInt(20) * BigInt(1e18),
   },
   safe: {
     address: process.env.SAFE_ADDRESS,
@@ -50,6 +49,11 @@ const config = {
     bridgeOutInterval: 1 * 60 * 1000, // 1 minute (was 3 minutes)
     withdrawalInterval: 1 * 60 * 1000, // 1 minute (was 10 seconds)
     ethereumDepositInterval: 1 * 60 * 1000, // 1 minute (was 2 minutes)
+  },
+  balance: {
+    gasFeeUSDST: BigInt(process.env.GAS_FEE_USDST || '1') * BigInt(1e16),
+    gasFeeVoucher: BigInt(process.env.GAS_FEE_VOUCHER || '100') * BigInt(1e16),
+    minTransactionsThreshold: BigInt(process.env.MIN_TRANSACTIONS_THRESHOLD || '500'),
   },
   strato: {
     gas: {
@@ -109,7 +113,7 @@ const requiredEnvVars = [
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  const error = `Missing required environment variables: ${missingEnvVars.join(", ")}`;
-  logError("Config", error, { missingEnvVars });
-  throw new Error(error);
+  const error = `Missing required environment variables when initializing the config: ${missingEnvVars.join(", ")}`;
+  console.error(error);
+  process.exit(2);
 }

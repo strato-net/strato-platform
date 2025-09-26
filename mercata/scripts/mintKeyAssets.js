@@ -53,11 +53,18 @@ require("dotenv").config();
     SILVST: (process.env.SILVST || "2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94").toLowerCase(),
   };
 
+  // const amounts = {
+  //   WBTCST: process.env.AMT_WBTCST || "91590000000000000",      // 0.09159 WBTCST
+  //   ETHST : process.env.AMT_ETHST  || "3858150000000000000",   // 3.85815 ETHST
+  //   GOLDST: process.env.AMT_GOLDST || "2988870000000000000",   // 2.98887 GOLDST
+  //   SILVST: process.env.AMT_SILVST || "269235000000000000000", // 269.235 SILVST
+  // };
+
   const amounts = {
-    WBTCST: process.env.AMT_WBTCST || "91590000000000000",      // 0.09159 WBTCST
-    ETHST : process.env.AMT_ETHST  || "3858150000000000000",   // 3.85815 ETHST
-    GOLDST: process.env.AMT_GOLDST || "2988870000000000000",   // 2.98887 GOLDST
-    SILVST: process.env.AMT_SILVST || "269235000000000000000", // 269.235 SILVST
+    WBTCST: process.env.AMT_WBTCST || "1000000000000000000000000",    // 1,000,000 WBTCST
+    ETHST : process.env.AMT_ETHST  || "1000000000000000000000000",   // 1,000,000 ETHST
+    GOLDST: process.env.AMT_GOLDST || "1000000000000000000000000",   // 1,000,000 GOLDST
+    SILVST: process.env.AMT_SILVST || "1000000000000000000000000",   // 1,000,000 SILVST
   };
 
   const headers = {

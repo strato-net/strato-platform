@@ -158,6 +158,8 @@ const Dashboard = () => {
                   liquidityInfo={liquidityInfo} 
                   userPools={userPools}
                   shouldPreventFlash={true}
+                  safetyInfo={safetyInfo}
+                  loadingSafety={loading}
                 /> 
               </div>
 

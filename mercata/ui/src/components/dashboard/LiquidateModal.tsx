@@ -154,10 +154,30 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
       toast({ title: "Please enter a repay amount", variant: "destructive" });
       return;
     }
-    await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
-    toast({ title: "Liquidation submitted", variant: "success" });
-    onSuccess();
-    onOpenChange(false);
+    
+    try {
+      const result = await executeLiquidation(loan.id, collateral.asset, repayWeiOrAll);
+      // Check the actual transaction status, not just that the API call succeeded
+      if (result && result.status && result.status.toLowerCase() === 'success') {
+        toast({ title: "Liquidation submitted", variant: "success" });
+        onSuccess();
+        onOpenChange(false);
+      } else {
+        // Transaction failed at blockchain level
+        toast({ 
+          title: "Liquidation Failed", 
+          description: "The liquidation transaction failed. Please try again.",
+          variant: "destructive" 
+        });
+      }
+    } catch (error) {
+      console.error('Liquidation failed:', error);
+      toast({ 
+        title: "Liquidation Failed", 
+        description: "Unable to submit liquidation. Please try again.",
+        variant: "destructive" 
+      });
+    }
   };
 
   return (
