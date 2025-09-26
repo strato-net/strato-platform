@@ -18,7 +18,6 @@ import {
   debtFromScaled,
   totalDebtFromScaled,
   previewBorrowIndexFromFlatApr,
-  exchangeRateFromComponents,
 } from "../helpers/lending.helper";
 
 const {
@@ -30,6 +29,42 @@ const {
   CollateralVault,
   PriceOracle,
 } = constants;
+
+/**
+ * Get the latest exchange rate for the lending pool from Cirrus events
+ */
+export const getExchangeRateFromCirrus = async (
+  accessToken: string,
+): Promise<string> => {
+  const oneToOne = (10n ** 18n).toString();
+  try {
+    // Query the most recent ExchangeRateUpdated event from the lending pool
+    const response = await cirrus.get(
+      accessToken,
+      `/${LendingPool}-ExchangeRateUpdated`,
+      {
+        params: {
+          select: "newRate::text,block_timestamp",
+          order: "block_timestamp.desc",
+          limit: "1"
+        }
+      }
+    );
+
+    const events = response?.data || [];
+    if (events.length === 0) {
+      return oneToOne; // Default 1:1 exchange rate
+    }
+
+    const latestEvent = events[0];
+    const exchangeRate = latestEvent?.newRate || oneToOne;
+
+    return exchangeRate;
+  } catch (error) {
+    console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
+    return oneToOne;
+  }
+};
 
 /**
  * Generic Cirrus fetch for the LendingRegistry row.
@@ -461,13 +496,8 @@ export const liquidityAndBalance = async (
   // System totals and exchange rate
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
-  const exchangeRate = exchangeRateFromComponents(
-    availableLiquidity,
-    systemTotalDebt,
-    reservesAccruedStr.toString(),
-    totalMTokenSupply,
-    badDebtStr.toString()
-  );
+  // Get exchange rate from Cirrus events instead of calculating manually
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
