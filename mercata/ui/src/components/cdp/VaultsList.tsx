@@ -574,7 +574,13 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
     );
   }
 
-  if (positions.length === 0) {
+  // Filter out vaults with 0 collateral for display
+  const vaultsWithCollateral = positions.filter(position => {
+    const collateralAmount = parseFloat(formatWeiToDecimalHP(position.collateralAmount, position.collateralAmountDecimals));
+    return collateralAmount > 0;
+  });
+
+  if (vaultsWithCollateral.length === 0) {
     return (
       <Card className="w-full">
         <CardHeader>
@@ -608,7 +614,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           }
         `}</style>
         <div className="space-y-4">
-          {positions.map((position, index) => {
+          {vaultsWithCollateral.map((position, index) => {
             const currentDebt = parseFloat(formatWeiToDecimalHP(position.debtAmount, 18));
             const hasDebt = currentDebt > 0;
             const healthFactor = hasDebt 
