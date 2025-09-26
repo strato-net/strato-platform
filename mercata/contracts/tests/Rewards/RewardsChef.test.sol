@@ -1,6 +1,7 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../Util.sol";
 import "../MockTimeProvider.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
 contract Describe_TokenPausable {
     using TestUtils for User;
@@ -62,6 +63,9 @@ contract Describe_TokenPausable {
         mockTime = new MockTimeProvider();
 
         chef = new RewardsChef(address(this), tokenAddress, cataPerSecond, address(mockTime));
+
+        // Transfer ownership of the reward token to the chef so it can mint rewards
+        Ownable(tokenAddress).transferOwnership(address(chef));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -159,4 +163,41 @@ contract Describe_TokenPausable {
         require(ERC20(lpToken1).balanceOf(address(user1)) == initLpTokensPerUser,
 		"User1 should have back his LP tokens");
     }
+
+
+    function it_should_update_accrued_rewards_for_pool() {
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10;
+
+        // given there is a pool
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // given user has deposited lp tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+	// given 10 seconds has passed
+	uint256 ten_seconds = 10;
+	mockTime.advanceTime(ten_seconds);
+
+        // when
+	chef.updatePool(poolId);
+
+        // then
+        PoolInfo pool1 = chef.pools()[poolId];
+        uint256 lp1Supply = ERC20(lpToken1).balanceOf(address(chef));
+        uint256 reward = ten_seconds * cataPerSecond;
+
+	// then reward was minted
+        require(ERC20(rewardsToken).balanceOf(address(chef)) == reward,
+		"Chef should have minted reward to itself");
+
+	// then accumulated reward per share is properly calculated
+        uint256 expectedAccPerToken =
+	    (reward * chef.PRECISION_MULTIPLIER()) / lp1Supply;
+        require(pool1.accPerToken == expectedAccPerToken, "accPerToken calculation mismatch");
+    }
+
 }
