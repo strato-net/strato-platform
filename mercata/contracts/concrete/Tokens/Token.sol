@@ -43,6 +43,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     TokenStatus public status;
     TokenFactory public tokenFactory;
     RewardsManager public rewardsManager;
+    AdminRegistry public adminRegistry;
 
     event StatusChanged(TokenStatus newStatus);
 
@@ -55,7 +56,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         if (paused()) {
             require(
                 _msgSender() == owner() ||
-                AdminRegistry(owner()).whitelist(address(this), "transfer", _msgSender())
+                (address(adminRegistry) != address(0) && adminRegistry.whitelist(address(this), "_transfer", _msgSender()))
             );
         }
         _;
@@ -95,6 +96,10 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
 
     function setRewardsManager(address _rewardsManager) external onlyOwner {
         rewardsManager = RewardsManager(_rewardsManager);
+    }
+
+    function setAdminRegistry(address _adminRegistry) external onlyOwner {
+        adminRegistry = AdminRegistry(_adminRegistry);
     }
 
     function mint(address to, uint256 amount) external onlyOwner {
