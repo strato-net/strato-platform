@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 
 import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
+import "../../interfaces/ITimeProvider.sol";
 
 // ═════════════════════════════════════════════════════════════════════════
 // DATA STRUCTURES
@@ -191,6 +192,9 @@ contract record RewardsChef is Ownable {
     // Minimum time in the future for new bonus periods
     uint256 public minFutureTime;
 
+    // Time provider for getting current timestamp
+    ITimeProvider public timeProvider;
+
     // Info of each of the stake pool.
     PoolInfo[] public pools;
 
@@ -203,12 +207,26 @@ contract record RewardsChef is Ownable {
 
     constructor(address initialOwner,
 		address _rewardToken,
-		uint256 _cataPerSecond
+		uint256 _cataPerSecond,
+		address _timeProvider
 	        ) Ownable(initialOwner) {
         rewardToken = Token(_rewardToken);
         cataPerSecond = _cataPerSecond;
+        timeProvider = ITimeProvider(_timeProvider);
         pools = [];
         minFutureTime = 3600; // Initialize with 1 hour
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // TIMESTAMP UTILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Returns the current timestamp using the injected time provider
+     * @return Current timestamp in seconds since Unix epoch
+     */
+    function currentTimestamp() internal view returns (uint256) {
+        return timeProvider.currentTimestamp();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -238,10 +256,10 @@ contract record RewardsChef is Ownable {
         PoolInfo memory poolInfo;
         poolInfo.lpToken = _lpToken;
         poolInfo.allocPoint = _allocPoint;
-        poolInfo.lastRewardTimestamp = block.timestamp;
+        poolInfo.lastRewardTimestamp = currentTimestamp();
         poolInfo.accPerToken = 0;
         poolInfo.bonusPeriods = [];
-        poolInfo.bonusPeriods.push(BonusPeriod(block.timestamp, _bonusMultiplier));
+        poolInfo.bonusPeriods.push(BonusPeriod(currentTimestamp(), _bonusMultiplier));
 
         pools.push(poolInfo);
 
@@ -271,7 +289,7 @@ contract record RewardsChef is Ownable {
     ) public onlyOwner {
         require(_pid < pools.length, "Pool does not exist");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
-        require(_startTimestamp >= block.timestamp + minFutureTime, "Start timestamp must be far enough in the future");
+        require(_startTimestamp >= currentTimestamp() + minFutureTime, "Start timestamp must be far enough in the future");
 
         // Ensure new period starts after the last period
         uint256 periodsLength = pools[_pid].bonusPeriods.length;
@@ -327,24 +345,24 @@ contract record RewardsChef is Ownable {
         require(_pid < pools.length, "Pool does not exist");
 
         PoolInfo storage pool = pools[_pid];
-        if (block.timestamp <= pool.lastRewardTimestamp) {
+        if (currentTimestamp() <= pool.lastRewardTimestamp) {
             return;
         }
 
         uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
         if (lpSupply == 0) {
-            pool.lastRewardTimestamp = block.timestamp;
+            pool.lastRewardTimestamp = currentTimestamp();
             return;
         }
 
-        uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, currentTimestamp());
         // totalAllocPoint is always greater than zero OR there are no pools yet added
         uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
 
         rewardToken.mint(address(this), cataReward);
 
         pool.accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
-        pool.lastRewardTimestamp = block.timestamp;
+        pool.lastRewardTimestamp = currentTimestamp();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -424,8 +442,8 @@ contract record RewardsChef is Ownable {
         uint256 accPerToken = pool.accPerToken;
         uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
 
-        if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        if (currentTimestamp() > pool.lastRewardTimestamp && lpSupply != 0) {
+            uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, currentTimestamp());
             uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
             accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
         }

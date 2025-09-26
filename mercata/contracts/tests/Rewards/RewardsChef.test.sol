@@ -1,5 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../Util.sol";
+import "../MockTimeProvider.sol";
 
 contract Describe_TokenPausable {
     using TestUtils for User;
@@ -15,6 +16,7 @@ contract Describe_TokenPausable {
     uint256 initLpTokensPerUser = 1000;
 
     RewardsChef chef;
+    MockTimeProvider mockTime;
     uint256 cataPerSecond;
     uint256 currentTimestamp;
 
@@ -56,7 +58,10 @@ contract Describe_TokenPausable {
 	cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
 
-        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond);
+        // Create mock time provider
+        mockTime = new MockTimeProvider();
+
+        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond, address(mockTime));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
