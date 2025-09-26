@@ -216,14 +216,40 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	// Register the Cirrus provider
 	const cirrusProvider = new CirrusProvider();
-	vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
-		const argInput = await vscode.window.showInputBox({
-			placeHolder: 'ex: BlockApps-Mercata-Asset?address=eq.9b617d82a19cde1a5ad3489bfb91716c88f928a6',
-			prompt: `Enter cirrus query.`
-		});
-		if (!argInput) return;
-		cirrusProvider.query(argInput);
-	});
+        vscode.commands.registerCommand('cirrus.queryCirrus', async () => {
+                const action = await vscode.window.showQuickPick<{
+                        label: string;
+                        description: string;
+                        value: 'remote' | 'local';
+                }>([
+                        {
+                                label: 'Search Cirrus',
+                                description: 'Query Cirrus with a custom filter',
+                                value: 'remote'
+                        },
+                        {
+                                label: 'Scan Local Contract Events',
+                                description: 'Parse Solidity contracts from the configured contractsPath',
+                                value: 'local'
+                        }
+                ], {
+                        placeHolder: 'Select how you want to populate the Cirrus explorer'
+                });
+
+                if (!action) return;
+
+                if (action.value === 'remote') {
+                        const argInput = await vscode.window.showInputBox({
+                                placeHolder: 'ex: BlockApps-Mercata-Asset?address=eq.9b617d82a19cde1a5ad3489bfb91716c88f928a6',
+                                prompt: `Enter cirrus query.`
+                        });
+                        if (!argInput) return;
+                        cirrusProvider.query(argInput);
+                        return;
+                }
+
+                await cirrusProvider.showLocalEvents();
+        });
 	vscode.window.registerTreeDataProvider('cirrus', cirrusProvider)
 
 	// Register the nodes provider
