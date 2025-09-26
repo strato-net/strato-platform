@@ -53,12 +53,10 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
 
     modifier whenNotPausedOrOwner() {
         if (paused()) {
-            // paused → only owner can still act.
-            try {
-                _checkOwner();
-            } catch {
-                return _checkAdmin(msg.sig, msg.data);
-            }
+            require(
+                _msgSender() == owner() ||
+                AdminRegistry(owner()).whitelist(address(this), "transfer", _msgSender())
+            );
         }
         _;
     }
@@ -136,14 +134,8 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         return customDecimals;
     }
 
-    function transfer(address to, uint256 amount) public override whenNotPausedOrOwner returns (bool) {
-        _transfer(msg.sender, to, amount);
-        return true;
-    }
-
-    function transferFrom(address from, address to, uint256 amount) public override whenNotPausedOrOwner returns (bool) {
-        _transfer(from, to, amount);
-        return true;
+    function _transfer(address from, address to, uint256 amount) internal override whenNotPausedOrOwner {
+        super._transfer(from, to, amount);
     }
 
     function _update(address from, address to, uint256 value) internal override {

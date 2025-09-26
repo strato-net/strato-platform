@@ -44,10 +44,13 @@ abstract contract Ownable is Context {
     modifier onlyOwner() {
         try {
             _checkOwner();
+            _;
         } catch {
-            return _checkAdmin(msg.sig, msg.data);
+            AdminRegistry admin = AdminRegistry(owner());
+            address sender = _msgSender();
+            (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
+            return ret;
         }
-        _;
     }
 
     /**
@@ -62,14 +65,9 @@ abstract contract Ownable is Context {
      */
     function _checkOwner() internal view virtual {
         if (owner() != _msgSender()) {
-            // require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
+            require(owner() == _msgSender(), string(owner()) + " does not match sender " + string(_msgSender()));
             revert OwnableUnauthorizedAccount(_msgSender());
         }
-    }
-
-    function _checkAdmin(string sig, variadic data) internal view virtual returns (variadic) {
-        (bool didExecute, variadic ret) = AdminRegistry(owner()).castVoteOnIssue(_msgSender(), sig, data);
-        return ret;
     }
 
     /**
