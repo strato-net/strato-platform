@@ -103,6 +103,8 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Either (isLeft)
+import Data.Foldable (for_)
 import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
@@ -134,6 +136,8 @@ data CallInfo = CallInfo
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString (SVMType.Type, Variable)),
+    stateMap :: !(M.Map Address AddressStateModification),
+    storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -234,10 +238,49 @@ instance
   ) =>
   (RawStorageKey `A.Alters` RawStorageValue) (SM m)
   where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+  lookup _ k   = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+      Just v -> pure $ Just v
+      Nothing -> genericLookupRawStorageDB k
+  lookupWithDefault _ k   = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+      Just v -> pure v
+      Nothing -> genericLookupWithDefaultRawStorageDB k
+  insert _ k v = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertRawStorageDB k v
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.insert k v $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ kvs = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertManyRawStorageDB kvs
+      (c:cs') -> do
+        let c' = c {
+              storageMap = kvs `M.union` storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ k   = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericDeleteRawStorageDB k
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.delete k $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
 
 instance
   ( MonadUnliftIO m,
@@ -248,9 +291,57 @@ instance
   ) =>
   (Address `A.Alters` AddressState) (SM m)
   where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+  lookup _ a = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup a . stateMap <$> cs of
+      Just (ASModification s) -> pure $ Just s
+      Just ASDeleted -> pure $ Just blankAddressState
+      Nothing -> getAddressStateMaybe a
+  insert _ a s = do
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressState a s
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a (ASModification s) $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ as = do
+    let asMods = M.map ASModification as
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressStates asMods
+      (c:cs') -> do
+        let c' = c {
+              stateMap = asMods `M.union` stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ a = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressState a
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a ASDeleted $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  deleteMany _ as = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressStates as
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.difference (stateMap c) . M.fromList $ (,ASDeleted) <$> as
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
 
 instance
   ( MonadUnliftIO m,
@@ -261,7 +352,7 @@ instance
   ) =>
   A.Selectable Address AddressState (SM m)
   where
-  select _ = getAddressStateMaybe
+  select = A.lookup
 
 instance
   (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m) =>
@@ -654,7 +745,7 @@ withCallInfo ::
 withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
   addCallInfo a c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
-  popCallInfo
+  popCallInfo $ isLeft eRes
   case eRes of
     Left (e :: SomeException) -> throwIO e
     Right res -> pure res
@@ -679,6 +770,8 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = NE.singleton initialLocalVariables,
+            stateMap = M.empty,
+            storageMap = M.empty,
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -697,10 +790,20 @@ uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
   (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
 
-popCallInfo :: MonadSM m => m ()
-popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "popCallInfo was called on an already empty stack" ()
-  (_ : rest) -> pure rest
+popCallInfo :: MonadSM m => Bool -> m ()
+popCallInfo reverted = do
+  cci <- getCurrentCallInfoIfExists
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+    [] -> internalError "popCallInfo was called on an already empty stack" ()
+    (_ : rest) -> pure rest
+
+  unless reverted . for_ cci $ \ci -> do
+    A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
+    let fromASM ASDeleted = Left ()
+        fromASM (ASModification as) = Right as
+        (deletes, inserts) = M.mapEither fromASM $ stateMap ci
+    A.insertMany (A.Proxy @AddressState) $ inserts
+    A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
 
 withLocalVars :: MonadSM m => m a -> m a
 withLocalVars = bracket_ pushLocalVars popLocalVars
@@ -725,7 +828,7 @@ withTempCallInfo :: MonadSM m => Bool -> m a -> m a
 withTempCallInfo ro f = do
   dupCallInfo ro
   eResult <- try f
-  popCallInfo
+  popCallInfo $ isLeft eResult
   case eResult of
     Left (e :: SomeException) -> throwIO e
     Right result -> pure result
@@ -734,7 +837,7 @@ withUncheckedCallInfo :: MonadSM m => m a -> m a
 withUncheckedCallInfo f = do
   uncheckedCallInfo
   eResult <- try f
-  popCallInfo
+  popCallInfo $ isLeft eResult
   case eResult of
     Left (e :: SomeException) -> throwIO e
     Right result -> pure result
