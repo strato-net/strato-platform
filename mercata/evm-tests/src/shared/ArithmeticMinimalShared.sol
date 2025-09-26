@@ -1,8 +1,7 @@
-import "./Workhorse.sol";
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-// Workhorse moved to separate file for SolidVM parser compatibility
+import "./WorkhorseLocal.sol";
 
 contract RevertCallee {
     uint public hits;
@@ -22,10 +21,8 @@ contract RevertCallee {
     }
 }
 
-
-contract Describe_ArithmeticMinimal {
-    constructor() {
-    }
+contract Describe_ArithmeticMinimal_LocalCopy {
+    constructor() {}
 
     function it_adds_uints() public {
         require(1 + 2 == 3, "1+2 should equal 3");
@@ -37,7 +34,6 @@ contract Describe_ArithmeticMinimal {
         require(y + 1 == x, "Underflow did not wrap");
     }
 
-    // Additional small-width overflow/underflow wrap tests
     function it_uint8_add_overflow_wraps() public {
         uint8 x = 255;
         uint8 y = x + 1;
@@ -56,7 +52,6 @@ contract Describe_ArithmeticMinimal {
         require(y == -128, "int8 add did not wrap to -128");
     }
 
-    // Helper: heavy work with intermittent logging/progress
     event Progress(uint i);
     uint public lastProgress;
     function heavyWork(uint iterations, uint logEvery) external returns (uint sum) {
@@ -67,13 +62,6 @@ contract Describe_ArithmeticMinimal {
                 emit Progress(i);
             }
         }
-    }
-
-    // Attempt to induce OOG on SolidVM CLI by using a large loop with intermittent logging
-    function it_try_oog_heavy_work_attempt() public {
-        // Tune these if runs are too slow/fast
-        // Disabled self-call attempt; SolidVM fuzzer does not resolve self external calls reliably
-        // this.heavyWork(2000000, 200000);
     }
 
     function it_infinite_loop_reverts() public {
@@ -113,8 +101,7 @@ contract Describe_ArithmeticMinimal {
         RevertCallee callee = new RevertCallee();
         try callee.mutateThenRevert() {
             require(false, "unexpected success");
-        } catch {
-        }
+        } catch {}
         emit After(counter);
         require(counter == beforeCaller + 1, "Caller outer change missing");
         require(callee.hits() == 0, "Callee state not rolled back");
@@ -126,10 +113,6 @@ contract Describe_ArithmeticMinimal {
         require(r == 12, "External add returned wrong value");
         require(callee.hits() == 1, "Callee state not updated on success");
     }
-
-    // SolidVM-specific delegate mapping test moved to DelegateMappingSolidVMOnly.test.sol
-
-    // NOTE: EVM-only selector checks were removed from shared suite to keep SolidVM compatible
 }
 
 

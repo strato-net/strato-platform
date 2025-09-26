@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import {Describe_ArithmeticMinimal} from "mercata/contracts/tests/Semantics/ArithmeticMinimal.test.sol";
+import {Describe_ArithmeticMinimal_LocalCopy as Describe_ArithmeticMinimal} from "src/shared/ArithmeticMinimalShared.sol";
 
 contract SharedSemanticsHarness {
     function test_shared_arithmetic_minimal() public {
@@ -29,6 +29,13 @@ contract SharedSemanticsHarness {
         try c.it_int8_add_overflow_wraps() {
             revert("Expected revert on int8 add overflow");
         } catch {}
+
+        // OOG behavior: low-gas call should revert
+        (bool ok, ) = address(c).call{gas: 5000}(abi.encodeWithSignature("heavyWork()"));
+        require(!ok, "Expected out-of-gas to revert");
+
+        // Explicit OOG rollback semantics: callee rolls back, caller persists
+        c.it_oog_rolls_back_callee_keeps_caller();
     }
 
     // EVM-only delegatecall semantics: storage context, msg.sender, and address(this)

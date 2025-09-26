@@ -6,4 +6,6 @@ remappings = [
   "mercata/=../"
 ]
 
+libs = ["lib", "../mercata"]
+
 
