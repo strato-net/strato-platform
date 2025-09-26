@@ -136,7 +136,8 @@ const ActivityFeedList = () => {
   }, [currentPage, isLoggedIn, filters]);
 
   // Memoized utility functions to prevent unnecessary re-renders
-  const formatAddress = useCallback((address: string) => {
+  const formatAddress = useCallback((address: string | null) => {
+    if (!address) return "N/A";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }, []);
 
