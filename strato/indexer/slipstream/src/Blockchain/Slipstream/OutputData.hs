@@ -211,7 +211,7 @@ slipstreamQueryText sqlTypeText (CreateTable tableName cols pk mTC) = T.concat $
 slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCols contractCols cols) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
+  , " CASCADE;\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -255,7 +255,7 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCol
   , tableNameContractName tableName
   , "' WITH NO DATA;\n"
   , "CREATE UNIQUE INDEX \""
-  , tableNameToText tableName
+  , T.pack . take 32 . BC.unpack . Base16.encode . keccak256ToByteString . hash . encodeUtf8  $ tableNameToText tableName
   , "_index\"\n  ON "
   , tableNameToDoubleQuoteText tableName
   , "(address);\n"
@@ -267,7 +267,7 @@ slipstreamQueryText _ (CreateContractView tableName storageTableName' storageCol
 slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols keyTypes) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
+  , " CASCADE;\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -311,7 +311,7 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
   , tableNameCollectionName tableName
   , "' WITH NO DATA;\n"
   , "CREATE UNIQUE INDEX \""
-  , tableNameToText tableName
+  , T.pack . take 32 . BC.unpack . Base16.encode . keccak256ToByteString . hash . encodeUtf8 $ tableNameToText tableName
   , "_index\"\n  ON "
   , tableNameToDoubleQuoteText tableName
   , wrapAndEscapeDouble $ ["address", "collection_name"] ++ (fst <$> keyTypes)
@@ -324,7 +324,7 @@ slipstreamQueryText _ (CreateCollectionView tableName storageCols contractCols k
 slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
+  , " CASCADE;\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -368,7 +368,7 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
   , tableNameEventName tableName
   , "' WITH NO DATA;\n"
   , "CREATE UNIQUE INDEX \""
-  , tableNameToText tableName
+  , T.pack . take 32 . BC.unpack . Base16.encode . keccak256ToByteString . hash . encodeUtf8 $ tableNameToText tableName
   , "_index\"\n  ON "
   , tableNameToDoubleQuoteText tableName
   , "(transaction_hash, event_index);\n"
@@ -380,7 +380,7 @@ slipstreamQueryText _ (CreateEventView tableName eventCols contractCols cols _) 
 slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCols keyTypes) = T.concat $
   [ "DROP MATERIALIZED VIEW IF EXISTS "
   , tableNameToDoubleQuoteText tableName
-  , ";\nBEGIN;\nCREATE MATERIALIZED VIEW "
+  , " CASCADE;\nBEGIN;\nCREATE MATERIALIZED VIEW "
   , tableNameToDoubleQuoteText tableName
   , " AS SELECT "
   , T.intercalate ", " $
@@ -424,7 +424,7 @@ slipstreamQueryText _ (CreateEventArrayView tableName eventArrayCols contractCol
   , tableNameCollectionName tableName
   , "' WITH NO DATA;\n"
   , "CREATE UNIQUE INDEX \""
-  , tableNameToText tableName
+  , T.pack . take 32 . BC.unpack . Base16.encode . keccak256ToByteString . hash . encodeUtf8 $ tableNameToText tableName
   , "_index\"\n  ON "
   , tableNameToDoubleQuoteText tableName
   , wrapAndEscapeDouble $ ["address", "transaction_hash", "event_index", "collection_name"] ++ (fst <$> keyTypes)
