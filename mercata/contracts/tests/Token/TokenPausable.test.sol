@@ -226,12 +226,13 @@ contract Describe_TokenPausable {
         // Create AdminRegistry with this contract as admin
         AdminRegistry adminRegistry = new AdminRegistry([this]);
         
-        // Create TokenFactory with this contract as owner so we can call createToken
-        TokenFactory tokenFactory = new TokenFactory(address(this));
-        
-        // Create a new token through TokenFactory with AdminRegistry as the token owner
+        // Create TokenFactory with adminRegistry as owner so we can call createTokenWithInitialOwner
+        TokenFactory tokenFactory = new TokenFactory(address(adminRegistry));
+
+        // Create a new token through TokenFactory with this contract as the token owner
         uint256 transferAmount = 500 * 10**18;
-        address tokenAddress = tokenFactory.createToken(
+        (bool didExecute, variadic ret) = adminRegistry.castVoteOnIssue(
+            address(tokenFactory), "createTokenWithInitialOwner",
             "Admin Token",
             "Token for testing admin functionality",
             [],
@@ -239,13 +240,12 @@ contract Describe_TokenPausable {
             [],
             "ADMIN",
             transferAmount * 2,
-            18
+            18,
+            this
         );
+        require(didExecute, "Admin token not created");
+        address tokenAddress = address(ret);
         Token adminToken = Token(tokenAddress);
-        require(address(adminToken) != address(0), "Admin token not created");
-
-        // Set the AdminRegistry as the token factory owner
-        Ownable(tokenFactory).transferOwnership(address(adminRegistry));
 
         // Give user1 some tokens
         bool success = ERC20(adminToken).transfer(
@@ -269,7 +269,7 @@ contract Describe_TokenPausable {
         require(!success, "Non-whitelisted user should not be able to transfer when paused");
         
         // Now whitelist user1 for _transfer function
-        (bool didExecute, variadic ret) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminToken), "_transfer", address(user1));
+        (didExecute, ret) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminToken), "_transfer", address(user1));
         require(didExecute, "Failed to add whitelist");
         
         // Now user1 should be able to transfer when paused

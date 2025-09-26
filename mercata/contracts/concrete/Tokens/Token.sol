@@ -53,10 +53,12 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
 
     modifier whenNotPausedOrOwner() {
         if (paused()) {
-            require(
-                _msgSender() == owner() ||
-                AdminRegistry(Ownable(tokenFactory).owner()).whitelist(address(this), "_transfer", _msgSender())
-            );
+            try {
+                _checkOwner();
+            } catch {
+                AdminRegistry admin = AdminRegistry(Ownable(tokenFactory).owner());
+                require(admin.whitelist(address(this), "_transfer", _msgSender()));
+            }
         }
         _;
     }
