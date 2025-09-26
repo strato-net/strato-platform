@@ -13,14 +13,24 @@ const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFa
 // Helper function to get CDP collateral for a user
 const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
   try {
-    // Use direct vault query instead of going through registry (more efficient and avoids the vault missing error)
+    // Get the CDPEngine address from registry to ensure we only query the correct instance
+    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPCollateralForUser");
+    
+    if (!registry?.cdpEngine) {
+      return new Map();
+    }
+
+    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+
+    // Use direct vault query with specific CDPEngine address
     const { data: userVaults } = await cirrus.get(
       accessToken,
       `/${CDPEngine}-vaults`,
       {
         params: {
           select: "user:key,asset:key2,Vault:value",
-          key: `eq.${userAddress.toLowerCase()}`
+          key: `eq.${userAddress.toLowerCase()}`,
+          address: `eq.${cdpEngineAddress}`
         }
       }
     );
