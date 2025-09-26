@@ -1021,7 +1021,7 @@ export const getSupportedAssets = async (
   });
   
   const configs = await Promise.all(configPromises);
-  return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null && !c.isPaused);
+  return configs.filter((c: AssetConfig | null): c is AssetConfig => c !== null);
 };
 
 export const getMaxLiquidatable = async (
