@@ -25,6 +25,7 @@ import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
 import           Blockchain.Strato.Model.Validator
+import           Blockchain.Stream.Action                        (Delegatecall(..))
 import qualified Data.Aeson                                      as JSON
 import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
@@ -397,6 +398,38 @@ genesisBlock  =
              , cdpRegistryEvents
              , cdpVaultEvents
              , safetyModuleEvents
+             ],
+        genesisInfoDelegatecalls = M.fromList . map (fmap S.singleton) $
+          ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress "BlockApps" "Mercata" "Token")) <$> GA.assets)
+          ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress rateStrategyImplAddress "BlockApps" "Mercata" "RateStrategy")
+             , (priceOracleAddress, Delegatecall priceOracleAddress priceOracleImplAddress "BlockApps" "Mercata" "PriceOracle")
+             , (collateralVaultAddress, Delegatecall collateralVaultAddress collateralVaultImplAddress "BlockApps" "Mercata" "CollateralVault")
+             , (liquidityPoolAddress, Delegatecall liquidityPoolAddress liquidityPoolImplAddress "BlockApps" "Mercata" "LiquidityPool")
+             , (lendingPoolAddress, Delegatecall lendingPoolAddress lendingPoolImplAddress "BlockApps" "Mercata" "LendingPool")
+             , (poolConfiguratorAddress, Delegatecall poolConfiguratorAddress poolConfiguratorImplAddress "BlockApps" "Mercata" "PoolConfigurator")
+             , (lendingRegistryAddress, Delegatecall lendingRegistryAddress lendingRegistryImplAddress "BlockApps" "Mercata" "LendingRegistry")
+             , (mercataBridgeAddress, Delegatecall mercataBridgeAddress mercataBridgeImplAddress "BlockApps" "Mercata" "MercataBridge")
+             , (poolFactoryAddress, Delegatecall poolFactoryAddress poolFactoryImplAddress "BlockApps" "Mercata" "PoolFactory")
+             , (tokenFactoryAddress, Delegatecall tokenFactoryAddress tokenFactoryImplAddress "BlockApps" "Mercata" "TokenFactory")
+             , (adminRegistryAddress, Delegatecall adminRegistryAddress adminRegistryImplAddress "BlockApps" "Mercata" "AdminRegistry")
+             , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress "BlockApps" "Mercata" "FeeCollector")
+             , (voucherAddress, Delegatecall voucherAddress voucherImplAddress "BlockApps" "Mercata" "Voucher")
+             , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (rewardsManagerAddress, Delegatecall rewardsManagerAddress rewardsManagerImplAddress "BlockApps" "Mercata" "RewardsManager")
+             , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress "BlockApps" "Mercata" "CDPEngine")
+             , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress "BlockApps" "Mercata" "CDPRegistry")
+             , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
+             , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress "BlockApps" "Mercata" "CDPReserve")
+             , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
+             , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (goldstPoolAddress, Delegatecall goldstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
              ]
         }
 

@@ -678,8 +678,7 @@ extractCodeCollectionAddedMessages a =
                 codePtr = cp,
                 creator = cn,
                 application = n,
-                abstracts = abstracts',
-                recordMappings = []
+                abstracts = abstracts'
               }
     _ -> Nothing
 

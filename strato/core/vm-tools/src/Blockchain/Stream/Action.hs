@@ -31,8 +31,6 @@ module Blockchain.Stream.Action (
   actionDataApplication,
   actionDataStorageDiffs,
   actionDataAbstracts,
-  actionDataMappings,
-  actionDataArrays,
   actionDataCallTypes,
   
   CallType(..),
@@ -250,8 +248,6 @@ data ActionData = ActionData
     _actionDataApplication :: Text,
     _actionDataStorageDiffs :: DataDiff,
     _actionDataAbstracts :: Map (Address, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
-    _actionDataMappings :: [Text],
-    _actionDataArrays :: [Text],
     _actionDataCallTypes :: [CallType]
   }
   deriving (Eq, Show, Generic, NFData)
@@ -290,9 +286,7 @@ mergeActionData newData oldData =
       calls = ((++) `on` _actionDataCallTypes) oldData newData
       cc = _actionDataCodeCollection oldData <> _actionDataCodeCollection newData
       abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
-      mappings = nub $ _actionDataMappings oldData ++ _actionDataMappings newData
-      arrays = nub $ _actionDataArrays oldData ++ _actionDataArrays newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs abstracts mappings arrays calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs abstracts calls
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
 mergeActionDataStorageDiffs newData oldData =
@@ -316,8 +310,6 @@ instance ToJSON ActionData where
         "application" .= _actionDataApplication,
         "diff" .= _actionDataStorageDiffs,
         "abstracts" .= _actionDataAbstracts,
-        "mappings" .= _actionDataMappings,
-        "arrays" .= _actionDataArrays,
         "types" .= _actionDataCallTypes
       ]
 
@@ -331,10 +323,8 @@ instance FromJSON ActionData where
     ap <- o .: "application"
     df <- explicitParseField parseDiffSolidVM o "diff"
     da <- o .: "abstracts"
-    dm <- o .: "mappings"
-    dr <- o .: "arrays"
     dt <- o .: "types"
-    return $ ActionData ch cc cr ccr rt ap df da dm dr dt
+    return $ ActionData ch cc cr ccr rt ap df da dt
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
@@ -344,7 +334,7 @@ data Delegatecall = Delegatecall
     _delegatecallApplication :: Text,
     _delegatecallContractName :: Text
   }
-  deriving (Eq, Show, Generic, NFData)
+  deriving (Eq, Show, Read, Generic, NFData)
 
 --makeLenses ''Delegatecall
 
