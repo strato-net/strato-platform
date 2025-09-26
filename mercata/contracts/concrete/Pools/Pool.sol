@@ -378,8 +378,14 @@ contract record Pool is Ownable {
         emit Swap(msg.sender, address(inputToken), address(outputToken), amountIn, amountOut);
     }
 
-    // ============ ADMIN FUNCTIONS ============
-    
+    /// @notice Transfer the pool to a new factory
+    /// @param newFactory The address of the new factory
+    /// @dev This function can only be called by the current PoolFactory contract
+    function transferPoolToFactory(address newFactory) external onlyPoolFactory {
+        require(newFactory != address(0), "Invalid factory address");
+        poolFactory = PoolFactory(newFactory);
+    }
+
     /// @notice Set fee parameters for this pool (factory only)
     /// @param newSwapFeeRate New swap fee rate in basis points (e.g., 30 = 0.3%)
     /// @param newLpSharePercent New LP share percentage in basis points (e.g., 7000 = 70%)

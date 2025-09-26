@@ -656,6 +656,12 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 (CodeAtAccount
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS oracleAddress2 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress2 <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setLendingPool\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setLiquidityPool\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setCollateralVault\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setRateStrategy\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setPriceOracle\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setAllComponents\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
@@ -855,7 +861,7 @@ sUsdst = SolidVMContractWithStorage sUsdstAddress 0 (CodeAtAccount mercataAddres
      ]
 
 ethstPool :: AccountInfo
-ethstPool = SolidVMContractWithStorage ethstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+ethstPool = SolidVMContractWithStorage ethstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ ownedByBlockApps mercataAddress
   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain ethstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -883,7 +889,7 @@ ethstLpToken = SolidVMContractWithStorage ethstLpTokenAddress 0 (CodeAtAccount m
      ]
 
 wbtcstPool :: AccountInfo
-wbtcstPool = SolidVMContractWithStorage wbtcstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+wbtcstPool = SolidVMContractWithStorage wbtcstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ ownedByBlockApps mercataAddress
   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain wbtcstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -911,7 +917,7 @@ wbtcstLpToken = SolidVMContractWithStorage wbtcstLpTokenAddress 0 (CodeAtAccount
      ]
 
 goldstPool :: AccountInfo
-goldstPool = SolidVMContractWithStorage goldstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+goldstPool = SolidVMContractWithStorage goldstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ ownedByBlockApps mercataAddress
   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain goldstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -939,7 +945,7 @@ goldstLpToken = SolidVMContractWithStorage goldstLpTokenAddress 0 (CodeAtAccount
      ]
 
 silvstPool :: AccountInfo
-silvstPool = SolidVMContractWithStorage silvstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+silvstPool = SolidVMContractWithStorage silvstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ ownedByBlockApps mercataAddress
   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain silvstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -967,7 +973,7 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 (CodeAtAccount
      ]
 
 -- paxgstPool :: AccountInfo
--- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ createdByBlockApps mercataAddress
+-- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 (CodeAtAccount mercataAddress "Pool") $ ownedByBlockApps mercataAddress
 --   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
 --      , (".tokenA", BContract "Token" $ unspecifiedChain paxgstRoot)
 --      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)

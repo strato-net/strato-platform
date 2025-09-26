@@ -104,12 +104,11 @@ contract record Mercata {
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
-        cdpRegistry = new CDPRegistry(this);
+        cdpRegistry = new CDPRegistry(address(adminRegistry));
         cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
         cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
         cdpReserve = new CDPReserve(address(cdpRegistry), address(adminRegistry));
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
-        Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
     }
