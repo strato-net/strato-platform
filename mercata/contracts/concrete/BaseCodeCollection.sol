@@ -100,7 +100,7 @@ contract record Mercata {
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
-        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry));
+        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry)); // TODO: set relayer address correctly
         rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine

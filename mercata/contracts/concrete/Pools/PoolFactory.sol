@@ -226,8 +226,8 @@ contract record PoolFactory is Ownable {
         );
 
         // deploy new pool first
-        pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
         address thisOwner = owner();
+        pool = address(new Pool(tokenA, tokenB, lpTokenAddress, address(thisOwner)));
         Token(lpTokenAddress).addWhitelist(thisOwner, "mint", pool);
         Token(lpTokenAddress).addWhitelist(thisOwner, "burn", pool);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
