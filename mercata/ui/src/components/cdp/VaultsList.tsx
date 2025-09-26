@@ -52,6 +52,8 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   const [inputAmounts, setInputAmounts] = useState<Record<string, string>>({});
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});  // Store max values for comparison
+  const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
+  const [assetPauseStates, setAssetPauseStates] = useState<Record<string, boolean>>({});
 
   // Fetch positions from backend
   useEffect(() => {
@@ -60,19 +62,41 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
       try {
         const fetchedPositions = await cdpService.getVaults();
         setPositions(fetchedPositions);
+
+        // Check global pause status
+        try {
+          const globalPauseStatus = await cdpService.getGlobalPaused();
+          setIsGlobalPaused(globalPauseStatus.isPaused);
+        } catch (error) {
+          console.error("Failed to fetch global pause status:", error);
+          setIsGlobalPaused(true); // Default to paused if we can't fetch
+        }
         
-        // Initialize state for each position
+        // Initialize state for each position and check asset pause status
         const initialActiveActions: Record<string, null> = {};
         const initialAmounts: Record<string, string> = {};
         const initialMaxStates: Record<string, boolean> = {};
-        fetchedPositions.forEach(position => {
+        const initialAssetPauseStates: Record<string, boolean> = {};
+        
+        // Check pause status for each asset
+        for (const position of fetchedPositions) {
           initialActiveActions[position.asset] = null;
           initialAmounts[position.asset] = "";
           initialMaxStates[position.asset] = false;
-        });
+          
+          try {
+            const assetConfig = await cdpService.getAssetConfig(position.asset);
+            initialAssetPauseStates[position.asset] = assetConfig?.isPaused || false;
+          } catch (error) {
+            console.error(`Failed to fetch pause status for ${position.symbol}:`, error);
+            initialAssetPauseStates[position.asset] = true; // Default to paused if we can't fetch
+          }
+        }
+        
         setActiveActions(initialActiveActions);
         setInputAmounts(initialAmounts);
         setMaxStates(initialMaxStates);
+        setAssetPauseStates(initialAssetPauseStates);
       } catch (error) {
         console.error("Failed to fetch positions:", error);
         toast({
@@ -688,47 +712,61 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
                 <div className="mt-4">
-                  <div className="mb-2">
-                    <p className="text-xs text-gray-500">
-                      Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Amount"
-                      value={inputAmounts[position.asset] || ""}
-                      onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
-                      className={`flex-1 ${
-                        maxStates[position.asset] 
-                          ? 'text-blue-600 bg-blue-50 border-blue-300' 
-                          : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
-                            ? 'text-red-600 bg-red-50 border-red-300'
-                            : ''
-                      }`}
-                      type="number"
-                      step="any"
-                    />
-                  <Button 
-                    variant={maxStates[position.asset] ? "default" : "outline"}
-                    size="sm" 
-                    className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
-                    onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
-                  >
-                    MAX
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="min-w-[80px]"
-                    onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
-                    disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
-                  >
-                    {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
-                      ? "Amount exceeds maximum"
-                      : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
-                    }
-                  </Button>
-                  </div>
+                  {/* Show pause message for deposit/borrow when globally paused or asset paused */}
+                  {(isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'borrow') ? (
+                    <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
+                      <p className="text-sm text-yellow-700 font-medium">
+                        {isGlobalPaused 
+                          ? "Deposit/Borrow paused by admin at this time"
+                          : `Deposit/Borrow for ${position.symbol} paused by admin at this time`
+                        }
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="mb-2">
+                        <p className="text-xs text-gray-500">
+                          Transaction Fee: {activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'repay' ? '0.02' : '0.01'} USDST
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Amount"
+                          value={inputAmounts[position.asset] || ""}
+                          onChange={(e) => handleInputChange(position.asset, e.target.value, e)}
+                          className={`flex-1 ${
+                            maxStates[position.asset] 
+                              ? 'text-blue-600 bg-blue-50 border-blue-300' 
+                              : isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")
+                                ? 'text-red-600 bg-red-50 border-red-300'
+                                : ''
+                          }`}
+                          type="number"
+                          step="any"
+                        />
+                      <Button 
+                        variant={maxStates[position.asset] ? "default" : "outline"}
+                        size="sm" 
+                        className={`min-w-[50px] ${maxStates[position.asset] ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''}`}
+                        onClick={() => handleMaxClick(position.asset, activeActions[position.asset]!)}
+                      >
+                        MAX
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="min-w-[80px]"
+                        onClick={() => handleAction(position.asset, activeActions[position.asset]!, inputAmounts[position.asset] || "")}
+                        disabled={isAmountAboveMax(position.asset, inputAmounts[position.asset] || "")}
+                      >
+                        {isAmountAboveMax(position.asset, inputAmounts[position.asset] || "") 
+                          ? "Amount exceeds maximum"
+                          : activeActions[position.asset]!.charAt(0).toUpperCase() + activeActions[position.asset]!.slice(1)
+                        }
+                      </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
