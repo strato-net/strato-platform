@@ -5,9 +5,7 @@ import "../abstract/ERC20/ERC20.sol";
 //Generic token
 import "./Tokens/Token.sol";
 import "./Tokens/TokenFactory.sol";
-import "./Tokens/TokenFaucet.sol";
 //import "Tokens/Metadata/TokenMetadata.sol";
-//import "Tokens/TokenAccess.sol";
 
 //Admin Registry
 import "Admin/AdminRegistry.sol";
@@ -18,11 +16,6 @@ import "./Pools/PoolFactory.sol";
 
 //Admin
 // import "Admin/FeeCollector.sol";
-
-//Redemption
-//import "Redemptions/RedemptionService.sol";
-//import "Redemptions/CryptoRedemptionService.sol"; incomplete
-//import "Redemptions/PhysicalRedemptionService.sol"; doesn't compile
 
 //Rewards
 import "./Rewards/RewardsManager.sol";

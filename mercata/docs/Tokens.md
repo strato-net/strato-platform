@@ -8,9 +8,7 @@ Functional summary:
 Key contracts:
 - Token.sol: ERC20 with custom decimals, metadata, rewards hook, and owner controls.
 - TokenFactory.sol: Deploys new Token contracts with initial supply and metadata.
-- TokenFaucet.sol: Test/distribution faucet for minting small amounts.
 - TokenMetadata.sol: On-chain metadata storage.
-- TokenAccess.sol: Access helpers for controlled operations.
 
 Core flows:
 - Mint/Burn: Owner-controlled supply changes.
