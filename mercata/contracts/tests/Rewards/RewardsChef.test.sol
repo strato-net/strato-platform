@@ -1,13 +1,11 @@
 import "../../concrete/BaseCodeCollection.sol";
-
-contract User {
-    function do(address a, string f, variadic args) public returns (variadic) {
-        variadic result = address(a).call(f, args);
-        return result;
-    }
-}
+import "../Util.sol";
+import "../MockTimeProvider.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
 contract Describe_TokenPausable {
+    using TestUtils for User;
+
     constructor() {
     }
 
@@ -16,8 +14,10 @@ contract Describe_TokenPausable {
     Token lpToken1;
     User user1;
     User user2;
+    uint256 initLpTokensPerUser = 1000 * 1e18;
 
     RewardsChef chef;
+    MockTimeProvider mockTime;
     uint256 cataPerSecond;
     uint256 currentTimestamp;
 
@@ -52,14 +52,20 @@ contract Describe_TokenPausable {
         require(lpToken1Address != address(0), "LP Token address is 0");
         lpToken1 = Token(lpToken1Address);
 
-        // Mint 1000 LP tokens to each user
-        lpToken1.mint(address(user1), 1000);
-        lpToken1.mint(address(user2), 1000);
+        // Mint initLpTokensPerUser LP tokens to each user
+        lpToken1.mint(address(user1), initLpTokensPerUser);
+        lpToken1.mint(address(user2), initLpTokensPerUser);
 
 	cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
 
-        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond);
+        // Create mock time provider
+        mockTime = new MockTimeProvider();
+
+        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond, address(mockTime));
+
+        // Transfer ownership of the reward token to the chef so it can mint rewards
+        Ownable(tokenAddress).transferOwnership(address(chef));
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -110,5 +116,89 @@ contract Describe_TokenPausable {
         require(chef.totalAllocPoint() == updatedAllocationPoints, "Total allocation points should be updated");
     }
 
+    // ═════════════════════════════════════════════════════════════════════════
+    // USER INTERACTIONS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_allow_user_to_deposit_lp_tokens() {
+        // given
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10;
+
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // when
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+        // then
+        require(ERC20(lpToken1).balanceOf(address(chef)) == amount,
+		"Chef should have received the deposited LP tokens");
+        require(ERC20(lpToken1).balanceOf(address(user1)) == (initLpTokensPerUser - amount),
+		"User1 should not own LP token");
+    }
+
+    function it_should_allow_user_to_withdraw_lp_token() {
+        // given
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10;
+
+        // given there is a pool
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // given user has deposited lp tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+        // when
+        TestUtils.callAs(user1, address(chef), "withdraw(uint256, uint256)", poolId, amount);
+
+        // then
+        require(ERC20(lpToken1).balanceOf(address(chef)) == 0,
+		"Chef should not have the deposited LP tokens");
+        require(ERC20(lpToken1).balanceOf(address(user1)) == initLpTokensPerUser,
+		"User1 should have back his LP tokens");
+    }
+
+
+    function it_should_update_accrued_rewards_for_pool() {
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10 * 1e18;
+
+        // given there is a pool
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // given user has deposited lp tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+	// given 10 seconds has passed
+	uint256 ten_seconds = 10;
+	mockTime.advanceTime(ten_seconds);
+
+        // when
+	chef.updatePool(poolId);
+
+        // then
+        PoolInfo pool1 = chef.pools()[poolId];
+        uint256 lp1Supply = ERC20(lpToken1).balanceOf(address(chef));
+        uint256 reward = ten_seconds * cataPerSecond;
+
+	// then reward was minted
+        require(ERC20(rewardsToken).balanceOf(address(chef)) == reward,
+		"Chef should have minted reward to itself");
+
+	// then accumulated reward per share is properly calculated
+        uint256 expectedAccPerToken =
+	    (reward * chef.PRECISION_MULTIPLIER()) / lp1Supply;
+	require(expectedAccPerToken != 0, "expectedAccPerToken should not be zero");
+        require(pool1.accPerToken == expectedAccPerToken, "accPerToken calculation mismatch");
+    }
 
 }
