@@ -16,6 +16,7 @@ contract Describe_TokenPausable {
     Token lpToken1;
     User user1;
     User user2;
+    uint256 initLpTokensPerUser = 1000;
 
     RewardsChef chef;
     uint256 cataPerSecond;
@@ -52,9 +53,9 @@ contract Describe_TokenPausable {
         require(lpToken1Address != address(0), "LP Token address is 0");
         lpToken1 = Token(lpToken1Address);
 
-        // Mint 1000 LP tokens to each user
-        lpToken1.mint(address(user1), 1000);
-        lpToken1.mint(address(user2), 1000);
+        // Mint initLpTokensPerUser LP tokens to each user
+        lpToken1.mint(address(user1), initLpTokensPerUser);
+        lpToken1.mint(address(user2), initLpTokensPerUser);
 
 	cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
