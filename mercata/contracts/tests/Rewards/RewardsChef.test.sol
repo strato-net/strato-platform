@@ -131,5 +131,27 @@ contract Describe_TokenPausable {
 		"User1 should not own LP token");
     }
 
+    function it_should_allow_user_to_withdraw_lp_token() {
+        // given
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10;
 
+        // given there is a pool
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // given user has deposited lp tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+        // when
+        TestUtils.callAs(user1, address(chef), "withdraw(uint256, uint256)", poolId, amount);
+
+        // then
+        require(ERC20(lpToken1).balanceOf(address(chef)) == 0,
+		"Chef should not have the deposited LP tokens");
+        require(ERC20(lpToken1).balanceOf(address(user1)) == initLpTokensPerUser,
+		"User1 should have back his LP tokens");
+    }
 }
