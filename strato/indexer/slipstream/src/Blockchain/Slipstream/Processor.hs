@@ -53,7 +53,6 @@ import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
-import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -130,10 +129,9 @@ rowToCollections row =
         _ -> [] 
    in Map.fromList newState
 
-processedContractToProcessedCollectionRows :: Map.Map Text Value -> [Text] -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state mapAndArrayNames row abiid cregator =
-  let onlyRecord = Map.toList (Map.restrictKeys state (S.fromList mapAndArrayNames))
-      extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
+processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state row abiid cregator =
+  let extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
       extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
       extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
       extractValues v                     = [("it don't matter", [], v)]
@@ -143,7 +141,7 @@ processedContractToProcessedCollectionRows state mapAndArrayNames row abiid creg
             [] -> Nothing
             _  -> Just (a, t, ks, v)
           ) $ extractValues value
-        ) onlyRecord
+        ) $ Map.toList state
       processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
    in processRecord <$> recordVMs  
 
@@ -232,7 +230,7 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ _ <- messages]
+        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ <- messages]
       delegatecalls =
         [d | VME.DelegatecallMade d <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
@@ -278,9 +276,6 @@ processTheMessages messages = do
                 cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name
             let indexContract = rowToInsert abiid row cont
-            let mapNames = actionMappings row --recorded mappings
-                arrNames = actionArrays row --all
-                collectionNames = mapNames ++ arrNames
                 abstracts = actionAbstracts row
             --get columns for abstract table
             $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
@@ -296,12 +291,10 @@ processTheMessages messages = do
                 let result = (indexContract, tableName, (cr', ap', n'), cols)
                 $logInfoS "result: " $ T.pack (show result)
                 pure (Just result)
-            $logDebugLS "Globals: Recorded Map names are: " . T.pack $ show mapNames ++ " contract: " ++ show (E.contractName indexContract)
-            $logDebugLS "Globals: Recorded Array names are: " . T.pack $ show arrNames ++ " contract: " ++ show (E.contractName indexContract)
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
                 parents' = map (\(_,_,p ,_)-> p) abstractColumns'
-                pCollections = processedContractToProcessedCollectionRows stateDiff (collectionNames) row abiid (actionCCCreator row) --get all collection rows to insert
+                pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
                 pCollectionsWithAbstracts = duplicateForParentsAndIncludeOriginal pCollections parents'
             recordAction row
             pure . Right $ BatchedInserts indexContract pCollectionsWithAbstracts
@@ -329,7 +322,8 @@ processTheMessages messages = do
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ insertCollectionTable processedEventArrays
 
-  let insertViews = insertsByCodeHash >>= \ins ->
+  let delegateMap = Map.fromList $ (\d -> (Action._delegatecallStorageAddress d, d)) <$> delegatecalls
+      insertViews = insertsByCodeHash >>= \ins ->
         let indexView = (\i ->
               indexTableName
                 (E.creator i)
@@ -342,7 +336,14 @@ processTheMessages messages = do
                 (application c)
                 (contractname c)
                 (collection_name c)
-              ) <$> collectionInserts ins
+              : maybe [] (\Action.Delegatecall{..} -> [
+                  collectionTableName
+                    _delegatecallOrganization
+                    _delegatecallApplication
+                    _delegatecallContractName
+                    (collection_name c)
+                ]) (Map.lookup (address c) delegateMap)
+              ) =<< collectionInserts ins
          in indexView : collViews
       eventViews = (\e ->
         eventTableName
@@ -350,14 +351,29 @@ processTheMessages messages = do
           (T.pack $ evContractApplication e)
           (T.pack $ evContractName e)
           (T.pack $ evName e)
-        ) . eventEvent <$> processedEvents
-      eventArrViews = mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
+        : maybe [] (\Action.Delegatecall{..} -> [
+          eventTableName
+            _delegatecallOrganization
+            _delegatecallApplication
+            _delegatecallContractName
+            (T.pack $ evName e)
+        ]) (Map.lookup (evContractAddress e) delegateMap)
+        ) =<< eventEvent <$> processedEvents
+      eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
         eventCollectionTableName
           (creator e)
           (application e)
           (contractname e)
           eName
           (collection_name e)
+        : maybe [] (\Action.Delegatecall{..} -> [
+          eventCollectionTableName
+            _delegatecallOrganization
+            _delegatecallApplication
+            _delegatecallContractName
+            eName
+            (collection_name e)
+        ]) (Map.lookup (address e) delegateMap)
         ) processedEventArrays
       delegateViews = (\Action.Delegatecall{..} ->
         indexTableName

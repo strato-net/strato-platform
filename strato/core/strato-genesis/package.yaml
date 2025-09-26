@@ -43,6 +43,7 @@ library:
       - solid-vm-model
       - ethereum-rlp
       - lens
+      - vm-tools
 
 tests:
   strato-genesis-test:

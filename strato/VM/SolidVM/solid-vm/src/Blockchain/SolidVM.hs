@@ -261,8 +261,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
-      !mappings = getMapNamesFromContract contract'
-      !arrays = getArrayNamesFromContract contract'
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
@@ -271,7 +269,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
         _ -> creator
 
-  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
+  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -453,8 +451,6 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
 
   let !abstracts' = getAbstractParentsFromContract contract cc
-      !mappings = getMapNamesFromContract contract
-      !arrays = getArrayNamesFromContract contract
 
   -- grab the org from the senders account and set it to the codeAddress
   cnAccount <-
@@ -467,7 +463,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction to (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to
