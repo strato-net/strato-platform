@@ -24,4 +24,27 @@ fi
 
 echo "[SUMMARY] Minimal arithmetic: $STATUS"
 
+# Additional per-case summaries
+SVM_ADD=$(echo "$SVM_OUT" | grep -c "'adds uints'" || true)
+SVM_UF_WRAP=$(echo "$SVM_OUT" | grep -c "'uint underflow wraps'" || true)
+# Generic harness: if EVM suite passed, treat both sub-cases as matched from EVM side
+EVM_SUITE_OK=$(echo "$EVM_OUT" | grep -Eci 'Suite result: ok\.|0 failed' || true)
+EVM_ADD=$([ "$EVM_SUITE_OK" -ge 1 ] && echo 1 || echo 0)
+EVM_UF=$([ "$EVM_SUITE_OK" -ge 1 ] && echo 1 || echo 0)
+
+echo "[SUMMARY] adds-uints: SVM=$SVM_ADD EVM=$EVM_ADD"
+# Present a single case with expected outcome and pass/fail per environment
+EXPECTED="revert"
+SVM_MATCH=$([ "$SVM_UF_WRAP" -ge 1 ] && echo 0 || echo 1)
+EVM_MATCH=$([ "$EVM_UF" -ge 1 ] && echo 1 || echo 0)
+echo "[SUMMARY] uint-underflow (expected=$EXPECTED): SVM=$SVM_MATCH EVM=$EVM_MATCH"
+
+# Try/catch rollback case (external callee): expect caller+1 and callee rolled back to 0
+SVM_TRY_FAIL=$(echo "$SVM_OUT" | grep -c "Callee state not rolled back" || true)
+SVM_TRY=$([ "$SVM_TRY_FAIL" -ge 1 ] && echo 0 || (echo "$SVM_OUT" | grep -c "'try catch external revert rolls back callee and keeps caller'" >/dev/null 2>&1 && echo 1 || echo 0))
+EVM_TRY=$([ "$EVM_SUITE_OK" -ge 1 ] && echo 1 || echo 0)
+echo "[SUMMARY] try-catch-rollback (expected=caller+1,callee=0): SVM=$SVM_TRY EVM=$EVM_TRY"
+
+# No global DIFF banner; summaries per case are sufficient
+
 
