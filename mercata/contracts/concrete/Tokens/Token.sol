@@ -1,10 +1,10 @@
 import "../../abstract/ERC20/access/Ownable.sol";
-import "../Admin/AdminRegistry.sol";
-import "./TokenMetadata.sol";
 import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/utils/Pausable.sol";
+import "../Admin/AdminRegistry.sol";
 import "../Rewards/RewardsManager.sol";
+import "./TokenMetadata.sol";
 import "./TokenFactory.sol";
-import "../../abstract/ERC20/utils/Pauseable.sol";
 
 /**
  * FYI: IMPORTANT NOTICE FOR ERC20 REIMPLEMENTATION

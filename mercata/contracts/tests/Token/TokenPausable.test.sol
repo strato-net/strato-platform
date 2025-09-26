@@ -269,8 +269,7 @@ contract Describe_TokenPausable {
         require(!success, "Non-whitelisted user should not be able to transfer when paused");
         
         // Now whitelist user1 for _transfer function
-        (didExecute, ret) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminToken), "_transfer", address(user1));
-        require(didExecute, "Failed to add whitelist");
+        adminToken.addWhitelist(address(adminRegistry), "_transfer", address(user1));
         
         // Now user1 should be able to transfer when paused
         success = false;
@@ -284,9 +283,8 @@ contract Describe_TokenPausable {
         // Approve user2 to spend user1's tokens
         user1.do(address(adminToken), "approve(address,uint256)", address(user2), transferAmount);
 
-        // Now whitelist user1 for _transfer function
-        (didExecute, ret) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(adminToken), "_transfer", address(user2));
-        require(didExecute, "Failed to add whitelist");
+        // Now whitelist user2 for _transfer function
+        adminToken.addWhitelist(address(adminRegistry), "_transfer", address(user2));
 
         // Try to have user2 transferFrom - should fail since token is paused
         success = false;
