@@ -14,6 +14,7 @@ module Blockchain.DB.RawStorageDB
     FullRawStorage,
     genericLookupRawStorageDB,
     genericInsertRawStorageDB,
+    genericInsertManyRawStorageDB,
     genericDeleteRawStorageDB,
     genericLookupWithDefaultRawStorageDB,
     putRawStorageKeyVal',
@@ -147,6 +148,14 @@ genericInsertRawStorageDB ::
 genericInsertRawStorageDB key val = do
   theMap <- getMemRawStorageTxDB
   putMemRawStorageTxMap $ M.insert key val theMap
+
+genericInsertManyRawStorageDB ::
+  HasMemRawStorageDB m =>
+  M.Map RawStorageKey RawStorageValue ->
+  m ()
+genericInsertManyRawStorageDB localMap = do
+  txMap <- getMemRawStorageTxDB
+  putMemRawStorageTxMap $ localMap `M.union` txMap
 
 genericDeleteRawStorageDB ::
   HasMemRawStorageDB m =>

@@ -134,14 +134,18 @@ export const getUserVaults = async (
       return [];
     }
 
-    // Query vaults directly with user filter to avoid pulling all vaults
+    // Get the specific CDPEngine address from registry
+    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+    
+    // Query vaults directly with user filter and specific CDPEngine address
     const { data: userVaults } = await cirrus.get(
       accessToken,
       `/${CDPEngine}-vaults`,
       {
         params: {
           select: "user:key,asset:key2,Vault:value",
-          key: `eq.${userAddress.toLowerCase()}`
+          key: `eq.${userAddress.toLowerCase()}`,
+          address: `eq.${cdpEngineAddress}`
         }
       }
     );
@@ -936,14 +940,18 @@ export const getLiquidatable = async (
     throw new Error("CDP Engine not found");
   }
 
-  // For liquidation, we need ALL vaults, not just user-specific ones
+  // Get the specific CDPEngine address from registry
+  const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+
+  // For liquidation, we need ALL vaults from the specific CDPEngine instance, not just user-specific ones
   // Query all vaults directly to avoid the massive registry response
   const { data: allVaultEntries } = await cirrus.get(
     accessToken,
     `/${CDPEngine}-vaults`,
     {
       params: {
-        select: "user:key,asset:key2,Vault:value"
+        select: "user:key,asset:key2,Vault:value",
+        address: `eq.${cdpEngineAddress}`
       }
     }
   ).catch(() => ({ data: [] })); // Graceful fallback
@@ -1226,6 +1234,8 @@ export const getBadDebt = async (
   }
 
   try {
+    // Get the specific CDPEngine address from registry
+    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
     
     // Query the badDebt mapping from the CDP Engine contract
     // Use ::text to force Cirrus to return large numbers as strings instead of scientific notation
@@ -1234,7 +1244,8 @@ export const getBadDebt = async (
       `/${CDPEngine}-badDebtUSDST`,
       {
         params: {
-          select: "key,value::text"
+          select: "key,value::text",
+          address: `eq.${cdpEngineAddress}`
         }
       }
     );
@@ -1349,7 +1360,8 @@ export const getClaimableAmount = async (
       cirrus.get(accessToken, `/${CDPEngine}-juniorNotes`, {
         params: {
           select: "key,JuniorNote:value",
-          key: `eq.${account}`
+          key: `eq.${account}`,
+          address: `eq.${cdpEngineAddress}`
         }
       }),
       
@@ -1447,6 +1459,9 @@ export const getJuniorNotes = async (
   }
 
   try {
+    // Get the specific CDPEngine address from registry
+    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
+    
     // Query the juniorNotes mapping for the specific account
     const { data } = await cirrus.get(
       accessToken,
@@ -1454,7 +1469,8 @@ export const getJuniorNotes = async (
       {
         params: {
           select: "key,JuniorNote:value",
-          key: `eq.${account}`
+          key: `eq.${account}`,
+          address: `eq.${cdpEngineAddress}`
         }
       }
     );

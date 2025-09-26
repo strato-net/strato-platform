@@ -17,6 +17,13 @@ HIGHWAYDIR=${FAKEROOT}/highway
 STRATODIR=${FAKEROOT}/strato
 VAULTDIR=${FAKEROOT}/vault-wrapper
 
+# NIX support - add --nix flag to stack commands when NIX=true
+ifeq ($(NIX),true)
+  NIX_FLAG=--nix
+else
+  NIX_FLAG=
+endif
+
 ifndef VERSION
   ifeq ($(REPO),public)
     VERSION = `cat VERSION`
@@ -107,7 +114,7 @@ build_common:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	cd strato && stack install \
+	cd strato && stack install ${NIX_FLAG} \
 		--test --no-run-tests
 
 build_common_docker:
@@ -115,7 +122,7 @@ build_common_docker:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	cd strato && stack build \
+	cd strato && stack build ${NIX_FLAG} \
 		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -124,7 +131,7 @@ build_common_profiled:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	cd strato && stack build \
+	cd strato && stack build ${NIX_FLAG} \
 		--profile --work-dir .stack-work-profile \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
@@ -132,7 +139,7 @@ build_common_fast:
 	@echo building haskell libraries and creating directories (fast)
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	cd strato && stack build \
+	cd strato && stack build ${NIX_FLAG} \
 		--fast --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 

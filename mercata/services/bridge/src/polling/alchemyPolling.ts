@@ -3,7 +3,8 @@ import {
   getEnabledChains,
   getEnabledAssets,
 } from "../services/cirrusService";
-import { depositBatch, updateLastProcessedBlock } from "../services/bridgeService";
+import { depositBatch } from "../services/bridgeService";
+import { blockTrackingService } from "../services/blockTrackingService";
 import { NonEmptyArray, Deposit, ChainInfo } from "../types";
 import {
   getCurrentBlockNumber,
@@ -75,8 +76,16 @@ const parseDepositEvents = async (logs: any[], externalChainId: number) => {
 const pollChainForDeposits = async (chainInfo: ChainInfo) => {
   const externalChainId = chainInfo.externalChainId;
   const depositRouter = chainInfo.depositRouter;
-  const lastProcessedBlock = parseInt(chainInfo.lastProcessedBlock) || 0;
+  const blockchainLastProcessedBlock = parseInt(chainInfo.lastProcessedBlock) || 0;
+  
+  // Get the effective last processed block (max of blockchain and local storage)
+  const lastProcessedBlock = await blockTrackingService.getEffectiveLastProcessedBlock(
+    externalChainId, 
+    blockchainLastProcessedBlock
+  );
+  
   let currentBlock: number | null = null;
+  let depositsProcessed = false;
 
   try {
     if (!isChainConfigured(externalChainId)) return;
@@ -95,6 +104,8 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
     );
 
     if (logs.length === 0) {
+      // No deposits found - only update locally
+      await blockTrackingService.updateLastProcessedBlockLocally(externalChainId, currentBlock);
       return;
     }
 
@@ -108,6 +119,7 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
     // Process valid deposits first
     if (filteredDeposits.length > 0) {
       await depositBatch(filteredDeposits as NonEmptyArray<Deposit>);
+      depositsProcessed = true;
     }
 
     // If there were parse failures, throw error after processing valid ones
@@ -115,13 +127,17 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
       throw new Error(`Failed to parse ${failedParses} out of ${validDeposits.length} deposits for chain ${externalChainId}`);
     }
   } finally {
-    // Always update lastProcessedBlock if we got a currentBlock
+    // Update lastProcessedBlock based on whether deposits were processed
     if (currentBlock !== null && currentBlock > lastProcessedBlock) {
       try {
-        await updateLastProcessedBlock(externalChainId, currentBlock);
+        if (depositsProcessed) {
+          // Deposits were processed - update both local and blockchain
+          await blockTrackingService.updateLastProcessedBlockEverywhere(externalChainId, currentBlock);
+        }
+        // Note: Local-only update for no deposits case is already handled above in the "no logs" section
       } catch (updateError) {
         // Enhance error with context before re-throwing
-        const enhancedError = new Error(`updateLastProcessedBlock failed for chain ${externalChainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
+        const enhancedError = new Error(`Block update failed for chain ${externalChainId} block ${currentBlock}: ${(updateError as Error).message}\nOriginal stack: ${(updateError as Error).stack}`);
         throw enhancedError;
       }
     }

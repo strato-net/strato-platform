@@ -10,7 +10,7 @@ export interface BlockchainEvent {
   block_timestamp: string;
   block_number: string;
   transaction_hash: string;
-  transaction_sender: string;
+  transaction_sender: string | null;
   event_index: number;
   creator: string;
   application: string;
