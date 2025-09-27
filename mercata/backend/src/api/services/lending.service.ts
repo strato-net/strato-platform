@@ -241,7 +241,7 @@ export const borrow = async (
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
-  
+
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -320,7 +320,7 @@ export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const registry = await getPool(accessToken, undefined, { 
+  const registry = await getPool(accessToken, undefined, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
@@ -350,7 +350,7 @@ export const collateralAndBalance = async (
   // Create maps for asset configs and prices
   const assetConfigMap = new Map();
   const priceMap = new Map();
-  
+
   // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
@@ -434,8 +434,8 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, { 
-    address: `in.(${borrowableAsset},${mToken})`, 
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
@@ -523,12 +523,12 @@ export const liquidityAndBalance = async (
 
   // User’s withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
-  const userUSDSTValue = userMTokenBalance > 0n 
+  const userUSDSTValue = userMTokenBalance > 0n
     ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
     : 0n;
 
   const poolAvailableLiquidity = BigInt(availableLiquidity);
-  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
+  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
 
@@ -853,8 +853,8 @@ export const configureAsset = async (
   userAddress: string,
   body: Record<string, string | number>
 ) => {
-  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
-      body.liquidationBonus === undefined || body.interestRate === undefined || 
+  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined ||
+      body.liquidationBonus === undefined || body.interestRate === undefined ||
       body.reserveFactor === undefined) {
     throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor");
   }
