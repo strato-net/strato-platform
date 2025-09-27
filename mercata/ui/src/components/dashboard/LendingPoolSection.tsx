@@ -27,7 +27,7 @@ const LendingPoolSection = () => {
   const [depositAmount, setDepositAmount] = useState<string>("");
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stakeMUSDST, setStakeMUSDST] = useState<boolean>(true);
+  const [stakeMToken, setStakeMToken] = useState<boolean>(true);
   const [includeStakedMUSDST, setIncludeStakedMUSDST] = useState<boolean>(false);
   const { toast } = useToast();
 
@@ -84,8 +84,7 @@ const LendingPoolSection = () => {
     }
   };
 
-  const handleLiquidityAction = async (type: "deposit" | "withdraw") => {
-    try {
+  const handleLiquidityAction = async (type: "deposit" | "withdraw") => {try {
       setIsProcessing(true);
 
       const isMaxSelected = (): boolean => {
@@ -103,9 +102,16 @@ const LendingPoolSection = () => {
       if (type === "withdraw" && isMaxSelected()) {
         await withdrawLiquidityAll();
       } else {
-        await (type === "deposit" ? depositLiquidity : withdrawLiquidity)({
-          amount: amountWei,
-        });
+        if (type === "deposit") {
+          await depositLiquidity({
+            amount: amountWei,
+            stakeMToken,
+          });
+        } else {
+          await withdrawLiquidity({
+            amount: amountWei,
+          });
+        }
       }
 
       toast({
@@ -205,8 +211,8 @@ const LendingPoolSection = () => {
                   <div className="flex items-center space-x-2 mt-3">
                     <Checkbox
                       id="stake-musdst"
-                      checked={stakeMUSDST}
-                      onCheckedChange={(checked) => setStakeMUSDST(checked as boolean)}
+                      checked={stakeMToken}
+                      onCheckedChange={(checked) => setStakeMToken(checked as boolean)}
                     />
                     <label
                       htmlFor="stake-musdst"

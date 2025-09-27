@@ -307,7 +307,8 @@ const MintWidget: React.FC = () => {
             if (nowWei - beforeWei == targetIncreaseWei) {
               // Deposit the minted amount
               const amtDec = safeParseUnits(amount, 18).toString();
-              await depositLiquidity({ amount: amtDec });
+              // Note that we will not stake for rewards when autoDeposit
+              await depositLiquidity({ amount: amtDec, stakeMToken: false });
               await refreshLiquidity();
               // Also update the React state
               await fetchUsdstBalance(userAddress);
@@ -463,4 +464,3 @@ const MintWidget: React.FC = () => {
 };
 
 export default MintWidget;
-

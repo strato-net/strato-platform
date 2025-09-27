@@ -103,6 +103,7 @@ export const depositLiquidity = async (
   accessToken: string,
   userAddress: string,
   amount: string,
+  stakeMToken: boolean,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
     accessToken,
@@ -115,6 +116,10 @@ export const depositLiquidity = async (
   if (!liquidityPool || !lendingPool || !borrowableAsset) {
     throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
   }
+
+  // TODO: Implement stakeMToken logic here
+  // If stakeMToken is true, additional transactions may be needed to stake the received mToken tokens
+  console.log(`Deposit liquidity with stakeMToken: ${stakeMToken}`);
 
   const tx: FunctionInput[] = [
     {
