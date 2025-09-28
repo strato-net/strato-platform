@@ -1,4 +1,5 @@
 import { cirrus, strato } from "../../utils/mercataApiHelper";
+
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
@@ -67,6 +68,25 @@ export const getExchangeRateFromCirrus = async (
 };
 
 /**
+ * Helper function to get a specific token balance for a user
+ */
+const getTokenBalance = async (
+  accessToken: string,
+  tokenAddress: string,
+  userAddress: string
+): Promise<string> => {
+  const tokenData = await getTokens(accessToken, {
+    address: `eq.${tokenAddress}`,
+    select: `address,balances:${Token}-_balances(user:key,balance:value::text)`,
+    "balances.key": `eq.${userAddress}`
+  });
+
+  const token = tokenData?.[0];
+  const userBalance = token?.balances?.find((b: any) => b.user === userAddress)?.balance;
+  return userBalance || "0";
+};
+
+/**
  * Generic Cirrus fetch for the LendingRegistry row.
  * - No implicit user filters here. Callers pass explicit filters/selects when needed.
  */
@@ -105,23 +125,23 @@ export const depositLiquidity = async (
   amount: string,
   stakeMToken: boolean,
 ) => {
-  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
+  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
     undefined,
     {
-      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
+      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset),mToken:lendingPool_fkey(mToken)`,
     } as Record<string, string>
   );
 
-  if (!liquidityPool || !lendingPool || !borrowableAsset) {
-    throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
+  if (!liquidityPool || !lendingPool || !borrowableAsset || (stakeMToken && !mToken)) {
+    throw new Error("Liquidity pool, lending pool, borrowable asset or mToken address not found");
   }
 
-  // TODO: Implement stakeMToken logic here
-  // If stakeMToken is true, additional transactions may be needed to stake the received mToken tokens
-  console.log(`Deposit liquidity with stakeMToken: ${stakeMToken}`);
+  // Get user's mToken balance before deposit
+  const mTokenBalanceBefore = stakeMToken ? await getTokenBalance(accessToken, mToken, userAddress) : "0";
 
-  const tx: FunctionInput[] = [
+  // First transaction: deposit liquidity
+  const depositTx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
@@ -136,10 +156,52 @@ export const depositLiquidity = async (
     },
   ];
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  const builtDepositTx = await buildFunctionTx(depositTx, userAddress, accessToken);
+  const depositResult = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtDepositTx)
   );
+
+  // If staking is requested and deposit was successful, execute staking transaction
+  if (stakeMToken && depositResult.status === "Success") {
+    // Get user's mToken balance after deposit to calculate the newly minted amount
+    const mTokenBalanceAfter = await getTokenBalance(accessToken, mToken, userAddress);
+    const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
+
+    if (BigInt(newlyMintedAmount) > 0n) {
+      const rewardsChefContractName = "RewardsChef";
+      const rewardsChefContractAddress = "2c871ba97b2b5f66134fdc50009857b98cac4715"; // TODO: Read from configuration
+      const poolIdx = 0; // TODO: Read from configuration
+
+      const stakingTx: FunctionInput[] = [
+        // First approve mToken for RewardsChef
+        {
+          contractName: extractContractName(Token),
+          contractAddress: mToken,
+          method: "approve",
+          args: { spender: rewardsChefContractAddress, value: newlyMintedAmount },
+        },
+        // Then deposit into RewardsChef
+        {
+          contractName: rewardsChefContractName,
+          contractAddress: rewardsChefContractAddress,
+          method: "deposit",
+          args: { _pid: poolIdx, _amount: newlyMintedAmount },
+        },
+      ];
+
+      const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
+      const stakingResult = await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
+      );
+
+      // Fail the entire operation if staking fails
+      if (stakingResult.status !== "Success") {
+        throw new Error("Deposit succeeded but staking failed");
+      }
+    }
+  }
+
+  return depositResult;
 };
 
 export const withdrawLiquidity = async (
