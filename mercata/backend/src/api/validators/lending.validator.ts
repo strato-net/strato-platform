@@ -17,6 +17,7 @@ export function validateDepositLiquidityArgs(args: any) {
 export function validateWithdrawLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
+    includeStakedMToken: Joi.boolean().required(),
   });
 
   const { error } = schema.validate(args);

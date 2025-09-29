@@ -245,13 +245,66 @@ export const withdrawLiquidity = async (
   accessToken: string,
   userAddress: string,
   amount: string,
+  includeStakedMToken: boolean = false
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
+  // If includeStakedMToken is enabled, we might need to unstake first
+  if (includeStakedMToken) {
+    // Get mToken address first
+    const { mToken: { mToken } } = await getPool(accessToken, undefined, {
+      select: "mToken:lendingPool_fkey(mToken)"
+    });
+    if (!mToken) {
+      throw new Error("mToken address not found");
+    }
 
+    // Get current mUSDST balance in wallet
+    const unstakedMTokenBalance = await getTokenBalance(accessToken, mToken, userAddress);
+
+    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
+    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
+    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
+
+    // Convert withdrawal amount (USDST) to required mTokens
+    const amountWei = BigInt(amount);
+    const exchangeRateWei = BigInt(exchangeRate);
+    const requiredMTokenWei = (amountWei * (10n ** 18n)) / exchangeRateWei;
+
+    // Check if we need to unstake
+    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
+
+    if (requiredMTokenWei > unstakedMTokenWei) {
+      // We need to unstake some mTokens first
+      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
+
+      console.log(`Need to unstake ${amountToUnstake.toString()} mTokens before withdrawal`);
+
+      // Build unstaking transaction
+      const unstakeTx = await buildFunctionTx({
+        contractName: "RewardsChef",
+        contractAddress: config.rewardsChef,
+        method: "withdraw",
+        args: {
+          _pid: config.rewardsChefMUsdstPoolId,
+          _amount: amountToUnstake.toString()
+        }
+      }, userAddress, accessToken);
+
+      // Execute unstaking transaction first
+      console.log("Executing unstaking transaction...");
+      await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
+      );
+
+      console.log("Unstaking completed successfully");
+    }
+  }
+
+  // Now proceed with the normal withdrawal
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,

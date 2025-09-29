@@ -93,12 +93,12 @@ const LendingPoolSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(withdrawAmount)) return false;
     try {
       const amountWei = safeParseUnits(withdrawAmount, 18);
-      const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+      const maxWithdrawableWei = getMaxWithdrawableAmount();
       const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
       const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
 
       if (amountWei <= 0n) return false;
-      if (amountWei > maxWithdrawableWei) return false; // Check against max withdrawable (considers both user balance and pool liquidity)
+      if (amountWei > maxWithdrawableWei) return false;
       if (usdstBalanceWei < feeWei) return false;
       return true;
     } catch {
@@ -132,6 +132,7 @@ const LendingPoolSection = () => {
         } else {
           await withdrawLiquidity({
             amount: amountWei,
+            includeStakedMToken,
           });
         }
       }
@@ -341,13 +342,13 @@ const LendingPoolSection = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const maxWithdrawableUSDST = liquidityInfo?.withdrawable?.maxWithdrawableUSDST;
                         const usdstBalanceWei = BigInt(liquidityInfo?.supplyable?.userBalance || "0");
                         const feeWei = safeParseUnits(LENDING_WITHDRAW_FEE, 18);
 
-                        if (!maxWithdrawableUSDST || usdstBalanceWei < feeWei) return;
+                        if (usdstBalanceWei < feeWei) return;
 
-                        const maxWithdrawableWei = BigInt(maxWithdrawableUSDST);
+                        const maxWithdrawableWei = getMaxWithdrawableAmount();
+
                         if (maxWithdrawableWei <= 0n) return;
 
                         const formatted = formatUnits(maxWithdrawableWei, 18);
@@ -362,14 +363,17 @@ const LendingPoolSection = () => {
                       Max
                     </button>
                     Withdrawable:{" "}
-                    {loadingLiquidity ?
+                    {loadingLiquidity ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                      : liquidityInfo?.withdrawable?.maxWithdrawableUSDST
-                        ? formatBalance(liquidityInfo.withdrawable.maxWithdrawableUSDST || 0n, undefined, 18, 2)
-                        : "0.00"}{" "}
-                    USDST ({liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00"} )
+                    ) : (
+                      formatBalance(getMaxWithdrawableAmount(), undefined, 18, 2)
+                    )}{" "}
+                    USDST ({includeStakedMToken
+                      ? (liquidityInfo?.withdrawable?.userBalanceTotal ? formatBalance(liquidityInfo?.withdrawable?.userBalanceTotal || 0n,"mUSDST", 18) : "0.00")
+                      : (liquidityInfo?.withdrawable?.userBalance ? formatBalance(liquidityInfo?.withdrawable?.userBalance || 0n,"mUSDST", 18) : "0.00")
+                    } )
                   </div>
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
@@ -404,7 +408,7 @@ const LendingPoolSection = () => {
                   {/* Withdraw Amount Warning */}
                   {(() => {
                     const withdrawAmountWei = withdrawAmount ? safeParseUnits(withdrawAmount, 18) : 0n;
-                    const maxWithdrawableWei = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+                    const maxWithdrawableWei = getMaxWithdrawableAmount();
 
                     // Check if withdraw amount exceeds withdrawable limit
                     const isInsufficientWithdrawable = withdrawAmountWei > 0n && withdrawAmountWei > maxWithdrawableWei;
