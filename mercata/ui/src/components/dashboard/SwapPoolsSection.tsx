@@ -194,13 +194,7 @@ const SwapPoolsSection = () => {
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Your Liquidity (Total): {formatBalance([{ balance: pool.lpToken.balance }]?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                      </div>
-                      <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
-                        <span>• Staked: {formatBalance([{ balance: pool.lpToken.balance }]?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
-                      </div>
-                      <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
-                        <span>• Unstaked: 0.000000 {pool.lpToken._symbol}</span>
+                        <span>Your Liquidity: {formatBalance([{ balance: pool.lpToken.balance }]?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                     </div>
                   </div>

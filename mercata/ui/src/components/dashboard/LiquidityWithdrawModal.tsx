@@ -1,9 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -50,7 +47,6 @@ const LiquidityWithdrawModal = ({
     computeMaxTransferable("100", false, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_FEE).toString(), setFeeError);
   }, [usdstBalance, voucherBalance]);
 
-  const [includeStakedLPToken, setIncludeStakedLPToken] = useState<boolean>(false);
 
   const { removeLiquidity } = useSwapContext();
   const { toast } = useToast();
@@ -63,7 +59,6 @@ const LiquidityWithdrawModal = ({
 
   const handleClose = () => {
     setWithdrawPercent('');
-    setIncludeStakedLPToken(false); // Reset to default (unchecked)
     onClose();
   };
 
@@ -257,32 +252,6 @@ const LiquidityWithdrawModal = ({
             )}
           </div>
 
-          {/* Include Staked LP Token Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="include-staked-lp-token"
-              checked={includeStakedLPToken}
-              onCheckedChange={(checked) => setIncludeStakedLPToken(checked as boolean)}
-            />
-            <label
-              htmlFor="include-staked-lp-token"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Include staked {selectedPool?.lpToken?._symbol || 'LP token'}
-            </label>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">
-                  Your {selectedPool?.lpToken?._symbol || 'LP token'} may be staked in the rewards program.
-                  When this option is enabled, you can withdraw the {selectedPool?.lpToken?._symbol || 'LP token'} that was staked as well.
-                  If disabled, only unstaked {selectedPool?.lpToken?._symbol || 'LP token'} will be eligible for withdrawal.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
 
           <div className="pt-2">
             <Button

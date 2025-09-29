@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { HelpCircle } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -61,7 +58,6 @@ const LiquidityDepositModal = ({
   const [tokenBBalance, setTokenBBalance] = useState('');
   const [balanceLoading, setBalanceLoading] = useState(false);
   const [depositMode, setDepositMode] = useState<'A' | 'B' | 'A&B'>('A&B');
-  const [stakeLPToken, setStakeLPToken] = useState<boolean>(true);
 
   const { addLiquidityDualToken, addLiquiditySingleToken, getPoolByAddress, fetchTokenBalances, fetchPools } = useSwapContext();
   const { toast } = useToast();
@@ -101,7 +97,6 @@ const LiquidityDepositModal = ({
     setToken1Amount('');
     setToken2Amount('');
     setDepositMode('A');
-    setStakeLPToken(true); // Reset to default (checked)
     onClose();
   };
 
@@ -657,32 +652,6 @@ const LiquidityDepositModal = ({
             )}
           </div>
 
-          {/* Stake LP Token Checkbox */}
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="stake-lp-token"
-              checked={stakeLPToken}
-              onCheckedChange={(checked) => setStakeLPToken(checked as boolean)}
-            />
-            <label
-              htmlFor="stake-lp-token"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-            >
-              Stake my {selectedPool?.lpToken?._symbol || 'LP Token'} to earn rewards
-            </label>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
-              </TooltipTrigger>
-              <TooltipContent>
-                <p className="max-w-xs text-sm">
-                  When providing liquidity to the pool, you'll receive {selectedPool?.lpToken?._symbol ? `a ${selectedPool.lpToken._symbol} token` : 'an LP Token'} representing your share.
-                  If this option is enabled, this token will be automatically staked in the rewards program.
-                  The longer the token is staked, the more rewards it accrues.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
 
           <div className="pt-2">
             <Button 
