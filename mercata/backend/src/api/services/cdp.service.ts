@@ -1117,7 +1117,7 @@ export const setCollateralConfig = async (
   }
 
   // Convert UI values back to contract format
-  const liquidationRatioContract = Math.floor((Number(configData.liquidationRatio) * Number(WAD)) / 100);
+  const liquidationRatioContract = Math.floor((Number(configData.liquidationRatio) * Number(WAD)));
   
   // Convert annual rate to per-second rate in RAY units (avoiding scientific notation)
   const [intPart, decPart = ''] = configData.stabilityFeeRate.toString().split('.');
