@@ -110,3 +110,63 @@ export const handleAmountInputChange = (
 
   setError("");
 };
+
+export const handleAdminNumericInputChange = (
+  userInput: string,
+  setValue: (value: string) => void,
+  setError: (error: string) => void,
+  maxValue: string = "999999999999999999999999999",
+  decimals: number = 18,
+  minValue: string = "0"
+): void => {
+  const input = userInput.replace(/,/g, "").trim();
+  
+  // Check for valid number format first
+  // For integer-only inputs (decimals = 0), don't allow decimal points
+  const basicPattern = decimals === 0 ? /^\d*$/ : /^\d*\.?\d*$/;
+  if (!basicPattern.test(input)) {
+    setError(decimals === 0 ? "Only whole numbers allowed" : "Invalid input format");
+    return;
+  }
+
+  // Always set the value after basic format validation
+  if (!input) {
+    setValue("");
+    setError("");
+    return;
+  }
+
+  if (input === ".") {
+    setValue("0.");
+    setError("");
+    return;
+  }
+
+  setValue(input);
+  
+  // Check decimal places
+  if (input.includes('.')) {
+    const decimalPart = input.split('.')[1];
+    if (decimalPart && decimalPart.length > decimals) {
+      setError(`Maximum ${decimals} decimal places allowed`);
+      return;
+    }
+  }
+
+  // Check min and max values (no balance check needed for admin forms)
+  const numValue = parseFloat(input);
+  const maxNum = parseFloat(maxValue);
+  const minNum = parseFloat(minValue);
+  
+  if (numValue > maxNum) {
+    setError(`Value cannot exceed ${maxValue}`);
+    return;
+  }
+  
+  if (numValue < minNum) {
+    setError(`Value must be at least ${minValue}`);
+    return;
+  }
+
+  setError("");
+};
