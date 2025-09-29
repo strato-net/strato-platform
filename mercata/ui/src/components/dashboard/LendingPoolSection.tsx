@@ -38,6 +38,28 @@ const LendingPoolSection = () => {
     fetchUsdstBalance(userAddress);
   };
 
+  const getMaxWithdrawableAmount = (): bigint => {
+    if (includeStakedMToken) {
+      // Calculate unstaked value in USDST (existing logic)
+      const unstakedValueUSDST = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+
+      // Calculate staked value in USDST
+      const stakedMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalanceStaked || "0");
+      const exchangeRateWei = BigInt(liquidityInfo?.exchangeRate || "0");
+
+      let stakedValueUSDST = 0n;
+      if (stakedMTokenWei > 0n && exchangeRateWei > 0n) {
+        stakedValueUSDST = (stakedMTokenWei * exchangeRateWei) / (10n ** 18n);
+      }
+
+      // Total = unstaked + staked (both in USDST)
+      return unstakedValueUSDST + stakedValueUSDST;
+    } else {
+      // Use only unstaked mUSDST (original behavior)
+      return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
+    }
+  };
+
   // 1. Fetch on userAddress change only, with abort controller
   useEffect(() => {
     if (!userAddress) return;
