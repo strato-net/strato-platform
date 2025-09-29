@@ -19,7 +19,7 @@ import Blockchain.Data.BlockHeader
 import Blockchain.MemVMContext
 import Blockchain.SolidVM.Simple
 import Blockchain.Strato.Model.Address
-import Blockchain.VMContext (VMBase)
+import Blockchain.VMContext (VMBase, runningTests)
 import Control.Lens
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
@@ -80,7 +80,8 @@ runFuzzer dSettings compile src = compile src >>= \case
   Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
-    runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $
+    runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $ do
+      lift . modify' $ runningTests .~ True
       fmap concat . for (M.toList $ _contracts cc) $ \(cName, c) ->
         if not (describePrefix `T.isPrefixOf` labelToText cName)
           then pure []
