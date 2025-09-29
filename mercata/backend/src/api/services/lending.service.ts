@@ -1,8 +1,9 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
+import * as config from "../../config/config";
 import { getBalance, getTokens } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
@@ -29,6 +30,7 @@ const {
   Token,
   CollateralVault,
   PriceOracle,
+  RewardsChef,
 } = constants;
 
 /**
@@ -84,6 +86,37 @@ const getTokenBalance = async (
   const token = tokenData?.[0];
   const userBalance = token?.balances?.find((b: any) => b.user === userAddress)?.balance;
   return userBalance || "0";
+};
+
+/**
+ * Helper function to get user's staked balance from RewardsChef using the getBalance view function
+ */
+const getStakedBalance = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string
+): Promise<string> => {
+  try {
+    // Build a proper function call transaction for the view function
+    const viewCall = await buildFunctionTx({
+      contractName: "RewardsChef",
+      contractAddress: rewardsChefAddress,
+      method: "getBalance",
+      args: { _pid: poolId, _user: userAddress }
+    });
+
+    const response = await bloc.post(accessToken, StratoPaths.transactionParallel, viewCall);
+
+    if (response.status === 200 && response.data?.[0]?.data?.contents?.[0]) {
+      return response.data[0].data.contents[0].toString();
+    }
+
+    return "0";
+  } catch (error) {
+    console.error("Failed to fetch staked balance from RewardsChef:", error);
+    return "0";
+  }
 };
 
 /**
@@ -169,8 +202,8 @@ export const depositLiquidity = async (
 
     if (BigInt(newlyMintedAmount) > 0n) {
       const rewardsChefContractName = "RewardsChef";
-      const rewardsChefContractAddress = "2c871ba97b2b5f66134fdc50009857b98cac4715"; // TODO: Read from configuration
-      const poolIdx = 0; // TODO: Read from configuration
+      const rewardsChefContractAddress = config.rewardsChef;
+      const poolIdx = config.rewardsChefMUsdstPoolId;
 
       const stakingTx: FunctionInput[] = [
         // First approve mToken for RewardsChef
@@ -191,7 +224,7 @@ export const depositLiquidity = async (
 
       const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
       const stakingResult = await postAndWaitForTx(accessToken, () =>
-        strato.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
+        bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
       );
 
       // Fail the entire operation if staking fails
@@ -588,7 +621,18 @@ export const liquidityAndBalance = async (
     )
   );
 
-  // User’s withdrawable underlying (min of user mToken value and pool cash)
+  // Get user's staked balance from RewardsChef
+  const rewardsChefContractAddress = config.rewardsChef;
+  const poolIdx = config.rewardsChefMUsdstPoolId;
+  let stakedMTokenBalance = "0";
+  try {
+    stakedMTokenBalance = await getStakedBalance(accessToken, rewardsChefContractAddress, poolIdx, userAddress);
+  } catch (error) {
+    console.warn("Failed to fetch staked balance from RewardsChef:", error);
+    // Continue with staked balance = 0
+  }
+
+  // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
   const userUSDSTValue = userMTokenBalance > 0n
     ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
@@ -613,7 +657,9 @@ export const liquidityAndBalance = async (
     },
     withdrawable: {
       ...mTokenInfoClean,
-      userBalance: mTokenBalance,
+      userBalance: mTokenBalance, // This is the unstaked (wallet) balance
+      userBalanceStaked: stakedMTokenBalance, // Staked balance from RewardsChef
+      userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),
     },

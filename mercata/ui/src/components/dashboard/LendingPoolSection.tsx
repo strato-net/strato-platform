@@ -557,8 +557,8 @@ const LendingPoolSection = () => {
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                    ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
+                    ) : liquidityInfo?.withdrawable?.userBalanceTotal ? (
+                      formatBalance(liquidityInfo.withdrawable.userBalanceTotal || 0n, undefined, 18, 2, 2)
                     ) : (
                       "0.00"
                     )}
@@ -571,13 +571,8 @@ const LendingPoolSection = () => {
                       <span className="text-gray-400 animate-pulse">
                         Loading...
                       </span>
-                    ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      (() => {
-                        // Mock: 60% of total is staked (this would come from backend)
-                        const totalBalance = BigInt(liquidityInfo.withdrawable.userBalance || "0");
-                        const stakedBalance = (totalBalance * 60n) / 100n;
-                        return formatBalance(stakedBalance.toString(), undefined, 18, 2, 2);
-                      })()
+                    ) : liquidityInfo?.withdrawable?.userBalanceStaked ? (
+                      formatBalance(liquidityInfo.withdrawable.userBalanceStaked || 0n, undefined, 18, 2, 2)
                     ) : (
                       "0.00"
                     )}
@@ -591,12 +586,7 @@ const LendingPoolSection = () => {
                         Loading...
                       </span>
                     ) : liquidityInfo?.withdrawable?.userBalance ? (
-                      (() => {
-                        // Mock: 40% of total is unstaked (this would come from backend)
-                        const totalBalance = BigInt(liquidityInfo.withdrawable.userBalance || "0");
-                        const unstakedBalance = (totalBalance * 40n) / 100n;
-                        return formatBalance(unstakedBalance.toString(), undefined, 18, 2, 2);
-                      })()
+                      formatBalance(liquidityInfo.withdrawable.userBalance || 0n, undefined, 18, 2, 2)
                     ) : (
                       "0.00"
                     )}
