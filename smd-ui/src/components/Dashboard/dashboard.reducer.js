@@ -26,187 +26,170 @@ import {
   UPDATE_NETWORK_HEALTH,
 } from "./dashboard.action";
 
+// Load persisted data on initialization
+const loadPersistedData = () => {
+  try {
+    const stored = localStorage.getItem('dashboardData');
+    if (!stored) return null;
+    const { data, timestamp } = JSON.parse(stored);
+    // 5 minute expiry
+    if (Date.now() - timestamp > 300000) {
+      localStorage.removeItem('dashboardData');
+      return null;
+    }
+    return data;
+  } catch (error) {
+    return null;
+  }
+};
+
+const persistedData = loadPersistedData();
+
 const initialState = {
-  shardCount: 0,
-  lastBlockNumber: 0,
-  usersCount: 0,
-  contractsCount: 0,
-  transactionsCount: [],
-  blockPropagation: [],
-  blockDifficulty: [],
-  transactionTypes: [],
-  healthStatus: false,
-  uptime: 0,
-  systemStatus: false,
-  systemWarnings: "",
+  shardCount: persistedData?.shardCount || 0,
+  lastBlockNumber: persistedData?.lastBlockNumber || 0,
+  usersCount: persistedData?.usersCount || 0,
+  contractsCount: persistedData?.contractsCount || 0,
+  transactionsCount: persistedData?.transactionsCount || [],
+  blockPropagation: persistedData?.blockPropagation || [],
+  blockDifficulty: persistedData?.blockDifficulty || [],
+  transactionTypes: persistedData?.transactionTypes || [],
+  healthStatus: persistedData?.healthStatus || false,
+  uptime: persistedData?.uptime || 0,
+  systemStatus: persistedData?.systemStatus || false,
+  systemWarnings: persistedData?.systemWarnings || "",
   ifHovering: false,
-  networkStatus: false,
+  networkStatus: persistedData?.networkStatus || false,
 };
 
 const reducer = function (state = initialState, action) {
+  let newState;
+  
   switch (action.type) {
     case PRELOAD_BLOCK_NUMBER:
-      return {
-        ...state,
-        lastBlockNumber: action.data,
-      };
-
     case UPDATE_BLOCK_NUMBER:
-      return {
+      newState = {
         ...state,
         lastBlockNumber: action.data,
       };
+      break;
 
     case PRELOAD_CONTRACT_COUNT:
-      return {
-        ...state,
-        contractsCount: action.data,
-      };
-
     case UPDATE_CONTRACT_COUNT:
-      return {
+      newState = {
         ...state,
         contractsCount: action.data,
       };
+      break;
 
     case PRELOAD_USERS_COUNT:
-      return {
-        ...state,
-        usersCount: action.data,
-      };
-
     case UPDATE_USERS_COUNT:
-      return {
+      newState = {
         ...state,
         usersCount: action.data,
       };
+      break;
+      
     case PRELOAD_SHARD_COUNT:
-      return {
-        ...state,
-        shardCount: action.data,
-      };
-
     case UPDATE_SHARD_COUNT:
-      return {
+      newState = {
         ...state,
         shardCount: action.data,
       };
+      break;
 
     case PRELOAD_TRANSACTION_COUNT:
-      return {
-        ...state,
-        transactionsCount: action.data,
-      };
-
     case UPDATE_TRANSACTION_COUNT:
-      return {
+      newState = {
         ...state,
         transactionsCount: action.data,
       };
+      break;
 
     case PRELOAD_BLOCK_DIFFICULTY:
-      return {
-        ...state,
-        blockDifficulty: action.data,
-      };
-
     case UPDATE_BLOCK_DIFFICULTY:
-      return {
+      newState = {
         ...state,
         blockDifficulty: action.data,
       };
+      break;
 
     case PRELOAD_BLOCK_PROPAGATION:
-      return {
-        ...state,
-        blockPropagation: action.data,
-      };
-
     case UPDATE_BLOCK_PROPAGATION:
-      return {
+      newState = {
         ...state,
         blockPropagation: action.data,
       };
+      break;
 
     case PRELOAD_TRANSACTION_TYPES:
-      return {
-        ...state,
-        transactionTypes: action.data,
-      };
-
     case UPDATE_TRANSACTION_TYPES:
-      return {
+      newState = {
         ...state,
         transactionTypes: action.data,
       };
+      break;
 
     case PRELOAD_HEALTH:
-      return {
-        ...state,
-        healthStatus: action.data.healthStatus,
-        health: action.data.health,
-        healthIssues: action.data.healthIssues,
-      };
-
     case UPDATE_HEALTH:
-      return {
+      newState = {
         ...state,
         healthStatus: action.data.healthStatus,
         health: action.data.health,
         healthIssues: action.data.healthIssues,
       };
+      break;
 
     case PRELOAD_NODE_UPTIME:
-      return {
-        ...state,
-        uptime: action.data,
-      };
-
     case UPDATE_NODE_UPTIME:
-      return {
+      newState = {
         ...state,
         uptime: action.data,
       };
+      break;
 
     case PRELOAD_SYSTEM_INFO:
-      return {
-        ...state,
-        systemStatus: action.data.status,
-        systemWarnings: action.data.warnings,
-        systemInfo: action.data.systemInfo,
-      };
-
     case UPDATE_SYSTEM_INFO:
-      return {
+      newState = {
         ...state,
         systemStatus: action.data.status,
         systemWarnings: action.data.warnings,
         systemInfo: action.data.systemInfo,
       };
+      break;
 
     case PRELOAD_NETWORK_HEALTH:
-      return {
-        ...state,
-        networkStatus: action.data.status,
-        networkStatusMessage: action.data.statusMessage,
-      };
-
     case UPDATE_NETWORK_HEALTH:
-      return {
+      newState = {
         ...state,
         networkStatus: action.data.status,
         networkStatusMessage: action.data.statusMessage,
       };
+      break;
 
     case CHANGE_HEALTH_STATUS:
-      return {
+      newState = {
         ...state,
         healthStatus: action.data,
         systemStatus: action.data,
       };
+      break;
+      
     default:
       return state;
   }
+  
+  // Persist data after state update
+  try {
+    localStorage.setItem('dashboardData', JSON.stringify({
+      data: newState,
+      timestamp: Date.now()
+    }));
+  } catch (error) {
+    // Ignore localStorage errors
+  }
+  
+  return newState;
 };
 
 export default reducer;
