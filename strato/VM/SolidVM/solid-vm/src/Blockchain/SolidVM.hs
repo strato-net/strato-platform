@@ -222,7 +222,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
@@ -2473,7 +2473,8 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
@@ -2494,7 +2495,8 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   (ctr, originAddress, ctrName) <- getCreator creator
