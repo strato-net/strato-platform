@@ -28,7 +28,7 @@ const LendingPoolSection = () => {
   const [withdrawAmount, setWithdrawAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [stakeMToken, setStakeMToken] = useState<boolean>(true);
-  const [includeStakedMUSDST, setIncludeStakedMUSDST] = useState<boolean>(false);
+  const [includeStakedMToken, setIncludeStakedMToken] = useState<boolean>(false);
   const { toast } = useToast();
 
   const refreshLendingData = (signal?: AbortSignal) => {
@@ -357,8 +357,8 @@ const LendingPoolSection = () => {
                   <div className="flex items-center space-x-2 mt-3">
                     <Checkbox
                       id="include-staked-musdst"
-                      checked={includeStakedMUSDST}
-                      onCheckedChange={(checked) => setIncludeStakedMUSDST(checked as boolean)}
+                      checked={includeStakedMToken}
+                      onCheckedChange={(checked) => setIncludeStakedMToken(checked as boolean)}
                     />
                     <label
                       htmlFor="include-staked-musdst"
