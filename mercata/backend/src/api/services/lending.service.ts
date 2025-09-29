@@ -89,7 +89,11 @@ const getTokenBalance = async (
 };
 
 /**
- * Helper function to get user's staked balance from RewardsChef using the getBalance view function
+ * Helper function to get user's staked balance from RewardsChef using Cirrus events
+ *
+ * This function queries the latest CurrentUserAmount event for the given user and pool,
+ * which contains the current staked balance. This approach avoids on-chain calls while
+ * working around the limitation that nested mappings cannot be queried from Cirrus.
  */
 const getStakedBalance = async (
   accessToken: string,
@@ -98,23 +102,23 @@ const getStakedBalance = async (
   userAddress: string
 ): Promise<string> => {
   try {
-    // Build a proper function call transaction for the view function
-    const viewCall = await buildFunctionTx({
-      contractName: "RewardsChef",
-      contractAddress: rewardsChefAddress,
-      method: "getBalance",
-      args: { _pid: poolId, _user: userAddress }
+    // Query the latest CurrentUserAmount event for this user and pool
+    const response = await cirrus.get(accessToken, `/${RewardsChef}-CurrentUserAmount`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        user: `eq.${userAddress}`,
+        pid: `eq.${poolId}`,
+        select: "currentAmount::text,block_timestamp",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
     });
 
-    const response = await bloc.post(accessToken, StratoPaths.transactionParallel, viewCall);
-
-    if (response.status === 200 && response.data?.[0]?.data?.contents?.[0]) {
-      return response.data[0].data.contents[0].toString();
-    }
-
-    return "0";
+    // Extract the current amount from the latest event
+    const latestEvent = response.data?.[0];
+    return latestEvent?.currentAmount || "0";
   } catch (error) {
-    console.error("Failed to fetch staked balance from RewardsChef:", error);
+    console.error("Failed to fetch staked balance from RewardsChef events:", error);
     return "0";
   }
 };
