@@ -99,12 +99,10 @@ import qualified Data.Text.Encoding as DT
 import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
-import Data.IORef
 import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
-import System.IO.Unsafe (unsafePerformIO)
 --import Blockchain.DB.RawStorageDB
 --import Blockchain.Data.BlockSummary
 --import Blockchain.DB.MemAddressStateDB
@@ -126,7 +124,7 @@ import Text.Parsec (runParser)
 import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
--- import UnliftIO hiding (assert)
+import UnliftIO hiding (assert)
 
 
 type SolidVMBase m = VMBase m
@@ -2521,11 +2519,8 @@ callBuiltin "fastForward" [SInteger seconds] = do
           updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp }
       -- Update the environment with new block header
       Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
-        env { Env.blockHeader = updatedBlockHeader }
+        pure $ env { Env.blockHeader = updatedBlockHeader }
       return SNULL
-
-callBuiltin "fastForward" args =
-  invalidArguments "fastForward expects exactly one integer argument (seconds)" args
 
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
@@ -2679,7 +2674,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 addLocalVariable :: MonadSM m => SVMType.Type -> SolidString -> Value -> m ()
 addLocalVariable theType name value = do
   --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
-  newVariable <- liftIO $ fmap Variable $ Data.IORef.newIORef value
+  newVariable <- liftIO $ fmap Variable $ newIORef value
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
@@ -2756,7 +2751,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
   let locals = args ++ returns
   localVars1 <-
     forM locals $ \(n, (t, v)) -> do
-      newVar <- liftIO $ fmap Variable $ Data.IORef.newIORef v
+      newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
 
   val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]

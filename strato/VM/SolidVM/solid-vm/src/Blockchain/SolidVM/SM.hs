@@ -192,6 +192,7 @@ type MonadSM m =
     Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
+    Mod.Modifiable Env.Environment m,
     Mod.Modifiable Env.Sender m,
     Mod.Modifiable [CallInfo] m,
     Mod.Modifiable Action m,
@@ -403,6 +404,10 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
+  get _   = gets env
+  put _ m = modify $ \ss -> ss{ env = m }
 
 instance
   (Mod.Modifiable (Maybe DebugSettings) m) =>
