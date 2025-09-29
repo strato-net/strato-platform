@@ -223,50 +223,73 @@ filterFuncs cc x name f visibilities = case f ^. funcVisibility of
     bottom $ "cannot access function " <> labelToText name <> " because it is marked as " <> tShowVisibility v <$ x
   _ -> functionType cc x name $ ("" <$) <$> f
 
+getParentsAnnotated :: Annotated CodeCollectionF -> Annotated ContractF -> Maybe [Annotated ContractF]
+getParentsAnnotated cc c = either (const Nothing) (Just . map (fmap . fmap $ const "")) $
+  getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> c)
+
+recursively :: SourceAnnotation Text -> SSS Type' -> SSS Type'
+recursively ctx f = go
+  where
+    go = f >>= \case
+      b@Bottom{} -> do
+        c <- asks contract
+        t' <- pickType' ctx <$> traverse recurse (c ^. parents)
+        case t' of
+          Bottom{} -> pure b
+          t -> pure t
+      t -> pure t
+    recurse parentName = do
+      cc <- asks codeCollection
+      case M.lookup parentName $ cc ^. contracts of
+        Nothing -> pure . bottom $ "Could not find parent contract " <> T.pack parentName <$ ctx
+        Just c' -> local (\r -> r {contract = c'}) go
+
 lookupContractFunction :: SourceAnnotation Text -> SolidString -> SolidString -> SSS Type'
 lookupContractFunction x cName fName = do
   cc@CodeCollection {..} <- asks codeCollection
   ctract <- asks contract
-  pure $ case M.lookup cName _contracts of
-    Nothing -> bottom $ ("Unknown contract: " <> labelToText cName) <$ x
-    Just c -> case M.lookup fName (_functions c) of
-      Nothing -> case M.lookup fName (_constants c) of
-        Nothing -> case M.lookup fName (_storageDefs c) of
-          Nothing -> case M.lookup fName (_structs c) of
-            Nothing ->
-              bottom $
-                ( T.concat
-                    [ "Unknown contract function: ",
-                      labelToText cName,
-                      ".",
-                      labelToText fName
-                    ]
-                )
-                  <$ x
-            Just fields ->
-              let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
-                  fRets = Static (SVMType.Struct Nothing fName) x
-               in Function fArgs fRets x [] [] False
-          Just VariableDecl {..} ->
-            if _varIsPublic
-              then do
-                nestedType' x _varType  -- Use nestedType' to handle arrays and other types
-              else
+  case M.lookup cName _contracts of
+    Nothing -> pure . bottom $ ("Unknown contract: " <> labelToText cName) <$ x
+    Just c' -> local (\r -> r {contract = c'}) . recursively x $ do
+      c <- asks contract
+      pure $ case M.lookup fName (_functions c) of
+        Nothing -> case M.lookup fName (_constants c) of
+          Nothing -> case M.lookup fName (_storageDefs c) of
+            Nothing -> case M.lookup fName (_structs c) of
+              Nothing ->
                 bottom $
                   ( T.concat
-                      [ "Contract variable ",
+                      [ "Unknown contract function: ",
                         labelToText cName,
                         ".",
-                        labelToText fName,
-                        " is not public."
+                        labelToText fName
                       ]
                   )
                     <$ x
-        Just ConstantDecl {..} -> Static _constType x
-      Just f -> filterFuncs cc x fName f $
-        case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
-          [] -> [Internal, Private]
-          _ -> []
+              Just fields ->
+                let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
+                    fRets = Static (SVMType.Struct Nothing fName) x
+                 in Function fArgs fRets x [] [] False
+            Just VariableDecl {..} ->
+              if _varIsPublic
+                then do
+                  nestedType' x _varType  -- Use nestedType' to handle arrays and other types
+                else
+                  bottom $
+                    ( T.concat
+                        [ "Contract variable ",
+                          labelToText cName,
+                          ".",
+                          labelToText fName,
+                          " is not public."
+                        ]
+                    )
+                      <$ x
+          Just ConstantDecl {..} -> Static _constType x
+        Just f -> filterFuncs cc x fName f $
+          case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
+            [] -> [Internal, Private]
+            _ -> []
       
   where 
     nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
@@ -796,13 +819,13 @@ typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode" =
 typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
-  pure $ case getParents ((fmap $ const ()) <$> cc) ((fmap $ const ()) <$> ctract) of
-    Left _ -> bottom $ "Contract has missing parents" <$ x
-    Right parents' -> case filter (elem method . M.keys . _functions) parents' of
+  pure $ case getParentsAnnotated cc ctract of
+    Nothing -> bottom $ "Contract has missing parents" <$ x
+    Just parents' -> case filter (elem method . M.keys . _functions) parents' of
       [] -> bottom $ "cannot use super without a parent contract" <$ x
       ps -> case M.lookup method . _functions $ last ps of
         Nothing -> bottom $ ("super does not have a function called " <> labelToText method) <$ x
-        Just f -> filterFuncs cc x method (("" <$) <$> f) [External, Private]
+        Just f -> filterFuncs cc x method f [External, Private]
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
@@ -1010,12 +1033,12 @@ checkOverrides cc c funcName f =
       parentsWithSameFunc =
         catMaybes $
           sequence . (_contractName &&& (M.lookup funcName . _functions))
-            <$> catMaybes (flip M.lookup (cc ^. contracts) <$> c ^. parents)
+            <$> fromMaybe [] (getParentsAnnotated cc c)
    in case parentsWithSameFunc of
         [] -> case mOs of
           Nothing -> functionType cc ctx funcName f
           Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
-        p : ps -> case mOs of
+        (n, p) : ps -> case mOs of
           Nothing ->
             bottom $
               T.concat
@@ -1027,7 +1050,17 @@ checkOverrides cc c funcName f =
                 ]
                 <$ ctx
           Just [] -> case ps of
-            [] -> typecheckFuncs cc ctx funcName f $ snd p
+            [] -> if p ^. funcVirtual
+                    then typecheckFuncs cc ctx funcName f p
+                    else bottom $
+                      T.concat
+                        [ "Function ",
+                          tFuncName,
+                          " is marked as override, but parent contract ",
+                          T.pack n,
+                          " does not mark the function as virtual"
+                        ]
+                        <$ ctx
             _ ->
               bottom $
                 T.concat
@@ -1564,43 +1597,32 @@ userTypeHelper' (Just "byte") = (SVMType.Bytes Nothing $ Just 1)
 userTypeHelper' _ = SVMType.Bool --TODO fix this
 
 getFunctionByNameRecursively :: SolidString -> SourceAnnotation Text -> SSS Type'
-getFunctionByNameRecursively name ctx = go False
-  where
-    go isParent = do
-      c <- asks contract
-      cc <- asks codeCollection
-      case M.lookup name $ c ^. functions of
-        Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
-        Nothing -> case M.lookup name $ c ^. events of
-          Just theEvent -> pure $ eventType ctx theEvent
-          Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
-    recurse parentName = do
-      cc <- asks codeCollection
-      case M.lookup parentName $ cc ^. contracts of
-        Nothing -> pure . bottom $ "Could not find parent contract " <> T.pack parentName <$ ctx
-        Just c' -> local (\r -> r {contract = c'}) $ go True
+getFunctionByNameRecursively name ctx = do
+  cName <- asks $ _contractName . contract
+  recursively ctx $ do
+    c <- asks contract
+    cc <- asks codeCollection
+    let isParent = cName == c ^. contractName
+    case M.lookup name $ c ^. functions of
+      Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
+      Nothing -> case M.lookup name $ c ^. events of
+        Just theEvent -> pure $ eventType ctx theEvent
+        Nothing -> pure . bottom $ "Could not find contract function " <> T.pack name <$ ctx
 
 getModifierByNameRecursively :: SolidString -> SolidString -> SourceAnnotation Text -> SSS Type'
-getModifierByNameRecursively funcName name ctx = go
-  where
-    go = do
-      c <- asks contract
-      case M.lookup name $ c ^. modifiers of
-        Just theMod -> pure $ modifierType ctx theMod
-        Nothing -> do
-          cc <- asks codeCollection
-          case M.lookup name $ cc ^. contracts of
-            Just c' -> if funcName /= "constructor"
-              then pure . bottom $ "Parent constructors can only be invoked from the contract's constructor" <$ ctx
-              else case c' ^. constructor of
-                Just f -> pure $ functionType cc ctx name f
-                Nothing -> pure $ Function (Product [] ctx) (Product [] ctx) ctx [] [] False
-            Nothing -> pickType' ctx <$> traverse recurse (c ^. parents)
-    recurse parentName = do
+getModifierByNameRecursively funcName name ctx = recursively ctx $ do
+  c <- asks contract
+  case M.lookup name $ c ^. modifiers of
+    Just theMod -> pure $ modifierType ctx theMod
+    Nothing -> do
       cc <- asks codeCollection
-      case M.lookup parentName $ cc ^. contracts of
-        Nothing -> pure . bottom $ "Could not find parent contract " <> T.pack parentName <$ ctx
-        Just c' -> local (\r -> r {contract = c'}) go
+      case M.lookup name $ cc ^. contracts of
+        Just c' -> if funcName /= "constructor"
+          then pure . bottom $ "Parent constructors can only be invoked from the contract's constructor" <$ ctx
+          else case c' ^. constructor of
+            Just f -> pure $ functionType cc ctx name f
+            Nothing -> pure $ Function (Product [] ctx) (Product [] ctx) ctx [] [] False
+        Nothing -> pure . bottom $ "Could not find contract modifier " <> T.pack name <$ ctx
 
 getVarTypeByName' :: SolidString -> SourceAnnotation Text -> SSS Type'
 getVarTypeByName' name ctx = do
