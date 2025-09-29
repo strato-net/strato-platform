@@ -96,6 +96,7 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
+import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
 import Data.IORef
@@ -127,10 +128,6 @@ import Text.Read (readEither, readMaybe)
 import Text.Tools
 -- import UnliftIO hiding (assert)
 
--- Global time offset for fastForward functionality
-{-# NOINLINE globalTimeOffset #-}
-globalTimeOffset :: IORef Integer
-globalTimeOffset = unsafePerformIO $ Data.IORef.newIORef 0
 
 type SolidVMBase m = VMBase m
 
@@ -1386,10 +1383,8 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       return $ Constant (flip SAccount False (unspecifiedChain acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      offset <- liftIO $ Data.IORef.readIORef globalTimeOffset
       let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
-      let finalTimestamp = round $ baseTimestamp + fromIntegral offset
-      return $ Constant $ SInteger finalTimestamp
+      return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
       pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
@@ -2512,14 +2507,23 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "fastForward" args = do
-  case args of
-    [SInteger seconds] -> do
-      -- Add seconds to the global time offset
-      liftIO $ Data.IORef.atomicModifyIORef' globalTimeOffset $ \currentOffset -> 
-        (currentOffset + seconds, ())
+callBuiltin "fastForward" [SInteger seconds] = do
+  -- Only allow fastForward during testing
+  env' <- getEnv
+  if not (Env.runningTests env')
+    then invalidArguments "fastForward can only be called during testing" [SInteger seconds]
+    else do
+      -- Get current timestamp and add seconds
+      let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
+          newTimestamp = addUTCTime (fromIntegral seconds) currentTimestamp
+          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp }
+      -- Update the environment with new block header
+      Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+        env { Env.blockHeader = updatedBlockHeader }
       return SNULL
-    _ -> invalidArguments "fastForward expects exactly one integer argument (seconds)" args
+
+callBuiltin "fastForward" args =
+  invalidArguments "fastForward expects exactly one integer argument (seconds)" args
 
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
