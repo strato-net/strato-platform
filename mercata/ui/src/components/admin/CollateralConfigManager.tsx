@@ -11,7 +11,7 @@ import { cdpService, AssetConfig } from '@/services/cdpService';
 import { toast } from 'sonner';
 import { Form, Input, Switch, Button as AntButton } from 'antd';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
-
+import { handleRecipientAddress, handleAdminNumericInputChange } from '@/utils/transferValidation';
 
 const CollateralConfigManager = () => {
   const [form] = Form.useForm();
@@ -51,6 +51,7 @@ const CollateralConfigManager = () => {
   const resetForm = useCallback(() => {
     form.resetFields();
     setEditingAsset(null);
+    setInputErrors({});
   }, [form]);
 
  
@@ -58,18 +59,44 @@ const CollateralConfigManager = () => {
   const handleSubmit = useCallback(async (values: any) => {
     try {
       setLoading(true);
+      
+      // Convert UI values to contract format
+      const WAD = BigInt(10) ** BigInt(18);
+      const RAY = BigInt(10) ** BigInt(27);
+      const secondsPerYear = BigInt(365 * 24 * 60 * 60);
+      
+      // Convert liquidation ratio from percentage to WAD (e.g., 150% -> 1.5e18)
+      const liquidationRatioContract = (BigInt(Math.floor(Number(values.liquidationRatio) * 100)) * WAD) / BigInt(100);
+      
+      // Convert stability fee rate from annual percentage to per-second RAY
+      const [intPart, decPart = ''] = values.stabilityFeeRate.toString().split('.');
+      const scale = BigInt(10) ** BigInt(decPart.length);
+      const stabilityFeeRateContract = (BigInt(intPart + decPart) * RAY) / (BigInt(100) * scale * secondsPerYear) + RAY;
+      
+      // Convert unit scale from decimal count to 1eX format
+      const unitScaleContract = BigInt(10) ** BigInt(values.unitScale);
+      
+      // Convert debt floor/ceiling from USD to wei (18 decimals)
+      const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor) * 1e18));
+      const debtCeilingContract = BigInt(Math.floor(Number(values.debtCeiling) * 1e18));
+      
       const configData = {
-        ...values,
-        isPaused: values.isPaused ?? false  // Default to false if undefined
-      };     
-      console.log("configData CDPPPP", configData);
+        asset: values.asset,
+        liquidationRatio: liquidationRatioContract.toString(),
+        liquidationPenaltyBps: values.liquidationPenaltyBps,
+        closeFactorBps: values.closeFactorBps,
+        stabilityFeeRate: stabilityFeeRateContract.toString(),
+        debtFloor: debtFloorContract.toString(),
+        debtCeiling: debtCeilingContract.toString(),
+        unitScale: unitScaleContract.toString(),
+        isPaused: values.isPaused ?? false
+      };
+      
+      
       await cdpService.setCollateralConfig(configData);
       toast.success('Collateral configuration updated successfully');
       resetForm();
       await loadAssets();
-    } catch (error) {
-      console.error('Failed to set collateral config:', error);
-      toast.error('Failed to update collateral configuration');
     } finally {
       setLoading(false);
     }
@@ -77,19 +104,23 @@ const CollateralConfigManager = () => {
 
   const handleEditAsset = useCallback((asset: AssetConfig) => {
     setEditingAsset(asset.asset);
+    
+    // Convert debt floor/ceiling from wei back to USD
+    const debtFloorUI = Number(asset.debtFloor) / 1e18;
+    const debtCeilingUI = Number(asset.debtCeiling) / 1e18;
+    
+    // Convert unit scale from 1eX back to decimal count
+    const unitScaleUI = Math.log10(Number(asset.unitScale));
+    
     form.setFieldsValue({
       asset: asset.asset.trim(),
-      // Convert liquidation ratio from percentage back to decimal format
-      liquidationRatio: asset.liquidationRatio,
-      liquidationPenaltyBps: asset.liquidationPenaltyBps,
-      closeFactorBps: asset.closeFactorBps,
-      // Convert stability fee rate from RAY back to annual percentage
-      stabilityFeeRate: asset.stabilityFeeRate,
-      // Convert USD amounts from wei back to decimal format
-      debtFloor:asset.debtFloor ,
-      debtCeiling:asset.debtCeiling,
-      // Convert unit scale from wei back to decimal format
-      unitScale:asset.unitScale,
+      liquidationRatio: (asset.liquidationRatio / 100).toString(), // Convert percentage to decimal for form
+      liquidationPenaltyBps: asset.liquidationPenaltyBps.toString(),
+      closeFactorBps: asset.closeFactorBps.toString(),
+      stabilityFeeRate: asset.stabilityFeeRate.toString(), // Backend already provides annual percentage
+      debtFloor: debtFloorUI.toString(),
+      debtCeiling: debtCeilingUI.toString(),
+      unitScale: unitScaleUI.toString(),
       isPaused: asset.isPaused,
     });
     setActiveTab('add');
@@ -127,12 +158,30 @@ const CollateralConfigManager = () => {
   const formatValue = useCallback((value: string, type: 'percentage' | 'usd' | 'bps' | 'raw') => {
     const num = parseFloat(value);
     switch (type) {
-      case 'percentage': return `${(num / 100).toFixed(2)}%`;
+      case 'percentage': return `${num.toFixed(2)}%`;
       case 'usd': return `$${(num / 1e18).toFixed(2)}`;
       case 'bps': return `${(num / 100).toFixed(2)}%`;
       default: return value;
     }
   }, []);
+
+  const [inputErrors, setInputErrors] = useState<Record<string, string>>({});
+
+  const handleNumericInputChange = useCallback((field: string, value: string, maxValue: string = "999999999999999999999999999", decimals: number = 18, minValue: string = "0") => {
+    const setError = (error: string) => {
+      setInputErrors(prev => ({ ...prev, [field]: error }));
+    };
+    
+    handleAdminNumericInputChange(
+      value,
+      (formattedValue) => form.setFieldValue(field, formattedValue),
+      setError,
+      maxValue,
+      decimals,
+      minValue
+    );
+  }, [form]);
+
 
 
   return (
@@ -211,22 +260,34 @@ const CollateralConfigManager = () => {
                     name="asset"
                     label="Asset Address"
                     // rules={formRules.asset}
+                    validateStatus={inputErrors.asset ? 'error' : ''}
+                    help={inputErrors.asset}
                   >
                     <Input 
                       placeholder="0x..." 
                       disabled={editingAsset !== null}
                       className="w-full"
+                      onChange={(e) => handleRecipientAddress(
+                        e,
+                        (value) => form.setFieldValue('asset', value),
+                        (error: string) => setInputErrors(prev => ({ ...prev, asset: error }))
+                      )}
                     />
                   </Form.Item>
 
                   <Form.Item
                     name="liquidationRatio"
                     label="Liquidation Ratio (e.g., 1.5 = 150%)"
+                    extra="Range: 1.0-5.0 (100%-500%)"
                     // rules={formRules.liquidationRatio}
+                    validateStatus={inputErrors.liquidationRatio ? 'error' : ''}
+                    help={inputErrors.liquidationRatio}
                   >
                     <Input 
                       placeholder="1.5"
                       className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('liquidationRatio', e.target.value, "5", 2, "1")}
                     />
                   </Form.Item>
 
@@ -234,11 +295,15 @@ const CollateralConfigManager = () => {
                     name="liquidationPenaltyBps"
                     label="Liquidation Penalty (Basis Points)"
                     // rules={formRules.liquidationPenaltyBps}
-                    extra="500-3000 bps (5%-30%)"
+                    extra="Range: 500-3000 bps (5%-30%)"
+                    validateStatus={inputErrors.liquidationPenaltyBps ? 'error' : ''}
+                    help={inputErrors.liquidationPenaltyBps}
                   >
                     <Input 
                       placeholder="1000"
                       className="w-full"
+                      inputMode="numeric"
+                      onChange={(e) => handleNumericInputChange('liquidationPenaltyBps', e.target.value, "3000", 0, "500")}
                     />
                   </Form.Item>
 
@@ -246,11 +311,15 @@ const CollateralConfigManager = () => {
                     name="closeFactorBps"
                     label="Close Factor (Basis Points)"
                     // rules={formRules.closeFactorBps}
-                    extra="5000-10000 bps (50%-100%)"
+                    extra="Range: 5000-10000 bps (50%-100%)"
+                    validateStatus={inputErrors.closeFactorBps ? 'error' : ''}
+                    help={inputErrors.closeFactorBps}
                   >
                     <Input 
                       placeholder="5000"
                       className="w-full"
+                      inputMode="numeric"
+                      onChange={(e) => handleNumericInputChange('closeFactorBps', e.target.value, "10000", 0, "5000")}
                     />
                   </Form.Item>
 
@@ -258,22 +327,31 @@ const CollateralConfigManager = () => {
                     name="stabilityFeeRate"
                     label="Stability Fee Rate (RAY)"
                     // rules={formRules.stabilityFeeRate}
-                    extra="Per-second interest rate (minimum 1.0 = 0% interest)"
+                    extra="Range: 0-100% annual rate (0% = 1.0 RAY minimum)"
+                    validateStatus={inputErrors.stabilityFeeRate ? 'error' : ''}
+                    help={inputErrors.stabilityFeeRate}
                   >
                     <Input 
                       placeholder="1.0"
                       className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('stabilityFeeRate', e.target.value, "100", 18, "0")}
                     />
                   </Form.Item>
 
                   <Form.Item
                     name="debtFloor"
                     label="Debt Floor (USD)"
+                    extra="Range: 0+ USD (2 decimal places)"
                     // rules={[...formRules.debtFloor, { validator: validateDebtFloor }]}
+                    validateStatus={inputErrors.debtFloor ? 'error' : ''}
+                    help={inputErrors.debtFloor}
                   >
                     <Input 
                       placeholder="100"
                       className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('debtFloor', e.target.value, "1000000", 2, "0")}
                     />
                   </Form.Item>
 
@@ -281,23 +359,31 @@ const CollateralConfigManager = () => {
                     name="debtCeiling"
                     label="Debt Ceiling (USD)"
                     // rules={[...formRules.debtCeiling, { validator: validateDebtCeiling }]}
-                    extra="Enter the full number (e.g., 1000000 not 1e+6)"
+                    extra="Range: 0+ USD (2 decimal places)"
+                    validateStatus={inputErrors.debtCeiling ? 'error' : ''}
+                    help={inputErrors.debtCeiling}
                   >
                     <Input 
                       placeholder="Enter debt ceiling (e.g., 1000000 for $1M)"
                       className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('debtCeiling', e.target.value, "1000000000", 2, "0")}
                     />
                   </Form.Item>
 
                   <Form.Item
                     name="unitScale"
-                    label="Unit Scale"
+                    label="Token Decimals"
                     // rules={formRules.unitScale}
-                    extra="Enter decimal value (e.g., 1 for 18 decimals, 0.001 for 15 decimals)"
+                    extra="Range: 0-18 (decimal places, e.g., 18 for standard ERC20)"
+                    validateStatus={inputErrors.unitScale ? 'error' : ''}
+                    help={inputErrors.unitScale}
                   >
                     <Input 
-                      placeholder="Enter unit scale (e.g., 1 for 18 decimals)"
+                      placeholder="Enter decimal places (e.g., 18 for standard ERC20)"
                       className="w-full"
+                      inputMode="numeric"
+                      onChange={(e) => handleNumericInputChange('unitScale', e.target.value, "18", 0, "0")}
                     />
                   </Form.Item>
 
