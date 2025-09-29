@@ -146,7 +146,7 @@ const reducer = function (state = initialState, action) {
         ...state,
         uptime: action.data,
       };
-      break;
+      break;  
 
     case PRELOAD_SYSTEM_INFO:
     case UPDATE_SYSTEM_INFO:
