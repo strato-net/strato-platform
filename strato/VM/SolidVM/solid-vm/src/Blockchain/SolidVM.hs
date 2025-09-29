@@ -98,10 +98,12 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
 import Data.Time.Clock.POSIX
 import Data.Traversable
+import Data.IORef
 import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
 import qualified LabeledError
+import System.IO.Unsafe (unsafePerformIO)
 --import Blockchain.DB.RawStorageDB
 --import Blockchain.Data.BlockSummary
 --import Blockchain.DB.MemAddressStateDB
@@ -123,7 +125,12 @@ import Text.Parsec (runParser)
 import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
-import UnliftIO hiding (assert)
+-- import UnliftIO hiding (assert)
+
+-- Global time offset for fastForward functionality
+{-# NOINLINE globalTimeOffset #-}
+globalTimeOffset :: IORef Integer
+globalTimeOffset = unsafePerformIO $ Data.IORef.newIORef 0
 
 type SolidVMBase m = VMBase m
 
@@ -1379,7 +1386,10 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       return $ Constant (flip SAccount False (unspecifiedChain acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      offset <- liftIO $ Data.IORef.readIORef globalTimeOffset
+      let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      let finalTimestamp = round $ baseTimestamp + fromIntegral offset
+      return $ Constant $ SInteger finalTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
       pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
@@ -2502,6 +2512,15 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "fastForward" args = do
+  case args of
+    [SInteger seconds] -> do
+      -- Add seconds to the global time offset
+      liftIO $ Data.IORef.atomicModifyIORef' globalTimeOffset $ \currentOffset -> 
+        (currentOffset + seconds, ())
+      return SNULL
+    _ -> invalidArguments "fastForward expects exactly one integer argument (seconds)" args
+
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
 certificateMap :: Maybe String -> CC.Contract -> Value
@@ -2654,7 +2673,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 addLocalVariable :: MonadSM m => SVMType.Type -> SolidString -> Value -> m ()
 addLocalVariable theType name value = do
   --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
-  newVariable <- liftIO $ fmap Variable $ newIORef value
+  newVariable <- liftIO $ fmap Variable $ Data.IORef.newIORef value
   cs <- Mod.get (Mod.Proxy @[CallInfo])
   case cs of
     [] -> internalError "addLocalVariable called with an empty stack" (name, value)
@@ -2731,7 +2750,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
   let locals = args ++ returns
   localVars1 <-
     forM locals $ \(n, (t, v)) -> do
-      newVar <- liftIO $ fmap Variable $ newIORef v
+      newVar <- liftIO $ fmap Variable $ Data.IORef.newIORef v
       return (n, (t, newVar))
 
   val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]

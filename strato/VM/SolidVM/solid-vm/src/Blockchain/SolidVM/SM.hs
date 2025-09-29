@@ -631,7 +631,8 @@ getVariableOfName name = do
                        "parseCert",
                        "verifyCert",
                        "verifyCertSignedBy",
-                       "verifySignature"
+                       "verifySignature",
+                       "fastForward"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing

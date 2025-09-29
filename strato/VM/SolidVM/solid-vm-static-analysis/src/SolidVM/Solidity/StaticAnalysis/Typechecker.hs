@@ -1479,6 +1479,9 @@ createFuncArgs x = Product [stringType' x, stringType' x, Static SVMType.Variadi
 saltCreateArgs :: SourceAnnotation Text -> Type'
 saltCreateArgs x = Product [stringType' x, stringType' x, stringType' x, Static SVMType.Variadic x] x
 
+fastForwardArgs :: SourceAnnotation Text -> Type'
+fastForwardArgs x = intType' x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
@@ -1528,6 +1531,7 @@ getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' 
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] [] False
 getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] [] False
+getVarType' "fastForward" ctx = pure $ Function (fastForwardArgs ctx) (Product [] ctx) ctx [] [] False
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util" Nothing) ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx
