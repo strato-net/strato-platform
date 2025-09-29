@@ -170,6 +170,12 @@ const TokenConfigTable = () => {
     return (parseInt(assetConfig.reserveFactor) / 100).toFixed(1);
   };
 
+  const getRawPerSecondFactorRAY = (address: string) => {
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.perSecondFactorRAY) return '';
+    return BigInt(assetConfig.perSecondFactorRAY).toString();
+  };
+
   const handleConfigureAsset = (token: {address: string; symbol: string; name: string}) => {
     setSelectedToken(token);
     setConfigureAssetModalOpen(true);
@@ -326,6 +332,7 @@ const TokenConfigTable = () => {
           liquidationBonus: getRawLiquidationBonus(selectedToken.address),
           interestRate: getRawInterestRate(selectedToken.address),
           reserveFactor: getRawReserveFactor(selectedToken.address),
+          perSecondFactorRAY: getRawPerSecondFactorRAY(selectedToken.address),
         } : undefined}
         onSuccess={refreshAllData}
       />

@@ -27,6 +27,7 @@ type LendingContextType = {
     liquidationBonus: number; 
     interestRate: number; 
     reserveFactor: number; 
+    perSecondFactorRAY: string;
   }) => Promise<void>;
   loading: boolean;
   refreshLendingData: () => Promise<void>;
@@ -128,6 +129,7 @@ export const LendingProvider = ({
     liquidationBonus: number; 
     interestRate: number; 
     reserveFactor: number; 
+    perSecondFactorRAY: string;
   }): Promise<void> => {
     setLoading(true);
     try {

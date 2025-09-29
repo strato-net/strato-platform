@@ -270,6 +270,7 @@ export interface AssetConfig {
   liquidationThreshold: string;
   ltv: string;
   reserveFactor: string;
+  perSecondFactorRAY: string;
 }
 
 export interface LendData {

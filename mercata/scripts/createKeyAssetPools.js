@@ -93,7 +93,7 @@ require("dotenv").config();
   const poolExists = async (tokenB) => {
     const path = `/BlockApps-Mercata-Pool`; // pool table name
     const params = {
-      _owner: `eq.${POOL_FACTORY}`,
+      poolFactory: `eq.${POOL_FACTORY}`,
       tokenA: `eq.${USDST.toLowerCase()}`,
       tokenB: `eq.${tokenB.toLowerCase()}`,
       select: "address",
