@@ -209,8 +209,8 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams 
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
-                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (accStateRef E.^. AddressStateRefAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
-                                         E.||. (accStateRef E.^. AddressStateRefContractName `E.like` E.val (Just . T.unpack $ "%" <> v <> "%"))) <$> searches
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (accStateRef E.^. AddressStateRefAddress) `E.ilike` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (accStateRef E.^. AddressStateRefContractName `E.ilike` E.val (Just . T.unpack $ "%" <> v <> "%"))) <$> searches
                            in foldr (E.||.) (E.val False) queries
                         ) _qaSearch
                     ]
