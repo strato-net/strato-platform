@@ -42,7 +42,7 @@ const DashboardSidebar = () => {
     { icon: <Book size={20} />, label: 'Borrow', path: '/dashboard/borrow' },
     { icon: <ArrowRightLeft size={20} />, label: 'Swap', path: '/dashboard/swap' },
     { icon: <Database size={20} />, label: 'Pools', path: '/dashboard/pools' },
-    { icon: <Gift size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
+    // { icon: <Gift size={20} />, label: 'Rewards', path: '/dashboard/rewards' },
     { icon: <Activity size={20} />, label: 'Activity Feed', path: '/dashboard/activity' },
     { icon: <Shield size={20} />, label: 'Admin', path: '/dashboard/admin' },
   ];
