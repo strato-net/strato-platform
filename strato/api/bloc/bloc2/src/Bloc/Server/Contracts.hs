@@ -44,6 +44,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.List (sort)
 import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
@@ -71,17 +72,35 @@ getContracts mName mOffset mLimit chainId = do
                 pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
           )
           Map.empty
-  addrStateRefs <-
+  
+  -- Step 1: Get all unique contract names (without pagination)
+  let contractLimit = fromIntegral $ fromMaybe 10 mLimit
+      contractOffset = fromIntegral $ fromMaybe 0 mOffset
+  
+  -- Get all records to extract unique contract names
+  allAddrStateRefs <-
     getAccount'
       accountsFilterParams
         { _qaChainId = maybeToList chainId,
           _qaExternal = Just False,
           _qaSearch = mName,
-          _qaOffset = fromIntegral <$> mOffset,
-          _qaLimit = fromIntegral <$> mLimit
+          _qaOffset = Nothing,  -- No offset - get all records
+          _qaLimit = Nothing    -- No limit - get all records
         }
-  reducedResponseMap <- addressesToMap addrStateRefs
-  return . GetContractsResponse $ reducedResponseMap
+  
+  -- Group by contract name to get unique contracts
+  allContractsMap <- addressesToMap allAddrStateRefs
+  let allContractNames = Map.keys allContractsMap
+      sortedContractNames = sort allContractNames
+      
+  -- Apply pagination to contract names (exactly 10 contracts per page)
+  let paginatedContractNames = take contractLimit $ drop contractOffset sortedContractNames
+  
+  -- Step 2: Get all instances for the paginated contract names
+  -- Filter the original map to only include the paginated contracts
+  let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
+  
+  return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::
   ( MonadLogger m,

@@ -199,14 +199,14 @@ class Contracts extends Component {
               />
             </div>
             <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
-              {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)} (${returnedInstances} Contract Instances)`}
+              {`Contracts ${this.state.offset + 1}-${this.state.offset + contractNames.length} (${returnedInstances} Total Instances)`}
             </div>
             <div className="col-sm-2 smd-pad-16 text-right">
               <Button
                 onClick={this.onNextClick}
                 className="pt-icon-arrow-right"
                 text="Next"
-                disabled={returnedInstances < this.state.limit}
+                disabled={contractNames.length < this.state.limit}
               />
             </div>
           </div>
