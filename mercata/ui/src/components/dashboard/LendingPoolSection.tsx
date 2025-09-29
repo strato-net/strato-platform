@@ -40,22 +40,22 @@ const LendingPoolSection = () => {
 
   const getMaxWithdrawableAmount = (): bigint => {
     if (includeStakedMToken) {
-      // Calculate unstaked value in USDST (existing logic)
-      const unstakedValueUSDST = BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
-
-      // Calculate staked value in USDST
-      const stakedMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalanceStaked || "0");
+      // Calculate total value in USDST using total mTokens
+      const totalMTokenWei = BigInt(liquidityInfo?.withdrawable?.userBalanceTotal || "0");
       const exchangeRateWei = BigInt(liquidityInfo?.exchangeRate || "0");
 
-      let stakedValueUSDST = 0n;
-      if (stakedMTokenWei > 0n && exchangeRateWei > 0n) {
-        stakedValueUSDST = (stakedMTokenWei * exchangeRateWei) / (10n ** 18n);
+      if (totalMTokenWei === 0n || exchangeRateWei === 0n) {
+        return 0n;
       }
 
-      // Total = unstaked + staked (both in USDST)
-      return unstakedValueUSDST + stakedValueUSDST;
+      // Convert total mTokens to USDST
+      const totalValueUSDST = (totalMTokenWei * exchangeRateWei) / (10n ** 18n);
+
+      // Limit by pool available liquidity
+      const poolLiquidityWei = BigInt(liquidityInfo?.availableLiquidity || "0");
+      return totalValueUSDST < poolLiquidityWei ? totalValueUSDST : poolLiquidityWei;
     } else {
-      // Use only unstaked mUSDST (original behavior)
+      // Use only unstaked mUSDST (original behavior - already includes pool limits)
       return BigInt(liquidityInfo?.withdrawable?.maxWithdrawableUSDST || "0");
     }
   };
