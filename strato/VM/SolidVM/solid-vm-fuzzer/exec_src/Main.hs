@@ -144,7 +144,7 @@ main = do
               . traverse (uncurry parseSourceWithAnnotations)
               . unSourceMap
         compile = runMemCompilerT
-                . compileSourceWithAnnotations True
+                . compileSourceWithAnnotations True True
                 . M.fromList
                 . unSourceMap
         analyze src = compile src >>= \eCC -> pure $ runDetectors parse (const eCC) id src

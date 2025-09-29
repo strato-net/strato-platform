@@ -6,7 +6,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module SolidVM.Solidity.StaticAnalysis.Typechecker
-  ( detector,
+  ( detector
+  , detector'
   )
 where
 
@@ -952,25 +953,29 @@ const' _ (Bottom e) = Bottom e
 const' t _ = t
 
 detector :: CompilerDetector
-detector cc =
+detector = detector' False
+
+detector' :: Bool -> CompilerDetector
+detector' isRunningTests cc =
   let cc'@CodeCollection {..} = (\sa -> sa {_sourceAnnotationAnnotation = ""}) <$> cc
    in fromMaybe []
         . fmap (\(a :| as) -> getTypeErrors $ reduceType' emptyAnnotation (a : as))
         . NE.nonEmpty
-        $ contractHelper cc'
+        $ contractHelper isRunningTests cc'
           <$> M.elems _contracts
 
 contractHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Type'
-contractHelper cc c =
+contractHelper isRunningTests cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
       funcsAndConstr = constr <> _functions c 
       varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
       constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
       constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper isRunningTests cc c) <$> M.toList funcsAndConstr
       modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
@@ -1113,12 +1118,13 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
     in runReader (statementsHelperM (M.fromList args) contents') r
 
 functionHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   SolidString ->
   Annotated FuncF ->
   Type'
-functionHelper cc c funcName f@Func {..} =
+functionHelper _isRunningTests cc c funcName f@Func {..} =
   let check = checkOverrides cc c funcName f
    in unlessBottom check $ \t' -> case f ^. funcContents of
         Nothing -> t'

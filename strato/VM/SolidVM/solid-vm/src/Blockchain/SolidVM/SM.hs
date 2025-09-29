@@ -1099,7 +1099,8 @@ getCodeAndCollection address' = do
     Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
     Nothing -> do
       (contractName', ch) <- getContractNameAndHash address'
-      cc <- codeCollectionFromHash True ch
+      isRunningTests <- Env.runningTests <$> getEnv
+      cc <- codeCollectionFromHash isRunningTests True ch
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
