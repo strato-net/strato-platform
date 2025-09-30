@@ -4,7 +4,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import * as config from "../../config/config";
-import { getBalance, getTokens } from "./tokens.service";
+import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import {
@@ -67,25 +67,6 @@ export const getExchangeRateFromCirrus = async (
     console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
     return oneToOne;
   }
-};
-
-/**
- * Helper function to get a specific token balance for a user
- */
-const getTokenBalance = async (
-  accessToken: string,
-  tokenAddress: string,
-  userAddress: string
-): Promise<string> => {
-  const tokenData = await getTokens(accessToken, {
-    address: `eq.${tokenAddress}`,
-    select: `address,balances:${Token}-_balances(user:key,balance:value::text)`,
-    "balances.key": `eq.${userAddress}`
-  });
-
-  const token = tokenData?.[0];
-  const userBalance = token?.balances?.find((b: any) => b.user === userAddress)?.balance;
-  return userBalance || "0";
 };
 
 /**
@@ -175,7 +156,7 @@ export const depositLiquidity = async (
   }
 
   // Get user's mToken balance before deposit
-  const mTokenBalanceBefore = stakeMToken ? await getTokenBalance(accessToken, mToken, userAddress) : "0";
+  const mTokenBalanceBefore = stakeMToken ? await getTokenBalanceForUser(accessToken, mToken, userAddress) : "0";
 
   // First transaction: deposit liquidity
   const depositTx: FunctionInput[] = [
@@ -201,7 +182,7 @@ export const depositLiquidity = async (
   // If staking is requested and deposit was successful, execute staking transaction
   if (stakeMToken && depositResult.status === "Success") {
     // Get user's mToken balance after deposit to calculate the newly minted amount
-    const mTokenBalanceAfter = await getTokenBalance(accessToken, mToken, userAddress);
+    const mTokenBalanceAfter = await getTokenBalanceForUser(accessToken, mToken, userAddress);
     const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
 
     if (BigInt(newlyMintedAmount) > 0n) {
@@ -263,7 +244,7 @@ export const withdrawLiquidity = async (
     }
 
     // Get current mUSDST balance in wallet
-    const unstakedMTokenBalance = await getTokenBalance(accessToken, mToken, userAddress);
+    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
 
     // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
     const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
