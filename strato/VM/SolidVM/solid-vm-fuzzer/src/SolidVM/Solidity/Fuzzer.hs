@@ -89,15 +89,21 @@ runFuzzer dSettings compile src = compile src >>= \case
             Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
               _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
-              fmap catMaybes . for (M.toList $ _functions c) $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
+              testResults <- fmap catMaybes . for (M.toList $ _functions c) $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
                 if
                     | testPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> test bh addr fName f
+                        result <- Just <$> test bh addr fName f
+                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                        pure result
                     | propertyPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> prop bh addr fName f
+                        result <- Just <$> prop bh addr fName f
+                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                        pure result
                     | otherwise -> pure Nothing
+              _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
+              pure testResults
 
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True
