@@ -281,8 +281,6 @@ export const withdrawLiquidity = async (
       // We need to unstake some mTokens first
       const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
 
-      console.log(`Need to unstake ${amountToUnstake.toString()} mTokens before withdrawal`);
-
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: "RewardsChef",
@@ -295,12 +293,9 @@ export const withdrawLiquidity = async (
       }, userAddress, accessToken);
 
       // Execute unstaking transaction first
-      console.log("Executing unstaking transaction...");
       await postAndWaitForTx(accessToken, () =>
         strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
       );
-
-      console.log("Unstaking completed successfully");
     }
   }
 
