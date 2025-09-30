@@ -14,20 +14,26 @@ const Transaction = db.sequelize.define('raw_transaction', {
   nonce: {
     type: db.Sequelize.BIGINT
   },
-  gas_price: {
-    type: db.Sequelize.BIGINT
-  },
   gas_limit: {
     type: db.Sequelize.BIGINT
   },
   to_address: {
     type: db.Sequelize.STRING(64)
   },
-  value: {
-    type: db.Sequelize.BIGINT
+  func_name: {
+    type: db.Sequelize.TEXT
   },
-  code_or_data: {
-    type: db.Sequelize.BLOB
+  contract_name: {
+    type: db.Sequelize.TEXT
+  },
+  args: {
+    type: db.Sequelize.ARRAY(db.Sequelize.TEXT)
+  },
+  network: {
+    type: db.Sequelize.TEXT
+  },
+  code: {
+    type: db.Sequelize.TEXT
   },
   r: {
     type: db.Sequelize.STRING
