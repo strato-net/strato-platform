@@ -9,6 +9,34 @@ contract User {
     }
 }
 
+contract OldMemberVars {
+    constructor(){}
+
+    uint public favoriteNumber;
+
+    function initialize() public {
+        favoriteNumber = 42;
+    }
+}
+
+contract NewMemberVars {
+    constructor(){}
+
+    uint public favoriteNumber;
+
+    function doMath() public returns (uint) {
+        return favoriteNumber + 1;
+    }
+}
+
+contract NowAFunction {
+    constructor(){}
+
+    function favoriteNumber() public returns (uint) {
+        return 21;
+    }
+}
+
 contract Describe_BadDebt_Basic {
 
     constructor() {
@@ -20,6 +48,10 @@ contract Describe_BadDebt_Basic {
     User user2;
 
     Token USDST;
+
+    function require_equal(uint observed, uint expected, string memory message) public {
+        require(observed == expected, message + " Got: " + string(observed) + ", expected: " + string(expected));
+    }
 
     function beforeAll() public {
         m = new Mercata();
@@ -132,24 +164,18 @@ contract Describe_BadDebt_Basic {
     }
 
     function it_proxy_can_access_admins_array() public {
-                // Test that admins array access should be possible for fresh AdminRegistry
+        // Test that admins array access should be possible for fresh AdminRegistry
         AdminRegistry fresh_admin_registry = new AdminRegistry();
         fresh_admin_registry.initialize([this]);
-        address[] memory fresh_admins = fresh_admin_registry.admins();
-        require(fresh_admins.length == 1, "Should have 1 initial admin");
-        require(fresh_admins[0] == this, "First admin should be this");
+        require(fresh_admin_registry.admins(0) == this, "First admin should be this");
 
         // Test that admins array access should be possible for fresh proxied AdminRegistry
         AdminRegistry fresh_proxied_admin_registry = AdminRegistry(address(new Proxy(address(fresh_admin_registry), this)));
         fresh_proxied_admin_registry.initialize([this]);
-        address[] memory fresh_proxied_admins = fresh_proxied_admin_registry.admins();
-        require(fresh_proxied_admins.length == 1, "Should have 1 initial admin");
-        require(fresh_proxied_admins[0] == this, "First admin should be this");
+        require(fresh_proxied_admin_registry.admins(0) == this, "First admin should be this");  
 
         // Test that admins array access should be possible for mercata's AdminRegistry
-        address[] memory admins = m.adminRegistry().admins();
-        require(admins.length == 1, "Should have 1 initial admin");
-        require(admins[0] == this, "First admin should be this");
+        require(m.adminRegistry().admins(0) == this, "First admin should be this");
     }
 
     function it_proxy_can_become_what_it_is_not() public {
@@ -180,10 +206,7 @@ contract Describe_BadDebt_Basic {
         // Can get public member vars on our newly upgraded feeCollector
         bool my_initialized = AdminRegistry(address(feeCollector)).initialized();
         require(my_initialized, "AdminRegistry should be initialized");
-        address[] memory my_admins = AdminRegistry(address(feeCollector)).admins();
-        require(my_admins.length == 1, "Should have 1 initial admin");
-        address admin = my_admins[0];
-        require(admin == this, "First admin should be this");
+        require(AdminRegistry(address(feeCollector)).admins(0) == this, "First admin should be this");
 
         // Cleanup
         Token(USDST).burn(address(user1), 100e18);
@@ -192,6 +215,10 @@ contract Describe_BadDebt_Basic {
         require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");
     }
 
+    /// @dev once this bug is patched, this test will not compile, so remove it.
+    /// for now, it fails:
+    /// ❌ Unit test 'proxy should not compile because sets variables to functions' failed:
+    ///     Left type error: string cast: [SContractFunction Nothing f333513fb947874fad99f100c89f9815bc4931f3 "initialized"]
     function it_proxy_should_not_compile_because_sets_variables_to_functions() public {
         address adminRegistryImpl = address(new AdminRegistry());
         AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, address(user1))));
@@ -207,4 +234,26 @@ contract Describe_BadDebt_Basic {
         bool initialized2 = adminRegistry.initialized;
         log(string(initialized2));
     }
+
+    function it_proxy_can_access_old_member_vars() public {
+        address oldMemberVarsImpl = address(new OldMemberVars());
+        OldMemberVars oldMemberVars = OldMemberVars(address(new Proxy(oldMemberVarsImpl, this)));
+        oldMemberVars.initialize();
+        require(oldMemberVars.favoriteNumber() == 42, "oldMemberVars not initialized");
+
+        address newMemberVarsImpl = address(new NewMemberVars());
+        Proxy(address(oldMemberVars)).setLogicContract(address(newMemberVarsImpl));
+        require_equal(NewMemberVars(address(oldMemberVars)).doMath(), 43, "old state var not preserved");
+    }
+
+    function it_proxy_cannot_morph_funcs_to_vars() public {
+        address nowAFunctionImpl = address(new NowAFunction());
+        NowAFunction nowAFunction = NowAFunction(address(new Proxy(nowAFunctionImpl, this)));
+        require_equal(nowAFunction.favoriteNumber(), 21, "nowAFunction not initialized");
+
+        address newMemberVarsImpl = address(new NewMemberVars());
+        Proxy(address(nowAFunction)).setLogicContract(address(newMemberVarsImpl));
+        require_equal(NewMemberVars(address(nowAFunction)).doMath(), 1, "function might be taken as integer");
+    }
 }
+
