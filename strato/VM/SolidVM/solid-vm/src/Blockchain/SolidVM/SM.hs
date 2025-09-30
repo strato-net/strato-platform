@@ -194,6 +194,7 @@ type MonadSM m =
     Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
+    Mod.Modifiable Env.Environment m,
     Mod.Modifiable Env.Sender m,
     Mod.Modifiable [CallInfo] m,
     Mod.Modifiable Action m,
@@ -405,6 +406,10 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
+  get _   = gets env
+  put _ m = modify $ \ss -> ss{ env = m }
 
 instance
   (Mod.Modifiable (Maybe DebugSettings) m) =>
@@ -633,7 +638,8 @@ getVariableOfName name = do
                        "parseCert",
                        "verifyCert",
                        "verifyCertSignedBy",
-                       "verifySignature"
+                       "verifySignature",
+                       "fastForward"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
@@ -1107,7 +1113,8 @@ getCodeAndCollection address' = do
     Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
     Nothing -> do
       (contractName', ch) <- getContractNameAndHash address'
-      cc <- codeCollectionFromHash True ch
+      isRunningTests <- Env.runningTests <$> getEnv
+      cc <- codeCollectionFromHash isRunningTests True ch
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 

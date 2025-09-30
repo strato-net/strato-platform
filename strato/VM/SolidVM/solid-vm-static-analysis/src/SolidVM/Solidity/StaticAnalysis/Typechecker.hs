@@ -6,7 +6,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module SolidVM.Solidity.StaticAnalysis.Typechecker
-  ( detector,
+  ( detector
+  , detector'
   )
 where
 
@@ -40,7 +41,8 @@ emptyAnnotation :: SourceAnnotation Text
 emptyAnnotation = (SourceAnnotation (initialPosition "") (initialPosition "") "")
 
 data R = R
-  { codeCollection :: Annotated CodeCollectionF,
+  { isRunningTests :: Bool,
+    codeCollection :: Annotated CodeCollectionF,
     contract :: Annotated ContractF,
     function :: Maybe (Annotated FuncF),
     functName :: Maybe String,
@@ -952,49 +954,55 @@ const' _ (Bottom e) = Bottom e
 const' t _ = t
 
 detector :: CompilerDetector
-detector cc =
+detector = detector' False
+
+detector' :: Bool -> CompilerDetector
+detector' test cc =
   let cc'@CodeCollection {..} = (\sa -> sa {_sourceAnnotationAnnotation = ""}) <$> cc
    in fromMaybe []
         . fmap (\(a :| as) -> getTypeErrors $ reduceType' emptyAnnotation (a : as))
         . NE.nonEmpty
-        $ contractHelper cc'
+        $ contractHelper test cc'
           <$> M.elems _contracts
 
 contractHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Type'
-contractHelper cc c =
+contractHelper test cc c =
   let constr = maybe M.empty (M.singleton "constructor") $ _constructor c
       funcsAndConstr = constr <> _functions c 
-      varTypes' = reduceType' (_contractContext c) $ varDeclHelper cc c <$> M.elems (_storageDefs c)
-      constTypes' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_constants c)
-      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper cc c <$> M.elems (_flConstants cc)
-      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper cc c) <$> M.toList funcsAndConstr
-      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper cc c <$> M.elems (_modifiers c)
+      varTypes' = reduceType' (_contractContext c) $ varDeclHelper test cc c <$> M.elems (_storageDefs c)
+      constTypes' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_constants c)
+      constTypes'' = reduceType' (_contractContext c) $ constDeclHelper test cc c <$> M.elems (_flConstants cc)
+      funcTypes' = reduceType' (_contractContext c) $ uncurry (functionHelper test cc c) <$> M.toList funcsAndConstr
+      modifierTypes' = reduceType' (_contractContext c) $ modifierHelper test cc c <$> M.elems (_modifiers c)
   in reduceType' (_contractContext c) [varTypes', constTypes', funcTypes', constTypes'', modifierTypes']
 
 varDeclHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Annotated VariableDeclF ->
   Type'
-varDeclHelper cc c VariableDecl {..} =
+varDeclHelper test cc c VariableDecl {..} =
   let ty = Static _varType _varContext
    in case _varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R cc c Nothing (Just "Nothing") Nothing []
+          let r = R test cc c Nothing (Just "Nothing") Nothing []
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Annotated ConstantDeclF ->
   Type'
-constDeclHelper cc c ConstantDecl {..} =
+constDeclHelper test cc c ConstantDecl {..} =
   let ty = Static _constType _constContext
-      r = R cc c Nothing (Just "Nothing") Nothing []
+      r = R test cc c Nothing (Just "Nothing") Nothing []
    in runReader (evalStateT (ty ~> tcExpr _constInitialVal) ((Nothing, M.empty) :| [])) r
 
 checkOverrides ::
@@ -1089,13 +1097,14 @@ checkOverrides cc c funcName f =
                             <$ ctx
 
 modifierHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   Annotated ModifierF ->
   Type'
-modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} = 
+modifierHelper test cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
   let r =
-        R cc c Nothing Nothing (Just m) $
+        R test cc c Nothing Nothing (Just m) $
           map
             (fmap $ isJust . _varInitialVal)
             (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1113,12 +1122,13 @@ modifierHelper cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
     in runReader (statementsHelperM (M.fromList args) contents') r
 
 functionHelper ::
+  Bool ->
   Annotated CodeCollectionF ->
   Annotated ContractF ->
   SolidString ->
   Annotated FuncF ->
   Type'
-functionHelper cc c funcName f@Func {..} =
+functionHelper test cc c funcName f@Func {..} =
   let check = checkOverrides cc c funcName f
    in unlessBottom check $ \t' -> case f ^. funcContents of
         Nothing -> t'
@@ -1127,7 +1137,7 @@ functionHelper cc c funcName f@Func {..} =
             then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
               ([], [], Just Payable, Just External) ->
                 let r =
-                      R cc c (Just f) (Just funcName) Nothing $
+                      R test cc c (Just f) (Just funcName) Nothing $
                         map
                           (fmap $ isJust . _varInitialVal)
                           (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1170,7 +1180,7 @@ functionHelper cc c funcName f@Func {..} =
                 then case (_funcVisibility) of
                   Just External ->
                     let r =
-                          R cc c (Just f) (Just funcName) Nothing $
+                          R test cc c (Just f) (Just funcName) Nothing $
                             map
                               (fmap $ isJust . _varInitialVal)
                               (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1194,7 +1204,7 @@ functionHelper cc c funcName f@Func {..} =
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               let r =
-                    R cc c (Just f) (Just funcName) Nothing $
+                    R test cc c (Just f) (Just funcName) Nothing $
                       map
                         (fmap $ isJust . _varInitialVal)
                         (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
@@ -1463,6 +1473,9 @@ createFuncArgs x = Product [stringType' x, stringType' x, Static SVMType.Variadi
 saltCreateArgs :: SourceAnnotation Text -> Type'
 saltCreateArgs x = Product [stringType' x, stringType' x, stringType' x, Static SVMType.Variadic x] x
 
+fastForwardArgs :: SourceAnnotation Text -> Type'
+fastForwardArgs x = intType' x
+
 getVarType' :: String -> SourceAnnotation Text -> SSS Type'
 getVarType' "this" ctx = pure $ Static (SVMType.Account False) ctx
 getVarType' s@('u' : 'i' : 'n' : 't' : n) ctx = case n of
@@ -1512,6 +1525,11 @@ getVarType' "ecrecover" ctx = pure $ Function (ecrecoverArgs ctx) (addressType' 
 getVarType' "parseCert" ctx = pure $ Function (parseCertArgs ctx) (certType' ctx) ctx [] [] False
 getVarType' "create" ctx = pure $ Function (createFuncArgs ctx) (accountType' ctx) ctx [] [] False
 getVarType' "create2" ctx = pure $ Function (saltCreateArgs ctx) (accountType' ctx) ctx [] [] False
+getVarType' "fastForward" ctx = do
+  test <- asks isRunningTests
+  if test
+    then pure $ Function (fastForwardArgs ctx) (Product [] ctx) ctx [] [] False
+    else pure . bottom $ "fastForward can only be called while running tests" <$ ctx
 getVarType' "Util" ctx = pure $ Static (SVMType.UnknownLabel "Util" Nothing) ctx
 getVarType' "msg" ctx = pure $ Static (SVMType.UnknownLabel "msg" Nothing) ctx
 getVarType' "tx" ctx = pure $ Static (SVMType.UnknownLabel "tx" Nothing) ctx

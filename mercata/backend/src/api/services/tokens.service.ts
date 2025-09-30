@@ -115,6 +115,26 @@ export const getTokens = async (
   }
 };
 
+/**
+ * Get a specific token balance for a user
+ * Returns the balance as a string, or "0" if not found
+ */
+export const getTokenBalanceForUser = async (
+  accessToken: string,
+  tokenAddress: string,
+  userAddress: string
+): Promise<string> => {
+  const tokenData = await getTokens(accessToken, {
+    address: `eq.${tokenAddress}`,
+    select: `address,balances:${Token}-_balances(user:key,balance:value::text)`,
+    "balances.key": `eq.${userAddress}`
+  });
+
+  const token = tokenData?.[0];
+  const userBalance = token?.balances?.find((b: any) => b.user === userAddress)?.balance;
+  return userBalance || "0";
+};
+
 // Get user tokens
 export const getBalance = async (
   accessToken: string,

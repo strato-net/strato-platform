@@ -343,7 +343,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           -- Maybe the typechecking should be done elsewhere, but this will
           -- allow us to prevent faulty code collections from going into the
           -- genesis block
-          cc <- codeCollectionFromHash True codeHash'
+          cc <- codeCollectionFromHash False True codeHash'
           case cc ^. CC.contracts . at contractName' of
             Nothing -> do
               $logWarnS "populateStorageDBs/toAction" . T.pack $

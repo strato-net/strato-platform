@@ -270,6 +270,7 @@ export interface AssetConfig {
   liquidationThreshold: string;
   ltv: string;
   reserveFactor: string;
+  perSecondFactorRAY: string;
 }
 
 export interface LendData {
@@ -321,18 +322,8 @@ export interface ApprovedToken {
   _symbol: string;
 }
 
-export interface PriceHistoryEntry {
-  id: string;
-  timestamp: Date;
-  asset: string;
-  price: string;
-  blockTimestamp: Date;
-}
-
-export interface PriceHistoryResponse {
-  data: PriceHistoryEntry[];
-  totalCount: number;
-}
+// Re-export oracle types from shared-types package
+export type { PriceHistoryEntry, PriceHistoryResponse } from '@mercata/shared-types';
 
 export interface HealthImpactData {
   currentHealthFactor: number;

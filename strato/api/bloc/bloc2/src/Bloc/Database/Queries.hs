@@ -171,6 +171,7 @@ createMetadataNoCompile ::
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 createMetadataNoCompile sourceList = do
-  compiledSource <- compileSourceWithAnnotations True (Map.fromList $ unSourceMap sourceList)
+  let isRunningTests = False
+  compiledSource <- compileSourceWithAnnotations isRunningTests True (Map.fromList $ unSourceMap sourceList)
   let srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
   pure $ (srcHash,) <$> compiledSource

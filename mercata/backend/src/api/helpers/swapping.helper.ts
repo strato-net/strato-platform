@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, validatePoolWithTokenAddressesArray, validateSinglePoolWithBalances, validateSwapEventArray } from "@shared/swap-types";
+import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, validatePoolWithTokenAddressesArray, validateSinglePoolWithBalances, validateSwapEventArray, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
@@ -102,7 +102,7 @@ export const calculateLPTokenPrice = (
 // ============================================================================
 
 export const buildPoolParams = (rawParams: Record<string, string | undefined>, userAddress?: string): Record<string, string> => ({
-  _owner: "eq." + constants.poolFactory,
+  poolFactory: "eq." + constants.poolFactory,
   ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
   select: rawParams.select || constants.swapSelectFields.join(","),
   ...(rawParams.select || !userAddress ? {} : {
@@ -137,7 +137,7 @@ export const getTokenBalance = (token: RawToken, userAddress: string): string =>
 export const getTradingVolume24hForPools = async (
   accessToken: string,
   poolAddresses: string[],
-  priceMap: Map<string, string>
+  priceMap: OraclePriceMap
 ): Promise<Map<string, string>> => {
   if (poolAddresses.length === 0) {
     return new Map();
@@ -146,7 +146,7 @@ export const getTradingVolume24hForPools = async (
   const { data: swapEvents } = await cirrus.get(accessToken, `/${PoolSwap}`, {
     params: {
       address: `in.(${poolAddresses.join(',')})`,
-      "pool._owner": `eq.${constants.poolFactory}`,
+      "pool.poolFactory": `eq.${constants.poolFactory}`,
       select: swapHistorySelectFields.join(','),
       block_timestamp: `gte.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()}`,
     }
@@ -267,7 +267,7 @@ export const buildLPToken = (
 
 export const buildPoolList = (
   pools: RawGetPool[],
-  priceMap: Map<string, string>,
+  priceMap: OraclePriceMap,
   volumeMap: Map<string, string>,
   factoryData: RawPoolFactory | undefined,
   userAddress: string | undefined
@@ -320,7 +320,7 @@ export const buildPoolList = (
 export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: string): Promise<{ tokenA: string; tokenB: string }> => {
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
-      _owner: "eq." + constants.poolFactory,
+      poolFactory: "eq." + constants.poolFactory,
       address: "eq." + poolAddress,
       select: "tokenA,tokenB"
     }
@@ -335,7 +335,7 @@ export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: 
 export const fetchPoolBalances = async (accessToken: string, poolAddress: string) => {
   const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
     params: {
-      _owner: "eq." + constants.poolFactory,
+      poolFactory: "eq." + constants.poolFactory,
       address: "eq." + poolAddress,
       select: "tokenABalance::text,tokenBBalance::text,lpToken:lpToken_fkey(_totalSupply::text)"
     }
