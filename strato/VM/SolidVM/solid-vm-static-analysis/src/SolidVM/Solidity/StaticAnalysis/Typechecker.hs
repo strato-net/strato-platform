@@ -136,17 +136,19 @@ showType' (Sum ts) =
       T.intercalate " | " $ showType' <$> NE.toList ts,
       ")"
     ]
-showType' (Function a (Product [] _) _ _ _ _) =
-  T.concat
-    [ "function ",
-      showType' a
-    ]
 showType' (Function a r _ _ _ _) =
   T.concat
-    [ "function (",
-      showType' a,
-      " returns ",
-      showType' r
+    [ "function "
+    , case a of
+        Product{} -> showType' a
+        Sum{} -> showType' a
+        _ -> "(" <> showType' a <> ")"
+    , case r of
+        Product [] _ -> ""
+        _ -> " returns " <> case r of
+          Product{} -> showType' r
+          Sum{} -> showType' r
+          _ -> "(" <> showType' r <> ")"
     ]
 showType' (MultiVariate a _) =
   T.concat
@@ -251,8 +253,7 @@ lookupContractFunction x cName fName = do
                in Function fArgs fRets x [] [] False
           Just VariableDecl {..} ->
             if _varIsPublic
-              then do
-                nestedType' x _varType  -- Use nestedType' to handle arrays and other types
+              then constructGetterType x _varType
               else
                 bottom $
                   ( T.concat
@@ -271,42 +272,18 @@ lookupContractFunction x cName fName = do
           _ -> []
       
   where 
-    nestedType' :: SourceAnnotation Text -> SVMType.Type -> Type'
-    nestedType' y (SVMType.Array t _) = 
-        -- For multidimensional arrays, we need to accept multiple indices as a product
-        let indicez = collectArrayDimensions t []
-            indexType = Static (SVMType.Int (Just False) (Just 32)) y
-            indexTypes = replicate (length indicez + 1) indexType
-            baseType = getBaseType t
-        in Function (Product [] y) 
-                   (Static (SVMType.Array t Nothing) y) 
-                   y 
-                   [ Function 
-                       (Product indexTypes y)  -- Accept all indices as a product
-                       (Static baseType y)     -- Return the base type
-                       y 
-                       [] 
-                       [] 
-                       False
-                   ]
-                   [] 
-                   False
-      where
-        -- Helper to collect all array dimensions
-        collectArrayDimensions :: SVMType.Type -> [SVMType.Type] -> [SVMType.Type]
-        collectArrayDimensions (SVMType.Array innerT _) acc = 
-            collectArrayDimensions innerT (innerT : acc)
-        collectArrayDimensions _ acc = acc
-
-        -- Helper to get the base (non-array) type
-        getBaseType :: SVMType.Type -> SVMType.Type
-        getBaseType (SVMType.Array innerT _) = getBaseType innerT
-        getBaseType bt = bt
-    nestedType' y (SVMType.Mapping _ k v) = let f = nestedType' y v
-                                              in case f of
-                                                  Function (Product args _) ret _ _ _ _ -> Function (Product ((Static k y):args) y) ret y [] [] False
-                                                  _ -> bottom $ "A maximum one layer nesting of mappings is supported" <$ y
-    nestedType' y t = Function (Product [] y) (Static t y) y [] [] False
+    constructGetterType :: SourceAnnotation Text -> SVMType.Type -> Type'
+    constructGetterType y (SVMType.Array t _) = case constructGetterType y t of
+      Function (Product args y') rets ctx w j f ->
+        let baseType = Static (SVMType.Int (Just False) (Just 32)) y
+         in Function (Product (baseType : args) y') rets ctx w j f
+      _ -> bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
+    constructGetterType y (SVMType.Mapping _ k v) = case constructGetterType y v of
+      Function (Product args y') rets ctx w j f ->
+        let baseType = Static k y
+         in Function (Product (baseType : args) y') rets ctx w j f
+      _ -> bottom $ "Failed to construct type for contract mapping getter. This is probably a SolidVM typechecker bug" <$ y
+    constructGetterType y t = Function (Product [] y) (Static t y) y [] [] False
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
@@ -426,7 +403,7 @@ simpleType' x =
          ]
 
 arrayType' :: SourceAnnotation Text -> Type'
-arrayType' x = Function (MultiVariate (Static (SVMType.Int Nothing Nothing) x) x) (topType' x) x [] [] False
+arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
@@ -502,8 +479,6 @@ typecheck' unify r1 r2 = case (r1, r2) of
       (Bottom es, _) -> Bottom es
       (_, Bottom ess) -> Bottom ess
       _ -> Function a v x [] [] False
-  (f@Function{}, Static t x) -> typecheck' unify f (toFunctionType t x)
-  (Static t x, f@Function{}) -> typecheck' unify (toFunctionType t x) f
   (a, b) ->
     pure . bottom $
       ( T.concat
@@ -593,20 +568,6 @@ string' [] = fromString ""
 string' ("" : as) = string' as
 string' (a : _) = a
 
-toFunctionType :: SVMType.Type -> SourceAnnotation Text -> Type'
-toFunctionType (SVMType.Array t _) x = case toFunctionType t x of
-  f@Function{} -> case functionArgType f of
-    Product ts y -> f{functionArgType = Product ((Static (SVMType.Int Nothing Nothing) x):ts) y}
-    _ -> Bottom $ x :| []
-  _ -> Bottom $ x :| []
-toFunctionType (SVMType.Mapping _ k v) x = case toFunctionType v x of
-  f@Function{} -> case functionArgType f of
-    Product ts y -> f{functionArgType = Product ((Static k x):ts) y}
-    _ -> Bottom $ x :| []
-  _ -> Bottom $ x :| []
-toFunctionType SVMType.Variadic x = Function (Product [] x) (topType' x) x [] [] False
-toFunctionType t x = Function (Product [] x) (Static t x) x [] [] False
-
 theLastPartOf :: SolidString -> Text
 theLastPartOf = unsafeHead . reverse . T.splitOn "." . labelToText
   where unsafeHead [] = error "Data.Text.splitOn returned an empty list. This should not be possible"
@@ -684,7 +645,11 @@ typecheckStatic (SVMType.Enum b1 t1 n1) (SVMType.Enum b2 t2 n2) =
                 <> labelToText t2
                 <> " do not match."
 typecheckStatic (SVMType.Array t1 l1) (SVMType.Array t2 l2) = do
-  e <- typecheckStatic t1 t2
+  e <- case t1 of
+    SVMType.UnknownLabel "*" _ -> pure t2
+    _ -> case t2 of
+      SVMType.UnknownLabel "*" _ -> pure t1
+      _ -> typecheckStatic t1 t2
   case (l1, l2) of
     (Just a, Just b) | a /= b -> Left "Mismatched length between array values"
     _ -> Right $ SVMType.Array e (l1 <|> l2)
