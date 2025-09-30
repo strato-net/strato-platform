@@ -42,3 +42,5 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const mercataBridge = process.env.MERCATA_BRIDGE || "0000000000000000000000000000000000001008";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
+export const rewardsChef = process.env.REWARDS_CHEF_CONTRACT_ADDRESS || "4d6d27a347faea2c0ac69c73f1462aeb6cb8b44f";
+export const rewardsChefMUsdstPoolId = parseInt(process.env.REWARDS_CHEF_MUSDST_POOL_ID || "0", 10);
