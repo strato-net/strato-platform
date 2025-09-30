@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
 contract Describe_FastForward {
 
   function beforeAll() {
