@@ -3,6 +3,30 @@ pragma solidity ^0.8.0;
 
 import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
+import "../../interfaces/ITimeProvider.sol";
+
+// ═════════════════════════════════════════════════════════════════════════
+// DATA STRUCTURES
+// ═════════════════════════════════════════════════════════════════════════
+
+struct UserInfo {
+    uint256 amount;      // How many LP tokens the user has provided.
+    uint256 rewardDebt;  // Reward debt
+}
+
+struct BonusPeriod {
+    uint256 startTimestamp;   // When this bonus period begins
+    uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
+}
+
+struct PoolInfo {
+    address lpToken;             // The LP Token added to the stake pool
+    uint256 allocPoint;          // How many allocation points assigned to
+                          // this pool.  Importance of the pool.
+    uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
+    uint256 accPerToken;         // Accumulated CATA per share (per token)
+    BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
+}
 
 /**
  * RewardsChef - A staking contract that allows creating pools for various LP
@@ -136,28 +160,6 @@ contract record RewardsChef is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    // ═════════════════════════════════════════════════════════════════════════
-    // DATA STRUCTURES
-    // ═════════════════════════════════════════════════════════════════════════
-
-    struct UserInfo {
-        uint256 amount;      // How many LP tokens the user has provided.
-        uint256 rewardDebt;  // Reward debt
-    }
-
-    struct BonusPeriod {
-        uint256 startTimestamp;   // When this bonus period begins
-        uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
-    }
-
-    struct PoolInfo {
-        address lpToken;             // The LP Token added to the stake pool
-        uint256 allocPoint;          // How many allocation points assigned to
-	                             // this pool.  Importance of the pool.
-        uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
-        uint256 accPerToken;         // Accumulated CATA per share (per token)
-        BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
-    }
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -171,7 +173,7 @@ contract record RewardsChef is Ownable {
     // precision. We multiply when storing rewards per token (accPerToken calculation) and
     // divide when calculating individual user rewards to get the actual reward amount.
     // This multiplier also propagates to rewardDebt calculations to maintain consistency.
-    uint256 private PRECISION_MULTIPLIER = 1e12;
+    uint256 public PRECISION_MULTIPLIER = 1e18;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -190,6 +192,9 @@ contract record RewardsChef is Ownable {
     // Minimum time in the future for new bonus periods
     uint256 public minFutureTime;
 
+    // Time provider for getting current timestamp
+    ITimeProvider public timeProvider;
+
     // Info of each of the stake pool.
     PoolInfo[] public pools;
 
@@ -202,12 +207,26 @@ contract record RewardsChef is Ownable {
 
     constructor(address initialOwner,
 		address _rewardToken,
-		uint256 _cataPerSecond
+		uint256 _cataPerSecond,
+		address _timeProvider
 	        ) Ownable(initialOwner) {
         rewardToken = Token(_rewardToken);
         cataPerSecond = _cataPerSecond;
+        timeProvider = ITimeProvider(_timeProvider);
         pools = [];
         minFutureTime = 3600; // Initialize with 1 hour
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // TIMESTAMP UTILITIES
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /**
+     * @dev Returns the current timestamp using the injected time provider
+     * @return Current timestamp in seconds since Unix epoch
+     */
+    function currentTimestamp() internal view returns (uint256) {
+        return timeProvider.currentTimestamp();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -237,10 +256,10 @@ contract record RewardsChef is Ownable {
         PoolInfo memory poolInfo;
         poolInfo.lpToken = _lpToken;
         poolInfo.allocPoint = _allocPoint;
-        poolInfo.lastRewardTimestamp = block.timestamp;
+        poolInfo.lastRewardTimestamp = currentTimestamp();
         poolInfo.accPerToken = 0;
         poolInfo.bonusPeriods = [];
-        poolInfo.bonusPeriods.push(BonusPeriod(block.timestamp, _bonusMultiplier));
+        poolInfo.bonusPeriods.push(BonusPeriod(currentTimestamp(), _bonusMultiplier));
 
         pools.push(poolInfo);
 
@@ -270,7 +289,7 @@ contract record RewardsChef is Ownable {
     ) public onlyOwner {
         require(_pid < pools.length, "Pool does not exist");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
-        require(_startTimestamp >= block.timestamp + minFutureTime, "Start timestamp must be far enough in the future");
+        require(_startTimestamp >= currentTimestamp() + minFutureTime, "Start timestamp must be far enough in the future");
 
         // Ensure new period starts after the last period
         uint256 periodsLength = pools[_pid].bonusPeriods.length;
@@ -326,24 +345,24 @@ contract record RewardsChef is Ownable {
         require(_pid < pools.length, "Pool does not exist");
 
         PoolInfo storage pool = pools[_pid];
-        if (block.timestamp <= pool.lastRewardTimestamp) {
+        if (currentTimestamp() <= pool.lastRewardTimestamp) {
             return;
         }
 
-        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+        uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
         if (lpSupply == 0) {
-            pool.lastRewardTimestamp = block.timestamp;
+            pool.lastRewardTimestamp = currentTimestamp();
             return;
         }
 
-        uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, currentTimestamp());
         // totalAllocPoint is always greater than zero OR there are no pools yet added
         uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
 
         rewardToken.mint(address(this), cataReward);
 
         pool.accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
-        pool.lastRewardTimestamp = block.timestamp;
+        pool.lastRewardTimestamp = currentTimestamp();
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -361,16 +380,23 @@ contract record RewardsChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
-                rewardToken.transfer(msg.sender, pending);
+                ERC20(rewardToken).transfer(msg.sender, pending);
             }
         }
 
         if (_amount > 0) {
-            Token(pool.lpToken).transferFrom(msg.sender, address(this), _amount);
+            ERC20(pool.lpToken).transferFrom(msg.sender, address(this), _amount);
             user.amount += _amount;
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+	// WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+	//
+	// This has to be set in variable and only then applied to
+	// user.rewardDebt, otherwise the solidvm throws!
+	uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
         emit Deposit(msg.sender, _pid, _amount);
     }
@@ -387,15 +413,22 @@ contract record RewardsChef is Ownable {
 
         uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
         if (pending > 0) {
-            rewardToken.transfer(msg.sender, pending);
+            ERC20(rewardToken).transfer(msg.sender, pending);
         }
 
         if (_amount > 0) {
             user.amount -= _amount;
-            Token(pool.lpToken).transfer(msg.sender, _amount);
+            ERC20(pool.lpToken).transfer(msg.sender, _amount);
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+	// WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+	//
+	// This has to be set in variable and only then applied to
+	// user.rewardDebt, otherwise the solidvm throws!
+	uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -407,10 +440,10 @@ contract record RewardsChef is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
 
         uint256 accPerToken = pool.accPerToken;
-        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+        uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
 
-        if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
+        if (currentTimestamp() > pool.lastRewardTimestamp && lpSupply != 0) {
+            uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, currentTimestamp());
             uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
             accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
         }

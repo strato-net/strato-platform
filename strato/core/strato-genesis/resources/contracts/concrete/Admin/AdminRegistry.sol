@@ -15,9 +15,17 @@ contract record AdminRegistry {
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
 
+    bool public initialized = false;
+
+    modifier onlyOnce() {
+        require(!initialized, "AdminRegistry is already initialized");
+        initialized = true;
+        _;
+    }
+
     constructor() { }
 
-    function initialize(address[] _initialAdmins) external {
+    function initialize(address[] _initialAdmins) external onlyOnce {
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
             admins.push(_initialAdmins[i]);

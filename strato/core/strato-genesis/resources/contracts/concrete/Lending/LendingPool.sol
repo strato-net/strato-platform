@@ -35,6 +35,8 @@ contract record LendingPool is Ownable {
     event ReservesSweptSafety(uint amount, address to);
     event BadDebtRecognized(uint amount);     // global, no borrower index
     event BadDebtCovered(uint cover, uint remainingBadDebt);
+    event BadDebtWrittenOffFromReserves(uint writeOff, uint badDebt, uint reservesAccrued);
+    event DepositorHaircutApplied(uint writeOff, uint badDebt, string calldata reason);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -103,6 +105,10 @@ contract record LendingPool is Ownable {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _registry, address _poolConfigurator, address _tokenFactory, address _feeCollector, address _safetyModule) external onlyOwner {
+        // hotfix
+        RAY = 1e27;
+        SECONDS_PER_YEAR = 31536000;
+        
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
@@ -1089,9 +1095,16 @@ contract record LendingPool is Ownable {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
-    // BAD DEPT  FUNCTIONS
+    // BAD DEBT  FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════════════
 
+    /**
+    * @notice Recognize a borrower's remaining loan as bad debt and sweep any residual collateral.
+    * @dev Minimal side effects:
+    *      - Accrues interest, converts scaled → base, removes loan from accrual, bumps `badDebt`.
+    *      - Iterates configured assets and seizes any leftover collateral balances (>0) to `feeCollector`.
+    *      - No-op if borrower still has liquidation-weighted value or has no scaled debt.
+    */
     function recognizeBadDebt(address borrower) external onlyPoolConfigurator {
         _accrue();
         if (_getTotalCollateralValueForHealth(borrower) > 0) return;
@@ -1102,11 +1115,25 @@ contract record LendingPool is Ownable {
 
         uint baseBad = (scaled * borrowIndex) / RAY;
 
+        // stop interest accrual on this borrower
         totalScaledDebt -= scaled;
         ln.scaledDebt = 0;
         delete userLoan[borrower];
 
+        // track non-accruing receivable
         badDebt += baseBad;
+
+        // Sweep any residual collateral (even if liquidation-weighted value was 0)
+        CollateralVault vault = _collateralVault();
+        require (address(feeCollector) != address(0), "LP: Fee collector not set");
+        uint n = configuredAssets.length;
+        for (uint i = 0; i < n; i++) {
+            address collateral = configuredAssets[i];
+            uint amt = vault.userCollaterals(borrower, collateral);
+            if (amt != 0) {
+                vault.seizeCollateral(borrower, address(feeCollector), collateral, amt); // vault emits CollateralRemoved
+            }
+        }
 
         emit BadDebtRecognized(baseBad);
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
@@ -1124,6 +1151,41 @@ contract record LendingPool is Ownable {
         }
 
         // Any excess cash simply improves liquidity until swept to reserves
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+    }
+
+    function writeOffBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
+        if (amount == 0) return;
+        _accrue(); 
+
+        // capacity = min(reservesAccrued, badDebt)
+        uint cap = reservesAccrued < badDebt ? reservesAccrued : badDebt;
+        if (cap == 0) return;
+
+        // use at most the amount sent, further capped by capacity
+        uint writeOff = amount <= cap ? amount : cap;
+
+        reservesAccrued -= writeOff;
+        badDebt        -= writeOff;
+
+        emit BadDebtWrittenOffFromReserves(writeOff, badDebt, reservesAccrued);
+        emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
+    }
+
+    /// @notice LAST-RESORT: write off bad debt without funding (haircut depositors).
+    /// @dev Reduces `badDebt` directly, which lowers getExchangeRate() once, pro-rata for all mToken holders.
+    ///      Use only after attempting SM coverage and reserves write-off.
+    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external onlyPoolConfigurator
+    {
+        require(amount > 0, "LP:zero");
+        _accrue();
+
+        uint writeOff = amount <= badDebt ? amount : badDebt;
+        if (writeOff == 0) return;
+
+        badDebt -= writeOff;
+
+        emit DepositorHaircutApplied(writeOff, badDebt, reason);
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 } 

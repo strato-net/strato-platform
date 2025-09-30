@@ -554,6 +554,7 @@ assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Blo
     allBalances = assetBalances asset
     totalSupply = sum $ snd <$> allBalances
 
+-- To be deleted
 rateStrategy :: AccountInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 proxy $ createdByBlockApps mercataAddress
   ++ [(".logicContract", BAccount $ unspecifiedChain rateStrategyImplAddress)]
@@ -791,6 +792,12 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ create
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress1 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrice\"><a:" <> addrBS oracleAddress2 <> ">", BBool True)
      , (".whitelist<a:" <> addrBS priceOracleAddress <> "><\"setAssetPrices\"><a:" <> addrBS oracleAddress2 <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setLendingPool\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setLiquidityPool\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setCollateralVault\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setRateStrategy\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setPriceOracle\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setAllComponents\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
@@ -1000,8 +1007,8 @@ sUsdst = SolidVMContractWithStorage sUsdstAddress 0 proxy $ ownedByBlockApps mer
      ]
 
 ethstPool :: AccountInfo
-ethstPool = SolidVMContractWithStorage ethstPoolAddress 0 proxy $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+ethstPool = SolidVMContractWithStorage ethstPoolAddress 0 proxy $ ownedByBlockApps mercataAddress
+  ++ [ (".poolFactory", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".logicContract", BAccount $ unspecifiedChain poolImplAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain ethstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -1030,8 +1037,8 @@ ethstLpToken = SolidVMContractWithStorage ethstLpTokenAddress 0 proxy $ ownedByB
      ]
 
 wbtcstPool :: AccountInfo
-wbtcstPool = SolidVMContractWithStorage wbtcstPoolAddress 0 proxy $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+wbtcstPool = SolidVMContractWithStorage wbtcstPoolAddress 0 proxy $ ownedByBlockApps mercataAddress
+  ++ [ (".poolFactory", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".logicContract", BAccount $ unspecifiedChain poolImplAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain wbtcstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -1060,8 +1067,8 @@ wbtcstLpToken = SolidVMContractWithStorage wbtcstLpTokenAddress 0 proxy $ ownedB
      ]
 
 goldstPool :: AccountInfo
-goldstPool = SolidVMContractWithStorage goldstPoolAddress 0 proxy $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+goldstPool = SolidVMContractWithStorage goldstPoolAddress 0 proxy $ ownedByBlockApps mercataAddress
+  ++ [ (".poolFactory", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".logicContract", BAccount $ unspecifiedChain poolImplAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain goldstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -1090,8 +1097,8 @@ goldstLpToken = SolidVMContractWithStorage goldstLpTokenAddress 0 proxy $ ownedB
      ]
 
 silvstPool :: AccountInfo
-silvstPool = SolidVMContractWithStorage silvstPoolAddress 0 proxy $ createdByBlockApps mercataAddress
-  ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+silvstPool = SolidVMContractWithStorage silvstPoolAddress 0 proxy $ ownedByBlockApps mercataAddress
+  ++ [ (".poolFactory", BAccount $ unspecifiedChain poolFactoryAddress)
      , (".logicContract", BAccount $ unspecifiedChain poolImplAddress)
      , (".tokenA", BContract "Token" $ unspecifiedChain silvstRoot)
      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
@@ -1120,8 +1127,8 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ ownedB
      ]
 
 -- paxgstPool :: AccountInfo
--- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 proxy $ createdByBlockApps mercataAddress
---   ++ [ ("._owner", BAccount $ unspecifiedChain poolFactoryAddress)
+-- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 proxy $ ownedByBlockApps mercataAddress
+--   ++ [ (".poolFactory", BAccount $ unspecifiedChain poolFactoryAddress)
 --      , (".tokenA", BContract "Token" $ unspecifiedChain paxgstRoot)
 --      , (".tokenB", BContract "Token" $ unspecifiedChain usdstAddress)
 --      , (".lpToken", BContract "Token" $ unspecifiedChain paxgstLpTokenAddress)

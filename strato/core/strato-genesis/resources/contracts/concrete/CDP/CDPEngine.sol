@@ -163,6 +163,10 @@ contract record CDPEngine is Ownable {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _registry) external onlyOwner {
+        // hotfix
+        RAY = 1e27;
+        WAD = 1e18;
+
         require(_registry != address(0), "CDPEngine: invalid registry");
         registry = CDPRegistry(_registry);
     }
