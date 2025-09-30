@@ -94,15 +94,21 @@ runFuzzer dSettings compile src = compile src >>= \case
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
               _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
               let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
-               in fmap catMaybes . for functionsInSourceOrder $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
+              testResults <- fmap catMaybes . for functionsInSourceOrder $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
                 if
                     | testPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> test bh addr fName f
+                        result <- Just <$> test bh addr fName f
+                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                        pure result
                     | propertyPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> prop bh addr fName f
+                        result <- Just <$> prop bh addr fName f
+                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                        pure result
                     | otherwise -> pure Nothing
+              _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
+              pure testResults
 
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True
