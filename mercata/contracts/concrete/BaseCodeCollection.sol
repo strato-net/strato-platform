@@ -40,6 +40,9 @@ import "CDP/CDPEngine.sol";
 import "CDP/CDPVault.sol";
 import "CDP/CDPReserve.sol";
 
+//Proxy
+import "Proxy/Proxy.sol";
+
 //TODO
 contract record Mercata {
     RateStrategy public rateStrategy;
@@ -62,28 +65,69 @@ contract record Mercata {
     SafetyModule public safetyModule;
 
     constructor() public {
+        // The owner of the implementation contract is ignored in favor of the proxy owner
+        address implOwnerIgnored = address("deadbeef");
+        
         // Create AdminRegistry first
-        adminRegistry = new AdminRegistry([this]);
+        address adminRegistryImpl = address(new AdminRegistry());
+        adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, this)));
+        adminRegistry.initialize([this]); // Mercata contract is temporarily the sole admin
+        Ownable(address(adminRegistry)).transferOwnership(address(adminRegistry));
 
         // Create FeeCollector
-        feeCollector = new FeeCollector(address(adminRegistry));
+        address feeCollectorImpl = address(new FeeCollector(implOwnerIgnored));
+        feeCollector = FeeCollector(address(new Proxy(feeCollectorImpl, this)));
+        Ownable(feeCollector).transferOwnership(address(adminRegistry));
 
         // Create Factories
-        tokenFactory = new TokenFactory(address(adminRegistry));
-        poolFactory = new PoolFactory(address(adminRegistry), address(tokenFactory), address(address(adminRegistry)), address(feeCollector));
+        address tokenFactoryImpl = address(new TokenFactory(implOwnerIgnored));
+        tokenFactory = TokenFactory(address(new Proxy(tokenFactoryImpl, this)));
+        Ownable(tokenFactory).transferOwnership(address(adminRegistry));
+
+        address poolFactoryImpl = address(new PoolFactory(implOwnerIgnored));
+        poolFactory = PoolFactory(address(new Proxy(poolFactoryImpl, this)));
+        poolFactory.initialize(address(tokenFactory), address(adminRegistry), address(feeCollector));
+        Ownable(poolFactory).transferOwnership(address(adminRegistry));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(tokenFactory), "createTokenWithInitialOwner", address(poolFactory));
 
         // Create Lending related contracts
-        lendingRegistry = new LendingRegistry(address(adminRegistry));
-        collateralVault = new CollateralVault(address(lendingRegistry), address(adminRegistry));
-        liquidityPool = new LiquidityPool(address(lendingRegistry), address(adminRegistry));
-        rateStrategy = new RateStrategy();
-        priceOracle = new PriceOracle(address(adminRegistry));
-        poolConfigurator = new PoolConfigurator(address(lendingRegistry), address(adminRegistry));
-        safetyModule = new SafetyModule(address(lendingRegistry), address(tokenFactory), address(adminRegistry));
-        lendingPool = new LendingPool(address(lendingRegistry), address(poolConfigurator), address(adminRegistry), address(tokenFactory), address(feeCollector), address(safetyModule));
+        address lendingRegistryImpl = address(new LendingRegistry(implOwnerIgnored));
+        lendingRegistry = LendingRegistry(address(new Proxy(lendingRegistryImpl, this)));
+        Ownable(lendingRegistry).transferOwnership(address(adminRegistry));
 
-        // Allow poolConfigurator to set the lendingRegistry components
+        address collateralVaultImpl = address(new CollateralVault(implOwnerIgnored));
+        collateralVault = CollateralVault(address(new Proxy(collateralVaultImpl, this)));
+        collateralVault.initialize(address(lendingRegistry));
+        Ownable(collateralVault).transferOwnership(address(adminRegistry));
+
+        address liquidityPoolImpl = address(new LiquidityPool(implOwnerIgnored));
+        liquidityPool = LiquidityPool(address(new Proxy(liquidityPoolImpl, this)));
+        liquidityPool.initialize(address(lendingRegistry));
+        Ownable(liquidityPool).transferOwnership(address(adminRegistry));
+
+        address rateStrategyImpl = address(new RateStrategy());
+        rateStrategy = RateStrategy(address(new Proxy(rateStrategyImpl, this)));
+        Ownable(address(rateStrategy)).transferOwnership(address(adminRegistry));
+
+        address priceOracleImpl = address(new PriceOracle(implOwnerIgnored));
+        priceOracle = PriceOracle(address(new Proxy(priceOracleImpl, this)));
+        Ownable(priceOracle).transferOwnership(address(adminRegistry));
+
+        address poolConfiguratorImpl = address(new PoolConfigurator(implOwnerIgnored));
+        poolConfigurator = PoolConfigurator(address(new Proxy(poolConfiguratorImpl, this)));
+        poolConfigurator.initialize(address(lendingRegistry));
+        Ownable(poolConfigurator).transferOwnership(address(adminRegistry));
+
+        address safetyModuleImpl = address(new SafetyModule(implOwnerIgnored));
+        safetyModule = SafetyModule(address(new Proxy(safetyModuleImpl, this)));
+        safetyModule.initialize(address(lendingRegistry), address(tokenFactory));
+        Ownable(safetyModule).transferOwnership(address(adminRegistry));
+
+        address lendingPoolImpl = address(new LendingPool(implOwnerIgnored));
+        lendingPool = LendingPool(address(new Proxy(lendingPoolImpl, this)));
+        lendingPool.initialize(address(lendingRegistry), address(poolConfigurator), address(tokenFactory), address(feeCollector), address(safetyModule));
+        Ownable(lendingPool).transferOwnership(address(adminRegistry));
+
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLendingPool", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setLiquidityPool", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setCollateralVault", address(poolConfigurator));
@@ -93,15 +137,37 @@ contract record Mercata {
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
-        mercataBridge = new MercataBridge(address(tokenFactory), address(adminRegistry), address(adminRegistry)); // TODO: set relayer address correctly
-        rewardsManager = new RewardsManager(RewardsManagerArgs([], [], [], [], address(0)), address(adminRegistry));
+        address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
+        mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
+        mercataBridge.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
+        Ownable(mercataBridge).transferOwnership(address(adminRegistry));
+
+        address rewardsManagerImpl = address(new RewardsManager(implOwnerIgnored));
+        rewardsManager = RewardsManager(address(new Proxy(rewardsManagerImpl, this)));
+        rewardsManager.initialize(RewardsManagerArgs([], [], [], [], address(0)));
+        Ownable(rewardsManager).transferOwnership(address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
-        cdpRegistry = new CDPRegistry(address(adminRegistry));
-        cdpVault = new CDPVault(address(cdpRegistry), address(adminRegistry));
-        cdpEngine = new CDPEngine(address(cdpRegistry), address(adminRegistry));
-        cdpReserve = new CDPReserve(address(cdpRegistry), address(adminRegistry));
+        address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));
+        cdpRegistry = CDPRegistry(address(new Proxy(cdpRegistryImpl, this)));
+
+        address cdpVaultImpl = address(new CDPVault(implOwnerIgnored));
+        cdpVault = CDPVault(address(new Proxy(cdpVaultImpl, this)));
+        cdpVault.initialize(address(cdpRegistry));
+        Ownable(cdpVault).transferOwnership(address(adminRegistry));
+
+        address cdpEngineImpl = address(new CDPEngine(implOwnerIgnored));
+        cdpEngine = CDPEngine(address(new Proxy(cdpEngineImpl, this)));
+        cdpEngine.initialize(address(cdpRegistry));
+        Ownable(cdpEngine).transferOwnership(address(adminRegistry));
+
+        address cdpReserveImpl = address(new CDPReserve(implOwnerIgnored));
+        cdpReserve = CDPReserve(address(new Proxy(cdpReserveImpl, this)));
+        cdpReserve.initialize(address(cdpRegistry));
+        Ownable(cdpReserve).transferOwnership(address(adminRegistry));
+
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
+        Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
         adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
     }

@@ -24,7 +24,9 @@ contract record LiquidityPool is Ownable  {
         _;
     }
 
-    constructor(address _registry, address _owner) Ownable(_owner) {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _registry) external onlyOwner {
         require(_registry != address(0), "Invalid registry");
         registry = LendingRegistry(_registry);
     }

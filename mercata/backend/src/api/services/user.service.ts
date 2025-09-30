@@ -152,8 +152,9 @@ export const getOpenIssues = async (
   try {
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
+        address: `eq.${adminRegistry}`,
         select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value),executed:${AdminRegistry}-IssueExecuted(*)`,
-        ['votes.value']: 'neq.',
+        ['votes.value']: 'neq.""',
         ['executed.limit']: 10,
         ['executed.order']: 'block_timestamp.desc',
       },
@@ -179,6 +180,7 @@ export const getOpenIssues = async (
 
     return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
   } catch (error) {
+    console.log(error);
     return [];
   }
 };

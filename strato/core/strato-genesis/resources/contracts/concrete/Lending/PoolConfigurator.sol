@@ -11,11 +11,13 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record PoolConfigurator is Ownable {
    
-    LendingRegistry public immutable registry;
+    LendingRegistry public registry;
 
     event AssetConfigured(address indexed asset, uint ltv, uint liquidationThreshold, uint liquidationBonus, uint interestRate, uint reserveFactor, uint perSecondFactorRAY);
 
-    constructor(address _registry, address initialOwner) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _registry) external onlyOwner {
         require(_registry != address(0), "Invalid registry");
         registry = LendingRegistry(_registry);
     }
@@ -186,7 +188,16 @@ contract record PoolConfigurator is Ownable {
         pool.setFeeCollector(_feeCollector);
     }
 
-     // Setter function for borrowable asset
+    /**
+     * @notice Set safety module address
+     * @param _safetyModule The safety module address
+     */
+    function setSafetyModule(address _safetyModule) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setSafetyModule(_safetyModule);
+    }
+
+    // Setter function for borrowable asset
     function setBorrowableAsset(address asset) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
         LendingPool pool = LendingPool(registry.getLendingPool());
@@ -212,6 +223,28 @@ contract record PoolConfigurator is Ownable {
         pool.setSafetyShareBps(bps);
     }
 
+    // Individual setters for the LendingRegistry
+    function setLendingPool(address _lendingPool) external onlyOwner {
+        require(_lendingPool != address(0), "Invalid lendingPool address");
+        registry.setLendingPool(_lendingPool);
+    }
+    function setLiquidityPool(address _liquidityPool) external onlyOwner {
+        require(_liquidityPool != address(0), "Invalid liquidityPool address");
+        registry.setLiquidityPool(_liquidityPool);
+    }
+    function setCollateralVault(address _collateralVault) external onlyOwner {
+        require(_collateralVault != address(0), "Invalid collateralVault address");
+        registry.setCollateralVault(_collateralVault);
+    }
+    function setRateStrategy(address _rateStrategy) external onlyOwner {
+        require(_rateStrategy != address(0), "Invalid rateStrategy address");
+        registry.setRateStrategy(_rateStrategy);
+    }
+    function setPriceOracle(address _priceOracle) external onlyOwner {
+        require(_priceOracle != address(0), "Invalid priceOracle address");
+        registry.setPriceOracle(_priceOracle);
+    }
+
     /**
      * @notice Forwarder to sweep protocol reserves from the LendingPool to the FeeCollector
      * @dev Restricted to governance (onlyOwner). The LendingPool enforces bounds and accrual.
@@ -220,4 +253,23 @@ contract record PoolConfigurator is Ownable {
         LendingPool pool = LendingPool(registry.getLendingPool());
         pool.sweepReserves(amount);
     }
+
+    /// @notice Forwarder to write off bad debt without funding (haircut depositors)
+    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.writeOffBadDebtWithHaircut(amount, reason);
+    }
+
+    /// @notice Forwarder to write off bad debt using protocol reserves
+    function writeOffBadDebtFromReserves(uint amount) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.writeOffBadDebtFromReserves(amount);
+    }
+
+    /// @notice Forwarder to recognize a borrower's remaining loan as bad debt and sweep any residual collateral
+    function recognizeBadDebt(address borrower) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.recognizeBadDebt(borrower);
+    }
+
 } 

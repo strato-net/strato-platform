@@ -48,8 +48,6 @@ data AggregateAction = AggregateAction
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
     actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
-    actionMappings :: [Text],
-    actionArrays :: [Text],
     actionType :: Action.CallType,
     actionSrc :: Maybe Text
   }
@@ -98,8 +96,6 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
             actionAbstracts = _actionDataAbstracts,
-            actionMappings = _actionDataMappings,
-            actionArrays = _actionDataArrays,
             actionType = t,
             actionSrc = _src
           }

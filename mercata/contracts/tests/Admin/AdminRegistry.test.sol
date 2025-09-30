@@ -52,7 +52,8 @@ contract Describe_AdminRegistry {
         address[] memory initialAdmins = new address[](2);
         initialAdmins[0] = admin1;
         initialAdmins[1] = address(user1);
-        adminRegistry = new AdminRegistry(initialAdmins);
+        adminRegistry = new AdminRegistry();
+        adminRegistry.initialize(initialAdmins);
         token = new TestERC20("Test Token", "TEST", address(adminRegistry));
     }
 
@@ -67,14 +68,16 @@ contract Describe_AdminRegistry {
 
     function it_admin_registry_handles_empty_initial_admins() {
         address[] memory emptyAdmins = new address[](0);
-        AdminRegistry emptyRegistry = new AdminRegistry(emptyAdmins);
+        AdminRegistry emptyRegistry = new AdminRegistry();
+        emptyRegistry.initialize(emptyAdmins);
         require(!emptyRegistry.isAdminAddress(admin1), "Should have no admins");
     }
 
     function it_admin_registry_handles_single_initial_admin() {
         address[] memory singleAdmin = new address[](1);
         singleAdmin[0] = admin1;
-        AdminRegistry singleRegistry = new AdminRegistry(singleAdmin);
+        AdminRegistry singleRegistry = new AdminRegistry();
+        singleRegistry.initialize(singleAdmin);
         require(singleRegistry.isAdminAddress(admin1), "Should have one admin");
         require(!singleRegistry.isAdminAddress(admin2), "Should not have second admin");
     }

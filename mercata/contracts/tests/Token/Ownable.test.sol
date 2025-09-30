@@ -183,7 +183,8 @@ contract Describe_Ownable {
     // ============ ADMIN INTEGRATION TESTS ============
 
     function it_ownable_falls_back_to_admin_registry_when_not_owner() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Initially, the function should not have been called
@@ -203,7 +204,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_requires_admin_votes_for_non_owner_access() {
-        AdminRegistry admin = new AdminRegistry([address(this)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Single admin should not be able to execute without votes
@@ -217,7 +219,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_allows_admin_execution_with_sufficient_votes() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // First vote - should not execute yet
@@ -230,7 +233,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_admin_registry_as_owner() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Initially, the function should not have been called
@@ -291,7 +295,8 @@ contract Describe_Ownable {
     // ============ ADMIN REGISTRY COMPLEX SCENARIOS ============
 
     function it_ownable_handles_admin_registry_with_multiple_admins() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1), address(user2)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1), address(user2)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // First vote using correct parameter format
@@ -307,7 +312,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_admin_registry_vote_failure() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Only one vote - should not execute
@@ -316,7 +322,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_admin_registry_with_different_functions() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Vote for ownerOnlyFunction using correct parameter format
@@ -343,7 +350,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_owner_check_with_admin_registry() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         require(Ownable(ownableWithAdmin).owner() == address(admin), "Should identify admin registry as owner");
@@ -367,7 +375,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_only_owner_modifier_with_admin_fallback() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Admin fallback should work with votes using correct parameter format
@@ -414,8 +423,10 @@ contract Describe_Ownable {
     // ============ COMPLEX ADMIN SCENARIOS ============
 
     function it_ownable_handles_admin_registry_owner_transfer() {
-        AdminRegistry admin1 = new AdminRegistry([address(this), address(user1)]);
-        AdminRegistry admin2 = new AdminRegistry([address(this), address(user2)]);
+        AdminRegistry admin1 = new AdminRegistry();
+        admin1.initialize([address(this), address(user1)]);
+        AdminRegistry admin2 = new AdminRegistry();
+        admin2.initialize([address(this), address(user2)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin1));
         
         // Transfer ownership to new admin using correct parameter format
@@ -429,7 +440,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_admin_registry_renunciation() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // Renounce ownership using correct parameter format
@@ -462,7 +474,8 @@ contract Describe_Ownable {
     }
 
     function it_ownable_handles_large_admin_registry() {
-        AdminRegistry admin = new AdminRegistry([address(this), address(user1), address(user2), address(user3)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([address(this), address(user1), address(user2), address(user3)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
         // With 4 admins, we need 3 votes to execute (threshold: 3 * (votes + 1) >= 2 * 4 = 8)
