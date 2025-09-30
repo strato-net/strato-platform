@@ -186,7 +186,6 @@ export const depositLiquidity = async (
     const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
 
     if (BigInt(newlyMintedAmount) > 0n) {
-      const rewardsChefContractName = "RewardsChef";
       const rewardsChefContractAddress = config.rewardsChef;
       const poolIdx = config.rewardsChefMUsdstPoolId;
 
@@ -200,7 +199,7 @@ export const depositLiquidity = async (
         },
         // Then deposit into RewardsChef
         {
-          contractName: rewardsChefContractName,
+          contractName: RewardsChef,
           contractAddress: rewardsChefContractAddress,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
@@ -264,7 +263,7 @@ export const withdrawLiquidity = async (
 
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
-        contractName: "RewardsChef",
+        contractName: RewardsChef,
         contractAddress: config.rewardsChef,
         method: "withdraw",
         args: {
