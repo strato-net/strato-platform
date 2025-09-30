@@ -182,7 +182,7 @@ contract record MercataBridge is Ownable {
     constructor(address _owner) Ownable(_owner) { }
 
     function initialize(address _tokenFactory, address _relayer) external onlyOwner {
-        // hotfix
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         PERMISSION_WRAP = 1;
         PERMISSION_MINT = 2;
         PERMISSION_MASK = 3;

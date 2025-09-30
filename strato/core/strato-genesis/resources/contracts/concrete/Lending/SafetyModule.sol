@@ -44,7 +44,7 @@ contract record SafetyModule is Ownable {
     constructor(address _owner) Ownable(_owner) { }
 
     function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
-        // hotfix
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         COOLDOWN_SECONDS = 259200;
         UNSTAKE_WINDOW = 172800;
         MAX_SLASH_BPS = 3000;
