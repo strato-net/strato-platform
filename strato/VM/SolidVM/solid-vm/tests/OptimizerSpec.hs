@@ -53,7 +53,7 @@ instance {-# OVERLAPPING #-} (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Al
 
 runOptimizer :: String -> IO CodeCollection
 runOptimizer c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
-  eCC <- compileSourceWithAnnotations True (M.fromList [("", T.pack c)])
+  eCC <- compileSourceWithAnnotations True True (M.fromList [("", T.pack c)])
   case eCC of
     Left _ -> internalError "Compilation Error" ()
     Right cc -> pure cc

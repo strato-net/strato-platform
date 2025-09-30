@@ -1,9 +1,10 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
-import { poolConfigurator as poolConfiguratorAddress } from "../../config/config";
-import { getBalance, getTokens } from "./tokens.service";
+import * as config from "../../config/config";
+import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import {
@@ -29,6 +30,7 @@ const {
   Token,
   CollateralVault,
   PriceOracle,
+  RewardsChef,
 } = constants;
 
 /**
@@ -64,6 +66,41 @@ export const getExchangeRateFromCirrus = async (
   } catch (error) {
     console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
     return oneToOne;
+  }
+};
+
+/**
+ * Helper function to get user's staked balance from RewardsChef using Cirrus events
+ *
+ * This function queries the latest CurrentUserAmount event for the given user and pool,
+ * which contains the current staked balance. This approach avoids on-chain calls while
+ * working around the limitation that nested mappings cannot be queried from Cirrus.
+ */
+const getStakedBalance = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string
+): Promise<string> => {
+  try {
+    // Query the latest CurrentUserAmount event for this user and pool
+    const response = await cirrus.get(accessToken, `/${RewardsChef}-CurrentUserAmount`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        user: `eq.${userAddress}`,
+        pid: `eq.${poolId}`,
+        select: "currentAmount::text,block_timestamp",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
+    });
+
+    // Extract the current amount from the latest event
+    const latestEvent = response.data?.[0];
+    return latestEvent?.currentAmount || "0";
+  } catch (error) {
+    console.error("Failed to fetch staked balance from RewardsChef events:", error);
+    return "0";
   }
 };
 
@@ -104,20 +141,25 @@ export const depositLiquidity = async (
   accessToken: string,
   userAddress: string,
   amount: string,
+  stakeMToken: boolean,
 ) => {
-  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
+  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
     undefined,
     {
-      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
+      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset),mToken:lendingPool_fkey(mToken)`,
     } as Record<string, string>
   );
 
-  if (!liquidityPool || !lendingPool || !borrowableAsset) {
-    throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
+  if (!liquidityPool || !lendingPool || !borrowableAsset || (stakeMToken && !mToken)) {
+    throw new Error("Liquidity pool, lending pool, borrowable asset or mToken address not found");
   }
 
-  const tx: FunctionInput[] = [
+  // Get user's mToken balance before deposit
+  const mTokenBalanceBefore = stakeMToken ? await getTokenBalanceForUser(accessToken, mToken, userAddress) : "0";
+
+  // First transaction: deposit liquidity
+  const depositTx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
@@ -132,22 +174,112 @@ export const depositLiquidity = async (
     },
   ];
 
-  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  const builtDepositTx = await buildFunctionTx(depositTx, userAddress, accessToken);
+  const depositResult = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtDepositTx)
   );
+
+  // If staking is requested and deposit was successful, execute staking transaction
+  if (stakeMToken && depositResult.status === "Success") {
+    // Get user's mToken balance after deposit to calculate the newly minted amount
+    const mTokenBalanceAfter = await getTokenBalanceForUser(accessToken, mToken, userAddress);
+    const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
+
+    if (BigInt(newlyMintedAmount) > 0n) {
+      const rewardsChefContractAddress = config.rewardsChef;
+      const poolIdx = config.rewardsChefMUsdstPoolId;
+
+      const stakingTx: FunctionInput[] = [
+        // First approve mToken for RewardsChef
+        {
+          contractName: extractContractName(Token),
+          contractAddress: mToken,
+          method: "approve",
+          args: { spender: rewardsChefContractAddress, value: newlyMintedAmount },
+        },
+        // Then deposit into RewardsChef
+        {
+          contractName: RewardsChef,
+          contractAddress: rewardsChefContractAddress,
+          method: "deposit",
+          args: { _pid: poolIdx, _amount: newlyMintedAmount },
+        },
+      ];
+
+      const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
+      const stakingResult = await postAndWaitForTx(accessToken, () =>
+        bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
+      );
+
+      // Fail the entire operation if staking fails
+      if (stakingResult.status !== "Success") {
+        throw new Error("Deposit succeeded but staking failed");
+      }
+    }
+  }
+
+  return depositResult;
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
   userAddress: string,
   amount: string,
+  includeStakedMToken: boolean = false
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
+  // If includeStakedMToken is enabled, we might need to unstake first
+  if (includeStakedMToken) {
+    // Get mToken address first
+    const { mToken: { mToken } } = await getPool(accessToken, undefined, {
+      select: "mToken:lendingPool_fkey(mToken)"
+    });
+    if (!mToken) {
+      throw new Error("mToken address not found");
+    }
+
+    // Get current mUSDST balance in wallet
+    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
+
+    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
+    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
+    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
+
+    // Convert withdrawal amount (USDST) to required mTokens
+    const amountWei = BigInt(amount);
+    const exchangeRateWei = BigInt(exchangeRate);
+    const requiredMTokenWei = (amountWei * (10n ** 18n)) / exchangeRateWei;
+
+    // Check if we need to unstake
+    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
+
+    if (requiredMTokenWei > unstakedMTokenWei) {
+      // We need to unstake some mTokens first
+      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
+
+      // Build unstaking transaction
+      const unstakeTx = await buildFunctionTx({
+        contractName: RewardsChef,
+        contractAddress: config.rewardsChef,
+        method: "withdraw",
+        args: {
+          _pid: config.rewardsChefMUsdstPoolId,
+          _amount: amountToUnstake.toString()
+        }
+      }, userAddress, accessToken);
+
+      // Execute unstaking transaction first
+      await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
+      );
+    }
+  }
+
+  // Now proceed with the normal withdrawal
   const builtTx = await buildFunctionTx({
     contractName: extractContractName(LendingPool),
     contractAddress: lendingPool,
@@ -241,7 +373,7 @@ export const borrow = async (
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
-  
+
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -320,7 +452,7 @@ export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const registry = await getPool(accessToken, undefined, { 
+  const registry = await getPool(accessToken, undefined, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
@@ -350,7 +482,7 @@ export const collateralAndBalance = async (
   // Create maps for asset configs and prices
   const assetConfigMap = new Map();
   const priceMap = new Map();
-  
+
   // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
@@ -434,8 +566,8 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, { 
-    address: `in.(${borrowableAsset},${mToken})`, 
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
@@ -521,14 +653,19 @@ export const liquidityAndBalance = async (
     )
   );
 
-  // User’s withdrawable underlying (min of user mToken value and pool cash)
+  // Get user's staked balance from RewardsChef
+  const rewardsChefContractAddress = config.rewardsChef;
+  const poolIdx = config.rewardsChefMUsdstPoolId;
+  const stakedMTokenBalance = await getStakedBalance(accessToken, rewardsChefContractAddress, poolIdx, userAddress);
+
+  // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
-  const userUSDSTValue = userMTokenBalance > 0n 
+  const userUSDSTValue = userMTokenBalance > 0n
     ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
     : 0n;
 
   const poolAvailableLiquidity = BigInt(availableLiquidity);
-  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
+  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
 
@@ -546,7 +683,9 @@ export const liquidityAndBalance = async (
     },
     withdrawable: {
       ...mTokenInfoClean,
-      userBalance: mTokenBalance,
+      userBalance: mTokenBalance, // This is the unstaked (wallet) balance
+      userBalanceStaked: stakedMTokenBalance, // Staked balance from RewardsChef
+      userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),
     },
@@ -881,7 +1020,7 @@ export const configureAsset = async (
 
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "configureAsset",
     args: {
       asset: body.asset,
@@ -919,7 +1058,7 @@ export const sweepReserves = async (
 
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "sweepReserves",
     args: {
       amount,
@@ -955,7 +1094,7 @@ export const setDebtCeilings = async (
 
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "setDebtCeilings",
     args: {
       assetUnits,

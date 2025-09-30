@@ -5,8 +5,9 @@ import { validateAddressField, numericStringField } from "./common.validators";
 export function validateDepositLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
+    stakeMToken: Joi.boolean().required(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Deposit Liquidity Argument Validation Error: " + error.message);
@@ -16,8 +17,9 @@ export function validateDepositLiquidityArgs(args: any) {
 export function validateWithdrawLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
+    includeStakedMToken: Joi.boolean().required(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Withdraw Liquidity Argument Validation Error: " + error.message);

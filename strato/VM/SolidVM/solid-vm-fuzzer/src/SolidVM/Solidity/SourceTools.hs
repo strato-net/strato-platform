@@ -71,7 +71,7 @@ defaultSourceTools dSettings =
           . traverse (uncurry parseSourceWithAnnotations)
           . unSourceMap
       compile =
-        compileSourceWithAnnotationsWithoutImports True
+        compileSourceWithAnnotationsWithoutImports True True
           . M.fromList
           . unSourceMap
       analyze = runDetectors parse compile id

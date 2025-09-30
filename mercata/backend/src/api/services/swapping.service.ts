@@ -38,7 +38,7 @@ import {
   validatePoolWithTokenAArray,
   validatePoolWithTokenBArray,
   validateSinglePoolFactory
-} from "@shared/swap-types";
+} from "@mercata/shared-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
 

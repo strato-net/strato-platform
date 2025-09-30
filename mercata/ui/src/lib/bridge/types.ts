@@ -1,33 +1,4 @@
-// Bridge Types
-export interface Token {
-  stratoToken: string;           // Key: address of the STRATO token
-  stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
-  stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)
-  externalChainId: string;       // Matches AssetInfo.externalChainId
-  permissions: number;           // Matches AssetInfo.permissions
-  externalName: string;          // Matches AssetInfo.externalName
-  externalToken: string;         // Matches AssetInfo.externalToken
-  externalSymbol: string;        // Matches AssetInfo.externalSymbol
-  externalDecimals: string;      // Matches AssetInfo.externalDecimals
-  maxPerTx: string;              // Matches AssetInfo.maxPerTx
-}
-
-export interface NetworkConfig {
-  chainId: string;
-  chainName: string;
-  rpcUrl: string;
-  explorer: string;
-  depositRouter: string;
-}
-
-// Bridge Context Types
-export interface BridgeOutParams {
-  stratoTokenAmount: string;
-  externalRecipient: string;
-  stratoToken: string;
-  externalChainId: string;
-  targetStratoToken?: string; // For withdrawals: which asset mapping to use
-}
+import { BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
 
 export interface BalanceResponse {
   balance: string;
@@ -35,18 +6,7 @@ export interface BalanceResponse {
 
 export interface BridgeResponse {
   success: boolean;
-  data?: unknown;
-}
-
-export interface NetworkConfigFromAPI {
-  externalChainId: number;
-  chainInfo: {
-    custody: string;
-    enabled: boolean;
-    chainName: string;
-    depositRouter: string;
-    lastProcessedBlock: string;
-  };
+  data?: WithdrawalRequestResponse;
 }
 
 export type NetworkSummary = {
@@ -56,46 +16,20 @@ export type NetworkSummary = {
   depositRouter: string;
 };
 
-// Bridge Transaction Types
-export interface BridgeTransaction {
-  transaction_hash: string;
-  block_timestamp: string;
-  chainId?: number;
-  from: string;
-  to: string;
-  amount: string;
-  txHash?: string;
-  token?: string;
-  key?: string;
-  depositStatus?: string;
-  withdrawalStatus?: string;
-  tokenSymbol?: string;
-  ethTokenName?: string;
-  ethTokenSymbol?: string;
-  ethTokenAddress?: string;
-}
-
-export interface BridgeTransactionResponse {
-  data: BridgeTransaction[];
-  totalCount: number;
-}
-
-export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | 'RedemptionInitiated' | 'USDSTDeposit';
-
 export type BridgeContextType = {
   loading: boolean;
   error: string | null;
   availableNetworks: NetworkSummary[];
-  bridgeableTokens: Token[];
-  redeemableTokens: Token[];
+  bridgeableTokens: BridgeToken[];
+  redeemableTokens: BridgeToken[];
   selectedNetwork: string | null;
-  selectedToken: Token | null;
-  selectedMintToken: Token | null;
+  selectedToken: BridgeToken | null;
+  selectedMintToken: BridgeToken | null;
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  bridgeOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
-  redeemOut: (params: BridgeOutParams) => Promise<BridgeResponse>;
+  bridgeOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  redeemOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 
@@ -107,8 +41,8 @@ export type BridgeContextType = {
     refetch: () => Promise<void>;
   };
   setSelectedNetwork: (networkName: string) => void;
-  setSelectedToken: (token: Token | null) => void;
-  setSelectedMintToken: (token: Token | null) => void;
+  setSelectedToken: (token: BridgeToken | null) => void;
+  setSelectedMintToken: (token: BridgeToken | null) => void;
   loadNetworksAndTokens: () => Promise<void>;
   // Bridge transaction functions
   fetchDepositTransactions: (rawParams?: Record<string, string | undefined>) => Promise<BridgeTransactionResponse>;
@@ -227,7 +161,7 @@ export interface BridgeError {
 }
 
 export interface BridgeContext {
-  selectedToken: Token;
+  selectedToken: BridgeToken;
   selectedNetwork: string;
   amount: string;
   userAddress: string;

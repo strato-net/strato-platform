@@ -158,7 +158,7 @@ contract record RewardsChef is Ownable {
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-
+    event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -172,7 +172,7 @@ contract record RewardsChef is Ownable {
     // precision. We multiply when storing rewards per token (accPerToken calculation) and
     // divide when calculating individual user rewards to get the actual reward amount.
     // This multiplier also propagates to rewardDebt calculations to maintain consistency.
-    uint256 private PRECISION_MULTIPLIER = 1e12;
+    uint256 public PRECISION_MULTIPLIER = 1e18;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -195,7 +195,7 @@ contract record RewardsChef is Ownable {
     PoolInfo[] public pools;
 
     // Info of each user that stakes LP tokens.
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -371,8 +371,15 @@ contract record RewardsChef is Ownable {
             user.amount += _amount;
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -396,8 +403,15 @@ contract record RewardsChef is Ownable {
             ERC20(pool.lpToken).transfer(msg.sender, _amount);
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -419,4 +433,8 @@ contract record RewardsChef is Ownable {
         return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
     }
 
+    function getBalance(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < pools.length, "Pool does not exist");
+        return userInfo[_pid][_user].amount;
+    }
 }

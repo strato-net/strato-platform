@@ -96,6 +96,7 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
+import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
 import qualified Data.Vector as V
@@ -124,6 +125,7 @@ import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
+
 
 type SolidVMBase m = VMBase m
 
@@ -222,7 +224,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
@@ -1379,7 +1381,8 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       return $ Constant (flip SAccount False (unspecifiedChain acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
       pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
@@ -2473,7 +2476,8 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
@@ -2494,7 +2498,8 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   (ctr, originAddress, ctrName) <- getCreator creator
@@ -2502,6 +2507,21 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "fastForward" [SInteger seconds] = do
+  -- Only allow fastForward during testing
+  env' <- getEnv
+  if not (Env.runningTests env')
+    then invalidArguments "fastForward can only be called during testing" [SInteger seconds]
+    else do
+      -- Get current timestamp and add seconds
+      let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
+          newTimestamp = addUTCTime (fromIntegral seconds) currentTimestamp
+          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp }
+      -- Update the environment with new block header
+      Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+        pure $ env { Env.blockHeader = updatedBlockHeader }
+      return SNULL
+
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
 certificateMap :: Maybe String -> CC.Contract -> Value

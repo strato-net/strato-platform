@@ -87,11 +87,39 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     fetchData();
   }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
 
-  const toggleExpanded = (vaultKey: string) => {
+  const toggleExpanded = async (vaultKey: string) => {
+    const isCurrentlyExpanded = expandedVaults[vaultKey];
+    
     setExpandedVaults(prev => ({
       ...prev,
       [vaultKey]: !prev[vaultKey]
     }));
+    
+    // If expanding the vault and we don't have max value yet, fetch it
+    if (!isCurrentlyExpanded && !maxValues[vaultKey]) {
+      const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
+      const vault = liquidatableVaults[vaultIndex];
+      
+      if (vault && vault.borrower) {
+        try {
+          // Fetch max liquidatable amount from backend
+          const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower);
+          const backendMaxWei = result.maxAmount;
+          
+          // Convert backend max from wei to decimal (18 decimals for USDST)
+          const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+          
+          // Calculate actual max as minimum of backend max and available USDST balance
+          const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          
+          // Store the max value
+          setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          
+        } catch (error) {
+          console.error("Error fetching max liquidatable amount:", error);
+        }
+      }
+    }
   };
 
   const handleLiquidationAmountChange = (vaultKey: string, value: string) => {
@@ -133,58 +161,94 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
       setMaxStates(prev => ({ ...prev, [vaultKey]: false }));
       setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
     } else {
-      try {
-        // Fetch max liquidatable amount from backend
-        const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
-        const backendMaxWei = result.maxAmount;
-        
-        // Convert backend max from wei to decimal (18 decimals for USDST)
-        const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
-        
-        
-        // Check if balance is insufficient
-        if (availableUsdstBalance < 0.02) {
+      // Check if balance is insufficient
+      if (availableUsdstBalance < 0.02) {
+        return;
+      }
+      
+      // Use already-fetched max value if available, otherwise fetch it
+      let actualMaxDecimal = maxValues[vaultKey];
+      
+      if (!actualMaxDecimal) {
+        try {
+          // Fetch max liquidatable amount from backend if not already available
+          const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
+          const backendMaxWei = result.maxAmount;
+          
+          // Convert backend max from wei to decimal (18 decimals for USDST)
+          const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+          
+          // Calculate actual max as minimum of backend max and available USDST balance
+          actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          
+          // Store the max value
+          setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          
+        } catch (error) {
+          console.error("Error fetching max liquidatable amount:", error);
+          toast({
+            title: "Error",
+            description: "Failed to calculate maximum liquidation amount",
+            variant: "destructive",
+          });
           return;
         }
-        
-        // Calculate actual max as minimum of backend max and available USDST balance
-        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
-        
-        // Store the max value and set max state
-        setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
-        setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
-        setLiquidationAmounts(prev => ({ 
-          ...prev, 
-          [vaultKey]: actualMaxDecimal.toString() 
-        }));
-        
-      } catch (error) {
-        console.error("Error fetching max liquidatable amount:", error);
-        toast({
-          title: "Error",
-          description: "Failed to calculate maximum liquidation amount",
-          variant: "destructive",
-        });
+      } else {
+        // Recalculate based on current USDST balance in case it changed
+        const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
+        const currentVault = liquidatableVaults[vaultIndex];
+        if (currentVault && currentVault.borrower) {
+          try {
+            const result = await cdpService.getMaxLiquidatable(currentVault.asset, currentVault.borrower);
+            const backendMaxWei = result.maxAmount;
+            const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+            actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+            setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          } catch (error) {
+            console.error("Error updating max liquidatable amount:", error);
+            // Use the cached value if update fails
+          }
+        }
       }
+      
+      // Set max state and update input amount
+      setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
+      setLiquidationAmounts(prev => ({ 
+        ...prev, 
+        [vaultKey]: actualMaxDecimal.toString() 
+      }));
     }
   };
 
   const calculateExpectedProfit = (vault: VaultData, liquidationAmount: string): string => {
+    const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset)}`;
     const amount = parseFloat(liquidationAmount);
-    if (isNaN(amount) || amount <= 0) return "$0.00";
+    
+    // If no valid amount provided, use the maximum liquidatable amount instead of 0
+    let calculationAmount = amount;
+    if (isNaN(amount) || amount <= 0) {
+      const maxAmount = maxValues[vaultKey];
+      if (maxAmount && maxAmount > 0) {
+        calculationAmount = maxAmount;
+      } else {
+        return "$0.00";
+      }
+    } else {
+      calculationAmount = amount;
+    }
     
     // Get the actual liquidation penalty from asset config
     const assetConfig = assetConfigs[vault.asset];
     if (!assetConfig) {
       console.warn(`No asset config found for ${vault.asset}, using fallback 5% penalty`);
       const fallbackBonus = 0.05;
-      const profit = amount * fallbackBonus;
+      const profit = calculationAmount * fallbackBonus;
       return `$${formatNumber(profit)}`;
     }
     
     // Convert basis points to decimal (e.g., 500 bps = 5% = 0.05)
     const liquidationBonus = assetConfig.liquidationPenaltyBps / 10000;
-    const profit = amount * liquidationBonus;
+    const profit = calculationAmount * liquidationBonus;
     return `$${formatNumber(profit)}`;
   };
 
