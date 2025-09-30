@@ -23,7 +23,6 @@ import DepositsPage from "./pages/DepositsPage";
 import AssetDetail from "./pages/AssetDetail";
 import Pools from "./pages/Pools";
 import ActivityFeed from "./pages/ActivityFeed";
-import Rewards from "./pages/Rewards";
 import NotFound from "./pages/NotFound";
 
 // Import dashboard components
@@ -165,14 +164,6 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <Pools />
-                                    </ProtectedRoute>
-                                  }
-                                />
-                                <Route
-                                  path="/dashboard/rewards"
-                                  element={
-                                    <ProtectedRoute>
-                                      <Rewards />
                                     </ProtectedRoute>
                                   }
                                 />
