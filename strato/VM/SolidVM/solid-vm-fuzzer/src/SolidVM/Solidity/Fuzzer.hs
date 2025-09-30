@@ -28,8 +28,10 @@ import Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
 import Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BL
+import Data.List (sortBy)
 import qualified Data.Map.Strict as M
 import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Ord (comparing)
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding as T
@@ -82,14 +84,17 @@ runFuzzer dSettings compile src = compile src >>= \case
     let args = FuzzerArgs src "" [] "" [] Nothing
     runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $ do
       lift . modify' $ runningTests .~ True
-      fmap concat . for (M.toList $ _contracts cc) $ \(cName, c) ->
+      let contractsInSourceOrder =
+            sortBy (comparing (\(_, c') -> c' ^. contractContext . sourceAnnotationStart)) (M.toList $ _contracts cc)
+       in fmap concat . for contractsInSourceOrder $ \(cName, c) ->
         if not (describePrefix `T.isPrefixOf` labelToText cName)
           then pure []
           else case _funcArgs <$> _constructor c of
             Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
               _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
-              fmap catMaybes . for (M.toList $ _functions c) $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
+              let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
+               in fmap catMaybes . for functionsInSourceOrder $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
                 if
                     | testPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
