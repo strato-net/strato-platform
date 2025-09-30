@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -72,7 +73,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
+import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
@@ -375,6 +376,10 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   putAddressStateTxDBMap M.empty
                   putMemRawStorageTxMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
+                Just (Left (PaymentError limit (_, actual))) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
                 _ -> do
                   let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
@@ -456,7 +461,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
             lift $ A.delete (Proxy @AddressState) address'
           lift $ P.incCounter vmTxsSuccessful
       return $ attachFeeResult execResults
-    else throwE $ TFInsufficientFunds 100000000000000000 0 t -- TODO: Get the actual tx cost and user's USDST balance
+    else case erException feeResult of
+      Just (Left PaymentError{}) -> pure feeResult
+      _ -> pure $ feeResult{ erException = Just . Left $ PaymentError 10_000_000_000_000_000 (show tAddr, 0) } -- TODO: Make Fee contract throw a PaymentError and remove this case
 
 runCodeForTransaction ::
   (VMBase m) =>

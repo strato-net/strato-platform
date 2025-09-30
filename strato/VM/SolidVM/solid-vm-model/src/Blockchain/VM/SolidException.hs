@@ -83,7 +83,7 @@ data SolidException
   | InvalidCertificate String String
   | MalformedData String String
   | TooMuchGas Integer Integer
-  | PaymentError String String
+  | PaymentError Integer (String, Integer)
   | ReservedWordError String String
   | ImmutableError String String
   | FailedToAttainRunTimCode String String
@@ -128,7 +128,7 @@ showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
 showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %d, but the current gasInfo was: %d" a b
-showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
+showSolidException (PaymentError a (addr, b)) = printf "There was an error sending %d wei to the following address with a balance of %d: %s" a b addr
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
@@ -229,8 +229,8 @@ malformedData = toThrower MalformedData
 tooMuchGas :: Integer -> Integer -> a
 tooMuchGas limit actual = throw $ TooMuchGas limit actual
 
-paymentError :: (Show v) => String -> v -> a
-paymentError = toThrower PaymentError
+paymentError :: Integer -> (String, Integer) -> a
+paymentError limit actual = throw $ PaymentError limit actual
 
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
