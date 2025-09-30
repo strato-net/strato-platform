@@ -17,6 +17,7 @@ filesToEmbed = [
   "contracts/abstract/ERC20/access/Ownable.sol",
   "contracts/abstract/ERC20/extensions/IERC20Metadata.sol",
   "contracts/abstract/ERC20/utils/Context.sol",
+  "contracts/abstract/ERC20/utils/Pausable.sol",
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
   "contracts/concrete/BaseCodeCollection.sol",
@@ -40,8 +41,6 @@ filesToEmbed = [
   "contracts/concrete/Rewards/RewardsManager.sol",
   "contracts/concrete/Rewards/RewardsChef.sol",
   "contracts/concrete/Tokens/Token.sol",
-  "contracts/concrete/Tokens/TokenAccess.sol",
-  "contracts/concrete/Tokens/TokenFaucet.sol",
   "contracts/concrete/Tokens/TokenFactory.sol",
   "contracts/concrete/Tokens/TokenMetadata.sol",
   "contracts/concrete/Voucher/Voucher.sol"
