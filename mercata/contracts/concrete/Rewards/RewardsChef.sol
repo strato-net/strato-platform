@@ -192,7 +192,7 @@ contract record RewardsChef is Ownable {
     uint256 public minFutureTime;
 
     // Info of each of the stake pool.
-    PoolInfo[] public pools;
+    PoolInfo[] public record pools;
 
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;

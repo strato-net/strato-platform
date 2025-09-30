@@ -1790,8 +1790,10 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                   res <- pay "built-in transfer function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return $ Constant SNULL
-                    _ -> paymentError (show amount) (show address')
-                _ -> paymentError "unknown" (show address')
+                    _ -> do
+                      balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) from
+                      paymentError amount (show address', balance)
+                _ -> typeError "transfer arguments" argVals
 
             -- Send Wei return bool on failure or success
             -- TODO: When gas gets more implemented ensure that this function does not
