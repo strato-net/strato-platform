@@ -992,10 +992,10 @@ export const configureAsset = async (
   userAddress: string,
   body: Record<string, string | number>
 ) => {
-  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined ||
-      body.liquidationBonus === undefined || body.interestRate === undefined ||
-      body.reserveFactor === undefined) {
-    throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor");
+  if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
+      body.liquidationBonus === undefined || body.interestRate === undefined || 
+      body.reserveFactor === undefined || body.perSecondFactorRAY === undefined) {
+    throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY");
   }
 
   const ltv = Number(body.ltv);
@@ -1003,6 +1003,7 @@ export const configureAsset = async (
   const liquidationBonus = Number(body.liquidationBonus);
   const interestRate = Number(body.interestRate);
   const reserveFactor = Number(body.reserveFactor);
+  const perSecondFactorRAY = String(body.perSecondFactorRAY); // Keep as string for BigInt precision
 
   if (isNaN(ltv) || ltv < 100 || ltv > 9500) throw new Error("LTV must be between 100 and 9500 basis points (1% to 95%)");
   if (isNaN(liquidationThreshold) || liquidationThreshold < 100 || liquidationThreshold > 9500) throw new Error("Liquidation threshold must be between 100 and 9500 basis points (1% to 95%)");
@@ -1010,14 +1011,16 @@ export const configureAsset = async (
   if (isNaN(interestRate) || interestRate < 0 || interestRate > 10000) throw new Error("Interest rate must be between 0 and 10000 basis points (0% to 100%)");
   if (isNaN(reserveFactor) || reserveFactor < 0 || reserveFactor > 5000) throw new Error("Reserve factor must be between 0 and 5000 basis points (0% to 50%)");
   if (ltv > liquidationThreshold) throw new Error("LTV cannot be higher than liquidation threshold");
-
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = registry._owner;
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
+  
+  // Validate perSecondFactorRAY
+  if (!/^\d+$/.test(perSecondFactorRAY)) throw new Error("perSecondFactorRAY must be a valid integer string");
+  const rayValue = BigInt(perSecondFactorRAY);
+  const minRAY = BigInt('1000000000000000000000000000'); // 1e27
+  if (rayValue < minRAY) throw new Error("perSecondFactorRAY must be >= 1e27 (1 RAY)");
 
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "configureAsset",
     args: {
       asset: body.asset,
@@ -1026,6 +1029,7 @@ export const configureAsset = async (
       liquidationBonus,
       interestRate,
       reserveFactor,
+      perSecondFactorRAY,
     },
   }, userAddress, accessToken);
 
@@ -1052,13 +1056,9 @@ export const sweepReserves = async (
     throw new Error("Amount must be a valid positive integer");
   }
 
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
-
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "sweepReserves",
     args: {
       amount,
@@ -1092,13 +1092,9 @@ export const setDebtCeilings = async (
     throw new Error("USD value must be a valid number"); // convert to BigInt before making the API call.
   }
 
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
-
   const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "setDebtCeilings",
     args: {
       assetUnits,
