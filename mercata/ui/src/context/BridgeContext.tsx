@@ -10,16 +10,12 @@ import {
 import { api } from "@/lib/axios";
 import { formatBalance } from "@/utils/numberUtils";
 import {
-  Token,
-  BridgeOutParams,
   BalanceResponse,
   BridgeResponse,
-  NetworkConfigFromAPI,
   NetworkSummary,
   BridgeContextType,
-  BridgeTransactionResponse,
-  BridgeTransactionTab,
 } from "@/lib/bridge/types";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, BridgeTransactionTab, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
 
 const BridgeContext = createContext<BridgeContextType | undefined>(undefined);
 
@@ -29,18 +25,18 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const [availableNetworks, setAvailableNetworks] = useState<NetworkSummary[]>(
     [],
   );
-  const [bridgeableTokens, setBridgeableTokens] = useState<Token[]>([]);
-  const [redeemableTokens, setRedeemableTokens] = useState<Token[]>([]);
+  const [bridgeableTokens, setBridgeableTokens] = useState<BridgeToken[]>([]);
+  const [redeemableTokens, setRedeemableTokens] = useState<BridgeToken[]>([]);
   const [selectedNetwork, setSelectedNetwork] = useState<string | null>(null);
-  const [selectedToken, setSelectedToken] = useState<Token | null>(null);
-  const [selectedMintToken, setSelectedMintToken] = useState<Token | null>(null);
+  const [selectedToken, setSelectedToken] = useState<BridgeToken | null>(null);
+  const [selectedMintToken, setSelectedMintToken] = useState<BridgeToken | null>(null);
   const [networksLoaded, setNetworksLoaded] = useState(false);
   const [targetTransactionTab, setTargetTransactionTab] = useState<BridgeTransactionTab | null>(null);
 
   const fetchTokensForChain = useCallback(
     async (chainId: string) => {
       try {
-        const { data } = await api.get<Token[]>(
+        const { data } = await api.get<BridgeToken[]>(
           `/bridge/bridgeableTokens/${chainId}`,
         );
         const tokens = Array.isArray(data) ? data : [];
@@ -63,7 +59,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
 
     try {
-      const { data } = await api.get<NetworkConfigFromAPI[]>(
+      const { data } = await api.get<NetworkConfig[]>(
         `/bridge/networkConfigs`,
       );
 
@@ -105,10 +101,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const bridgeOut = useCallback(
-    async (params: BridgeOutParams): Promise<BridgeResponse> => {
+    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post(`/bridge/bridgeOut`, params);
+        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/bridgeOut`, params);
         return { success: true, data };
       } catch (e) {
         setError("Bridge out failed");
@@ -121,10 +117,10 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const redeemOut = useCallback(
-    async (params: BridgeOutParams): Promise<BridgeResponse> => {
+    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post(`/bridge/redeemOut`, params);
+        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/redeemOut`, params);
         return { success: true, data };
       } catch (e) {
         setError("Redeem out failed");
@@ -288,7 +284,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
   const fetchRedeemableTokens = useCallback(
     async (chainId: string) => {
       try {
-        const { data } = await api.get<Token[]>(`/bridge/redeemableTokens/${chainId}`);
+        const { data } = await api.get<BridgeToken[]>(`/bridge/redeemableTokens/${chainId}`);
         const tokens = Array.isArray(data) ? data : [];
         setRedeemableTokens(tokens);
 
