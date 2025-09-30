@@ -44,6 +44,11 @@ contract record SafetyModule is Ownable {
     constructor(address _owner) Ownable(_owner) { }
 
     function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
+        // hotfix
+        COOLDOWN_SECONDS = 259200;
+        UNSTAKE_WINDOW = 172800;
+        MAX_SLASH_BPS = 3000;
+
         require(_lendingRegistry != address(0)  && _tokenFactory != address(0), "SM:zero addr");
         lendingRegistry = LendingRegistry(_lendingRegistry);
         tokenFactory = TokenFactory(_tokenFactory);

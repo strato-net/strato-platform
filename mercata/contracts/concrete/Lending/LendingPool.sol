@@ -105,6 +105,10 @@ contract record LendingPool is Ownable {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _registry, address _poolConfigurator, address _tokenFactory, address _feeCollector, address _safetyModule) external onlyOwner {
+        // hotfix
+        RAY = 1e27;
+        SECONDS_PER_YEAR = 31536000;
+        
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
