@@ -205,7 +205,7 @@ contract Describe_Mercata {
         User u = new User();
         AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins(1) == address(u) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
         require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
     }
@@ -239,7 +239,7 @@ contract Describe_Mercata {
         User u = new User();
         AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins(1) == address(u) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
         require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";

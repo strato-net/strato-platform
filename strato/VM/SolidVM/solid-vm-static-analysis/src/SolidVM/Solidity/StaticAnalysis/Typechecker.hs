@@ -22,7 +22,7 @@ import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust)
+import Data.Maybe (catMaybes, fromJust, fromMaybe)
 import qualified Data.Set as S
 import Data.Source
 import Data.String (IsString, fromString)
@@ -45,9 +45,7 @@ data R = R
     codeCollection :: Annotated CodeCollectionF,
     contract :: Annotated ContractF,
     function :: Maybe (Annotated FuncF),
-    functName :: Maybe String,
-    modifier :: Maybe (Annotated ModifierF),
-    immutableValNames :: [(String, Bool)]
+    modifier :: Maybe (Annotated ModifierF)
   }
 
 type SSS = StateT (NonEmpty (Maybe Type', M.Map SolidString (Annotated VarDefEntryF))) (Reader R)
@@ -62,6 +60,7 @@ data TypeF' a
       { staticType :: Type,
         staticContext :: a
       }
+  | Mutable (TypeF' a)
   | Product
       { productTypes :: [TypeF' a],
         productContext :: a
@@ -124,6 +123,7 @@ showType' :: Type' -> Text
 showType' (Top _ _) = "var"
 showType' (Bottom _) = "bottom"
 showType' (Static t _) = showType t
+showType' (Mutable t) = showType' t
 showType' (Product ts _) =
   T.concat
     [ "(",
@@ -159,14 +159,30 @@ showType' (MultiVariate a _) =
 showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
   T.empty
 
+mutable :: Type' -> Type'
+mutable m@Mutable{} = m
+mutable m@(Product ts _) =
+  let isMutable Mutable{} = True
+      isMutable _ = False
+   in if all isMutable ts
+        then m
+        else bottom $ "Cannot mutate immutable value" <$ context' m
+mutable m@(Sum (t :| ts)) =
+  let isMutable Mutable{} = True
+      isMutable _ = False
+   in if all isMutable $ t:ts
+        then m
+        else bottom $ "Cannot mutate immutable value" <$ context' m
+mutable t = bottom $ "Cannot mutate immutable value" <$ context' t
 
 varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
 varDefsToType' BlankEntry t = Product [topType' (context' t), t] (context' t)
 varDefsToType' VarDefEntry {..} t | vardefType == Nothing = t
-varDefsToType' VarDefEntry {..} (Top _ _) = Static (fromJust vardefType) vardefContext
-varDefsToType' VarDefEntry {..} t@(Static _ _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
-varDefsToType' VarDefEntry {..} t@(Sum _) = Product [Static (fromJust vardefType) vardefContext, t] vardefContext
-varDefsToType' VarDefEntry {..} (Product ts _) = Product (Static (fromJust vardefType) vardefContext : ts) vardefContext
+varDefsToType' VarDefEntry {..} Top{} = Mutable $ Static (fromJust vardefType) vardefContext
+varDefsToType' VarDefEntry {..} t@Static{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
+varDefsToType' VarDefEntry {..} t@Mutable{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
+varDefsToType' VarDefEntry {..} t@Sum{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
+varDefsToType' VarDefEntry {..} (Product ts _) = Product (Mutable (Static (fromJust vardefType) vardefContext) : ts) vardefContext
 varDefsToType' VarDefEntry {} (Bottom es) = Bottom es
 varDefsToType' VarDefEntry {..} _ = bottom $ "Could not match variable definition with function type" <$ vardefContext
 
@@ -411,14 +427,8 @@ sumType' (Sum t1) t2 = Sum (t1 <> (t2 :| []))
 sumType' t1 (Sum t2) = Sum ((t1 :| []) <> t2)
 sumType' t1 t2 = Sum (t1 :| [t2])
 
-sumType :: Type' -> Type' -> Type' -> Type'
-sumType (Sum t1) (Sum t2) (Sum t3) = Sum (t1 <> t2 <> t3)
-sumType (Sum t1) (Sum t2) t3 = Sum (t1 <> t2 <> (t3 :| []))
-sumType (Sum t1) t2 t3 = Sum (t1 <> (t2 :| [t3]))
-sumType t1 (Sum t2) (Sum t3) = Sum ((t1 :| []) <> t2 <> t3)
-sumType t1 (Sum t2) t3 = Sum ((t1 :| [t3]) <> t2)
-sumType t1 t2 (Sum t3) = Sum ((t1 :| [t2]) <> t3)
-sumType t1 t2 t3 = Sum (t1 :| [t2, t3])
+sumType :: [Type'] -> Type'
+sumType = foldr1 sumType'
 
 pickType' :: SourceAnnotation Text -> [Type'] -> Type'
 pickType' x [] = bottom x
@@ -441,6 +451,7 @@ context' :: TypeF' a -> a
 context' Top {..} = topContext
 context' (Bottom (e :| _)) = e
 context' Static {..} = staticContext
+context' (Mutable t) = context' t
 context' Product {..} = productContext
 context' Function {..} = functionContext
 context' (Sum (a :| _)) = context' a
@@ -457,6 +468,9 @@ typecheck' unify r1 r2 = case (r1, r2) of
   (m@(Static t x), Top names _) -> m <$ reduceType' x . (m :) <$> traverse (\n -> unify x n t) (S.toList names)
   (Top _ _, m) -> pure m
   (m, Top _ _) -> pure m
+  (Mutable t1, Mutable t2) -> Mutable <$> typecheck' unify t1 t2
+  (Mutable t1, t2) -> typecheck' unify t1 t2
+  (t1, Mutable t2) -> typecheck' unify t1 t2
   (t1, Sum t2) -> pickType' (context' t1) <$> traverse (typecheck' unify t1) (NE.toList t2)
   (Sum t1, t2) -> pickType' (context' t2) <$> traverse (flip (typecheck' unify) t2) (NE.toList t1)
   (Static t1 _, Static t2 x) -> pure $ case typecheckStatic t1 t2 of
@@ -580,7 +594,6 @@ typecheckStatic (SVMType.Int s1 b1) (SVMType.Int s2 b2) =
     _ -> case (b1, b2) of
       (Just a, Just b) | a /= b -> Left "Mismatched length between integer values"
       _ -> Right $ SVMType.Int (s1 <|> s2) (b1 <|> b2)
-typecheckStatic (SVMType.Int _ _) SVMType.Decimal = Right $ SVMType.Decimal
 typecheckStatic (SVMType.String d1) (SVMType.String d2) =
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between string values"
@@ -592,7 +605,6 @@ typecheckStatic (SVMType.Bytes d1 b1) (SVMType.Bytes d2 b2) =
       (Just a, Just b) | a /= b -> Left "Mismatched length between bytes values"
       _ -> Right $ SVMType.Bytes (d1 <|> d2) (b1 <|> b2)
 typecheckStatic SVMType.Decimal SVMType.Decimal = Right $ SVMType.Decimal
-typecheckStatic SVMType.Decimal (SVMType.Int _ _) = Right $ SVMType.Decimal
 typecheckStatic SVMType.Bool SVMType.Bool = Right SVMType.Bool
 typecheckStatic (SVMType.Address a) (SVMType.Address b) = Right $ SVMType.Account (a && b)
 typecheckStatic (SVMType.Address a) (SVMType.Account b) = Right $ SVMType.Account (a && b)
@@ -717,6 +729,12 @@ typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
   pure $ case t of
     Bottom es -> Bottom es
     _ -> Static v x
+typecheckIndex (Mutable t1) t2 = do
+  t <- typecheckIndex t1 t2
+  pure $ case t of
+    Static{} -> Mutable t
+    Top{} -> Mutable t
+    _ -> t
 typecheckIndex x y =
   pure . bottom $
     ( T.concat
@@ -732,6 +750,12 @@ typecheckIndex x y =
 typecheckMember :: Type' -> SolidString -> SSS Type'
 typecheckMember (Bottom es) _ = pure $ Bottom es
 typecheckMember (Sum ts'@(t :| _)) n = pickType' (context' t) <$> traverse (flip typecheckMember n) (NE.toList ts')
+typecheckMember (Mutable t) member = do
+  t' <- typecheckMember t member
+  pure $ case t' of
+    Static{} -> Mutable t'
+    Top{} -> Mutable t'
+    _ -> t'
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
@@ -776,7 +800,7 @@ typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
     Nothing -> lookupEnum enum
   pure $
     if n `elem` names
-      then Static e x
+      then Mutable $ Static e x
       else
         bottom $
           ( T.concat
@@ -815,7 +839,7 @@ typecheckMember (Static (SVMType.Address _) x) "root" = pure $ Static (SVMType.A
 typecheckMember (Static (SVMType.Struct _ struct) x) n = do
   names <- M.fromList <$> lookupStruct struct
   pure $ case M.lookup n names of
-    Just t -> Static t x
+    Just t -> Mutable $ Static t x
     Nothing ->
       bottom $
         ( T.concat
@@ -953,10 +977,15 @@ varDeclHelper ::
   Type'
 varDeclHelper test cc c VariableDecl {..} =
   let ty = Static _varType _varContext
-   in case _varInitialVal of
+      mut = if _isImmutable
+              then id
+              else (\t -> case t of
+                      Static{} -> Mutable t
+                      _ -> t)
+   in mut $ case _varInitialVal of
         Nothing -> ty
         Just e ->
-          let r = R test cc c Nothing (Just "Nothing") Nothing []
+          let r = R test cc c Nothing Nothing
            in runReader (evalStateT (ty ~> tcExpr e) ((Nothing, M.empty) :| [])) r
 
 constDeclHelper ::
@@ -967,7 +996,7 @@ constDeclHelper ::
   Type'
 constDeclHelper test cc c ConstantDecl {..} =
   let ty = Static _constType _constContext
-      r = R test cc c Nothing (Just "Nothing") Nothing []
+      r = R test cc c Nothing Nothing
    in runReader (evalStateT (ty ~> tcExpr _constInitialVal) ((Nothing, M.empty) :| [])) r
 
 checkOverrides ::
@@ -1069,10 +1098,7 @@ modifierHelper ::
   Type'
 modifierHelper test cc c m@SolidVM.Model.CodeCollection.Modifier {..} =
   let r =
-        R test cc c Nothing Nothing (Just m) $
-          map
-            (fmap $ isJust . _varInitialVal)
-            (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+        R test cc c Nothing $ Just m
       swap = uncurry $ flip (,)
       args =
         ( \(it, n) ->
@@ -1102,10 +1128,7 @@ functionHelper test cc c funcName f@Func {..} =
             then case (_funcArgs, _funcVals, _funcStateMutability, _funcVisibility) of
               ([], [], Just Payable, Just External) ->
                 let r =
-                      R test cc c (Just f) (Just funcName) Nothing $
-                        map
-                          (fmap $ isJust . _varInitialVal)
-                          (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                      R test cc c (Just f) Nothing
                     swap = uncurry $ flip (,)
                     args =
                       ( \(it, n) ->
@@ -1145,10 +1168,7 @@ functionHelper test cc c funcName f@Func {..} =
                 then case (_funcArgs, _funcVals, _funcVisibility) of
                   ([], [], Just External) ->
                     let r =
-                          R test cc c (Just f) (Just funcName) Nothing $
-                            map
-                              (fmap $ isJust . _varInitialVal)
-                              (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                          R test cc c (Just f) Nothing
                         swap = uncurry $ flip (,)
                         args =
                           ( \(it, n) ->
@@ -1185,10 +1205,7 @@ functionHelper test cc c funcName f@Func {..} =
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               let r =
-                    R test cc c (Just f) (Just funcName) Nothing $
-                      map
-                        (fmap $ isJust . _varInitialVal)
-                        (filter (_isImmutable . snd) . M.toList $ _storageDefs c)
+                    R test cc c (Just f) Nothing
                   swap = uncurry $ flip (,)
                   args =
                     ( \(it, n) ->
@@ -1522,15 +1539,15 @@ getVarType' name ctx = do
   case varDefy of
     Just _ -> do
       case _varType <$> varDefy of
-        Just (SVMType.UserDefined ggg b) -> return (Static (SVMType.UserDefined ggg b) ctx)
+        Just (SVMType.UserDefined ggg b) -> return (Mutable $ Static (SVMType.UserDefined ggg b) ctx)
         _ -> getVarTypeByName' (stringToLabel name) ctx
     Nothing -> do
       case filter (userDefinedHelper name . _varType) [x | x <- (M.elems (_storageDefs c))] of
         (l:_) ->
           let vt = _varType l
-           in case _varInitialVal l of
-                Just _ -> pure $ (Static vt ctx)
-                _ -> pure $ (Static (SVMType.actual vt) ctx)
+           in pure . Mutable $ case _varInitialVal l of
+                Just _ -> Static vt ctx
+                _ -> Static (SVMType.actual vt) ctx
         [] -> getVarTypeByName' (stringToLabel name) ctx
 
 userDefinedHelper :: String -> Type -> Bool
@@ -1590,43 +1607,43 @@ getVarTypeByName' name ctx = do
   mVar <- foldr (lookupVar . snd) Nothing <$> get
   case mVar of
     Just BlankEntry -> error "getVarTypeByName' BlankEntry: I don't think this can happen"
-    Just VarDefEntry {..} -> case vardefType of
-      Just t -> pure $ Static t ctx
-      Nothing -> pure $ Top (S.singleton name) ctx
+    Just VarDefEntry {..} -> pure . Mutable $ case vardefType of
+      Just t -> Static t ctx
+      Nothing -> Top (S.singleton name) ctx
     Nothing -> do
       c <- asks contract
       cc <- asks codeCollection
-      let mVarDecl = ((_varType &&& const ctx) <$> M.lookup name (_storageDefs c))
-              <|> ((_constType &&& const ctx) <$> M.lookup name (_constants c))
-              <|> ((_constType &&& const ctx) <$> M.lookup name (_flConstants cc))
-              <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
-              <|> (const (SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_flEnums cc))
-              <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_flStructs cc))
-              <|> (const (SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
-              <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
-              <|> (const (SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
+      let mVarDecl = ((\v -> (Mutable, _varType v, ctx)) <$> M.lookup name (_storageDefs c))
+              <|> ((\v -> (id, _constType v, ctx)) <$> M.lookup name (_constants c))
+              <|> ((\v -> (id, _constType v, ctx)) <$> M.lookup name (_flConstants cc))
+              <|> (const (id, SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_enums c))
+              <|> (const (id, SVMType.Enum Nothing name Nothing, ctx) <$> M.lookup name (_flEnums cc))
+              <|> (const (id, SVMType.Struct Nothing name, ctx) <$> M.lookup name (_flStructs cc))
+              <|> (const (id, SVMType.Struct Nothing name, ctx) <$> M.lookup name (_structs c))
+              <|> (const (id, SVMType.Error Nothing name, ctx) <$> M.lookup name (_errors c))
+              <|> (const (id, SVMType.Error Nothing name, ctx) <$> M.lookup name (_flErrors cc))
       case mVarDecl of
-        Just (e@(SVMType.Enum {}), ctx') ->
+        Just (mut, e@(SVMType.Enum {}), ctx') ->
           pure . Sum $
-            (Static e ctx')
+            (mut $ Static e ctx')
               :| [ Function (Static e ctx') (Static e ctx') ctx' [] [] False,
                    Function (intType' ctx') (Static e ctx') ctx' [] [] False
                  ]
-        Just (s@(SVMType.Struct _ struct), ctx') -> do
+        Just (mut, s@(SVMType.Struct _ struct), ctx') -> do
           fields <- fmap snd <$> lookupStruct struct
           let fArgs = flip Product ctx $ flip Static ctx <$> fields
           pure . Sum $
-            (Static s ctx')
+            (mut $ Static s ctx')
               :| [ Function fArgs (Static s ctx') ctx' [] [] False
                  ]
-        Just (e@(SVMType.Error _ err), ctx') -> do
+        Just (_, e@(SVMType.Error _ err), ctx') -> do
           args <- lookupError err
           let eArgs = flip Product ctx $ flip Static ctx . snd <$> args
           pure . Sum $
             (Static e ctx')
               :| [ Function eArgs (Static e ctx') ctx' [] (Just . fst <$> args) False
                  ]
-        Just (t, ctx') -> pure $ Static t ctx'
+        Just (mut, t, ctx') -> pure . mut $ Static t ctx'
         Nothing ->
           getFunctionByNameRecursively name ctx >>= \case
             b@Bottom {} -> do
@@ -1791,74 +1808,21 @@ simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> 
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   pushLocalVariables vdefs
   let ts' = foldr varDefsToType' (topType' x) vdefs
-  mExpr' <- maybe (pure $ topType' x) tcExpr mExpr
-  case (ts', mExpr') of
-    ((Static a@(SVMType.Int _ _) _), (Static b@(SVMType.Decimal) _)) -> pure . bottom $
-      "Type mismatch: "
-        <> showType a
-        <> " and "
-        <> showType b
-        <> " do not match." <$ x
-    _ -> ts' ~> maybe (pure $ topType' x) tcExpr mExpr
+  ts' ~> maybe (pure $ topType' x) tcExpr mExpr
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
 
-checkIfImmuteOperationValid :: Annotated ExpressionF -> SSS Type'
-checkIfImmuteOperationValid (Variable y a) = do
-  lstImmutNames <- asks immutableValNames
-  if null lstImmutNames
-    then tcExpr (Variable y a)
-    else do
-      thisFuncName <- asks functName
-      let namesOfImmutesOnly = map (\x -> fst x) lstImmutNames
-      let notConstructAndImmuteAissgnedValue = ((fromMaybe "" thisFuncName) /= "constructor") && (a `elem` namesOfImmutesOnly)
-      let constructorAndImmuteValueOverwritten = ((fromMaybe "" thisFuncName) == "constructor") && ((a, True) `elem` lstImmutNames)
-      if notConstructAndImmuteAissgnedValue || constructorAndImmuteValueOverwritten
-        then pure . bottom $ "Immutable assignment error at" <$ y
-        else tcExpr (Variable y a)
-checkIfImmuteOperationValid a = tcExpr a
-
 tcExpr :: Annotated ExpressionF -> SSS Type'
-tcExpr (Binary x "+" a b) = do
-  typeOne <- tcExpr a
-  typeTwo <- tcExpr b
-  case ((typeOne, a), (typeTwo, b)) of
-    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    _ -> sumType (intType' x) (stringType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "-" a b) = do
-  typeOne <- tcExpr a
-  typeTwo <- tcExpr b
-  case ((typeOne, a), (typeTwo, b)) of
-    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "*" a b) = do
-  typeOne <- tcExpr a
-  typeTwo <- tcExpr b
-  case ((typeOne, a), (typeTwo, b)) of
-    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "/" a b) = do
-  typeOne <- tcExpr a
-  typeTwo <- tcExpr b
-  case ((typeOne, a), (typeTwo, b)) of
-    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) -> pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "%" a b) = do
-  typeOne <- tcExpr a
-  typeTwo <- tcExpr b
-  case ((typeOne, a), (typeTwo, b)) of
-    -- Int % Decimal
-    (((Static (SVMType.Int _ _) _), (Variable _ _)), ((Static (SVMType.Decimal) _), _)) ->
-      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    -- Decimal % Int
-    (((Static (SVMType.Decimal) _), _), ((Static (SVMType.Int _ _) _), (Variable _ _))) ->
-      pure . bottom $ ("Cannot perform arithmetic with explicit 'decimal' and 'int' types") <$ x
-    -- Default: Int % Int or Decimal % Decimal
-    _ -> sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "+" a b) =
+  sumType [intType' x, stringType' x, decimalType' x] ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "-" a b) =
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "*" a b) =
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "/" a b) =
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
+tcExpr (Binary x "%" a b) =
+  sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "|" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&" a b) =
@@ -1874,66 +1838,21 @@ tcExpr (Binary x ">>" a b) =
 tcExpr (Binary x ">>>" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x ">>>=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (mutable <$> tcExpr a) <~> tcExpr b
 tcExpr (Binary x ">>=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
+  intType' x ~> (mutable <$> tcExpr a) <~> tcExpr b
 tcExpr (Binary x "<<=" a b) =
-  intType' x ~> tcExpr a <~> tcExpr b
-tcExpr (Binary x "+=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> sumType (intType' x) (stringType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
-tcExpr (Binary x "-=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
-tcExpr (Binary x "*=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
-tcExpr (Binary x "/=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
-tcExpr (Binary x "%=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> sumType' (intType' x) (decimalType' x) ~> (checkIfImmuteOperationValid a) <~> tcExpr b
+  intType' x ~> (mutable <$> tcExpr a) <~> tcExpr b
+tcExpr (Binary x "+=" a b) =
+  sumType [intType' x, stringType' x, decimalType' x] ~> (mutable <$> tcExpr a) <~> tcExpr b
+tcExpr (Binary x "-=" a b) =
+  sumType' (intType' x) (decimalType' x) ~> (mutable <$> tcExpr a) <~> tcExpr b
+tcExpr (Binary x "*=" a b) =
+  sumType' (intType' x) (decimalType' x) ~> (mutable <$> tcExpr a) <~> tcExpr b
+tcExpr (Binary x "/=" a b) =
+  sumType' (intType' x) (decimalType' x) ~> (mutable <$> tcExpr a) <~> tcExpr b
+tcExpr (Binary x "%=" a b) =
+  sumType' (intType' x) (decimalType' x) ~> (mutable <$> tcExpr a) <~> tcExpr b
 tcExpr (Binary x "|=" a b) =
   intType' x ~> tcExpr a <~> tcExpr b
 tcExpr (Binary x "&=" a b) =
@@ -1956,23 +1875,13 @@ tcExpr (Binary x ">=" a b) =
   sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
 tcExpr (Binary x "<=" a b) =
   sumType' (intType' x) (decimalType' x) ~> tcExpr a <~> tcExpr b !> pure (boolType' x)
-tcExpr (Binary x "=" a b) = do
-  a' <- tcExpr a
-  b' <- tcExpr b
-  case (a', b') of
-    ((Static c@(SVMType.Int _ _) _), (Static d@(SVMType.Decimal) _)) ->  pure . bottom $
-      "Type mismatch: "
-        <> showType c
-        <> " and "
-        <> showType d
-        <> " do not match." <$ x
-    _ -> (checkIfImmuteOperationValid a) <~> tcExpr b
+tcExpr (Binary _ "=" a b) = (mutable <$> tcExpr a) <~> tcExpr b
 tcExpr (Binary _ _ a b) =
   (tcExpr a <~> tcExpr b)
 tcExpr (PlusPlus x a) =
-  intType' x ~> tcExpr a
+  intType' x ~> (mutable <$> tcExpr a)
 tcExpr (MinusMinus x a) = do
-  intType' x ~> tcExpr a
+  intType' x ~> (mutable <$> tcExpr a)
 tcExpr (NewExpression x b@SVMType.Bytes {}) = do
   let fArgs = Product [Static (SVMType.Int Nothing Nothing) x] x
       fRets = Static b x
@@ -2097,14 +2006,14 @@ tcExpr (FunctionCall x expr args) = do
     NamedArgs es -> apply e a $ Just (fst <$> es)
     _ -> apply e a Nothing
 tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
-tcExpr (Unitary x "++" a) = intType' x ~> tcExpr a
-tcExpr (Unitary x "--" a) = intType' x ~> tcExpr a
+tcExpr (Unitary x "++" a) = intType' x ~> (mutable <$> tcExpr a)
+tcExpr (Unitary x "--" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
 tcExpr (Unitary x "delete" a) = do
-  t <- tcExpr a
+  t <- mutable <$> tcExpr a
   t' <- typecheck (deleteArgs x) t
   pure $ case t' of
-    Bottom _ -> Bottom $ (("Cannot delete state variables of type " <> (showType' t)) <$ x) :| []
+    Bottom{} -> t'
     _ -> Product [] x
 tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
@@ -2121,6 +2030,7 @@ tcExpr (ArrayExpression x es) = do
   t' <- foldr (<~>) (pure $ topType' x) $ tcExpr <$> es
   pure $ case t' of
     (Static t _) -> Static (SVMType.Array t Nothing) x
+    Mutable (Static t _) -> Mutable $ Static (SVMType.Array t Nothing) x
     _ -> t'
 tcExpr (Variable x name) = getVarType' (labelToString name) x
 tcExpr (ObjectLiteral x _) = pure . bottom $ "Cannot use object literals within contract definitions" <$ x

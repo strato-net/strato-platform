@@ -220,8 +220,7 @@ contract Describe_AdminRegistry {
     function it_admin_registry_has_votes_mapping() {
         // Test that votes mapping exists and is accessible
         string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
-        address[] memory votes = adminRegistry.votes(issueId);
-        require(votes.length == 0, "Initial votes should be empty");
+        require(adminRegistry.votes(issueId, 0) == address(0), "Initial votes should be empty");
     }
 
     function it_admin_registry_has_votes_map_mapping() {
@@ -235,10 +234,9 @@ contract Describe_AdminRegistry {
 
     function it_admin_registry_has_admins_array() {
         // Test that admins array exists and is accessible
-        address[] memory admins = adminRegistry.admins();
-        require(admins.length == 2, "Should have 2 initial admins");
-        require(admins[0] == admin1, "First admin should be admin1");
-        require(admins[1] == address(user1), "Second admin should be user1");
+        require(adminRegistry.admins(0) == admin1, "First admin should be admin1");
+        require(adminRegistry.admins(1) == address(user1), "Second admin should be user1");
+        require(adminRegistry.admins(2) == address(0), "There should be no third admin");
     }
 
     function it_admin_registry_has_admin_map_mapping() {
@@ -396,26 +394,26 @@ contract Describe_AdminRegistry {
     function it_admin_registry_handles_admin_management() {
         // Add admin using the proper addAdmin function
         adminRegistry.addAdmin(admin3);
-        require(adminRegistry.admins().length == 2, "Admin was added before enough votes were cast");
+        require(adminRegistry.admins(2) == address(0), "Admin was added before enough votes were cast");
         
         user1.do(address(adminRegistry), "addAdmin", admin3);
-        require(adminRegistry.admins().length == 3, "New admin was not added correctly");
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "New admin was not added correctly");
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should be admin after voting");
         
         // Remove admin using the proper removeAdmin function
         adminRegistry.removeAdmin(admin3);
-        require(adminRegistry.admins().length == 3, "Admin was removed before enough votes were cast");
+        require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was removed before enough votes were cast");
         
         user1.do(address(adminRegistry), "removeAdmin", admin3);
-        require(adminRegistry.admins().length == 2, "Admin was not removed correctly");
+        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was not removed correctly");
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin after removal");
         
         // Swap admin using the proper swapAdmin function
         adminRegistry.swapAdmin(admin3);
-        require(adminRegistry.admins().length == 2, "Admin was swapped before enough votes were cast");
+        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was swapped before enough votes were cast");
         
         user1.do(address(adminRegistry), "swapAdmin", admin3);
-        require(adminRegistry.admins().length == 2, "Admin swap should maintain same count");
+        require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin swap should maintain same count");
     }
 
     function it_admin_registry_handles_complex_issue_execution() {
