@@ -192,6 +192,9 @@ silvstPoolAddress = 0x101d
 silvstLpTokenAddress :: Address
 silvstLpTokenAddress = 0x101e
 
+rewardsChefAddress :: Address
+rewardsChefAddress = 0x101f
+
 -- paxgstPoolAddress :: Address
 -- paxgstPoolAddress = 0x1023
 -- 
@@ -280,6 +283,7 @@ genesisBlock  =
             , voucher
             , mToken
             , rewardsManager
+            , rewardsChef
             , cdpEngine
             , cdpRegistry
             , cdpVault
@@ -697,6 +701,24 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 (CodeAtAccount mercataAddres
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
      , ("._balances<a:" <> addrBS blockappsAddress <> ">", BInteger $ 250_000 * oneE18)
+     ]
+
+rewardsChef :: AccountInfo
+rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mercataAddress "RewardsChef") $ ownedByBlockApps mercataAddress
+  ++ [ (".MAX_INT", BInteger 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
+     , (".PRECISION_MULTIPLIER", BInteger oneE18)
+     , (".rewardToken", BContract "Token" $ unspecifiedChain cataAddress)
+     , (".cataPerSecond", BInteger 100000000000000)
+     , (".totalAllocPoint", BInteger 100)
+     , (".minFutureTime", BInteger 3600)
+     , (".pools[0].lpToken", BAccount $ unspecifiedChain mTokenAddress)
+     , (".pools[0].allocPoint", BInteger 100)
+     , (".pools[0].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[0].accPerToken", BInteger 0)
+     , (".pools[0].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[0].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[0].bonusPeriods.length", BInteger 1)
+     , (".pools.length", BInteger 1)
      ]
 
 rewardsManager :: AccountInfo
