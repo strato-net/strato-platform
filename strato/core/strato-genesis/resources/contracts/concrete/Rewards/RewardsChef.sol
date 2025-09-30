@@ -4,6 +4,29 @@ pragma solidity ^0.8.0;
 import "../../abstract/ERC20/ERC20.sol";
 import "../Tokens/Token.sol";
 
+// ═════════════════════════════════════════════════════════════════════════
+// DATA STRUCTURES
+// ═════════════════════════════════════════════════════════════════════════
+
+struct UserInfo {
+    uint256 amount;      // How many LP tokens the user has provided.
+    uint256 rewardDebt;  // Reward debt
+}
+
+struct BonusPeriod {
+    uint256 startTimestamp;   // When this bonus period begins
+    uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
+}
+
+struct PoolInfo {
+    address lpToken;             // The LP Token added to the stake pool
+    uint256 allocPoint;          // How many allocation points assigned to
+                          // this pool.  Importance of the pool.
+    uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
+    uint256 accPerToken;         // Accumulated CATA per share (per token)
+    BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
+}
+
 /**
  * RewardsChef - A staking contract that allows creating pools for various LP
  * tokens, where users earn CATA token rewards over time for staking their LP
@@ -135,29 +158,7 @@ contract record RewardsChef is Ownable {
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-
-    // ═════════════════════════════════════════════════════════════════════════
-    // DATA STRUCTURES
-    // ═════════════════════════════════════════════════════════════════════════
-
-    struct UserInfo {
-        uint256 amount;      // How many LP tokens the user has provided.
-        uint256 rewardDebt;  // Reward debt
-    }
-
-    struct BonusPeriod {
-        uint256 startTimestamp;   // When this bonus period begins
-        uint256 bonusMultiplier;  // The multiplier for this period (not smaller than 1)
-    }
-
-    struct PoolInfo {
-        address lpToken;             // The LP Token added to the stake pool
-        uint256 allocPoint;          // How many allocation points assigned to
-	                             // this pool.  Importance of the pool.
-        uint256 lastRewardTimestamp; // Last time the CATA distribution occurs
-        uint256 accPerToken;         // Accumulated CATA per share (per token)
-        BonusPeriod[] bonusPeriods;  // Array of bonus periods for this pool
-    }
+    event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -171,7 +172,7 @@ contract record RewardsChef is Ownable {
     // precision. We multiply when storing rewards per token (accPerToken calculation) and
     // divide when calculating individual user rewards to get the actual reward amount.
     // This multiplier also propagates to rewardDebt calculations to maintain consistency.
-    uint256 private PRECISION_MULTIPLIER = 1e12;
+    uint256 public PRECISION_MULTIPLIER = 1e18;
 
     // ═════════════════════════════════════════════════════════════════════════
     // STATE VARIABLES
@@ -194,7 +195,7 @@ contract record RewardsChef is Ownable {
     PoolInfo[] public pools;
 
     // Info of each user that stakes LP tokens.
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -330,7 +331,7 @@ contract record RewardsChef is Ownable {
             return;
         }
 
-        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+        uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
         if (lpSupply == 0) {
             pool.lastRewardTimestamp = block.timestamp;
             return;
@@ -361,17 +362,24 @@ contract record RewardsChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
-                rewardToken.transfer(msg.sender, pending);
+                ERC20(rewardToken).transfer(msg.sender, pending);
             }
         }
 
         if (_amount > 0) {
-            Token(pool.lpToken).transferFrom(msg.sender, address(this), _amount);
+            ERC20(pool.lpToken).transferFrom(msg.sender, address(this), _amount);
             user.amount += _amount;
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -387,16 +395,23 @@ contract record RewardsChef is Ownable {
 
         uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
         if (pending > 0) {
-            rewardToken.transfer(msg.sender, pending);
+            ERC20(rewardToken).transfer(msg.sender, pending);
         }
 
         if (_amount > 0) {
             user.amount -= _amount;
-            Token(pool.lpToken).transfer(msg.sender, _amount);
+            ERC20(pool.lpToken).transfer(msg.sender, _amount);
         }
 
-        user.rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -407,7 +422,7 @@ contract record RewardsChef is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
 
         uint256 accPerToken = pool.accPerToken;
-        uint256 lpSupply = Token(pool.lpToken).balanceOf(address(this));
+        uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
 
         if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
             uint256 multiplier = getMultiplier(_pid, pool.lastRewardTimestamp, block.timestamp);
@@ -418,4 +433,8 @@ contract record RewardsChef is Ownable {
         return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
     }
 
+    function getBalance(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < pools.length, "Pool does not exist");
+        return userInfo[_pid][_user].amount;
+    }
 }
