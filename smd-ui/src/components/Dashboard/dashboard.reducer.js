@@ -54,7 +54,7 @@ const initialState = {
   blockPropagation: persistedData.blockPropagation || [],
   blockDifficulty: persistedData.blockDifficulty || [],
   transactionTypes: persistedData.transactionTypes || [],
-  healthStatus: persistedData?.healthStatus || false,
+  healthStatus: persistedData.healthStatus || false,
   uptime: persistedData.uptime || 0,
   systemStatus: persistedData.systemStatus || false,
   systemWarnings: persistedData.systemWarnings || "",
