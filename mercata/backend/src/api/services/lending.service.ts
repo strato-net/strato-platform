@@ -676,13 +676,7 @@ export const liquidityAndBalance = async (
   // Get user's staked balance from RewardsChef
   const rewardsChefContractAddress = config.rewardsChef;
   const poolIdx = config.rewardsChefMUsdstPoolId;
-  let stakedMTokenBalance = "0";
-  try {
-    stakedMTokenBalance = await getStakedBalance(accessToken, rewardsChefContractAddress, poolIdx, userAddress);
-  } catch (error) {
-    console.warn("Failed to fetch staked balance from RewardsChef:", error);
-    // Continue with staked balance = 0
-  }
+  const stakedMTokenBalance = await getStakedBalance(accessToken, rewardsChefContractAddress, poolIdx, userAddress);
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
