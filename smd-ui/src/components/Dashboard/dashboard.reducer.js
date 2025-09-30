@@ -46,20 +46,20 @@ const loadPersistedData = () => {
 const persistedData = loadPersistedData();
 
 const initialState = {
-  shardCount: persistedData?.shardCount || 0,
-  lastBlockNumber: persistedData?.lastBlockNumber || 0,
-  usersCount: persistedData?.usersCount || 0,
-  contractsCount: persistedData?.contractsCount || 0,
-  transactionsCount: persistedData?.transactionsCount || [],
-  blockPropagation: persistedData?.blockPropagation || [],
-  blockDifficulty: persistedData?.blockDifficulty || [],
-  transactionTypes: persistedData?.transactionTypes || [],
+  shardCount: persistedData.shardCount || 0,
+  lastBlockNumber: persistedData.lastBlockNumber || 0,
+  usersCount: persistedData.usersCount || 0,
+  contractsCount: persistedData.contractsCount || 0,
+  transactionsCount: persistedData.transactionsCount || [],
+  blockPropagation: persistedData.blockPropagation || [],
+  blockDifficulty: persistedData.blockDifficulty || [],
+  transactionTypes: persistedData.transactionTypes || [],
   healthStatus: persistedData?.healthStatus || false,
-  uptime: persistedData?.uptime || 0,
-  systemStatus: persistedData?.systemStatus || false,
-  systemWarnings: persistedData?.systemWarnings || "",
+  uptime: persistedData.uptime || 0,
+  systemStatus: persistedData.systemStatus || false,
+  systemWarnings: persistedData.systemWarnings || "",
   ifHovering: false,
-  networkStatus: persistedData?.networkStatus || false,
+  networkStatus: persistedData.networkStatus || false,
 };
 
 const reducer = function (state = initialState, action) {
