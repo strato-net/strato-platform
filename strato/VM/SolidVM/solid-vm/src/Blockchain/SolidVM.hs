@@ -1403,9 +1403,9 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       let parents' = either (throw . fst) id $ CC.getParents cc ctract
       case filter (elem method . M.keys . CC._functions) parents' of
         [] -> typeError "cannot use super without a parent contract" (method, ctract)
-        ps -> do
+        (p:_) -> do
           addr <- getCurrentAddress
-          return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) (NamedAccount addr UnspecifiedChain) method
+          return $ Constant $ SContractFunction (Just $ CC._contractName p) (NamedAccount addr UnspecifiedChain) method
     (SAccount a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContractItem a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n

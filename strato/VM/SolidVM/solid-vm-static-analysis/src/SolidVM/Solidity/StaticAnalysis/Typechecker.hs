@@ -821,13 +821,15 @@ typecheckMember (Static (SVMType.UnknownLabel "type" Nothing) x) "runtimeCode" =
 typecheckMember (Static (SVMType.UnknownLabel "super" Nothing) x) method = do
   ctract <- asks contract
   cc <- asks codeCollection
+  mf <- asks functName
   pure $ case getParentsAnnotated cc ctract of
     Nothing -> bottom $ "Contract has missing parents" <$ x
     Just parents' -> case filter (elem method . M.keys . _functions) parents' of
       [] -> bottom $ "cannot use super without a parent contract" <$ x
       ps -> case M.lookup method . _functions $ last ps of
         Nothing -> bottom $ ("super does not have a function called " <> labelToText method) <$ x
-        Just f -> filterFuncs cc x method f [External, Private]
+        Just f -> filterFuncs cc x method f $ Private
+          : (bool [External] [] $ maybe False (== method) mf)
 typecheckMember (Static e@(SVMType.Enum _ enum mNames) x) n = do
   names <- case mNames of
     Just names -> pure names
@@ -1038,15 +1040,17 @@ checkOverrides cc c funcName f =
   let ctx = f ^. funcContext
       mOs = f ^. funcOverrides
       tFuncName = T.pack funcName
-      parentsWithSameFunc =
+      parentsWithSameFunc' =
         catMaybes $
-          sequence . (_contractName &&& (M.lookup funcName . _functions))
+          sequence . (_contractName &&& sequence . (id &&& (M.lookup funcName . _functions)))
             <$> fromMaybe [] (getParentsAnnotated cc c)
+      grandparents = (\(_,(c',_)) -> maybe [] (map _contractName) $ getParentsAnnotated cc c') =<< parentsWithSameFunc'
+      parentsWithSameFunc = filter ((`notElem` grandparents) . fst) parentsWithSameFunc'
    in case parentsWithSameFunc of
         [] -> case mOs of
           Nothing -> functionType cc ctx funcName f
           Just _ -> bottom $ "Function " <> tFuncName <> " is declared override, but none of its parents have a function by the same name" <$ ctx
-        (n, p) : ps -> case mOs of
+        ps@((n, (parent, p)) : _) -> case mOs of
           Nothing ->
             bottom $
               T.concat
@@ -1057,8 +1061,8 @@ checkOverrides cc c funcName f =
                   " have a function by the same name"
                 ]
                 <$ ctx
-          Just [] -> case ps of
-            [] -> if p ^. funcVirtual
+          Just [] -> case S.toList . S.fromList $ fst <$> ps of
+            [_] -> if p ^. funcVirtual || parent ^. contractType == InterfaceType
                     then typecheckFuncs cc ctx funcName f p
                     else bottom $
                       T.concat
@@ -1069,13 +1073,13 @@ checkOverrides cc c funcName f =
                           " does not mark the function as virtual"
                         ]
                         <$ ctx
-            _ ->
+            psNub ->
               bottom $
                 T.concat
                   [ "Function ",
                     tFuncName,
                     " is marked as override, but does not specify which base contract to override. Options include ",
-                    T.intercalate ", " $ T.pack . fst <$> parentsWithSameFunc
+                    T.intercalate ", " $ T.pack <$> psNub
                   ]
                   <$ ctx
           Just os ->
@@ -1085,7 +1089,7 @@ checkOverrides cc c funcName f =
                   foldr
                     ( \a (ns, vs, es) -> case a of
                         (o, Nothing) -> (o : ns, vs, es)
-                        (o, Just f') ->
+                        (o, Just (_, f')) ->
                           if f' ^. funcVirtual
                             then case typecheckFuncs cc ctx funcName f f' of
                               Bottom e -> (ns, vs, (o, e) : es)
@@ -1604,7 +1608,7 @@ getFunctionByNameRecursively name ctx = do
   recursively ctx $ do
     c <- asks contract
     cc <- asks codeCollection
-    let isParent = cName == c ^. contractName
+    let isParent = cName /= c ^. contractName
     case M.lookup name $ c ^. functions of
       Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
       Nothing -> case M.lookup name $ c ^. events of
