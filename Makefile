@@ -114,8 +114,7 @@ build_common:
 	mkdir -p ${HIGHWAYDIR}
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
-	cd strato && stack install ${NIX_FLAG} \
-		--test --no-run-tests
+	cd strato && stack install ${NIX_FLAG}
 
 build_common_docker:
 	@echo building haskell libraries and creating directories in docker
@@ -123,9 +122,16 @@ build_common_docker:
 	mkdir -p ${STRATODIR}
 	mkdir -p ${VAULTDIR}
 	cd strato && stack build ${NIX_FLAG} \
-		--test --no-run-tests \
 		--copy-bins --local-bin-path=${FAKEROOT}/usr/local/bin
 
+build_common_with_tests:
+	@echo building haskell libraries and creating directories
+	mkdir -p ${HIGHWAYDIR}
+	mkdir -p ${STRATODIR}
+	mkdir -p ${VAULTDIR}
+	cd strato && stack install ${NIX_FLAG} \
+	  --test --no-run-tests
+		
 build_common_profiled:
 	@echo building haskell libraries and creating directories (profiled)
 	mkdir -p ${HIGHWAYDIR}
