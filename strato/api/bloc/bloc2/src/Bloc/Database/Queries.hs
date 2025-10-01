@@ -74,7 +74,7 @@ getContractByAddress a funcName = runMaybeT $ do
         & qaAddress ?~ a
   codePtr <- case addressStateRefContractName r of
     -- TODO: This block of code is a hack. Figure out a better solution
-    Just "Proxy" | funcName /= "setLogicContract" -> do
+    Just "Proxy" | funcName `notElem` ["setLogicContract", "owner", "renounceOwnership", "transferOwnership"] -> do
       (StorageAddress _ v _) <- MaybeT
         . fmap listToMaybe
         . getStorage'
