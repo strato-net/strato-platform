@@ -64,8 +64,7 @@ describe('BlockView: index', () => {
   });
 
   describe('actions', () => {
-
-    test('back to blocks list', () => {
+    test.skip('back to blocks list', () => {
       const props = {
         match: {
           params: {

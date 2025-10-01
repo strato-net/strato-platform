@@ -16,6 +16,7 @@
 import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../Admin/AdminRegistry.sol";
+import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 
@@ -75,7 +76,9 @@ contract record PoolFactory is Ownable {
     /// @param _tokenFactory The address of the token factory
     /// @param _adminRegistry The address of the admin registry
     /// @param _feeCollector The address of the fee collector
-    constructor(address initialOwner, address _tokenFactory, address _adminRegistry, address _feeCollector) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _tokenFactory, address _adminRegistry, address _feeCollector) external onlyOwner {
         require(_adminRegistry != address(0), "Zero admin registry address");
         require(_tokenFactory  != address(0), "Zero token factory address");
         require(_feeCollector  != address(0), "Zero fee collector address");
@@ -163,8 +166,8 @@ contract record PoolFactory is Ownable {
         require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
         require(newLpSharePercent > 0, "LP share must be greater than 0");
         
-        // Verify the pool is owned by this factory
-        require(Ownable(poolAddress).owner() == address(this), "Pool not owned by factory");
+        // Verify the pool belongs to this factory
+        require(address(Pool(poolAddress).poolFactory()) == address(this), "Pool does not belong to this factory");
         
         // Call the pool's single setFeeParameters function
         Pool(poolAddress).setFeeParameters(newSwapFeeRate, newLpSharePercent);
@@ -226,8 +229,8 @@ contract record PoolFactory is Ownable {
         );
 
         // deploy new pool first
-        pool = address(new Pool(tokenA, tokenB, lpTokenAddress));
         address thisOwner = owner();
+        pool = address(new Pool(tokenA, tokenB, lpTokenAddress, address(thisOwner)));
         Token(lpTokenAddress).addWhitelist(thisOwner, "mint", pool);
         Token(lpTokenAddress).addWhitelist(thisOwner, "burn", pool);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
@@ -248,8 +251,8 @@ contract record PoolFactory is Ownable {
         for (uint256 i = 0; i < allPools.length; i++) {
             address pool = allPools[i];
             if (pool != address(0)) {
-                // Transfer pool ownership to new factory
-                Ownable(pool).transferOwnership(newFactory);
+                // Transfer pool to new factory
+                Pool(pool).transferPoolToFactory(newFactory);
             }
         }
         emit PoolsMigrated(address(this), newFactory, allPools.length);
@@ -262,7 +265,7 @@ contract record PoolFactory is Ownable {
             address pool = poolAddresses[i];
             
             // Verify the pool belongs to this factory
-            require(Ownable(pool).owner() == address(this), "Pool does not belong to this factory");
+            require(address(Pool(pool).poolFactory()) == address(this), "Pool does not belong to this factory");
             
             // Get tokenA and tokenB from the pool contract
             Pool poolContract = Pool(pool);

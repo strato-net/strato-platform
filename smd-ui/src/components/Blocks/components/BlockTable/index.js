@@ -1,6 +1,6 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, reset, Form } from 'redux-form';
 import { BLOCK_QUERY_TYPES, RESOURCE_TYPES } from '../../../QueryEngine/queryTypes';
 import { fetchBlockData } from '../../../BlockData/block-data.actions';
@@ -47,7 +47,7 @@ class BlockTable extends Component {
     const { handleSubmit } = this.props;
 
     function handleClick(blockNumber) {
-      mixpanelWrapper.track("blocks_row_click");
+      // mixpanelWrapper.track("blocks_row_click");
       history.push('/blocks/' + blockNumber);
     }
 
@@ -122,17 +122,17 @@ class BlockTable extends Component {
                   validate={required}
                   onKeyPress={
                     (e) => {
-                      if (e.key === 'Enter') {
-                        //this.dispatchSubmit();
-                        mixpanelWrapper.track('blocks_query_submit');
-                      }
+                      // if (e.key === 'Enter') {
+                      //   //this.dispatchSubmit();
+                      //   mixpanelWrapper.track('blocks_query_submit');
+                      // }
                     }
                   }
                   dir="auto" />
               </div>
               <Button type="submit" onClick={() => {
                 // this.dispatchSubmit();
-                mixpanelWrapper.track('blocks_query_submit');
+                // mixpanelWrapper.track('blocks_query_submit');
               }}
                 className="pt-intent-primary pt-icon-arrow-right" />
             </div>
@@ -149,7 +149,7 @@ class BlockTable extends Component {
           {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
-            mixpanelWrapper.track('blocks_query_remove_tag');
+            // mixpanelWrapper.track('blocks_query_remove_tag');
           }} className="pt-tag-remove" />
         </span>
       )

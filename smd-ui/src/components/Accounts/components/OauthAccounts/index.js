@@ -8,7 +8,7 @@ import {
   resetOauthUserAccount,
   oauthAccountsFilter
 } from './oauthAccounts.actions';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class OauthAccounts extends Component {
 
@@ -28,7 +28,7 @@ class OauthAccounts extends Component {
       this.props.resetOauthUserAccount(user);
       this.setState({ selected: null });
     } else {
-      mixpanelWrapper.track('accounts_row_click');
+      // mixpanelWrapper.track('accounts_row_click');
       this.props.fetchOauthAccountDetail(user.commonName, user.userAddress, this.props.selectedChain);
     }
   }

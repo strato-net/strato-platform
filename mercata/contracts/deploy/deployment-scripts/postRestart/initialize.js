@@ -30,7 +30,7 @@ async function initialize() {
     // Query Cirrus for an existing pool
     try {
       const data = await cirrusSearch("BlockApps-Mercata-Pool", {
-        _owner: `eq.${poolFactoryAddress}`,
+        poolFactory: `eq.${poolFactoryAddress}`,
         tokenA: `in.(${USDST_ADDRESS},${GOLDST_ADDRESS})`,
         tokenB: `in.(${USDST_ADDRESS},${GOLDST_ADDRESS})`,
         select: "address",

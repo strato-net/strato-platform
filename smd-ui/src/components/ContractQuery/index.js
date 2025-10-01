@@ -10,7 +10,7 @@ import {
   queryCirrus
 } from './contractQuery.actions.js';
 import { env } from '../../env.js';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { Button, NonIdealState, Switch } from '@blueprintjs/core';
 
 class ContractQuery extends Component {
@@ -48,7 +48,7 @@ class ContractQuery extends Component {
   }
 
   handleFieldChange(event) {
-    mixpanelWrapper.track('contract_query_field_change');
+    // mixpanelWrapper.track('contract_query_field_change');
     this.setState({
       ...this.state,
       field: event.target.value
@@ -56,7 +56,7 @@ class ContractQuery extends Component {
   }
 
   handleOperatorChange(event) {
-    mixpanelWrapper.track('contract_query_operator_change');
+    // mixpanelWrapper.track('contract_query_operator_change');
     this.setState({
       ...this.state,
       operator: event.target.value
@@ -71,7 +71,7 @@ class ContractQuery extends Component {
   }
 
   handleAddTag() {
-    mixpanelWrapper.track('contract_query_add_tag_click');
+    // mixpanelWrapper.track('contract_query_add_tag_click');
     this.props.addQueryFilter(this.state.field, this.state.operator, this.state.value);
     this.setState({
       field: 'Select field',
@@ -81,12 +81,12 @@ class ContractQuery extends Component {
   }
 
   handleRemoveTag(i) {
-    mixpanelWrapper.track('contract_query_remove_tag_click');
+    // mixpanelWrapper.track('contract_query_remove_tag_click');
     this.props.removeQueryFilter(i);
   }
 
   componentDidMount() {
-    mixpanelWrapper.track('contract_query_load');
+    // mixpanelWrapper.track('contract_query_load');
     this.props.queryCirrus(this.props.match.params.name, this.props.contractQuery.queryString);
     this.setState({tableName: this.props.match.params.name})
   }
@@ -201,7 +201,7 @@ class ContractQuery extends Component {
             <Button
               onClick={
                 (e) => {
-                  mixpanelWrapper.track('contract_query_go_back_click');
+                  // mixpanelWrapper.track('contract_query_go_back_click');
                   this.props.history.goBack();
                 }
               }

@@ -67,7 +67,7 @@ import Control.Monad.Change.Alter (Alters, Selectable)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
-import Data.Foldable (for_)
+import Data.Foldable (for_, toList)
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
@@ -77,7 +77,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import SolidVM.Model.CodeCollection (emptyCodeCollection)
-import SolidVM.Model.Storable
+import SolidVM.Model.Storable hiding (toList)
 import qualified SolidVM.Model.CodeCollection as CC
 import Text.Format
 
@@ -268,6 +268,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
   -- Step 3: Address Processing - Iterate through all genesis account addresses
   let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
       events = genesisInfoEvents genesisInfo
+      delegatecalls = genesisInfoDelegatecalls genesisInfo
 
   for_ addresses $ \address -> do
     -- Fetch full address state from the state database
@@ -295,7 +296,8 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
     fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
-    vmEvents <- squashMap (toAction addressEvents) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
+    let addressDelegatecalls = Map.findWithDefault S.empty address delegatecalls
+    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
     pub (mkStateDiff fullAccountDiffs) vmEvents
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
@@ -322,10 +324,11 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
       , Selectable Ad.Address AddressState m
       )
       => S.Seq Event
+      -> S.Seq A.Delegatecall
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m [VMEvent]
-    toAction addressEvents a d = do
+    toAction addressEvents delegatecalls a d = do
       let ch = codeHash d
       cPtr <- fromMaybe ch <$> resolveCodePtr ch
       let
@@ -335,7 +338,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           originAddress' = mkOriginAddress
 
       appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
-      (abstrs, maps, arrs, cc) <- case cPtr of
+      (abstrs, cc) <- case cPtr of
         SolidVMCode contractName' codeHash' -> do
           -- Maybe the typechecking should be done elsewhere, but this will
           -- allow us to prevent faulty code collections from going into the
@@ -346,11 +349,9 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
               $logWarnS "populateStorageDBs/toAction" . T.pack $
                 "Couldn't find a contract named " ++ contractName' ++
                 " in code collection " ++ format codeHash'
-              pure (Map.empty, [], [], cc)
+              pure (Map.empty, cc)
             Just contract' -> do
               let !abstracts' = getAbstractParentsFromContract contract' cc
-                  !mappings = getMapNamesFromContract contract'
-                  !arrays = getArrayNamesFromContract contract'
               $logInfoS "populateStorageDBs/toAction" . T.pack $
                 "creator: " ++ T.unpack creator' ++ ", app: "
                 ++ T.unpack appName'
@@ -358,15 +359,15 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                 "creatorAddress: " ++ T.unpack creatorAddress' ++
                 ", originAddress: " ++ T.unpack originAddress'
               !abstrs' <- Map.fromList <$> traverse (resolveNameParts a creator' appName') abstracts'
-              pure (abstrs', mappings, arrays, cc)
-        _ -> pure (Map.empty, [], [], emptyCodeCollection)
+              pure (abstrs', cc)
+        _ -> pure (Map.empty, emptyCodeCollection)
       let cca = case ch of
             SolidVMCode n _ ->
               let
                 application' = T.pack n
                 codeCollection' = () <$ cc
                 codeCollectionAdded =
-                  CodeCollectionAdded codeCollection' ch creator' application' abstrs maps
+                  CodeCollectionAdded codeCollection' ch creator' application' abstrs
               in Just codeCollectionAdded
             ExternallyOwned _ -> Nothing
             CodeAtAccount {} -> Nothing
@@ -388,14 +389,15 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     originAddress'
                     appName'
                     storageDiff
-                    abstrs maps arrs
+                    abstrs
                     [A.Create]),
               A._src = join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
               A._events = addressEvents,
-              A._delegatecalls = S.empty
+              A._delegatecalls = delegatecalls
             }
-      pure $ catMaybes [cca, act]
+          dcms = Just . DelegatecallMade <$> toList delegatecalls
+      pure $ catMaybes $ [cca, act] ++ dcms
       where
 
         fromDiff :: Diff a 'Eventual -> a

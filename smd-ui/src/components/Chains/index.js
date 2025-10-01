@@ -6,7 +6,7 @@ import {
   resetChainId,
   resetInitailLabel
 } from './chains.actions';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import Tour from '../Tour';
@@ -15,7 +15,7 @@ import Chain from '../Chain';
 import './chains.css';
 import HexText from '../HexText';
 import { Button, Switch } from '@blueprintjs/core';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 
 const tourSteps = [
   {
@@ -41,8 +41,8 @@ class Chains extends Component {
 
   componentDidMount() {
     this.props.fetchChains(this.state.limit, this.state.offset);
-    mixpanelWrapper.track('chains_page_load');
-    ReactGA.send({hitType: "pageview", page: "/shards", title: "Shards"});
+    // mixpanelWrapper.track('chains_page_load');
+    // ReactGA.send({hitType: "pageview", page: "/shards", title: "Shards"});
   }
 
   updateLabelFilter(filter) {
@@ -60,7 +60,7 @@ class Chains extends Component {
       this.props.resetChainId(label);
       this.setState({ selected: null });
     } else {
-      mixpanelWrapper.track('chains_row_click');
+      // mixpanelWrapper.track('chains_row_click');
       chainIds.forEach((chainId) => {
         this.props.fetchChainDetail(label, chainId);
       })

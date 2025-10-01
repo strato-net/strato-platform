@@ -23,8 +23,8 @@ export interface Token {
   creator?: string;
   root?: string;
   contract_name?: string;
-  collectionname?: string;
-  collectiontype?: string;
+  collection_name?: string;
+  collection_type?: string;
   token?: {
     _name: string;
     _symbol: string;
@@ -270,6 +270,7 @@ export interface AssetConfig {
   liquidationThreshold: string;
   ltv: string;
   reserveFactor: string;
+  perSecondFactorRAY: string;
 }
 
 export interface LendData {

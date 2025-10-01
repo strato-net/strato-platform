@@ -41,7 +41,14 @@ contract record SafetyModule is Ownable {
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
 
-    constructor(address _lendingRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        COOLDOWN_SECONDS = 259200;
+        UNSTAKE_WINDOW = 172800;
+        MAX_SLASH_BPS = 3000;
+
         require(_lendingRegistry != address(0)  && _tokenFactory != address(0), "SM:zero addr");
         lendingRegistry = LendingRegistry(_lendingRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
