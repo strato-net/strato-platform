@@ -148,9 +148,6 @@ voucherAddress = 0x100e
 mTokenAddress :: Address
 mTokenAddress = 0x100f
 
-rewardsManagerAddress :: Address
-rewardsManagerAddress = 0x1010
-
 cdpEngineAddress :: Address
 cdpEngineAddress = 0x1011
 
@@ -198,7 +195,7 @@ rewardsChefAddress = 0x101f
 
 -- paxgstPoolAddress :: Address
 -- paxgstPoolAddress = 0x1023
--- 
+--
 -- paxgstLpTokenAddress :: Address
 -- paxgstLpTokenAddress = 0x1024
 
@@ -246,9 +243,6 @@ tokenImplAddress = 0x110f
 
 poolImplAddress :: Address
 poolImplAddress = 0x1117
-
-rewardsManagerImplAddress :: Address
-rewardsManagerImplAddress = 0x1110
 
 cdpEngineImplAddress :: Address
 cdpEngineImplAddress = 0x1111
@@ -326,7 +320,6 @@ genesisBlock  =
             ContractNoStorage voucherImplAddress 0 (mercataContract "Voucher"),
             ContractNoStorage tokenImplAddress 0 (mercataContract "Token"),
             ContractNoStorage poolImplAddress 0 (mercataContract "Pool"),
-            ContractNoStorage rewardsManagerImplAddress 0 (mercataContract "RewardsManager"),
             ContractNoStorage cdpEngineImplAddress 0 (mercataContract "CDPEngine"),
             ContractNoStorage cdpRegistryImplAddress 0 (mercataContract "CDPRegistry"),
             ContractNoStorage cdpVaultImplAddress 0 (mercataContract "CDPVault"),
@@ -351,7 +344,6 @@ genesisBlock  =
               , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
               , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
               , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
-              , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
               , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
               , (".cdpRegistry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
               , (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
@@ -373,7 +365,6 @@ genesisBlock  =
             , feeCollector
             , voucher
             , mToken
-            , rewardsManager
             , rewardsChef
             , cdpEngine
             , cdpRegistry
@@ -419,7 +410,6 @@ genesisBlock  =
              , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress "BlockApps" "Mercata" "FeeCollector")
              , (voucherAddress, Delegatecall voucherAddress voucherImplAddress "BlockApps" "Mercata" "Voucher")
              , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (rewardsManagerAddress, Delegatecall rewardsManagerAddress rewardsManagerImplAddress "BlockApps" "Mercata" "RewardsManager")
              , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress "BlockApps" "Mercata" "CDPEngine")
              , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress "BlockApps" "Mercata" "CDPRegistry")
              , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
@@ -524,7 +514,7 @@ assetToAccountInfos asset@GA.Asset{..} =
       allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
       name' = if root == silvstRoot then "SILVST" else name
-      description' = fromMaybe description $ M.lookup name' descriptions 
+      description' = fromMaybe description $ M.lookup name' descriptions
    in case allBalances of
         [] -> Nothing
         _ -> Just . SolidVMContractWithStorage root 0 proxy $
@@ -546,7 +536,6 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3)
                 (const (".status", if not (name `elem` ["USDCST", "USDTST"]) then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3))
                 $ find (== root) supportedCollaterals)]
-            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
 assetToEvents :: GA.Asset -> (Address, S.Seq Event)
@@ -866,21 +855,6 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".pools.length", BInteger 1)
      ]
 
-rewardsManager :: AccountInfo
-rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 proxy $ ownedByBlockApps mercataAddress
-  ++ [ (".rewardTokens[0]", BContract "Token" $ unspecifiedChain cataAddress)
-     , (".logicContract", BAccount $ unspecifiedChain rewardsManagerImplAddress)
-     , (".rewardTokens.length", BInteger 1)
-     , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
-     , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
-     , (".eligibleTokens.length", BInteger . fromIntegral $ length supportedCollaterals)
-     ]
-  ++ concatMap (\(i, a) ->
-    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain a)
-    , (".eligibleTokenMap<a:" <> addrBS a <> ">", BInteger $ i + 1)
-    ]
-  ) (zip [0..] supportedCollaterals)
-
 cdpEngine :: AccountInfo
 cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [ (".registry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
@@ -1163,7 +1137,7 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ ownedB
 --      , (".lpSharePercent", BInteger 0)
 --      , (".zapSwapFeesEnabled", BBool True)
 --      ]
--- 
+--
 -- paxgstLpToken :: AccountInfo
 -- paxgstLpToken = SolidVMContractWithStorage paxgstLpTokenAddress 0 proxy $ ownedByBlockApps mercataAddress
 --   ++ [ ("._name", BString "PAXGST-USDST LP Token")
