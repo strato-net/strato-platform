@@ -63,8 +63,9 @@ getContractByAddress ::
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
+  Text ->
   m (Maybe Contract)
-getContractByAddress a = runMaybeT $ do
+getContractByAddress a funcName = runMaybeT $ do
   (AddressStateRef' r _) <-
     MaybeT
       . fmap listToMaybe
@@ -72,7 +73,8 @@ getContractByAddress a = runMaybeT $ do
       $ accountsFilterParams
         & qaAddress ?~ a
   codePtr <- case addressStateRefContractName r of
-    Just "Proxy" -> do -- TODO: This block of code is a hack. Figure out a better solution
+    -- TODO: This block of code is a hack. Figure out a better solution
+    Just "Proxy" | funcName /= "setLogicContract" -> do
       (StorageAddress _ v _) <- MaybeT
         . fmap listToMaybe
         . getStorage'
