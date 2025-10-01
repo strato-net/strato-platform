@@ -224,14 +224,14 @@ contract Describe_BadDebt_Basic {
         AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, address(user1))));
         adminRegistry.initialize([this]);
 
-        bool initialized1 = adminRegistry.initialized;
+        bool initialized1 = adminRegistry.initialized();
         log(string(initialized1));
 
         // Upgrade to a different implementation
         user1.do(address(adminRegistry), "setLogicContract", address(new FeeCollector(this)));
 
         // Ensure that old member vars are accessible
-        bool initialized2 = adminRegistry.initialized;
+        bool initialized2 = adminRegistry.initialized();
         log(string(initialized2));
     }
 

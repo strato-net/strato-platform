@@ -70,8 +70,10 @@ contract Describe_TokenPausable {
     // STAKE POOL MANAGEMENT
     // ═════════════════════════════════════════════════════════════════════════
 
+    PoolInfo emptyPoolInfo = PoolInfo(address(0), 0, 0, 0, []);
+
     function it_should_start_with_no_pools() {
-        require(chef.pools().length == 0, "Pools list should be empty");
+        require(chef.pools(0) == emptyPoolInfo, "Pools list should be empty");
     }
 
     function it_should_allow_adding_new_pool() {
@@ -83,9 +85,9 @@ contract Describe_TokenPausable {
         chef.addPool(allocationPoints, address(lpToken1), multiplier);
 
         // then
-        require(chef.pools().length == 1, "Pools list should have 1 pool");
+        require(chef.pools(1) == emptyPoolInfo, "Pools list should have 1 pool");
 
-        PoolInfo pool1 = chef.pools()[0];
+        PoolInfo pool1 = chef.pools(0);
         require(pool1.lpToken == address(lpToken1), "LP token address should match");
         require(pool1.allocPoint == allocationPoints, "Allocation points should match");
         require(pool1.lastRewardTimestamp == currentTimestamp, "lastRewardTimestamp should be set to block.timestamp");
@@ -109,7 +111,7 @@ contract Describe_TokenPausable {
         chef.updateAllocationPoints(poolId, updatedAllocationPoints);
 
         // then
-        PoolInfo pool1 = chef.pools()[poolId];
+        PoolInfo pool1 = chef.pools(poolId);
         require(pool1.allocPoint == updatedAllocationPoints, "Allocation points should be updated");
         require(chef.totalAllocPoint() == updatedAllocationPoints, "Total allocation points should be updated");
     }
@@ -184,7 +186,7 @@ contract Describe_TokenPausable {
 	chef.updatePool(poolId);
 
         // then
-        PoolInfo pool1 = chef.pools()[poolId];
+        PoolInfo pool1 = chef.pools(poolId);
         uint256 lp1Supply = ERC20(lpToken1).balanceOf(address(chef));
         uint256 reward = ten_seconds * cataPerSecond;
 
