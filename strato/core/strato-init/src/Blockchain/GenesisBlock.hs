@@ -67,7 +67,7 @@ import Control.Monad.Change.Alter (Alters, Selectable)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
-import Data.Foldable (for_, toList)
+import Data.Foldable (for_)
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
@@ -396,8 +396,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
             }
-          dcms = Just . DelegatecallMade <$> toList delegatecalls
-      pure $ catMaybes $ [cca, act] ++ dcms
+      pure $ catMaybes [cca, act]
       where
 
         fromDiff :: Diff a 'Eventual -> a

@@ -231,8 +231,8 @@ processTheMessages messages = do
       -- level like this
       creates =
         [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ <- messages]
-      delegatecalls =
-        [d | VME.DelegatecallMade d <- messages]
+      delegatecalls = concatMap toList
+        [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cp, cr, ap) -> do

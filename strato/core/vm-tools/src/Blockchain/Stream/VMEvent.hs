@@ -14,7 +14,7 @@ import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Stream.Action (Action, Delegatecall)
+import Blockchain.Stream.Action (Action)
 import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
@@ -35,7 +35,6 @@ data VMEvent
         application :: Text,
         abstracts :: Map (Address, Text) (Text, Text, [Text])
       }
-  | DelegatecallMade Delegatecall
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
 
@@ -48,8 +47,6 @@ instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
   format (CodeCollectionAdded _ cp cr ap _) =
     "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
-  format (DelegatecallMade d) =
-    "DelegatecallMade: " ++ format d
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 instance Binary VMEvent
