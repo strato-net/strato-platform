@@ -94,7 +94,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
-import Data.Foldable (toList)
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
@@ -654,10 +653,9 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
     else case erAction <$> result of
       Right (Just act) ->
         let ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-            dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
             act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
             actionEvents = [NewAction act']
-         in ccEvents ++ dcEvents ++ actionEvents
+         in ccEvents ++ actionEvents
       _ -> []
 
 extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
