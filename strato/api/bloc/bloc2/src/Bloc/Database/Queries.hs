@@ -46,6 +46,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Handlers.AccountInfo
+import Handlers.Storage
 import SQLM
 import SolidVM.Model.CodeCollection
 import Text.Format
@@ -58,7 +59,8 @@ getContractByAddress ::
     HasCodeDB m,
     A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
   m (Maybe Contract)
@@ -69,7 +71,24 @@ getContractByAddress a = runMaybeT $ do
       . getAccount'
       $ accountsFilterParams
         & qaAddress ?~ a
-  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  codePtr <- case addressStateRefContractName r of
+    Just "Proxy" -> do -- TODO: This block of code is a hack. Figure out a better solution
+      (StorageAddress _ v _) <- MaybeT
+        . fmap listToMaybe
+        . getStorage'
+        $ storageFilterParams
+            { qsAddress = Just a
+            , qsKey = Just ".logicContract"
+            }
+      logicContract <- MaybeT . pure . stringAddress $ Text.unpack v
+      (AddressStateRef' l _) <- MaybeT
+        . fmap listToMaybe
+        . getAccount'
+        $ accountsFilterParams
+          & qaAddress ?~ logicContract
+      MaybeT . pure $ addressStateRefCodePtr l
+
+    _ -> MaybeT . pure $ addressStateRefCodePtr r
   MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
 getContractDetailsByCodeHash ::
