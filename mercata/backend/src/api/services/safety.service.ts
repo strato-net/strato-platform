@@ -2,6 +2,7 @@ import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
+import * as config from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 
@@ -54,9 +55,9 @@ export const getSafetyModuleInfo = async (
   accessToken: string,
   userAddress: string
 ): Promise<SafetyModuleInfo> => {
-  const config = getSafetyModuleConfig();
-  const safetyModuleAddress = config.safetyModule.address;
-  const sTokenAddress = config.sToken.address;
+  const safetyModuleConfig = getSafetyModuleConfig();
+  const safetyModuleAddress = safetyModuleConfig.safetyModule.address;
+  const sTokenAddress = safetyModuleConfig.sToken.address;
 
   try {
     // Note: We need to query multiple sources for complete SafetyModule data:
@@ -97,7 +98,7 @@ export const getSafetyModuleInfo = async (
         `/BlockApps-Mercata-Token`,
         {
           params: {
-            address: `eq.${config.asset.address}`,
+            address: `eq.${safetyModuleConfig.asset.address}`,
             select: `address,balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
             "balances.key": `eq.${safetyModuleAddress}`
           }
@@ -252,7 +253,7 @@ export const stakeSafetyModule = async (
 
   const tx: FunctionInput = {
     contractName: extractContractName(SafetyModule),
-    contractAddress: config.safetyModule.address,
+    contractAddress: safetyModuleConfig.safetyModule.address,
     method: "stake",
     args: {
       assetsIn: amount,
@@ -270,11 +271,11 @@ export const startCooldownSafetyModule = async (
   accessToken: string,
   userAddress: string
 ): Promise<{ status: string; hash: string }> => {
-  const config = getSafetyModuleConfig();
+  const safetyModuleConfig = getSafetyModuleConfig();
 
   const tx: FunctionInput = {
     contractName: extractContractName(SafetyModule),
-    contractAddress: config.safetyModule.address,
+    contractAddress: safetyModuleConfig.safetyModule.address,
     method: "startCooldown",
     args: {},
   };
@@ -301,7 +302,7 @@ export const redeemSafetyModule = async (
 
   const tx: FunctionInput = {
     contractName: extractContractName(SafetyModule),
-    contractAddress: config.safetyModule.address,
+    contractAddress: safetyModuleConfig.safetyModule.address,
     method: "redeem",
     args: {
       sharesIn: sharesAmount,
