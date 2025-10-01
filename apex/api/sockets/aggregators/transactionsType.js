@@ -12,7 +12,8 @@ function getTransactionsType() {
       {
         attributes: [
           'to_address',
-          'code_or_data',
+          'func_name',
+          'code',
         ],
         raw: true,
         limit: 15,
@@ -24,9 +25,11 @@ function getTransactionsType() {
       data.forEach(tx => {
         let txType;
         if (tx.to_address) {
-          txType = tx.code_or_data.length ? 'FunctionCall' : 'Transfer';
+          // Has recipient address
+          txType = (tx.func_name || tx.code) ? 'FunctionCall' : 'Transfer';
         } else {
-            txType = tx.code_or_data.length ? 'Contract' : 'PrivateTX';
+          // No recipient address
+          txType = tx.code ? 'Contract' : 'PrivateTX';
         }
         typesCounter[txType] += 1;
       });
