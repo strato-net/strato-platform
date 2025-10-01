@@ -145,7 +145,7 @@ services:
   nginx:
     depends_on:
     - apex
-    - docs
+    #- docs
     - postgrest
     - prometheus
     - smd
@@ -157,7 +157,7 @@ services:
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}
-    - DOCS_HOST=${DOCS_HOST}
+    #- DOCS_HOST=${DOCS_HOST}
     - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
     - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
     - OAUTH_SCOPE=${OAUTH_SCOPE}
@@ -191,16 +191,16 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-  docs:
-    environment:
-    - API_URL=/strato-api/eth/v1.2/swagger.json
-    image: swaggerapi/swagger-ui:v3.22.1
-    restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "100m"
-        max-file: "3"
+#   docs:
+#     environment:
+#     - API_URL=/strato-api/eth/v1.2/swagger.json
+#     image: swaggerapi/swagger-ui:v3.22.1
+#     restart: unless-stopped
+#     logging:
+#       driver: "json-file"
+#       options:
+#         max-size: "100m"
+#         max-file: "3"
   zookeeper:
     image: zookeeper:3.9.3
     restart: unless-stopped
