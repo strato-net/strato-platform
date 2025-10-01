@@ -179,9 +179,16 @@ contract record MercataBridge is Ownable {
 /* --------------------------------------------------------------------- */
 /*                             CONSTRUCTOR                               */
 /* --------------------------------------------------------------------- */
-    constructor(address _tokenFactory, address _relayer, address _owner)
-        Ownable(_owner)
-    {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _tokenFactory, address _relayer) external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        PERMISSION_WRAP = 1;
+        PERMISSION_MINT = 2;
+        PERMISSION_MASK = 3;
+        WITHDRAWAL_ABORT_DELAY = 172800;
+        USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+
         require(_tokenFactory!=address(0)&&_relayer!=address(0),"MB: zero");
         tokenFactory = TokenFactory(_tokenFactory);
         relayer      = _relayer;

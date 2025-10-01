@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.30;
+
 import "../../concrete/BaseCodeCollection.sol";
 import "../Util.sol";
-import "../MockTimeProvider.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract Describe_TokenPausable {
@@ -17,7 +19,6 @@ contract Describe_TokenPausable {
     uint256 initLpTokensPerUser = 1000 * 1e18;
 
     RewardsChef chef;
-    MockTimeProvider mockTime;
     uint256 cataPerSecond;
     uint256 currentTimestamp;
 
@@ -59,10 +60,7 @@ contract Describe_TokenPausable {
 	cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
 
-        // Create mock time provider
-        mockTime = new MockTimeProvider();
-
-        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond, address(mockTime));
+        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond);
 
         // Transfer ownership of the reward token to the chef so it can mint rewards
         Ownable(tokenAddress).transferOwnership(address(chef));
@@ -180,7 +178,7 @@ contract Describe_TokenPausable {
 
 	// given 10 seconds has passed
 	uint256 ten_seconds = 10;
-	mockTime.advanceTime(ten_seconds);
+	fastForward(10);
 
         // when
 	chef.updatePool(poolId);

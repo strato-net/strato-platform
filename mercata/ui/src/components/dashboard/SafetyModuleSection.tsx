@@ -550,7 +550,7 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your sUSDST</span>
+                  <span className="text-gray-500 text-sm sm:text-base">Your sUSDST Shares</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
                     {loading ? (
                       <span className="text-gray-400 animate-pulse">

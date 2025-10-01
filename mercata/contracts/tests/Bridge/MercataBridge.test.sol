@@ -131,9 +131,11 @@ contract Describe_MercataBridge {
     }
 
     function beforeEach() {
-        adminRegistry = new AdminRegistry([owner]);
+        adminRegistry = new AdminRegistry();
+        adminRegistry.initialize([owner]);
         tokenFactory = new TokenFactory(address(adminRegistry));
-        bridge = new MercataBridge(address(tokenFactory), address(this), owner);
+        bridge = new MercataBridge(owner);
+        bridge.initialize(address(tokenFactory), address(this));
         
         // Create test tokens through token factory with AdminRegistry as owner
         testToken = TestERC20(tokenFactory.createTokenWithInitialOwner("Test Token", "TEST", [], [], [], "TEST", 0, 18, address(adminRegistry)));
@@ -194,7 +196,7 @@ contract Describe_MercataBridge {
     function it_bridge_reverts_with_zero_addresses() {
         bool reverted = false;
         try {
-            new MercataBridge(address(0), address(relayer), owner);
+            new MercataBridge(owner).initialize(address(0), address(relayer));
         } catch {
             reverted = true;
         }
@@ -202,7 +204,7 @@ contract Describe_MercataBridge {
         
         reverted = false;
         try {
-            new MercataBridge(address(tokenFactory), address(0), owner);
+            new MercataBridge(owner).initialize(address(tokenFactory), address(0));
         } catch {
             reverted = true;
         }

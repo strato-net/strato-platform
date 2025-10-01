@@ -221,7 +221,7 @@ services:
   postgres:
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
-    image: postgres:9.6
+    image: postgres:14.18
     volumes:
       - pgdata:/var/lib/postgresql/data
     command:

@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Dialog } from '@blueprintjs/core';
-import mixpanelWrapper from '../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import { closeUploadModal, resetError } from './uploadFile.actions';
 import { toasts } from '../../Toasts';
 import { isOauthEnabled } from '../../../lib/checkMode';
@@ -22,7 +22,7 @@ class UplaodFile extends Component {
   }
 
   componentDidMount() {
-    mixpanelWrapper.track("external_storage_loaded");
+    // mixpanelWrapper.track("external_storage_loaded");
     !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
 
@@ -34,7 +34,7 @@ class UplaodFile extends Component {
         <Dialog
           isOpen={this.props.isOpen}
           onClose={() => {
-            mixpanelWrapper.track('close_upload_modal');
+            // mixpanelWrapper.track('close_upload_modal');
             this.props.closeUploadModal();
           }}
           iconName={result ? 'saved' : 'pt-icon-upload'}

@@ -5,7 +5,7 @@ import logo from './BlockAppsLogos_DarkBG-Horizontal.png';
 
 import 'normalize.css/normalize.css';
 import '@blueprintjs/core/dist/blueprint.css';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { isS3Available } from '../../lib/checkS3Credentials';
 
 class SideBar extends Component {
@@ -49,7 +49,7 @@ class SideBar extends Component {
               to={'/external_storage'}
               className="menu-item"
               activeClassName="active-menu-item"
-              onClick={() => { mixpanelWrapper.track('nav_link_external_storage_click') }}
+              onClick={() => { /*mixpanelWrapper.track('nav_link_external_storage_click') */}}
             >
               <i className='fa fa-cloud-upload'> </i>
               <span className="menu-text">External Storage</span>

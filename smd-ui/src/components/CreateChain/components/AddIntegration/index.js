@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm } from 'redux-form';
 import { openAddIntegrationModal, closeAddIntegrationModal } from '../../createChain.actions';
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
@@ -26,9 +26,9 @@ class AddIntegration extends Component {
     this.props.closeAddIntegrationModal();
   }
 
-  componentDidMount() {
-    mixpanelWrapper.track("add_integration_loaded");
-  }
+  // componentDidMount() {
+  //   mixpanelWrapper.track("add_integration_loaded");
+  // }
 
   handleNameChange(event) {
     this.setState({
@@ -59,7 +59,7 @@ class AddIntegration extends Component {
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
-      mixpanelWrapper.track('add_integration_submit_click_successful');
+      // mixpanelWrapper.track('add_integration_submit_click_successful');
       this.props.handler(data);
       this.props.reset();
       this.closeModal();
@@ -138,7 +138,7 @@ class AddIntegration extends Component {
     return (
       <div >
         <Button onClick={() => {
-          mixpanelWrapper.track("add_integration_open_click");
+          // mixpanelWrapper.track("add_integration_open_click");
           this.props.fetchChainIds();
           this.props.openAddIntegrationModal();
           this.props.initialize(this.props.initialValues);
@@ -187,7 +187,7 @@ class AddIntegration extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("add_integration_cancel");
+                  // mixpanelWrapper.track("add_integration_cancel");
                   this.props.reset();
                   this.closeModal();
                 }} />

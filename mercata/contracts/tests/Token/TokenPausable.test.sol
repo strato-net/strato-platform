@@ -224,7 +224,8 @@ contract Describe_TokenPausable {
 
     function it_allows_whitelisted_user_to_transfer_when_paused() {
         // Create AdminRegistry with this contract as admin
-        AdminRegistry adminRegistry = new AdminRegistry([this]);
+        AdminRegistry adminRegistry = new AdminRegistry();
+        adminRegistry.initialize([this]);
         
         // Create TokenFactory with adminRegistry as owner so we can call createTokenWithInitialOwner
         TokenFactory tokenFactory = new TokenFactory(address(adminRegistry));

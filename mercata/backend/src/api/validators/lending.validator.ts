@@ -5,8 +5,9 @@ import { validateAddressField, numericStringField } from "./common.validators";
 export function validateDepositLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
+    stakeMToken: Joi.boolean().required(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Deposit Liquidity Argument Validation Error: " + error.message);
@@ -16,8 +17,9 @@ export function validateDepositLiquidityArgs(args: any) {
 export function validateWithdrawLiquidityArgs(args: any) {
   const schema = Joi.object({
     amount: numericStringField("amount"),
+    includeStakedMToken: Joi.boolean().required(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Withdraw Liquidity Argument Validation Error: " + error.message);
@@ -91,6 +93,21 @@ export function validateConfigureAssetArgs(args: any) {
     liquidationBonus: Joi.number().min(10000).max(12500).required(),
     interestRate: Joi.number().min(0).max(10000).required(),
     reserveFactor: Joi.number().min(0).max(5000).required(),
+    perSecondFactorRAY: Joi.string().pattern(/^\d+$/).custom((value, helpers) => {
+      try {
+        const rayValue = BigInt(value);
+        const minRAY = BigInt('1000000000000000000000000000'); // 1e27
+        if (rayValue < minRAY) {
+          return helpers.error('any.invalid');
+        }
+        return value;
+      } catch (error) {
+        return helpers.error('any.invalid');
+      }
+    }).required().messages({
+      'any.invalid': 'perSecondFactorRAY must be >= 1e27 (1 RAY)',
+      'string.pattern.base': 'perSecondFactorRAY must be a valid integer string'
+    }),
   });
   
   const { error } = schema.validate(args);

@@ -40,6 +40,7 @@ import {
   validateLiquidateArgs,
   validateOpenJuniorNoteArgs,
   validateTopUpJuniorNoteArgs,
+  validateSetCollateralConfigArgs
 } from "../validators/cdp.validator";
 
 class CDPController {
@@ -302,6 +303,9 @@ class CDPController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, body } = req;
+      
+      validateSetCollateralConfigArgs(body);
+      
       const result = await setCollateralConfig(accessToken, userAddress as string, body);
       res.status(RestStatus.OK).json(result);
     } catch (error) {

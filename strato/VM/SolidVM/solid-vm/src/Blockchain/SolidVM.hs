@@ -96,6 +96,7 @@ import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as DT
+import Data.Time.Clock
 import Data.Time.Clock.POSIX
 import Data.Traversable
 import qualified Data.Vector as V
@@ -124,6 +125,7 @@ import Text.Printf
 import Text.Read (readEither, readMaybe)
 import Text.Tools
 import UnliftIO hiding (assert)
+
 
 type SolidVMBase m = VMBase m
 
@@ -222,7 +224,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
 
   fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
@@ -261,8 +263,6 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
-      !mappings = getMapNamesFromContract contract'
-      !arrays = getArrayNamesFromContract contract'
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
@@ -271,7 +271,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         Just (PtrToCode (CodeAtAccount cp _)) -> cp
         _ -> creator
 
-  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts mappings arrays
+  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -453,8 +453,6 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       parentName' = if parentName == (CC._contractName contract) then "" else parentName
 
   let !abstracts' = getAbstractParentsFromContract contract cc
-      !mappings = getMapNamesFromContract contract
-      !arrays = getArrayNamesFromContract contract
 
   -- grab the org from the senders account and set it to the codeAddress
   cnAccount <-
@@ -467,7 +465,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction to (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts mappings arrays
+  initializeAction to (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) to
@@ -590,7 +588,18 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
               SVMType.Array _ _ -> return ()
               _ -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) MS.BDefault
     )
-  when (fnCalltype == CC.DelegateCall) $ addDelegatecall from to' (T.pack ctrName) (T.pack parentName')
+  when (fnCalltype == CC.DelegateCall) $ do
+    (codeContractName, codeContractParentName) <- do
+      ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) ccToGet
+      let n = case ch of
+                SolidVMCode n' _ -> n'
+                CodeAtAccount _ n' -> n'
+                _ -> ""
+      resolveCodePtrParent ch >>= \case -- CodePtr's parent
+        Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
+        _ -> pure (n, "")
+    (_, _, codeContractCreator) <- getCreator ccToGet
+    addDelegatecall from to' (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
   ((ctrName, parentName'),) <$> logFunctionCall valList to contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
@@ -1379,7 +1388,8 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       return $ Constant (flip SAccount False (unspecifiedChain acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
-      return $ Constant $ SInteger $ round $ utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
+      return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "coinbase") ->
       pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
@@ -1780,8 +1790,10 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                   res <- pay "built-in transfer function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return $ Constant SNULL
-                    _ -> paymentError (show amount) (show address')
-                _ -> paymentError "unknown" (show address')
+                    _ -> do
+                      balance <- addressStateBalance <$> A.lookupWithDefault (A.Proxy :: A.Proxy AddressState) from
+                      paymentError amount (show address', balance)
+                _ -> typeError "transfer arguments" argVals
 
             -- Send Wei return bool on failure or success
             -- TODO: When gas gets more implemented ensure that this function does not
@@ -2473,7 +2485,8 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
@@ -2494,7 +2507,8 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- will still work but will have incorrect codeptrs.
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
-  (hsh, cc) <- codeCollectionFromSource True $ BC.pack contractSrc
+  isRunningTests <- Env.runningTests <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   (ctr, originAddress, ctrName) <- getCreator creator
@@ -2502,6 +2516,21 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
+callBuiltin "fastForward" [SInteger seconds] = do
+  -- Only allow fastForward during testing
+  env' <- getEnv
+  if not (Env.runningTests env')
+    then invalidArguments "fastForward can only be called during testing" [SInteger seconds]
+    else do
+      -- Get current timestamp and add seconds
+      let currentTimestamp = BlockHeader.timestamp $ Env.blockHeader env'
+          newTimestamp = addUTCTime (fromIntegral seconds) currentTimestamp
+          updatedBlockHeader = (Env.blockHeader env') { BlockHeader.timestamp = newTimestamp }
+      -- Update the environment with new block header
+      Mod.modify_ (Mod.Proxy @Env.Environment) $ \env ->
+        pure $ env { Env.blockHeader = updatedBlockHeader }
+      return SNULL
+
 callBuiltin x args = unknownFunction ("callBuiltin " ++ show args) x
 
 certificateMap :: Maybe String -> CC.Contract -> Value

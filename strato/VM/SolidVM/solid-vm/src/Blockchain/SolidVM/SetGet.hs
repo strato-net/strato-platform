@@ -158,12 +158,14 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> do
-      typeHint <- getValueType addressedPath
-      case typeHint of
-        TStruct{} -> return $ SReference addressedPath
-        TArray{} -> return $ SReference addressedPath
-        TMapping -> return $ SReference addressedPath
-        _ -> return $ findDefault typeHint
+      eTypeHint <- getValueType' addressedPath
+      case eTypeHint of
+        Right typeHint -> case typeHint of
+          TStruct{} -> return $ SReference addressedPath
+          TArray{} -> return $ SReference addressedPath
+          TMapping -> return $ SReference addressedPath
+          _ -> return $ findDefault typeHint
+        _ -> return $ SInteger 0
     MS.BString bs -> do
       t <- getXabiValueType addressedPath
       case t of

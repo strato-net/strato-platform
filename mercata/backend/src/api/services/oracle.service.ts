@@ -4,7 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
-import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "../../types";
+import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
 
 const {
   PriceOracle,

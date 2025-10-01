@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Slipstream.Metrics
-  ( recordGlobals,
-    recordKafkaMessages,
+  ( recordKafkaMessages,
     recordAction,
     recordCombinedAction,
     incNumTables,
@@ -12,10 +11,6 @@ module Blockchain.Slipstream.Metrics
     incNumHistoryTables,
     incNumBloomWrites,
     recordStackDepth,
-    recordCacheHit,
-    recordCacheMiss,
-    recordStorageHit,
-    recordStorageMiss,
     recordOffset,
     recordOffsetOverride,
   )
@@ -23,23 +18,12 @@ where
 
 import BlockApps.Crossmon
 import Blockchain.Slipstream.Data.Action
-import Blockchain.Slipstream.Data.Globals
 import qualified Blockchain.Stream.Action as Action
 import Control.Monad
 import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
-import qualified Data.Cache.LRU as LRU
-import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import Prometheus
-
-{-# NOINLINE globalsSize #-}
-globalsSize :: Vector T.Text Gauge
-globalsSize =
-  unsafeRegister
-    . vector "cache_type"
-    . gauge
-    $ Info "slipstream_globals_size" "Number of cache entries in Globals"
 
 {-# NOINLINE kafkaCount #-}
 kafkaCount :: Counter
@@ -77,13 +61,6 @@ stackDepth =
   unsafeRegister
     . gauge
     $ Info "slipstream_bloom_stack_depth" "Number of pending items in the delayed bloom filter"
-
-recordGlobals :: MonadIO m => Globals -> m ()
-recordGlobals g = liftIO $ do
-  let rec :: T.Text -> (Globals -> Int) -> IO ()
-      rec lab acc = withLabel globalsSize lab (flip setGauge . fromIntegral . acc $ g)
-  rec "created_tables" (M.size . createdTables)
-  rec "contract_states" (LRU.size . contractStates)
 
 recordKafkaMessages :: MonadIO m => [a] -> m ()
 recordKafkaMessages = liftIO . void . addCounter kafkaCount . fromIntegral . length
@@ -123,29 +100,6 @@ incNumBloomWrites = liftIO $ incCounter numBloomWrites
 
 recordStackDepth :: MonadIO m => Int -> m ()
 recordStackDepth = liftIO . setGauge stackDepth . fromIntegral
-
-{-# NOINLINE cacheStats #-}
-cacheStats :: Vector (T.Text, T.Text) Counter
-cacheStats =
-  unsafeRegister
-    . vector ("kind", "response")
-    . counter
-    $ Info "slipstream_cache_stats" "Number of cache hits and misses for Globals"
-
-recCache :: MonadIO m => (T.Text, T.Text) -> m ()
-recCache ls = liftIO $ withLabel cacheStats ls incCounter
-
-recordCacheHit :: MonadIO m => m ()
-recordCacheHit = recCache ("cache_hit", "")
-
-recordCacheMiss :: MonadIO m => m ()
-recordCacheMiss = recCache ("cache_miss", "")
-
-recordStorageHit :: MonadIO m => m ()
-recordStorageHit = recCache ("storage_hit", "")
-
-recordStorageMiss :: MonadIO m => T.Text -> m ()
-recordStorageMiss reason = recCache ("storage_miss", reason)
 
 {-# NOINLINE offsetChanges #-}
 offsetChanges :: Counter

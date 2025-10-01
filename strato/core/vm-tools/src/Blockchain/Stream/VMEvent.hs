@@ -33,8 +33,7 @@ data VMEvent
         codePtr :: CodePtr,
         creator :: Text,
         application :: Text,
-        abstracts :: Map (Address, Text) (Text, Text, [Text]),
-        recordMappings :: [Text]
+        abstracts :: Map (Address, Text) (Text, Text, [Text])
       }
   | DelegatecallMade Delegatecall
   | NewTransactionResult TransactionResult
@@ -47,9 +46,8 @@ vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cp cr ap _ rm) =
+  format (CodeCollectionAdded _ cp cr ap _) =
     "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
-      ++ (if (not $ null rm) then " " ++ show rm else "")
   format (DelegatecallMade d) =
     "DelegatecallMade: " ++ format d
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)

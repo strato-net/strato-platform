@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
-import mixpanelWrapper from '../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
 import { closeDownloadModal, downloadRequest, resetError, clearUrl } from './download.actions';
 import { toasts } from '../../Toasts';
@@ -87,7 +87,7 @@ class Download extends Component {
         <Dialog
           isOpen={this.props.isOpen}
           onClose={() => {
-            mixpanelWrapper.track('close_download_modal');
+            // mixpanelWrapper.track('close_download_modal');
             this.props.closeDownloadModal();
             this.props.reset();
           }}

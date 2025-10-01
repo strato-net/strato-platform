@@ -3,10 +3,10 @@ import { fetchContracts, changeContractFilter } from './contracts.actions';
 import { connect } from 'react-redux';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import { Button, Popover, PopoverInteractionKind, Position, Switch, Tooltip} from '@blueprintjs/core';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds, fetchChainDetailSelect } from '../Chains/chains.actions';
 import { withRouter } from 'react-router-dom';
@@ -49,15 +49,15 @@ class Contracts extends Component {
   }
 
   componentWillMount() {
-    mixpanelWrapper.track("contracts_loaded");
+    // mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
     this.props.fetchChainIds(this.chainLimit, this.chainOffset);
   }
 
-  componentDidMount() {
-    ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
-  }
+  // componentDidMount() {
+  //   ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
+  // }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
@@ -199,14 +199,14 @@ class Contracts extends Component {
               />
             </div>
             <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
-              {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)} (${returnedInstances} Contract Instances)`}
+              {`Contracts ${this.state.offset + 1}-${this.state.offset + contractNames.length} (${returnedInstances} Total Instances)`}
             </div>
             <div className="col-sm-2 smd-pad-16 text-right">
               <Button
                 onClick={this.onNextClick}
                 className="pt-icon-arrow-right"
                 text="Next"
-                disabled={returnedInstances < this.state.limit}
+                disabled={contractNames.length < this.state.limit}
               />
             </div>
           </div>

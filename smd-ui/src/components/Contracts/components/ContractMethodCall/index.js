@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover, Collapse, Switch } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { Link, withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import {
   methodCall,
@@ -25,7 +25,7 @@ class ContractMethodCall extends Component {
   }
 
   handleOpenModal = () => {
-    mixpanelWrapper.track("method_call_button_click");
+    // mixpanelWrapper.track("method_call_button_click");
     this.setState({isOpen : true})
   }
 
@@ -33,7 +33,7 @@ class ContractMethodCall extends Component {
     e.stopPropagation();
     e.preventDefault();
     this.props.reset();
-    mixpanelWrapper.track("method_call_cancel");
+    // mixpanelWrapper.track("method_call_cancel");
     this.setState({isOpen : false})
   }
 
@@ -70,7 +70,7 @@ class ContractMethodCall extends Component {
           chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
           useWallet: this.state.useWallet
         }
-        mixpanelWrapper.track("method_call_submit");
+        // mixpanelWrapper.track("method_call_submit");
         this.props.methodCall(this.props.methodKey, payload);
       } catch (e) {
         return

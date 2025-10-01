@@ -42,7 +42,9 @@ module Blockchain.SolidVM.SM
     getTypeOfName,
     getXabiType,
     getXabiValueType,
+    getXabiValueType',
     getValueType,
+    getValueType',
     pushSender,
     initializeAction,
     -- lookupX509AddrFromCBHash,
@@ -192,6 +194,7 @@ type MonadSM m =
     Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
+    Mod.Modifiable Env.Environment m,
     Mod.Modifiable Env.Sender m,
     Mod.Modifiable [CallInfo] m,
     Mod.Modifiable Action m,
@@ -403,6 +406,10 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
+  get _   = gets env
+  put _ m = modify $ \ss -> ss{ env = m }
 
 instance
   (Mod.Modifiable (Maybe DebugSettings) m) =>
@@ -631,7 +638,8 @@ getVariableOfName name = do
                        "parseCert",
                        "verifyCert",
                        "verifyCertSignedBy",
-                       "verifySignature"
+                       "verifySignature",
+                       "fastForward"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
@@ -975,13 +983,19 @@ getXabiType acct field = do
   pure $ getXabiTypeFromContract field ctract
 
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
-getXabiValueType (AccountPath loc path) = do
+getXabiValueType a = getXabiValueType' a >>= \case
+  Left (Left e) -> typeError "getXabiValueType/invalid storage path" e
+  Left (Right field) -> todo "getXabiValueType/unknown storage reference" field
+  Right t -> pure t
+
+getXabiValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) SVMType.Type)
+getXabiValueType' (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   case MS.getField path of
-    Left e -> typeError "getXabiValueType/invalid storage path" e
+    Left e -> pure . Left $ Left e
     Right field -> getXabiType loc field >>= \case
-      Nothing -> todo "getXabiValueType/unknown storage reference" field
-      Just v -> return $!!  case MS.toList path of
+      Nothing -> pure . Left $ Right field
+      Just v -> pure . Right $!!  case MS.toList path of
                   [] -> v
                   (_:xs) -> loop ccs' xs v
   where
@@ -1029,6 +1043,9 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
+getValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) BasicType)
+getValueType' p = traverse hintFromType =<< getXabiValueType' p
+
 initializeAction :: MonadSM m
                  => Address
                  -> String
@@ -1039,11 +1056,9 @@ initializeAction :: MonadSM m
                  -> Keccak256
                  -> CC.CodeCollection
                  -> Map (Address, T.Text) (T.Text, T.Text, [T.Text])
-                 -> [T.Text]
-                 -> [T.Text]
                  -> m ()
-initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr cc_crtr root appName hsh cc ab = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -1060,8 +1075,8 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> m ()
-addDelegatecall s c o a = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
+addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -1098,7 +1113,8 @@ getCodeAndCollection address' = do
     Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
     Nothing -> do
       (contractName', ch) <- getContractNameAndHash address'
-      cc <- codeCollectionFromHash True ch
+      isRunningTests <- Env.runningTests <$> getEnv
+      cc <- codeCollectionFromHash isRunningTests True ch
 
       let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 

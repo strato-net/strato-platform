@@ -3,7 +3,7 @@ import {connect} from 'react-redux';
 import {withRouter} from 'react-router-dom';
 import './TransactionList.css'
 import { Text } from '@blueprintjs/core';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { parseDateFromString } from '../../lib/dateUtils';
 import HexText from '../HexText';
 import { GET_TRANSACTIONS } from '../../sockets/rooms';
@@ -26,7 +26,7 @@ class TransactionList extends Component {
         return (
           <tr
             key={i}
-            onClick={e => {mixpanelWrapper.track("dashboard_transaction_click"); self.props.history.push('/transactions/' + tx.hash)}}
+            onClick={e => {/*mixpanelWrapper.track("dashboard_transaction_click");*/ self.props.history.push('/transactions/' + tx.hash)}}
           >
             <td width="40%">
               <HexText value={tx.hash} classes="small smd-pad-4"/>

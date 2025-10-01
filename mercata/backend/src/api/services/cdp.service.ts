@@ -1083,14 +1083,62 @@ export const getMaxLiquidatable = async (
     throw new Error("Asset global state not found");
   }
 
-  // Return the full debt amount instead of calculating constraints
-  // The smart contract will safely handle all capping logic (debt, close factor, coverage)
-  // This eliminates frontend dust calculation issues
+  // Get collateral config to access close factor
+  const config = registry.cdpEngine.collateralConfigs?.find(
+    (c: any) => c.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  )?.CollateralConfig;
+
+  if (!config) {
+    throw new Error("Asset config not found");
+  }
+
+  // Calculate total debt amount (Cap 1)
   const rateAccumulator = BigInt(globalState.rateAccumulator);
   const scaledDebt = BigInt(vaultData.scaledDebt);
   const totalDebtUSD = (scaledDebt * rateAccumulator) / RAY;
   
-  return { maxAmount: totalDebtUSD.toString() };
+  // Apply close factor cap (Cap 2)
+  const closeFactorBps = BigInt(config.closeFactorBps);
+  const closeFactorCap = (totalDebtUSD * closeFactorBps) / 10000n;
+  
+  // Calculate coverage cap (Cap 3) - ensures collateral can cover repay + penalty
+  const priceEntry = registry.priceOracle?.prices?.find(
+    (p: any) => p.asset.toLowerCase() === body.collateralAsset.toLowerCase()
+  );
+  
+  if (!priceEntry) {
+    throw new Error("Price not found for collateral asset");
+  }
+  
+  const price = BigInt(priceEntry.value || "0");
+  if (price <= 0n) {
+    throw new Error("Invalid collateral price");
+  }
+  
+  const collateralAmount = BigInt(vaultData.collateralAmount);
+  const unitScale = BigInt(config.unitScale);
+  const liquidationPenaltyBps = BigInt(config.liquidationPenaltyBps);
+  
+  const collateralUSD = (collateralAmount * price) / unitScale;
+  const coverageCap = (collateralUSD * 10000n) / (10000n + liquidationPenaltyBps);
+  
+  // Apply close factor and coverage caps
+  const actualMaxLiquidatable = BigInt(Math.min(
+    Number(closeFactorCap), 
+    Number(coverageCap)
+  ));
+  
+  // Add a small buffer to prevent dust issues when liquidating the maximum amount
+  // This ensures we can liquidate slightly more than the pure mathematical result
+  const bufferWei = 100000n; // 100k wei buffer
+  const maxLiquidatableWithBuffer = actualMaxLiquidatable + bufferWei;
+  
+  // Final safety: ensure we never exceed the total debt amount
+  const finalMaxLiquidatable = maxLiquidatableWithBuffer > totalDebtUSD 
+    ? totalDebtUSD 
+    : maxLiquidatableWithBuffer;
+  
+  return { maxAmount: finalMaxLiquidatable.toString() };
 };
 
 // ----- Admin Service Methods (Owner Only) -----
@@ -1115,30 +1163,20 @@ export const setCollateralConfig = async (
   if (!registry?.cdpEngine) {
     throw new Error("CDP Engine not found");
   }
-
-  // Convert UI values back to contract format
-  const liquidationRatioContract = Math.floor((Number(configData.liquidationRatio) * Number(WAD)) / 100);
   
-  // Convert annual rate to per-second rate in RAY units (avoiding scientific notation)
-  const [intPart, decPart = ''] = configData.stabilityFeeRate.toString().split('.');
-  const scale = BigInt(10) ** BigInt(decPart.length);
-  const secondsPerYear = BigInt(365 * 24 * 60 * 60);
-  const stabilityFeeRateContract = (BigInt(intPart + decPart) * RAY) / (BigInt(100) * scale * secondsPerYear) + RAY;
-   
-
   const tx: FunctionInput = {
     contractName: extractContractName(CDPEngine),
     contractAddress: registry.cdpEngine.address,
     method: "setCollateralAssetParams",
     args: {
       asset: configData.asset,
-      liquidationRatio: liquidationRatioContract.toString(),
-      liquidationPenaltyBps: configData.liquidationPenaltyBps.toString(),
-      closeFactorBps: configData.closeFactorBps.toString(),
-      stabilityFeeRate: stabilityFeeRateContract.toString(),
-      debtFloor: configData.debtFloor.toString(),
-      debtCeiling: configData.debtCeiling.toString(),
-      unitScale: configData.unitScale.toString(),
+      liquidationRatio: configData.liquidationRatio,
+      liquidationPenaltyBps: configData.liquidationPenaltyBps,
+      closeFactorBps: configData.closeFactorBps,
+      stabilityFeeRate: configData.stabilityFeeRate,
+      debtFloor: configData.debtFloor,
+      debtCeiling: configData.debtCeiling,
+      unitScale: configData.unitScale,
       pause: Boolean(configData.isPaused),
     },
   };

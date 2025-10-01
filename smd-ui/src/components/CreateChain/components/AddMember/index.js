@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Dialog, Intent } from '@blueprintjs/core';
 
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm } from 'redux-form';
 import { openAddMemberModal, closeAddMemberModal } from '../../createChain.actions';
 import { validate } from './validate';
@@ -27,9 +27,9 @@ class AddMember extends Component {
     this.props.closeAddMemberModal();
   }
 
-  componentDidMount() {
-    mixpanelWrapper.track("add_member_loaded");
-  }
+  // componentDidMount() {
+  //   mixpanelWrapper.track("add_member_loaded");
+  // }
 
   handleOrgNameChange(event) {
     this.setState({
@@ -74,7 +74,7 @@ class AddMember extends Component {
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
-      mixpanelWrapper.track('add_member_submit_click_successful');
+      // mixpanelWrapper.track('add_member_submit_click_successful');
       this.props.handler(data);
       this.props.reset();
       this.closeModal();
@@ -85,7 +85,7 @@ class AddMember extends Component {
     return (
       <div >
         <Button onClick={() => {
-          mixpanelWrapper.track("add_member_open_click");
+          // mixpanelWrapper.track("add_member_open_click");
           this.props.openAddMemberModal();
         }} className="pt-intent-primary pt-icon-add"
           style={{ marginTop: '8px' }}
@@ -216,7 +216,7 @@ class AddMember extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("add_member_cancel");
+                  // mixpanelWrapper.track("add_member_cancel");
                   this.props.reset();
                   this.closeModal();
                 }} />

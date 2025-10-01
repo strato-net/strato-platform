@@ -32,7 +32,7 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (MainC
 
 runTypechecker :: String -> IO [SourceAnnotation Text]
 runTypechecker c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
-  eCC <- compileSourceWithAnnotations True (M.fromList [("", T.pack c)])
+  eCC <- compileSourceWithAnnotations True True (M.fromList [("", T.pack c)])
   pure $ case eCC of
     Left anns -> anns
     Right _ -> []

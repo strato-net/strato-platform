@@ -46,6 +46,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import Handlers.AccountInfo
+import Handlers.Storage
 import SQLM
 import SolidVM.Model.CodeCollection
 import Text.Format
@@ -58,18 +59,48 @@ getContractByAddress ::
     HasCodeDB m,
     A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
+  Text ->
   m (Maybe Contract)
-getContractByAddress a = runMaybeT $ do
+getContractByAddress a funcName = runMaybeT $ do
   (AddressStateRef' r _) <-
     MaybeT
       . fmap listToMaybe
       . getAccount'
       $ accountsFilterParams
         & qaAddress ?~ a
-  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  codePtr <- case addressStateRefContractName r of
+    -- TODO: This block of code is a hack. Figure out a better solution
+    --
+    -- This is a quick hack to get around the issues with calling Proxy 
+    -- contracts through the API. If the contract is named "Proxy", and 
+    -- the function name being called is not "setLogicContract", then 
+    -- the API will load the ".logicContract" storage element from the 
+    -- contract's storage, then load the code for that address. 
+    -- 
+    -- Ideally, we wouldn't have to hardcode any of these names in 
+    -- the API, but this should get us back up and running for the
+    --  time being. 
+    Just "Proxy" | funcName `notElem` ["setLogicContract", "owner", "renounceOwnership", "transferOwnership"] -> do
+      (StorageAddress _ v _) <- MaybeT
+        . fmap listToMaybe
+        . getStorage'
+        $ storageFilterParams
+            { qsAddress = Just a
+            , qsKey = Just ".logicContract"
+            }
+      logicContract <- MaybeT . pure . stringAddress $ Text.unpack v
+      (AddressStateRef' l _) <- MaybeT
+        . fmap listToMaybe
+        . getAccount'
+        $ accountsFilterParams
+          & qaAddress ?~ logicContract
+      MaybeT . pure $ addressStateRefCodePtr l
+
+    _ -> MaybeT . pure $ addressStateRefCodePtr r
   MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
 
 getContractDetailsByCodeHash ::
@@ -171,6 +202,7 @@ createMetadataNoCompile ::
   SourceMap ->
   m (Either [SourceAnnotation Text] (Keccak256, CodeCollection))
 createMetadataNoCompile sourceList = do
-  compiledSource <- compileSourceWithAnnotations True (Map.fromList $ unSourceMap sourceList)
+  let isRunningTests = False
+  compiledSource <- compileSourceWithAnnotations isRunningTests True (Map.fromList $ unSourceMap sourceList)
   let srcHash = hash . Text.encodeUtf8 $ serializeSourceMap sourceList
   pure $ (srcHash,) <$> compiledSource

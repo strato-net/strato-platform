@@ -6,10 +6,10 @@ import type {
   SetPoolRatesParams,
   Pool,
   SwapToken,
-} from '@shared/swap-types';
+} from '@mercata/shared-types';
 import { SafetyModuleData } from '.';
 
-export * from '@shared/swap-types';
+export * from '@mercata/shared-types';
 // UI-SPECIFIC SWAP INTERFACES
 // ============================================================================
 

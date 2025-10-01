@@ -29,17 +29,18 @@ function getTransactions() {
 
 function parseTransactionType(t) {
   if(t.to_address == null) {
-      if(t.code_or_data.length == 0) {
-	        return "PrivateTX";
+      // No recipient address
+      if(t.code) {
+	        return "Contract";  // Contract creation (has code)
       } else {
-	        return "Contract";
+	        return "PrivateTX";  // No code, no recipient
       }
   }
-  else if(t.code_or_data.length == 0) {
-	  return "Transfer";
+  else if(t.func_name || t.code) {
+	  return "FunctionCall";  // Calling a function or sending code to existing contract
   }
   else {
-	  return "FunctionCall";
+	  return "Transfer";  // Simple value transfer
   }
 }
 
