@@ -199,7 +199,7 @@ export const depositLiquidity = async (
         },
         // Then deposit into RewardsChef
         {
-          contractName: RewardsChef,
+          contractName: extractContractName(RewardsChef),
           contractAddress: rewardsChefContractAddress,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
@@ -263,7 +263,7 @@ export const withdrawLiquidity = async (
 
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
-        contractName: RewardsChef,
+        contractName: extractContractName(RewardsChef),
         contractAddress: config.rewardsChef,
         method: "withdraw",
         args: {
