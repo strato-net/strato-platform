@@ -11,8 +11,8 @@ import {
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import { Link } from 'react-router-dom';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import { Link } from 'react-router-dom';
 import HexText from '../../../HexText';
 import { Tooltip, Position } from '@blueprintjs/core';
 import ContractSource from './ContractSource';
@@ -66,7 +66,7 @@ class ContractCard extends Component {
           <tr
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
-              mixpanelWrapper.track("contract_state_clicked")
+              // mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
               self.props.fetchContractInfoRequest(`card-data-${instance.address}-${self.props.selectedChain}`, name, instance.address, self.props.selectedChain)
@@ -213,7 +213,7 @@ class ContractCard extends Component {
                   <Button type="button"
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
-                      mixpanelWrapper.track("contracts_toggle_collapse_click");
+                      // mixpanelWrapper.track("contracts_toggle_collapse_click");
                       if(this.state.isOpen) {
                         this.props.selectContractInstance(name, null);
                       }

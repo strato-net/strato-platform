@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 import { withRouter, Link } from "react-router-dom";
 import { connect } from "react-redux";
-import mixpanelWrapper from "../../lib/mixpanelWrapper";
+// import mixpanelWrapper from "../../lib/mixpanelWrapper";
 import "./menubar.css";
 import logo from "./strato-mercata-beta-white.png";
 import { env } from "../../env";
@@ -165,9 +165,9 @@ class MenuBar extends Component {
       <Menu>
         <MenuItem
           className="pt-button pt-minimal pt-small"
-          onClick={() => {
-            mixpanelWrapper.track("docs_blockapps_click");
-          }}
+          // onClick={() => {
+          //   mixpanelWrapper.track("docs_blockapps_click");
+          // }}
           href="https://docs.blockapps.net/"
           target="_blank"
           rel="noopener noreferrer"
@@ -176,9 +176,9 @@ class MenuBar extends Component {
         />
         <MenuItem
           className="pt-button pt-minimal pt-small"
-          onClick={() => {
-            mixpanelWrapper.track("contact_blockapps_support_click");
-          }}
+          // onClick={() => {
+          //   mixpanelWrapper.track("contact_blockapps_support_click");
+          // }}
           href="https://support.blockapps.net"
           target="_blank"
           rel="noopener noreferrer"

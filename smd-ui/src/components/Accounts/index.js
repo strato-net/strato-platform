@@ -3,7 +3,7 @@ import {
   fetchAccounts,
   fetchOauthAccounts,
 } from './accounts.actions';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import Tour from '../Tour';
@@ -11,7 +11,7 @@ import BlocAccounts from './components/BlocAccounts';
 import OauthAccounts from './components/OauthAccounts';
 import './accounts.css';
 import { isOauthEnabled } from '../../lib/checkMode';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 
 const tourSteps = [/* {
     title: 'Create User',
@@ -46,8 +46,8 @@ class Accounts extends Component {
     } else {
       this.props.fetchAccounts(true, true, this.props.selectedChain);
     }
-    mixpanelWrapper.track('accounts_page_load');
-    ReactGA.send({hitType: "pageview", page: "/accounts", title: "Accounts"});
+    // mixpanelWrapper.track('accounts_page_load');
+    // ReactGA.send({hitType: "pageview", page: "/accounts", title: "Accounts"});
   }
 
   render() {

@@ -1,20 +1,20 @@
-FROM node:14.21.3-alpine3.17 as base
+FROM node:14.21.3-alpine3.17 AS base
 RUN apk add --no-cache lsof && \
     mkdir -p /usr/src/app && \
     npm install -g serve@13.0.2
 WORKDIR /usr/src/app
 
-FROM base as npminstaller
+FROM base AS npminstaller
 COPY package*.json /usr/src/app/
 RUN npm ci
 
 ### Builder
-FROM npminstaller as builder
+FROM npminstaller AS builder
 COPY . /usr/src/app/
 RUN npm run build
 
 ### Prod
-FROM base as prod
+FROM base AS prod
 ARG STRATO_VERSION
 ENV STRATO_VERSION=${STRATO_VERSION}
 ENV NODE_ENV=production
@@ -27,7 +27,7 @@ HEALTHCHECK --interval=5s --timeout=2s --start-period=180s \
 CMD [ "sh", "/usr/src/app/docker-run.sh" ]
 
 ### Test
-FROM base as test
+FROM base AS test
 COPY . /usr/src/app
 COPY --from=npminstaller /usr/src/app/node_modules /usr/src/app/node_modules/
 RUN npm ci

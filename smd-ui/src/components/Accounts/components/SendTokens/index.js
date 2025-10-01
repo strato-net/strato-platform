@@ -11,7 +11,7 @@ import { Button, Dialog, AnchorButton, Popover, PopoverInteractionKind, Position
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import ValueInput from '../../../ValueInput';
 import validate from './validate';
 import { fetchChainIds, getLabelIds } from '../../../Chains/chains.actions';
@@ -51,13 +51,13 @@ class SendTokens extends Component {
     // For non-oauth enabled
     this.props.sendTokens(payload);
 
-    mixpanelWrapper.track('send_ether_submit_click_successful');
+    // mixpanelWrapper.track('send_ether_submit_click_successful');
     this.props.reset();
   };
 
-  componentDidMount() {
-    mixpanelWrapper.track("send_ether_loaded");
-  }
+  // componentDidMount() {
+  //   mixpanelWrapper.track("send_ether_loaded");
+  // }
 
   userNameField = (users, isModeOauth) => {
     return (
@@ -338,7 +338,7 @@ class SendTokens extends Component {
       <div className="smd-pad-16">
         <AnchorButton 
           onClick={() => {
-            mixpanelWrapper.track("send_ether_open_click");
+            // mixpanelWrapper.track("send_ether_open_click");
             // TODO: remove public mode
             isModeOauth && this.props.fetchBalanceRequest(this.props.initialValues.fromAddress);
             this.props.fetchChainIds();
@@ -440,7 +440,7 @@ class SendTokens extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("send_ether_cancel");
+                  // mixpanelWrapper.track("send_ether_cancel");
                   this.closeModal();
                 }} />
                 <Button

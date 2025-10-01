@@ -17,7 +17,7 @@ import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isOauthEnabled } from '../../lib/checkMode';
@@ -126,7 +126,7 @@ class CreateContract extends Component {
     const self = this;
     reader.onload = function (event) {
       const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-      mixpanelWrapper.track("create_contract_file_upload");
+      // mixpanelWrapper.track("create_contract_file_upload");
       self.props.contractFormChange(
         fileContents
       );
@@ -146,7 +146,7 @@ class CreateContract extends Component {
     this.props.touch('contract');
     let contractSrc = SampleContracts[contractName];
     const self = this;
-    mixpanelWrapper.track("sample_contract_select");
+    // mixpanelWrapper.track("sample_contract_select");
     self.props.contractFormChange(contractSrc);
     self.props.compileContract(
       contractName,
@@ -224,7 +224,7 @@ class CreateContract extends Component {
       useWallet: this.state.useWallet
     };
 
-    mixpanelWrapper.track('create_contract_submit_click_successful');
+    // mixpanelWrapper.track('create_contract_submit_click_successful');
     this.props.createContract(payload);
     this.props.reset();
   };
@@ -281,7 +281,7 @@ class CreateContract extends Component {
   };
 
   componentDidMount() {
-    mixpanelWrapper.track("create_contract_loaded");
+    // mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
     !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
@@ -337,7 +337,7 @@ class CreateContract extends Component {
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
         <AnchorButton onClick={() => {
-          mixpanelWrapper.track("create_contract_open_click");
+          // mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal();
           this.props.initialize(this.props.initialValues);
           this.props.getLabelIds(this.props.initialValues.chainLabel)
@@ -554,7 +554,7 @@ class CreateContract extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("create_contract_cancel");
+                  // mixpanelWrapper.track("create_contract_cancel");
                   this.props.contractCloseModal()
                 }} />
                 <Button

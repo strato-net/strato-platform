@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# Check if nix-shell is available
+if ! command -v nix-shell >/dev/null 2>&1; then
+    echo "Error: nix-shell is not available on this system."
+    echo "Please install Nix from: https://nix.dev/install-nix.html"
+    exit 1
+fi
+
+nix-shell strato/nix/stack.nix 

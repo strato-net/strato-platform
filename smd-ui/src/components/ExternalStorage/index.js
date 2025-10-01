@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Tooltip, Position } from '@blueprintjs/core';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { openUploadModal } from './UploadFile/uploadFile.actions';
 import UploadFile from './UploadFile';
 import List from './List';
@@ -36,7 +36,7 @@ class ExternalStorage extends Component {
             >
               <Button
                 onClick={() => {
-                  mixpanelWrapper.track('open_upload_modal');
+                  // mixpanelWrapper.track('open_upload_modal');
                   this.props.openUploadModal();
                 }}
                 className="pt-intent-primary button-spacing pt-icon-upload"
@@ -44,21 +44,21 @@ class ExternalStorage extends Component {
             </Tooltip>
             <Button
               onClick={() => {
-                mixpanelWrapper.track('open_attest_modal');
+                // mixpanelWrapper.track('open_attest_modal');
                 this.props.openAttestModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-tick"
               text="Attest" />
             <Button
               onClick={() => {
-                mixpanelWrapper.track('open_verify_modal');
+                // mixpanelWrapper.track('open_verify_modal');
                 this.props.openVerifyModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-info-sign"
               text="Verify" />
             <Button
               onClick={() => {
-                mixpanelWrapper.track('open_download_modal');
+                // mixpanelWrapper.track('open_download_modal');
                 this.props.openDownloadModal();
               }}
               className="pt-intent-primary button-spacing pt-icon-download"
