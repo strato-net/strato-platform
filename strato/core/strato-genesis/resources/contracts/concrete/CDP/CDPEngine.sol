@@ -160,10 +160,13 @@ contract record CDPEngine is Ownable {
     }
     
     // ─────────────────────────────── Constructor ─────────────────────────────
-    constructor(
-        address _registry,
-        address initialOwner
-    ) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _registry) external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        RAY = 1e27;
+        WAD = 1e18;
+
         require(_registry != address(0), "CDPEngine: invalid registry");
         registry = CDPRegistry(_registry);
     }

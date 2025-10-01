@@ -60,7 +60,10 @@ class LendingController {
       const { accessToken, body, address: userAddress } = req;
       validateDepositLiquidityArgs(body);
 
-      const result = await depositLiquidity(accessToken, userAddress as string, body.amount);
+      const result = await depositLiquidity(accessToken,
+	                                    userAddress as string,
+					    body.amount,
+					    body.stakeMToken);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -77,7 +80,7 @@ class LendingController {
       const { accessToken, body, address: userAddress } = req;
       validateWithdrawLiquidityArgs(body);
 
-      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount);
+      const result = await withdrawLiquidity(accessToken, userAddress as string, body.amount, body.includeStakedMToken);
       res.status(RestStatus.OK).json(result);
       return next();
     } catch (error) {
@@ -242,7 +245,7 @@ class LendingController {
     try {
       const { accessToken, address: userAddress } = req;
       validateUserAddress(userAddress);
-      
+
       const result = await getLoan(accessToken, userAddress as string);
       res.status(RestStatus.OK).json(result);
     } catch (error) {

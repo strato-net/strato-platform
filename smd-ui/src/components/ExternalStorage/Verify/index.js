@@ -3,7 +3,7 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
-import mixpanelWrapper from '../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
 import { closeVerifyModal, verifyDocumentRequest, resetError } from './verify.actions';
 import { parseDateFromTimestamp } from '../../../lib/dateUtils';
@@ -145,7 +145,7 @@ class Verify extends Component {
           <Dialog
             isOpen={this.props.isOpen}
             onClose={() => {
-              mixpanelWrapper.track('close_verify_modal');
+              // mixpanelWrapper.track('close_verify_modal');
               this.closeModal();
             }}
             iconName={result ? 'saved' : 'pt-icon-info-sign'}

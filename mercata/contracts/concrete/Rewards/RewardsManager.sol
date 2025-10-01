@@ -46,10 +46,9 @@ contract record RewardsManager is Ownable {
 
     address public rewardDelegate;
     
-    constructor(
-        RewardsManagerArgs _args,
-        address _rewardsCreator
-    ) Ownable(_rewardsCreator) {
+    constructor(address _rewardsCreator) Ownable(_rewardsCreator) { }
+
+    function initialize(RewardsManagerArgs _args) external onlyOwner {
         for (uint i = 0; i < _args.initialRewardTokens.length; i++) {
             addRewardToken(address(_args.initialRewardTokens[i]));
         }

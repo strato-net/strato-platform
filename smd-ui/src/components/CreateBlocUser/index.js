@@ -6,16 +6,16 @@ import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 
 import './createBlocUser.css';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 
 class CreateBlocUser extends Component {
 
-  componentDidMount() {
-    mixpanelWrapper.track("create_user_loaded");
-  }
+  // componentDidMount() {
+  //   mixpanelWrapper.track("create_user_loaded");
+  // }
 
   submit = (values) => {
-    mixpanelWrapper.track('create_user_submit_click');
+    // mixpanelWrapper.track('create_user_submit_click');
     this.props.createBlocUser(values.username, values.password);
   }
 
@@ -23,7 +23,7 @@ class CreateBlocUser extends Component {
     return (
     <div className="smd-pad-16">
       <Button onClick={() => {
-        mixpanelWrapper.track('create_user_open_click');
+        // mixpanelWrapper.track('create_user_open_click');
         this.props.reset();
         this.props.openOverlay();
       }} className="pt-intent-primary pt-icon-add"
@@ -106,7 +106,7 @@ class CreateBlocUser extends Component {
           <div className="pt-dialog-footer">
             <div className="pt-dialog-footer-actions">
               <Button text="Cancel" onClick={() => {
-                mixpanelWrapper.track('create_user_close_click');
+                // mixpanelWrapper.track('create_user_close_click');
                 this.props.reset();
                 this.props.closeOverlay();
               }}/>

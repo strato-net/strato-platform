@@ -495,8 +495,9 @@ contract Describe_LendingPool_Basic {
         uint prior_balance = IERC20(USDST).balanceOf(address(this)); // to help with cleanup
 
         // Liquidation requires USDST balance
-        Token(USDST).mint(address(this), 1000e18);
-        IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
+        uint amount_needed = m.lendingPool().getUserDebt(address(user1));
+        Token(USDST).mint(address(this), amount_needed);
+        IERC20(USDST).approve(address(m.liquidityPool()), amount_needed);
 
         // Perform Liquidation
         pool.liquidationCallAll(GOLDST, address(user1));

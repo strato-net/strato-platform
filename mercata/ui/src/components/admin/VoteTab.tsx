@@ -138,7 +138,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {issue.args.join(', ')}
+                          {JSON.parse(issue.args || '[]').join(', ')}
                         </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
@@ -237,7 +237,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[300px] truncate">
-                          {issue.args.join(', ')}
+                          {JSON.parse(issue.args || '[]').join(', ')}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
                           <div className="flex items-center space-x-2">

@@ -4,7 +4,7 @@ import { withRouter, Link } from "react-router-dom";
 import NodeCard from "../NodeCard";
 import TransactionList from "../TransactionList";
 import NumberCard from "../NumberCard";
-import mixpanelWrapper from "../../lib/mixpanelWrapper";
+// import mixpanelWrapper from "../../lib/mixpanelWrapper";
 import { endTour } from "../Tour/tour.actions";
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
@@ -33,7 +33,7 @@ import {
   GET_NETWORK_HEALTH,
 } from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
-import ReactGA from "react-ga4";
+// import ReactGA from "react-ga4";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
 
@@ -81,12 +81,12 @@ class Dashboard extends Component {
     this.props.subscribeRoom(GET_SYSTEM_INFO);
     this.props.subscribeRoom(GET_NETWORK_HEALTH);
 
-    mixpanelWrapper.track("dashboard_page_load");
-    ReactGA.send({
-      hitType: "pageview",
-      page: "/smd",
-      title: "Dashboard",
-    });
+    // mixpanelWrapper.track("dashboard_page_load");
+    // ReactGA.send({
+    //   hitType: "pageview",
+    //   page: "/smd",
+    //   title: "Dashboard",
+    // });
   }
 
   displaySystemMetrics(cpu, memory, filesystem, networkStats, systemHealth) {

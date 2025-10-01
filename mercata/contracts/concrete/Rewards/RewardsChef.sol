@@ -158,7 +158,7 @@ contract record RewardsChef is Ownable {
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-
+    event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTANTS
@@ -192,10 +192,10 @@ contract record RewardsChef is Ownable {
     uint256 public minFutureTime;
 
     // Info of each of the stake pool.
-    PoolInfo[] public pools;
+    PoolInfo[] public record pools;
 
     // Info of each user that stakes LP tokens.
-    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
     // ═════════════════════════════════════════════════════════════════════════
     // CONSTRUCTOR
@@ -372,14 +372,14 @@ contract record RewardsChef is Ownable {
         }
 
         // ═════════════════════════════════════════════════════════════════════
-	// WARNING!!
+        // WARNING!!
         // ═════════════════════════════════════════════════════════════════════
-	//
-	// This has to be set in variable and only then applied to
-	// user.rewardDebt, otherwise the solidvm throws!
-	uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
         user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -404,14 +404,14 @@ contract record RewardsChef is Ownable {
         }
 
         // ═════════════════════════════════════════════════════════════════════
-	// WARNING!!
+        // WARNING!!
         // ═════════════════════════════════════════════════════════════════════
-	//
-	// This has to be set in variable and only then applied to
-	// user.rewardDebt, otherwise the solidvm throws!
-	uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
         user.rewardDebt = rewardDebt;
 
+        emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -433,4 +433,8 @@ contract record RewardsChef is Ownable {
         return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
     }
 
+    function getBalance(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < pools.length, "Pool does not exist");
+        return userInfo[_pid][_user].amount;
+    }
 }
