@@ -1474,7 +1474,7 @@ contract Describe_CDPEngine {
         
     }
 
-    function it_should_accrue_interest_with_fastForward() {
+    function it_cdp_engine_accrue_interest_with_fastForward() {
         log("=== Testing Interest Accrual with FastForward ===");
         
         // Fast forward a bit to avoid timestamp 0 issues
@@ -1533,13 +1533,12 @@ contract Describe_CDPEngine {
         // Calculate expected interest
         // With 5% APR stability fee rate
         uint256 actualInterest = debtAfterAccrual - initialDebt - 1; // Subtract the 1 wei we minted to trigger accrual
-        
+
+        uint interestRate = (actualInterest * 100) / debtAmount;
         log("Actual interest accrued", actualInterest);
-        log("Interest rate achieved", actualInterest * 100 / debtAmount); // As percentage
+        log("Interest rate achieved", interestRate); // As percentage
         
-        // Allow for some precision differences but ensure it's roughly 5%
-        require(actualInterest > 45e17, "Interest should be at least 4.5 USDST"); // > 4.5%
-        require(actualInterest < 55e17, "Interest should be less than 5.5 USDST"); // < 5.5%
+        require(interestRate == 5, "Interest rate should be at 5%");
     }
 
     function it_should_compound_interest_over_multiple_periods() {
