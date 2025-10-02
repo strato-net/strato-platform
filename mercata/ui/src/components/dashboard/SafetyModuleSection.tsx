@@ -353,7 +353,7 @@ const SafetyModuleSection = () => {
                 </div>
 
                 {/* Cooldown Section */}
-                {safetyInfo && BigInt(safetyInfo.userShares) > 0n && (
+                {safetyInfo && BigInt(safetyInfo.userSharesTotal) > 0n && (
                   <div className="bg-white rounded-lg p-4 border">
                     <h3 className="font-medium mb-3 flex items-center gap-2">
                       <Clock className="h-4 w-4" />
@@ -424,7 +424,7 @@ const SafetyModuleSection = () => {
                   <h3 className="font-medium mb-3">Redeem</h3>
                   
                   {/* Show redemption status */}
-                  {safetyInfo && BigInt(safetyInfo.userShares) === 0n ? (
+                  {safetyInfo && BigInt(safetyInfo.userSharesTotal) === 0n ? (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
                       <p className="text-sm text-gray-600">
                         No sUSDST shares to redeem. Stake USDST first to receive sUSDST shares.
@@ -449,7 +449,7 @@ const SafetyModuleSection = () => {
                     </div>
                   )}
 
-                  {safetyInfo && BigInt(safetyInfo.userShares) > 0n && (
+                  {safetyInfo && BigInt(safetyInfo.userSharesTotal) > 0n && (
                     <>
                       <div className="flex flex-col sm:flex-row items-stretch sm:items-start space-y-2 sm:space-y-0 sm:space-x-2">
                         <div className="relative flex-1">
