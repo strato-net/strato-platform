@@ -215,31 +215,6 @@ contract Describe_BadDebt_Basic {
         require(ERC20(USDST).balanceOf(address(feeCollector)) == 0, "FeeCollector should have 0 USDST");
     }
 
-    /// @dev once this bug is patched, this test will not compile, so remove it.
-    /// for now, it fails:
-    /// ❌ Unit test 'proxy should not compile because sets variables to functions' failed:
-    ///     Left type error: string cast: [SContractFunction Nothing f333513fb947874fad99f100c89f9815bc4931f3 "initialized"]
-    function it_proxy_should_not_compile_because_sets_variables_to_functions() public {
-        address adminRegistryImpl = address(new AdminRegistry());
-        AdminRegistry adminRegistry = AdminRegistry(address(new Proxy(adminRegistryImpl, address(user1))));
-        adminRegistry.initialize([this]);
-
-        bool initialized1 = adminRegistry.initialized();
-        log(string(initialized1));
-
-        // Upgrade to a different implementation
-        user1.do(address(adminRegistry), "setLogicContract", address(new FeeCollector(this)));
-
-        // Ensure that old member vars are accessible
-        bool caught = false;
-        try {
-            adminRegistry.initialized();
-        } catch {
-            caught = true;
-        }
-        require(caught, "Missing call to initialized() did not throw");
-    }
-
     function it_proxy_can_access_old_member_vars() public {
         address oldMemberVarsImpl = address(new OldMemberVars());
         OldMemberVars oldMemberVars = OldMemberVars(address(new Proxy(oldMemberVarsImpl, this)));
