@@ -52,11 +52,14 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
+import qualified Data.HashSet.InsOrd as HS
 import Data.Map (fromList, traverseWithKey)
 import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
 import Data.Source.Map
 import Data.Swagger hiding (Header, Http, delete)
+import qualified Data.Swagger as Swagger
 import Data.Text (Text)
+import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import HFlags
 import qualified Handlers.AccountInfo as Account
@@ -136,7 +139,7 @@ instance {-# OVERLAPPING #-} Accessible (Maybe BestBlock) IO where
 instance {-# OVERLAPPING #-} Accessible (Maybe WorldBestBlock) IO where
   access _ = fmap WorldBestBlock <$> runStratoRedisIO getWorldBestBlockInfo
 
-type FullAPI = Header "X-USER-ACCESS-TOKEN" Text :> (CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI)
+type FullAPI = CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
 
 newtype AccessToken = AccessToken { getAccessToken :: Maybe Text }
 
@@ -154,8 +157,8 @@ fullServer ::
     n ~ ReaderT AccessToken m
   ) =>
   ServerT FullAPI m
-fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken jwtToken)) coreApiServer
-                 :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken jwtToken)) bloc
+fullServer = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (AccessToken Nothing)) coreApiServer
+        :<|> hoistServer (Proxy :: Proxy BlocAPI) (flip runReaderT (AccessToken Nothing)) bloc
 
 ----------------
 
@@ -216,13 +219,33 @@ main = do
         ]
   _ <- traverseWithKey (\service url' -> putStrLn $ "The url for " <>  service <> " is " <> url') urlMap
 
-  let theDoc =
+  let baseDoc =
         toSwagger (Proxy :: Proxy FullAPI)
           & info . title .~ "Strato API"
           & info . description
             ?~ "This is the great Strato API, which let's \
-               \ you query the blockchain."
+               \ you query the blockchain. Authentication is handled via OAuth2 proxy."
           & info . version .~ "1.2"
+          & tags .~ HS.fromList 
+              [ Tag "Eth - GET" (Just "Ethereum API GET endpoints") Nothing
+              , Tag "Eth - POST" (Just "Ethereum API POST endpoints") Nothing
+              , Tag "Bloc - GET" (Just "Bloc API GET endpoints") Nothing
+              , Tag "Bloc - POST" (Just "Bloc API POST endpoints") Nothing
+              ]
+      
+      -- Automatically tag all endpoints based on path and method
+      theDoc = baseDoc & swaggerPaths %~ H.mapWithKey (\pathStr pathItem ->
+        let pathText = Text.pack pathStr
+            isBloc = "/bloc/" `Text.isInfixOf` pathText
+            tagOperation op method =
+              op & tags .~ HS.fromList [if isBloc then "Bloc - " <> method else "Eth - " <> method]
+        in pathItem
+          & Swagger.get %~ fmap (\op -> tagOperation op "GET")
+          & Swagger.post %~ fmap (\op -> tagOperation op "POST")
+          & Swagger.put %~ fmap (\op -> tagOperation op "PUT")
+          & Swagger.delete %~ fmap (\op -> tagOperation op "DELETE")
+          & Swagger.patch %~ fmap (\op -> tagOperation op "PATCH")
+        )
 
   -- print theDoc
   blockappsInit "core-api"

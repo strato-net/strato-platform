@@ -1,0 +1,53 @@
+services:
+  nginx-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: strato-api-nginx
+    ports:
+      - "80:80"
+    environment:
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-localhost}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-e4c811c5-d7f1-4e7a-a1fc-8480195e1f01}
+      - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration}
+    restart: unless-stopped
+
+# Alternative configuration if building strato-api from source:
+# Uncomment the services below and comment out the above nginx-proxy service
+#
+# services:
+#   strato-api:
+#     build:
+#       context: ../strato/api/strato-api
+#       dockerfile: Dockerfile
+#     container_name: strato-api
+#     ports:
+#       - "3000:3000"
+#     environment:
+#       - IDENTITY_SERVER_URL=${IDENTITY_SERVER_URL}
+#       - VAULT_URL=${VAULT_URL}
+#       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+#     networks:
+#       - strato-network
+#     restart: unless-stopped
+#
+#   nginx-proxy:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     container_name: strato-api-nginx
+#     ports:
+#       - "80:80"
+#     environment:
+#       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-localhost}
+#       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-e4c811c5-d7f1-4e7a-a1fc-8480195e1f01}
+#       - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration}
+#     depends_on:
+#       - strato-api
+#     networks:
+#       - strato-network
+#     restart: unless-stopped
+#
+# networks:
+#   strato-network:
+#     driver: bridge

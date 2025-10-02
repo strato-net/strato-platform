@@ -43,13 +43,13 @@ docker: build_all_docker docker-compose eks
 
 all_develop: build_develop docker-compose eks
 
-mercata: build_common apex nginx postgrest prometheus smd mercata-backend mercata-ui mercata-bridge mercata-oracle docker-compose
+mercata: build_common apex nginx postgrest prometheus smd strato-api-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle docker-compose
 
-build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
+build_all_docker: build_common_docker strato_docker apex highway highway-nginx nginx postgrest prometheus smd strato-api-nginx vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
+build_develop: develop apex highway highway-nginx nginx postgrest prometheus smd strato-api-nginx vault-wrapper vault-nginx mercata-backend mercata-ui mercata-bridge mercata-oracle
 
-.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-ui nginx postgrest prometheus smd strato strato_docker vault-nginx vault-wrapper
+.PHONY: all_develop apex build_all_docker build_buildbase build_common build_common_docker build_common_profiled build_develop docker-compose eks highway highway-nginx mercata mercata-backend mercata-bridge mercata-oracle mercata-ui nginx postgrest prometheus smd strato strato-api-nginx strato_docker vault-nginx vault-wrapper
 
 apex:
 	@echo Now building apex...
@@ -58,6 +58,10 @@ apex:
 nginx:
 	@echo Now building nginx...
 	BASIL_DOCKER_TAG=${REPO_URL}nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}nginx:${VERSION} make --directory=nginx-packager/
+
+strato-api-nginx:
+	@echo Now building strato-api-nginx...
+	BASIL_DOCKER_TAG=${REPO_URL}strato-api-nginx:${VERSION} ECR_DOCKER_TAG=${REPO_AWS_ECR_URL}strato-api-nginx:${VERSION} make --directory=strato-api-nginx/
 
 postgrest:
 	@echo Now building postgrest...
