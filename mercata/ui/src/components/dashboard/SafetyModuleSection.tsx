@@ -1,5 +1,5 @@
 import { formatUnits } from "ethers";
-import { CircleArrowDown, CircleArrowUp, Clock, Shield } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, Clock, Shield, HelpCircle } from "lucide-react";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -7,6 +7,8 @@ import { useTokenContext } from "@/context/TokenContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { SAFETY_STAKE_FEE, SAFETY_REDEEM_FEE, usdstAddress, safetyModuleAddress } from "@/lib/constants";
@@ -28,6 +30,8 @@ const SafetyModuleSection = () => {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [redeemAmount, setRedeemAmount] = useState<string>("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [stakeSUSDST, setStakeSUSDST] = useState<boolean>(true);
+  const [includeStakedSUSDST, setIncludeStakedSUSDST] = useState<boolean>(false);
   const { toast } = useToast();
 
 
@@ -73,12 +77,14 @@ const SafetyModuleSection = () => {
     if (!/^\d+(\.\d{1,18})?$/.test(redeemAmount)) return false;
     try {
       const amountWei = safeParseUnits(redeemAmount, 18);
-      const userSharesWei = BigInt(safetyInfo?.userShares || "0");
+      const availableSharesWei = includeStakedSUSDST
+        ? BigInt(safetyInfo?.userSharesTotal || "0")
+        : BigInt(safetyInfo?.userShares || "0");
       const usdstBalanceWei = BigInt(usdstBalance);
       const feeWei = safeParseUnits(SAFETY_REDEEM_FEE, 18);
-      
+
       if (amountWei <= 0n) return false;
-      if (amountWei > userSharesWei) return false; // Check against user's sUSDST balance
+      if (amountWei > availableSharesWei) return false; // Check against available sUSDST balance
       if (usdstBalanceWei < feeWei) return false; // Must have USDST for fee
       return true;
     } catch {
@@ -113,7 +119,7 @@ const SafetyModuleSection = () => {
       });
 
       // Then stake the tokens
-      await stakeSafety({ amount: amountWei });
+      await stakeSafety({ amount: amountWei, stakeSToken: stakeSUSDST });
 
       toast({
         title: "Stake Successful",
@@ -167,7 +173,7 @@ const SafetyModuleSection = () => {
         await redeemAllSafety();
       } else {
         const sharesAmountWei = safeParseUnits(redeemAmount, 18).toString();
-        await redeemSafety({ sharesAmount: sharesAmountWei });
+        await redeemSafety({ sharesAmount: sharesAmountWei, includeStakedSToken: includeStakedSUSDST });
       }
 
       toast({
@@ -274,6 +280,32 @@ const SafetyModuleSection = () => {
                   {/* Fee Display */}
                   <div className="text-sm text-gray-500 mt-1">
                     Transaction Fee: {SAFETY_STAKE_FEE} USDST
+                  </div>
+                  {/* Stake sUSDST Checkbox */}
+                  <div className="flex items-center space-x-2 mt-3">
+                    <Checkbox
+                      id="stake-susdst"
+                      checked={stakeSUSDST}
+                      onCheckedChange={(checked) => setStakeSUSDST(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="stake-susdst"
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Stake my sUSDST to earn rewards
+                    </label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs text-sm">
+                          When you deposit USDST to the Safety Module, you receive sUSDST tokens representing your share.
+                          If this option is enabled, these sUSDST tokens will be automatically staked in the rewards program to earn additional rewards.
+                          The longer the tokens are staked, the more rewards they accrue.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   {/* Fee Warning */}
                   {(() => {
@@ -451,18 +483,20 @@ const SafetyModuleSection = () => {
                       <button
                         type="button"
                         onClick={() => {
-                          const userSharesWei = BigInt(safetyInfo?.userShares || "0");
-                          if (userSharesWei <= 0n) return;
+                          const availableShares = includeStakedSUSDST
+                            ? BigInt(safetyInfo?.userSharesTotal || "0")
+                            : BigInt(safetyInfo?.userShares || "0");
+                          if (availableShares <= 0n) return;
 
-                          const formatted = formatUnits(userSharesWei, 18);
+                          const formatted = formatUnits(availableShares, 18);
                           const [w, f = ""] = formatted.split(".");
                           const clamped = f.length > 18 ? `${w}.${f.slice(0, 18)}` : formatted;
                           const clampedClean = clamped.replace(/\.?0+$/, "");
 
                           setRedeemAmount(clampedClean);
                         }}
-                        className={`mr-2 ${safetyInfo?.canRedeem && BigInt(safetyInfo?.userShares || "0") > 0n 
-                          ? "text-blue-600 hover:underline cursor-pointer" 
+                        className={`mr-2 ${safetyInfo?.canRedeem && BigInt(safetyInfo?.userShares || "0") > 0n
+                          ? "text-blue-600 hover:underline cursor-pointer"
                           : "text-gray-400 cursor-not-allowed"}`}
                         disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
                       >
@@ -473,14 +507,40 @@ const SafetyModuleSection = () => {
                         <span className="text-gray-400 animate-pulse">
                           Loading...
                         </span>
-                        : safetyInfo?.userShares
-                          ? formatBalance(safetyInfo.userShares || 0n, undefined, 18, 2)
-                          : "0.00"}{" "}
+                        : includeStakedSUSDST
+                          ? formatBalance(safetyInfo?.userSharesTotal || 0n, undefined, 18, 2)
+                          : formatBalance(safetyInfo?.userShares || 0n, undefined, 18, 2)}{" "}
                       sUSDST
                     </div>
                     {/* Fee Display */}
                     <div className="text-sm text-gray-500 mt-1">
                       Transaction Fee: {SAFETY_REDEEM_FEE} USDST
+                    </div>
+                    {/* Include Staked sUSDST Checkbox */}
+                    <div className="flex items-center space-x-2 mt-3">
+                      <Checkbox
+                        id="include-staked-susdst"
+                        checked={includeStakedSUSDST}
+                        onCheckedChange={(checked) => setIncludeStakedSUSDST(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="include-staked-susdst"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Include staked sUSDST
+                      </label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-gray-400 hover:text-gray-600 cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs text-sm">
+                            Some of your sUSDST tokens may be staked in the rewards program.
+                            When this option is enabled, you can redeem sUSDST that was staked as well.
+                            If disabled, only unstaked sUSDST will be eligible for redemption.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     {/* Mobile Button */}
                     <Button
@@ -550,8 +610,36 @@ const SafetyModuleSection = () => {
                   </span>
                 </div>
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start">
-                  <span className="text-gray-500 text-sm sm:text-base">Your sUSDST Shares</span>
+                  <span className="text-gray-500 text-sm sm:text-base">Your sUSDST (Total)</span>
                   <span className="font-medium text-sm sm:text-base sm:text-right">
+                    {loading ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : safetyInfo?.userSharesTotal ? (
+                      formatBalance(safetyInfo.userSharesTotal || 0n, undefined, 18, 2, 2)
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                  <span className="text-gray-400 text-xs sm:text-sm">• Staked</span>
+                  <span className="font-medium text-xs sm:text-sm sm:text-right">
+                    {loading ? (
+                      <span className="text-gray-400 animate-pulse">
+                        Loading...
+                      </span>
+                    ) : safetyInfo?.userSharesStaked ? (
+                      formatBalance(safetyInfo.userSharesStaked || 0n, undefined, 18, 2, 2)
+                    ) : (
+                      "0.00"
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start pl-4">
+                  <span className="text-gray-400 text-xs sm:text-sm">• Unstaked</span>
+                  <span className="font-medium text-xs sm:text-sm sm:text-right">
                     {loading ? (
                       <span className="text-gray-400 animate-pulse">
                         Loading...
