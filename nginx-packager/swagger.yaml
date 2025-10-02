@@ -14,8 +14,6 @@ tags:
     description: Endpoints related to transaction management
   - name: Smart Contracts
     description: Endpoints related to contract management
-  - name: Chains
-    description: Endpoints related to private chain management
   - name: Health Checks
     description: Endpoints related to the health of the system
 paths:
@@ -146,14 +144,6 @@ paths:
             type: integer
             minimum: 0
             exclusiveMinimum: false
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -164,7 +154,7 @@ paths:
                   $ref: "#/components/schemas/Account"
                 type: array
         "400":
-          description: Invalid `chainid` or `maxnonce` or `minnonce` or `nonce` or
+          description: Invalid parameters or `maxnonce` or `minnonce` or `nonce` or
             `maxbalance` or `minbalance` or `balance` or `address`
   /strato/v2.3/transaction:
     post:
@@ -312,13 +302,14 @@ paths:
       summary: Get a list of existing contracts (indexed blockchain data)
       description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
       parameters:
-        - $ref: "#/components/parameters/select"
-        - $ref: "#/components/parameters/order"
-        - $ref: "#/components/parameters/range"
-        - $ref: "#/components/parameters/rangeUnit"
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/preferCount"
+        - required: false
+          in: query
+          name: query
+          description: Additional query parameter
+          schema:
+            type: string
       responses:
         "200":
           description: OK
@@ -335,16 +326,17 @@ paths:
       summary: Search if a contract name exists (indexed blockchain data)
       description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
       parameters:
-        - $ref: "#/components/parameters/select"
-        - $ref: "#/components/parameters/order"
-        - $ref: "#/components/parameters/range"
-        - $ref: "#/components/parameters/rangeUnit"
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/preferCount"
         - required: true
           in: path
           name: contractName
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: query
+          description: Additional query parameter
           schema:
             type: string
       responses:
@@ -354,8 +346,7 @@ paths:
             application/json;charset=utf-8:
               schema:
                 items:
-                  $ref: "#/components/schemas/ContractName-Latest-OrAddress-alongwi\
-                      thChainId"
+                  $ref: "#/components/schemas/ContractName-Latest-OrAddress"
                 type: array
         "404":
           description: "`contractName` not found"
@@ -366,16 +357,17 @@ paths:
       summary: Search if a contract's history exists (indexed blockchain data)
       description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
       parameters:
-        - $ref: "#/components/parameters/select"
-        - $ref: "#/components/parameters/order"
-        - $ref: "#/components/parameters/range"
-        - $ref: "#/components/parameters/rangeUnit"
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/preferCount"
         - required: true
           in: path
           name: contractName
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: query
+          description: Additional query parameter
           schema:
             type: string
       responses:
@@ -385,8 +377,7 @@ paths:
             application/json;charset=utf-8:
               schema:
                 items:
-                  $ref: "#/components/schemas/ContractName-Latest-OrAddress-alongwi\
-                      thChainId"
+                  $ref: "#/components/schemas/ContractName-Latest-OrAddress"
                 type: array
         "404":
           description: "`contractName` not found"
@@ -398,14 +389,6 @@ paths:
       description: "Returns an object with contract names as keys, and the value is an array of each instance of that contract type. \
           Limits and offsets are calculated by contract instances, not contract types"
       parameters:
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
         - required: false
           in: query
           name: offset
@@ -430,7 +413,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetContractResponse"
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
   "/bloc/v2.2/contracts/{contractName}":
     get:
       tags:
@@ -474,14 +457,6 @@ paths:
             format: hex string
             minimum: 0
             maximum: 1.461501637330903e+48
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -490,7 +465,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContractDetails"
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractName` or `contractAddress` not found"
   "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state":
@@ -512,14 +487,6 @@ paths:
             format: hex string
             minimum: 0
             maximum: 1.461501637330903e+48
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
         - required: false
           in: query
           name: name
@@ -551,7 +518,7 @@ paths:
                   $ref: "#/components/schemas/SolidityValue"
                 type: object
         "400":
-          description: Invalid `length` or `offset` or `count` or `name` or `chainid`
+          description: Invalid `length` or `offset` or `count` or `name`
         "404":
           description: "`contractName` or `contractAddress` not found"
   "/bloc/v2.2/contracts/contract/{contractAddress}/details":
@@ -568,14 +535,6 @@ paths:
             format: hex string
             minimum: 0
             maximum: 1.461501637330903e+48
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -584,7 +543,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ContractDetails"
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractAddress` not found"
   "/bloc/v2.2/contracts/{contractName}/{contractAddress}/functions":
@@ -609,14 +568,6 @@ paths:
             format: hex string
             minimum: 0
             maximum: 1.461501637330903e+48
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -627,7 +578,7 @@ paths:
                   $ref: "#/components/schemas/FunctionName"
                 type: array
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractName` or `contractAddress` not found"
   "/bloc/v2.2/contracts/{contractName}/{contractAddress}/symbols":
@@ -649,14 +600,6 @@ paths:
             format: hex string
             minimum: 0
             maximum: 1.461501637330903e+48
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -668,7 +611,7 @@ paths:
                   type: string
                 type: array
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractName` or `contractAddress` not found"
   "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state/{mapping}/{key}":
@@ -700,14 +643,6 @@ paths:
           name: key
           schema:
             type: string
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -716,7 +651,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/GetContractStatesMappingResponse"
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractName` or `contractAddress` or `mapping` or `key` not found"
   "/bloc/v2.2/contracts/{contractName}/{contractAddress}/enum/{enumName}":
@@ -743,14 +678,6 @@ paths:
           name: enumName
           schema:
             type: string
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
       responses:
         "200":
           description: ""
@@ -761,7 +688,7 @@ paths:
                   $ref: "#/components/schemas/EnumValue"
                 type: array
         "400":
-          description: Invalid `chainid`
+          description: Invalid parameters
         "404":
           description: "`contractName` or `contractAddress` or `enumName` not found"
   /bloc/v2.2/contracts/compile:
@@ -826,14 +753,6 @@ paths:
           description: Hash of a transaction
           schema:
             type: string
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
             default: 
         - in: query
           name: resolve
@@ -849,7 +768,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/BlocTransactionResult"
         "400":
-          description: Invalid `resolve` or `chainid`
+          description: Invalid `resolve`
         "404":
           description: "`hash` not found"
   /bloc/v2.2/transactions/results:
@@ -859,14 +778,6 @@ paths:
       summary: Get the results of multiple transactions
       description: ""
       parameters:
-        - required: false
-          in: query
-          name: chainid
-          schema:
-            type: string
-            format: hex string
-            minimum: 0
-            maximum: 1.157920892373162e+77
         - in: query
           name: resolve
           allowEmptyValue: true
@@ -892,78 +803,7 @@ paths:
                   $ref: "#/components/schemas/BlocTransactionResult"
                 type: array
         "400":
-          description: Invalid `body` or `resolve` or `chainid`
-  /bloc/v2.2/chain:
-    get:
-      tags:
-        - Chains
-      summary: Get private chain info
-      parameters:
-        - in: query
-          name: chainid
-          required: true
-          explode: true
-          schema:
-            type: array
-            items:
-              maximum: 1.157920892373162e+77
-              format: hex string
-              minimum: 0
-              type: string
-        - $ref: "#/components/parameters/limit"
-        - $ref: "#/components/parameters/offset"
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json;charset=utf-8:
-              schema:
-                items:
-                  $ref: "#/components/schemas/NamedTuple"
-                type: array
-        "400":
-          description: Failing to parse a chain ID from the empty string
-    post:
-      tags:
-        - Chains
-      summary: Create a private chain
-      description: Returns chainId
-      requestBody:
-        content:
-          application/json;charset=utf-8:
-            schema:
-              $ref: "#/components/schemas/ChainInput"
-        required: true
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json;charset=utf-8:
-              schema:
-                $ref: "#/components/schemas/ChainId"
-        "400":
-          description: Invalid `body`
-  /bloc/v2.2/chains:
-    post:
-      tags:
-        - Chains
-      summary: Create an array of private chains
-      description: Returns an array of chainIds
-      requestBody:
-        content:
-          application/json;charset=utf-8:
-            schema:
-              $ref: "#/components/schemas/ChainInput"
-        required: true
-      responses:
-        "200":
-          description: ""
-          content:
-            application/json;charset=utf-8:
-              schema:
-                $ref: "#/components/schemas/ChainId"
-        "400":
-          description: Invalid `body`
+          description: Invalid `body` or `resolve`
   /health:
     get:
       tags:
@@ -1118,13 +958,6 @@ components:
         format: text
     rowFilter.contract.abi:
       name: abi
-      required: false
-      in: query
-      schema:
-        type: string
-        format: text
-    rowFilter.contract.chainId:
-      name: chainId
       required: false
       in: query
       schema:
@@ -1428,8 +1261,6 @@ components:
           type: string
         deletedStorage:
           type: string
-        chainId:
-          $ref: "#/components/schemas/ChainId"
       example:
         deletedStorage: Deleted Storage
         contractsDeleted: "[MyOldContract]"
@@ -1447,10 +1278,6 @@ components:
       type: object
     hex_word256:
       format: binary
-      type: string
-    ChainId:
-      description: Private chain id, 32 byte hex encoded string
-      example: ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781
       type: string
     BlocTransactionData:
       description: Bloc Transaction Data
@@ -1514,8 +1341,6 @@ components:
           minimum: 0
           exclusiveMinimum: false
           type: integer
-        chainId:
-          $ref: "#/components/schemas/ChainId"
         metadata:
           additionalProperties:
             type: string
@@ -1563,8 +1388,6 @@ components:
           type: string
         xabi:
           $ref: "#/components/schemas/Xabi_schema"
-        chainId:
-          $ref: "#/components/schemas/ChainId"
       example:
         bin: ContractBin
         address: 00000000000000000000000000000000deadbeef
@@ -2041,8 +1864,6 @@ components:
           format: int64
           minimum: -9223372036854776000
           type: integer
-        id:
-          $ref: "#/components/schemas/ChainId"
       example:
         createdAt: 1494448021000
         address: 00000000000000000000000000000000deadbeef
@@ -2098,10 +1919,9 @@ components:
       example:
         src: contract x { }
       type: string
-    ContractName-Latest-OrAddress-alongwithChainId:
-      description: Contract Name, "Latest", Or Address, along with ChainId
+    ContractName-Latest-OrAddress-WithInfo:
+      description: Contract Name, "Latest", Or Address
       example:
-        chainId: 123456879abcdef0123456879abcdef0123456879abcdef0123456879abcdef0
         address: 00000000000000000000000000000000deadbeef
       type: string
     VMType:
@@ -2336,7 +2156,7 @@ components:
         label: my chain
       type: object
     NamedTuple:
-      description: chainid and chaininfo pair
+      description: chaininfo pair
       example:
         id: ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781
         info:
@@ -2368,7 +2188,6 @@ components:
       minItems: 2
       items:
         anyOf:
-          - $ref: "#/components/schemas/ChainId"
           - $ref: "#/components/schemas/ChainInfo"
       maxItems: 2
       type: string
@@ -2564,8 +2383,6 @@ components:
           type: integer
         origin:
           type: string
-        chainId:
-          $ref: "#/components/schemas/ChainId"
       example:
         transactionType: Transfer
         origin: API
@@ -2627,8 +2444,6 @@ components:
           type: string
         codeHash:
           $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
-        chainId:
-          $ref: "#/components/schemas/ChainId"
         latestBlockNum:
           minimum: 0
           exclusiveMinimum: false
@@ -2716,8 +2531,6 @@ components:
           items:
             $ref: "#/components/schemas/CodeInfo"
           type: array
-        chain:
-          $ref: "#/components/schemas/ChainId"
         block:
           $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
         nonce:
@@ -2759,9 +2572,6 @@ components:
           format: text
           type: string
         abi:
-          format: text
-          type: string
-        chainId:
           format: text
           type: string
       type: object
