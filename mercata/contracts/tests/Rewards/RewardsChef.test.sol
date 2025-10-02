@@ -71,7 +71,8 @@ contract Describe_TokenPausable {
     // ═════════════════════════════════════════════════════════════════════════
 
     function it_should_start_with_no_pools() {
-        require(chef.pools().length == 0, "Pools list should be empty");
+        (address a, uint b, uint c, uint d) = chef.pools(0);
+        require(a == address(0) && b == 0 && c == 0 && d == 0, "Pools list should be empty");
     }
 
     function it_should_allow_adding_new_pool() {
@@ -83,9 +84,12 @@ contract Describe_TokenPausable {
         chef.addPool(allocationPoints, address(lpToken1), multiplier);
 
         // then
-        require(chef.pools().length == 1, "Pools list should have 1 pool");
+        (address a, uint b, uint c, uint d) = chef.pools(1);
+        require(a == address(0) && b == 0 && c == 0 && d == 0, "Pools list should have 1 pool");
 
-        PoolInfo pool1 = chef.pools()[0];
+        (a, b, c, d) = chef.pools(0);
+        (uint st, uint bm) = chef.getPoolBonusPeriod(0, 0);
+        PoolInfo pool1 = PoolInfo(a,b,c,d,[BonusPeriod(st, bm)]);
         require(pool1.lpToken == address(lpToken1), "LP token address should match");
         require(pool1.allocPoint == allocationPoints, "Allocation points should match");
         require(pool1.lastRewardTimestamp == currentTimestamp, "lastRewardTimestamp should be set to block.timestamp");
@@ -109,7 +113,8 @@ contract Describe_TokenPausable {
         chef.updateAllocationPoints(poolId, updatedAllocationPoints);
 
         // then
-        PoolInfo pool1 = chef.pools()[poolId];
+        (address a, uint b, uint c, uint d) = chef.pools(poolId);
+        PoolInfo pool1 = PoolInfo(a,b,c,d,[]);
         require(pool1.allocPoint == updatedAllocationPoints, "Allocation points should be updated");
         require(chef.totalAllocPoint() == updatedAllocationPoints, "Total allocation points should be updated");
     }
@@ -184,7 +189,8 @@ contract Describe_TokenPausable {
 	chef.updatePool(poolId);
 
         // then
-        PoolInfo pool1 = chef.pools()[poolId];
+        (address a, uint b, uint c, uint d) = chef.pools(poolId);
+        PoolInfo pool1 = PoolInfo(a,b,c,d,[]);
         uint256 lp1Supply = ERC20(lpToken1).balanceOf(address(chef));
         uint256 reward = ten_seconds * cataPerSecond;
 

@@ -507,8 +507,8 @@ contract Describe_BadDebt_Basic {
         require(badDebt >= 0, "Bad debt should be non-negative");
         
         // Test junior note validation
-        JuniorNote note = engine.juniorNotes(address(user1));
-        require(note.capUSDST >= 0, "Junior note cap should be non-negative");
+        (address a, uint capUSDST, uint b) = engine.juniorNotes(address(user1));
+        require(capUSDST >= 0, "Junior note cap should be non-negative");
         
         log("✅ Bad debt validation handled correctly");
     }

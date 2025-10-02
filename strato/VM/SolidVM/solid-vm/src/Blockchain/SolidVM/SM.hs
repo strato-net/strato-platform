@@ -1008,6 +1008,7 @@ getXabiValueType' (AccountPath loc path) = do
       SVMType.Array {SVMType.entry = v} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
         MS.ArrayIndex {} -> v
+        MS.MapIndex MS.INum{} -> v
         _ -> typeError "non-length or array index attribute of array" x
       SVMType.String {} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}

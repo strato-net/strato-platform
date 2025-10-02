@@ -551,20 +551,48 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                 ((SVMType.Mapping _ _ _), OrderedVals oa) ->
                   traverse convertValueToStoragePathPiece oa
                 _ -> Nothing
+              returnType = \case
+                SVMType.Array t _ -> returnType t
+                SVMType.Mapping _ _ t -> returnType t
+                t -> t
               isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
+              handleStruct s path = do
+                mFields <- case M.lookup s $ contract ^. CC.structs of
+                  Just vals -> pure . Just $ (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals
+                  Nothing -> do
+                    let !vals' = M.lookup s $ cc ^. CC.flStructs
+                    pure $ map (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals'
+                for mFields $ \fields -> do
+                  let fieldsToLoad = catMaybes $ (\(n, t) -> case t of
+                          SVMType.Error{} -> Nothing
+                          SVMType.Array{} -> Nothing
+                          SVMType.Mapping{} -> Nothing
+                          _ -> Just n
+                        ) <$> fields
+                  fieldVals <- for fieldsToLoad $ \fieldName ->
+                    getVar $ Constant $ SReference $ path `apSnoc` MS.Field (BC.pack $ labelToString fieldName)
+                  fieldVars <- traverse createVar fieldVals
+                  pure . STuple $ V.fromList fieldVars
+              handleSimple path = do
+                v <- getVar $ Constant $ SReference path
+                pure $ Just v
           when ((from /= to) && isForbidden) $
             unknownFunction "logFunctionCall" (functionName, "asdf4" :: String) -- contract ^. CC.contractName)
           -- TODO: this should only exist if the storage variable is declared "public",
           -- right now I just ignore this and allow anything to be called as a getter
           case args' of
             [] -> do
-              val <- withCallInfo to contract functionName hsh cc M.empty True False $ do
-                fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
-              pure $ pure val
+              let path = AccountPath to $ MS.singleton $ BC.pack $ labelToString functionName
+              withCallInfo to contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> pure $ handleSimple path
             _ -> do
-              valPath' <- withCallInfo to contract functionName hsh cc M.empty True False $ do
-                pure . Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
-              pure $ pure valPath'
+              let path = apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
+              withCallInfo to contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> pure $ handleSimple path
         Nothing -> case M.lookup "fallback" functionsIncludingConstructor of
           Just fallbackFunc -> do
             mCallInfo <- getCurrentCallInfoIfExists
@@ -1403,9 +1431,9 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       let parents' = either (throw . fst) id $ CC.getParents cc ctract
       case filter (elem method . M.keys . CC._functions) parents' of
         [] -> typeError "cannot use super without a parent contract" (method, ctract)
-        ps -> do
+        (p:_) -> do
           addr <- getCurrentAddress
-          return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) (NamedAccount addr UnspecifiedChain) method
+          return $ Constant $ SContractFunction (Just $ CC._contractName p) (NamedAccount addr UnspecifiedChain) method
     (SAccount a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContractItem a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n

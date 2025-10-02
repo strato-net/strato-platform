@@ -207,9 +207,9 @@ contract Describe_Mercata {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins().length == 2, "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
-        require(admin.admins().length == 3, "New admin was not added correctly");
+        require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
     }
 
     function it_can_execute_contract_creations() {
@@ -244,9 +244,9 @@ contract Describe_Mercata {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins().length == 2, "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
-        require(admin.admins().length == 3, "New admin was not added correctly");
+        require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
@@ -268,6 +268,6 @@ contract Describe_Mercata {
         admin.castVoteOnIssue(address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         adminUser.do(address(admin), "castVoteOnIssue", address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         admin.removeAdmin(address(adminUser));
-        require(admin.admins().length == 1, "Voting logic was not overwritten properly");
+        require(admin.admins(0) == address(this) && admin.admins(1) == address(0), "Voting logic was not overwritten properly");
     }
 }
