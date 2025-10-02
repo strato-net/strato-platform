@@ -206,7 +206,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress methodcallMethodName
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
@@ -342,7 +342,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress methodcallMethodName
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (format methodcallContractAddress)
                 Just x -> pure x
@@ -918,7 +918,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
           contract <- case mContract of
             Just x -> pure x
             Nothing -> do
-              mContract' <- lift $ getContractByAddress methodcallContractAddress methodcallMethodName
+              mContract' <- lift $ getContractByAddress methodcallContractAddress
               x <- case mContract' of
                 Nothing -> lift $ throwIO . UserError $ "Could not find contract " <> Text.pack (show methodcallContractAddress)
                 Just x -> pure x
@@ -978,7 +978,7 @@ postUsersContractMethod' cacheNonce FunctionParameters {..} = do
             ]
   contract <-
     maybe (throwIO err) pure
-      =<< getContractByAddress contractAddr funcName
+      =<< getContractByAddress contractAddr
   case M.lookup (Text.unpack funcName) (contract ^. functions) of
     Just _ -> pure ()
     Nothing -> throwIO . UserError $ "Contract doesn't have a method named '" <> funcName <> "'"
