@@ -16,6 +16,7 @@ module Control.Monad.Composable.Kafka (
   KafkaEnv(..),
   TopicName,
   kafkaStateToKafkaEnv,
+  getKafkaEnv,
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
@@ -98,6 +99,9 @@ kafkaStateToKafkaEnv :: MonadIO m =>
 kafkaStateToKafkaEnv kafkaState = do
   ksIORef <- liftIO $ newIORef kafkaState
   return $ KafkaEnv ksIORef
+
+getKafkaEnv :: HasKafka m => m KafkaEnv
+getKafkaEnv = KafkaEnv <$> accessEnv
 
 runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
 runKafkaMUsingEnv env f =

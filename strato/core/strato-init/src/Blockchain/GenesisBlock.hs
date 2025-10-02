@@ -65,6 +65,7 @@ import Control.Lens ((^.), at)
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
 import qualified Control.Monad.Change.Alter as A
+import Control.Monad.Composable.Kafka (getKafkaEnv, runKafkaMUsingEnv)
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
 import Data.Foldable (for_)
@@ -240,9 +241,10 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   -- Step 2: Kafka Topic Setup - Ensure StateDiff topic exists for event streaming
   liftIO . runKafkaMConfigured "strato-init" $ do
     assertStateDiffTopicCreation
+  kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
         commitSqlDiffs sd
-        void $ produceVMEvents vmes
+        void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
   populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub
 
 populateStorageDBs' ::
