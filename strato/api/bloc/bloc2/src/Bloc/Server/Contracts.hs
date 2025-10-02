@@ -26,7 +26,6 @@ import BlockApps.SolidityVarReader
 import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
@@ -121,6 +120,7 @@ getContractsContract ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -139,23 +139,15 @@ getContractsContract name addr chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
+      aParams = accountsFilterParams
           { _qaChainId = maybeToList chainId,
             _qaAddress = Just addr,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
+    Just contract -> pure contract
 
 getContractsState ::
   ( MonadIO m,
@@ -249,6 +241,7 @@ getContractsDetails' ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -264,28 +257,21 @@ getContractsDetails' contractAddress chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
+      aParams = accountsFilterParams
           { _qaChainId = maybeToList chainId,
             _qaAddress = Just contractAddress,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
+    Just contract -> pure contract
 
 getContractsDetails ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -298,6 +284,7 @@ getContractsFunctions ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -313,6 +300,7 @@ getContractsSymbols ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -328,6 +316,7 @@ getContractsEnum ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
