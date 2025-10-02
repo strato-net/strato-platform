@@ -44,4 +44,3 @@ export const adminRegistry = process.env.ADMIN_REGISTRY || "00000000000000000000
 export const voucher = process.env.VOUCHER_CONTRACT_ADDRESS || "000000000000000000000000000000000000100e";
 export const cdpRegistry = process.env.CDP_REGISTRY || "0000000000000000000000000000000000001012";
 export const rewardsChef = process.env.REWARDS_CHEF_CONTRACT_ADDRESS || "000000000000000000000000000000000000101f";
-export const rewardsChefMUsdstPoolId = parseInt(process.env.REWARDS_CHEF_MUSDST_POOL_ID || "0", 10);
