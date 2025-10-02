@@ -145,13 +145,15 @@ export const getPriceHistory = async (
     // --- Normalize batch events ---
     if (Array.isArray(batchResponse.data)) {
       batchResponse.data.forEach((event: any) => {
-        const idx = event.assets.indexOf(assetAddress);
-        if (idx !== -1) {
+        const assets = JSON.parse(event.assets);
+        const priceValues = JSON.parse(event.priceValues);
+        const idx = assets.indexOf(assetAddress);
+        if (idx !== -1 && priceValues[idx] !== undefined) {
           priceEvents.push({
             id: event.id.toString(),
             timestamp: new Date(parseInt(event.timestamp) * 1000),
             asset: assetAddress,
-            price: toPlainString(event.priceValues[idx]), // normalize to string
+            price: toPlainString(priceValues[idx]), // normalize to string
             blockTimestamp: new Date(event.block_timestamp),
           });
         }
