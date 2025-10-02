@@ -5,6 +5,8 @@
 module Blockchain.Stream.VMEvent
   ( VMEvent(..),
     produceVMEvents,
+    produceVMEvents',
+    runKafkaVMEvents,
     fetchVMEvents
   )
 where
@@ -56,7 +58,13 @@ instance JSON.ToJSON VMEvent
 instance JSON.FromJSON VMEvent
 
 produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
-produceVMEvents = runKafkaMConfigured "blockapps-data" . produceItems (lookupTopic "vmevents")
+produceVMEvents = runKafkaVMEvents . produceVMEvents'
+
+produceVMEvents' :: HasKafka k => [VMEvent] -> k [ProduceResponse]
+produceVMEvents' = produceItems (lookupTopic "vmevents")
+
+runKafkaVMEvents :: MonadIO m => KafkaM m a -> m a
+runKafkaVMEvents = runKafkaMConfigured "blockapps-data"
 
 fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
 fetchVMEvents = fetchItems $ lookupTopic "vmevents"
