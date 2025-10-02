@@ -198,7 +198,7 @@ rewardsChefAddress = 0x101f
 
 -- paxgstPoolAddress :: Address
 -- paxgstPoolAddress = 0x1023
--- 
+--
 -- paxgstLpTokenAddress :: Address
 -- paxgstLpTokenAddress = 0x1024
 
@@ -524,7 +524,7 @@ assetToAccountInfos asset@GA.Asset{..} =
       allBalances = (\(a, b) -> ("._balances<a:" <> addrBS a <> ">", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
       name' = if root == silvstRoot then "SILVST" else name
-      description' = fromMaybe description $ M.lookup name' descriptions 
+      description' = fromMaybe description $ M.lookup name' descriptions
    in case allBalances of
         [] -> Nothing
         _ -> Just . SolidVMContractWithStorage root 0 proxy $
@@ -802,6 +802,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ create
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setRateStrategy\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setPriceOracle\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setAllComponents\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS cataAddress <> "><\"mint\"><a:" <> addrBS rewardsChefAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
@@ -854,8 +855,9 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".PRECISION_MULTIPLIER", BInteger oneE18)
      , (".rewardToken", BContract "Token" $ unspecifiedChain cataAddress)
      , (".cataPerSecond", BInteger 100000000000000)
-     , (".totalAllocPoint", BInteger 100)
+     , (".totalAllocPoint", BInteger 400)
      , (".minFutureTime", BInteger 3600)
+     -- mUSDST
      , (".pools[0].lpToken", BAccount $ unspecifiedChain mTokenAddress)
      , (".pools[0].allocPoint", BInteger 100)
      , (".pools[0].lastRewardTimestamp", BInteger lastAccrual)
@@ -863,7 +865,32 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".pools[0].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
      , (".pools[0].bonusPeriods[0].bonusMultiplier", BInteger 1)
      , (".pools[0].bonusPeriods.length", BInteger 1)
-     , (".pools.length", BInteger 1)
+     -- sUSDST
+     , (".pools[1].lpToken", BAccount $ unspecifiedChain sUsdstAddress)
+     , (".pools[1].allocPoint", BInteger 100)
+     , (".pools[1].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[1].accPerToken", BInteger 0)
+     , (".pools[1].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[1].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[1].bonusPeriods.length", BInteger 1)
+     -- goldst
+     , (".pools[2].lpToken", BAccount $ unspecifiedChain goldstLpTokenAddress)
+     , (".pools[2].allocPoint", BInteger 100)
+     , (".pools[2].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[2].accPerToken", BInteger 0)
+     , (".pools[2].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[2].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[2].bonusPeriods.length", BInteger 1)
+     -- silvst
+     , (".pools[3].lpToken", BAccount $ unspecifiedChain silvstPoolAddress)
+     , (".pools[3].allocPoint", BInteger 100)
+     , (".pools[3].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[3].accPerToken", BInteger 0)
+     , (".pools[3].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[3].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[3].bonusPeriods.length", BInteger 1)
+     -- pools length
+     , (".pools.length", BInteger 4)
      ]
 
 rewardsManager :: AccountInfo
@@ -1163,7 +1190,7 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ ownedB
 --      , (".lpSharePercent", BInteger 0)
 --      , (".zapSwapFeesEnabled", BBool True)
 --      ]
--- 
+--
 -- paxgstLpToken :: AccountInfo
 -- paxgstLpToken = SolidVMContractWithStorage paxgstLpTokenAddress 0 proxy $ ownedByBlockApps mercataAddress
 --   ++ [ ("._name", BString "PAXGST-USDST LP Token")
