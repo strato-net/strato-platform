@@ -1831,18 +1831,6 @@ components:
       description: A Solidity argument value
       example: 5
       type: string
-    FileList:
-      properties:
-        contractAddress:
-          type: string
-        hash:
-          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
-        filekey:
-          type: string
-        uri:
-          type: string
-        createdAt:
-          $ref: "#/components/schemas/UTCTime"
     GetContractResponse:
       description: Response to Get Contracts endpoint
       additionalProperties:
@@ -2087,74 +2075,6 @@ components:
         isLastPending:
           type: boolean
           example: false
-    ChainInput:
-      description: Chain Input Info
-      required:
-        - src
-        - label
-        - balances
-        - args
-        - members
-      properties:
-        src:
-          type: string
-        contract:
-          type: string
-        label:
-          type: string
-        balances:
-          items:
-            $ref: "#/components/schemas/NamedTuple"
-          type: array
-        args:
-          additionalProperties:
-            $ref: "#/components/schemas/SolidityArgumentValue"
-          type: object
-        members:
-          items:
-            $ref: "#/components/schemas/NamedTuple"
-          type: array
-        metadata:
-          additionalProperties:
-            type: string
-          type: object
-      example:
-        args:
-          removeRule: AUTO_APPROVE
-          addRule: AUTO_APPROVE
-        balances:
-          - balance: 20000000
-            address: 5815b9975001135697b5739956b9a6c87f1c575c
-          - balance: 999999
-            address: 93fdd1d21502c4f87295771253f5b71d897d911c
-        members:
-          - access: true
-            orgUnit: Unit1
-            commonName: John Doe
-            orgName: Org1
-          - access: true
-            orgUnit: Unit2
-            commonName: Jane Doe
-            orgName: Org2
-        contract: Governance
-        src: contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN,
-          MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule;
-          event OrganizationAdded(string orgName, string orgUnit, string commonName, 
-          bool true); event OrganizationRemoved(string orgName, string orgUnit, 
-          string commonName, false); event ChainTerminated(); struct MemberVotes {
-          chainMember member; uint votes; }   struct chainMember {string o, string u,
-          string c, string a} MemberVotes[] addVotes; MemberVotes[] removeVotes; 
-          uint terminateVotes; voteToAdd(string o, string u, string c, bool a)
-          { OrganizationAdded(o,u,c,a); } function voteToRemove(string o, string u,
-           string c, bool a) { OrganizationRemoved(o,u,c,a); } function voteToTerminate() { terminateVotes++; if
-          (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); }
-          function satisfiesRule(Rule rule, uint votes) returns (bool) { if
-          (rule == Rule.AUTO_APPROVE) { return true; } else if (rule ==
-          Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }
-        metadata:
-          history: Governance
-        label: my chain
-      type: object
     NamedTuple:
       description: chaininfo pair
       example:
@@ -2408,10 +2328,6 @@ components:
         - CONTRACT
         - FUNCTION
         - TRANSFER
-    AWSTime:
-      example: 2021-11-18T20:05:38.000Z
-      format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
-      type: string
     UTCTime:
       example: 2016-07-22T00:00:00Z
       format: yyyy-mm-ddThh:MM:ssZ
