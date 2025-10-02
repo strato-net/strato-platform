@@ -307,9 +307,14 @@ paths:
         - required: false
           in: query
           name: query
-          description: Additional query parameter
+          description: Dynamic PostgREST query parameters (e.g., select=address)
           schema:
-            type: string
+            type: object
+            properties:
+              select:
+                type: string
+                example: "*"
+          explode: true
       responses:
         "200":
           description: OK
@@ -328,15 +333,20 @@ paths:
       parameters:
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
-        - required: true
-          in: path
-          name: contractName
-          schema:
-            type: string
         - required: false
           in: query
           name: query
-          description: Additional query parameter
+          description: Dynamic PostgREST query parameters (e.g., select=address)
+          schema:
+            type: object
+            properties:
+              select:
+                type: string
+                example: "*"
+          explode: true
+        - required: true
+          in: path
+          name: contractName
           schema:
             type: string
       responses:
@@ -359,15 +369,20 @@ paths:
       parameters:
         - $ref: "#/components/parameters/offset"
         - $ref: "#/components/parameters/limit"
-        - required: true
-          in: path
-          name: contractName
-          schema:
-            type: string
         - required: false
           in: query
           name: query
-          description: Additional query parameter
+          description: Dynamic PostgREST query parameters (e.g., select=address)
+          schema:
+            type: object
+            properties:
+              select:
+                type: string
+                example: "*"
+          explode: true
+        - required: true
+          in: path
+          name: contractName
           schema:
             type: string
       responses:
