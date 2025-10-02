@@ -18,9 +18,11 @@ import {
   getTokenBalance
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { 
-  SwapHistoryEntry, 
-  PoolList, 
+import { getPools as getRewardsChefPools, getStakedBalance } from "./rewardsChef.service";
+import * as config from "../../config/config";
+import {
+  SwapHistoryEntry,
+  PoolList,
   SwapParams,
   LiquidityParams,
   RemoveLiquidityParams,
@@ -70,8 +72,38 @@ export const getPools = async (
     key: `in.(${tokenAddresses.join(',')})`
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
-  
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress);
+
+  // Fetch staked balances from RewardsChef if userAddress is provided
+  let stakedBalanceMap: Map<string, string> | undefined;
+  if (userAddress) {
+    // Get all RewardsChef pools
+    const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
+
+    // Build a map of lpToken address -> rewards pool index
+    const lpTokenToPoolIdx = new Map<string, number>();
+    rewardsChefPools.forEach(pool => {
+      lpTokenToPoolIdx.set(pool.lpToken, pool.poolIdx);
+    });
+
+    // For each swap pool, check if it has a matching rewards pool and get staked balance
+    stakedBalanceMap = new Map<string, string>();
+    await Promise.all(
+      validatedPools.map(async (pool) => {
+        const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
+        if (poolIdx !== undefined) {
+          const stakedBalance = await getStakedBalance(
+            accessToken,
+            config.rewardsChef,
+            poolIdx,
+            userAddress
+          );
+          stakedBalanceMap!.set(pool.lpToken.address, stakedBalance);
+        }
+      })
+    );
+  }
+
+  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
 };
 
 // --- Token Queries ---

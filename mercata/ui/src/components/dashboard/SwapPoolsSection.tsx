@@ -194,8 +194,18 @@ const SwapPoolsSection = () => {
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                        <span>Your Liquidity: {formatBalance([{ balance: pool.lpToken.balance }]?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
+                      {pool.lpToken.stakedBalance !== undefined && (
+                        <>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
@@ -218,8 +228,8 @@ const SwapPoolsSection = () => {
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
-                        disabled={BigInt(pool.lpToken.balance || "0") === BigInt(0)}
-                        title={BigInt(pool.lpToken.balance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                        disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                        title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
