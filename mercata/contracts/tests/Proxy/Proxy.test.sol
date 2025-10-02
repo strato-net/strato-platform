@@ -231,8 +231,13 @@ contract Describe_BadDebt_Basic {
         user1.do(address(adminRegistry), "setLogicContract", address(new FeeCollector(this)));
 
         // Ensure that old member vars are accessible
-        bool initialized2 = adminRegistry.initialized();
-        log(string(initialized2));
+        bool caught = false;
+        try {
+            adminRegistry.initialized();
+        } catch {
+            caught = true;
+        }
+        require(caught, "Missing call to initialized() did not throw");
     }
 
     function it_proxy_can_access_old_member_vars() public {

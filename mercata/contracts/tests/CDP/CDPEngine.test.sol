@@ -417,8 +417,9 @@ contract Describe_CDPEngine {
             "USDST balance should decrease by repay amount"
         );
 
+        (uint _, uint scaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == mintAmount - repayAmount,
+            scaledDebt == mintAmount - repayAmount,
             "Debt should be reduced by repayment amount"
         );
         
@@ -448,13 +449,14 @@ contract Describe_CDPEngine {
             "USDST approval failed"
         );
 
+        (uint collateral, uint scaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == mintAmount,
+            scaledDebt == mintAmount,
             "Debt should be equal to mint amount when all debt is repaid"
         );
 
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).collateral == depositAmount,
+            collateral == depositAmount,
              "Collateral should be equal to deposit amount when all debt is repaid"
         );
 
@@ -467,8 +469,9 @@ contract Describe_CDPEngine {
         );
         require(cr == 2 ** 256 - 1, "CR should be max when no debt");
 
+        (collateral, scaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt == 0,
+            scaledDebt == 0,
             "Debt should be 0 when all debt is repaid"
         );
     }
@@ -590,9 +593,7 @@ contract Describe_CDPEngine {
             address(this),
             collateralTokenAddress
         );
-        uint256 currentDebt = cdpEngine
-            .vaults(address(this), collateralTokenAddress)
-            .scaledDebt;
+        (uint _, uint currentDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
 
         // Calculate minimum collateral needed to maintain liquidation ratio
         // minCollateral = debt * liquidationRatio / price
@@ -731,7 +732,7 @@ contract Describe_CDPEngine {
         require(newCR < LIQUIDATION_RATIO, "Position should be underwater after price drop");
 
         // Get state before liquidation
-        uint256 userBDebtBefore = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (uint _, uint userBDebtBefore) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         uint256 userBCollateralBefore = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
         uint256 userAUSDSTBefore = ERC20(usdstAddress).balanceOf(address(userA));
         uint256 userACollateralBefore = ERC20(collateralTokenAddress).balanceOf(address(userA));
@@ -743,7 +744,7 @@ contract Describe_CDPEngine {
         userA.do(address(cdpEngine), "liquidate", collateralTokenAddress, address(userB), debtToCover);
 
         // Get state after liquidation
-        uint256 userBDebtAfter = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (, uint userBDebtAfter) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         uint256 userBCollateralAfter = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
         uint256 userAUSDSTAfter = ERC20(usdstAddress).balanceOf(address(userA));
         uint256 userACollateralAfter = ERC20(collateralTokenAddress).balanceOf(address(userA));
@@ -866,7 +867,7 @@ contract Describe_CDPEngine {
 
         // === PHASE 1: DEPOSIT ===
         uint256 userBCollateralInitial = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
-        uint256 userBDebtInitial = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (uint256 _, uint256 userBDebtInitial) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         uint256 userBTokenBalanceInitial = ERC20(collateralTokenAddress).balanceOf(address(userB));
 
         require(userBCollateralInitial == 0, "UserB should start with no collateral in vault");
@@ -884,12 +885,12 @@ contract Describe_CDPEngine {
 
         // === PHASE 2: BORROW ===
         uint256 userBUSDSTBefore = ERC20(usdstAddress).balanceOf(address(userB));
-        uint256 userBDebtBefore = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (, uint256 userBDebtBefore) = cdpEngine.vaults(address(userB), collateralTokenAddress);
 
         userB.do(address(cdpEngine), "mint", collateralTokenAddress, borrowAmount);
 
         uint256 userBUSDSTAfter = ERC20(usdstAddress).balanceOf(address(userB));
-        uint256 userBDebtAfter = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (, uint256 userBDebtAfter) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         
         require(userBUSDSTAfter == userBUSDSTBefore + borrowAmount, "UserB should receive borrowed USDST");
         require(userBDebtAfter == userBDebtBefore + borrowAmount, "UserB debt should increase by borrow amount");
@@ -902,14 +903,14 @@ contract Describe_CDPEngine {
 
         // === PHASE 3: REPAY MAX ===
         uint256 userBUSDSTBeforeRepay = ERC20(usdstAddress).balanceOf(address(userB));
-        uint256 userBDebtBeforeRepay = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (uint256 _4, uint256 userBDebtBeforeRepay) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         uint256 userBCollateralBeforeRepay = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
 
         require(userBDebtBeforeRepay == borrowAmount, "UserB debt should be equal to borrow amount before repayment");
         userB.do(address(cdpEngine), "repayAll", collateralTokenAddress);
 
         uint256 userBUSDSTAfterRepay = ERC20(usdstAddress).balanceOf(address(userB));
-        uint256 userBDebtAfterRepay = cdpEngine.vaults(address(userB), collateralTokenAddress).scaledDebt;
+        (uint256 _5, uint256 userBDebtAfterRepay) = cdpEngine.vaults(address(userB), collateralTokenAddress);
         uint256 userBCollateralAfterRepay = cdpVault.userCollaterals(address(userB), collateralTokenAddress);
 
         require(userBDebtAfterRepay == 0, "UserB should have no debt after repayAll");
@@ -1086,7 +1087,7 @@ contract Describe_CDPEngine {
             crAfterRepay > crBeforeRepay,
             "Step 6: CR should improve after debt repayment"
         );
-        uint256 debtAfterRepay = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (uint256 _, uint256 debtAfterRepay) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
             debtAfterRepay == totalMinted - partialRepayAmount,
             "Step 6: Debt should be reduced by repayment amount"
@@ -1186,7 +1187,7 @@ contract Describe_CDPEngine {
         
         // Verify no debt remains (CR should be infinite)
         uint256 crAfterFullRepay = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
-        uint256 debtAfterFullRepay = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (, uint256 debtAfterFullRepay) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(debtAfterFullRepay == 0, "Step 9: Debt should be 0 after full repayment");
         require(crAfterFullRepay == 2**256 - 1, "Step 9: CR should be infinite after full repayment");
         // log(   " ═══════════════════════════════════════════════════════════════════
@@ -1260,7 +1261,7 @@ contract Describe_CDPEngine {
         // STEP 2: Mint USDST
         cdpEngine.mint(collateralTokenAddress, mintAmount);
         
-        uint256 debtAfterMint = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (uint256 _, uint256 debtAfterMint) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(debtAfterMint == mintAmount, "Step 2: Mint verification failed");
         // log("After mint - Debt", debtAfterMint);
         // log("After mint - Collateral", cdpVault.userCollaterals(address(this), collateralTokenAddress));
@@ -1272,7 +1273,7 @@ contract Describe_CDPEngine {
         );
         cdpEngine.repayAll(collateralTokenAddress);
         
-        uint256 debtAfterRepayAll = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (, uint256 debtAfterRepayAll) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 collateralAfterRepayAll = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         require(debtAfterRepayAll == 0, "Step 3: Debt should be 0 after repayAll");
         // log("After repayAll - Debt", debtAfterRepayAll);
@@ -1281,7 +1282,7 @@ contract Describe_CDPEngine {
         // STEP 4: withdrawMax (should withdraw almost everything)
         uint256 withdrawnAmount = cdpEngine.withdrawMax(collateralTokenAddress);
         
-        uint256 debtAfterWithdrawMax = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (uint256 _3, uint256 debtAfterWithdrawMax) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 collateralAfterWithdrawMax = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         
         // log("After withdrawMax - Withdrawn amount", withdrawnAmount);
@@ -1303,7 +1304,7 @@ contract Describe_CDPEngine {
         }
         
         // FINAL STATE LOGGING
-        uint256 finalDebt = cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt;
+        (uint256 _4, uint256 finalDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 finalCollateral = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         
         // log("FINAL STATE - Debt", finalDebt);
@@ -1359,8 +1360,9 @@ contract Describe_CDPEngine {
         // log("Engine vault collateral", cdpEngine.vaults(address(this), collateralTokenAddress).collateral);
         // log("CDPVault collateral", cdpVault.userCollaterals(address(this), collateralTokenAddress));
         
+        (uint256 collateral, uint256 _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).collateral == 
+            collateral == 
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 1: Engine and CDPVault should be in sync after deposit"
         );
@@ -1374,8 +1376,9 @@ contract Describe_CDPEngine {
         // log("Debt", cdpEngine.vaults(address(this), collateralTokenAddress).scaledDebt);
         // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress));
         
+        (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).collateral == 
+            collateral == 
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 2: Engine and CDPVault should be in sync after mint"
         );
@@ -1388,15 +1391,16 @@ contract Describe_CDPEngine {
         // log("CDPVault collateral", cdpVault.userCollaterals(address(this), collateralTokenAddress));
         // log("CR", cdpEngine.collateralizationRatio(address(this), collateralTokenAddress));
         
+        (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            cdpEngine.vaults(address(this), collateralTokenAddress).collateral == 
+            collateral == 
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 3: Engine and CDPVault should be in sync after withdrawMax"
         );
         
         // STEP 4: Test failed withdrawal - THIS IS THE CRITICAL TEST
         // log("=== BEFORE FAILED WITHDRAWAL ATTEMPT ===");
-        uint256 engineCollateralBefore = cdpEngine.vaults(address(this), collateralTokenAddress).collateral;
+        (uint engineCollateralBefore, uint _2) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 vaultCollateralBefore = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         uint256 userBalanceBefore = ERC20(collateralTokenAddress).balanceOf(address(this));
         
@@ -1413,7 +1417,7 @@ contract Describe_CDPEngine {
         }
         
         // log("=== AFTER FAILED WITHDRAWAL ATTEMPT ===");
-        uint256 engineCollateralAfter = cdpEngine.vaults(address(this), collateralTokenAddress).collateral;
+        (uint engineCollateralAfter, uint _3) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 vaultCollateralAfter = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         uint256 userBalanceAfter = ERC20(collateralTokenAddress).balanceOf(address(this));
         

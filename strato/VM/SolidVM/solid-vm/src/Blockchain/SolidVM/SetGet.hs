@@ -253,6 +253,7 @@ getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
+    SInteger i -> return $ i /= 0
     SNULL -> return False
     _ -> typeError "getBool" (p, v)
 

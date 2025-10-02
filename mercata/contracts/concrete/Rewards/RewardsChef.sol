@@ -194,6 +194,11 @@ contract record RewardsChef is Ownable {
     // Info of each of the stake pool.
     PoolInfo[] public record pools;
 
+    function getPoolBonusPeriod(uint poolIndex, uint bonusPeriodIndex) public returns (uint, uint) {
+        BonusPeriod bp = pools[poolIndex].bonusPeriods[bonusPeriodIndex];
+        return (bp.startTimestamp, bp.bonusMultiplier);
+    }
+
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 

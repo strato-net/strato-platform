@@ -273,12 +273,12 @@ lookupContractFunction x cName fName = do
     Nothing -> pure . bottom $ ("Unknown contract: " <> labelToText cName) <$ x
     Just c' -> local (\r -> r {contract = c'}) . recursively x $ do
       c <- asks contract
-      pure $ case M.lookup fName (_functions c) of
+      case M.lookup fName (_functions c) of
         Nothing -> case M.lookup fName (_constants c) of
           Nothing -> case M.lookup fName (_storageDefs c) of
             Nothing -> case M.lookup fName (_structs c) of
               Nothing ->
-                bottom $
+                pure . bottom $
                   ( T.concat
                       [ "Unknown contract function: ",
                         labelToText cName,
@@ -290,12 +290,12 @@ lookupContractFunction x cName fName = do
               Just fields ->
                 let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
                     fRets = Static (SVMType.Struct Nothing fName) x
-                 in Function fArgs fRets x [] [] False
+                 in pure $ Function fArgs fRets x [] [] False
             Just VariableDecl {..} ->
               if _varIsPublic
                 then constructGetterType x _varType
                 else
-                  bottom $
+                  pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
                           labelToText cName,
@@ -304,25 +304,37 @@ lookupContractFunction x cName fName = do
                         ]
                     )
                       <$ x
-          Just ConstantDecl {..} -> Static _constType x
-        Just f -> filterFuncs cc x fName f $
+          Just ConstantDecl {..} -> pure $ Static _constType x
+        Just f -> pure . filterFuncs cc x fName f $
           case filter (\(Using n _ _) -> n == cName) . concat . M.elems $ ctract ^. usings of
             [] -> [Internal, Private]
             _ -> []
       
   where 
-    constructGetterType :: SourceAnnotation Text -> SVMType.Type -> Type'
-    constructGetterType y (SVMType.Array t _) = case constructGetterType y t of
+    constructGetterType :: SourceAnnotation Text -> SVMType.Type -> SSS Type'
+    constructGetterType y (SVMType.Array t _) = constructGetterType y t >>= \case
       Function (Product args y') rets ctx w j f ->
         let baseType = Static (SVMType.Int (Just False) (Just 32)) y
-         in Function (Product (baseType : args) y') rets ctx w j f
-      _ -> bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
-    constructGetterType y (SVMType.Mapping _ k v) = case constructGetterType y v of
+         in pure $ Function (Product (baseType : args) y') rets ctx w j f
+      _ -> pure . bottom $ "Failed to construct type for contract array getter. This is probably a SolidVM typechecker bug" <$ y
+    constructGetterType y (SVMType.Mapping _ k v) = constructGetterType y v >>= \case
       Function (Product args y') rets ctx w j f ->
         let baseType = Static k y
-         in Function (Product (baseType : args) y') rets ctx w j f
-      _ -> bottom $ "Failed to construct type for contract mapping getter. This is probably a SolidVM typechecker bug" <$ y
-    constructGetterType y t = Function (Product [] y) (Static t y) y [] [] False
+         in pure $ Function (Product (baseType : args) y') rets ctx w j f
+      _ -> pure . bottom $ "Failed to construct type for contract mapping getter. This is probably a SolidVM typechecker bug" <$ y
+    constructGetterType y (SVMType.Struct _ s) = do
+      fields <- lookupStruct s
+      let rets = catMaybes $ (\(_, t) -> case t of
+              SVMType.Error{} -> Nothing
+              SVMType.Array{} -> Nothing
+              SVMType.Mapping{} -> Nothing
+              _ -> Just t
+            ) <$> fields
+      pure $ Function (Product [] y) (Product (flip Static y <$> rets) y) y [] [] False
+    constructGetterType y t@(SVMType.UnknownLabel s _) = lookupStruct s >>= \case
+      [] -> pure $ Function (Product [] y) (Static t y) y [] [] False
+      _ -> constructGetterType y (SVMType.Struct Nothing s)
+    constructGetterType y t = pure $ Function (Product [] y) (Static t y) y [] [] False
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
 productType' _ [Bottom es] = Bottom es
