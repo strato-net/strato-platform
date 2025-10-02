@@ -243,7 +243,7 @@ contract Describe_MercataBridge {
         uint256 newBlock = 1500;
         bridge.setLastProcessedBlock(externalChainId, newBlock);
         
-        (address _1, address _2, uint lastProcessedBlock, bool _4, string _5) = bridge.chains(externalChainId);
+        (,, uint lastProcessedBlock,,) = bridge.chains(externalChainId);
         uint256 setLastBlock = lastProcessedBlock;
         require(setLastBlock == newBlock, "Last processed block not updated");
     }
@@ -291,7 +291,7 @@ contract Describe_MercataBridge {
         
         bridge.setAssetMetadata(address(testToken), externalChainId, newName, newSymbol);
         
-        (address _1, uint _2, uint _3, string externalName, string externalSymbol, uint _6, uint8 _7) = bridge.assets(address(testToken), externalChainId);
+        (,,, string externalName, string externalSymbol,,) = bridge.assets(address(testToken), externalChainId);
         require(keccak256(externalName) == keccak256(newName), "Name not updated correctly");
         require(keccak256(externalSymbol) == keccak256(newSymbol), "Symbol not updated correctly");
     }
@@ -300,7 +300,7 @@ contract Describe_MercataBridge {
         uint256 newLimit = 2000000e18;
         bridge.setTokenLimits(address(testToken), externalChainId, newLimit);
         
-        (address _1, uint _2, uint _3, string _4, string _5, uint maxPerTx, uint8 _7) = bridge.assets(address(testToken), externalChainId);
+        (,,,,, uint maxPerTx,) = bridge.assets(address(testToken), externalChainId);
         require(maxPerTx == newLimit, "Token limit not updated correctly");
     }
 
@@ -395,7 +395,7 @@ contract Describe_MercataBridge {
         bridge.deposit(externalChainId, externalSender, txHash, address(testToken), amount, recipient, true);
         
         // Check that deposit was created
-        (address stratoToken, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, txHash);
+        (address stratoToken,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -411,7 +411,7 @@ contract Describe_MercataBridge {
         bridge.confirmDeposit(externalChainId, txHash);
         
         // Check that deposit was confirmed
-        (address stratoToken, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, txHash);
+        (address stratoToken,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -426,7 +426,7 @@ contract Describe_MercataBridge {
         // Then mark for review
         bridge.reviewDeposit(externalChainId, txHash);
         
-        (address stratoToken, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, txHash);
+        (address stratoToken,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -456,8 +456,8 @@ contract Describe_MercataBridge {
         
         bridge.depositBatch(chainIds, txHashes, tokens, amounts, recipients, senders, mintUSDSTs);
         
-        (address stratoToken1, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, "0xhash1");
-        (address stratoToken2, address _12, uint _13, address _14, BridgeStatus _15, bool _16, uint _17) = bridge.deposits(externalChainId, "0xhash2");
+        (address stratoToken1,,,,,,) = bridge.deposits(externalChainId, "0xhash1");
+        (address stratoToken2,,,,,,) = bridge.deposits(externalChainId, "0xhash2");
         require(stratoToken1 == address(testToken), "First deposit token should be set");
         require(stratoToken2 == address(testToken), "Second deposit token should be set");
     }
@@ -478,7 +478,7 @@ contract Describe_MercataBridge {
         
         bridge.confirmDepositBatch(chainIds, txHashes);
         
-        (address stratoToken, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, txHash);
+        (address stratoToken,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -498,7 +498,7 @@ contract Describe_MercataBridge {
         
         bridge.reviewDepositBatch(chainIds, txHashes);
         
-        (address stratoToken, address _2, uint _3, address _4, BridgeStatus _5, bool _6, uint _7) = bridge.deposits(externalChainId, txHash);
+        (address stratoToken,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -599,7 +599,7 @@ contract Describe_MercataBridge {
         require(withdrawalId == 1, "Withdrawal ID should be 1");
         require(bridge.withdrawalCounter() == 1, "Withdrawal counter should be 1");
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(withdrawalToken), "Token should be set");
     }
 
@@ -615,7 +615,7 @@ contract Describe_MercataBridge {
         uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(usdstToken), amount, true);
         require(withdrawalId == 1, "Withdrawal ID should be 1");
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(usdstToken), "Token should be set");
     }
 
@@ -632,7 +632,7 @@ contract Describe_MercataBridge {
         // Confirm withdrawal
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -650,7 +650,7 @@ contract Describe_MercataBridge {
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
         bridge.finaliseWithdrawal(withdrawalId, custodyTxHash);
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -672,7 +672,7 @@ contract Describe_MercataBridge {
         }
         require(reverted, "Should revert due to 48h wait period");
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -688,7 +688,7 @@ contract Describe_MercataBridge {
         // Abort by relayer (should succeed)
         bridge.abortWithdrawal(withdrawalId);
         
-        (uint _1, address _2, address stratoToken, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,, address stratoToken,,,,,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -717,8 +717,8 @@ contract Describe_MercataBridge {
         
         bridge.confirmWithdrawalBatch(ids, txHashes);
         
-        (uint _1, address _2, address stratoToken1, uint _4, address _5, BridgeStatus _6, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId1);
-        (uint _11, address _12, address stratoToken2, uint _14, address _15, BridgeStatus _16, bool _17, uint _18, uint _19) = bridge.withdrawals(withdrawalId2);
+        (,, address stratoToken1,,,,,,) = bridge.withdrawals(withdrawalId1);
+        (,, address stratoToken2,,,,,,) = bridge.withdrawals(withdrawalId2);
         require(stratoToken1 == address(testToken), "First withdrawal token should be set");
         require(stratoToken2 == address(usdstToken), "Second withdrawal token should be set");
     }
@@ -744,7 +744,7 @@ contract Describe_MercataBridge {
         
         bridge.finaliseWithdrawalBatch(ids, txHashes);
         
-        (uint _, address _2, address _3, uint _4, address _5, BridgeStatus bridgeStatus, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId);
+        (,,,,, BridgeStatus bridgeStatus,,,) = bridge.withdrawals(withdrawalId);
         require(bridgeStatus == BridgeStatus.COMPLETED, "Status should be COMPLETED");
     }
 
@@ -769,8 +769,8 @@ contract Describe_MercataBridge {
         
         bridge.abortWithdrawalBatch(ids);
         
-        (uint _1, address _2, address _3, uint _4, address _5, BridgeStatus bridgeStatus, bool _7, uint _8, uint _9) = bridge.withdrawals(withdrawalId1);
-        (uint _11, address _12, address _13, uint _14, address _15, BridgeStatus bridgeStatus2, bool _17, uint _18, uint _19) = bridge.withdrawals(withdrawalId2);
+        (,,,,, BridgeStatus bridgeStatus,,,) = bridge.withdrawals(withdrawalId1);
+        (,,,,, BridgeStatus bridgeStatus2,,,) = bridge.withdrawals(withdrawalId2);
         require(bridgeStatus == BridgeStatus.ABORTED, "First withdrawal should be ABORTED");
         require(bridgeStatus2 == BridgeStatus.ABORTED, "Second withdrawal should be ABORTED");
     }
@@ -889,8 +889,8 @@ contract Describe_MercataBridge {
         bridge.deposit(chainId1, externalSender, "0xtx1", address(testToken), 1000e18, address(0x1111), false);
         bridge.deposit(chainId2, externalSender, "0xtx2", address(testToken), 2000e18, address(0x2222), false);
         
-        (address _1, address _2, uint _3, address _4, BridgeStatus bridgeStatus1, bool _6, uint _7) = bridge.deposits(chainId1, "0xtx1");
-        (address _11, address _12, uint _13, address _14, BridgeStatus bridgeStatus2, bool _16, uint _17) = bridge.deposits(chainId2, "0xtx2");
+        (,,,, BridgeStatus bridgeStatus1,,) = bridge.deposits(chainId1, "0xtx1");
+        (,,,, BridgeStatus bridgeStatus2,,) = bridge.deposits(chainId2, "0xtx2");
         require(bridgeStatus1 == BridgeStatus.INITIATED, "First chain deposit should be INITIATED");
         require(bridgeStatus2 == BridgeStatus.INITIATED, "Second chain deposit should be INITIATED");
     }
