@@ -1,0 +1,2767 @@
+openapi: 3.0.0
+info:
+  version: "12"
+  title: STRATO Mercata API
+  license:
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+    name: APACHE LICENSE, VERSION 2.0
+  description: |
+    #### STRATO Mercata API reference
+tags:
+  - name: Users - Addresses
+    description: User accounts management
+  - name: Transactions
+    description: Endpoints related to transaction management
+  - name: Smart Contracts
+    description: Endpoints related to contract management
+  - name: Chains
+    description: Endpoints related to private chain management
+  - name: Health Checks
+    description: Endpoints related to the health of the system
+paths:
+  /strato/v2.3/users:
+    get:
+      tags:
+        - Users - Addresses
+      summary: Get list of users and account address
+      parameters:
+        - required: false
+          in: query
+          name: address
+          description: Address of user to look up the username of
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                properties:
+                  username:
+                    type: string
+                  address:
+                    type: string
+        "400":
+          description: Internal Error! Something is broken in the STRATO database. Please contact your network administrator to have this problem fixed.
+  /strato/v2.3/key:
+    post:
+      tags:
+        - Users - Addresses
+      summary:  Create the user address and key based on Bearer token
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                properties:
+                  status:
+                    type: string
+                  address:
+                    type: string
+    get:
+      tags:
+        - Users - Addresses
+      summary: Get user address based on Bearer token
+      parameters:
+        - required: false
+          in: query
+          name: username
+          description: (optional) Username to get another user's address
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                properties:
+                  status:
+                    type: string
+                  address:
+                    type: string
+        "400":
+          description: User doesn't exist
+  /strato-api/eth/v1.2/account:
+    get:
+      tags:
+        - Users - Addresses
+      summary: Get user blockchain account details
+      description: Returns account info from given parameters
+      parameters:
+        - required: false
+          in: query
+          name: address
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: balance
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: minbalance
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: maxbalance
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: nonce
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: minnonce
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: maxnonce
+          schema:
+            type: integer
+            minimum: 0
+            exclusiveMinimum: false
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/Account"
+                type: array
+        "400":
+          description: Invalid `chainid` or `maxnonce` or `minnonce` or `nonce` or
+            `maxbalance` or `minbalance` or `balance` or `address`
+  /strato/v2.3/transaction:
+    post:
+      tags:
+        - Transactions
+      summary: Post Transaction (create contract, function call, token transfer)
+      parameters:
+        - in: query
+          name: resolve
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        description: Create a Contract, Call a Function, Transfer Tokens
+        required: true
+        content:
+          application/json;charset=utf-8:
+            schema:
+              $ref: '#/components/schemas/SingleTransaction' 
+            examples:
+              CreateContract:
+                value:
+                  txs:
+                    - 
+                      payload:
+                        contract: "SimpleStorage"
+                        src: "contract SimpleStorage {uint storedData; constructor SimpleStorage(uint _storedData) {storedData = _storedData;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}"
+                        args:
+                          _storedData: 1
+                        metadata:
+                          history: "SimpleStorage"
+                          VM: "SolidVM"
+                      type: "CONTRACT"
+                  txParams:
+                    gasLimit: 10000000000
+                    gasPrice: 1
+              FunctionCall:
+                value:
+                  txs:
+                    - 
+                      payload:
+                        contractName: "SimpleStorage"
+                        contractAddress: "90f0a711cd0ab921bbc9b54c4a6bdb3219e590f9"
+                        method: "set"
+                        args:
+                          x: 5
+                      type: "FUNCTION"
+                  txParams:
+                    gasLimit: 32100000000
+                    gasPrice: 1
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8::
+              schema:
+                items:
+                  $ref: "#/components/schemas/BlocTransactionResultTrue"
+                type: array
+
+  /strato/v2.3/transaction/parallel:
+    post:
+      tags:
+        - Transactions
+      summary: Post Transactions in parallel (create contract, function call, token transfer)
+      parameters:
+        - in: query
+          name: resolve
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        description: Create Multiple Contracts, Call Multiple Functions, Transfer Tokens
+        required: true
+        content:
+          application/json;charset=utf-8:
+            schema:
+              $ref: '#/components/schemas/MultipleTransactions' 
+            examples:
+              CreateContract:
+                value:
+                  txs:
+                    - 
+                      payload:
+                        contract: "SimpleStorage"
+                        args: {}
+                        metadata:
+                          history: ""
+                          index: ""
+                          VM: "SolidVM"
+                      type: "CONTRACT"
+                    -
+                      payload:
+                        contract: "SimpleStorage2"
+                        args: {}
+                        metadata:
+                          history: ""
+                          index: ""
+                          VM: "SolidVM"
+                      type: "CONTRACT"
+                      
+                  txParams:
+                    gasLimit: 10000000000
+                    gasPrice: 1
+                  srcs:
+                    SimpleStorage: "contract SimpleStorage {uint storedData; function SimpleStorage() {storedData = 1;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}"
+                    SimpleStorage2: "contract SimpleStorage2 {uint storedData; function SimpleStorage2() {storedData = 2;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}"
+              FunctionCall:
+                value:
+                  txs:
+                    - 
+                      payload:
+                        contractName: "SimpleStorage"
+                        contractAddress: "90f0a711cd0ab921bbc9b54c4a6bdb3219e590f9"
+                        method: "set"
+                        args:
+                          x: 5
+                      type: "FUNCTION"
+                    -
+                      payload:
+                        contractName: "SimpleStorage2"
+                        contractAddress: "aa24835ecf86777c767f2055efe2779dcb2b8bb2"
+                        method: "set"
+                        args:
+                          x: 6
+                      type: "FUNCTION"
+                  txParams:
+                    gasLimit: 32100000000
+                    gasPrice: 1
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/BlocTransactionResult"
+                type: array
+  /cirrus/search/contract:
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get a list of existing contracts (indexed blockchain data)
+      description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
+      parameters:
+        - $ref: "#/components/parameters/select"
+        - $ref: "#/components/parameters/order"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/rangeUnit"
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/preferCount"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/contract"
+        "206":
+          description: Partial Content
+  "/cirrus/search/{contractName}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Search if a contract name exists (indexed blockchain data)
+      description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
+      parameters:
+        - $ref: "#/components/parameters/select"
+        - $ref: "#/components/parameters/order"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/rangeUnit"
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/preferCount"
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ContractName-Latest-OrAddress-alongwi\
+                      thChainId"
+                type: array
+        "404":
+          description: "`contractName` not found"
+  "/cirrus/search/history@{contractName}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Search if a contract's history exists (indexed blockchain data)
+      description: "Note: refer to <a href='https://postgrest.org/en/v9.0/api.html'>PostgREST documentation</a> for additional query options"
+      parameters:
+        - $ref: "#/components/parameters/select"
+        - $ref: "#/components/parameters/order"
+        - $ref: "#/components/parameters/range"
+        - $ref: "#/components/parameters/rangeUnit"
+        - $ref: "#/components/parameters/offset"
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/preferCount"
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ContractName-Latest-OrAddress-alongwi\
+                      thChainId"
+                type: array
+        "404":
+          description: "`contractName` not found"
+  /bloc/v2.2/contracts:
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get a list of all existing contracts
+      description: "Returns an object with contract names as keys, and the value is an array of each instance of that contract type. \
+          Limits and offsets are calculated by contract instances, not contract types"
+      parameters:
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+        - required: false
+          in: query
+          name: offset
+          schema:
+            type: number
+            format: number
+            minimum: 0
+            maximum: 1.157920892373162e+77
+        - required: false
+          in: query
+          name: limit
+          schema:
+            type: number
+            format: number
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/GetContractResponse"
+        "400":
+          description: Invalid `chainid`
+  "/bloc/v2.2/contracts/{contractName}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get a contract's address
+      description: ""
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          description: Name of an existing contract
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ContractName-Latest-OrAddress"
+                type: array
+        "404":
+          description: "`contractName` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get info of a Contract
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ContractDetails"
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get state of a contract
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+        - required: false
+          in: query
+          name: name
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: count
+          schema:
+            type: integer
+        - required: false
+          in: query
+          name: offset
+          schema:
+            type: integer
+        - in: query
+          name: length
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                additionalProperties:
+                  $ref: "#/components/schemas/SolidityValue"
+                type: object
+        "400":
+          description: Invalid `length` or `offset` or `count` or `name` or `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` not found"
+  "/bloc/v2.2/contracts/contract/{contractAddress}/details":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get the details of a contract
+      parameters:
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ContractDetails"
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractAddress` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}/functions":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get a list of functions in an existing contract
+      description: ""
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          description: Name of an existing contract
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          description: Address of an existing contract
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/FunctionName"
+                type: array
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}/symbols":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get Symbols from contract
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  example: SymbolName
+                  type: string
+                type: array
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}/state/{mapping}/{key}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get contract mapping and keys
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: true
+          in: path
+          name: mapping
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: key
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/GetContractStatesMappingResponse"
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` or `mapping` or `key` not found"
+  "/bloc/v2.2/contracts/{contractName}/{contractAddress}/enum/{enumName}":
+    get:
+      tags:
+        - Smart Contracts
+      summary: Get enum from a contract
+      parameters:
+        - required: true
+          in: path
+          name: contractName
+          schema:
+            type: string
+        - required: true
+          in: path
+          name: contractAddress
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.461501637330903e+48
+        - required: true
+          in: path
+          name: enumName
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/EnumValue"
+                type: array
+        "400":
+          description: Invalid `chainid`
+        "404":
+          description: "`contractName` or `contractAddress` or `enumName` not found"
+  /bloc/v2.2/contracts/compile:
+    post:
+      tags:
+        - Smart Contracts
+      summary: Compile contracts
+      requestBody:
+        content:
+          application/json;charset=utf-8:
+            schema:
+              items:
+                $ref: "#/components/schemas/PostCompileRequest"
+              type: array
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/PostCompileResponse"
+                type: array
+        "400":
+          description: Invalid `body`
+  #deprecate-7.5
+  /bloc/v2.2/contracts/xabi:
+    post:
+      tags:
+        - Smart Contracts
+      summary: (EVM contracts only, deprecated in STRATO 7.5) Post a Xabi Request
+      description: ""
+      requestBody:
+        content:
+          application/json;charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/PostXabiRequest"
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: "#/components/schemas/PostXabiRequest"
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/PostXabiResponse"
+        "400":
+          description: Invalid `body`
+  "/bloc/v2.2/transactions/{hash}/result":
+    get:
+      tags:
+        - Transactions
+      summary: "Get the result of a transaction"
+      description: ""
+      parameters:
+        - required: true
+          in: path
+          name: hash
+          description: Hash of a transaction
+          schema:
+            type: string
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+            default: 
+        - in: query
+          name: resolve
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/BlocTransactionResult"
+        "400":
+          description: Invalid `resolve` or `chainid`
+        "404":
+          description: "`hash` not found"
+  /bloc/v2.2/transactions/results:
+    post:
+      tags:
+        - Transactions
+      summary: Get the results of multiple transactions
+      description: ""
+      parameters:
+        - required: false
+          in: query
+          name: chainid
+          schema:
+            type: string
+            format: hex string
+            minimum: 0
+            maximum: 1.157920892373162e+77
+        - in: query
+          name: resolve
+          allowEmptyValue: true
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        content:
+          application/json;charset=utf-8:
+            schema:
+              items:
+                $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_stri\
+                  ng"
+              type: array
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/BlocTransactionResult"
+                type: array
+        "400":
+          description: Invalid `body` or `resolve` or `chainid`
+  /bloc/v2.2/chain:
+    get:
+      tags:
+        - Chains
+      summary: Get private chain info
+      parameters:
+        - in: query
+          name: chainid
+          required: true
+          explode: true
+          schema:
+            type: array
+            items:
+              maximum: 1.157920892373162e+77
+              format: hex string
+              minimum: 0
+              type: string
+        - $ref: "#/components/parameters/limit"
+        - $ref: "#/components/parameters/offset"
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                items:
+                  $ref: "#/components/schemas/NamedTuple"
+                type: array
+        "400":
+          description: Failing to parse a chain ID from the empty string
+    post:
+      tags:
+        - Chains
+      summary: Create a private chain
+      description: Returns chainId
+      requestBody:
+        content:
+          application/json;charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/ChainInput"
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ChainId"
+        "400":
+          description: Invalid `body`
+  /bloc/v2.2/chains:
+    post:
+      tags:
+        - Chains
+      summary: Create an array of private chains
+      description: Returns an array of chainIds
+      requestBody:
+        content:
+          application/json;charset=utf-8:
+            schema:
+              $ref: "#/components/schemas/ChainInput"
+        required: true
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/ChainId"
+        "400":
+          description: Invalid `body`
+  /health:
+    get:
+      tags:
+        - Health Checks
+      summary: Get overall health status of STRATO node, indicates if the node health needs administrator's attention. Useful for monitoring the node's health with external tools. Does not require authentication.
+      responses:
+        "200":
+          description: ""
+          content:
+            text/html;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/HealthResult"
+  /strato-api/eth/v1.2/metadata:
+    get:
+      tags:
+        - Health Checks
+      summary: Get the STRATO node's addresss, public key and list of validators. Also check if the node is synced and the vault's password is set.  Requires authentication.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                $ref: "#/components/schemas/Metadata"
+  /apex-api/status:
+    get:
+      tags:
+        - Health Checks
+      summary: Get detailed health information of the STRATO node, includes warning messages, resource usage, and other relevant health checks. Requires authentication.
+      responses:
+        "200":
+          description: ""
+          content:
+            application/json;charset=utf-8:
+              schema:
+                  $ref: "#/components/schemas/StratoStatus"
+components:
+  parameters:
+    preferParams:
+      name: Prefer
+      description: Preference
+      required: false
+      in: header
+      schema:
+        type: string
+        enum:
+          - params=single-object
+    preferReturn:
+      name: Prefer
+      description: Preference
+      required: false
+      in: header
+      schema:
+        type: string
+        enum:
+          - return=representation
+          - return=minimal
+          - return=none
+    preferCount:
+      name: Prefer
+      description: Preference
+      required: false
+      in: header
+      schema:
+        type: string
+        enum:
+          - count=none
+    select:
+      name: select
+      description: Filtering Columns
+      required: false
+      in: query
+      schema:
+        type: string
+    order:
+      name: order
+      description: Ordering
+      required: false
+      in: query
+      schema:
+        type: string
+    range:
+      name: Range
+      description: Limiting and Pagination
+      required: false
+      in: header
+      schema:
+        type: string
+    rangeUnit:
+      name: Range-Unit
+      description: Limiting and Pagination
+      required: false
+      in: header
+      schema:
+        type: string
+        default: items
+    offset:
+      name: offset
+      description: "Pagination offset (default: 0)"
+      required: false
+      in: query
+      schema:
+        type: string
+    limit:
+      name: limit
+      description: "Pagination limit per page (default: 100)"
+      required: false
+      in: query
+      schema:
+        type: string
+    rowFilter.cold_storage.address:
+      name: address
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+    rowFilter.cold_storage.chain_id:
+      name: chain_id
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+    rowFilter.cold_storage.binary_values:
+      name: binary_values
+      required: false
+      in: query
+      schema:
+        type: string
+        format: bytea
+    rowFilter.contract.id:
+      name: id
+      required: false
+      in: query
+      schema:
+        type: string
+        format: integer
+    rowFilter.contract.codeHash:
+      name: codeHash
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+    rowFilter.contract.contract:
+      name: contract
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+    rowFilter.contract.abi:
+      name: abi
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+    rowFilter.contract.chainId:
+      name: chainId
+      required: false
+      in: query
+      schema:
+        type: string
+        format: text
+  requestBodies:
+    PostBlocTransactionRequest:
+      content:
+        application/json;charset=utf-8:
+          schema:
+            $ref: "#/components/schemas/PostBlocTransactionRequest"
+      required: true
+  schemas:
+    UserName:
+      description: User Name
+      example: Martin
+      type: string
+    Address:
+      description: Ethereum Address, 20 byte hex encoded string
+      example: address=deadbeef
+      type: string
+    Password:
+      description: Password
+      example: '"securePassword"'
+      type: string
+    KeyStoreEntry:
+      required:
+        - password
+        - keyStore
+      properties:
+        password:
+          $ref: "#/components/schemas/Password"
+        keyStore:
+          $ref: "#/components/schemas/KeyStoreEntry"
+      example:
+        password: hunter2
+        keyStore:
+          accountAddress: 97b8c8d8334b6f3cd15e4e09986741e76b32c0f1
+          publicKey: BN7xUUo/jRkUcOCGZ9kLblhLMjX+l6onmrXSGyU9Vi+FepkXyn6INsJy1fXGXOfEAZHShgArFQIG+TuPEbaBG5M=
+          keystoreNonce: r1bGHtEsQ25mtNwagcc1YfAlvJ/dwR/V
+          encryptedSecretKey: +zf8oOegJOCNs2jlKLtB4rYtzQn1F22QWJ1aW65P/Uw6NYgkZFo3uAawiDGC8uEV
+          salt: mRxJz8789avdEy+sYvqi+g==
+          passwordHash: JDJhJDA2JDlHY09UQ1JPM09rT2d5M29xUjlRLk8xRFMzTWoyc3RXN25ybUU4ZVQ3MnN3LjNkT2sxRXcu
+      type: object
+    BlocTransactionResult:
+      description: Bloc Transaction Result
+      required:
+        - transactionStatus
+        - transactionHash
+      properties:
+        transactionStatus:
+          $ref: "#/components/schemas/BlocTransactionStatus"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionTxResult:
+          $ref: "#/components/schemas/TransactionResult"
+        transactionData:
+          $ref: "#/components/schemas/BlocTransactionData"
+      example:
+        status: Success
+        hash: 41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d
+      type: object
+    BlocTransactionResultTrue:
+      description: a transaction result with resolve set to true
+      properties:
+        transactionStatus:
+          $ref: "#/components/schemas/BlocTransactionStatus"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionTxResult:
+          $ref: "#/components/schemas/TransactionResult"
+        transactionData:
+          $ref: "#/components/schemas/BlocTransactionData"
+      example:
+        status: Success
+        hash: 41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d
+        txResult:
+          ...: null
+        data:
+          tag: Upload
+          contents:
+            ...: null
+            address: 90f0a711cd0ab921bbc9b54c4a6bdb3219e590f9
+      type: object
+    BlocTransactionResultFalse:
+      description: a transaction result with resolve set to false
+      properties:
+        transactionStatus:
+          $ref: "#/components/schemas/BlocTransactionStatus"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionTxResult:
+          $ref: "#/components/schemas/TransactionResult"
+        transactionData:
+          $ref: "#/components/schemas/BlocTransactionData"
+      example:
+        status: pending
+        hash: 41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d
+      type: object
+    FunctionCallResolveFalse:
+      description: Bloc Transaction Result
+      required:
+        - transactionStatus
+        - transactionHash
+      properties:
+        transactionStatus:
+          $ref: "#/components/schemas/BlocTransactionStatus"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionTxResult:
+          $ref: "#/components/schemas/TransactionResult"
+        transactionData:
+          $ref: "#/components/schemas/BlocTransactionData"
+      example:
+        status: Success
+        hash: 41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d
+        txResult: {}
+        data:
+          tag: "Call"
+          contents:
+            -
+      type: object
+    FunctionCallResolveTrue:
+      description: Bloc Transaction Result
+      required:
+        - transactionStatus
+        - transactionHash
+      properties:
+        transactionStatus:
+          $ref: "#/components/schemas/BlocTransactionStatus"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionTxResult:
+          $ref: "#/components/schemas/TransactionResult"
+        transactionData:
+          $ref: "#/components/schemas/BlocTransactionData"
+      example:
+        status: Success
+        hash: 41b1a0649752af1b28b3dc29a1556eee781e4a4c3a1f7f53f90fa834de098c4d
+        txResult: {}
+        data:
+          tag: "Call"
+          contents:
+            - 
+      type: object
+    BlocTransactionStatus:
+      description: Bloc Transaction Status
+      example: Success
+      type: string
+      enum:
+        - Success
+        - Failure
+        - Pending
+    StratoStatus:  
+      properties:
+        version:
+          type: string
+          example: "7.2.0"
+        timestamp:
+          type: number
+          example: 1637599908.539
+        lastBlock:
+          $ref: "#/components/schemas/LastBlockInfo"
+        pbftData:
+          properties:
+            round_number:
+              type: string
+              example: 65
+            sequence_number: 
+              type: string
+              example: 0
+            timestamp:
+              type: number
+              example: 1637599908.538
+        healthinfo:
+          properties:
+            uptime: 
+              type: number
+              example: 669.524 
+            isHealthy:
+              type: boolean
+              example: true
+            isNotStalled:
+              type: boolean
+              example: true
+            isValidBlocksInc:
+              type: boolean
+              example: true
+            isLastPending:
+              type: boolean
+              example: false
+            unhealthyProcess":
+              type: string
+              example: ""
+            warnings:
+              properties:
+                warningsActive:
+                  type: boolean
+                  example: true
+                messages:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MessagesArray'
+            systemInfo:
+              properties:
+                mem_active:
+                  type: integer
+                  example: 1764401152
+                mem_free:
+                  type: integer
+                  example: 310104064
+                mem_available:
+                  type: integer
+                  example: 2807885824
+                disk_usage:
+                  type: number
+                  example: 45.513292470970704
+                currentLoad:
+                  type: number
+                  example: 10.269936584544586
+                fsSize:
+                  example: [{"name":"/dev/nvme0n1p5","fsSize":72500822016,"fsSize_use":54.49,"fsSize_used":39503310848,"fsSize_size":72500822016}]
+                fsStats_rx:
+                  type: integer
+                  example: 0
+                fsStats_wx:
+                  type: integer
+                  example: 0
+                networkStats:
+                  example: [{"iface":"","networkStats_rx_bytes":0,"networkStats_tx_bytes":0}]
+                Alerts:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/MessagesArray'
+    MessagesArray:
+      properties:
+        message:
+          type: string
+          example: "Low Memory"
+    LastBlockInfo:
+      description: information about the last block
+      properties:
+        number:
+          type: string
+          example: 0
+        hash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        parentHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        totalDificulty:
+          type: string
+          example: 8192
+        nonce:
+          type: string
+          example: 42
+    Keccak256_hash-32_byte_hex_encoded_string:
+      description: Keccak256 hash 32 byte hex encoded string
+      example: 4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4
+      type: string
+    TransactionResult:
+      description: Transaction Result
+      required:
+        - blockHash
+        - transactionHash
+        - message
+        - response
+        - trace
+        - gasUsed
+        - etherUsed
+        - contractsCreated
+        - contractsDeleted
+        - stateDiff
+        - time
+        - newStorage
+        - deletedStorage
+      properties:
+        blockHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        transactionHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        message:
+          type: string
+        response:
+          type: string
+        trace:
+          type: string
+        gasUsed:
+          $ref: "#/components/schemas/hex_word256"
+        etherUsed:
+          $ref: "#/components/schemas/hex_word256"
+        contractsCreated:
+          type: string
+        contractsDeleted:
+          type: string
+        stateDiff:
+          type: string
+        time:
+          format: double
+          type: number
+        newStorage:
+          type: string
+        deletedStorage:
+          type: string
+        chainId:
+          $ref: "#/components/schemas/ChainId"
+      example:
+        deletedStorage: Deleted Storage
+        contractsDeleted: "[MyOldContract]"
+        gasUsed: ffffffffffffffff
+        stateDiff: I am a state Diff
+        time: 0.2321
+        response: I'm a tx result response
+        blockHash: ed167af05357a559c591267b8c797507f5527a7088caf411d33b89be727610f0
+        transactionHash: 1bc9423464da0090d450d66757be3b7a9a9c9287e636d67b173dc643bb1dfeb9
+        etherUsed: a
+        newStorage: New Storage
+        message: I'm a tx result message
+        trace: tx trace
+        contractsCreated: "[MyNewContractA, MyNewContractB]"
+      type: object
+    hex_word256:
+      format: binary
+      type: string
+    ChainId:
+      description: Private chain id, 32 byte hex encoded string
+      example: ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781
+      type: string
+    BlocTransactionData:
+      description: Bloc Transaction Data
+      properties:
+        Send:
+          $ref: "#/components/schemas/PostTransaction"
+        Upload:
+          $ref: "#/components/schemas/ContractDetails"
+        Call:
+          items:
+            $ref: "#/components/schemas/SolidityValue"
+          type: array
+      example:
+        tag: Call
+        contents:
+          []
+      maxProperties: 1
+      minProperties: 1
+      type: object
+    PostTransaction:
+      description: Post Transaction
+      required:
+        - hash
+        - gasLimit
+        - codeOrData
+        - gasPrice
+        - from
+        - value
+        - r
+        - s
+        - v
+        - nonce
+      properties:
+        hash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        gasLimit:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        codeOrData:
+          type: string
+        gasPrice:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        to:
+          $ref: "#/components/schemas/Address"
+        from:
+          $ref: "#/components/schemas/Address"
+        value:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        r:
+          $ref: "#/components/schemas/hex_natural"
+        s:
+          $ref: "#/components/schemas/hex_natural"
+        v:
+          $ref: "#/components/schemas/hex_word8"
+        nonce:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        chainId:
+          $ref: "#/components/schemas/ChainId"
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      example:
+        hash: 4fbe47914a102ae6561597c95ab95819ddfd6b18c7abc3004c099aeaed2234b4
+        gasLimit: 21000
+        codeOrData: ""
+        gasPrice: 50000000000
+        to: 00000000000000000000000000000000deadbeef
+        value: "10000000000000000000"
+        from: 111dec89c25cbda1c12d67621ee3c10ddb8196bf
+        r: "a90ee66c8faf6ce19a5e0496fc809cc1d6984d8636afc9c8a8b2ac381cabc014"
+        s: "5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a"
+        v: 1c
+        nonce: 0
+      type: object
+    hex_natural:
+      example: "8"
+      type: string
+    hex_word8:
+      format: binary
+      type: string
+    ContractDetails:
+      description: Returned data from contract creation.
+      required:
+        - bin
+        - binRuntime
+        - codeHash
+        - name
+        - src
+        - xabi
+      properties:
+        bin:
+          type: string
+        address:
+          $ref: "#/components/schemas/ContractName-Latest-OrAddress"
+        binRuntime:
+          type: string
+        codeHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        name:
+          type: string
+        src:
+          type: string
+        xabi:
+          $ref: "#/components/schemas/Xabi_schema"
+        chainId:
+          $ref: "#/components/schemas/ChainId"
+      example:
+        bin: ContractBin
+        address: 00000000000000000000000000000000deadbeef
+        bin-runtime: ContractRuntime
+        codeHash: 682a7e258d80bd2421d3103cbe71e3e3b82138116756b97b8256f061dc2f11fb
+        name: DetailsName
+        src: contract DetailsName { }
+        xabi:
+          modifiers:
+            onlyOwner:
+              args:
+                {}
+              contents: if (msg.sender != owner) throw; _;
+              selector: onlyOwner
+              vals:
+                {}
+          funcs:
+            set:
+              args:
+                x:
+                  signed: false
+                  type: Int
+                  index: 0
+                  bytes: 32
+              contents: "return; "
+              stateMutability: pure
+              payable: false
+              vals:
+                {}
+              constant: true
+            get:
+              args:
+                {}
+              contents: "return x; "
+              stateMutability: view
+              payable: false
+              vals:
+                "#0":
+                  signed: false
+                  type: Int
+                  index: 0
+                  bytes: 32
+              constant: true
+          kind: ContractKind
+          types:
+            SimpleStorage:
+              names:
+                - SUCCESS
+                - ERROR
+              type: Enum
+              bytes: 0
+          using:
+            SafeMath: for uint256
+          events:
+            {}
+          vars:
+            storedData:
+              atBytes: 0
+              signed: false
+              type: Int
+              constant: true
+              bytes: 32
+              public: false
+      type: object
+    ContractName-Latest-OrAddress:
+      description: Contract Name, "Latest", Or Address
+      example: 00000000000000000000000000000000deadbeef
+      type: string
+    Xabi_schema:
+      description: Xabi types
+      required:
+        - funcs
+        - vars
+        - types
+        - modifiers
+        - events
+        - kind
+        - using
+      properties:
+        funcs:
+          additionalProperties:
+            $ref: "#/components/schemas/Function_Type"
+          type: object
+        constr:
+          $ref: "#/components/schemas/Function_Type"
+        vars:
+          additionalProperties:
+            $ref: "#/components/schemas/VarType"
+          type: object
+        types:
+          additionalProperties:
+            $ref: "#/components/schemas/TypeDef"
+          type: object
+        modifiers:
+          additionalProperties:
+            $ref: "#/components/schemas/Function_Modifier"
+          type: object
+        events:
+          additionalProperties:
+            $ref: "#/components/schemas/Event_schema"
+          type: object
+        kind:
+          $ref: "#/components/schemas/Xabi_Kind_Schema"
+        using:
+          additionalProperties:
+            $ref: "#/components/schemas/Using_schema"
+          type: object
+      example:
+        modifiers:
+          onlyOwner:
+            args:
+              {}
+            contents: if (msg.sender != owner) throw; _;
+            selector: onlyOwner
+            vals:
+              {}
+        funcs:
+          set:
+            args:
+              x:
+                signed: false
+                type: Int
+                index: 0
+                bytes: 32
+            contents: "return; "
+            stateMutability: pure
+            payable: false
+            vals:
+              {}
+            constant: true
+          get:
+            args:
+              {}
+            contents: "return x; "
+            stateMutability: view
+            payable: false
+            vals:
+              "#0":
+                signed: false
+                type: Int
+                index: 0
+                bytes: 32
+            constant: true
+        kind: ContractKind
+        types:
+          SimpleStorage:
+            names:
+              - SUCCESS
+              - ERROR
+            type: Enum
+            bytes: 0
+        using:
+          SafeMath: for uint256
+        events:
+          {}
+        vars:
+          storedData:
+            atBytes: 0
+            signed: false
+            type: Int
+            constant: true
+            bytes: 32
+            public: false
+      type: object
+    Function_Type:
+      description: Xabi Function Type
+      required:
+        - args
+        - vals
+      properties:
+        args:
+          additionalProperties:
+            $ref: "#/components/schemas/Solidity_type"
+          type: object
+        vals:
+          additionalProperties:
+            $ref: "#/components/schemas/Solidity_type"
+          type: object
+        stateMutability:
+          $ref: "#/components/schemas/State_Mutability"
+        contents:
+          type: string
+        visibility:
+          $ref: "#/components/schemas/Visibility_of_a_Function"
+        modifiers:
+          items:
+            type: string
+          type: array
+      example:
+        args:
+          userAddress:
+            signed: false
+            type: Int
+            index: 0
+            bytes: 32
+        contents: return userAddress;
+        stateMutability: view
+        payable: false
+        vals:
+          "#0":
+            signed: false
+            type: Int
+            index: 0
+            bytes: 32
+        constant: true
+      type: object
+    Solidity_type:
+      description: Represents a soldity type
+      required:
+        - indexedTypeIndex
+        - indexedTypeType
+      properties:
+        indexedTypeIndex:
+          maximum: 2147483647
+          format: int32
+          minimum: -2147483648
+          type: integer
+        indexedTypeType:
+          $ref: "#/components/schemas/Solidity_type"
+      example:
+        dynamic: false
+        value:
+          type: Bytes
+        key:
+          type: Address
+        type: Mapping
+        index: 10
+      type: object
+    State_Mutability:
+      description: Reserved keywords for function state mutability
+      example: view
+      type: string
+      enum:
+        - Pure
+        - Constant
+        - View
+        - Payable
+    Visibility_of_a_Function:
+      description: Xabi Function Visibility
+      example: Public
+      type: string
+      enum:
+        - Private
+        - Public
+        - Internal
+        - External
+    VarType:
+      description: Represents a Solidity Variable
+      required:
+        - varTypeAtBytes
+        - varTypeType
+      properties:
+        varTypeAtBytes:
+          maximum: 2147483647
+          format: int32
+          minimum: -2147483648
+          type: integer
+        varTypePublic:
+          type: boolean
+        varTypeConstant:
+          type: boolean
+        varTypeInitialValue:
+          type: string
+        varTypeType:
+          $ref: "#/components/schemas/Solidity_type"
+      example:
+        atBytes: 16
+        initialValue: 6120418de8a7a0ce3c3a0e3fe907e1351ceb4fe7
+        type: Address
+        constant: false
+        public: true
+      type: object
+    TypeDef:
+      description: User defined type (Struct or Enum)
+      properties:
+        Enum:
+          required:
+            - names
+            - bytes
+          type: object
+          properties:
+            names:
+              items:
+                type: string
+              type: array
+            bytes:
+              maximum: 18446744073709552000
+              minimum: 0
+              type: integer
+        Struct:
+          required:
+            - fields
+            - bytes
+          type: object
+          properties:
+            bytes:
+              maximum: 18446744073709552000
+              minimum: 0
+              type: integer
+            fields:
+              items:
+                type: array
+                minItems: 2
+                items:
+                  $ref: "#/components/schemas/FieldType"
+                maxItems: 2
+              type: array
+        Contract:
+          required:
+            - bytes
+          type: object
+          properties:
+            bytes:
+              maximum: 18446744073709552000
+              minimum: 0
+              type: integer
+      example:
+        names:
+          - SUCCESS
+          - FAILURE
+          - NOT_AUTHORIZED
+        type: Enum
+        bytes: 3735928559
+      maxProperties: 1
+      minProperties: 1
+      type: object
+    FieldType:
+      description: Represents a Solidity Field Type
+      required:
+        - fieldTypeAtBytes
+        - fieldTypeType
+      properties:
+        fieldTypeAtBytes:
+          maximum: 2147483647
+          format: int32
+          minimum: -2147483648
+          type: integer
+        fieldTypeType:
+          $ref: "#/components/schemas/Solidity_type"
+      example:
+        atBytes: 32
+        type: Address
+      type: object
+    Function_Modifier:
+      description: Xabi Function Modifier
+      required:
+        - args
+        - selector
+        - vals
+      properties:
+        args:
+          additionalProperties:
+            $ref: "#/components/schemas/Solidity_type"
+          type: object
+        selector:
+          type: string
+        vals:
+          additionalProperties:
+            $ref: "#/components/schemas/Solidity_type"
+          type: object
+        contents:
+          type: string
+      example:
+        args:
+          userAddress:
+            signed: false
+            type: Int
+            index: 0
+            bytes: 32
+        selector: 0adfe412
+        vals:
+          "#0":
+            signed: false
+            type: Int
+            index: 0
+            bytes: 32
+      type: object
+    Event_schema:
+      description: Xabi Event
+      required:
+        - anonymous
+        - logs
+      properties:
+        anonymous:
+          type: boolean
+        logs:
+          items:
+            minItems: 2
+            items:
+              $ref: "#/components/schemas/Solidity_type"
+            maxItems: 2
+            type: array
+          type: array
+      example:
+        logs:
+          - - _from
+            - type: Address
+              index: 0
+          - - _to
+            - type: Address
+              index: 1
+        anonymous: true
+      type: object
+    Xabi_Kind_Schema:
+      description: Whether this xabi is a contract, a library, or an interface
+      example: ContractKind
+      type: string
+      enum:
+        - ContractKind
+        - InterfaceKind
+        - LibraryKind
+    Using_schema:
+      description: Xabi of a `using` declaration
+      example: for uint[]
+      type: string
+    SolidityValue:
+      description: A Solidity return type value
+      example: true
+      type: string
+    TransactionParameters:
+      description: Transaction Parameters
+      properties:
+        gasLimit:
+          maximum: 18446744073709552000
+          minimum: 0
+          type: integer
+        gasPrice:
+          maximum: 18446744073709552000
+          minimum: 0
+          type: integer
+        nonce:
+          maximum: 18446744073709552000
+          minimum: 0
+          type: integer
+      example:
+        gasLimit: 123
+        gasPrice: 345
+        nonce: 9876
+      type: object
+    SolidityArgumentValue:
+      description: A Solidity argument value
+      example: 5
+      type: string
+    FileList:
+      properties:
+        contractAddress:
+          type: string
+        hash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        filekey:
+          type: string
+        uri:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/UTCTime"
+    GetContractResponse:
+      description: Response to Get Contracts endpoint
+      additionalProperties:
+        items:
+          $ref: "#/components/schemas/AddressCreatedAt"
+        type: array
+      example:
+        MySampleContract:
+          - createdAt: 1976
+            address: 00000000000000000000000000000000deadbeef
+      type: object
+    AddressCreatedAt:
+      description: Address and its creation time (POSIX)
+      required:
+        - at
+      properties:
+        at:
+          maximum: 9223372036854776000
+          format: int64
+          minimum: -9223372036854776000
+          type: integer
+        id:
+          $ref: "#/components/schemas/ChainId"
+      example:
+        createdAt: 1494448021000
+        address: 00000000000000000000000000000000deadbeef
+      minItems: 1
+      items:
+        $ref: "#/components/schemas/ContractName-Latest-OrAddress"
+      maxItems: 1
+      type: object
+    FunctionName:
+      example: fireMissiles
+      type: string
+    GetContractStatesMappingResponse:
+      description: Response to the Get Cotnracts State Mapping route
+      example:
+        willRain: false
+      type: string
+    EnumValue:
+      example: Red
+      type: string
+    PostCompileResponse:
+      required:
+        - contractName
+        - codeHash
+      properties:
+        contractName:
+          type: string
+        codeHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+      example:
+        contractName: MySampleContract
+        codeHash: 2c2831bc66a7b43faba30136666c705d6f47b78b9a25e51f823f142a19853212
+      type: object
+    PostCompileRequest:
+      required:
+        - source
+      properties:
+        contractName:
+          type: string
+        source:
+          type: string
+      example:
+        contractName: MySampleContract
+        source: "contract MySampleContract { ...} "
+      type: object
+    PostXabiResponse:
+      additionalProperties:
+        $ref: "#/components/schemas/Xabi_schema"
+      example:
+        src:
+          {}
+      type: object
+    PostXabiRequest:
+      example:
+        src: contract x { }
+      type: string
+    ContractName-Latest-OrAddress-alongwithChainId:
+      description: Contract Name, "Latest", Or Address, along with ChainId
+      example:
+        chainId: 123456879abcdef0123456879abcdef0123456879abcdef0123456879abcdef0
+        address: 00000000000000000000000000000000deadbeef
+      type: string
+    VMType:
+      description: "The VM to use for a smart contract"
+      type: string
+      enum:
+        - "SolidVM"
+        - "EVM"  
+    SingleTransaction:
+      type: object
+      properties:
+        txs:
+          type: array
+          items:
+            type: object
+            properties:
+              payload:
+                type: object
+                properties:
+                    contract:
+                      type: string
+                      example: "SimpleStorage"
+                    src:
+                      type: string
+                      example: 
+                    args:
+                      type: object
+                      example: "contract SimpleStorage {uint storedData; constructor SimpleStorage(uint _storedData) {storedData = _storedData;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}"
+                    metadata:
+                      type: object
+                      properties:
+                        history:
+                          type: string
+                          example: "SimpleStorage"
+                        VM:
+                          type: string
+                          example: "SolidVM"
+              type:
+                type: string
+                example: "CONTRACT"
+        txParams:
+          type: object
+          properties:
+            gasLimit:
+              type: integer
+              example: 10000000000
+            gasPrice:
+              type: integer
+              example: 1
+    MultipleTransactions:
+      type: object
+      properties:
+        txs:
+          type: array
+          items:
+            type: object
+            properties:
+              payload:
+                type: object
+                properties:
+                    contract:
+                      type: string
+                    src:
+                      type: string
+                      example: "contract SimpleStorage {uint storedData; constructor SimpleStorage(uint _storedData) {storedData = _storedData;} function set(uint x) {storedData = x;} function get() constant returns (uint) {return storedData;}}"
+                    args:
+                      type: object
+                    metadata:
+                      type: object
+                      properties:
+                        history:
+                          type: string
+                          example: "SimpleStorage"
+                        VM:
+                          type: string
+                          example: "SolidVM"
+              type:
+                type: string
+                example: "CONTRACT"
+        txParams:
+          type: object
+          properties:
+            gasLimit:
+              type: integer
+              example: 10000000000
+            gasPrice:
+              type: integer
+              example: 1
+    Metadata:
+      description: The result of the /metadata endpoint
+      required:
+        - healthInfo
+      properties:
+        isSynced:
+          type: boolean
+          example: true
+        isVaultPasswordSet:
+          type: boolean
+          example: true
+        networkID:
+          type: string
+          example: "7596898649924658542"
+        nodeAddress:
+          type: string
+          example: "1a47282b27c42d2640e8554ec668858d6aa1f51f"
+        nodePubKey:
+          type: string
+          example: "04d6609cb246fb5f34e998f97e2af88e14d296183afe30d7017f72b756f34e1819ace9272137849f48a32ff9dbe39e753d5f30049549e61eea12a5144f16d61a20"
+        urls:
+          type: array
+          items:
+            type: object
+            properties:
+              fileServer:
+                type: string
+                example: "https://fileserver.example.com/highway"
+              monitor:
+                type: string
+                example: "https://monitor.example.com:18080"
+              oauthDiscovery:
+                type: string
+                example: "https://keycloak.example.com/.well-known/openid-configuration"
+              paymentServer:
+                type: string
+                example: "https://payments.example.com"
+              vault:
+                type: string
+                example: "https://vault.example.com:8093"
+        validators:
+          type: array
+          items:
+            type: object
+            properties:
+              commonName:
+                type: string
+                example: "NodeOne"
+              orgName:
+                type: string
+                example: "BlockApps"
+              orgUnit:
+                type: string
+                example: "Engineering"
+              access:
+                type: boolean
+                example: true
+    HealthResult:
+      description: The result of the /health endpoint
+      required:
+        - healthInfo
+      properties:
+        uptime:
+          type: number
+          example: 1163267.68
+        isHealthy:
+          type: boolean
+          example: true
+        isNotStalled:
+          type: boolean
+          example: true
+        isValidBlocksInc:
+          type: boolean
+          example: false
+        isLastPending:
+          type: boolean
+          example: false
+    ChainInput:
+      description: Chain Input Info
+      required:
+        - src
+        - label
+        - balances
+        - args
+        - members
+      properties:
+        src:
+          type: string
+        contract:
+          type: string
+        label:
+          type: string
+        balances:
+          items:
+            $ref: "#/components/schemas/NamedTuple"
+          type: array
+        args:
+          additionalProperties:
+            $ref: "#/components/schemas/SolidityArgumentValue"
+          type: object
+        members:
+          items:
+            $ref: "#/components/schemas/NamedTuple"
+          type: array
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      example:
+        args:
+          removeRule: AUTO_APPROVE
+          addRule: AUTO_APPROVE
+        balances:
+          - balance: 20000000
+            address: 5815b9975001135697b5739956b9a6c87f1c575c
+          - balance: 999999
+            address: 93fdd1d21502c4f87295771253f5b71d897d911c
+        members:
+          - access: true
+            orgUnit: Unit1
+            commonName: John Doe
+            orgName: Org1
+          - access: true
+            orgUnit: Unit2
+            commonName: Jane Doe
+            orgName: Org2
+        contract: Governance
+        src: contract Governance { enum Rule { AUTO_APPROVE, TWO_VOTES_IN,
+          MAJORITY_RULES } Rule addRule; Rule removeRule; Rule terminateRule;
+          event OrganizationAdded(string orgName, string orgUnit, string commonName, 
+          bool true); event OrganizationRemoved(string orgName, string orgUnit, 
+          string commonName, false); event ChainTerminated(); struct MemberVotes {
+          chainMember member; uint votes; }   struct chainMember {string o, string u,
+          string c, string a} MemberVotes[] addVotes; MemberVotes[] removeVotes; 
+          uint terminateVotes; voteToAdd(string o, string u, string c, bool a)
+          { OrganizationAdded(o,u,c,a); } function voteToRemove(string o, string u,
+           string c, bool a) { OrganizationRemoved(o,u,c,a); } function voteToTerminate() { terminateVotes++; if
+          (satisfiesRule(terminateRule, terminateVotes)) { ChainTerminated(); }
+          function satisfiesRule(Rule rule, uint votes) returns (bool) { if
+          (rule == Rule.AUTO_APPROVE) { return true; } else if (rule ==
+          Rule.TWO_VOTES_IN) { return votes >= 2; } else { return true; } } }
+        metadata:
+          history: Governance
+        label: my chain
+      type: object
+    NamedTuple:
+      description: chainid and chaininfo pair
+      example:
+        id: ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781
+        info:
+          signature:
+            r: "0"
+            s: "0"
+            v: 1b
+          accountInfo:
+            - balance: 2000
+              address: 5815b9975001135697b5739956b9a6c87f1c575c
+            - balance: 400000
+              address: 93fdd1d21502c4f87295771253f5b71d897d911c
+          members:
+            - access: true
+              orgUnit: Unit1
+              commonName: John Doe
+              orgName: Org1
+            - access: true
+              orgUnit: Unit2
+              commonName: Jane Doe
+              orgName: Org2
+          metadata:
+            {}
+          creationBlock: "0000000000000000000000000000000000000000000000000000000000000000"
+          codeInfo:
+            []
+          label: myChain
+          nonce: 5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+      minItems: 2
+      items:
+        anyOf:
+          - $ref: "#/components/schemas/ChainId"
+          - $ref: "#/components/schemas/ChainInfo"
+      maxItems: 2
+      type: string
+    PostBlocTransactionRequest:
+      description: Post Bloc Transaction Request
+      required:
+        - txs
+      properties:
+        address:
+          $ref: "#/components/schemas/Address"
+        txs:
+          items:
+            $ref: "#/components/schemas/BlocTransactionPayload"
+          type: array
+        txParams:
+          $ref: "#/components/schemas/TransactionParameters"
+      example:
+        address: 00000000000000000000000000000000deadbeef
+        txs:
+          - payload:
+              toAddress: "0000000000000000000000000000000012345678"
+              value: "600"
+              metadata:
+                purpose: groceries
+                VM: SolidVM
+            type: TRANSFER
+        txParams:
+          gasLimit: 1000000
+          gasPrice: 1
+          nonce: 0
+      type: object
+    BlocTransactionPayload:
+      description: Bloc Transaction Payload
+      properties:
+        BlocTransfer:
+          $ref: "#/components/schemas/TransferPayload"
+        BlocContract:
+          $ref: "#/components/schemas/ContractPayload"
+        BlocFunction:
+          $ref: "#/components/schemas/FunctionPayload"
+      example:
+        payload:
+          args:
+            _x: 1
+          src: contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x
+            = _x; } function set(uint _x) { x = _x; } }
+        type: CONTRACT
+      maxProperties: 1
+      minProperties: 1
+      type: object
+    TransferPayload:
+      description: Transfer Payload
+      required:
+        - toAddress
+        - value
+      properties:
+        toAddress:
+          $ref: "#/components/schemas/Address"
+        value:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      example:
+        toAddress: 00000000000000000000000000000000deadbeef
+        value: "1000000"
+      type: object
+    ContractPayload:
+      description: Contract Payload
+      required:
+        - src
+      properties:
+        src:
+          type: string
+        contract:
+          type: string
+        args:
+          additionalProperties:
+            $ref: "#/components/schemas/SolidityArgumentValue"
+          type: object
+        value:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      example:
+        args:
+          _x: 1
+        src: contract SimpleStorage { uint x; function SimpleStorage(uint _x) { x =
+          _x; } function set(uint _x) { x = _x; } }
+      type: object
+    FunctionPayload:
+      description: Function Payload
+      required:
+        - contractName
+        - contractAddress
+        - method
+        - args
+      properties:
+        contractName:
+          $ref: "#/components/schemas/ContractName"
+        contractAddress:
+          $ref: "#/components/schemas/Address"
+        method:
+          type: string
+        args:
+          additionalProperties:
+            $ref: "#/components/schemas/SolidityArgumentValue"
+          type: object
+        value:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      example:
+        contractAddress: 00000000000000000000000000000000deadbeef
+        args:
+          _x: 5
+        contractName: SimpleStorage
+        method: set
+      type: object
+    ContractName:
+      description: The name of the smart contract.
+      example: MySmartContract
+      type: string
+    Transaction:
+      description: A transaction
+      required:
+        - transactionType
+        - hash
+        - gasLimit
+        - gasPrice
+        - from
+        - value
+        - r
+        - s
+        - v
+        - nonce
+        - origin
+      properties:
+        transactionType:
+          $ref: "#/components/schemas/TransactionType"
+        hash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        gasLimit:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        codeOrData:
+          type: string
+        gasPrice:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        to:
+          $ref: "#/components/schemas/Address"
+        from:
+          $ref: "#/components/schemas/Address"
+        value:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        fromBlock:
+          type: boolean
+        blockNumber:
+          maximum: 9223372036854776000
+          minimum: -9223372036854776000
+          type: integer
+        r:
+          $ref: "#/components/schemas/hex_natural"
+        s:
+          $ref: "#/components/schemas/hex_natural"
+        v:
+          $ref: "#/components/schemas/hex_word8"
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+        timestamp:
+          $ref: "#/components/schemas/UTCTime"
+        nonce:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        origin:
+          type: string
+        chainId:
+          $ref: "#/components/schemas/ChainId"
+      example:
+        transactionType: Transfer
+        origin: API
+        hash: 6b0d5d3309777e2e799976ea377ce6aeb4a485b1e7cae56f41a85ada9855fb99
+        gasLimit: "90000000"
+        codeOrData: ""
+        gasPrice: "50000000000"
+        to: 00000000000000000000000000000000deadbeef
+        value: "154"
+        from: 000000000000000000000000000000000000abba
+        fromBlock: "True"
+        blockNumber: 342
+        r: a90ee66c8faf6ce19a5e0496fc809cc1d6984d8636afc9c8a8b2ac381cabc014
+        s: 5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+        timestamp: 2017-05-26 23:59:37115 UTC
+        v: 1c
+        nonce: "123"
+      type: object
+    TransactionType:
+      description: The type of transaction to
+      type: string
+      enum:
+        - CONTRACT
+        - FUNCTION
+        - TRANSFER
+    AWSTime:
+      example: 2021-11-18T20:05:38.000Z
+      format: yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+      type: string
+    UTCTime:
+      example: 2016-07-22T00:00:00Z
+      format: yyyy-mm-ddThh:MM:ssZ
+      type: string
+    Account:
+      description: An account
+      required:
+        - address
+        - nonce
+        - kind
+        - balance
+        - contractRoot
+        - code
+        - codeHash
+        - latestBlockNum
+      properties:
+        address:
+          $ref: "#/components/schemas/Address"
+        nonce:
+          $ref: "#/components/schemas/Nonce"
+        kind:
+          type: string
+        balance:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+        contractRoot:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        code:
+          type: string
+        codeHash:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        chainId:
+          $ref: "#/components/schemas/ChainId"
+        latestBlockNum:
+          minimum: 0
+          exclusiveMinimum: false
+          type: integer
+      example:
+        contractRoot: 64e604787cbf194841e7b68d7cd28786f6c9a0a3ab9f8b0a0e87cb4387ab0107
+        kind: AddressStateRef
+        balance: "123"
+        address: 00000000000000000000000000000000deadbeef
+        latestBlockNum: 23
+        codeHash: 157dbaa9b67adce425ab2c9398f1017944d4b898aabab5a9d4507b3ae11afc61
+        code: 60606040526000357c01000000000000000000000000000000000000000000000000000000009004806360fe47b11460415780636d4ce63c14605757603f565b005b605560048080359060200190919050506078565b005b606260048050506086565b6040518082815260200191505060405180910390f35b806000600050819055505b50565b600060006000505490506094565b9056
+        nonce: 42
+      type: object
+    Nonce:
+      description: Numeric Nonce
+      example: 1
+      type: integer
+    ChainSignature:
+      description: ChainSignature
+      required:
+        - r
+        - s
+        - v
+      properties:
+        r:
+          $ref: "#/components/schemas/hex_natural"
+        s:
+          $ref: "#/components/schemas/hex_natural"
+        v:
+          $ref: "#/components/schemas/hex_word8"
+      example:
+        r: "0"
+        s: "0"
+        v: 1b
+      type: object
+    ChainInfo:
+      description: ChainInfo
+      required:
+        - info
+      properties:
+        info:
+          $ref: "#/components/schemas/UnsignedChainInfo"
+        signature:
+          $ref: "#/components/schemas/ChainSignature"
+      example:
+        signature:
+          r: "0"
+          s: "0"
+          v: 1b
+        accountInfo:
+          - balance: 2000
+            address: 5815b9975001135697b5739956b9a6c87f1c575c
+          - balance: 400000
+            address: 93fdd1d21502c4f87295771253f5b71d897d911c
+        members:
+          - access: true
+            orgUnit: Unit1
+            commonName: John Doe
+            orgName: Org1
+          - access: true
+            orgUnit: Unit2
+            commonName: Jane Doe
+            orgName: Org2
+        metadata:
+          {}
+        creationBlock: "0000000000000000000000000000000000000000000000000000000000000000"
+        codeInfo:
+          []
+        label: myChain
+        nonce: 5a5e4ac0d5b1d8cde2662075ee00ecd2da47faae2729252c92237057c6e5b32a
+      type: object
+    UnsignedChainInfo:
+      description: UnsignedChainInfo
+      required:
+        - label
+        - info
+        - block
+        - nonce
+        - metadata
+      properties:
+        label:
+          type: string
+        info:
+          items:
+            $ref: "#/components/schemas/CodeInfo"
+          type: array
+        chain:
+          $ref: "#/components/schemas/ChainId"
+        block:
+          $ref: "#/components/schemas/Keccak256_hash-32_byte_hex_encoded_string"
+        nonce:
+          $ref: "#/components/schemas/Word256"
+        metadata:
+          additionalProperties:
+            type: string
+          type: object
+      minItems: 1
+      items:
+        items:
+          $ref: "#/components/schemas/NamedTuple"
+        type: array
+      maxItems: 1
+      type: object
+    CodeInfo:
+      description: Code Info
+      example:
+        name: ContractName
+        src: ContractSrc
+        code: ContractBin
+      type: integer
+    Word256:
+      description: Fixed-size words of 256 bits
+      example: ec41a0a4da1f33ee9a757f4fd27c2a1a57313353375860388c66edc562ddc781
+      type: string
+    contract:
+      properties:
+        id:
+          format: integer
+          type: integer
+          description: |-
+            Note:
+            This is a Primary Key.
+        codeHash:
+          format: text
+          type: string
+        contract:
+          format: text
+          type: string
+        abi:
+          format: text
+          type: string
+        chainId:
+          format: text
+          type: string
+      type: object
