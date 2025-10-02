@@ -1362,7 +1362,7 @@ contract Describe_CDPEngine {
         
         (uint256 collateral, uint256 _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            collateral == 
+            collateral ==
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 1: Engine and CDPVault should be in sync after deposit"
         );
@@ -1378,7 +1378,7 @@ contract Describe_CDPEngine {
         
         (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            collateral == 
+            collateral ==
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 2: Engine and CDPVault should be in sync after mint"
         );
@@ -1393,7 +1393,7 @@ contract Describe_CDPEngine {
         
         (collateral, _) = cdpEngine.vaults(address(this), collateralTokenAddress);
         require(
-            collateral == 
+            collateral ==
             cdpVault.userCollaterals(address(this), collateralTokenAddress),
             "Step 3: Engine and CDPVault should be in sync after withdrawMax"
         );
