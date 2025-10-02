@@ -68,6 +68,11 @@ const ActivityFeedFilters = memo(({
     ? eventNames.filter(event => event.contract === filters.contract_name)
     : eventNames;
 
+  // Deduplicate event names to prevent "DepositedDeposited" when "All Contracts" is selected
+  const uniqueEventNames = Array.from(
+    new Map(availableEvents.map(event => [event.name, event])).values()
+  );
+
   return (
     <div className="mb-4 sm:mb-6 p-3 sm:p-4 border rounded-lg bg-gray-50">
       <div className="flex items-center gap-2 mb-2 sm:mb-3">
@@ -118,7 +123,7 @@ const ActivityFeedFilters = memo(({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Events</SelectItem>
-              {availableEvents.map((event) => (
+              {uniqueEventNames.map((event) => (
                 <SelectItem key={`${event.contract}-${event.name}`} value={event.name}>
                   {event.name}
                 </SelectItem>
