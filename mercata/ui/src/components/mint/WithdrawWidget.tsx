@@ -18,6 +18,7 @@ import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
 import { WITHDRAW_USDST_FEE } from "@/lib/constants";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import { api } from "@/lib/axios";
 
 const WithdrawWidget: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -42,6 +43,9 @@ const WithdrawWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
+  const [safeLiquidity, setSafeLiquidity] = useState<string | null>(null);
+  const [safeLiquidityLoading, setSafeLiquidityLoading] = useState(false);
+  const [safeLiquidityError, setSafeLiquidityError] = useState<string | null>(null);
 
   // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
   const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
@@ -78,20 +82,82 @@ const WithdrawWidget: React.FC = () => {
     fetchRedeemableTokens(networkConfig.chainId);
   }, [selectedNetwork, availableNetworks, fetchRedeemableTokens]);
 
+  // Fetch Safe liquidity when network or token changes
+  useEffect(() => {
+    const fetchSafeLiquidity = async () => {
+      if (!selectedNetwork || !selectedMintToken) {
+        setSafeLiquidity(null);
+        setSafeLiquidityError(null);
+        return;
+      }
+
+      const networkConfig = availableNetworks.find(n => n.chainName === selectedNetwork);
+      if (!networkConfig) return;
+
+      setSafeLiquidityLoading(true);
+      setSafeLiquidityError(null);
+
+      try {
+        const response = await api.get(
+          `/safe/liquidity/${networkConfig.chainId}/${selectedMintToken.externalToken}`
+        );
+        
+        if (response.data?.balance) {
+          // Convert external token balance to USDST equivalent (assuming 1:1 for stablecoins)
+          // The balance is in wei format with external token decimals
+          const externalDecimals = parseInt(selectedMintToken.externalDecimals) || 18;
+          const balanceWei = BigInt(response.data.balance);
+          
+          // Convert to 18 decimals (USDST standard) if needed
+          let adjustedBalance: bigint;
+          if (externalDecimals < 18) {
+            // Scale up (e.g., USDC 6 decimals -> 18 decimals)
+            adjustedBalance = balanceWei * BigInt(10 ** (18 - externalDecimals));
+          } else if (externalDecimals > 18) {
+            // Scale down (unlikely but handle it)
+            adjustedBalance = balanceWei / BigInt(10 ** (externalDecimals - 18));
+          } else {
+            // Same decimals
+            adjustedBalance = balanceWei;
+          }
+
+          setSafeLiquidity(adjustedBalance.toString());
+        } else {
+          setSafeLiquidity(null);
+        }
+      } catch (error: any) {
+        // Don't block withdrawal if liquidity check fails
+        // User can still attempt withdrawal
+        setSafeLiquidityError(error?.response?.data?.error?.message || "Liquidity data unavailable");
+        setSafeLiquidity(null);
+      } finally {
+        setSafeLiquidityLoading(false);
+      }
+    };
+
+    fetchSafeLiquidity();
+  }, [selectedNetwork, selectedMintToken, availableNetworks]);
+
   const maxAmount = useMemo(() => {
     const usdstBalanceWei = usdstBalance || "0";
     const maxTransferable = computeMaxTransferable(usdstBalanceWei, true, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_USDST_FEE).toString(), setFeeError);
     
+    let finalMax = BigInt(maxTransferable);
+    
     // Apply token max per transaction limit if it exists
     if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx !== "0") {
       const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerTx, 18);
-      const maxTransferableBigInt = BigInt(maxTransferable);
-      const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
-      return finalMax.toString();
+      finalMax = finalMax < tokenMaxBigInt ? finalMax : tokenMaxBigInt;
     }
     
-    return maxTransferable;
-  }, [selectedMintToken, usdstBalance, voucherBalance]);
+    // Apply Safe liquidity limit if available
+    if (safeLiquidity && safeLiquidity !== "0") {
+      const safeLiquidityBigInt = BigInt(safeLiquidity);
+      finalMax = finalMax < safeLiquidityBigInt ? finalMax : safeLiquidityBigInt;
+    }
+    
+    return finalMax.toString();
+  }, [selectedMintToken, usdstBalance, voucherBalance, safeLiquidity]);
 
   const handleWithdraw = async () => {
     if (!selectedMintToken || !selectedNetwork || !address) return;
@@ -216,6 +282,27 @@ const WithdrawWidget: React.FC = () => {
           <span>Outcome</span>
           <span className="font-medium">{amount || "0.00"} {selectedMintToken?.externalSymbol || "withdrawn"} to {selectedNetwork || "external network"}</span>
         </div>
+        {selectedMintToken && selectedNetwork && (
+          <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+            <span className="font-medium text-blue-700">Available Liquidity</span>
+            <span className="font-semibold text-blue-700">
+              {safeLiquidityLoading ? (
+                "Loading..."
+              ) : safeLiquidityError ? (
+                <span className="text-yellow-600 text-xs">{safeLiquidityError}</span>
+              ) : safeLiquidity ? (
+                `${formatBalance(safeLiquidity, undefined, 18, 2, 2)} ${selectedMintToken.externalSymbol}`
+              ) : (
+                "N/A"
+              )}
+            </span>
+          </div>
+        )}
+        {safeLiquidity && !safeLiquidityLoading && !safeLiquidityError && (
+          <p className="text-xs text-gray-500 italic">
+            Maximum withdrawal limited by Safe reserves on {selectedNetwork}
+          </p>
+        )}
       </div>
 
       <div className="flex justify-end">

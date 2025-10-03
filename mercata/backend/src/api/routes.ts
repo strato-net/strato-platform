@@ -13,6 +13,7 @@ import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
 import cdpRoutes from "./routes/cdp.routes";
+import safeRoutes from "./routes/safe.routes";
 
 const router = Router();
 
@@ -52,6 +53,9 @@ router.use("/bridge", bridgeRoutes);
 
 // ----- CDP Routes -----
 router.use("/cdp", cdpRoutes);
+
+// ----- Safe Routes -----
+router.use("/safe", safeRoutes);
 
 // ----- Health Check -----
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {
