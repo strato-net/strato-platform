@@ -8,58 +8,77 @@ import {
   resetOauthUserAccount,
   oauthAccountsFilter
 } from './oauthAccounts.actions';
+import { fetchCertificate } from '../../accounts.actions';
 // import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 
 class OauthAccounts extends Component {
 
   constructor() {
     super()
-    this.state = {
-      selected: -1
-    }
+    this.state = { selected: -1 }
   }
 
-  updateFilter(filter) {
+  updateFilter = (filter) => {
     this.props.oauthAccountsFilter(filter);
-  };
+  }
 
-  onUserClick(user, index) {
-    if (user && index === this.state.selected) {
+  onUserClick = (user, index) => {
+    const { certificates, certificateLoading } = this.props;
+    
+    if (index === this.state.selected) {
       this.props.resetOauthUserAccount(user);
-      this.setState({ selected: null });
+      this.setState({ selected: -1 });
     } else {
-      // mixpanelWrapper.track('accounts_row_click');
+      // Load certificate lazily if not cached or loading
+      if (!certificates[user.address] && !certificateLoading[user.address]) {
+        this.props.fetchCertificate(user.address);
+      }
+      
       this.props.fetchOauthAccountDetail(user.commonName, user.userAddress, this.props.selectedChain);
+      this.setState({ selected: index });
     }
   }
 
   render() {
     const filter = this.props.filter;
 
-    const rows = this.props.oauthAccounts.filter(user => {
-      if (!user || user === undefined) {
-        return false;
-      }
-      if (!filter) {
-        return true;
-      }
-      return user.commonName.toLowerCase().indexOf(filter) > -1
-    })
+    const rows = this.props.oauthAccounts.filter(user => 
+      user && (!filter || (user.commonName && user.commonName.toLowerCase().includes(filter)))
+    )
       .map(function (user, index) {
         const position = index + 1;
         let userClasseName = '';
         if (this.state.selected === position) {
           userClasseName = ' selected';
         }
-        // change this
+        
+        // Get certificate info for this user
+        const certificate = this.props.certificates[user.address];
+        const isLoading = this.props.certificateLoading[user.address];
+        
+        // Show user data based on what's available  
+        let displayName = user.commonName || user.username || user.address;
+        let displayOrg = '';
+        
+        // Use certificate data if available
+        if (certificate) {
+          displayName = certificate.commonName || user.commonName || user.username || user.address;
+          displayOrg = certificate.organization || '';
+        }
+        
+        // Show loading state only when actively loading certificate for clicked user
+        const loadingIndicator = isLoading ? ' (Loading details...)' : '';
+        
+        // Format display text exactly as before
+        const displayText = displayOrg 
+          ? `${displayName} - ${displayOrg}${loadingIndicator}`
+          : `${displayName}${loadingIndicator}`;
+        
         return (
-          <div className="smd-margin-8" key={user.commonName}>
+          <div className="smd-margin-8" key={user.address}>
             <div className="row">
-              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={(e) => {
-                this.setState({ selected: position });
-                this.onUserClick(user, position);
-              }}>
-                {user.commonName} - {user.organization}
+              <div className={`pt-card pt-elevation-2 smd-pointer ${userClasseName}`} key={position} onClick={() => this.onUserClick(user, position)}>
+                {displayText}
               </div>
             </div>
           </div>
@@ -95,16 +114,13 @@ class OauthAccounts extends Component {
           <div className="row">
             <div className="col-sm-4 main-div">
               <div className="accounts-margin-top">
-                {rows.length === 0
-                  ?
+                {rows.length === 0 ? (
                   <table>
                     <tbody>
-                      <tr>
-                        <td colSpan={3}>No Users</td>
-                      </tr>
+                      <tr><td colSpan={3}>No Users</td></tr>
                     </tbody>
                   </table>
-                  : rows}
+                ) : rows}
               </div>
             </div>
             <div className="col-sm-8 account-details">
@@ -124,7 +140,9 @@ export function mapStateToProps(state) {
     oauthAccounts: state.accounts.oauthAccounts,
     filter: state.oauthAccounts.filter,
     selectedChain: state.chains.selectedChain,
-    oauthAccount: state.oauthAccounts.account
+    oauthAccount: state.oauthAccounts.account,
+    certificates: state.accounts.certificates,
+    certificateLoading: state.accounts.certificateLoading
   };
 }
 
@@ -133,6 +151,7 @@ export default withRouter(
     {
       fetchOauthAccountDetail,
       resetOauthUserAccount,
-      oauthAccountsFilter
+      oauthAccountsFilter,
+      fetchCertificate
     }
   )(OauthAccounts));

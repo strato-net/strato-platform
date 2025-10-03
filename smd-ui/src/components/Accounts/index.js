@@ -2,6 +2,7 @@ import React, { Component } from 'react';
 import {
   fetchAccounts,
   fetchOauthAccounts,
+  fetchCertificate,
 } from './accounts.actions';
 // import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
@@ -72,6 +73,7 @@ export default withRouter(
   connect(mapStateToProps,
     {
       fetchOauthAccounts,
-      fetchAccounts
+      fetchAccounts,
+      fetchCertificate
     }
   )(Accounts));
