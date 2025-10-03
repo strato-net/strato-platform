@@ -218,38 +218,25 @@ sqlTypeSQLite SqlJsonb   = "jsonb"
 sqlTypeSQLite SqlSerial  = ""
 
 slipstreamQuerySQLite :: SlipstreamQuery -> [T.Text]
-slipstreamQuerySQLite (CreateTable tableName cols pk mUc) = [T.concat
-  [ "CREATE TABLE IF NOT EXISTS ",
-    tableNameToDoubleQuoteText tableName,
-    " (",
-    csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeSQLite t) <$> cols,
-    case pk of
+slipstreamQuerySQLite (CreateTable tableName cols pk mTC) = [T.concat
+  [ "CREATE TABLE IF NOT EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , " ("
+  , csv $ (\(c,t) -> wrapEscapeDouble c <> " " <> sqlTypeSQLite t) <$> cols
+  , case pk of
       [] -> ""
-      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk,
-    case mUc of
-      Nothing -> ""
-      Just (n, uc) -> T.concat
-        [
-          ", CONSTRAINT ",
-          wrapDoubleQuotes $ escapeQuotes n,
-          " UNIQUE ",
-          uc
-        ],
-    ");"
+      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk
+  , case mTC of
+      Just (Unique n uc) -> T.concat
+        [ ", CONSTRAINT "
+        , wrapEscapeDouble n
+        , " UNIQUE "
+        , uc
+        ]
+      _ -> ""
+  , ");"
   ]]
-slipstreamQuerySQLite (AlterTableAddColumns tableName cols) = (\(c,t) -> T.concat
-  [ "ALTER TABLE ",
-    tableNameToDoubleQuoteText tableName,
-    " ADD COLUMN ",
-    wrapDoubleQuotes (escapeDoubleQuotes c),
-    " ",
-    sqlTypeSQLite t,
-    ";"
-  ]) <$> cols
-slipstreamQuerySQLite AlterTableAddForeignKey{} = []
-slipstreamQuerySQLite AlterTableAddPrimaryKey{} = []
-slipstreamQuerySQLite NotifyPostgREST = []
-slipstreamQuerySQLite sq = [slipstreamQueryText sqlTypeSQLite sq]
+slipstreamQuerySQLite _ = []
 
 lookupLDB :: (MonadIO m, Binary k, Binary v) => (r -> LDB.DB) -> k -> ReaderT r m (Maybe v)
 lookupLDB getDB k = do

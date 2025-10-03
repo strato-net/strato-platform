@@ -16,6 +16,8 @@
 
 module Blockchain.Slipstream.OutputData (
   SqlType(..),
+  TableConstraint(..),
+  OnConflict(..),
   sqlTypePostgres,
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
