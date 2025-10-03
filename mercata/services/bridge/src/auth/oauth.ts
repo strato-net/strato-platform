@@ -91,6 +91,20 @@ class OAuthUtil {
       try {
         result = await this.oauth2.getToken(tokenParams) as OAuthTokenResult;
       } catch (error: any) {
+        console.error(`[OAuth Debug] oauth2.getToken() failed:`, {
+          errorMessage: error?.message,
+          errorCode: error?.code,
+          hasResponse: !!error?.response,
+          statusCode: error?.response?.status,
+          statusText: error?.response?.statusText,
+          contentType: error?.response?.headers?.["content-type"],
+          responseDataType: typeof error?.response?.data,
+          responseDataPreview: error?.response?.data ? 
+            (typeof error?.response?.data === 'string' ? 
+              error.response.data.substring(0, 300) : 
+              JSON.stringify(error.response.data).substring(0, 300)
+            ) : 'No response data'
+        });
         throw new Error(`Error obtaining token. Result: ${result}; Error: ${error?.message}`);
       }
       // Ensure all numeric values are properly converted
@@ -105,10 +119,26 @@ class OAuthUtil {
         token: tokenData,
       };
     } catch (error: any) {
+      console.error(`[OAuth Debug] Final error handler triggered:`, {
+        errorMessage: error?.message,
+        errorName: error?.name,
+        errorCode: error?.code,
+        hasResponse: !!error?.response,
+        statusCode: error?.response?.status,
+        statusText: error?.response?.statusText,
+        responseHeaders: error?.response?.headers,
+        responseDataType: typeof error?.response?.data,
+        responseDataFull: error?.response?.data,
+        stackTrace: error?.stack
+      });
+      
       // Check if it's an axios error with response data
       if (error.response?.data) {
         const contentType = error.response.headers["content-type"] || "";
+        console.error(`[OAuth Debug] Processing HTTP response error - Content-Type: ${contentType}`);
+        
         if (!contentType.includes("application/json")) {
+          console.error(`[OAuth Debug] Non-JSON response detected!`);
           throw new Error(
             `OAuth endpoint returned non-JSON content (${contentType}). Response: ${error.response.data.substring(0, 200)}...`,
           );
