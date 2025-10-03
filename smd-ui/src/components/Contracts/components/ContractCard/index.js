@@ -26,7 +26,11 @@ class ContractCard extends Component {
       this.props.contract.contract.instances.some(instance => 
         instance.address.toLowerCase() === this.props.contract.searchTerm.toLowerCase()
       );
-    this.state = { isOpen: hasSearchMatch };
+    this.state = { 
+      isOpen: hasSearchMatch,
+      instanceLimit: 10,
+      instanceOffset: 0
+    };
   }
 
   componentWillMount(){
@@ -39,6 +43,22 @@ class ContractCard extends Component {
       this.props.selectContractInstance(name, searchTerm);
     }
   }
+
+  onNextInstanceClick = () => {
+    const { instanceOffset, instanceLimit } = this.state;
+    const newOffset = instanceOffset + instanceLimit;
+    this.setState({ instanceOffset: newOffset });
+  };
+
+  onPrevInstanceClick = () => {
+    const { instanceOffset, instanceLimit } = this.state;
+    const newOffset = Math.max(0, instanceOffset - instanceLimit);
+    this.setState({ instanceOffset: newOffset });
+  };
+
+  resetInstancePagination = () => {
+    this.setState({ instanceOffset: 0 });
+  };
 
   render() {
     let cardData = [];
@@ -60,7 +80,12 @@ class ContractCard extends Component {
       ) :
       instances.filter(instance => re.test(instance.address));
 
-    filteredInstances
+    // Paginate instances for current contract
+    const { instanceOffset, instanceLimit } = this.state;
+    const totalInstances = filteredInstances.length;
+    const paginatedInstances = filteredInstances.slice(instanceOffset, instanceOffset + instanceLimit);
+
+    paginatedInstances
       .forEach(function (instance, index) {
         cardData.push(
           <tr
@@ -218,7 +243,8 @@ class ContractCard extends Component {
                         this.props.selectContractInstance(name, null);
                       }
                       this.setState({
-                        isOpen: !this.state.isOpen
+                        isOpen: !this.state.isOpen,
+                        instanceOffset: 0  // Reset instance pagination when toggling
                       })
                     }}
                   >
@@ -241,6 +267,42 @@ class ContractCard extends Component {
                     <tbody>{cardData}</tbody>
                   </table>
                 </Collapse>
+                {/* Instance Pagination Controls */}
+                {this.state.isOpen && totalInstances > instanceLimit && (
+                  <div className="col-sm-12 pt-dark mt-2">
+                    <div className="row">
+                      <div className="col-sm-3 text-left">
+                        <Button
+                          onClick={this.onPrevInstanceClick}
+                          className="pt-icon-arrow-left"
+                          text="Previous"
+                          disabled={!(instanceOffset > 0)}
+                        />
+                      </div>
+                      <div className="col-sm-6 text-center" style={{ marginTop: '22px' }}>
+                        {`Instances ${instanceOffset + 1}-${Math.min(instanceOffset + instanceLimit, totalInstances)} (${totalInstances} Total)`}
+                      </div>
+                      <div className="col-sm-3 text-right">
+                        <Button
+                          onClick={this.onNextInstanceClick}
+                          className="pt-icon-arrow-right"
+                          text="Next"
+                          disabled={instanceOffset + instanceLimit >= totalInstances}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* Show instance count for contracts with instances but less than limit */}
+                {this.state.isOpen && totalInstances > 0 && totalInstances <= instanceLimit && (
+                  <div className="col-sm-12 pt-dark mt-2">
+                    <div className="row">
+                      <div className="col-sm-12 text-center">
+                        {`${totalInstances} Instance${totalInstances !== 1 ? 's' : ''}`}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
