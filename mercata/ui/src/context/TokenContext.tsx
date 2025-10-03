@@ -67,11 +67,13 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
+  // Only ACTIVE tokens with positive balance; PENDING and LEGACY tokens are excluded
   const getUserTokensWithBalance = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
     try {
       const res = await api.get<Token[]>(`/tokens/balance?value=gt.0`);
-      return res.data || [];
+      const activeTokens = (res.data || []).filter(token => token.status === '2');
+      return activeTokens;
     } catch (err) {
       return [];
     } finally {
