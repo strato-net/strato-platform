@@ -22,6 +22,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
      */
     function setAssetPrice(address asset, uint256 price) external onlyOwner {
         require(asset != address(0), "Invalid asset address");
+        require(price >= 0, "Price must be non-negative");
         
         prices[asset] = price;
         lastUpdated[asset] = block.timestamp;
@@ -38,6 +39,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         
         for (uint256 i = 0; i < assets.length; i++) {
             require(assets[i] != address(0), "Invalid asset address");
+            require(priceValues[i] >= 0, "Price must be non-negative");
             
             prices[assets[i]] = priceValues[i];
             lastUpdated[assets[i]] = block.timestamp;

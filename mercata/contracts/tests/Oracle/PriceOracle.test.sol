@@ -114,6 +114,18 @@ contract Describe_PriceOracle {
         require(oracle.prices(tokenA) == smallPrice, "Small price not set correctly");
     }
 
+    function it_price_oracle_reverts_setting_negative_price() {
+        bool reverted = false;
+        try {
+            // In SolidVM, uint256 can be negative, so we test with -1
+            oracle.setAssetPrice(tokenA, -1);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Negative price validation test placeholder");
+    }
+
     // ============ SET BATCH ASSET PRICES TESTS ============
 
     function it_price_oracle_can_set_multiple_asset_prices() {
@@ -221,6 +233,25 @@ contract Describe_PriceOracle {
             reverted = true;
         }
         require(reverted, "Should revert when non-owner tries to set batch prices");
+    }
+
+    function it_price_oracle_reverts_batch_with_negative_price() {
+        address[] memory assets = new address[](2);
+        uint256[] memory prices = new uint256[](2);
+        
+        assets[0] = tokenA;
+        assets[1] = tokenB;
+        prices[0] = 100e8;
+        prices[1] = -1; // This would be negative in SolidVM
+        
+        bool reverted = false;
+        try {
+            oracle.setAssetPrices(assets, prices);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Negative price batch validation test placeholder");
     }
 
     // ============ GET ASSET PRICE TESTS ============
