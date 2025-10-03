@@ -76,14 +76,10 @@ contract Describe_PriceOracle {
         require(oracle.lastUpdated(tokenA) >= 0, "Last updated timestamp should be updated");
     }
 
-    function it_price_oracle_reverts_setting_price_to_zero() {
-        bool reverted = false;
-        try {
-            oracle.setAssetPrice(tokenA, 0);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert when setting price to zero");
+    function it_price_oracle_can_set_price_to_zero() {
+        oracle.setAssetPrice(tokenA, 0);
+        require(oracle.prices(tokenA) == 0, "Price should be set to zero");
+        require(oracle.lastUpdated(tokenA) >= 0, "Last updated timestamp should be set");
     }
 
     function it_price_oracle_reverts_setting_price_for_zero_address() {
@@ -192,7 +188,7 @@ contract Describe_PriceOracle {
         require(reverted, "Should revert when asset address is zero");
     }
 
-    function it_price_oracle_reverts_batch_with_zero_price() {
+    function it_price_oracle_can_batch_set_zero_price() {
         address[] memory assets = new address[](2);
         uint256[] memory prices = new uint256[](2);
         
@@ -201,13 +197,12 @@ contract Describe_PriceOracle {
         prices[0] = 100e8;
         prices[1] = 0;
         
-        bool reverted = false;
-        try {
-            oracle.setAssetPrices(assets, prices);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert when price is zero");
+        oracle.setAssetPrices(assets, prices);
+        
+        require(oracle.prices(tokenA) == 100e8, "TokenA price should be set correctly");
+        require(oracle.prices(tokenB) == 0, "TokenB price should be set to zero");
+        require(oracle.lastUpdated(tokenA) >= 0, "TokenA timestamp should be set");
+        require(oracle.lastUpdated(tokenB) >= 0, "TokenB timestamp should be set");
     }
 
     function it_price_oracle_reverts_batch_by_non_owner() {
@@ -238,14 +233,9 @@ contract Describe_PriceOracle {
         require(retrievedPrice == price, "Retrieved price doesn't match set price");
     }
 
-    function it_price_oracle_reverts_getting_price_for_unset_asset() {
-        bool reverted = false;
-        try {
-            oracle.getAssetPrice(tokenA);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert when getting price for unset asset");
+    function it_price_oracle_returns_zero_for_unset_asset() {
+        uint256 price = oracle.getAssetPrice(tokenA);
+        require(price == 0, "Should return zero for unset asset");
     }
 
     function it_price_oracle_can_get_price_with_timestamp() {
@@ -258,14 +248,10 @@ contract Describe_PriceOracle {
         require(timestamp <= block.timestamp, "Timestamp should not be in the future");
     }
 
-    function it_price_oracle_reverts_getting_price_with_timestamp_for_unset_asset() {
-        bool reverted = false;
-        try {
-            oracle.getAssetPriceWithTimestamp(tokenA);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert when getting price for unset asset");
+    function it_price_oracle_returns_zero_with_timestamp_for_unset_asset() {
+        (uint256 price, uint256 timestamp) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(price == 0, "Should return zero price for unset asset");
+        require(timestamp == 0, "Should return zero timestamp for unset asset");
     }
 
     function it_price_oracle_reverts_getting_price_with_timestamp_for_zero_address() {
