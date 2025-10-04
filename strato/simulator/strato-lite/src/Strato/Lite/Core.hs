@@ -160,6 +160,7 @@ data CorePeer = CorePeer
   , _corePeerSlipstreamSource :: TQueue [VMEvent]
   , _corePeerNodeDataReqs :: TVar (Map MP.StateRoot (TMChan MP.NodeData))
   , _corePeerContext :: CoreContext
+  , _corePeerLoggingFunc :: Text -> LoggingT IO () -> IO ()
   }
 
 makeLenses ''CorePeer
@@ -621,17 +622,15 @@ instance {-# OVERLAPPING #-} (Monad m, RunsClient m) => RunsClient (CoreT m) whe
     c <- ask
     lift $ runClientConnection i p (transPipe (flip runReaderT c) a) (flip runReaderT c . f . transP2pConduits lift)
 
-instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m (LoggingT IO)) => RunsServer (MonadCoreP2P m) (LoggingT IO) where
+instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m) => RunsServer (MonadCoreP2P m) where
   runServer p runner f = runner $ \_ -> do
     c <- ask
-    liftIO . loggingFunc $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
-    pure ()
+    liftIO $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
 
-instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m (LoggingT IO)) => RunsServer (CoreT m) (LoggingT IO) where
+instance {-# OVERLAPPING #-} (MonadIO m, RunsServer m) => RunsServer (CoreT m) where
   runServer p runner f = runner $ \_ -> do
     c <- ask
-    liftIO . loggingFunc $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
-    pure ()
+    liftIO $ runServer p (\g -> runner $ \s -> lift . g $ transPipe (flip runReaderT c) s) (\a b -> flip runReaderT c $ f (transP2pConduits lift a) b)
 
 instance {-# OVERLAPPING #-} MonadBase m => HasSyncDB (CoreT m) where
   clearAllSyncTasks   = lift . clearAllSyncTasks
@@ -704,42 +703,52 @@ coreContextIO seqCtx vmCtx = do
 runMonad :: (m ~> BaseM) -> CorePeer -> CoreT m a -> BaseM a
 runMonad hoist p = hoist . flip runReaderT p
 
-runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> BaseM [Async ()]
+runNodeWithoutP2P :: MonadBase m => (m ~> BaseM) -> CorePeer -> IO [Async ()]
 runNodeWithoutP2P hoist p = do
-  tid <- liftIO myThreadId
+  tid <- myThreadId
   traverse (uncurry asyncOn) . zip [0..] $ nonP2pThreads hoist p tid
 
-runBackgroundThread :: (MonadUnliftIO m, MonadLogger m) => Text -> ThreadId -> m () -> m ()
-runBackgroundThread name tid f = catch f $ \(e :: SomeException) -> do
-  $logErrorS (name <> " ERROR") . T.pack $ show e
-  throwTo tid e
+runBase :: Text -> CorePeer -> BaseM () -> IO ()
+runBase name p f = do
+  let logF = (p ^. corePeerLoggingFunc) name
+  logF $ runResourceT f
 
-nonP2pThreads :: MonadBase m => (m ~> BaseM) -> CorePeer -> ThreadId -> [BaseM ()]
+runMonitored :: Text -> ThreadId -> CorePeer -> BaseM () -> IO ()
+runMonitored name tid p f = do
+  let logF = (p ^. corePeerLoggingFunc) name
+  catch (runBase name p f) $ \(e :: SomeException) -> logF $ do
+    $logErrorS (name <> " ERROR") . T.pack $ show e
+    throwTo tid e
+
+nonP2pThreads :: MonadBase m => (m ~> BaseM) -> CorePeer -> ThreadId -> [IO ()]
 nonP2pThreads hoist p tid =
-  [ runBackgroundThread "Sequencer"   tid $ runMonad hoist p corePeerSequencer
-  , runBackgroundThread "Seq Timer"   tid $ runMonad hoist p corePeerSeqTimerSource
-  , runBackgroundThread "VM"          tid $ runMonad hoist p corePeerVm
-  , runBackgroundThread "API Indexer" tid $ runMonad hoist p corePeerApiIndexer
-  , runBackgroundThread "P2P Indexer" tid $ runMonad hoist p corePeerP2pIndexer
-  , runBackgroundThread "Slipstream"  tid $ runMonad hoist p corePeerSlipstream
+  [ runMonitored "strato-sequencer"   tid p $ runMonad hoist p corePeerSequencer
+  , runMonitored "seq-timer"          tid p $ runMonad hoist p corePeerSeqTimerSource
+  , runMonitored "vm-runner"          tid p $ runMonad hoist p corePeerVm
+  , runMonitored "strato-api-indexer" tid p $ runMonad hoist p corePeerApiIndexer
+  , runMonitored "strato-p2p-indexer" tid p $ runMonad hoist p corePeerP2pIndexer
+  , runMonitored "slipstream"         tid p $ runMonad hoist p corePeerSlipstream
   ]
 
-runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> BaseM [Async ()]
+runNode :: MonadBase m => (m ~> BaseM) -> (m ~> m) -> CorePeer -> IO [Async ()]
 runNode hoist initDiscovery p = do
-  runMonad hoist p corePeerSetup
-  tid <- liftIO myThreadId
-  traverse (uncurry asyncOn) . zip [0..] $ runP2P tid : runEthDisc tid : nonP2pThreads hoist p tid
-  where runP2P tid = liftIO . loggingFunc . runBackgroundThread "STRATO P2P" tid $
-          stratoP2P (\f -> do
+  tid <- myThreadId
+  runMonitored "strato-setup" tid p $ runMonad hoist p corePeerSetup
+  flip catch wtf . traverse (uncurry asyncOn) . zip [0..] $ runP2P tid : runEthDisc tid : nonP2pThreads hoist p tid
+  where wtf (e :: SomeException) = runLoggingT $ do
+          $logErrorS "guh!" . T.pack $ show e
+          pure []
+        runP2P tid = runMonitored "strato-p2p" tid p . liftIO $
+          stratoP2P (\f -> runBase "strato-p2p" p $ do
             ctx <- newIORef (def :: P2PContext)
-            runResourceT . hoist . flip runReaderT p $ do
+            hoist . flip runReaderT p $ do
               let s = do
                     seqP2pSource <- lift . lift $ asks _corePeerSeqP2pSource
                     chan <- atomically $ dupTMChan seqP2pSource
                     sourceTMChan chan
               runReaderT (f s) ctx
           )
-        runEthDisc tid = liftIO . loggingFunc . runResourceT . runBackgroundThread "Ethereum Discovery" tid $
+        runEthDisc tid = runMonitored "ethereum-discover" tid p $
           ethereumDiscovery (\f -> do
             ctx <- newIORef (def :: P2PContext)
             hoist . initDiscovery . flip runReaderT p $ runReaderT (f 100) ctx
@@ -773,8 +782,9 @@ createCorePeer ::
   Validator ->
   GenesisInfo ->
   Bool ->
+  (Text -> LoggingT IO () -> IO ()) ->
   IO CorePeer
-createCorePeer network' name selfValidator genesisInfo valBehav = do
+createCorePeer network' name selfValidator genesisInfo valBehav logF = do
   unseqSource <- newTQueueIO
   seqP2pSource <- newBroadcastTMChanIO
   seqVmSource <- newTQueueIO
@@ -804,6 +814,7 @@ createCorePeer network' name selfValidator genesisInfo valBehav = do
       slipstreamSource
       nodeDataReqs
       coreContext
+      logF
 
 corePeerUnseqSink :: MonadBase m => [IngestEvent] -> CoreT m ()
 corePeerUnseqSink ies = do

@@ -192,8 +192,8 @@ class RunsClient m where
     (P2pConduits m -> m ()) ->
     m ()
 
-class RunsServer n m where
-  runServer :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> Host -> n ()) -> m ()
+class RunsServer m where
+  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> m ()) -> IO ()
 
 instance RunsClient ContextM where
   runClientConnection host' (TCPPort p) sSource handler = do
@@ -206,7 +206,7 @@ instance RunsClient ContextM where
         (handler conduits)
         (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
 
-instance RunsServer ContextM (LoggingT IO) where
+instance RunsServer ContextM where
   runServer (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
@@ -490,7 +490,7 @@ type MonadP2P m =
       m
   )
 
-type PeerRunner n m a = (ConduitM () P2pEvent n a -> n a) -> m a
+type PeerRunner m a = (ConduitM () P2pEvent m a -> m a) -> IO a
 
 getBlockHeaders :: Mod.Accessible [BlockHeader] m => m [BlockHeader]
 getBlockHeaders = Mod.access (Proxy @[BlockHeader])

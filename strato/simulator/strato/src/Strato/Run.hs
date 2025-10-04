@@ -125,7 +125,7 @@ runStrato runUI = do
               userRegistryCodeHash = Nothing,
               useWalletsByDefault = False
             }
-    as <- runFilesystemNode f c
+    as <- liftIO $ runFilesystemNode f c
     a <- liftIO . async $ Wai.run flags_backend_port $ app sqlitePath f c env M.empty
     let finalize = do
           putStrLn "Cancelling threads..."

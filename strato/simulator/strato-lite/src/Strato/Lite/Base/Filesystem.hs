@@ -145,7 +145,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => RunsClient (FilesystemT m) where
           conduits = P2pConduits pSource pSink sSource
       handler conduits
 
-instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) (LoggingT IO) where
+instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) where
   runServer (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do

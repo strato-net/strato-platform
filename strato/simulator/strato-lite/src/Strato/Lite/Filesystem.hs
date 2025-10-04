@@ -19,6 +19,7 @@
 
 module Strato.Lite.Filesystem where
 
+import BlockApps.Logging
 import BlockApps.X509.Certificate as X509
 import BlockApps.X509.Keys as X509
 import Blockchain.Data.BlockDB ()
@@ -50,6 +51,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.List (isPrefixOf)
+import qualified Data.Map.Strict as M
 import Data.Pool (withResource)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -57,6 +59,7 @@ import qualified Database.LevelDB as LDB
 import qualified Database.Persist.Sqlite as Lite
 import Executable.EVMFlags
 import Executable.EthDiscoverySetup (setupSQL)
+import GHC.Conc (retry)
 import Network.Socket as S
 import Strato.Lite.Base
 import Strato.Lite.Base.Filesystem
@@ -100,8 +103,9 @@ createFilesystemPeerAndCorePeer ::
   Bool ->
   Socket ->
   FilesystemDBs ->
+  (Text -> LoggingT IO () -> IO ()) ->
   IO (FilesystemPeer, CorePeer)
-createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs = do
+createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs logF = do
   bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
   genesisInfo' <- case network' of
     "mercata" -> pure Production.productionGenesisBlock
@@ -119,13 +123,16 @@ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myH
   B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo'
   genesisInfo <- getGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
-  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
+  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav logF
   pure (fsPeer, corePeer)
 
 hoistFilesystem :: FilesystemPeer -> (forall a. FilesystemT (ReaderT MemPeerDBEnv BaseM) a -> BaseM a)
 hoistFilesystem p f = runReaderT (runReaderT f p) (_filesystemPeerMap p)
 
-runFilesystemNode :: FilesystemPeer -> CorePeer -> BaseM [Async ()]
+runFilesystemNode
+  :: FilesystemPeer
+  -> CorePeer
+  -> IO [Async ()]
 runFilesystemNode p c = runNode (hoistFilesystem p) (\f ->
   bracket
     (connectMe $ _filesystemPeerUDPPort p)
@@ -147,9 +154,28 @@ createFilesystemNode ::
   m (FilesystemPeer, CorePeer)
 createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
   dir' <- resolvePath dir''
+  logsMapVar <- atomically $ newTVar M.empty
   let dir = dir' </> network' </> T.unpack name
+      logsDir = dir </> "logs"
+      logF logName f = do
+        mHandle <- atomically $ do
+          logsMap <- readTVar logsMapVar
+          case M.lookup logName logsMap of
+            Nothing -> do
+              modifyTVar logsMapVar $ M.insert logName Nothing
+              pure Nothing
+            Just Nothing -> retry
+            Just (Just h') -> pure $ Just h'
+        h <- case mHandle of
+          Just h' -> pure h'
+          Nothing -> do
+            h' <- openFile (logsDir </> T.unpack logName) AppendMode
+            atomically . modifyTVar logsMapVar . M.insert logName $ Just h'
+            pure h'
+        runLoggingTWithHandle h f
   privKey <- liftIO $ do
     createDirectoryIfMissing True dir
+    createDirectoryIfMissing True $ logsDir
     setCurrentDirectory dir
     privKeyFilePath <- resolvePath privKeyFile
     privBS <- catch (B.readFile privKeyFilePath) $ \(_ :: SomeException) -> do
@@ -195,4 +221,4 @@ createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPo
         , _kvDB = kvdb
         , _sqlPool = conn
         }
-  liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs
+  liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF
