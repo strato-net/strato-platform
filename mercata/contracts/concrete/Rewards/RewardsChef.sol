@@ -232,6 +232,7 @@ contract record RewardsChef is Ownable {
                 return;
             }
         }
+        require(_lpToken != address(rewardToken), "LP token cannot be the same as reward token");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
 
         totalAllocPoint += _allocPoint;

@@ -100,6 +100,23 @@ contract Describe_TokenPausable {
         require(chef.totalAllocPoint() == allocationPoints, "Total allocation points should match");
     }
 
+    function it_should_prevent_lp_token_being_same_as_reward_token() {
+        // given
+        uint256 allocationPoints = 1000;
+        uint256 multiplier = 1;
+
+        // when
+        bool reverted = false;
+        try chef.addPool(allocationPoints, address(rewardsToken), multiplier) {
+            // If we get here, the call didn't revert (which is a bug)
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        //then - should revert when trying to add pool with reward token as LP token
+        require(reverted, "Adding pool with LP token same as reward token should revert");
+    }
+
     function it_should_allow_updating_allocation_points() {
         // given
         uint256 initialAllocationPoints = 500;
