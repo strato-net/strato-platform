@@ -67,11 +67,15 @@ const socket = io(env.SOCKET_SERVER, { path: '/apex-ws', transports: ['websocket
 
 export function registerActions(eventChannelEmit, room, preloadAction, eventAction) {
   socket.on(`PRELOAD_${room}`, data => {
-    eventChannelEmit(preloadAction(data));
+    if (data && eventChannelEmit) {
+      eventChannelEmit(preloadAction(data));
+    }
   })
 
   socket.on(`EVENT_${room}`, data => {
-    eventChannelEmit(eventAction(data));
+    if (data && eventChannelEmit) {
+      eventChannelEmit(eventAction(data));
+    }
   })
 }
 
