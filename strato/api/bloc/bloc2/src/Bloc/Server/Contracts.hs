@@ -58,9 +58,11 @@ getContracts ::
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
+  Maybe Integer ->
+  Maybe Integer ->
   Maybe ChainId ->
   m GetContractsResponse
-getContracts mName mOffset mLimit chainId = do
+getContracts mName mOffset mLimit mInstanceOffset mInstanceLimit chainId = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM
@@ -99,7 +101,12 @@ getContracts mName mOffset mLimit chainId = do
   -- Filter the original map to only include the paginated contracts
   let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
   
-  return . GetContractsResponse $ paginatedContractsMap
+  -- Step 3: Apply instance pagination if parameters are provided
+  let instanceOffset = fromIntegral $ fromMaybe 0 mInstanceOffset
+      instanceLimit = fromIntegral $ fromMaybe 10 mInstanceLimit
+      paginatedInstancesMap = Map.map (take instanceLimit . drop instanceOffset) paginatedContractsMap
+  
+  return . GetContractsResponse $ paginatedInstancesMap
 
 getContractsData ::
   ( MonadLogger m,

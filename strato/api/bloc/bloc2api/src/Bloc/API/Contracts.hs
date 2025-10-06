@@ -47,11 +47,19 @@ type GetContracts =
     :> QueryParam "name" Text
     :> QueryParam "offset" Integer
     :> QueryParam "limit" Integer
+    :> QueryParam "instanceOffset" Integer
+    :> QueryParam "instanceLimit" Integer
     :> QueryParam "chainid" ChainId
     :> Get '[JSON] GetContractsResponse
 
 instance ToParam (QueryParam "limit" Integer) where
   toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
+
+instance ToParam (QueryParam "instanceOffset" Integer) where
+  toParam _ = DocQueryParam "instanceOffset" [] "Offset for paginating contract instances" Normal
+
+instance ToParam (QueryParam "instanceLimit" Integer) where
+  toParam _ = DocQueryParam "instanceLimit" [] "Limit for paginating contract instances" Normal
 
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64,

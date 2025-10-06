@@ -43,6 +43,8 @@ getContracts ::
   Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
+  Maybe Integer ->
+  Maybe Integer ->
   Maybe ChainId ->
   ClientM GetContractsResponse
 getContracts = client (Proxy @GetContracts)

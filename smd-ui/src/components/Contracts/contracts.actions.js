@@ -4,13 +4,15 @@ export const FETCH_CONTRACTS_FAILED = 'FETCH_CONTRACTS_FAILED';
 export const CHANGE_CONTRACT_FILTER = 'CHANGE_CONTRACT_FILTER';
 export const TOGGLE_COLLAPSE_TABLE = 'TOGGLE_COLLAPSE_TABLE';
 
-export const fetchContracts = function (chainId, limit, offset, name) {
+export const fetchContracts = function (chainId, limit, offset, name, instanceOffset, instanceLimit) {
   return {
     type: FETCH_CONTRACTS,
     chainId,
     limit,
     offset,
-    name
+    name,
+    instanceOffset,
+    instanceLimit
   }
 };
 

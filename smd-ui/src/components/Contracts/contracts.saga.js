@@ -31,22 +31,13 @@ async function fetchJson(url) {
   return res.json();
 }
 
-export async function getContracts(chainid, limit, offset, searchTerm) {
+export async function getContracts(chainid, limit, offset, searchTerm, instanceOffset, instanceLimit) {
   const params = new URLSearchParams({ limit, offset });
 
   if (chainid) params.set("chainid", chainid);
-
-  // if (searchTerm && isValidContractAddress(searchTerm)) {
-  //   const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
-  //   const { _contractName } = await fetchJson(detailUrl);
-    
-  //   if (_contractName) params.set("name", searchTerm);
-
-  //   const listUrl = `${contractsUrl}?${params}`;
-  //   return fetchJson(listUrl);
-  // }
-
   if (searchTerm) params.set("name", searchTerm);
+  if (instanceOffset !== undefined) params.set("instanceOffset", instanceOffset);
+  if (instanceLimit !== undefined) params.set("instanceLimit", instanceLimit);
 
   const listUrl = `${contractsUrl}?${params}`;
   return fetchJson(listUrl);
@@ -59,7 +50,9 @@ export function* fetchContracts(action) {
       action.chainId,
       action.limit,
       action.offset,
-      action.name
+      action.name,
+      action.instanceOffset,
+      action.instanceLimit
     );
     yield put(fetchContractsSuccess(response));
   } catch (err) {

@@ -9,6 +9,7 @@ import {
   fetchAccount,
   fetchContractInfoRequest
 } from './contractCard.actions';
+import { fetchContracts } from '../contracts.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 // import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -28,8 +29,8 @@ class ContractCard extends Component {
       );
     this.state = { 
       isOpen: hasSearchMatch,
-      instanceLimit: 10,
-      instanceOffset: 0
+      instanceOffset: 0,
+      instanceLimit: 10
     };
   }
 
@@ -45,19 +46,29 @@ class ContractCard extends Component {
   }
 
   onNextInstanceClick = () => {
-    const { instanceOffset, instanceLimit } = this.state;
-    const newOffset = instanceOffset + instanceLimit;
-    this.setState({ instanceOffset: newOffset });
+    const newOffset = this.state.instanceOffset + this.state.instanceLimit;
+    this.setState({ instanceOffset: newOffset }, () => {
+      this.fetchContractInstances();
+    });
   };
 
   onPrevInstanceClick = () => {
-    const { instanceOffset, instanceLimit } = this.state;
-    const newOffset = Math.max(0, instanceOffset - instanceLimit);
-    this.setState({ instanceOffset: newOffset });
+    const newOffset = Math.max(0, this.state.instanceOffset - this.state.instanceLimit);
+    this.setState({ instanceOffset: newOffset }, () => {
+      this.fetchContractInstances();
+    });
   };
 
-  resetInstancePagination = () => {
-    this.setState({ instanceOffset: 0 });
+  fetchContractInstances = () => {
+    const { instanceOffset, instanceLimit } = this.state;
+    this.props.fetchContracts(
+      this.props.selectedChain,
+      10, // contract limit
+      0,  // contract offset
+      this.props.contract.name, // contract name filter
+      instanceOffset,
+      instanceLimit
+    );
   };
 
   render() {
@@ -80,12 +91,12 @@ class ContractCard extends Component {
       ) :
       instances.filter(instance => re.test(instance.address));
 
-    // Paginate instances for current contract
+    // Calculate total instances for pagination display
     const { instanceOffset, instanceLimit } = this.state;
     const totalInstances = filteredInstances.length;
-    const paginatedInstances = filteredInstances.slice(instanceOffset, instanceOffset + instanceLimit);
+    const hasMoreInstances = totalInstances >= instanceLimit && (instanceOffset + instanceLimit) < totalInstances;
 
-    paginatedInstances
+    filteredInstances
       .forEach(function (instance, index) {
         cardData.push(
           <tr
@@ -268,7 +279,7 @@ class ContractCard extends Component {
                   </table>
                 </Collapse>
                 {/* Instance Pagination Controls */}
-                {this.state.isOpen && totalInstances > instanceLimit && (
+                {this.state.isOpen && (instanceOffset > 0 || hasMoreInstances) && (
                   <div className="col-sm-12 pt-dark mt-2">
                     <div className="row">
                       <div className="col-sm-3 text-left">
@@ -287,18 +298,8 @@ class ContractCard extends Component {
                           onClick={this.onNextInstanceClick}
                           className="pt-icon-arrow-right"
                           text="Next"
-                          disabled={instanceOffset + instanceLimit >= totalInstances}
+                          disabled={!hasMoreInstances}
                         />
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Show instance count for contracts with instances but less than limit */}
-                {this.state.isOpen && totalInstances > 0 && totalInstances <= instanceLimit && (
-                  <div className="col-sm-12 pt-dark mt-2">
-                    <div className="row">
-                      <div className="col-sm-12 text-center">
-                        {`${totalInstances} Instance${totalInstances !== 1 ? 's' : ''}`}
                       </div>
                     </div>
                   </div>
@@ -329,6 +330,7 @@ export default withRouter(
     fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
-    fetchAccount
+    fetchAccount,
+    fetchContracts
   })(ContractCard)
 );
