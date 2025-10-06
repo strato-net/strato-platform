@@ -117,6 +117,27 @@ contract Describe_TokenPausable {
         require(reverted, "Adding pool with LP token same as reward token should revert");
     }
 
+    function it_should_prevent_adding_duplicate_pool() {
+        // given
+        uint256 allocationPoints = 1000;
+        uint256 multiplier = 1;
+
+        // given a pool already exists
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // when trying to add the same pool again
+        bool reverted = false;
+        try chef.addPool(allocationPoints, address(lpToken1), multiplier) {
+            // If we get here, the call didn't revert (which is a bug)
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+
+        // then - should revert when trying to add duplicate LP token
+        require(reverted, "Adding duplicate LP token should revert");
+    }
+
     function it_should_allow_updating_allocation_points() {
         // given
         uint256 initialAllocationPoints = 500;

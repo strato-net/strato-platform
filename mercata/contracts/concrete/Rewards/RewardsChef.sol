@@ -200,6 +200,9 @@ contract record RewardsChef is Ownable {
         return (bp.startTimestamp, bp.bonusMultiplier);
     }
 
+    // Tracks whether an LP token is already in use by a pool
+    mapping(address => bool) private lpTokenInUse;
+
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
@@ -226,13 +229,7 @@ contract record RewardsChef is Ownable {
         address _lpToken,
         uint256 _bonusMultiplier
     ) public onlyOwner {
-        // Check if LP token already exists in pools. If it does exists, return
-        // early
-        for (uint256 i = 0; i < pools.length; i++) {
-            if (pools[i].lpToken == _lpToken) {
-                return;
-            }
-        }
+        require(!lpTokenInUse[_lpToken], "LP token already exists");
         require(_lpToken != address(rewardToken), "LP token cannot be the same as reward token");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
 
@@ -251,6 +248,7 @@ contract record RewardsChef is Ownable {
         poolInfo.bonusPeriods.push(BonusPeriod(block.timestamp, _bonusMultiplier));
 
         pools.push(poolInfo);
+        lpTokenInUse[_lpToken] = true;
 
         emit PoolAdded(pools.length - 1, _lpToken, _allocPoint, _bonusMultiplier);
     }
