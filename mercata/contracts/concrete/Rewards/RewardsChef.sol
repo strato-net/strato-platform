@@ -158,6 +158,7 @@ contract record RewardsChef is Ownable {
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -417,6 +418,23 @@ contract record RewardsChef is Ownable {
 
         emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Withdraw(msg.sender, _pid, _amount);
+    }
+
+    function emergencyWithdraw(uint256 _pid) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        uint256 amount = user.amount;
+        user.amount = 0;
+        user.rewardDebt = 0;
+
+        if (amount > 0) {
+            ERC20(pool.lpToken).transfer(msg.sender, amount);
+        }
+
+        emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
     function pendingCata(uint256 _pid, address _user) external view returns (uint256) {

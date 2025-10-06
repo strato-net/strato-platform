@@ -184,6 +184,48 @@ contract Describe_TokenPausable {
 		"User1 should have back his LP tokens");
     }
 
+    function it_should_allow_emergency_withdraw_without_claiming_rewards() {
+        // given
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+        uint256 amount = 10 * 1e18;
+
+        // given there is a pool
+        chef.addPool(allocationPoints, address(lpToken1), multiplier);
+
+        // given user has deposited lp tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, amount);
+
+        // given time has passed so there are pending rewards
+        fastForward(10);
+
+        // Record balances before emergency withdraw
+        uint256 userRewardBalanceBefore = ERC20(rewardsToken).balanceOf(address(user1));
+        uint256 pendingRewards = chef.pendingCata(poolId, address(user1));
+
+        // Verify there ARE rewards to forfeit
+        require(pendingRewards > 0, "There should be pending rewards before emergency withdraw");
+
+        // when - emergency withdraw
+        TestUtils.callAs(user1, address(chef), "emergencyWithdraw(uint256)", poolId);
+
+        // then - LP tokens are returned
+        require(ERC20(lpToken1).balanceOf(address(chef)) == 0,
+		"Chef should not have the deposited LP tokens");
+        require(ERC20(lpToken1).balanceOf(address(user1)) == initLpTokensPerUser,
+		"User1 should have all LP tokens back");
+
+        // then - rewards are NOT transferred (forfeited)
+        require(ERC20(rewardsToken).balanceOf(address(user1)) == userRewardBalanceBefore,
+		"User should not receive rewards during emergency withdraw");
+
+        // then - user info is reset
+        uint256 userBalance = chef.getBalance(poolId, address(user1));
+        require(userBalance == 0, "User balance should be reset to 0");
+    }
+
 
     function it_should_update_accrued_rewards_for_pool() {
         uint256 allocationPoints = 100;
