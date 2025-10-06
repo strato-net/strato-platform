@@ -9,7 +9,7 @@ import {
   fetchAccount,
   fetchContractInfoRequest
 } from './contractCard.actions';
-import { fetchContracts } from '../contracts.actions';
+import { fetchContracts } from '../../contracts.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 // import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
