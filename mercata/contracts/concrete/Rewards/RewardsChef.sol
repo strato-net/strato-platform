@@ -280,10 +280,8 @@ contract record RewardsChef is Ownable {
 
         // Ensure new period starts after the last period
         uint256 periodsLength = pools[_pid].bonusPeriods.length;
-        if (periodsLength > 0) {
-            require(_startTimestamp > pools[_pid].bonusPeriods[periodsLength - 1].startTimestamp,
-                    "New period must start after the last period");
-        }
+        require(_startTimestamp > pools[_pid].bonusPeriods[periodsLength - 1].startTimestamp,
+                "New period must start after the last period");
 
         pools[_pid].bonusPeriods.push(BonusPeriod(_startTimestamp, _bonusMultiplier));
 
