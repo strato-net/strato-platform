@@ -25,7 +25,7 @@ import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable
 const Transfer = () => {
   const { userAddress } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
-  const { getUserTokensWithBalance, transferToken } = useTokenContext();
+  const { getTransferableTokens, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -57,15 +57,16 @@ const Transfer = () => {
   }, [fromAsset, voucherBalance, usdstBalance]);
 
   const fetchUserTokens = useCallback(async () => {
+    console.log("fetchUserTokens");
     try {
-      const tokens = await getUserTokensWithBalance();
+      const tokens = await getTransferableTokens();
       setTokens(tokens);
       return tokens;
     } catch (err) {
       console.error("Failed to fetch tokens:", err);
       return [];
     }
-  }, [getUserTokensWithBalance]);
+  }, [getTransferableTokens]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {

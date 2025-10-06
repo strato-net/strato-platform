@@ -18,6 +18,7 @@ type TokenContextType = {
   getActiveTokens: () => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
+  getTransferableTokens: () => Promise<Token[]>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
   transferToken: (payload: { address: string; to: string; value: string }) => Promise<void>;
   approveToken: (payload: { address: string; spender: string; value: string }) => Promise<void>;
@@ -67,13 +68,23 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // Only ACTIVE tokens with positive balance; PENDING and LEGACY tokens are excluded
   const getUserTokensWithBalance = useCallback(async (): Promise<Token[]> => {
     setLoading(true);
     try {
       const res = await api.get<Token[]>(`/tokens/balance?value=gt.0`);
-      const activeTokens = (res.data || []).filter(token => token.status === '2');
-      return activeTokens;
+      return res.data || [];
+    } catch (err) {
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getTransferableTokens = useCallback(async (): Promise<Token[]> => {
+    setLoading(true);
+    try {
+      const res = await api.get<Token[]>(`/tokens/transferable`);
+      return res.data || [];
     } catch (err) {
       return [];
     } finally {
@@ -163,6 +174,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         getActiveTokens,
         getToken,
         getUserTokensWithBalance,
+        getTransferableTokens,
         createToken,
         transferToken,
         approveToken,

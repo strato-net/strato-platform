@@ -8,7 +8,7 @@ import { getPool as getLendingRegistry } from "./lending.service";
 import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher } = constants;
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, AdminRegistry } = constants;
 
 // Helper function to get CDP collateral for a user
 const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
@@ -221,6 +221,151 @@ export const getBalance = async (
     throw error;
   }
 };
+
+/**
+ * Get transferable tokens according to Token.sol logic (whenNotPausedOrOwner modifier)
+ * A token is transferable if:
+ * 1. User has positive balance, AND
+ * 2. One of the following:
+ *    a. Token is not paused, OR
+ *    b. Token is paused AND user is the owner, OR
+ *    c. Token is paused AND user is whitelisted in AdminRegistry
+ */
+export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
+  // Get tokens with enhanced select to include _paused, _owner, and tokenFactory fields
+  const tokens = await getBalance(accessToken, userAddress, {
+    select: `address,user:key,balance:value::text,token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,_paused,tokenFactory,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
+  });
+
+  // Pre-filter: only tokens with positive balance
+  const tokensWithBalance = tokens.filter((tokenData: any) => {
+    const balance = tokenData.balance || "0";
+    return balance !== "0" && tokenData.token;
+  });
+
+  // Separate tokens into paused and not paused
+  const notPausedTokens: any[] = [];
+  const pausedTokens: any[] = [];
+  
+  for (const tokenData of tokensWithBalance) {
+    const token = tokenData.token;
+    const isPaused = token._paused === true;
+    const isOwner = token._owner?.toLowerCase() === userAddress.toLowerCase();
+    console.log("isPaused", isPaused);
+    console.log("isOwner", isOwner);
+
+    if (!isPaused) {
+      // Token not paused - always transferable
+      notPausedTokens.push(tokenData);
+    } else if (isOwner) {
+      // Token paused but user is owner - transferable
+      notPausedTokens.push(tokenData);
+    } else {
+      // Token paused and user is not owner - need to check whitelist
+      pausedTokens.push(tokenData);
+    }
+  }
+
+  // If there are no paused tokens requiring whitelist check, return early
+  if (pausedTokens.length === 0) {
+    return notPausedTokens;
+  }
+
+  // For paused tokens, check AdminRegistry whitelist
+  // We need to get the AdminRegistry address from TokenFactory and then check whitelist
+  const whitelistedTokens = await checkWhitelistForTokens(
+    accessToken,
+    pausedTokens,
+    userAddress
+  );
+
+  return [...notPausedTokens, ...whitelistedTokens];
+};
+
+/**
+ * Helper function to check AdminRegistry whitelist for paused tokens
+ * According to Token.sol:
+ * - Get AdminRegistry from TokenFactory owner
+ * - Check whitelist(tokenAddress, "transfer", userAddress)
+ */
+async function checkWhitelistForTokens(
+  accessToken: string,
+  pausedTokens: any[],
+  userAddress: string
+): Promise<any[]> {
+  try {
+    // Get unique TokenFactory addresses
+    const tokenFactoryAddresses = new Set(
+      pausedTokens
+        .map(td => td.token.tokenFactory)
+        .filter(addr => addr)
+    );
+
+    if (tokenFactoryAddresses.size === 0) {
+      return []; // No token factories, no whitelisted tokens
+    }
+
+    // Fetch TokenFactory contracts to get their owners (AdminRegistry addresses)
+    const tokenFactoryData = await cirrus.get(
+      accessToken,
+      `/${TokenFactory}`,
+      {
+        params: {
+          address: `in.(${Array.from(tokenFactoryAddresses).join(',')})`,
+          select: 'address,_owner'
+        }
+      }
+    );
+
+    // Map tokenFactory address -> AdminRegistry address
+    const factoryToAdmin = new Map(
+      (tokenFactoryData.data || []).map((tf: any) => [tf.address, tf._owner])
+    );
+
+    // Get unique AdminRegistry addresses
+    const adminRegistryAddresses = new Set(
+      Array.from(factoryToAdmin.values()).filter(addr => addr)
+    );
+
+    if (adminRegistryAddresses.size === 0) {
+      return []; // No admin registries found
+    }
+
+    // Query whitelist for all combinations
+    // whitelist mapping: address (token) => string (function) => address (user) => bool
+    const tokenAddresses = pausedTokens.map(td => td.token.address);
+    
+    const whitelistData = await cirrus.get(
+      accessToken,
+      `/${AdminRegistry}-whitelist`,
+      {
+        params: {
+          address: `in.(${Array.from(adminRegistryAddresses).join(',')})`,
+          key: `in.(${tokenAddresses.join(',')})`,
+          key2: 'eq.transfer',
+          key3: `eq.${userAddress.toLowerCase()}`,
+          select: 'address,key,key2,key3,value'
+        }
+      }
+    );
+
+    // Build a set of whitelisted token addresses
+    const whitelistedTokenAddresses = new Set(
+      (whitelistData.data || [])
+        .filter((wl: any) => wl.value === true)
+        .map((wl: any) => wl.key)
+    );
+
+    // Filter paused tokens to only those that are whitelisted
+    return pausedTokens.filter(tokenData => 
+      whitelistedTokenAddresses.has(tokenData.token.address)
+    );
+  } catch (error) {
+    console.error('❌ [WHITELIST] Error checking AdminRegistry whitelist:', error);
+    // On error, fail closed - don't include paused tokens that we couldn't verify
+    return [];
+  }
+}
 
 export const createToken = async (
   accessToken: string,
