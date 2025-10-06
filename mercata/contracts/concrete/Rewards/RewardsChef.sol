@@ -350,6 +350,13 @@ contract record RewardsChef is Ownable {
         pool.lastRewardTimestamp = block.timestamp;
     }
 
+    function massUpdatePools() public {
+        uint256 poolCount = pools.length;
+        for (uint256 pid = 0; pid < poolCount; pid++) {
+            updatePool(pid);
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // USER INTERACTIONS
     // ═════════════════════════════════════════════════════════════════════════

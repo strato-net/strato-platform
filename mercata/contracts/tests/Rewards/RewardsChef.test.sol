@@ -285,4 +285,55 @@ contract Describe_TokenPausable {
         require(pool1.accPerToken == expectedAccPerToken, "accPerToken calculation mismatch");
     }
 
+    function it_should_update_all_pools_when_mass_update_is_called() {
+        // given - create two pools with different allocation points
+        uint256 pool1AllocPoint = 100;
+        uint256 pool2AllocPoint = 200;
+        uint256 multiplier = 1;
+        uint256 amount1 = 10 * 1e18;
+        uint256 amount2 = 20 * 1e18;
+
+        // Create second LP token
+        address lpToken2Address = m.tokenFactory().createToken(
+            "TestLP2",
+            "Test LP Token 2",
+            [], [], [], "TESTLP2", 0, 18
+        );
+        require(lpToken2Address != address(0), "LP Token 2 address is 0");
+        Token lpToken2 = Token(lpToken2Address);
+
+        // Mint LP tokens to users
+        lpToken2.mint(address(user1), initLpTokensPerUser);
+
+        // Add two pools
+        chef.addPool(pool1AllocPoint, address(lpToken1), multiplier);
+        chef.addPool(pool2AllocPoint, address(lpToken2), multiplier);
+
+        // Users deposit into both pools
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount1);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", 0, amount1);
+
+        TestUtils.callAs(user1, address(lpToken2), "approve(address, uint256)", address(chef), amount2);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", 1, amount2);
+
+        // Record initial state
+        (address lp1Before, uint alloc1Before, uint pool1LastRewardBefore, uint pool1AccPerTokenBefore) = chef.pools(0);
+        (address lp2Before, uint alloc2Before, uint pool2LastRewardBefore, uint pool2AccPerTokenBefore) = chef.pools(1);
+
+        // Fast forward time
+        fastForward(10);
+
+        // when - call massUpdatePools
+        chef.massUpdatePools();
+
+        // then - verify both pools were updated
+        (address lp1After, uint alloc1After, uint pool1LastRewardAfter, uint pool1AccPerTokenAfter) = chef.pools(0);
+        (address lp2After, uint alloc2After, uint pool2LastRewardAfter, uint pool2AccPerTokenAfter) = chef.pools(1);
+
+        require(pool1LastRewardAfter > pool1LastRewardBefore, "Pool 1 lastRewardTimestamp should be updated");
+        require(pool2LastRewardAfter > pool2LastRewardBefore, "Pool 2 lastRewardTimestamp should be updated");
+        require(pool1AccPerTokenAfter > pool1AccPerTokenBefore, "Pool 1 accPerToken should be updated");
+        require(pool2AccPerTokenAfter > pool2AccPerTokenBefore, "Pool 2 accPerToken should be updated");
+    }
+
 }
