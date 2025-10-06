@@ -1,5 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -18,6 +19,7 @@ import Blockchain.Strato.Model.Options (flags_network)
 import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Common.API
+import Control.Monad (unless, when)
 import Control.Monad.Trans.Resource
 import Crypto.Random.Entropy
 import qualified Data.Binary as Binary
@@ -96,8 +98,25 @@ header = do
 runStrato :: (JSM () -> IO ()) -> IO ()
 runStrato runUI = do
   -- createHaskoinMultiSigScript
-  let sqlitePath = "strato.sqlite"
   runLoggingT . runResourceT $ do
+    if flags_logs /= ""
+      then getFilesystemLogs flags_directory flags_network flags_username flags_logs flags_tail
+      else runStratoNode runUI
+
+runStratoNode :: (JSM () -> IO ()) -> ResourceT (LoggingT IO) ()
+runStratoNode runUI = do
+  when (flags_wipe || flags_resync) $ do
+    catch (wipeFilesystemNode flags_directory flags_network flags_username)
+          (\(_ :: SomeException) -> pure ())
+    liftIO . putStrLn $ concat
+      [ "Node "
+      , flags_username
+      , " on network "
+      , flags_network
+      , " successfully wiped"
+      ]
+  unless flags_wipe $ do
+    let sqlitePath = "strato.sqlite"
     (f,c) <- createFilesystemNode
                flags_directory
                sqlitePath

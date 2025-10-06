@@ -139,6 +139,38 @@ runFilesystemNode p c = runNode (hoistFilesystem p) (\f ->
     (\s -> liftIO $ S.close s >> putStrLn "Closed UDP socket")
     (\s -> local (filesystemPeerUDPSocket .~ s) f)) c
 
+getNodeDirectory :: MonadIO m => FilePath -> String -> String -> m FilePath
+getNodeDirectory dir' network' nodeName = do
+  dir <- resolvePath dir'
+  pure $ dir </> network' </> nodeName
+
+getLogsDirectory :: FilePath -> FilePath
+getLogsDirectory = (</> "logs")
+
+wipeFilesystemNode ::
+  MonadIO m =>
+  FilePath ->
+  String ->
+  String ->
+  m ()
+wipeFilesystemNode dir' network' name = do
+  dir <- getNodeDirectory dir' network' name
+  liftIO $ removeDirectoryRecursive dir
+
+getFilesystemLogs ::
+  (MonadUnliftIO m, MonadThrow m) =>
+  FilePath ->
+  String ->
+  String ->
+  String ->
+  Bool ->
+  m ()
+getFilesystemLogs dir' network' name logFileName _ = do
+  dir <- getNodeDirectory dir' network' name
+  let logsDir = getLogsDirectory dir
+      logFilePath = logsDir </> logFileName
+  runConduitRes $ sourceFile logFilePath .| decodeUtf8C .| awaitForever (liftIO . putStr . T.unpack)
+
 createFilesystemNode ::
   MonadResource m =>
   FilePath ->
@@ -152,11 +184,10 @@ createFilesystemNode ::
   Host ->
   Bool ->
   m (FilesystemPeer, CorePeer)
-createFilesystemNode dir'' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
-  dir' <- resolvePath dir''
+createFilesystemNode dir' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
+  dir <- getNodeDirectory dir' network' $ T.unpack name
   logsMapVar <- atomically $ newTVar M.empty
-  let dir = dir' </> network' </> T.unpack name
-      logsDir = dir </> "logs"
+  let logsDir = getLogsDirectory dir
       logF logName f = do
         mHandle <- atomically $ do
           logsMap <- readTVar logsMapVar

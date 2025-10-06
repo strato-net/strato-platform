@@ -48,6 +48,7 @@ module Blockchain.Slipstream.OutputData (
   getAllEvents,
   processParents,
   dbQueryCatchError,
+  valueToSQLText',
   storageTableName,
   globalEventTableName,
   initialSlipstreamQueries
@@ -276,7 +277,9 @@ slipstreamQueryText _ CreateView{..} =
             ]) <$> viewColumns)
         , " FROM "
         , tableNameToDoubleQuoteText sourceTableName
-        , " s INNER JOIN contract c ON s.address = c.address WHERE c.creator = '"
+        , " s INNER JOIN "
+        , tableNameToText contractTableName
+        , " c ON s.address = c.address WHERE c.creator = '"
         , tableNameCreator viewName
         , "' AND c.application = '"
         , tableNameApplication viewName
@@ -577,7 +580,7 @@ createIndexTable ::
 createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
       -- histTableName = historyTableName creator a n
-      -- storageHistoryTableName = historyTableName "" "" "storage"
+      -- storageHistoryTableName = historyTableName "" "" "cirrus_storage"
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "application", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
@@ -607,7 +610,7 @@ createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType)
       mappingCols = (fst <$> baseMappingColumns) ++ ["value"]
   yield $ CreateView
     tableName
-    (indexTableName "" "" "mapping")
+    mappingTableName
     mappingCols
     []
     keyNames
@@ -639,7 +642,7 @@ createEventArrayTable (creator, a, n, e) cc (arr, arrType) = do
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ CreateView
     tableName
-    (indexTableName "" "" "event_array")
+    eventArrayTableName
     cols
     ["creator", "application", "contract_name"]
     keyNames
@@ -659,8 +662,7 @@ insertIndexTable ::
 insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
-          let contractTableName = indexTableName "" "" "contract"
-              keySt = baseColumns ++ [("creator", SqlText), ("application", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
+          let keySt = baseColumns ++ [("creator", SqlText), ("application", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
               contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
               baseVals =
                 [ ValueAddress . E.address,
@@ -696,8 +698,7 @@ insertDelegatecall ::
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
 insertDelegatecall (Delegatecall s _ c a n) = do
-  let contractTableName = indexTableName "" "" "contract"
-      contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
+  let contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
       contractValsForSQL = map (Just . SimpleValue)
         [ ValueAddress s,
           ValueString c,
@@ -825,7 +826,7 @@ insertCollectionTableQuery rows =
 
     renderInsert [] = []
     renderInsert group@((_, isMerge, _) : _) =
-      let tblName = indexTableName "" "" "mapping"
+      let tblName = mappingTableName
           tblText = tableNameToDoubleQuoteText tblName
 
           onConflictCols = ["address", "collection_name", "key"]
@@ -877,7 +878,7 @@ insertEventArrayTableQuery ms =
     let ms' = mapMaybe (\m -> (\k -> (m, k, collectionDataValue m)) <$> listToMaybe (collectionDataKeys m)) ms
      in flip map ms' $ \case
           (x,k,v) ->
-            let tableName = indexTableName "" "" "event_array"
+            let tableName = eventArrayTableName
                 keySt = baseEventCollectionColumns ++ [("key", SqlJsonb), ("value", SqlJsonb)]
                 baseVals =
                   [ ValueAddress . address,
@@ -1158,10 +1159,19 @@ valueToSQLText t v =
    in (\w -> pref <> w <> suff) <$> v'
 
 storageTableName :: TableName
-storageTableName = indexTableName "" "" "storage"
+storageTableName = indexTableName "" "" "cirrus_storage"
 
 globalEventTableName :: TableName
-globalEventTableName = indexTableName "" "" "event"
+globalEventTableName = indexTableName "" "" "cirrus_event"
+
+contractTableName :: TableName
+contractTableName = indexTableName "" "" "cirrus_contract"
+
+mappingTableName :: TableName
+mappingTableName = indexTableName "" "" "cirrus_mapping"
+
+eventArrayTableName :: TableName
+eventArrayTableName = indexTableName "" "" "cirrus_event_array"
 
 initialSlipstreamQueries :: [SlipstreamQuery]
 initialSlipstreamQueries =
@@ -1182,7 +1192,7 @@ initialSlipstreamQueries =
       ["address"]
       Nothing
   , CreateTable
-      (historyTableName "" "" "storage")
+      (historyTableName "" "" "cirrus_storage")
       [ ("address", SqlText)
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
@@ -1198,7 +1208,7 @@ initialSlipstreamQueries =
       []
       Nothing
   , CreateTable
-      (indexTableName "" "" "contract")
+      contractTableName
       [ ("address", SqlText)
       , ("creator", SqlText)
       , ("application", SqlText)
@@ -1207,7 +1217,7 @@ initialSlipstreamQueries =
       ["address", "creator", "application", "contract_name"]
       (Just $ Foreign "contract_storage" ["address"] storageTableName ["address"])
   , CreateTable
-      (indexTableName "" "" "mapping")
+      mappingTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
@@ -1241,7 +1251,7 @@ initialSlipstreamQueries =
       ["transaction_hash", "event_index"]
       (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
   , CreateTable
-      (indexTableName "" "" "event_array")
+      eventArrayTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)

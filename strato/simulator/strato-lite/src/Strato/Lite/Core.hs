@@ -58,7 +58,6 @@ import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Monad
 import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.Processor
-import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Discovery.Data.MemPeerDB ()
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Indexer.ApiIndexer
@@ -971,7 +970,7 @@ corePeerSlipstream = do
   runConduit $
     sourceFlushTQueue slipstreamSource
       .| ( do
-             yield $ Right [CreateTable (IndexTableName "" "" "event") [("address", SqlText),("block_hash", SqlText),("block_timestamp", SqlText),("block_number", SqlText),("transaction_hash", SqlText),("transaction_sender", SqlText),("event_index", SqlDecimal),("creator", SqlText),("application", SqlText),("contract_name", SqlText),("event_name", SqlText),("attributes", SqlText)] ["transaction_hash","event_index"] Nothing]
+             yield $ Right initialSlipstreamQueries
              awaitForever $ processTheMessages . concat
          )
       .| ( awaitForever $ \case
