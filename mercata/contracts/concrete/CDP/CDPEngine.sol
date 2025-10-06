@@ -306,7 +306,7 @@ contract record CDPEngine is Ownable {
             require(assetDebtUSD + amountUSD <= assetConfig.debtCeiling, "CDPEngine: debt ceiling exceeded");
         }       
         // Increase scaled debt (principal) using current index
-        uint scaledAdd = (amountUSD * RAY) / assetState.rateAccumulator;
+        uint scaledAdd = (amountUSD * RAY + assetState.rateAccumulator - 1) / assetState.rateAccumulator;
         userVault.scaledDebt += scaledAdd;
         assetState.totalScaledDebt += scaledAdd;
         // Enforce per-vault debt floor post-mint
@@ -348,7 +348,7 @@ contract record CDPEngine is Ownable {
             require(assetDebtUSD + amountMinted <= config.debtCeiling, "CDPEngine: debt ceiling exceeded");
         }
         // Increase scaled principal at current index
-        uint scaledAdd = (amountMinted * RAY) / assetState.rateAccumulator;
+        uint scaledAdd = (amountMinted * RAY + assetState.rateAccumulator - 1) / assetState.rateAccumulator;
         userVault.scaledDebt += scaledAdd;
         assetState.totalScaledDebt += scaledAdd;
         // Enforce per-vault floor after mint
