@@ -857,6 +857,13 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".cataPerSecond", BInteger 100000000000000)
      , (".totalAllocPoint", BInteger 600)
      , (".minFutureTime", BInteger 3600)
+     -- lpTokenInUse mapping entries
+     , (".lpTokenInUse<a:" <> addrBS mTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS sUsdstAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS ethstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
      -- mUSDST
      , (".pools[0].lpToken", BAccount $ unspecifiedChain mTokenAddress)
      , (".pools[0].allocPoint", BInteger 100)
