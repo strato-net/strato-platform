@@ -376,7 +376,7 @@ contract record RewardsChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
-                ERC20(rewardToken).transfer(msg.sender, pending);
+                rewardToken.transfer(msg.sender, pending);
             }
         }
 

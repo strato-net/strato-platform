@@ -22,7 +22,7 @@ import Data.Foldable (traverse_)
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromJust, fromMaybe)
+import Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Set as S
 import Data.Source
 import Data.String (IsString, fromString)
@@ -171,21 +171,16 @@ mutable m@(Product ts _) =
 mutable m@(Sum (t :| ts)) =
   let isMutable Mutable{} = True
       isMutable _ = False
-   in if all isMutable $ t:ts
-        then m
-        else bottom $ "Cannot mutate immutable value" <$ context' m
+   in case filter isMutable $ t:ts of
+        [] -> bottom $ "Cannot mutate immutable value" <$ context' m
+        (j:js) -> Sum $ j :| js
 mutable t = bottom $ "Cannot mutate immutable value" <$ context' t
 
-varDefsToType' :: Annotated VarDefEntryF -> Type' -> Type'
-varDefsToType' BlankEntry t = Product [topType' (context' t), t] (context' t)
-varDefsToType' VarDefEntry {..} t | vardefType == Nothing = t
-varDefsToType' VarDefEntry {..} Top{} = Mutable $ Static (fromJust vardefType) vardefContext
-varDefsToType' VarDefEntry {..} t@Static{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
-varDefsToType' VarDefEntry {..} t@Mutable{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
-varDefsToType' VarDefEntry {..} t@Sum{} = Product [Mutable $ Static (fromJust vardefType) vardefContext, t] vardefContext
-varDefsToType' VarDefEntry {..} (Product ts _) = Product (Mutable (Static (fromJust vardefType) vardefContext) : ts) vardefContext
-varDefsToType' VarDefEntry {} (Bottom es) = Bottom es
-varDefsToType' VarDefEntry {..} _ = bottom $ "Could not match variable definition with function type" <$ vardefContext
+varDefsToType' :: SourceAnnotation Text -> Annotated VarDefEntryF -> Type'
+varDefsToType' x BlankEntry = topType' x
+varDefsToType' _ VarDefEntry {..} = case vardefType of
+  Nothing -> topType' vardefContext
+  Just t  -> Mutable $ Static t vardefContext
 
 lookupEnum :: SolidString -> SSS [SolidString]
 lookupEnum name = do
@@ -337,7 +332,6 @@ lookupContractFunction x cName fName = do
     constructGetterType y t = pure $ Function (Product [] y) (Static t y) y [] [] False
 
 productType' :: SourceAnnotation Text -> [Type'] -> Type'
-productType' _ [Bottom es] = Bottom es
 productType' _ [t] = t
 productType' x ts = case reduceType' x ts of
   Bottom es -> Bottom es
@@ -791,6 +785,7 @@ typecheckMember (Mutable t) member = do
     Static{} -> Mutable t'
     Top{} -> Mutable t'
     _ -> t'
+typecheckMember (Product [t] _) member = typecheckMember t member
 typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
@@ -1830,7 +1825,7 @@ statementHelper (SimpleStatement stmt x) = simpleStatementHelper x stmt
 simpleStatementHelper :: SourceAnnotation Text -> Annotated SimpleStatementF -> SSS Type'
 simpleStatementHelper x (VariableDefinition vdefs mExpr) = do
   pushLocalVariables vdefs
-  let ts' = foldr varDefsToType' (topType' x) vdefs
+  let ts' = Product (varDefsToType' x <$> vdefs) x
   ts' ~> maybe (pure $ topType' x) tcExpr mExpr
 simpleStatementHelper _ (ExpressionStatement expr) =
   tcExpr expr
