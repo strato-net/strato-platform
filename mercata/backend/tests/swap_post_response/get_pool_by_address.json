@@ -1,0 +1,27 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.an("object");
+    pm.expect(json).to.have.property('address');
+    pm.expect(json).to.have.property('poolName');
+    pm.expect(json).to.have.property('poolSymbol');
+    pm.expect(json).to.have.property('tokenA');
+    pm.expect(json).to.have.property('tokenB');
+    pm.expect(json).to.have.property('lpToken');
+    pm.expect(json).to.have.property('totalLiquidityUSD');
+    pm.expect(json).to.have.property('tradingVolume24h');
+    pm.expect(json).to.have.property('apy');
+    pm.expect(json).to.have.property('aToBRatio');
+    pm.expect(json).to.have.property('bToARatio');
+    pm.expect(json).to.have.property('oracleAToBRatio');
+    pm.expect(json).to.have.property('oracleBToARatio');
+    pm.expect(json).to.have.property('swapFeeRate');
+    pm.expect(json).to.have.property('lpSharePercent');
+});
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.swapPoolSingle;
+    pm.expect(json).to.have.jsonSchema(schema);
+});

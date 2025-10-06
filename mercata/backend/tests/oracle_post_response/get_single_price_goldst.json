@@ -1,0 +1,16 @@
+const schemas = pm.require('@blockapps/mercata-schema');
+
+const json = pm.response.json();
+
+pm.test("Valid response format", function () {
+    pm.expect(json).to.be.an('object');
+    pm.expect(json).to.have.property('asset');
+    pm.expect(json).to.have.property('price');
+})
+
+pm.test("AI Likes the Schema", function () {
+    const schema = schemas.oracleSinglePrice;
+    pm.expect(json).to.have.jsonSchema(schema);
+});
+
+pm.test("Price found: $" + (Number(json.price)/1e18).toString(), function() {})
