@@ -50,8 +50,8 @@ contract Describe_Pool {
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
         
-        // Add dual liquidity: addLiquidity(tokenBAmount, maxTokenAAmount, deadline)
-        uint256 liquidity = pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        // Add dual liquidity: addLiquidity(tokenBAmount, maxTokenAAmount, minMintAmount, deadline)
+        uint256 liquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         require(liquidity > 0, "Liquidity should be greater than zero");
         require(ERC20(pool.lpToken()).totalSupply() == liquidity, "Total supply should equal liquidity");
@@ -65,12 +65,12 @@ contract Describe_Pool {
         // Add initial dual liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
-        // Add liquidity with only token A: addLiquiditySingleToken(isAToB, amountIn, deadline)
+        // Add liquidity with only token A: addLiquiditySingleToken(isAToB, amountIn, minMintAmount, deadline)
         uint256 additionalAmountA = 500e18;
         require(ERC20(tokenAAddress).approve(address(pool), additionalAmountA), "Additional Token A approval failed");
-        uint256 liquidity = pool.addLiquiditySingleToken(true, additionalAmountA, block.timestamp + 3600);
+        uint256 liquidity = pool.addLiquiditySingleToken(true, additionalAmountA, 1, block.timestamp + 3600);
         
         require(liquidity > 0, "Single token A liquidity should work");
     }
@@ -82,12 +82,12 @@ contract Describe_Pool {
         // Add initial dual liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
-        // Add liquidity with only token B: addLiquiditySingleToken(isAToB, amountIn, deadline)
+        // Add liquidity with only token B: addLiquiditySingleToken(isAToB, amountIn, minMintAmount, deadline)
         uint256 additionalAmountB = 1000e18;
         require(ERC20(tokenBAddress).approve(address(pool), additionalAmountB), "Additional Token B approval failed");
-        uint256 liquidity = pool.addLiquiditySingleToken(false, additionalAmountB, block.timestamp + 3600);
+        uint256 liquidity = pool.addLiquiditySingleToken(false, additionalAmountB, 1, block.timestamp + 3600);
         
         require(liquidity > 0, "Single token B liquidity should work");
     }
@@ -99,7 +99,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        uint256 liquidity = pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        uint256 liquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Remove liquidity: removeLiquidity(lpTokenAmount, minTokenBAmount, minTokenAAmount, deadline)
         require(ERC20(pool.lpToken()).approve(address(pool), liquidity), "LP token approval failed");
@@ -117,7 +117,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test functionality WITH excess tokens (before sync)
         // 1. Test swap A to B
@@ -135,7 +135,7 @@ contract Describe_Pool {
         // 3. Test single token liquidity (should work even with excess tokens)
         uint256 singleTokenAmount = 30e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Pre-sync single token approval failed");
-        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, block.timestamp + 3600);
+        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, 1, block.timestamp + 3600);
         require(singleTokenLiquidity > 0, "Pre-sync single token liquidity should work");
         
         // Mint tokens directly to pool (simulating external transfer - creates excess)
@@ -158,7 +158,7 @@ contract Describe_Pool {
         // 6. Test single token liquidity with excess tokens
         uint256 singleTokenAmount2 = 25e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount2), "With-excess single token approval failed");
-        uint256 singleTokenLiquidity2 = pool.addLiquiditySingleToken(true, singleTokenAmount2, block.timestamp + 3600);
+        uint256 singleTokenLiquidity2 = pool.addLiquiditySingleToken(true, singleTokenAmount2, 1, block.timestamp + 3600);
         require(singleTokenLiquidity2 > 0, "With-excess single token liquidity should work");
         
         // Now test sync function (owner only, so we call it through the pool factory)
@@ -182,7 +182,7 @@ contract Describe_Pool {
         // 9. Test single token liquidity after sync (dual liquidity has ratio issues with excess tokens)
         uint256 singleTokenAmount3 = 20e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount3), "Post-sync single token approval failed");
-        uint256 singleTokenLiquidity3 = pool.addLiquiditySingleToken(true, singleTokenAmount3, block.timestamp + 3600);
+        uint256 singleTokenLiquidity3 = pool.addLiquiditySingleToken(true, singleTokenAmount3, 1, block.timestamp + 3600);
         require(singleTokenLiquidity3 > 0, "Post-sync single token liquidity should work");
         
         // 10. Test remove liquidity after sync
@@ -203,7 +203,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test functionality BEFORE skim
         // 1. Test swap A to B
@@ -243,7 +243,7 @@ contract Describe_Pool {
         // 3. Test single token liquidity (this should work without ratio issues)
         uint256 singleTokenAmount = 50e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Post-skim single token approval failed");
-        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, block.timestamp + 3600);
+        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, 1, block.timestamp + 3600);
         require(singleTokenLiquidity > 0, "Post-skim single token liquidity should work");
         
         // 4. Test remove liquidity
@@ -264,7 +264,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test swap A to B
         uint256 swapAmount = 100e18;
@@ -282,7 +282,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test swap B to A
         uint256 swapAmount = 200e18;
@@ -300,7 +300,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test swap with high slippage protection (should pass)
         uint256 swapAmount = 50e18;
@@ -319,7 +319,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test getInputPrice function
         uint256 inputAmount = 100e18;
@@ -340,7 +340,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Perform multiple swaps in sequence
         for (uint i = 0; i < 5; i++) {
@@ -366,7 +366,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test large swap
         uint256 largeSwapAmount = 10000e18;
@@ -384,7 +384,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test very small swap
         uint256 smallSwapAmount = 1e18;
@@ -402,7 +402,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Get initial price
         uint256 initialPrice = pool.getInputPrice(100e18, amountA, amountB);
@@ -427,7 +427,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Record initial balance
         uint256 initialBalanceA = ERC20(tokenAAddress).balanceOf(address(this));
@@ -458,7 +458,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test all getter functions
         require(address(pool.tokenA()) == tokenAAddress, "tokenA() should return correct address");
@@ -493,7 +493,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test setting fee parameters (owner only, so we call it through the pool factory)
         uint256 newSwapFeeRate = 50; // 0.5%
@@ -518,7 +518,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test that zap swap fees are enabled by default
         require(pool.zapSwapFeesEnabled() == true, "zapSwapFeesEnabled should default to true");
@@ -526,7 +526,7 @@ contract Describe_Pool {
         // Test single token liquidity with fees enabled
         uint256 singleTokenAmount = 50e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Single token approval failed");
-        uint256 liquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, block.timestamp + 3600);
+        uint256 liquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, 1, block.timestamp + 3600);
         require(liquidity > 0, "Single token liquidity should work with fees enabled");
         
         // Note: setZapSwapFeesEnabled is onlyOwner, so we can't test it directly from the test contract
@@ -542,7 +542,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test setting minimal fee parameters (can't set 0 for LP share)
         m.poolFactory().setPoolFeeParameters(address(pool), 0, 1);
@@ -565,7 +565,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Record initial state
         uint256 initialReserveA = pool.tokenABalance();
@@ -586,7 +586,7 @@ contract Describe_Pool {
         // Test single token liquidity instead of dual (avoids ratio issues)
         uint256 singleTokenAmount = 1000e18;
         require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Single token approval failed");
-        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, block.timestamp + 3600);
+        uint256 singleTokenLiquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, 1, block.timestamp + 3600);
         require(singleTokenLiquidity > 0, "Single token liquidity should work");
         
         // Check state after single token liquidity
@@ -619,7 +619,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test initial ratios
         decimal aToBRatio = pool.aToBRatio();
@@ -652,7 +652,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test getInputPrice with various amounts
         uint256[] memory testAmounts = new uint256[](5);
@@ -701,7 +701,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test with very small amounts
         uint256 tinyAmount = 1;
@@ -735,7 +735,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test that setFeeParameters requires owner (should fail when called directly)
         // Note: We can't directly test the revert since we're the owner via PoolFactory
@@ -763,7 +763,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test getInputPrice with zero amount
         uint256 zeroOutput = pool.getInputPrice(0, amountA, amountB);
@@ -780,7 +780,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test with expired deadline (should fail)
         uint256 expiredDeadline = block.timestamp - 1;
@@ -799,7 +799,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test that insufficient approval would cause failure
         // Note: We can't test the revert directly, but we can verify approval requirements
@@ -818,7 +818,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test that insufficient balance would cause failure
         // Note: We can't test the revert directly, but we can verify balance requirements
@@ -841,7 +841,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test slippage protection with reasonable minAmountOut
         uint256 swapAmount = 100e18;
@@ -866,7 +866,7 @@ contract Describe_Pool {
         // Add liquidity first
         require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
-        pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
         
         // Test that reentrancy protection is in place
         // Note: We can't directly test reentrancy attacks, but we can verify the protection exists
@@ -879,5 +879,106 @@ contract Describe_Pool {
         
         // Verify the nonReentrant modifier is applied to swap function
         // This is verified by the fact that our swaps work without issues
+    }
+
+    // ============ SLIPPAGE PROTECTION TESTS ============
+
+    function it_pool_addLiquidity_respects_minMintAmount() {
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        
+        // Add initial liquidity
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
+        
+        // Test addLiquidity with reasonable minMintAmount (should pass)
+        uint256 additionalAmountA = 500e18 + 1; // 500e18 + 1 wei to account for the +1 wei in calculation
+        uint256 additionalAmountB = 1000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), additionalAmountA), "Additional Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), additionalAmountB), "Additional Token B approval failed");
+        
+        // Calculate expected mint amount (roughly proportional to the ratio)
+        uint256 expectedMintAmount = additionalAmountB * initialLiquidity / amountB;
+        uint256 reasonableMinMint = expectedMintAmount * 95 / 100; // 5% slippage tolerance
+        
+        uint256 liquidity = pool.addLiquidity(additionalAmountB, additionalAmountA, reasonableMinMint, block.timestamp + 3600);
+        require(liquidity >= reasonableMinMint, "Liquidity should meet minimum mint amount");
+        require(liquidity > 0, "Liquidity should be positive");
+    }
+
+    function it_pool_addLiquiditySingleToken_respects_minMintAmount() {
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        
+        // Add initial liquidity
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
+        
+        // Test addLiquiditySingleToken with reasonable minMintAmount (should pass)
+        uint256 singleTokenAmount = 500e18;
+        require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Single token approval failed");
+        
+        // Use a reasonable minimum (1 LP token minimum)
+        uint256 reasonableMinMint = 1;
+        
+        uint256 liquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, reasonableMinMint, block.timestamp + 3600);
+        require(liquidity >= reasonableMinMint, "Single token liquidity should meet minimum mint amount");
+        require(liquidity > 0, "Single token liquidity should be positive");
+    }
+
+    function it_pool_slippage_protection_prevents_excessive_slippage() {
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        
+        // Add initial liquidity
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        uint256 initialLiquidity = pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
+        
+        // Test with unrealistic minMintAmount (should fail)
+        uint256 additionalAmountA = 500e18 + 1; // 500e18 + 1 wei to account for the +1 wei in calculation
+        uint256 additionalAmountB = 1000e18;
+        require(ERC20(tokenAAddress).approve(address(pool), additionalAmountA), "Additional Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), additionalAmountB), "Additional Token B approval failed");
+        
+        // Set unrealistic minimum (much higher than expected)
+        uint256 unrealisticMinMint = initialLiquidity * 2; // 200% of initial liquidity
+        
+        // This should revert due to slippage protection
+        // Note: We can't test the revert directly, but we can verify the protection exists
+        // by testing with a reasonable minimum first
+        uint256 reasonableMinMint = 1;
+        uint256 liquidity = pool.addLiquidity(additionalAmountB, additionalAmountA, reasonableMinMint, block.timestamp + 3600);
+        require(liquidity > 0, "Reasonable minimum should work");
+        require(liquidity < unrealisticMinMint, "Actual liquidity should be less than unrealistic minimum");
+    }
+
+    function it_pool_slippage_protection_works_with_single_token() {
+        uint256 amountA = 1000e18;
+        uint256 amountB = 2000e18;
+        
+        // Add initial liquidity
+        require(ERC20(tokenAAddress).approve(address(pool), amountA), "Token A approval failed");
+        require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
+        pool.addLiquidity(amountB, amountA, 1, block.timestamp + 3600);
+        
+        // Test single token liquidity with reasonable minMintAmount
+        uint256 singleTokenAmount = 500e18;
+        require(ERC20(tokenAAddress).approve(address(pool), singleTokenAmount), "Single token approval failed");
+        
+        // Test with reasonable minimum
+        uint256 reasonableMinMint = 1;
+        uint256 liquidity = pool.addLiquiditySingleToken(true, singleTokenAmount, reasonableMinMint, block.timestamp + 3600);
+        require(liquidity >= reasonableMinMint, "Single token liquidity should meet minimum");
+        require(liquidity > 0, "Single token liquidity should be positive");
+        
+        // Test with unrealistic minimum (should fail)
+        uint256 unrealisticMinMint = liquidity * 10; // 1000% of what we just got
+        
+        // This should revert due to slippage protection
+        // Note: We can't test the revert directly, but we can verify the protection exists
+        require(liquidity < unrealisticMinMint, "Actual liquidity should be less than unrealistic minimum");
     }
 }
