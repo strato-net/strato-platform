@@ -243,6 +243,8 @@ contract record Pool is Ownable {
     /// @notice Add liquidity to the pool and receive LP tokens
     /// @param tokenBAmount The amount of tokenB to add (used as the base for calculations)
     /// @param maxTokenAAmount The maximum amount of tokenA the user is willing to add
+    /// @param minMintAmount The minimum amount of LP tokens to receive (slippage protection)
+    /// @param deadline Expiry timestamp
     /// @return The amount of LP tokens minted to the user
     /// @dev For the first liquidity provision, tokenBAmount determines the initial LP token supply
     /// @dev For subsequent provisions, the ratio must match the current pool ratio
@@ -250,6 +252,7 @@ contract record Pool is Ownable {
     function addLiquidity(
         uint256 tokenBAmount,
         uint256 maxTokenAAmount,
+        uint256 minMintAmount,
         uint256 deadline
     ) external returns (uint256) {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
@@ -267,6 +270,8 @@ contract record Pool is Ownable {
             tokenAAmount = maxTokenAAmount;
             mintAmount = tokenBAmount;
         }
+
+        require(mintAmount >= minMintAmount, "Slippage: insufficient LP minted");
 
         lpToken.mint(msg.sender, mintAmount);
         require(tokenB.transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
@@ -492,11 +497,13 @@ contract record Pool is Ownable {
     /// @notice Add liquidity with a single token (zap-in)
     /// @param isAToB True if depositing tokenA only, false if depositing tokenB only
     /// @param amountIn Amount of the single token supplied by the user
+    /// @param minMintAmount The minimum amount of LP tokens to receive (slippage protection)
     /// @param deadline Expiry timestamp
     /// @return liquidityMinted Amount of LP tokens minted to the user
     function addLiquiditySingleToken(
         bool isAToB,
         uint256 amountIn,
+        uint256 minMintAmount,
         uint256 deadline
     ) external returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid inputs");
@@ -524,6 +531,7 @@ contract record Pool is Ownable {
         }
 
         liquidityMinted = _mintLiquidityAfterZap(tokenBContribution, tokenAContribution);
+        require(liquidityMinted >= minMintAmount, "Slippage: insufficient LP minted");
         _updateStateVars(tokenABalance + tokenAContribution, tokenBBalance + tokenBContribution);
     }
 }
