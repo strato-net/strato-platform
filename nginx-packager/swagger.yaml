@@ -1,12 +1,11 @@
 openapi: 3.0.0
 info:
-  version: "12"
+  version: "15"
   title: STRATO Mercata API
   license:
     url: https://www.apache.org/licenses/LICENSE-2.0.html
     name: APACHE LICENSE, VERSION 2.0
-  description: |
-    #### STRATO Mercata API reference
+  description: STRATO Mercata API reference
 tags:
   - name: Users - Addresses
     description: User accounts management
