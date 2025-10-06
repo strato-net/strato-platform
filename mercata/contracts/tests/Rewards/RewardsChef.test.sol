@@ -336,4 +336,86 @@ contract Describe_TokenPausable {
         require(pool2AccPerTokenAfter > pool2AccPerTokenBefore, "Pool 2 accPerToken should be updated");
     }
 
+    function it_should_update_existing_pools_before_adding_new_pool() {
+        // given - create first pool and deposit
+        uint256 pool1AllocPoint = 100;
+        uint256 multiplier = 1;
+        uint256 amount1 = 10 * 1e18;
+
+        chef.addPool(pool1AllocPoint, address(lpToken1), multiplier);
+
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount1);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", 0, amount1);
+
+        // Fast forward time so pool 0 has pending rewards
+        fastForward(10);
+
+        // Record pool 0 state before adding pool 1
+        (address lp0, uint alloc0, uint pool0LastRewardBefore, uint pool0AccPerTokenBefore) = chef.pools(0);
+        uint256 currentTime = block.timestamp;
+
+        // Create second LP token
+        address lpToken2Address = m.tokenFactory().createToken(
+            "TestLP2",
+            "Test LP Token 2",
+            [], [], [], "TESTLP2", 0, 18
+        );
+        Token lpToken2 = Token(lpToken2Address);
+
+        // when - add second pool (should update pool 0 first)
+        chef.addPool(200, address(lpToken2), multiplier);
+
+        // then - pool 0 should have been updated
+        (address lp0After, uint alloc0After, uint pool0LastRewardAfter, uint pool0AccPerTokenAfter) = chef.pools(0);
+
+        require(pool0LastRewardAfter == currentTime, "Pool 0 should be updated to current timestamp");
+        require(pool0AccPerTokenAfter > pool0AccPerTokenBefore, "Pool 0 accPerToken should increase");
+    }
+
+    function it_should_update_all_pools_before_changing_allocation_points() {
+        // given - create two pools with deposits
+        uint256 multiplier = 1;
+        uint256 amount = 10 * 1e18;
+
+        // Create second LP token
+        address lpToken2Address = m.tokenFactory().createToken(
+            "TestLP2",
+            "Test LP Token 2",
+            [], [], [], "TESTLP2", 0, 18
+        );
+        Token lpToken2 = Token(lpToken2Address);
+        lpToken2.mint(address(user1), initLpTokensPerUser);
+
+        // Add two pools
+        chef.addPool(100, address(lpToken1), multiplier);
+        chef.addPool(200, address(lpToken2), multiplier);
+
+        // Deposit into both pools
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", 0, amount);
+
+        TestUtils.callAs(user1, address(lpToken2), "approve(address, uint256)", address(chef), amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", 1, amount);
+
+        // Fast forward time
+        fastForward(10);
+
+        // Record state before updating allocation
+        (address lp0, uint alloc0, uint pool0LastRewardBefore, uint pool0AccPerTokenBefore) = chef.pools(0);
+        (address lp1, uint alloc1, uint pool1LastRewardBefore, uint pool1AccPerTokenBefore) = chef.pools(1);
+        uint256 currentTime = block.timestamp;
+
+        // when - update allocation points of pool 0
+        chef.updateAllocationPoints(0, 300);
+
+        // then - both pools should be updated
+        (address lp0After, uint alloc0After, uint pool0LastRewardAfter, uint pool0AccPerTokenAfter) = chef.pools(0);
+        (address lp1After, uint alloc1After, uint pool1LastRewardAfter, uint pool1AccPerTokenAfter) = chef.pools(1);
+
+        require(pool0LastRewardAfter == currentTime, "Pool 0 should be updated to current timestamp");
+        require(pool1LastRewardAfter == currentTime, "Pool 1 should be updated to current timestamp");
+        require(pool0AccPerTokenAfter > pool0AccPerTokenBefore, "Pool 0 accPerToken should increase");
+        require(pool1AccPerTokenAfter > pool1AccPerTokenBefore, "Pool 1 accPerToken should increase");
+    }
+
 }

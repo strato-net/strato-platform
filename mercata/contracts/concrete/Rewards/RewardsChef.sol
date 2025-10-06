@@ -233,6 +233,8 @@ contract record RewardsChef is Ownable {
         require(_lpToken != address(rewardToken), "LP token cannot be the same as reward token");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
 
+        massUpdatePools();
+
         totalAllocPoint += _allocPoint;
         require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
         // See 'PRECISION LOSS PREVENTION' section in top comment
@@ -258,6 +260,8 @@ contract record RewardsChef is Ownable {
         uint256 _allocPoint
     ) public onlyOwner {
         require(_pid < pools.length, "Pool does not exist");
+
+        massUpdatePools();
 
         uint256 oldAllocPoint = pools[_pid].allocPoint;
         totalAllocPoint = totalAllocPoint - oldAllocPoint + _allocPoint;
