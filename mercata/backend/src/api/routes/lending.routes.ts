@@ -5,87 +5,75 @@ import SafetyController from "../controllers/safety.controller";
 
 const router = Router();
 
-// ----- Pool Information -----
-// Get lending pool information
+/** @openapi /lending/pools: { get: { summary: "Get lending pool information", tags: ["Lending"] } } */
 router.get("/pools", authHandler.authorizeRequest(true), LendingController.get);
  
-// New: Helper actions
+/** @openapi /lending/loans/borrow-max: { post: { summary: "Borrow maximum amount", tags: ["Lending"] } } */
 router.post("/loans/borrow-max", authHandler.authorizeRequest(), LendingController.borrowMax);
+
+/** @openapi /lending/collateral/withdraw-max: { post: { summary: "Withdraw maximum collateral", tags: ["Lending"] } } */
 router.post("/collateral/withdraw-max", authHandler.authorizeRequest(), LendingController.withdrawCollateralMax);
 
-// ----- User Balances & Positions -----
-// Get user's collateral and balance information
+/** @openapi /lending/collateral: { get: { summary: "Get user's collateral and balance", tags: ["Lending"] } } */
 router.get("/collateral", authHandler.authorizeRequest(), LendingController.getCollateralAndBalance);
  
-// Get user's liquidity and balance information
+/** @openapi /lending/liquidity: { get: { summary: "Get user's liquidity and balance", tags: ["Lending"] } } */
 router.get("/liquidity", authHandler.authorizeRequest(), LendingController.getLiquidityAndBalance);
 
-// Get user's loans
+/** @openapi /lending/loans: { get: { summary: "Get user's loans", tags: ["Lending"] }, post: { summary: "Borrow from lending pool", tags: ["Lending"] }, patch: { summary: "Repay loan", tags: ["Lending"] } } */
 router.get("/loans", authHandler.authorizeRequest(), LendingController.getLoans);
 
-// ----- Liquidity Management -----
-// Deposit liquidity to the lending pool
+/** @openapi /lending/pools/liquidity: { post: { summary: "Deposit liquidity to lending pool", tags: ["Lending"] }, delete: { summary: "Withdraw liquidity from lending pool", tags: ["Lending"] } } */
 router.post("/pools/liquidity", authHandler.authorizeRequest(), LendingController.depositLiquidity);
-
-// Withdraw liquidity from the lending pool
 router.delete("/pools/liquidity", authHandler.authorizeRequest(), LendingController.withdrawLiquidity);
-// Withdraw all liquidity (no dust)
+
+/** @openapi /lending/pools/withdraw-all: { post: { summary: "Withdraw all liquidity", tags: ["Lending"] } } */
 router.post("/pools/withdraw-all", authHandler.authorizeRequest(), LendingController.withdrawLiquidityAll);
 
-// ----- Collateral Management -----
-// Supply collateral
+/** @openapi /lending/collateral: { post: { summary: "Supply collateral", tags: ["Lending"] }, delete: { summary: "Withdraw collateral", tags: ["Lending"] } } */
 router.post("/collateral", authHandler.authorizeRequest(), LendingController.supplyCollateral);
-
-// Withdraw collateral
 router.delete("/collateral", authHandler.authorizeRequest(), LendingController.withdrawCollateral);
 
-// ----- Loan Operations -----
-// Borrow from the lending pool
 router.post("/loans", authHandler.authorizeRequest(), LendingController.borrow);
-
-// Repay loan
 router.patch("/loans", authHandler.authorizeRequest(), LendingController.repay);
 
-// Repay all
+/** @openapi /lending/loans/repay-all: { post: { summary: "Repay all loans", tags: ["Lending"] } } */
 router.post("/loans/repay-all", authHandler.authorizeRequest(), LendingController.repayAll);
 
-// ----- Liquidation Data (Listing) -----
-// Get currently liquidatable loans
+/** @openapi /lending/liquidate: { get: { summary: "Get liquidatable loans", tags: ["Lending"] } } */
 router.get("/liquidate", authHandler.authorizeRequest(), LendingController.listLiquidatable);
 
-// Get near-unhealthy loans (query param margin=x)
+/** @openapi /lending/liquidate/near-unhealthy: { get: { summary: "Get near-unhealthy loans", tags: ["Lending"] } } */
 router.get("/liquidate/near-unhealthy", authHandler.authorizeRequest(), LendingController.listNearUnhealthy);
 
-// ----- Liquidation Management -----
-// Execute liquidation on a specific loan (singular alias for UI compatibility)
+/** @openapi /lending/liquidate/{id}: { post: { summary: "Execute liquidation", tags: ["Lending"] } } */
 router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
-// Existing plural route retained for backward compatibility
+
+/** @openapi /lending/liquidations/{id}: { post: { summary: "Execute liquidation (legacy)", tags: ["Lending"] } } */
 router.post("/liquidations/:id", authHandler.authorizeRequest(), LendingController.executeLiquidation);
 
-// ----- Admin Configuration -----
-// Configure asset with all parameters
+/** @openapi /lending/admin/configure-asset: { post: { summary: "Configure asset (admin)", tags: ["Lending"] } } */
 router.post("/admin/configure-asset", authHandler.authorizeRequest(), LendingController.configureAsset);
 
-// Sweep protocol reserves to fee collector
+/** @openapi /lending/admin/sweep-reserves: { post: { summary: "Sweep protocol reserves (admin)", tags: ["Lending"] } } */
 router.post("/admin/sweep-reserves", authHandler.authorizeRequest(), LendingController.sweepReserves);
 
-// Set debt ceilings for protocol risk management
+/** @openapi /lending/admin/set-debt-ceilings: { post: { summary: "Set debt ceilings (admin)", tags: ["Lending"] } } */
 router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingController.setDebtCeilings);
 
-// ----- SafetyModule -----
-// Get SafetyModule info (total assets, user shares, cooldown status, etc.)
+/** @openapi /lending/safety/info: { get: { summary: "Get SafetyModule info", tags: ["Lending"] } } */
 router.get("/safety/info", authHandler.authorizeRequest(), SafetyController.getInfo);
 
-// Stake USDST to receive sUSDST shares
+/** @openapi /lending/safety/stake: { post: { summary: "Stake USDST", tags: ["Lending"] } } */
 router.post("/safety/stake", authHandler.authorizeRequest(), SafetyController.stake);
 
-// Start cooldown period for unstaking
+/** @openapi /lending/safety/cooldown: { post: { summary: "Start cooldown period", tags: ["Lending"] } } */
 router.post("/safety/cooldown", authHandler.authorizeRequest(), SafetyController.startCooldown);
 
-// Redeem specific amount of sUSDST shares for USDST (after cooldown + within window)
+/** @openapi /lending/safety/redeem: { post: { summary: "Redeem sUSDST shares", tags: ["Lending"] } } */
 router.post("/safety/redeem", authHandler.authorizeRequest(), SafetyController.redeem);
 
-// Redeem all sUSDST shares for USDST (after cooldown + within window)
+/** @openapi /lending/safety/redeem-all: { post: { summary: "Redeem all sUSDST shares", tags: ["Lending"] } } */
 router.post("/safety/redeem-all", authHandler.authorizeRequest(), SafetyController.redeemAll);
 
-export default router; 
+export default router;

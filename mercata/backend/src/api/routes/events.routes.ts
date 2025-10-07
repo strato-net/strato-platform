@@ -4,10 +4,42 @@ import EventsController from "../controllers/events.controller";
 
 const router = Router();
 
-// Get events with optional filters
+/**
+ * @openapi
+ * /events:
+ *   get:
+ *     summary: Get blockchain events
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { type: object } }
+ */
 router.get("/", authHandler.authorizeRequest(), EventsController.getEvents);
 
-// Get contract information for filtering
+/**
+ * @openapi
+ * /events/contracts:
+ *   get:
+ *     summary: Get contract information
+ *     tags: [Events]
+ *     responses:
+ *       200:
+ *         description: Success
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data: { type: array, items: { type: object } }
+ */
 router.get("/contracts", authHandler.authorizeRequest(), EventsController.getContractInfo);
 
-export default router; 
+export default router;
