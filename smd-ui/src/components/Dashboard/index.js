@@ -266,9 +266,19 @@ class Dashboard extends Component {
                 description={sec2Date(uptime)}
                 mode={
                   !metadata
+                  ? "danger"
+                  : !health || !systemHealth || !synced
+                  ? "warning"
+                  : "success"
                 }
                 iconClass={
                   !metadata
+                  ? "fa-triangle-exclamation"
+                  : !health || !systemHealth
+                  ? "fa-exclamation-circle"
+                  : !synced
+                  ? "fa-rotate"
+                  : "fa-check-circle"
                 }
               />
             </Popover>
