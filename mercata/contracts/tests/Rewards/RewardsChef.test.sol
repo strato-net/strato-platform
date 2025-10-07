@@ -23,16 +23,16 @@ contract Describe_TokenPausable {
     uint256 currentTimestamp;
 
     function beforeAll() {
-        // Create test users
+        // Create test users once
         user1 = new User();
         user2 = new User();
-
-        // Create full Mercata infrastructure
-        m = new Mercata();
-        require(address(m) != address(0), "Mercata address is 0");
     }
 
     function beforeEach() {
+        // Create fresh Mercata infrastructure for each test
+        m = new Mercata();
+        require(address(m) != address(0), "Mercata address is 0");
+
         // Deploy a fresh test token for each test
         address tokenAddress = m.tokenFactory().createToken(
             "TestCATA",
@@ -57,11 +57,19 @@ contract Describe_TokenPausable {
         lpToken1.mint(address(user1), initLpTokensPerUser);
         lpToken1.mint(address(user2), initLpTokensPerUser);
 
-	cataPerSecond = 1000;
+        cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
 
-        // Use RewardsChef from Mercata and initialize it
+        // Use RewardsChef from Mercata
         chef = m.rewardsChef();
+
+        // Whitelist test contract to transfer ownership via adminRegistry voting
+        m.adminRegistry().castVoteOnIssue(address(chef), "transferOwnership", address(this));
+
+        // Transfer ownership to test contract (now whitelisted)
+        Ownable(address(chef)).transferOwnership(address(this));
+
+        // Initialize RewardsChef (now that we own it)
         chef.initialize(tokenAddress, cataPerSecond);
 
         // Transfer ownership of the reward token to the chef so it can mint rewards
