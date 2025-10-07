@@ -194,6 +194,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             setRepayAmount(val);
           }}
           className="pt-2"
+          disabled={BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
         />
       </div>
 

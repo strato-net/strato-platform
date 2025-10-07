@@ -11,6 +11,7 @@ interface PercentageButtonsProps {
   percentages?: number[];
   className?: string;
   decimals?: number;
+  disabled?: boolean;
 }
 
 const PercentageButtons: React.FC<PercentageButtonsProps> = ({
@@ -20,6 +21,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
   percentages = [0.25, 0.5, 0.75, 1],
   className = "",
   decimals = 18,
+  disabled = false,
 }) => {
   const maxValueBigInt = useMemo(() => {
     const s = String(maxValue || "0").replace(/,/g, "").trim();
@@ -59,7 +61,7 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
     }));
   }, [percentages, maxValueBigInt]);
 
-  const isDisabled = maxValueBigInt <= 0n;
+  const isDisabled = disabled || maxValueBigInt <= 0n;
 
   return (
     <div className={`flex gap-2 ${className}`}>
@@ -76,7 +78,9 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
             disabled={isDisabled}
             title={
               isDisabled
-                ? "No amount available"
+                ? disabled 
+                  ? "Amount too small for percentage selection"
+                  : "No amount available"
                 : `Set to ${percent * 100}% of available`
             }
           >
