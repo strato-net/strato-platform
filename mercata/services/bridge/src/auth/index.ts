@@ -139,7 +139,7 @@ export const getBAUserToken = async (): Promise<string> => {
 
     // Type assertion for token object
     const token = tokenObj.token[getOAuthConfig().tokenField] as string;
-    const expiresAt = Math.floor((tokenObj.token.expires_at as number) / 1000);
+    const expiresAt = tokenObj.token.expires_at as number;
 
     console.debug(`[Auth] Token extracted:`, {
       hasAccessToken: !!token,
