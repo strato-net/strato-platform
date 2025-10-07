@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -48,17 +49,41 @@ const ConfigureAssetModal = ({
 }: ConfigureAssetModalProps) => {
   const { toast } = useToast();
   const { configureAsset, loading } = useLendingContext();
+
+  const defaultValues = {
+    "ltv": "75",
+    "liquidationThreshold": "80",
+    "liquidationBonus": "105",
+    "interestRate": "5",
+    "reserveFactor": "10",
+    "perSecondFactorRAY":
+    "1000000001547125956666413085"
+  };
   
   const form = useForm<ConfigureAssetFormValues>({
     defaultValues: {
-      ltv: currentConfig?.ltv?.replace('%', '') || '75',
-      liquidationThreshold: currentConfig?.liquidationThreshold?.replace('%', '') || '80',
-      liquidationBonus: currentConfig?.liquidationBonus?.replace('%', '') || '105',
-      interestRate: currentConfig?.interestRate?.replace('%', '') || '5',
-      reserveFactor: currentConfig?.reserveFactor?.replace('%', '') || '10',
-      perSecondFactorRAY: currentConfig?.perSecondFactorRAY || '1000000001547125956666413085',
+      ltv: currentConfig?.ltv?.replace('%', '') || defaultValues.ltv,
+      liquidationThreshold: currentConfig?.liquidationThreshold?.replace('%', '') || defaultValues.liquidationThreshold,
+      liquidationBonus: currentConfig?.liquidationBonus?.replace('%', '') || defaultValues.liquidationBonus,
+      interestRate: currentConfig?.interestRate?.replace('%', '') || defaultValues.interestRate,
+      reserveFactor: currentConfig?.reserveFactor?.replace('%', '') || defaultValues.reserveFactor,
+      perSecondFactorRAY: currentConfig?.perSecondFactorRAY || defaultValues.perSecondFactorRAY,
     },
   });
+
+  // Reset form values when token or config changes
+  useEffect(() => {
+    if (open && currentConfig) {
+      form.reset({
+        ltv: currentConfig.ltv?.replace('%', '') || defaultValues.ltv,
+        liquidationThreshold: currentConfig.liquidationThreshold?.replace('%', '') || defaultValues.liquidationThreshold,
+        liquidationBonus: currentConfig.liquidationBonus?.replace('%', '') || defaultValues.liquidationBonus,
+        interestRate: currentConfig.interestRate?.replace('%', '') || defaultValues.interestRate,
+        reserveFactor: currentConfig.reserveFactor?.replace('%', '') || defaultValues.reserveFactor,
+        perSecondFactorRAY: currentConfig.perSecondFactorRAY || defaultValues.perSecondFactorRAY,
+      });
+    }
+  }, [open, currentConfig, form]);
 
   const validateForm = (data: ConfigureAssetFormValues) => {
     const ltv = parseFloat(data.ltv);
@@ -178,7 +203,7 @@ const ConfigureAssetModal = ({
                             <FormControl>
                               <div className="relative">
                                 <Input
-                                  placeholder="75"
+                                  placeholder={defaultValues.ltv}
                                   {...field}
                                   className="pr-8"
                                 />
@@ -212,7 +237,7 @@ const ConfigureAssetModal = ({
                             <FormControl>
                               <div className="relative">
                                 <Input
-                                  placeholder="80"
+                                  placeholder={defaultValues.liquidationThreshold}
                                   {...field}
                                   className="pr-8"
                                 />
@@ -247,7 +272,7 @@ const ConfigureAssetModal = ({
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="105"
+                                placeholder={defaultValues.liquidationBonus}
                                 {...field}
                                 className="pr-8"
                               />
@@ -296,7 +321,7 @@ const ConfigureAssetModal = ({
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="5.0"
+                                placeholder={defaultValues.interestRate}
                                 {...field}
                                 className="pr-8"
                               />
@@ -328,7 +353,7 @@ const ConfigureAssetModal = ({
                           </FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="1000000001547125956666413085"
+                              placeholder={defaultValues.perSecondFactorRAY}
                               {...field}
                               className="font-mono text-sm"
                             />
@@ -375,7 +400,7 @@ const ConfigureAssetModal = ({
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="10"
+                                placeholder={defaultValues.reserveFactor}
                                 {...field}
                                 className="pr-8"
                               />

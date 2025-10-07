@@ -1400,7 +1400,7 @@ contract Describe_CDPEngine {
         
         // STEP 4: Test failed withdrawal - THIS IS THE CRITICAL TEST
         // log("=== BEFORE FAILED WITHDRAWAL ATTEMPT ===");
-        (uint engineCollateralBefore, uint _2) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint engineCollateralBefore,) = cdpEngine.vaults(address(this), collateralTokenAddress);
         uint256 vaultCollateralBefore = cdpVault.userCollaterals(address(this), collateralTokenAddress);
         uint256 userBalanceBefore = ERC20(collateralTokenAddress).balanceOf(address(this));
         

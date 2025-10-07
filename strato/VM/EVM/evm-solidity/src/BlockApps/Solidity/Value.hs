@@ -242,6 +242,11 @@ unsparse imap =
 tosparse :: [Value] -> I.IntMap Value
 tosparse = I.fromList . zip [0 ..]
 
+valueToTexts :: Value -> [Text]
+valueToTexts = \case
+  ValueVariadic vals -> valueToText <$> vals
+  v -> pure $ valueToText v
+
 valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv

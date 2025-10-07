@@ -855,8 +855,15 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".PRECISION_MULTIPLIER", BInteger oneE18)
      , (".rewardToken", BContract "Token" $ unspecifiedChain cataAddress)
      , (".cataPerSecond", BInteger 100000000000000)
-     , (".totalAllocPoint", BInteger 400)
+     , (".totalAllocPoint", BInteger 600)
      , (".minFutureTime", BInteger 3600)
+     -- lpTokenInUse mapping entries
+     , (".lpTokenInUse<a:" <> addrBS mTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS sUsdstAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS ethstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
      -- mUSDST
      , (".pools[0].lpToken", BAccount $ unspecifiedChain mTokenAddress)
      , (".pools[0].allocPoint", BInteger 100)
@@ -882,15 +889,31 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".pools[2].bonusPeriods[0].bonusMultiplier", BInteger 1)
      , (".pools[2].bonusPeriods.length", BInteger 1)
      -- silvst
-     , (".pools[3].lpToken", BAccount $ unspecifiedChain silvstPoolAddress)
+     , (".pools[3].lpToken", BAccount $ unspecifiedChain silvstLpTokenAddress)
      , (".pools[3].allocPoint", BInteger 100)
      , (".pools[3].lastRewardTimestamp", BInteger lastAccrual)
      , (".pools[3].accPerToken", BInteger 0)
      , (".pools[3].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
      , (".pools[3].bonusPeriods[0].bonusMultiplier", BInteger 1)
      , (".pools[3].bonusPeriods.length", BInteger 1)
+     -- ethst
+     , (".pools[4].lpToken", BAccount $ unspecifiedChain ethstLpTokenAddress)
+     , (".pools[4].allocPoint", BInteger 100)
+     , (".pools[4].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[4].accPerToken", BInteger 0)
+     , (".pools[4].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[4].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[4].bonusPeriods.length", BInteger 1)
+     -- wbtcst
+     , (".pools[5].lpToken", BAccount $ unspecifiedChain wbtcstLpTokenAddress)
+     , (".pools[5].allocPoint", BInteger 100)
+     , (".pools[5].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[5].accPerToken", BInteger 0)
+     , (".pools[5].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[5].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[5].bonusPeriods.length", BInteger 1)
      -- pools length
-     , (".pools.length", BInteger 4)
+     , (".pools.length", BInteger 6)
      ]
 
 rewardsManager :: AccountInfo

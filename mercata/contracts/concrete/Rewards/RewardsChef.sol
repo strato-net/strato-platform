@@ -158,6 +158,7 @@ contract record RewardsChef is Ownable {
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -199,6 +200,9 @@ contract record RewardsChef is Ownable {
         return (bp.startTimestamp, bp.bonusMultiplier);
     }
 
+    // Tracks whether an LP token is already in use by a pool
+    mapping(address => bool) private lpTokenInUse;
+
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public record userInfo;
 
@@ -225,14 +229,11 @@ contract record RewardsChef is Ownable {
         address _lpToken,
         uint256 _bonusMultiplier
     ) public onlyOwner {
-        // Check if LP token already exists in pools. If it does exists, return
-        // early
-        for (uint256 i = 0; i < pools.length; i++) {
-            if (pools[i].lpToken == _lpToken) {
-                return;
-            }
-        }
+        require(!lpTokenInUse[_lpToken], "LP token already exists");
+        require(_lpToken != address(rewardToken), "LP token cannot be the same as reward token");
         require(_bonusMultiplier >= 1, "Bonus multiplier must be at least 1");
+
+        massUpdatePools();
 
         totalAllocPoint += _allocPoint;
         require(totalAllocPoint > 0, "Total allocation points must be greater than zero");
@@ -249,6 +250,7 @@ contract record RewardsChef is Ownable {
         poolInfo.bonusPeriods.push(BonusPeriod(block.timestamp, _bonusMultiplier));
 
         pools.push(poolInfo);
+        lpTokenInUse[_lpToken] = true;
 
         emit PoolAdded(pools.length - 1, _lpToken, _allocPoint, _bonusMultiplier);
     }
@@ -258,6 +260,8 @@ contract record RewardsChef is Ownable {
         uint256 _allocPoint
     ) public onlyOwner {
         require(_pid < pools.length, "Pool does not exist");
+
+        massUpdatePools();
 
         uint256 oldAllocPoint = pools[_pid].allocPoint;
         totalAllocPoint = totalAllocPoint - oldAllocPoint + _allocPoint;
@@ -280,10 +284,8 @@ contract record RewardsChef is Ownable {
 
         // Ensure new period starts after the last period
         uint256 periodsLength = pools[_pid].bonusPeriods.length;
-        if (periodsLength > 0) {
-            require(_startTimestamp > pools[_pid].bonusPeriods[periodsLength - 1].startTimestamp,
-                    "New period must start after the last period");
-        }
+        require(_startTimestamp > pools[_pid].bonusPeriods[periodsLength - 1].startTimestamp,
+                "New period must start after the last period");
 
         pools[_pid].bonusPeriods.push(BonusPeriod(_startTimestamp, _bonusMultiplier));
 
@@ -352,6 +354,13 @@ contract record RewardsChef is Ownable {
         pool.lastRewardTimestamp = block.timestamp;
     }
 
+    function massUpdatePools() public {
+        uint256 poolCount = pools.length;
+        for (uint256 pid = 0; pid < poolCount; pid++) {
+            updatePool(pid);
+        }
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // USER INTERACTIONS
     // ═════════════════════════════════════════════════════════════════════════
@@ -367,7 +376,7 @@ contract record RewardsChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
-                ERC20(rewardToken).transfer(msg.sender, pending);
+                rewardToken.transfer(msg.sender, pending);
             }
         }
 
@@ -418,6 +427,23 @@ contract record RewardsChef is Ownable {
 
         emit CurrentUserAmount(msg.sender, _pid, user.amount);
         emit Withdraw(msg.sender, _pid, _amount);
+    }
+
+    function emergencyWithdraw(uint256 _pid) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        uint256 amount = user.amount;
+        user.amount = 0;
+        user.rewardDebt = 0;
+
+        if (amount > 0) {
+            ERC20(pool.lpToken).transfer(msg.sender, amount);
+        }
+
+        emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
     function pendingCata(uint256 _pid, address _user) external view returns (uint256) {

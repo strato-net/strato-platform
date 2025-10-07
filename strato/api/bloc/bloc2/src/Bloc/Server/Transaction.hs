@@ -1110,7 +1110,7 @@ constructArgValuesAndSource args argNamesTypes = do
       if Map.null argNamesTypes
         then return []
         else throwIO (UserError "no arguments provided to function.")
-    Just argsMap -> map valueToText <$> getArgValues argsMap argNamesTypes
+    Just argsMap -> concatMap valueToTexts <$> getArgValues argsMap argNamesTypes
 
 getAccountTxParams ::
   ( MonadIO m

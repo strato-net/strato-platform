@@ -9,7 +9,9 @@
 {-# LANGUAGE TupleSections #-}
 
 module SolidVM.Solidity.Fuzzer
-  ( runFuzzer,
+  ( defaultHook,
+    runFuzzer,
+    runFuzzerWithHook,
     module SolidVM.Solidity.Fuzzer.Types,
   )
 where
@@ -28,9 +30,10 @@ import Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
 import Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BL
+import Data.Foldable (foldlM)
 import Data.List (sortBy)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.Ord (comparing)
 import Data.Source
 import qualified Data.Text as T
@@ -73,12 +76,23 @@ withTestName = fmap . fmap . (,) . formatTestName
 success :: Applicative f => SourceAnnotation a -> f FuzzerResult
 success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
 
+defaultHook :: Monad m => Int -> FuzzerTestAndResult -> m FuzzerTestAndResult
+defaultHook _ r = pure r
+
 runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
   (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
   SourceMap ->
   m [FuzzerTestAndResult]
-runFuzzer dSettings compile src = compile src >>= \case
+runFuzzer dSettings compile src = runFuzzerWithHook dSettings compile src defaultHook
+
+runFuzzerWithHook :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
+  Maybe DebugSettings ->
+  (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
+  SourceMap ->
+  (Int -> FuzzerTestAndResult -> m FuzzerTestAndResult) ->
+  m [FuzzerTestAndResult]
+runFuzzerWithHook dSettings compile src hook = compile src >>= \case
   Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
@@ -94,8 +108,9 @@ runFuzzer dSettings compile src = compile src >>= \case
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
               _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
               let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
-              testResults <- fmap catMaybes . for functionsInSourceOrder $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
-                if
+              testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
+                mResult <- fmap (fmap (withTestName $ T.pack fName)) $
+                  if
                     | testPrefix `T.isPrefixOf` labelToText fName -> do
                         _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
                         result <- Just <$> test bh addr fName f
@@ -107,6 +122,8 @@ runFuzzer dSettings compile src = compile src >>= \case
                         _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
                         pure result
                     | otherwise -> pure Nothing
+                maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
+                ) (1, []) functionsInSourceOrder
               _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
               pure testResults
 
