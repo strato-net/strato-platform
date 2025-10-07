@@ -428,7 +428,6 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
     ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to
     let n = case ch of
               SolidVMCode n' _ -> n' 
-              CodeAtAccount _ n' -> n' 
               _ -> ""
     resolveCodePtrParent ch >>= \case -- CodePtr's parent
       Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
@@ -443,9 +442,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
   cnAccount <-
     if isRCC
       then
-        addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \case
-          CodeAtAccount {} -> pure to
-          _ -> pure from
+        addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \_ -> pure from
       else pure to
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to (T.pack ctrName) (T.pack parentName')) abstracts'
@@ -606,7 +603,6 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) ccToGet
       let n = case ch of
                 SolidVMCode n' _ -> n'
-                CodeAtAccount _ n' -> n'
                 _ -> ""
       resolveCodePtrParent ch >>= \case -- CodePtr's parent
         Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
