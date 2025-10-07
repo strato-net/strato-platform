@@ -19,6 +19,7 @@
 
 module Strato.Lite.Simulator where
 
+import BlockApps.Logging
 import BlockApps.X509.Certificate as X509
 import Blockchain.Data.BlockDB ()
 import Blockchain.GenesisBlocks.Contracts.CertRegistry
@@ -114,7 +115,7 @@ createSimulatorPeerAndCorePeer network' privKey selfId initialValidators' extraC
   simPeer <- createSimulatorPeer privKey inet ipAsText tcpPort udpPort bootNodes
   let vals = snd <$> initialValidators'
       genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract extraCerts Helium.genesisBlock
-  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav
+  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav $ const runLoggingT
   pure (simPeer, corePeer)
 
 createSimulatorConnection ::
@@ -239,7 +240,7 @@ hoistSimulator s f = do
   mpdb <- fmap _simulatorContextPeerMap . atomically . readTVar $ _simulatorPeerContext s
   runReaderT (runReaderT f s) mpdb
 
-runSimulatorNode :: SimulatorPeer -> CorePeer -> BaseM [Async ()]
+runSimulatorNode :: SimulatorPeer -> CorePeer -> IO [Async ()]
 runSimulatorNode s c = runNode (hoistSimulator s) id c
 
 createSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager BaseM (SimulatorPeer, CorePeer)
@@ -261,7 +262,7 @@ addSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes = 
         writeTVar (mgr ^. network) $ net & nodes . at nodeLabel ?~ node
         pure True
       _ -> pure False
-  when didCreate . lift $ do
+  when didCreate . liftIO $ do
     a <- uncurry runSimulatorNode node
     atomically $ modifyTVar (mgr ^. threads) $ nodeThreads . at nodeLabel ?~ a
   pure didCreate
@@ -326,7 +327,7 @@ runNetwork nodesList validatorsFilter = do
   peers <- liftIO $ traverse (\(p, (n, (c, i, t, u))) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
-  nodeThreads' <- for nodesMap $ uncurry runSimulatorNode
+  nodeThreads' <- liftIO . for nodesMap $ uncurry runSimulatorNode
   let threadPool = ThreadPool nodeThreads' M.empty
   networkTVar <- newTVarIO network'
   threadsTVar <- newTVarIO threadPool
@@ -350,7 +351,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   for eConnections $ \connections' -> do
     let connectionsMap = M.fromList $ zip connectionsList connections'
         network' = Network nodesMap connectionsMap inet
-    nodeThreads' <- for nodesMap $ \(s,c) -> runNodeWithoutP2P (hoistSimulator s) c
+    nodeThreads' <- liftIO . for nodesMap $ \(s,c) -> runNodeWithoutP2P (hoistSimulator s) c
     connectionThreads' <- for connectionsMap $ async . runSimulatorConnection
     let threadPool = ThreadPool nodeThreads' connectionThreads'
     networkTVar <- newTVarIO network'
@@ -360,5 +361,5 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
 runNetworkOld :: [(SimulatorPeer, CorePeer)] -> [SimulatorP2PConnection] -> BaseM ()
 runNetworkOld nodes' connections' =
   concurrently_
-    (mapConcurrently (uncurry runSimulatorNode) nodes')
+    (liftIO $ mapConcurrently (uncurry runSimulatorNode) nodes')
     (mapConcurrently runSimulatorConnection connections')

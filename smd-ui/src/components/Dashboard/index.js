@@ -66,6 +66,9 @@ class Dashboard extends Component {
     super(props);
     this.state = {
       isHovering: false,
+      clientUptime: 0,
+      lastServerUptime: 0,
+      lastUpdateTime: Date.now(),
     };
   }
   componentDidMount() {
@@ -80,6 +83,10 @@ class Dashboard extends Component {
     this.props.subscribeRoom(GET_SHARD_COUNT);
     this.props.subscribeRoom(GET_SYSTEM_INFO);
     this.props.subscribeRoom(GET_NETWORK_HEALTH);
+    this.props.subscribeRoom(GET_NODE_UPTIME);
+
+    // Start client-side uptime timer
+    this.startUptimeTimer();
 
     // mixpanelWrapper.track("dashboard_page_load");
     // ReactGA.send({
@@ -87,6 +94,30 @@ class Dashboard extends Component {
     //   page: "/smd",
     //   title: "Dashboard",
     // });
+  }
+
+  startUptimeTimer = () => {
+    this.uptimeInterval = setInterval(() => {
+      const now = Date.now();
+      const timeDiff = Math.floor((now - this.state.lastUpdateTime) / 1000);
+      const newClientUptime = this.state.lastServerUptime + timeDiff;
+      
+      this.setState({
+        clientUptime: newClientUptime,
+        lastUpdateTime: now
+      });
+    }, 1000);
+  }
+
+  componentDidUpdate(prevProps) {
+    // Update client timer when server uptime changes
+    if (prevProps.dashboard.uptime !== this.props.dashboard.uptime && this.props.dashboard.uptime > 0) {
+      this.setState({
+        lastServerUptime: this.props.dashboard.uptime,
+        clientUptime: this.props.dashboard.uptime,
+        lastUpdateTime: Date.now()
+      });
+    }
   }
 
   displaySystemMetrics(cpu, memory, filesystem, networkStats, systemHealth) {
@@ -180,6 +211,11 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(GET_SYSTEM_INFO);
     this.props.unSubscribeRoom(GET_SHARD_COUNT);
     this.props.unSubscribeRoom(GET_NETWORK_HEALTH);
+    
+    // Clear uptime timer
+    if (this.uptimeInterval) {
+      clearInterval(this.uptimeInterval);
+    }
   }
 
   render() {
@@ -189,7 +225,7 @@ class Dashboard extends Component {
     const txTypeData = this.props.dashboard.transactionTypes;
     const { usersCount, contractsCount, lastBlockNumber } =
       this.props.dashboard;
-    const uptime = this.props.dashboard.uptime;
+    const uptime = this.state.clientUptime || this.props.dashboard.uptime;
     const health = this.props.dashboard.health;
     const healthStatus = this.props.dashboard.healthStatus;
     const healthIssues = this.props.dashboard.healthIssues;

@@ -51,10 +51,10 @@ import qualified Text.Colors                           as C
 import           UnliftIO
 
 runEthServer ::
-  (RunsServer n m, MonadP2P n) =>
+  (RunsServer m, MonadP2P m) =>
   Int ->
-  PeerRunner n m () ->
-  m ()
+  PeerRunner m () ->
+  IO ()
 runEthServer listenPort runner =
   runServer (TCPPort listenPort) runner $ \c a ->
     ethServerHandler (c ^. peerSource) (c ^. peerSink) (c ^. seqSource) a
@@ -181,13 +181,13 @@ runEthServerConduit p pSource pSink seqSrc peerStr = labelPeerThread peerStr "Pe
       return ret
 
 stratoP2PServer ::
-  (MonadIO m, MonadLogger m, MonadP2P n, RunsServer n m) =>
-  PeerRunner n m () ->
-  m ()
-stratoP2PServer runner = labelTheThread "stratoP2PServer" $ do
+  (MonadP2P m, RunsServer m) =>
+  PeerRunner m () ->
+  IO ()
+stratoP2PServer runner = labelTheThread "stratoP2PServer" . runner $ \_ -> do
   $logInfoS "stratoP2PServer" $ T.pack $ "connect address: " ++ flags_address
   $logInfoS "stratoP2PServer" $ T.pack $ "listen port:     " ++ show flags_listen
-  runEthServer flags_listen runner
+  liftIO $ runEthServer flags_listen runner
 
 logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
 logAndLengthenPeerDisableBy disableBy peer = do

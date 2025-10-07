@@ -86,23 +86,23 @@ main = do
             Left xs -> if j
                          then printJSON xs
                          else putStrLn "Parse errors:" >> traverse_ print xs
-          "test" -> runCli (fuzz Nothing srcMap) >>= \xs ->
-              if j
-                then printJSON xs
-                else do
-                  traverse_ (\case
-                        FuzzerSuccess (SourceAnnotation _ _ (testName, _)) ->
-                          putStrLn . T.unpack $ "✅ " <> testName <> " succeeded"
-                        FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
-                          putStrLn . T.unpack $ "❌ " <> testName <> " failed: " <> msg
-                      ) xs
-                  let totalTests = length xs
-                      passedTests = length $ filter isFuzzerSuccess xs
-                      isFuzzerSuccess (FuzzerSuccess _) = True
-                      isFuzzerSuccess _ = False
-                  when (totalTests > 0) $ do
-                    putStrLn ""
-                    putStrLn $ "(" ++ show passedTests ++ " / " ++ show totalTests ++ " tests passed)"
+          "test" -> do
+            let printResult i r = liftIO $ r <$ case r of
+                  FuzzerSuccess (SourceAnnotation _ _ (testName, _)) -> do
+                    putStrLn $ "✅ " <> show i <> ". " <> T.unpack testName <> " succeeded"
+                  FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
+                    putStrLn $ "❌ " <> show i <> ". " <> T.unpack testName <> " failed: " <> T.unpack msg
+            xs <- runCli $ fuzz Nothing srcMap $ if j then defaultHook else printResult
+            if j
+              then printJSON xs
+              else do
+                let totalTests = length xs
+                    passedTests = length $ filter isFuzzerSuccess xs
+                    isFuzzerSuccess (FuzzerSuccess _) = True
+                    isFuzzerSuccess _ = False
+                when (totalTests > 0) $ do
+                  putStrLn ""
+                  putStrLn $ "(" ++ show passedTests ++ " / " ++ show totalTests ++ " tests passed)"
           "compile" -> runCli (compile srcMap) >>= \case
             Right cc -> if j
                           then printJSON cc
@@ -142,7 +142,7 @@ main = do
                               Just resp -> atomically $ writeTQueue q resp
                             loop
                 void . runConcurrently . asum $ map Concurrently
-                  [ void $ runCli (fuzz (Just dSettings) srcMap')
+                  [ void $ runCli (fuzz (Just dSettings) srcMap' defaultHook)
                   , loop
                   , forever $ handleOutput dSettings >>= atomically . writeTQueue q
                   , forever $ atomically (readTQueue q) >>= printJSON
@@ -156,7 +156,7 @@ main = do
                 . M.fromList
                 . unSourceMap
         analyze src = compile src >>= \eCC -> pure $ runDetectors parse (const eCC) id src
-        fuzz dSettings = runFuzzer dSettings compile
+        fuzz dSettings = runFuzzerWithHook dSettings compile
         handleInput :: DebugSettings -> JsonRpcMessage -> IO (Maybe JsonRpcMessage)
         handleInput dSettings (Rpc i m _ v) = case m of
           "pause" -> Nothing <$ pause dSettings
