@@ -57,7 +57,6 @@ const Transfer = () => {
   }, [fromAsset, voucherBalance, usdstBalance]);
 
   const fetchUserTokens = useCallback(async () => {
-    console.log("fetchUserTokens");
     try {
       const tokens = await getTransferableTokens();
       setTokens(tokens);
