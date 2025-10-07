@@ -201,7 +201,6 @@ class Dashboard extends Component {
       ? this.props.appMetadata.metadata.isSynced
       : false;
     const metadata = this.props.appMetadata.metadata;
-    const isLoadingMetadata = this.props.appMetadata.loading;
     const networkHealth = this.props.dashboard.networkStatus;
     const networkStatusMessage = this.props.dashboard.networkStatusMessage;
 
@@ -240,9 +239,7 @@ class Dashboard extends Component {
               content={
                 <div
                   className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
-                    isLoadingMetadata
-                      ? "primary"
-                      : !metadata
+                    !metadata
                       ? "danger"
                       : !health || !systemHealth || !synced
                       ? "warning"
@@ -250,15 +247,9 @@ class Dashboard extends Component {
                   }`}
                 >
                   <h5 className="pt-callout-title">
-                    {isLoadingMetadata 
-                      ? "Loading..." 
-                      : !metadata 
-                      ? "API Disconnected" 
-                      : healthStatus}
+                  {!metadata ? "API Disconnected" : healthStatus}
                   </h5>
-                  {isLoadingMetadata
-                    ? "Fetching node metadata from API..."
-                    : !metadata
+                  {!metadata
                     ? "Cannot connect to the Node's API"
                     : !health || !systemHealth
                     ? `Health issues: ${
@@ -271,33 +262,13 @@ class Dashboard extends Component {
               }
             >
               <NumberCard
-                number={
-                  isLoadingMetadata 
-                    ? "LOADING..." 
-                    : !metadata 
-                    ? "DISCONNECTED" 
-                    : healthStatus
-                }
+            number={!metadata ? "DISCONNECTED" : healthStatus}
                 description={sec2Date(uptime)}
                 mode={
-                  isLoadingMetadata
-                    ? "neutral"
-                    : !metadata
-                    ? "danger"
-                    : !health || !systemHealth || !synced
-                    ? "warning"
-                    : "success"
+                  !metadata
                 }
                 iconClass={
-                  isLoadingMetadata
-                    ? "fa-spinner fa-spin"
-                    : !metadata
-                    ? "fa-triangle-exclamation"
-                    : !health || !systemHealth
-                    ? "fa-exclamation-circle"
-                    : !synced
-                    ? "fa-rotate"
-                    : "fa-check-circle"
+                  !metadata
                 }
               />
             </Popover>

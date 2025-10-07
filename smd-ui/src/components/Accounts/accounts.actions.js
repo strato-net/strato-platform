@@ -19,7 +19,6 @@ export const FETCH_OAUTH_ACCOUNTS_REQUEST = 'FETCH_OAUTH_ACCOUNTS_REQUEST';
 export const FETCH_OAUTH_ACCOUNTS_SUCCESS = 'FETCH_OAUTH_ACCOUNTS_SUCCESS';
 export const FETCH_OAUTH_ACCOUNTS_FAILURE = 'FETCH_OAUTH_ACCOUNTS_FAILURE';
 
-
 export const fetchAccounts = function (loadAddresses, loadBalances, chainId) {
   return {
     type: FETCH_ACCOUNTS,
@@ -172,4 +171,3 @@ export const fetchOauthAccountsFailure = function () {
     type: FETCH_OAUTH_ACCOUNTS_FAILURE
   }
 };
-

@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import {
   fetchAccounts,
-  fetchOauthAccounts
+  fetchOauthAccounts,
 } from './accounts.actions';
 // import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
