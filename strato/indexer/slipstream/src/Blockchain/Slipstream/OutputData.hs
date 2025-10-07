@@ -218,9 +218,9 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
 slipstreamQueryText _ CreateView{..} =
   let baseColumnSet = Set.fromList $ sourceTableColumns ++ contractTableColumns
    in T.concat $
-        [ "DROP MATERIALIZED VIEW IF EXISTS "
+        [ "DROP VIEW IF EXISTS "
         , tableNameToDoubleQuoteText viewName
-        , " CASCADE;\nBEGIN;\nCREATE MATERIALIZED VIEW "
+        , " CASCADE;\nCREATE VIEW " -- \nBEGIN;\nCREATE VIEW "
         , tableNameToDoubleQuoteText viewName
         , " AS SELECT "
         , T.intercalate ", " $
@@ -294,21 +294,22 @@ slipstreamQueryText _ CreateView{..} =
             , "'"
             ]
           ) <$> extraJoinColumns
-        , " WITH NO DATA;\n"
-        , "CREATE UNIQUE INDEX \""
-        , T.pack
-            . take 32 . BC.unpack
-            . Base16.encode . keccak256ToByteString
-            . hash . encodeUtf8
-            $ tableNameToText viewName
-        , "_index\"\n  ON "
-        , tableNameToDoubleQuoteText viewName
-        , wrapAndEscapeDouble primaryKeyColumns
         , ";\n"
-        , "COMMIT;\n"
-        , "REFRESH MATERIALIZED VIEW "
-        , tableNameToDoubleQuoteText viewName
-        , ";"
+        -- , " WITH NO DATA;\n"
+        -- , "CREATE UNIQUE INDEX \""
+        -- , T.pack
+        --     . take 32 . BC.unpack
+        --     . Base16.encode . keccak256ToByteString
+        --     . hash . encodeUtf8
+        --     $ tableNameToText viewName
+        -- , "_index\"\n  ON "
+        -- , tableNameToDoubleQuoteText viewName
+        -- , wrapAndEscapeDouble primaryKeyColumns
+        -- , ";\n"
+        -- , "COMMIT;\n"
+        -- , "REFRESH MATERIALIZED VIEW "
+        -- , tableNameToDoubleQuoteText viewName
+        -- , ";"
         ]
 slipstreamQueryText _ InsertTable{..} = T.concat $
   [ "INSERT INTO ",
@@ -378,11 +379,11 @@ slipstreamQueryText _ (CreateFkeyFunction ForeignKeyInfo{..}) = T.concat
   , tableNameToDoubleQuoteText fkiDestTableName
   , " TO postgres;"
   ]
-slipstreamQueryText _ (RefreshMaterializedView tableName) = T.concat
-  [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "
-  , tableNameToDoubleQuoteText tableName
-  , ";"
-  ]
+slipstreamQueryText _ (RefreshMaterializedView _tableName) = T.concat []
+  -- [ "REFRESH MATERIALIZED VIEW CONCURRENTLY "
+  -- , tableNameToDoubleQuoteText tableName
+  -- , ";"
+  -- ]
 slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 
 data ProcessedCollectionRow = ProcessedCollectionRow
@@ -724,12 +725,12 @@ insertCollectionTable maps = do
   yieldMany results
 
 refreshMaterializedView ::
-  OutputM m =>
+  -- OutputM m =>
   TableName ->
   ConduitM () SlipstreamQuery m ()
 refreshMaterializedView tn = case tableNameContractName tn of
   "" -> pure ()
-  _ -> yield $ RefreshMaterializedView tn
+  _ -> pure () -- yield $ RefreshMaterializedView tn
 
 processGroupedData :: [ProcessedCollectionRow] -> [SlipstreamQuery]
 processGroupedData rows@(row:_) =
