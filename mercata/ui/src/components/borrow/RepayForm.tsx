@@ -29,20 +29,20 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
     healthImpact: 0,
     isHealthy: true,
   });
-  const maxAmount = useMemo(
-    () =>
-      computeMaxTransferable(
-        BigInt(loans?.totalAmountOwed || 0) < (BigInt(usdstBalance) - 1n)
-          ? loans?.totalAmountOwed
-          : (BigInt(usdstBalance) - 1n).toString(),
-        true,
-        voucherBalance,
-        (BigInt(usdstBalance) - 1n).toString(),
-        safeParseUnits(REPAY_FEE).toString(),
-        setFeeError
-      ),
-    [voucherBalance, usdstBalance, loans?.totalAmountOwed]
-  );
+  const maxAmount = useMemo(() => {
+    const availableBalance = (BigInt(usdstBalance) - 1n).toString();
+    const maxTransferable = computeMaxTransferable(
+      availableBalance,
+      true,
+      voucherBalance,
+      availableBalance,
+      safeParseUnits(REPAY_FEE).toString(),
+      setFeeError
+    );
+    
+    const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+    return BigInt(maxTransferable) < totalOwed ? maxTransferable : totalOwed.toString();
+  }, [voucherBalance, usdstBalance, loans?.totalAmountOwed]);
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -80,6 +80,10 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
     const owed = BigInt(loans?.totalAmountOwed || 0);
     const inputWei = safeParseUnits(repayAmount || "0");
     const isFullRepay = inputWei >= owed && owed > 0n;
+    console.log('isFullRepay', isFullRepay);
+    console.log('inputWei', inputWei);
+    console.log('owed', owed);
+    console.log('repayAmount', repayAmount);
     if (isFullRepay) {
       onRepay('ALL');
       setRepayAmount(""); setRepayAmountError(""); setFeeError("");
