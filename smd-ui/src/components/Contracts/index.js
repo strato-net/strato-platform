@@ -132,7 +132,7 @@ class Contracts extends Component {
         return (
           <div className="row pt-dark" key={'contract-card-' + i}>
             <div className="col-sm-12">
-              {value && <ContractCard contract={{ name: value, contract: contracts[value], searchTerm: isValidContractAddress(this.props.filter) ? this.props.filter : null }} />}
+              {value && <ContractCard contract={{ name: value, contract: contracts[value], searchTerm: isValidContractAddress(this.props.filter) ? this.props.filter : null }} instancePagination={this.props.instancePagination} />}
               <br />
             </div>
           </div>

@@ -7,7 +7,8 @@ import {
   fetchState,
   fetchCirrusInstances,
   fetchAccount,
-  fetchContractInfoRequest
+  fetchContractInfoRequest,
+  fetchContractInstances
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
@@ -26,18 +27,40 @@ class ContractCard extends Component {
       this.props.contract.contract.instances.some(instance => 
         instance.address.toLowerCase() === this.props.contract.searchTerm.toLowerCase()
       );
-    this.state = { isOpen: hasSearchMatch };
+    this.state = { 
+      isOpen: hasSearchMatch,
+      instanceOffset: 0,
+      instanceLimit: 10
+    };
   }
 
   componentWillMount(){
     const name = this.props.contract.name;
     const searchTerm = this.props.contract.searchTerm;
+    
+    // Fetch initial instances (first 10)
+    this.props.fetchContractInstances(name, this.props.selectedChain, this.state.instanceOffset, this.state.instanceLimit);
+    
     if(searchTerm){
       this.props.fetchState(name, searchTerm, this.props.selectedChain);
       this.props.fetchAccount(name, searchTerm);
       this.props.fetchContractInfoRequest(`card-data-${searchTerm}-${this.props.selectedChain}`, name, searchTerm)
       this.props.selectContractInstance(name, searchTerm);
     }
+  }
+
+  loadMoreInstances = () => {
+    const name = this.props.contract.name;
+    const newOffset = this.state.instanceOffset + this.state.instanceLimit;
+    this.setState({ instanceOffset: newOffset });
+    this.props.fetchContractInstances(name, this.props.selectedChain, newOffset, this.state.instanceLimit);
+  }
+
+  loadPreviousInstances = () => {
+    const name = this.props.contract.name;
+    const newOffset = Math.max(0, this.state.instanceOffset - this.state.instanceLimit);
+    this.setState({ instanceOffset: newOffset });
+    this.props.fetchContractInstances(name, this.props.selectedChain, newOffset, this.state.instanceLimit);
   }
 
   render() {
@@ -240,6 +263,40 @@ class ContractCard extends Component {
                     </thead>
                     <tbody>{cardData}</tbody>
                   </table>
+                  
+                  {/* Pagination Controls */}
+                  <div className="row" style={{ marginTop: '10px', marginBottom: '10px' }}>
+                    <div className="col-sm-6">
+                      <Button 
+                        type="button"
+                        className="pt-button pt-intent-primary pt-icon-chevron-left"
+                        onClick={this.loadPreviousInstances}
+                        disabled={this.state.instanceOffset === 0}
+                      >
+                        Previous
+                      </Button>
+                    </div>
+                    <div className="col-sm-6 text-right">
+                      <Button 
+                        type="button"
+                        className="pt-button pt-intent-primary pt-icon-chevron-right"
+                        onClick={this.loadMoreInstances}
+                        disabled={!this.props.instancePagination[name]?.hasMore}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Pagination Info */}
+                  <div className="row">
+                    <div className="col-sm-12 text-center">
+                      <small className="pt-text-muted">
+                        Showing {this.state.instanceOffset + 1}-{this.state.instanceOffset + cardData.length} instances
+                        {this.props.instancePagination[name]?.hasMore && " (more available)"}
+                      </small>
+                    </div>
+                  </div>
                 </Collapse>
               </div>
             </div>
@@ -257,7 +314,8 @@ class ContractCard extends Component {
 export function mapStateToProps(state, ownProps) {
   return {
     contractInfos: state.contractCard.contractInfos,
-    selectedChain: state.chains.selectedChain
+    selectedChain: state.chains.selectedChain,
+    instancePagination: state.contracts.instancePagination
   };
 }
 
@@ -267,6 +325,7 @@ export default withRouter(
     fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
-    fetchAccount
+    fetchAccount,
+    fetchContractInstances
   })(ContractCard)
 );

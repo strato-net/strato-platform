@@ -8,14 +8,16 @@ import {
   FETCH_STATE_SUCCESS,
   FETCH_CIRRUS_INSTANCES_SUCCESS,
   SELECT_CONTRACT_INSTANCE,
-  FETCH_ACCOUNT_SUCCESS
+  FETCH_ACCOUNT_SUCCESS,
+  FETCH_CONTRACT_INSTANCES_SUCCESS
 } from './components/ContractCard/contractCard.actions';
 
 const initialState = {
   contracts: {},
   filter: '',
   error: null,
-  isLoading: false
+  isLoading: false,
+  instancePagination: {} // Track pagination state for each contract
 };
 
 const reducer = function (state = initialState, action) {
@@ -59,7 +61,36 @@ const reducer = function (state = initialState, action) {
         contracts: updatedContracts,
         filter: state.filter,
         error: state.error,
-        isLoading: false
+        isLoading: false,
+        instancePagination: state.instancePagination
+      };
+    case FETCH_CONTRACT_INSTANCES_SUCCESS:
+      const contractName = action.contractName;
+      const newInstances = action.instances.map(instance => ({
+        ...instance,
+        fromBloc: true
+      }));
+      
+      // Update pagination state
+      const updatedPagination = {
+        ...state.instancePagination,
+        [contractName]: {
+          ...state.instancePagination[contractName],
+          currentInstances: newInstances,
+          hasMore: newInstances.length === 10 // Assume 10 is the limit
+        }
+      };
+      
+      return {
+        ...state,
+        contracts: {
+          ...state.contracts,
+          [contractName]: {
+            ...state.contracts[contractName],
+            instances: newInstances
+          }
+        },
+        instancePagination: updatedPagination
       };
     case FETCH_CONTRACTS_FAILED:
       return {

@@ -15,7 +15,10 @@ import {
   fetchAccountFailure,
   FETCH_CONTRACT_INFO_REQUEST,
   fetchContractInfoSuccess,
-  fetchContractInfoFailure
+  fetchContractInfoFailure,
+  FETCH_CONTRACT_INSTANCES_REQUEST,
+  fetchContractInstancesSuccess,
+  fetchContractInstancesFailure
 } from './contractCard.actions';
 import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
@@ -142,6 +145,35 @@ export function* fetchAccount(action) {
   }
 }
 
+export function getContractInstances(contractName, chainId, offset, limit) {
+  const options = { 
+    params: { contractName }, 
+    query: { 
+      chainid: chainId,
+      offset: offset,
+      limit: limit
+    } 
+  };
+  const url = env.BLOC_URL + createUrl("/contracts/::contractName/instances", options);
+
+  return fetch(
+    url,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      },
+    })
+    .then(handleErrors)
+    .then(function (response) {
+      return response.json();
+    })
+    .catch(function (error) {
+      throw error;
+    });
+}
+
 export function* fetchContractInfo(action) {
   try {
     const response = yield call(getContract, action.contractName, action.contractAddress, action.chainId);
@@ -153,8 +185,22 @@ export function* fetchContractInfo(action) {
   }
 }
 
+export function* fetchContractInstances(action) {
+  try {
+    const response = yield call(getContractInstances, action.contractName, action.chainId, action.offset, action.limit);
+    yield put(fetchContractInstancesSuccess(action.contractName, response));
+  }
+  catch (err) {
+    yield put(fetchContractInstancesFailure(action.contractName, err));
+  }
+}
+
 export function* watchFetchCirrusContracts() {
   yield takeEvery(FETCH_CIRRUS_INSTANCES_REQUEST, fetchCirrusInstances);
+}
+
+export function* watchFetchContractInstances() {
+  yield takeEvery(FETCH_CONTRACT_INSTANCES_REQUEST, fetchContractInstances);
 }
 
 export function* watchFetchState() {

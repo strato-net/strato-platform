@@ -57,6 +57,7 @@ import {
   watchFetchCirrusContracts,
   watchAccount,
   watchFetchInfo,
+  watchFetchContractInstances,
 } from './components/Contracts/components/ContractCard/contractCard.saga';
 
 import {
@@ -135,6 +136,7 @@ const rootSaga = function* startForeman() {
     fork(watchFetchInfo),
     fork(watchMethodCall),
     fork(watchFetchCirrusContracts),
+    fork(watchFetchContractInstances),
     fork(watchExecuteQuery),
     fork(watchTransactionResult),
     fork(watchQueryCirrus),

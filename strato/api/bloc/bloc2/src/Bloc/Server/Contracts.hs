@@ -59,8 +59,10 @@ getContracts ::
   Maybe Integer ->
   Maybe Integer ->
   Maybe ChainId ->
+  Maybe Integer ->
+  Maybe Integer ->
   m GetContractsResponse
-getContracts mName mOffset mLimit chainId = do
+getContracts mName mOffset mLimit chainId mInstanceOffset mInstanceLimit = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM
@@ -115,6 +117,41 @@ getContractsData (ContractName cName) = do
           _qaIgnoreChain = Just True
         }
   return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
+
+getContractInstances ::
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  ContractName ->
+  Maybe ChainId ->
+  Maybe Integer ->
+  Maybe Integer ->
+  m GetContractInstancesResponse
+getContractInstances (ContractName cName) chainId mOffset mLimit = do
+  let instanceLimit = fromIntegral $ fromMaybe 10 mLimit
+      instanceOffset = fromIntegral $ fromMaybe 0 mOffset
+      addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
+  
+  -- Get all instances for this contract
+  allInstances <-
+    getAccount'
+      accountsFilterParams
+        { _qaContractName = Just cName,
+          _qaChainId = maybeToList chainId,
+          _qaExternal = Just False,
+          _qaOffset = Nothing,
+          _qaLimit = Nothing
+        }
+  
+  -- Convert to AddressCreatedAt format
+  instances <- forM allInstances $ \(AddressStateRef' AddressStateRef {..} _) -> do
+    ts <- liftIO getCurrentTime
+    pure $ addressToVal ts addressStateRefAddress chainId
+  
+  -- Apply pagination
+  let paginatedInstances = take instanceLimit $ drop instanceOffset instances
+  
+  return . GetContractInstancesResponse $ paginatedInstances
 
 getContractsContract ::
   ( MonadIO m,

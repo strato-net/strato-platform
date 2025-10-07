@@ -48,6 +48,8 @@ type GetContracts =
     :> QueryParam "offset" Integer
     :> QueryParam "limit" Integer
     :> QueryParam "chainid" ChainId
+    :> QueryParam "instanceOffset" Integer
+    :> QueryParam "instanceLimit" Integer
     :> Get '[JSON] GetContractsResponse
 
 instance ToParam (QueryParam "limit" Integer) where
@@ -130,6 +132,43 @@ type GetContractsData =
   "contracts"
     :> Capture "contractName" ContractName
     :> Get '[JSON] [Address]
+
+-- GET /contracts/:contractName/instances - Get paginated instances for a contract
+type GetContractInstances =
+  "contracts"
+    :> Capture "contractName" ContractName
+    :> "instances"
+    :> QueryParam "chainid" ChainId
+    :> QueryParam "offset" Integer
+    :> QueryParam "limit" Integer
+    :> Get '[JSON] GetContractInstancesResponse
+
+newtype GetContractInstancesResponse = GetContractInstancesResponse
+  { unInstances :: [AddressCreatedAt]
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON GetContractInstancesResponse where
+  toJSON = toJSON . unInstances
+
+instance FromJSON GetContractInstancesResponse where
+  parseJSON = fmap GetContractInstancesResponse . parseJSON
+
+instance Arbitrary GetContractInstancesResponse where arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSchema GetContractInstancesResponse where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped . name ?~ "Get Contract Instances Response"
+      & mapped . schema . description ?~ "Response to Get Contract Instances endpoint"
+      & mapped . schema . example ?~ toJSON ex
+    where
+      ex :: GetContractInstancesResponse
+      ex =
+        GetContractInstancesResponse
+          [ AddressCreatedAt 1976 (Address 0xdeadbeef) Nothing,
+            AddressCreatedAt 1977 (Address 0xdeadbeef) Nothing
+          ]
 
 -- GET /contracts/:contractName/:contractAddress.:extension? TODO: Check .extension
 type GetContractsContract =

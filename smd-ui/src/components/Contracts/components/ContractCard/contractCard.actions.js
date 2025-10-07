@@ -11,6 +11,9 @@ export const FETCH_ACCOUNT_FAILURE = 'FETCH_ACCOUNT_FAILURE';
 export const FETCH_CONTRACT_INFO_REQUEST = 'FETCH_CONTRACT_INFO_REQUEST';
 export const FETCH_CONTRACT_INFO_SUCCESS = 'FETCH_CONTRACT_INFO_SUCCESS';
 export const FETCH_CONTRACT_INFO_FAILURE = 'FETCH_CONTRACT_INFO_FAILURE';
+export const FETCH_CONTRACT_INSTANCES_REQUEST = 'FETCH_CONTRACT_INSTANCES_REQUEST';
+export const FETCH_CONTRACT_INSTANCES_SUCCESS = 'FETCH_CONTRACT_INSTANCES_SUCCESS';
+export const FETCH_CONTRACT_INSTANCES_FAILURE = 'FETCH_CONTRACT_INSTANCES_FAILURE';
 
 export const fetchState = function (name, address, chainId) {
   return {
@@ -116,6 +119,32 @@ export const fetchContractInfoFailure = function(key, error) {
   return {
     type: FETCH_CONTRACT_INFO_FAILURE,
     key,
+    error
+  }
+}
+
+export const fetchContractInstances = function(contractName, chainId, offset, limit) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES_REQUEST,
+    contractName,
+    chainId,
+    offset,
+    limit
+  }
+}
+
+export const fetchContractInstancesSuccess = function(contractName, instances) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES_SUCCESS,
+    contractName,
+    instances
+  }
+}
+
+export const fetchContractInstancesFailure = function(contractName, error) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES_FAILURE,
+    contractName,
     error
   }
 }
