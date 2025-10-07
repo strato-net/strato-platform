@@ -210,10 +210,14 @@ contract record RewardsChef is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(address initialOwner,
-		address _rewardToken,
-		uint256 _cataPerSecond
-	        ) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _rewardToken, uint256 _cataPerSecond) external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        PRECISION_MULTIPLIER = 1e18;
+
+        require(_rewardToken != address(0), "Invalid reward token address");
         rewardToken = Token(_rewardToken);
         cataPerSecond = _cataPerSecond;
         pools = [];

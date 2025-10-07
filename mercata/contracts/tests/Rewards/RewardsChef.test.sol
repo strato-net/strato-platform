@@ -60,7 +60,9 @@ contract Describe_TokenPausable {
 	cataPerSecond = 1000;
         currentTimestamp = block.timestamp;
 
-        chef = new RewardsChef(address(this), tokenAddress, cataPerSecond);
+        // Use RewardsChef from Mercata and initialize it
+        chef = m.rewardsChef();
+        chef.initialize(tokenAddress, cataPerSecond);
 
         // Transfer ownership of the reward token to the chef so it can mint rewards
         Ownable(tokenAddress).transferOwnership(address(chef));
