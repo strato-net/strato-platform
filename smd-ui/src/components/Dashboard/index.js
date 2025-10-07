@@ -247,7 +247,7 @@ class Dashboard extends Component {
                   }`}
                 >
                   <h5 className="pt-callout-title">
-                  {!metadata ? "API Disconnected" : healthStatus}
+                    {!metadata ? "API Disconnected" : healthStatus}
                   </h5>
                   {!metadata
                     ? "Cannot connect to the Node's API"
@@ -262,23 +262,23 @@ class Dashboard extends Component {
               }
             >
               <NumberCard
-            number={!metadata ? "DISCONNECTED" : healthStatus}
+                number={!metadata ? "DISCONNECTED" : healthStatus}
                 description={sec2Date(uptime)}
                 mode={
                   !metadata
-                  ? "danger"
-                  : !health || !systemHealth || !synced
-                  ? "warning"
-                  : "success"
+                    ? "danger"
+                    : !health || !systemHealth || !synced
+                    ? "warning"
+                    : "success"
                 }
                 iconClass={
                   !metadata
-                  ? "fa-triangle-exclamation"
-                  : !health || !systemHealth
-                  ? "fa-exclamation-circle"
-                  : !synced
-                  ? "fa-rotate"
-                  : "fa-check-circle"
+                    ? "fa-triangle-exclamation"
+                    : !health || !systemHealth
+                    ? "fa-exclamation-circle"
+                    : !synced
+                    ? "fa-rotate"
+                    : "fa-check-circle"
                 }
               />
             </Popover>

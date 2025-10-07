@@ -136,5 +136,3 @@ export default withRouter(
       oauthAccountsFilter
     }
   )(OauthAccounts));
-
-  
