@@ -39,9 +39,6 @@ import qualified Data.NibbleString as N
 import Prelude hiding (round)
 import Prometheus
 
-loggingFunc :: LoggingT m a -> m a
-loggingFunc = runLoggingT
-
 type BaseM = ResourceT (LoggingT IO)
 
 type MonadBase m = ( MonadFail m

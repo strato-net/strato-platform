@@ -174,7 +174,6 @@ getFilesystemLogs dir' network' name logFileName _ = do
 createFilesystemNode ::
   MonadResource m =>
   FilePath ->
-  FilePath ->
   String ->
   FilePath ->
   Validator ->
@@ -184,7 +183,7 @@ createFilesystemNode ::
   Host ->
   Bool ->
   m (FilesystemPeer, CorePeer)
-createFilesystemNode dir' dbPath network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
+createFilesystemNode dir' network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
   dir <- getNodeDirectory dir' network' $ T.unpack name
   logsMapVar <- atomically $ newTVar M.empty
   let logsDir = getLogsDirectory dir
@@ -218,8 +217,11 @@ createFilesystemNode dir' dbPath network' privKeyFile selfId name tcpPort udpPor
       Left e -> error $ e ++ ": " ++ BC.unpack privBS
       Right p -> pure p
     -- either error id . bsToPriv <$> B.readFile privKeyFile
-  conn <- liftIO . loggingFunc $ Lite.createSqlitePool (T.pack dbPath) 1
-  liftIO . withResource conn $ \c -> loggingFunc $ do
+  (ethPool, cirrusPool) <- liftIO . logF "strato-setup" $ do
+    eth <- Lite.createSqlitePool "eth.sqlite" 1
+    cirrus <- Lite.createSqlitePool "cirrus.sqlite" 1
+    pure (eth, cirrus)
+  liftIO . withResource ethPool $ \c -> logF "strato-setup" $ do
     flip runReaderT c $ do
       Lite.runMigration DataDefs.migrateAuto
       -- Lite.runMigration DataDefs.indexAll
@@ -250,6 +252,7 @@ createFilesystemNode dir' dbPath network' privKeyFile selfId name tcpPort udpPor
         , _canonicalDB = cbdb
         , _blockDB = bdb
         , _kvDB = kvdb
-        , _sqlPool = conn
+        , _ethSqlPool = ethPool
+        , _cirrusSqlPool = cirrusPool
         }
   liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF

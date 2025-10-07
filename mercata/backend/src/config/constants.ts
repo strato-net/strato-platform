@@ -33,7 +33,7 @@ export const constants = (() => {
   const CDPRegistry = `${CONTRACT_PREFIX}CDPRegistry`;
   const RewardsChef = `${CONTRACT_PREFIX}RewardsChef`;
   const Voucher = `${CONTRACT_PREFIX}Voucher`;
-  const Event = "cirrus_event";
+  const Event = "event";
     
   const tokenSelectFields = [
     "address",

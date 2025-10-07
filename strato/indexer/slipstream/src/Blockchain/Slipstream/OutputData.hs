@@ -580,7 +580,6 @@ createIndexTable ::
 createIndexTable contract cc (creator, a, n) = do
   let tableName = indexTableName creator a n
       -- histTableName = historyTableName creator a n
-      -- storageHistoryTableName = historyTableName "" "" "cirrus_storage"
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
       contractCols = ["creator", "application", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
@@ -1159,19 +1158,22 @@ valueToSQLText t v =
    in (\w -> pref <> w <> suff) <$> v'
 
 storageTableName :: TableName
-storageTableName = indexTableName "" "" "cirrus_storage"
+storageTableName = indexTableName "" "" "storage"
+
+storageHistoryTableName :: TableName
+storageHistoryTableName = historyTableName "" "" "storage"
 
 globalEventTableName :: TableName
-globalEventTableName = indexTableName "" "" "cirrus_event"
+globalEventTableName = indexTableName "" "" "event"
 
 contractTableName :: TableName
-contractTableName = indexTableName "" "" "cirrus_contract"
+contractTableName = indexTableName "" "" "contract"
 
 mappingTableName :: TableName
-mappingTableName = indexTableName "" "" "cirrus_mapping"
+mappingTableName = indexTableName "" "" "mapping"
 
 eventArrayTableName :: TableName
-eventArrayTableName = indexTableName "" "" "cirrus_event_array"
+eventArrayTableName = indexTableName "" "" "event_array"
 
 initialSlipstreamQueries :: [SlipstreamQuery]
 initialSlipstreamQueries =
@@ -1192,7 +1194,7 @@ initialSlipstreamQueries =
       ["address"]
       Nothing
   , CreateTable
-      (historyTableName "" "" "cirrus_storage")
+      storageHistoryTableName
       [ ("address", SqlText)
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)

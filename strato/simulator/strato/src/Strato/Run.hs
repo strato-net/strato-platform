@@ -116,10 +116,8 @@ runStratoNode runUI = do
       , " successfully wiped"
       ]
   unless flags_wipe $ do
-    let sqlitePath = "strato.sqlite"
     (f,c) <- createFilesystemNode
                flags_directory
-               sqlitePath
                flags_network
                flags_private_key
                (Validator $ T.pack flags_username)
@@ -145,18 +143,19 @@ runStratoNode runUI = do
               useWalletsByDefault = False
             }
     as <- liftIO $ runFilesystemNode f c
-    a <- liftIO . async $ Wai.run flags_backend_port $ app sqlitePath f c env M.empty
+    a <- liftIO . async $ Wai.run flags_backend_port $
+      app f c env M.empty
     let finalize = do
           putStrLn "Cancelling threads..."
           traverse_ cancel $ a:as
           putStrLn "Done cancelling threads"
     finally (liftIO . runUI $ mainWidgetWithHead header App.mainWidget) $ liftIO finalize
 
-fullServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
-fullServer d f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer d f c blocEnv urlMap)
+fullServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
+fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer f c blocEnv urlMap)
 
 api :: Proxy (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
 api = Proxy
 
-app :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
-app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap
+app :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
+app f c blocEnv urlMap = serve api $ fullServer f c blocEnv urlMap

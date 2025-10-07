@@ -102,7 +102,8 @@ data FilesystemDBs = FilesystemDBs
   , _canonicalDB :: LDB.DB
   , _blockDB :: LDB.DB
   , _kvDB :: LDB.DB
-  , _sqlPool :: SQL.ConnectionPool
+  , _ethSqlPool :: SQL.ConnectionPool
+  , _cirrusSqlPool :: SQL.ConnectionPool
   }
 
 makeLenses ''FilesystemDBs
@@ -205,9 +206,9 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
 
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamQuery where
   output slipstreamQuery = for_ (slipstreamQuerySQLite slipstreamQuery) $ \cmd -> do
-    pool <- asks $ _sqlPool . _filesystemDBs
+    pool <- asks $ _cirrusSqlPool . _filesystemDBs
     traverse_ ($logDebugS ("slipstream/cmds")) $ T.lines cmd
-    liftIO . loggingFunc $ flip SQL.runSqlPool pool $ catch
+    flip SQL.runSqlPool pool $ catch
       (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) [])
       (\(e :: SomeException) -> do
         $logErrorS "slipstream/error" . T.pack $ show e
@@ -294,10 +295,10 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` OutputBlock) (Fi
   delete _ = deleteLDB $ _blockDB . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (FilesystemT m) where
-  accessEnv = asks $ SQLDB . _sqlPool . _filesystemDBs
+  accessEnv = asks $ SQLDB . _ethSqlPool . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv CirrusDB (FilesystemT m) where
-  accessEnv = asks $ CirrusDB . _sqlPool . _filesystemDBs
+  accessEnv = asks $ CirrusDB . _cirrusSqlPool . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Address Certificate (FilesystemT m) where
   select _ = getX509CertForAccount
