@@ -43,6 +43,7 @@ const Transfer = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
+  const [showInactiveTokens, setShowInactiveTokens] = useState(false);
 
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
@@ -66,6 +67,59 @@ const Transfer = () => {
       return [];
     }
   }, [getTransferableTokens]);
+
+  // Sort and separate tokens with configurable priority order
+  const { activeTokens, inactiveTokens } = useMemo(() => {
+    const active = tokens.filter(token => token.token?.status === '2');
+    const inactive = tokens.filter(token => token.token?.status !== '2');
+
+    // Token sort configuration - defines priority groups for active tokens
+    const getPriority = (token: Token): number => {
+      const symbol = token?.token?._symbol || '';
+      const address = token.address?.toLowerCase() || '';
+
+      // Priority 1: USDST
+      if (address === usdstAddress.toLowerCase()) return 1;
+
+      // Priority 2: Collateral tokens (GOLDST, WBTCST, etc)
+      const collateralTokens = ['GOLDST', 'WBTCST', 'ETHST', 'SILVST'];
+      if (collateralTokens.includes(symbol)) return 2;
+
+      // Priority 3: Special LP Tokens
+      const specialLpTokens = ['MUSDST', 'SUSDST'];
+      if (specialLpTokens.includes(symbol)) return 3;
+
+      // Priority 4: LP Tokens (contains "LP" in symbol)
+      if (symbol.includes('-LP')) return 4;
+
+      // Priority 4: Everything else
+      return 5;
+    };
+
+    const sortActiveTokens = (a: Token, b: Token) => {
+      const priorityA = getPriority(a);
+      const priorityB = getPriority(b);
+
+      // Sort by priority first
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+
+      // Within same priority, sort alphabetically by symbol
+      return sortAlphabetically(a, b);
+    };
+
+    const sortAlphabetically = (a: Token, b: Token) => {
+      const symbolA = a?.token?._symbol || '';
+      const symbolB = b?.token?._symbol || '';
+      return symbolA.localeCompare(symbolB);
+    };
+
+    active.sort(sortActiveTokens);
+    inactive.sort(sortAlphabetically);
+
+    return { activeTokens: active, inactiveTokens: inactive };
+  }, [tokens]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -131,7 +185,10 @@ const Transfer = () => {
               <label className="text-sm text-gray-600">Token</label>
               <Popover
                 open={tokenPopoverOpen}
-                onOpenChange={setTokenPopoverOpen}
+                onOpenChange={(open) => {
+                  setTokenPopoverOpen(open);
+                  if (!open) setShowInactiveTokens(false); // Reset when closing
+                }}
               >
                 <PopoverTrigger asChild>
                   <Button
@@ -150,21 +207,63 @@ const Transfer = () => {
                 <PopoverContent className="w-full p-0">
                   <div className="flex flex-col max-h-72 overflow-y-auto">
                     {tokens.length > 0 ? (
-                      tokens.map((token) => (
-                        <Button
-                          key={token.address}
-                          variant="ghost"
-                          className="justify-start"
-                          onClick={() => {
-                            setFromAsset(token);
-                            setFromAmount("");
-                            setTokenPopoverOpen(false);
-                          }}
-                        >
-                          {token?.token?._symbol ||
-                            fromAsset?.token?._name}
-                        </Button>
-                      ))
+                      <>
+                        {/* Active tokens */}
+                        {activeTokens.map((token) => (
+                          <Button
+                            key={token.address}
+                            variant="ghost"
+                            className="justify-start"
+                            onClick={() => {
+                              setFromAsset(token);
+                              setFromAmount("");
+                              setTokenPopoverOpen(false);
+                            }}
+                          >
+                            {token?.token?._symbol ||
+                              token?.token?._name}
+                          </Button>
+                        ))}
+                        
+                        {/* Show More button if there are inactive tokens */}
+                        {inactiveTokens.length > 0 && !showInactiveTokens && (
+                          <Button
+                            variant="ghost"
+                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            onClick={() => setShowInactiveTokens(true)}
+                          >
+                            Show More ({inactiveTokens.length})
+                          </Button>
+                        )}
+                        
+                        {/* Inactive tokens (shown when expanded) */}
+                        {showInactiveTokens && inactiveTokens.map((token) => (
+                          <Button
+                            key={token.address}
+                            variant="ghost"
+                            className="justify-start text-gray-400"
+                            onClick={() => {
+                              setFromAsset(token);
+                              setFromAmount("");
+                              setTokenPopoverOpen(false);
+                            }}
+                          >
+                            {token?.token?._symbol ||
+                              token?.token?._name}
+                          </Button>
+                        ))}
+                        
+                        {/* Show Less button */}
+                        {showInactiveTokens && inactiveTokens.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            onClick={() => setShowInactiveTokens(false)}
+                          >
+                            Show Less
+                          </Button>
+                        )}
+                      </>
                     ) : (
                       <span className="p-2 text-sm text-gray-500">
                         No tokens available
