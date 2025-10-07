@@ -297,7 +297,7 @@ supportedCollaterals = Set.toList
                      $ GE.assetRootAddress <$> combinedEscrows
 
 mercataContract :: String -> CodePtr
-mercataContract = CodeAtAccount mercataAddress
+mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts)
 
 proxy :: CodePtr
 proxy = mercataContract "Proxy"

@@ -68,12 +68,13 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka (getKafkaEnv, runKafkaMUsingEnv)
 import Control.Monad.Composable.Redis
 import Control.Monad.IO.Class
-import Data.Foldable (for_)
+import Data.Foldable (foldl', for_)
 import qualified Data.Map as Map
 import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe
 import qualified Data.Sequence as S
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -244,7 +245,13 @@ populateStorageDBs getMetadata genesisInfo genesisBlock genesisChainId = do
   kafkaEnv <- runKafkaVMEvents getKafkaEnv
   let pub sd vmes = do
         commitSqlDiffs sd
-        void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes
+        let filterRedundantCCAs (evs, hs) ev@(CodeCollectionAdded _ (SolidVMCode _ h) _ _ _) =
+              if h `Set.member` hs
+                then (evs, hs)
+                else (ev:evs, Set.insert h hs)
+            filterRedundantCCAs (evs, hs) ev = (ev:evs, hs)
+            vmes' = reverse . fst $ foldl' filterRedundantCCAs ([], Set.empty) vmes
+        void . runKafkaMUsingEnv kafkaEnv $ produceVMEvents' vmes'
   populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub
 
 populateStorageDBs' ::
