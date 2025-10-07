@@ -61,6 +61,9 @@ class OAuthUtil {
           tokenHost: new URL(oauth.tokenEndpoint).origin,
           tokenPath: new URL(oauth.tokenEndpoint).pathname,
         },
+        options: {
+          timeout: 5000
+        }
       };
 
       // @ts-ignore - ResourceOwnerPassword exists at runtime but not in types
