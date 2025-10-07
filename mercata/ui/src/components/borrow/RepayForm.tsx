@@ -80,10 +80,6 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
     const owed = BigInt(loans?.totalAmountOwed || 0);
     const inputWei = safeParseUnits(repayAmount || "0");
     const isFullRepay = inputWei >= owed && owed > 0n;
-    console.log('isFullRepay', isFullRepay);
-    console.log('inputWei', inputWei);
-    console.log('owed', owed);
-    console.log('repayAmount', repayAmount);
     if (isFullRepay) {
       onRepay('ALL');
       setRepayAmount(""); setRepayAmountError(""); setFeeError("");
