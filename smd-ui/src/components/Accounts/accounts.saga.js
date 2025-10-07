@@ -25,10 +25,7 @@ import {
   FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST,
   FETCH_OAUTH_ACCOUNTS_REQUEST,
   fetchOauthAccountsSuccess,
-  fetchOauthAccountsFailure,
-  FETCH_CERTIFICATE_REQUEST,
-  fetchCertificateSuccess,
-  fetchCertificateFailure
+  fetchOauthAccountsFailure
 } from './accounts.actions';
 import { env } from '../../env';
 import { hideLoading } from 'react-redux-loading-bar';
@@ -105,32 +102,52 @@ export function getAccountDetailApi(address, chainid) {
 }
 
 export function getOauthAccountsApi() {
-  return fetch(oauthAccountDataUrl, {
-    method: 'GET',
-    credentials: "include",
-    headers: { 'Accept': 'application/json' }
-  })
-    .then(handleErrors)
-    .then(res => res.json())
-    .then(users => users.map(user => ({ ...user, certificate: null })))
-    .catch(error => {
-      throw error;
-    });
-}
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
 
-export function getCertificateApi(address) {
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq." + address;
-  
-  return fetch(cirrusUrl, {
-    method: 'GET',
-    credentials: "include",
-    headers: { 'Accept': 'application/json' }
-  })
+
+  // strato URL add limit and offset if needed
+  return fetch(
+    oauthAccountDataUrl,
+    {
+      method: 'GET',
+      credentials: "include",
+      headers: {
+        'Accept': 'application/json'
+      },
+    }
+  )
     .then(handleErrors)
-    .then(response => response.json())
-    .then(certificates => certificates.length > 0 ? certificates[0] : null)
-    .catch(error => {
-      console.error('Certificate API error:', error);
+    .then(function (res) {
+      return res.json();
+    })
+    .then(function (users) {
+      const fetches = [];
+      for (let x in users) {
+        const url = cirrusUrl + users[x].address;
+        fetches.push(
+          fetch (
+            url,
+            {
+              method: 'GET',
+              credentials: "include",
+              headers: {
+                'Accept': 'application/json'
+              },
+            }
+          )
+            .then(handleErrors)
+            .then(function (response) {
+              return response.json();
+            })
+            .catch(function (error) {
+              throw error;
+            }))
+      }
+      return Promise.all(fetches).then(function (responses) {
+        return responses.map(x => x.length > 0 ? x[0] : null);
+      });
+    })
+    .catch(function (error) {
       throw error;
     });
 }
@@ -210,17 +227,6 @@ export function* getOauthAccounts() {
   }
 }
 
-export function* fetchCertificate(action) {
-  try {
-    const certificate = yield call(getCertificateApi, action.address);
-    yield put(fetchCertificateSuccess(action.address, certificate));
-  }
-  catch (err) {
-    console.error(`Certificate fetch failed for ${action.address}:`, err);
-    yield put(fetchCertificateFailure(action.address, err));
-  }
-}
-
 export default function* watcAccountActions() {
   yield [
     takeLatest(FETCH_ACCOUNTS, getAccounts),
@@ -228,7 +234,6 @@ export default function* watcAccountActions() {
     takeEvery(FETCH_ACCOUNT_DETAIL_REQUEST, getAccountDetail),
     takeEvery(FETCH_CURRENT_ACCOUNT_DETAIL_REQUEST, getCurrentAccountDetail),
     takeEvery(GET_BALANCE, getBalance),
-    takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts),
-    takeLatest(FETCH_CERTIFICATE_REQUEST, fetchCertificate)
+    takeEvery(FETCH_OAUTH_ACCOUNTS_REQUEST, getOauthAccounts)
   ];
 }

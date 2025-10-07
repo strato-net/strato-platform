@@ -13,10 +13,7 @@ import {
   FETCH_CURRENT_ACCOUNT_DETAIL_SUCCESS,
   FETCH_CURRENT_ACCOUNT_DETAIL_FAILURE,
   FETCH_OAUTH_ACCOUNTS_SUCCESS,
-  FETCH_OAUTH_ACCOUNTS_FAILURE,
-  FETCH_CERTIFICATE_REQUEST_SUCCESS,
-  FETCH_CERTIFICATE_REQUEST_FAILURE,
-  FETCH_CERTIFICATE_REQUEST
+  FETCH_OAUTH_ACCOUNTS_FAILURE
 } from './accounts.actions';
 
 const initialState = {
@@ -24,9 +21,7 @@ const initialState = {
   currentAccountDetail: null,
   filter: '',
   error: null,
-  oauthAccounts: [],
-  certificates: {}, // Cache for individual certificates
-  certificateLoading: {} // Track loading state for each certificate
+  oauthAccounts: []
 };
 
 const reducer = function (state = initialState, action) {
@@ -169,39 +164,6 @@ const reducer = function (state = initialState, action) {
         ...state,
         oauthAccounts: [],
         error: action.error
-      }
-    case FETCH_CERTIFICATE_REQUEST_SUCCESS:
-      return {
-        ...state,
-        certificates: {
-          ...state.certificates,
-          [action.address]: action.certificate
-        },
-        certificateLoading: {
-          ...state.certificateLoading,
-          [action.address]: false
-        }
-      }
-    case FETCH_CERTIFICATE_REQUEST_FAILURE:
-      return {
-        ...state,
-        certificates: {
-          ...state.certificates,
-          [action.address]: null
-        },
-        certificateLoading: {
-          ...state.certificateLoading,
-          [action.address]: false
-        },
-        error: action.error
-      }
-    case FETCH_CERTIFICATE_REQUEST:
-      return {
-        ...state,
-        certificateLoading: {
-          ...state.certificateLoading,
-          [action.address]: true
-        }
       }
     default:
       return state;
