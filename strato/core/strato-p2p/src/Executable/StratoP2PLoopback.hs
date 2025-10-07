@@ -31,10 +31,10 @@ loopbackEvents =
 recordEvent :: MonadIO m => T.Text -> m ()
 recordEvent lab = liftIO $ withLabel loopbackEvents lab incCounter
 
-stratoP2PLoopback :: (MonadIO m, MonadLogger m, MonadP2P n) => PeerRunner n m () -> m ()
+stratoP2PLoopback :: MonadP2P m => PeerRunner m () -> IO ()
 stratoP2PLoopback runner = do
-  $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
   runner $ \sSource -> do
+    $logInfoS "stratoP2PLoopback" "Reflecting PBFT back to unseq since 2019"
     let toWireMessage = \case
           P2pBlockstanbul wm -> do
             let msgHash = rlpHash wm

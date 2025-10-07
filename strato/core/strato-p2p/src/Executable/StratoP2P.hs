@@ -19,17 +19,20 @@ import           Executable.StratoP2PClient
 import           Executable.StratoP2PLoopback
 import           Executable.StratoP2PServer
 
-raceAll :: [LoggingT IO a]
-        -> LoggingT IO a
+raceAll :: [IO a]
+        -> IO a
 raceAll = runConcurrently . asum . Prelude.map Concurrently
 
-stratoP2P :: ( MonadP2P n
-             , RunsClient n
-             , RunsServer n (BL.LoggingT IO)
+stratoP2P :: ( MonadP2P m
+             , RunsClient m
+             , RunsServer m
              )
-          => PeerRunner n (BL.LoggingT IO) () -> BL.LoggingT IO ()
+          => PeerRunner m () -> IO ()
 stratoP2P runner = labelTheThread "stratoP2P" $ do
-  raceAll [ stratoP2PLoopback runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PLoopback ERROR" . T.pack $ show e)
-          , stratoP2PClient   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PClient ERROR" . T.pack $ show e)
-          , stratoP2PServer   runner `catch` (\(e :: SomeException) -> $logErrorS "stratoP2PServer ERROR" . T.pack $ show e)
+  raceAll [ stratoP2PLoopback runner `catch` oops "stratoP2PLoopback"
+          , stratoP2PClient   runner `catch` oops "stratoP2PClient"
+          , stratoP2PServer   runner `catch` oops "stratoP2PServer"
           ]
+  where oops :: T.Text -> SomeException -> IO ()
+        oops name (e :: SomeException) = runner $ \_ ->
+          $logErrorS (name <> " ERROR") . T.pack $ show e

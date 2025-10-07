@@ -21,6 +21,7 @@
 module Strato.Lite.Base.Filesystem where
 
 import BlockApps.Logging
+import BlockApps.Solidity.Value as V
 import BlockApps.X509.Certificate
 import Blockchain.Context hiding (actionTimestamp, blockHeaders, remainingBlockHeaders)
 import Blockchain.Data.Block
@@ -72,7 +73,7 @@ import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.Network
 import Data.Default
-import Data.Foldable (for_)
+import Data.Foldable (for_, traverse_)
 import qualified Data.Map.Strict as M
 import Data.List (foldl', sortOn)
 import Data.Maybe (fromMaybe) -- (catMaybes, fromMaybe)
@@ -101,7 +102,8 @@ data FilesystemDBs = FilesystemDBs
   , _canonicalDB :: LDB.DB
   , _blockDB :: LDB.DB
   , _kvDB :: LDB.DB
-  , _sqlPool :: SQL.ConnectionPool
+  , _ethSqlPool :: SQL.ConnectionPool
+  , _cirrusSqlPool :: SQL.ConnectionPool
   }
 
 makeLenses ''FilesystemDBs
@@ -145,7 +147,7 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => RunsClient (FilesystemT m) where
           conduits = P2pConduits pSource pSink sSource
       handler conduits
 
-instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) (LoggingT IO) where
+instance {-# OVERLAPPING #-} MonadIO m => RunsServer (FilesystemT m) where
   runServer (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
@@ -203,12 +205,15 @@ instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m)
   output = commitSqlDiffs
 
 instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => (FilesystemT m) `Mod.Outputs` SlipstreamQuery where
-  output slipstreamQuery = do
-    let cmds = slipstreamQuerySQLite slipstreamQuery
-    pool <- asks $ _sqlPool . _filesystemDBs
-    flip for_ ($logDebugS ("slipstream/cmds")) $ concatMap T.lines cmds
-    liftIO . loggingFunc $ flip SQL.runSqlPool pool . for_ cmds $ \cmd ->
-      (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) []) `catch` (\(e :: SomeException) -> $logErrorS "slipstream/error" . T.pack $ show e)
+  output slipstreamQuery = for_ (slipstreamQuerySQLite slipstreamQuery) $ \cmd -> do
+    pool <- asks $ _cirrusSqlPool . _filesystemDBs
+    traverse_ ($logDebugS ("slipstream/cmds")) $ T.lines cmd
+    flip SQL.runSqlPool pool $ catch
+      (void $ SQL.rawExecute (T.intercalate " " (T.lines cmd)) [])
+      (\(e :: SomeException) -> do
+        $logErrorS "slipstream/error" . T.pack $ show e
+        traverse_ ($logErrorS "slipstream/error") $ T.lines cmd
+      )
 
 sqlTypeSQLite :: SqlType -> T.Text
 sqlTypeSQLite SqlBool    = "bool"
@@ -217,39 +222,57 @@ sqlTypeSQLite SqlText    = "text"
 sqlTypeSQLite SqlJsonb   = "jsonb"
 sqlTypeSQLite SqlSerial  = ""
 
-slipstreamQuerySQLite :: SlipstreamQuery -> [T.Text]
-slipstreamQuerySQLite (CreateTable tableName cols pk mUc) = [T.concat
-  [ "CREATE TABLE IF NOT EXISTS ",
-    tableNameToDoubleQuoteText tableName,
-    " (",
-    csv $ (\(c,t) -> wrapDoubleQuotes (escapeDoubleQuotes c) <> " " <> sqlTypeSQLite t) <$> cols,
-    case pk of
+slipstreamQuerySQLite :: SlipstreamQuery -> Maybe T.Text
+slipstreamQuerySQLite (CreateTable tableName cols pk mTC) = Just $ T.concat
+  [ "CREATE TABLE IF NOT EXISTS "
+  , tableNameToDoubleQuoteText tableName
+  , " ("
+  , csv $ (\(c,t) -> wrapEscapeDouble c <> " " <> sqlTypeSQLite t) <$> cols
+  , case pk of
       [] -> ""
-      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk,
-    case mUc of
-      Nothing -> ""
-      Just (n, uc) -> T.concat
-        [
-          ", CONSTRAINT ",
-          wrapDoubleQuotes $ escapeQuotes n,
-          " UNIQUE ",
-          uc
-        ],
-    ");"
-  ]]
-slipstreamQuerySQLite (AlterTableAddColumns tableName cols) = (\(c,t) -> T.concat
-  [ "ALTER TABLE ",
-    tableNameToDoubleQuoteText tableName,
-    " ADD COLUMN ",
-    wrapDoubleQuotes (escapeDoubleQuotes c),
-    " ",
-    sqlTypeSQLite t,
-    ";"
-  ]) <$> cols
-slipstreamQuerySQLite AlterTableAddForeignKey{} = []
-slipstreamQuerySQLite AlterTableAddPrimaryKey{} = []
-slipstreamQuerySQLite NotifyPostgREST = []
-slipstreamQuerySQLite sq = [slipstreamQueryText sqlTypeSQLite sq]
+      _ -> ",\n  PRIMARY KEY " <> wrapAndEscapeDouble pk
+  , case mTC of
+      Just (Unique n uc) -> T.concat
+        [ ", CONSTRAINT "
+        , wrapEscapeDouble n
+        , " UNIQUE "
+        , uc
+        ]
+      _ -> ""
+  , ");"
+  ]
+slipstreamQuerySQLite InsertTable{..} = Just $ T.concat
+  [ "INSERT "
+  , case onConflict of
+      Just DoNothing -> "OR IGNORE "
+      Just OnConflict{} -> "OR REPLACE "
+      _ -> ""
+  , "INTO "
+  , tableNameToDoubleQuoteText tableName
+  , " "
+  , wrapAndEscapeDouble $ fst <$> tableColumns
+  , "\n  VALUES "
+  , csv $ wrapParens . csv . map
+      (\((_,t),v) -> fromMaybe "NULL" $ valueToSQLiteText t =<< v)
+      . zip tableColumns
+      <$> values
+  ]
+slipstreamQuerySQLite _ = Nothing
+
+valueToSQLiteText :: SqlType -> Value -> Maybe T.Text
+valueToSQLiteText t v = case t of
+  SqlJsonb -> (\w -> "jsonb(" <> wrapEscapeSingle w <> ")") <$> w'
+  _ -> wrapEscapeSingle <$> valueToSQLText' True v
+  where v' = valueToSQLText' True v
+        w' = (\w -> case v of
+            SimpleValue ValueString{} -> wrapEscapeDouble w
+            SimpleValue ValueBytes{} -> wrapEscapeDouble w
+            SimpleValue ValueAddress{} -> wrapEscapeDouble w
+            SimpleValue ValueAccount{} -> wrapEscapeDouble w
+            ValueContract{} -> wrapEscapeDouble w
+            ValueArraySentinel _ -> "\"\""
+            _ -> w
+          ) <$> v'
 
 lookupLDB :: (MonadIO m, Binary k, Binary v) => (r -> LDB.DB) -> k -> ReaderT r m (Maybe v)
 lookupLDB getDB k = do
@@ -272,10 +295,10 @@ instance {-# OVERLAPPING #-} MonadIO m => (Keccak256 `A.Alters` OutputBlock) (Fi
   delete _ = deleteLDB $ _blockDB . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (FilesystemT m) where
-  accessEnv = asks $ SQLDB . _sqlPool . _filesystemDBs
+  accessEnv = asks $ SQLDB . _ethSqlPool . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv CirrusDB (FilesystemT m) where
-  accessEnv = asks $ CirrusDB . _sqlPool . _filesystemDBs
+  accessEnv = asks $ CirrusDB . _cirrusSqlPool . _filesystemDBs
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Address Certificate (FilesystemT m) where
   select _ = getX509CertForAccount
