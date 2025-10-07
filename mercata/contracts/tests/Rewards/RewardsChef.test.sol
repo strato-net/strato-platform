@@ -420,4 +420,137 @@ contract Describe_TokenPausable {
         require(pool1AccPerTokenAfter > pool1AccPerTokenBefore, "Pool 1 accPerToken should increase");
     }
 
+    function it_should_account_for_old_rewards_before_updating_cata_per_second() {
+        // given - initial cataPerSecond is 1000
+        uint256 initialCataPerSecond = chef.cataPerSecond();
+        require(initialCataPerSecond == 1000, "Initial cataPerSecond should be 1000");
+
+        // given - add pool with 100 allocation points
+        uint256 poolId = 0;
+        uint256 depositAmount = 1000 * 1e18;
+        chef.addPool(100, address(lpToken1), 1);
+
+        // given - user1 deposits LP tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), depositAmount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, depositAmount);
+
+        // given - advance time by 10 seconds to accrue rewards at 1000 CATA/second
+        fastForward(10);
+
+        // when - update cataPerSecond to 2000
+        chef.updateCataPerSecond(2000);
+
+        // then - check that old rewards were accounted for
+        // Expected: 10 seconds * 1000 CATA/second * (100 allocPoint / 100 totalAllocPoint) = 10000 CATA
+        (address lp0, uint alloc0, uint lastReward0, uint accPerToken0) = chef.pools(0);
+        uint256 expectedAccPerToken = (10000 * 1e18) / depositAmount;
+        require(accPerToken0 == expectedAccPerToken, "Pool should have accrued rewards at old rate");
+
+        // then - user should be able to claim the old rewards
+        uint256 userBalanceBefore = ERC20(rewardsToken).balanceOf(address(user1));
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, 0);
+        uint256 userBalanceAfter = ERC20(rewardsToken).balanceOf(address(user1));
+        uint256 claimedRewards = userBalanceAfter - userBalanceBefore;
+        require(claimedRewards == 10000, "User should receive rewards accrued at old rate");
+    }
+
+    function it_should_accrue_new_rewards_at_new_cata_per_second_rate() {
+        // given - initial cataPerSecond is 1000
+        uint256 initialCataPerSecond = chef.cataPerSecond();
+        require(initialCataPerSecond == 1000, "Initial cataPerSecond should be 1000");
+
+        // given - add pool with 100 allocation points
+        uint256 poolId = 0;
+        uint256 depositAmount = 1000 * 1e18;
+        chef.addPool(100, address(lpToken1), 1);
+
+        // given - user1 deposits LP tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), depositAmount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, depositAmount);
+
+        // given - advance time by 10 seconds at old rate
+        fastForward(10);
+
+        // given - claim rewards earned at old rate
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, 0);
+        uint256 userBalanceAfterOldRewards = ERC20(rewardsToken).balanceOf(address(user1));
+
+        // when - update cataPerSecond to 2000
+        chef.updateCataPerSecond(2000);
+
+        // when - advance time by 10 more seconds at new rate
+        fastForward(10);
+
+        // when - claim rewards earned at new rate
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, 0);
+        uint256 userBalanceAfterNewRewards = ERC20(rewardsToken).balanceOf(address(user1));
+
+        // then - new rewards should be calculated at 2000 CATA/second
+        // Expected: 10 seconds * 2000 CATA/second * (100 allocPoint / 100 totalAllocPoint) = 20000 CATA
+        uint256 newRewards = userBalanceAfterNewRewards - userBalanceAfterOldRewards;
+        require(newRewards == 20000, "User should receive rewards accrued at new rate");
+    }
+
+    function it_should_update_cata_per_second_for_multiple_pools() {
+        // given - add two pools with equal allocation points
+        uint256 pool0Id = 0;
+        uint256 pool1Id = 1;
+        uint256 deposit0Amount = 1000 * 1e18;
+        uint256 deposit1Amount = 500 * 1e18;
+
+        chef.addPool(100, address(lpToken1), 1);
+
+        // Create second LP token
+        address lpToken2Address = m.tokenFactory().createToken(
+            "TestLP2",
+            "Test LP Token 2",
+            [], [], [], "TESTLP2", 0, 18
+        );
+        Token lpToken2 = Token(lpToken2Address);
+        lpToken2.mint(address(user2), initLpTokensPerUser);
+        chef.addPool(100, address(lpToken2), 1);
+
+        // given - users deposit to both pools
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), deposit0Amount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", pool0Id, deposit0Amount);
+
+        TestUtils.callAs(user2, address(lpToken2), "approve(address, uint256)", address(chef), deposit1Amount);
+        TestUtils.callAs(user2, address(chef), "deposit(uint256, uint256)", pool1Id, deposit1Amount);
+
+        // given - advance time by 10 seconds at 1000 CATA/second
+        fastForward(10);
+
+        // when - update cataPerSecond to 3000
+        chef.updateCataPerSecond(3000);
+
+        // then - both pools should have accrued rewards at old rate
+        (address lp0, uint alloc0, uint lastReward0, uint accPerToken0) = chef.pools(0);
+        (address lp1, uint alloc1, uint lastReward1, uint accPerToken1) = chef.pools(1);
+
+        // Each pool gets 50% of rewards: 10 seconds * 1000 CATA/second * 0.5 = 5000 CATA per pool
+        uint256 expectedAccPerToken0 = (5000 * 1e18) / deposit0Amount;
+        uint256 expectedAccPerToken1 = (5000 * 1e18) / deposit1Amount;
+
+        require(accPerToken0 == expectedAccPerToken0, "Pool 0 should have correct accPerToken at old rate");
+        require(accPerToken1 == expectedAccPerToken1, "Pool 1 should have correct accPerToken at old rate");
+
+        // when - advance time by 10 more seconds at new rate
+        fastForward(10);
+
+        // when - update pools to accrue new rewards
+        chef.updatePool(0);
+        chef.updatePool(1);
+
+        // then - pools should accrue at new rate (3000 CATA/second)
+        (lp0, alloc0, lastReward0, accPerToken0) = chef.pools(0);
+        (lp1, alloc1, lastReward1, accPerToken1) = chef.pools(1);
+
+        // Each pool now gets: 10 seconds * 3000 CATA/second * 0.5 = 15000 CATA per pool
+        uint256 newAccPerToken0 = expectedAccPerToken0 + ((15000 * 1e18) / deposit0Amount);
+        uint256 newAccPerToken1 = expectedAccPerToken1 + ((15000 * 1e18) / deposit1Amount);
+
+        require(accPerToken0 == newAccPerToken0, "Pool 0 should have correct accPerToken at new rate");
+        require(accPerToken1 == newAccPerToken1, "Pool 1 should have correct accPerToken at new rate");
+    }
+
 }
