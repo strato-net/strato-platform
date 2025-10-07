@@ -61,12 +61,18 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
     }));
   }, [percentages, maxValueBigInt]);
 
-  const isDisabled = disabled || maxValueBigInt <= 0n;
-
   return (
     <div className={`flex gap-2 ${className}`}>
       {percentageValues.map(({ percent, percentValue }) => {
-        const isActive = valueBigInt === percentValue;
+        const is100Percent = percent === 1;
+        const isZeroAmount = maxValueBigInt <= 0n;
+        const isSmallAmount = disabled && maxValueBigInt > 0n; // Only when explicitly disabled due to small amount
+        
+        // Disable all buttons if no amount available, but allow 100% for small amounts
+        const shouldDisable = isZeroAmount || (isSmallAmount && !is100Percent);
+        
+        // Only consider active if not disabled
+        const isActive = !shouldDisable && valueBigInt === percentValue;
 
         return (
           <Button
@@ -74,13 +80,13 @@ const PercentageButtons: React.FC<PercentageButtonsProps> = ({
             variant={isActive ? "default" : "outline"}
             size="sm"
             onClick={() => handlePercentageClick(percent)}
-            className={`flex-1 transition-all duration-200 ${!isDisabled ? "hover:scale-105" : ""}`}
-            disabled={isDisabled}
+            className={`flex-1 transition-all duration-200 ${!shouldDisable ? "hover:scale-105" : ""}`}
+            disabled={shouldDisable}
             title={
-              isDisabled
-                ? disabled 
-                  ? "Amount too small for percentage selection"
-                  : "No amount available"
+              shouldDisable
+                ? isZeroAmount
+                  ? "No amount available"
+                  : "Amount too small for percentage selection"
                 : `Set to ${percent * 100}% of available`
             }
           >
