@@ -63,10 +63,11 @@ class ContractCard extends Component {
 
   fetchContractInstances = () => {
     const { instanceOffset, instanceLimit } = this.state;
+    // Only fetch the specific contract with instance pagination
     this.props.fetchContracts(
       this.props.selectedChain,
-      10, // contract limit
-      0,  // contract offset
+      1, // Only get 1 contract (the current one)
+      0, // No offset needed since we're filtering by name
       this.props.contract.name, // contract name filter
       instanceOffset,
       instanceLimit

@@ -104,9 +104,34 @@ getContracts mName mOffset mLimit mInstanceOffset mInstanceLimit chainId = do
   -- Step 3: Apply instance pagination if parameters are provided
   let instanceOffset = fromIntegral $ fromMaybe 0 mInstanceOffset
       instanceLimit = fromIntegral $ fromMaybe 10 mInstanceLimit
-      paginatedInstancesMap = Map.map (take instanceLimit . drop instanceOffset) paginatedContractsMap
-  
-  return . GetContractsResponse $ paginatedInstancesMap
+      
+  -- If we're filtering by a specific contract name AND have instance pagination
+  case (mName, mInstanceOffset, mInstanceLimit) of
+    (Just contractName, Just _, Just _) -> do
+      -- Get ALL instances for this specific contract first
+      allInstancesForContract <- getAccount'
+        accountsFilterParams
+          { _qaChainId = maybeToList chainId,
+            _qaExternal = Just False,
+            _qaSearch = Just contractName, -- Filter by contract name
+            _qaOffset = Nothing,
+            _qaLimit = Nothing
+          }
+      
+      -- Convert to AddressCreatedAt format
+      ts <- liftIO getCurrentTime
+      let allAddressCreatedAt = map (\addr -> AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr chainId) 
+                                   (map (\(AddressStateRef' AddressStateRef {..} _) -> addressStateRefAddress) allInstancesForContract)
+      
+      -- Apply instance pagination to this specific contract
+      let paginatedInstances = take instanceLimit $ drop instanceOffset allAddressCreatedAt
+      
+      -- Return only this contract with paginated instances
+      return . GetContractsResponse $ Map.singleton contractName paginatedInstances
+      
+    _ -> do
+      -- Original logic for general contract listing (no instance pagination)
+      return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::
   ( MonadLogger m,
