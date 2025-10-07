@@ -24,7 +24,7 @@ const VoteTab = () => {
     getOpenIssues();
   }, []);
 
-  const handleCastVoteOnIssue = (target: string, func: string, args: any[]) => {
+  const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
   };
 
@@ -205,6 +205,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
+                    const issueArgs = JSON.parse(issue.args) || [];
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
