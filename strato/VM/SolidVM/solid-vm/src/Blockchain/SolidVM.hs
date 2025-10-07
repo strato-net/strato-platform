@@ -230,7 +230,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
         !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
     argVals <- argsToVals argExps
 
-    create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals
+    create' sender' newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals
 
 getParentName :: MonadSM m => Address -> m String
 getParentName address = fromMaybeM (return "") $
@@ -244,22 +244,11 @@ getParentName address = fromMaybeM (return "") $
                                     _ -> pure ""
                             )
 
-create' :: MonadSM m => Address -> Maybe Code -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
-create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch cc contractName' valList = do
+create' :: MonadSM m => Address -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
+create' creator originAddress issuerAcct issuerName newAddress ch cc contractName' valList = do
   
   -- Get parentName and cc_creator from maybeCodePtr or creator
-  (parentName, cc_creator) <- case maybeCodePtr of
-                  (Just(PtrToCode (CodeAtAccount codePtrAcc _))) -> do
-                      parentName <- getParentName codePtrAcc
-                      appCreator <- getSolidStorageKeyVal' codePtrAcc $ MS.StoragePath [MS.Field ":creator"]
-                      let cc_creator = case appCreator of
-                                        MS.BString cn' -> Just (BC.unpack cn')
-                                        _ -> Nothing
-                      return (parentName, cc_creator)
-                  _ -> do
-                      parentName <- getParentName creator
-                      return (parentName, Nothing)
-  
+  parentName <-  getParentName creator
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
       !abstracts' = getAbstractParentsFromContract contract' cc
@@ -267,7 +256,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
 
-  initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts
+  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc abstracts
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -311,7 +300,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAddress
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ (fmap T.pack cc_creator)) newAddress
+    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ Nothing) newAddress
     
   when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAddress
@@ -1613,7 +1602,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddress creator
   (issuerAcct, originAddress, issuerName) <- getCreator creator
   argVals <- argsToVals args
-  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
+  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
   return $
     Constant $
       SContract contractName' $
@@ -1630,7 +1619,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
+  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
   onTraced $ do
     liftIO $
       putStrLn $
@@ -2515,7 +2504,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   theEnv <- getEnv
   let origin = Env.origin theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
-  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals)
+  execResults <- create' creator newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals)
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2536,7 +2525,7 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals
+  execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
