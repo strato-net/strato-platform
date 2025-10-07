@@ -201,6 +201,7 @@ class Dashboard extends Component {
       ? this.props.appMetadata.metadata.isSynced
       : false;
     const metadata = this.props.appMetadata.metadata;
+    const isLoadingMetadata = this.props.appMetadata.loading;
     const networkHealth = this.props.dashboard.networkStatus;
     const networkStatusMessage = this.props.dashboard.networkStatusMessage;
 
@@ -239,7 +240,9 @@ class Dashboard extends Component {
               content={
                 <div
                   className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
-                    !metadata
+                    isLoadingMetadata
+                      ? "primary"
+                      : !metadata
                       ? "danger"
                       : !health || !systemHealth || !synced
                       ? "warning"
@@ -247,9 +250,15 @@ class Dashboard extends Component {
                   }`}
                 >
                   <h5 className="pt-callout-title">
-                    {!metadata ? "API Disconnected" : healthStatus}
+                    {isLoadingMetadata 
+                      ? "Loading..." 
+                      : !metadata 
+                      ? "API Disconnected" 
+                      : healthStatus}
                   </h5>
-                  {!metadata
+                  {isLoadingMetadata
+                    ? "Fetching node metadata from API..."
+                    : !metadata
                     ? "Cannot connect to the Node's API"
                     : !health || !systemHealth
                     ? `Health issues: ${
@@ -262,17 +271,27 @@ class Dashboard extends Component {
               }
             >
               <NumberCard
-                number={!metadata ? "DISCONNECTED" : healthStatus}
+                number={
+                  isLoadingMetadata 
+                    ? "LOADING..." 
+                    : !metadata 
+                    ? "DISCONNECTED" 
+                    : healthStatus
+                }
                 description={sec2Date(uptime)}
                 mode={
-                  !metadata
+                  isLoadingMetadata
+                    ? "neutral"
+                    : !metadata
                     ? "danger"
                     : !health || !systemHealth || !synced
                     ? "warning"
                     : "success"
                 }
                 iconClass={
-                  !metadata
+                  isLoadingMetadata
+                    ? "fa-spinner fa-spin"
+                    : !metadata
                     ? "fa-triangle-exclamation"
                     : !health || !systemHealth
                     ? "fa-exclamation-circle"
