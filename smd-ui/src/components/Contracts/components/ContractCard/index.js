@@ -93,8 +93,13 @@ class ContractCard extends Component {
 
     // Calculate total instances for pagination display
     const { instanceOffset, instanceLimit } = this.state;
-    const totalInstances = filteredInstances.length;
-    const hasMoreInstances = totalInstances >= instanceLimit && (instanceOffset + instanceLimit) < totalInstances;
+    const currentPageInstances = filteredInstances.length;
+    
+    // For backend pagination, we show pagination controls if:
+    // 1. We have instances on current page (currentPageInstances > 0)
+    // 2. We're not on the first page (instanceOffset > 0) OR we have a full page (currentPageInstances >= instanceLimit)
+    const hasMoreInstances = currentPageInstances >= instanceLimit;
+    const showPagination = currentPageInstances > 0 && (instanceOffset > 0 || hasMoreInstances);
 
     filteredInstances
       .forEach(function (instance, index) {
@@ -279,7 +284,7 @@ class ContractCard extends Component {
                   </table>
                 </Collapse>
                 {/* Instance Pagination Controls */}
-                {this.state.isOpen && (instanceOffset > 0 || hasMoreInstances) && (
+                {this.state.isOpen && showPagination && (
                   <div className="col-sm-12 pt-dark mt-2">
                     <div className="row">
                       <div className="col-sm-3 text-left">
@@ -291,7 +296,7 @@ class ContractCard extends Component {
                         />
                       </div>
                       <div className="col-sm-6 text-center" style={{ marginTop: '22px' }}>
-                        {`Instances ${instanceOffset + 1}-${Math.min(instanceOffset + instanceLimit, totalInstances)} (${totalInstances} Total)`}
+                        {`Instances ${instanceOffset + 1}-${instanceOffset + currentPageInstances} (Page ${Math.floor(instanceOffset / instanceLimit) + 1})`}
                       </div>
                       <div className="col-sm-3 text-right">
                         <Button
