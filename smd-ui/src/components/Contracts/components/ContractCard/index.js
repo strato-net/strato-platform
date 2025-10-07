@@ -47,6 +47,7 @@ class ContractCard extends Component {
 
   onNextInstanceClick = () => {
     const newOffset = this.state.instanceOffset + this.state.instanceLimit;
+    console.log('Next clicked - old offset:', this.state.instanceOffset, 'new offset:', newOffset);
     this.setState({ instanceOffset: newOffset }, () => {
       this.fetchContractInstances();
     });
@@ -54,6 +55,7 @@ class ContractCard extends Component {
 
   onPrevInstanceClick = () => {
     const newOffset = Math.max(0, this.state.instanceOffset - this.state.instanceLimit);
+    console.log('Previous clicked - old offset:', this.state.instanceOffset, 'new offset:', newOffset);
     this.setState({ instanceOffset: newOffset }, () => {
       this.fetchContractInstances();
     });
@@ -91,15 +93,30 @@ class ContractCard extends Component {
       ) :
       instances.filter(instance => re.test(instance.address));
 
-    // Calculate total instances for pagination display
+    // Calculate pagination display for backend pagination
     const { instanceOffset, instanceLimit } = this.state;
     const currentPageInstances = filteredInstances.length;
     
-    // For backend pagination, we show pagination controls if:
-    // 1. We have instances on current page (currentPageInstances > 0)
-    // 2. We're not on the first page (instanceOffset > 0) OR we have a full page (currentPageInstances >= instanceLimit)
+    // Backend pagination logic:
+    // - hasMoreInstances: true if we got a full page (means more data likely exists)
+    // - showPagination: show controls if we have any instances
+    // - Previous button: enabled if not on first page (instanceOffset > 0)
+    // - Next button: disabled if we didn't get a full page (means no more data)
     const hasMoreInstances = currentPageInstances >= instanceLimit;
-    const showPagination = currentPageInstances > 0 && (instanceOffset > 0 || hasMoreInstances);
+    const showPagination = currentPageInstances > 0;
+    const currentPageNumber = Math.floor(instanceOffset / instanceLimit) + 1;
+    
+    // Debug logging to help troubleshoot
+    console.log('Pagination Debug:', {
+      instanceOffset,
+      instanceLimit,
+      currentPageInstances,
+      hasMoreInstances,
+      showPagination,
+      currentPageNumber,
+      isFirstPage: instanceOffset <= 0,
+      isLastPage: !hasMoreInstances
+    });
 
     filteredInstances
       .forEach(function (instance, index) {
@@ -292,11 +309,11 @@ class ContractCard extends Component {
                           onClick={this.onPrevInstanceClick}
                           className="pt-icon-arrow-left"
                           text="Previous"
-                          disabled={!(instanceOffset > 0)}
+                          disabled={instanceOffset <= 0}
                         />
                       </div>
                       <div className="col-sm-6 text-center" style={{ marginTop: '22px' }}>
-                        {`Instances ${instanceOffset + 1}-${instanceOffset + currentPageInstances} (Page ${Math.floor(instanceOffset / instanceLimit) + 1})`}
+                        {`Instances ${instanceOffset + 1}-${instanceOffset + currentPageInstances} (Page ${currentPageNumber})`}
                       </div>
                       <div className="col-sm-3 text-right">
                         <Button
