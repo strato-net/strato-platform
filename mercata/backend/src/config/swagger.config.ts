@@ -62,9 +62,12 @@ const swaggerOptions: swaggerJSDoc.Options = {
     },
   },
   apis: [
-    './src/api/routes.ts',
+    './src/api/routes.ts',        // For local development
     './src/api/routes/*.ts',
     './src/api/controllers/*.ts',
+    './dist/api/routes.js',       // For production
+    './dist/api/routes/*.js',
+    './dist/api/controllers/*.js',
   ],
 };
 
