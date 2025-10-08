@@ -75,6 +75,21 @@ type GetContractsWithPreview =
 instance ToParam (QueryParam "limit" Integer) where
   toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
 
+instance ToParam (QueryParam' '[Optional, Strict] "address" Address) where
+  toParam _ = DocQueryParam "address" [] "Contract address" Normal
+
+instance ToParam (QueryParam "instancesFor" Text) where
+  toParam _ = DocQueryParam "instancesFor" [] "Contract name to get instances for" Normal
+
+instance ToParam (QueryParam "instOffset" Integer) where
+  toParam _ = DocQueryParam "instOffset" [] "Starting index for contract instances" Normal
+
+instance ToParam (QueryParam "instLimit" Integer) where
+  toParam _ = DocQueryParam "instLimit" [] "Maximum number of contract instances to return" Normal
+
+instance ToParam (QueryParam "instancesPreviewLimit" Integer) where
+  toParam _ = DocQueryParam "instancesPreviewLimit" [] "Maximum number of preview instances to return" Normal
+
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64,
     address :: Address,
