@@ -7,18 +7,16 @@ const router = Router();
  * @openapi
  * /config:
  *   get:
- *     summary: Get application configuration
+ *     summary: Fetch public application configuration
  *     tags: [Configuration]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Configuration payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/", ConfigController.getConfig);
 

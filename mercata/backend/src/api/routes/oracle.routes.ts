@@ -8,24 +8,28 @@ const router = Router();
  * @openapi
  * /oracle/price:
  *   get:
- *     summary: Get current price
+ *     summary: Fetch oracle price data
  *     tags: [Oracle]
  *     parameters:
  *       - name: asset
  *         in: query
- *         required: true
- *         schema: { type: string }
- *         description: Asset address
+ *         required: false
+ *         schema:
+ *           type: string
+ *         description: Optional asset address to filter for a single price
  *     responses:
  *       200:
- *         description: Success
+ *         description: Oracle price information
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               oneOf:
+ *                 - type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 - type: object
+ *                   additionalProperties: true
  */
 router.get("/price", authHandler.authorizeRequest(true), OracleController.getPrice);
 
@@ -33,7 +37,7 @@ router.get("/price", authHandler.authorizeRequest(true), OracleController.getPri
  * @openapi
  * /oracle/price:
  *   post:
- *     summary: Set price
+ *     summary: Set an oracle price (admin)
  *     tags: [Oracle]
  *     requestBody:
  *       required: true
@@ -47,14 +51,16 @@ router.get("/price", authHandler.authorizeRequest(true), OracleController.getPri
  *               price: { type: string, description: "Price value" }
  *     responses:
  *       200:
- *         description: Success
+ *         description: Price update transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 status:
+ *                   type: string
+ *                 hash:
+ *                   type: string
  */
 router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice);
 
@@ -62,24 +68,35 @@ router.post("/price", authHandler.authorizeRequest(), OracleController.setPrice)
  * @openapi
  * /oracle/price-history/{assetAddress}:
  *   get:
- *     summary: Get price history
+ *     summary: Retrieve historical oracle prices
  *     tags: [Oracle]
  *     parameters:
  *       - name: assetAddress
  *         in: path
  *         required: true
  *         schema: { type: string }
+ *       - name: order
+ *         in: query
+ *         required: false
+ *         description: Optional order clause (defaults to block_timestamp.asc)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Historical price data
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
- */
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 totalCount:
+ *                   type: integer
+*/
 router.get("/price-history/:assetAddress", authHandler.authorizeRequest(true), OracleController.getPriceHistory);
 
 export default router;
