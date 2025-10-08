@@ -250,7 +250,7 @@ const lendingLiquidationEntry = {
           usdValue: baseUintString,
           expectedProfit: baseUintString,
           maxRepay: baseUintString,
-          liquidationBonus: { type: "integer" }
+          liquidationBonus: baseUintString
         }
       }
     },
