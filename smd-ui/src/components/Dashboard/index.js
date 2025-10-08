@@ -277,8 +277,6 @@ class Dashboard extends Component {
                 <div
                   className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
                     isMetadataLoading || (!metadata && !this.props.appMetadata.error)
-                      ? "warning"
-                      : !metadata
                       ? "danger"
                       : !health || !systemHealth || !synced
                       ? "warning"
