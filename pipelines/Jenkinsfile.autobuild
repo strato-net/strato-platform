@@ -212,7 +212,7 @@ pipeline {
                     script: 'git log -1 --pretty=%B',
                     returnStdout: true
                   ).trim()
-                  return commitMessage.toUpperCase().contains('SYNC')
+                  return commitMessage.contains('SYNC')
                 }
               }
               agent { label "testsync" }
