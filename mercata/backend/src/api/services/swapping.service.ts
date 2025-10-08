@@ -44,6 +44,103 @@ import {
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
 
 // ============================================================================
+// HELPER FUNCTIONS FOR LP TOKEN STAKING
+// ============================================================================
+
+/**
+ * Fetches the LP token address for a given pool
+ */
+const fetchLPTokenAddress = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<string> => {
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params: {
+      poolFactory: "eq." + constants.poolFactory,
+      address: "eq." + poolAddress,
+      select: "lpToken"
+    }
+  });
+  const lpTokenAddress = poolData?.[0]?.lpToken;
+
+  if (!lpTokenAddress) {
+    throw new Error("Could not fetch LP token address for pool");
+  }
+
+  return lpTokenAddress;
+};
+
+/**
+ * Finds the RewardsChef pool index for a given LP token address
+ * Returns undefined if no matching pool is found
+ */
+const findRewardsChefPoolIdx = async (
+  accessToken: string,
+  lpTokenAddress: string
+): Promise<number | undefined> => {
+  const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
+  const rewardsPool = rewardsChefPools.find(p => p.lpToken === lpTokenAddress);
+  return rewardsPool?.poolIdx;
+};
+
+/**
+ * Gets the user's LP token balance from Cirrus
+ */
+const getUserLPTokenBalance = async (
+  accessToken: string,
+  lpTokenAddress: string,
+  userAddress: string
+): Promise<string> => {
+  const { data: lpTokenData } = await cirrus.get(accessToken, `/BlockApps-Mercata-Token`, {
+    params: {
+      address: `eq.${lpTokenAddress}`,
+      select: `balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
+      "balances.key": `eq.${userAddress.toLowerCase()}`
+    }
+  });
+  return lpTokenData?.[0]?.balances?.[0]?.balance || "0";
+};
+
+/**
+ * Stakes newly minted LP tokens into RewardsChef
+ */
+const stakeNewLPTokens = async (
+  accessToken: string,
+  userAddress: string,
+  lpTokenAddress: string,
+  rewardsPoolIdx: number,
+  lpTokenBalanceBefore: string
+): Promise<void> => {
+  // Wait for Cirrus to index the new LP token balance with retry logic
+  const lpTokenBalanceAfter = await waitForBalanceUpdate(
+    accessToken,
+    lpTokenAddress,
+    userAddress,
+    lpTokenBalanceBefore,
+    10,  // max retries
+    200  // 200ms delay between retries
+  );
+
+  // Calculate newly minted LP tokens
+  const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
+
+  if (BigInt(newlyMintedAmount) > 0n) {
+    // Stake the newly minted LP tokens
+    const stakingTx = await buildFunctionTx([
+      buildTokenApprovalTx(lpTokenAddress, rewardsChef, newlyMintedAmount),
+      {
+        contractName: "RewardsChef",
+        contractAddress: rewardsChef,
+        method: "deposit",
+        args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
+      }
+    ], userAddress, accessToken);
+
+    await executeTransaction(accessToken, stakingTx);
+  }
+};
+
+// ============================================================================
 // READ OPERATIONS
 // ============================================================================
 
@@ -278,42 +375,17 @@ export const addLiquidityDualToken = async (
 
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
 
-  // Get LP token address and balance before if we need to stake
+  // Prepare for LP token staking if requested
   let lpTokenAddress: string | undefined;
   let lpTokenBalanceBefore: string = "0";
   let rewardsPoolIdx: number | undefined;
 
   if (stakeLPToken) {
-    // Query pool to get LP token address
-    const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
-      params: {
-        poolFactory: "eq." + constants.poolFactory,
-        address: "eq." + poolAddress,
-        select: "lpToken"
-      }
-    });
-    lpTokenAddress = poolData?.[0]?.lpToken;
+    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
+    rewardsPoolIdx = await findRewardsChefPoolIdx(accessToken, lpTokenAddress);
 
-    if (!lpTokenAddress) {
-      throw new Error("Could not fetch LP token address for pool");
-    }
-
-    // Find RewardsChef pool for this LP token
-    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
-    const rewardsPool = rewardsChefPools.find(p => p.lpToken === lpTokenAddress);
-
-    if (rewardsPool) {
-      rewardsPoolIdx = rewardsPool.poolIdx;
-
-      // Get user's LP token balance before deposit
-      const { data: lpTokenData } = await cirrus.get(accessToken, `/BlockApps-Mercata-Token`, {
-        params: {
-          address: `eq.${lpTokenAddress}`,
-          select: `balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
-          "balances.key": `eq.${userAddress.toLowerCase()}`
-        }
-      });
-      lpTokenBalanceBefore = lpTokenData?.[0]?.balances?.[0]?.balance || "0";
+    if (rewardsPoolIdx !== undefined) {
+      lpTokenBalanceBefore = await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress);
     }
   }
 
@@ -331,35 +403,9 @@ export const addLiquidityDualToken = async (
 
   const depositResult = await executeTransaction(accessToken, tx);
 
-  // If stakeLPToken and deposit succeeded, stake the newly minted LP tokens
+  // Stake newly minted LP tokens if requested and deposit succeeded
   if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPoolIdx !== undefined) {
-    // Wait for Cirrus to index the new LP token balance with retry logic
-    const lpTokenBalanceAfter = await waitForBalanceUpdate(
-      accessToken,
-      lpTokenAddress,
-      userAddress,
-      lpTokenBalanceBefore,
-      10,  // max retries
-      200  // 200ms delay between retries
-    );
-
-    // Calculate newly minted LP tokens
-    const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
-
-    if (BigInt(newlyMintedAmount) > 0n) {
-      // Stake the newly minted LP tokens
-      const stakingTx = await buildFunctionTx([
-        buildTokenApprovalTx(lpTokenAddress, rewardsChef, newlyMintedAmount),
-        {
-          contractName: "RewardsChef",
-          contractAddress: rewardsChef,
-          method: "deposit",
-          args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
-        }
-      ], userAddress, accessToken);
-
-      await executeTransaction(accessToken, stakingTx);
-    }
+    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPoolIdx, lpTokenBalanceBefore);
   }
 
   return depositResult;
@@ -375,42 +421,17 @@ export const addLiquiditySingleToken = async (
   const pool = await fetchPoolTokenAddresses(accessToken, poolAddress);
   const depositTokenAddress = isAToB ? pool.tokenA : pool.tokenB;
 
+  // Prepare for LP token staking if requested
   let lpTokenAddress: string | undefined;
+  let lpTokenBalanceBefore: string = "0";
   let rewardsPoolIdx: number | undefined;
-  let lpTokenBalanceBefore = "0";
 
-  // If stakeLPToken is true, get LP balance before deposit
   if (stakeLPToken) {
-    // Query pool to get LP token address
-    const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
-      params: {
-        poolFactory: "eq." + constants.poolFactory,
-        address: "eq." + poolAddress,
-        select: "lpToken"
-      }
-    });
-    lpTokenAddress = poolData?.[0]?.lpToken;
+    lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
+    rewardsPoolIdx = await findRewardsChefPoolIdx(accessToken, lpTokenAddress);
 
-    if (!lpTokenAddress) {
-      throw new Error("Could not fetch LP token address for pool");
-    }
-
-    // Find RewardsChef pool for this LP token
-    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
-    const rewardsPool = rewardsChefPools.find(p => p.lpToken === lpTokenAddress);
-
-    if (rewardsPool) {
-      rewardsPoolIdx = rewardsPool.poolIdx;
-
-      // Get user's LP token balance before deposit
-      const { data: lpTokenData } = await cirrus.get(accessToken, `/BlockApps-Mercata-Token`, {
-        params: {
-          address: `eq.${lpTokenAddress}`,
-          select: `balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
-          "balances.key": `eq.${userAddress.toLowerCase()}`
-        }
-      });
-      lpTokenBalanceBefore = lpTokenData?.[0]?.balances?.[0]?.balance || "0";
+    if (rewardsPoolIdx !== undefined) {
+      lpTokenBalanceBefore = await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress);
     }
   }
 
@@ -427,35 +448,9 @@ export const addLiquiditySingleToken = async (
 
   const depositResult = await executeTransaction(accessToken, tx);
 
-  // If stakeLPToken and deposit succeeded, stake the newly minted LP tokens
+  // Stake newly minted LP tokens if requested and deposit succeeded
   if (stakeLPToken && depositResult.status === "Success" && lpTokenAddress && rewardsPoolIdx !== undefined) {
-    // Wait for Cirrus to index the new LP token balance with retry logic
-    const lpTokenBalanceAfter = await waitForBalanceUpdate(
-      accessToken,
-      lpTokenAddress,
-      userAddress,
-      lpTokenBalanceBefore,
-      10,  // max retries
-      200  // 200ms delay between retries
-    );
-
-    // Calculate newly minted LP tokens
-    const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
-
-    if (BigInt(newlyMintedAmount) > 0n) {
-      // Stake the newly minted LP tokens
-      const stakingTx = await buildFunctionTx([
-        buildTokenApprovalTx(lpTokenAddress, rewardsChef, newlyMintedAmount),
-        {
-          contractName: "RewardsChef",
-          contractAddress: rewardsChef,
-          method: "deposit",
-          args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
-        }
-      ], userAddress, accessToken);
-
-      await executeTransaction(accessToken, stakingTx);
-    }
+    await stakeNewLPTokens(accessToken, userAddress, lpTokenAddress, rewardsPoolIdx, lpTokenBalanceBefore);
   }
 
   return depositResult;
@@ -487,37 +482,15 @@ export const removeLiquidity = async (
 
   // If includeStakedLPToken is true, check if we need to unstake from RewardsChef first
   if (includeStakedLPToken) {
-    // Query pool to get LP token address
-    const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
-      params: {
-        poolFactory: "eq." + constants.poolFactory,
-        address: "eq." + poolAddress,
-        select: "lpToken"
-      }
-    });
-    const lpTokenAddress = poolData?.[0]?.lpToken;
+    const lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
+    const rewardsPoolIdx = await findRewardsChefPoolIdx(accessToken, lpTokenAddress);
 
-    if (!lpTokenAddress) {
-      throw new Error("Could not fetch LP token address for pool");
-    }
-
-    // Find RewardsChef pool for this LP token
-    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
-    const rewardsPool = rewardsChefPools.find(p => p.lpToken === lpTokenAddress);
-
-    if (rewardsPool) {
+    if (rewardsPoolIdx !== undefined) {
       // Get user's wallet LP token balance
-      const { data: lpTokenData } = await cirrus.get(accessToken, `/BlockApps-Mercata-Token`, {
-        params: {
-          address: `eq.${lpTokenAddress}`,
-          select: `balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
-          "balances.key": `eq.${userAddress.toLowerCase()}`
-        }
-      });
-      const walletLPBalance = BigInt(lpTokenData?.[0]?.balances?.[0]?.balance || "0");
+      const walletLPBalance = BigInt(await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress));
 
       // Get staked LP token balance
-      const stakedLPBalance = BigInt(await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress));
+      const stakedLPBalance = BigInt(await getStakedBalance(accessToken, rewardsChef, rewardsPoolIdx, userAddress));
 
       // Calculate required LP tokens and how much needs to be unstaked
       const requiredLPTokens = lpTokenAmountBigInt;
@@ -536,7 +509,7 @@ export const removeLiquidity = async (
           contractAddress: rewardsChef,
           method: "withdraw",
           args: {
-            _pid: rewardsPool.poolIdx,
+            _pid: rewardsPoolIdx,
             _amount: amountToUnstake.toString()
           }
         });
