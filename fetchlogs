@@ -1,0 +1,52 @@
+#!/bin/bash
+
+# fetchlogs script for collecting Docker container logs
+# This script collects logs from all running Docker containers and creates a zip file
+
+set -e
+
+echo "Starting log collection..."
+
+# Create logs directory
+mkdir -p strato_logs
+
+# Get list of running containers
+CONTAINERS=$(docker ps --format "{{.Names}}")
+
+if [ -z "$CONTAINERS" ]; then
+    echo "No running containers found"
+    touch strato_logs/no_containers.txt
+else
+    echo "Found containers: $CONTAINERS"
+    
+    # Collect logs from each container
+    for container in $CONTAINERS; do
+        echo "Collecting logs from container: $container"
+        docker logs "$container" > "strato_logs/${container}.log" 2>&1 || echo "Failed to get logs from $container" > "strato_logs/${container}.log"
+    done
+fi
+
+# Collect Docker system information
+echo "Collecting Docker system information..."
+docker ps -a > strato_logs/docker_ps_all.txt 2>&1 || echo "Failed to get docker ps -a" > strato_logs/docker_ps_all.txt
+docker images > strato_logs/docker_images.txt 2>&1 || echo "Failed to get docker images" > strato_logs/docker_images.txt
+docker system df > strato_logs/docker_system_df.txt 2>&1 || echo "Failed to get docker system df" > strato_logs/docker_system_df.txt
+
+# Collect system information
+echo "Collecting system information..."
+uname -a > strato_logs/system_info.txt 2>&1 || echo "Failed to get uname" > strato_logs/system_info.txt
+df -h > strato_logs/disk_usage.txt 2>&1 || echo "Failed to get disk usage" > strato_logs/disk_usage.txt
+free -h > strato_logs/memory_usage.txt 2>&1 || echo "Failed to get memory usage" > strato_logs/memory_usage.txt
+
+# Create zip file
+echo "Creating zip file..."
+zip -r strato_logs.zip strato_logs/ || {
+    echo "Failed to create zip file, trying with tar instead"
+    tar -czf strato_logs.tar.gz strato_logs/
+    mv strato_logs.tar.gz strato_logs.zip
+}
+
+# Clean up
+rm -rf strato_logs/
+
+echo "Log collection completed. Created: strato_logs.zip"

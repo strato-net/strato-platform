@@ -32,7 +32,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), forM)
 import qualified Control.Monad.Change.Alter as A
 import Data.Bifunctor (first)
 import Data.Foldable
@@ -62,7 +62,7 @@ getContracts ::
   Maybe Integer ->
   Maybe Integer ->
   m GetContractsResponse
-getContracts mName mOffset mLimit chainId mInstanceOffset mInstanceLimit = do
+getContracts mName mOffset mLimit chainId _mInstanceOffset _mInstanceLimit = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM

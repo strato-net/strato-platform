@@ -55,6 +55,12 @@ type GetContracts =
 instance ToParam (QueryParam "limit" Integer) where
   toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
 
+instance ToParam (QueryParam "instanceOffset" Integer) where
+  toParam _ = DocQueryParam "instanceOffset" [] "Starting index of contract instances" Normal
+
+instance ToParam (QueryParam "instanceLimit" Integer) where
+  toParam _ = DocQueryParam "instanceLimit" [] "Maximum number of contract instances to return" Normal
+
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64,
     address :: Address,
