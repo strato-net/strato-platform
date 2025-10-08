@@ -67,7 +67,7 @@ class ContractCard extends Component {
     let cardData = [];
     const name = this.props.contract.name;
     const contract = this.props.contract.contract;
-    const instances = contract && contract.instances ? contract.instances : [];
+    const instances = contract && contract.instances && Array.isArray(contract.instances) ? contract.instances : [];
     const searchTerm = this.props.contract.searchTerm;
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
@@ -78,10 +78,10 @@ class ContractCard extends Component {
     // Filter instances based on search term if present
     const filteredInstances = searchTerm ? 
       instances.filter(instance => 
-        re.test(instance.address) && 
+        instance && instance.address && re.test(instance.address) && 
         instance.address.toLowerCase() === searchTerm.toLowerCase()
       ) :
-      instances.filter(instance => re.test(instance.address));
+      instances.filter(instance => instance && instance.address && re.test(instance.address));
 
     filteredInstances
       .forEach(function (instance, index) {
@@ -114,7 +114,7 @@ class ContractCard extends Component {
     );
     let state = null;
 
-    if (selectedInstance.length > 0 && selectedInstance[0].state) {
+    if (selectedInstance && selectedInstance.length > 0 && selectedInstance[0] && selectedInstance[0].state) {
       const instance = selectedInstance[0];
       const contractKey = `card-data-${instance.address}-${self.props.selectedChain}`
       const contractInfo = this.props.contractInfos && this.props.contractInfos[contractKey] ? this.props.contractInfos[contractKey] : {}
@@ -292,7 +292,7 @@ class ContractCard extends Component {
                   <div className="row">
                     <div className="col-sm-12 text-center">
                       <small className="pt-text-muted">
-                        Showing {this.state.instanceOffset + 1}-{this.state.instanceOffset + cardData.length} instances
+                        Showing {this.state.instanceOffset + 1}-{this.state.instanceOffset + (cardData && cardData.length ? cardData.length : 0)} instances
                         {this.props.instancePagination[name] && this.props.instancePagination[name].hasMore && " (more available)"}
                       </small>
                     </div>
