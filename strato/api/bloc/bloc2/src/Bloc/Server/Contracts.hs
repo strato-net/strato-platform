@@ -130,7 +130,7 @@ getContractInstances ::
 getContractInstances (ContractName cName) chainId mOffset mLimit = do
   let instanceLimit = fromMaybe 10 mLimit
       instanceOffset = fromMaybe 0 mOffset
-      addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
+      addressToVal' ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
   
   -- Get all instances for this contract
   allInstances <-
@@ -146,10 +146,10 @@ getContractInstances (ContractName cName) chainId mOffset mLimit = do
   -- Convert to AddressCreatedAt format
   instances <- forM allInstances $ \(AddressStateRef' AddressStateRef {..} _) -> do
     ts <- liftIO getCurrentTime
-    pure $ addressToVal ts addressStateRefAddress chainId
+    pure $ addressToVal' ts addressStateRefAddress chainId
   
   -- Apply pagination
-        let paginatedInstances = take (fromIntegral instanceLimit) $ drop (fromIntegral instanceOffset) instances
+  let paginatedInstances = take (fromIntegral instanceLimit) $ drop (fromIntegral instanceOffset) instances
   
   return . GetContractInstancesResponse $ paginatedInstances
 
