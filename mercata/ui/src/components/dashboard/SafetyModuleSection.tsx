@@ -114,16 +114,26 @@ const SafetyModuleSection = () => {
 
       toast({
         title: "Approval Successful",
-        description: "Now staking your USDST...",
+        description: "Now depositing your USDST to Safety Module...",
         variant: "success",
       });
 
       // Then stake the tokens
       await stakeSafety({ amount: amountWei, stakeSToken: stakeSUSDST });
 
+      if (stakeSUSDST) {
+        toast({
+          title: "Deposit Successful",
+          description: "Now staking sUSDST to rewards program...",
+          variant: "success",
+        });
+      }
+
       toast({
-        title: "Stake Successful",
-        description: `You have successfully staked ${stakeAmount} USDST for sUSDST.`,
+        title: stakeSUSDST ? "Rewards Staking Successful" : "Stake Successful",
+        description: stakeSUSDST
+          ? `Successfully deposited ${stakeAmount} USDST and staked sUSDST to rewards program.`
+          : `You have successfully staked ${stakeAmount} USDST for sUSDST.`,
         variant: "success",
       });
 
