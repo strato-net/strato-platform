@@ -540,102 +540,24 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <Blueprint.Collapse
-                    className="col-sm-12"
-                    component="table"
-                    isOpen={false}
-                    keepChildrenMounted={false}
-                    transitionDuration={100}
-                  >
-                    <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                  "children": Array [
+                    <Blueprint.Collapse
+                      className="col-sm-12"
+                      component="table"
+                      isOpen={false}
+                      keepChildrenMounted={false}
+                      transitionDuration={100}
                     >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className=""
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </Blueprint.Collapse>,
-                  "className": "col-sm-12",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                    >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className=""
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>,
-                    "className": "col-sm-12",
-                    "component": "table",
-                    "isOpen": false,
-                    "keepChildrenMounted": false,
-                    "transitionDuration": 100,
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
+                      <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
                         <thead>
                           <tr>
                             <th>
                               Contract Address
                             </th>
                           </tr>
-                        </thead>,
+                        </thead>
                         <tbody>
                           <tr
                             className=""
@@ -654,55 +576,71 @@ ShallowWrapper {
                               />
                             </td>
                           </tr>
-                        </tbody>,
-                      ],
-                      "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <tr>
+                        </tbody>
+                      </table>
+                    </Blueprint.Collapse>,
+                    undefined,
+                  ],
+                  "className": "col-sm-12",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
+                        <thead>
+                          <tr>
                             <th>
                               Contract Address
                             </th>
-                          </tr>,
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <th>
-                              Contract Address
-                            </th>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "Contract Address",
-                            },
-                            "ref": null,
-                            "rendered": "Contract Address",
-                            "type": "th",
-                          },
-                          "type": "tr",
-                        },
-                        "type": "thead",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": Array [
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            className=""
+                            onClick={[Function]}
+                          >
+                            <td
+                              style={
+                                Object {
+                                  "border": "none",
+                                }
+                              }
+                            >
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>,
+                      "className": "col-sm-12",
+                      "component": "table",
+                      "isOpen": false,
+                      "keepChildrenMounted": false,
+                      "transitionDuration": 100,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <thead>
+                            <tr>
+                              <th>
+                                Contract Address
+                              </th>
+                            </tr>
+                          </thead>,
+                          <tbody>
                             <tr
                               className=""
                               onClick={[Function]}
@@ -719,30 +657,33 @@ ShallowWrapper {
                                   value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 />
                               </td>
+                            </tr>
+                          </tbody>,
+                        ],
+                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <tr>
+                              <th>
+                                Contract Address
+                              </th>
                             </tr>,
-                          ],
-                        },
-                        "ref": null,
-                        "rendered": Array [
-                          Object {
+                          },
+                          "ref": null,
+                          "rendered": Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                            "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": <td
-                                style={
-                                  Object {
-                                    "border": "none",
-                                  }
-                                }
-                              >
-                                <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />
-                              </td>,
-                              "className": "",
-                              "onClick": [Function],
+                              "children": <th>
+                                Contract Address
+                              </th>,
                             },
                             "ref": null,
                             "rendered": Object {
@@ -750,39 +691,104 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />,
-                                "style": Object {
-                                  "border": "none",
-                                },
+                                "children": "Contract Address",
+                              },
+                              "ref": null,
+                              "rendered": "Contract Address",
+                              "type": "th",
+                            },
+                            "type": "tr",
+                          },
+                          "type": "thead",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": Array [
+                              <tr
+                                className=""
+                                onClick={[Function]}
+                              >
+                                <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>
+                              </tr>,
+                            ],
+                          },
+                          "ref": null,
+                          "rendered": Array [
+                            Object {
+                              "instance": null,
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>,
+                                "className": "",
+                                "onClick": [Function],
                               },
                               "ref": null,
                               "rendered": Object {
                                 "instance": null,
                                 "key": undefined,
-                                "nodeType": "class",
+                                "nodeType": "host",
                                 "props": Object {
-                                  "classes": "small smd-pad-4",
-                                  "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  "children": <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />,
+                                  "style": Object {
+                                    "border": "none",
+                                  },
                                 },
                                 "ref": null,
-                                "rendered": null,
-                                "type": [Function],
+                                "rendered": Object {
+                                  "instance": null,
+                                  "key": undefined,
+                                  "nodeType": "class",
+                                  "props": Object {
+                                    "classes": "small smd-pad-4",
+                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  },
+                                  "ref": null,
+                                  "rendered": null,
+                                  "type": [Function],
+                                },
+                                "type": "td",
                               },
-                              "type": "td",
+                              "type": "tr",
                             },
-                            "type": "tr",
-                          },
-                        ],
-                        "type": "tbody",
-                      },
-                    ],
-                    "type": "table",
+                          ],
+                          "type": "tbody",
+                        },
+                      ],
+                      "type": "table",
+                    },
+                    "type": [Function],
                   },
-                  "type": [Function],
-                },
+                  undefined,
+                ],
                 "type": "div",
               },
               "type": "div",
@@ -1308,102 +1314,24 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <Blueprint.Collapse
-                      className="col-sm-12"
-                      component="table"
-                      isOpen={false}
-                      keepChildrenMounted={false}
-                      transitionDuration={100}
-                    >
-                      <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                    "children": Array [
+                      <Blueprint.Collapse
+                        className="col-sm-12"
+                        component="table"
+                        isOpen={false}
+                        keepChildrenMounted={false}
+                        transitionDuration={100}
                       >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className=""
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </Blueprint.Collapse>,
-                    "className": "col-sm-12",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "children": <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                      >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className=""
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>,
-                      "className": "col-sm-12",
-                      "component": "table",
-                      "isOpen": false,
-                      "keepChildrenMounted": false,
-                      "transitionDuration": 100,
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": Array [
+                        <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
                           <thead>
                             <tr>
                               <th>
                                 Contract Address
                               </th>
                             </tr>
-                          </thead>,
+                          </thead>
                           <tbody>
                             <tr
                               className=""
@@ -1422,55 +1350,71 @@ ShallowWrapper {
                                 />
                               </td>
                             </tr>
-                          </tbody>,
-                        ],
-                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                      },
-                      "ref": null,
-                      "rendered": Array [
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <tr>
+                          </tbody>
+                        </table>
+                      </Blueprint.Collapse>,
+                      undefined,
+                    ],
+                    "className": "col-sm-12",
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "children": <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
+                          <thead>
+                            <tr>
                               <th>
                                 Contract Address
                               </th>
-                            </tr>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": <th>
-                                Contract Address
-                              </th>,
-                            },
-                            "ref": null,
-                            "rendered": Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "Contract Address",
-                              },
-                              "ref": null,
-                              "rendered": "Contract Address",
-                              "type": "th",
-                            },
-                            "type": "tr",
-                          },
-                          "type": "thead",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": Array [
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              className=""
+                              onClick={[Function]}
+                            >
+                              <td
+                                style={
+                                  Object {
+                                    "border": "none",
+                                  }
+                                }
+                              >
+                                <HexText
+                                  classes="small smd-pad-4"
+                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                />
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>,
+                        "className": "col-sm-12",
+                        "component": "table",
+                        "isOpen": false,
+                        "keepChildrenMounted": false,
+                        "transitionDuration": 100,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <thead>
+                              <tr>
+                                <th>
+                                  Contract Address
+                                </th>
+                              </tr>
+                            </thead>,
+                            <tbody>
                               <tr
                                 className=""
                                 onClick={[Function]}
@@ -1487,30 +1431,33 @@ ShallowWrapper {
                                     value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   />
                                 </td>
+                              </tr>
+                            </tbody>,
+                          ],
+                          "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <tr>
+                                <th>
+                                  Contract Address
+                                </th>
                               </tr>,
-                            ],
-                          },
-                          "ref": null,
-                          "rendered": Array [
-                            Object {
+                            },
+                            "ref": null,
+                            "rendered": Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <td
-                                  style={
-                                    Object {
-                                      "border": "none",
-                                    }
-                                  }
-                                >
-                                  <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />
-                                </td>,
-                                "className": "",
-                                "onClick": [Function],
+                                "children": <th>
+                                  Contract Address
+                                </th>,
                               },
                               "ref": null,
                               "rendered": Object {
@@ -1518,39 +1465,104 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />,
-                                  "style": Object {
-                                    "border": "none",
-                                  },
+                                  "children": "Contract Address",
+                                },
+                                "ref": null,
+                                "rendered": "Contract Address",
+                                "type": "th",
+                              },
+                              "type": "tr",
+                            },
+                            "type": "thead",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": Array [
+                                <tr
+                                  className=""
+                                  onClick={[Function]}
+                                >
+                                  <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>
+                                </tr>,
+                              ],
+                            },
+                            "ref": null,
+                            "rendered": Array [
+                              Object {
+                                "instance": null,
+                                "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                                "nodeType": "host",
+                                "props": Object {
+                                  "children": <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>,
+                                  "className": "",
+                                  "onClick": [Function],
                                 },
                                 "ref": null,
                                 "rendered": Object {
                                   "instance": null,
                                   "key": undefined,
-                                  "nodeType": "class",
+                                  "nodeType": "host",
                                   "props": Object {
-                                    "classes": "small smd-pad-4",
-                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    "children": <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />,
+                                    "style": Object {
+                                      "border": "none",
+                                    },
                                   },
                                   "ref": null,
-                                  "rendered": null,
-                                  "type": [Function],
+                                  "rendered": Object {
+                                    "instance": null,
+                                    "key": undefined,
+                                    "nodeType": "class",
+                                    "props": Object {
+                                      "classes": "small smd-pad-4",
+                                      "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    },
+                                    "ref": null,
+                                    "rendered": null,
+                                    "type": [Function],
+                                  },
+                                  "type": "td",
                                 },
-                                "type": "td",
+                                "type": "tr",
                               },
-                              "type": "tr",
-                            },
-                          ],
-                          "type": "tbody",
-                        },
-                      ],
-                      "type": "table",
+                            ],
+                            "type": "tbody",
+                          },
+                        ],
+                        "type": "table",
+                      },
+                      "type": [Function],
                     },
-                    "type": [Function],
-                  },
+                    undefined,
+                  ],
                   "type": "div",
                 },
                 "type": "div",
@@ -2256,102 +2268,24 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <Blueprint.Collapse
-                    className="col-sm-12"
-                    component="table"
-                    isOpen={false}
-                    keepChildrenMounted={false}
-                    transitionDuration={100}
-                  >
-                    <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                  "children": Array [
+                    <Blueprint.Collapse
+                      className="col-sm-12"
+                      component="table"
+                      isOpen={false}
+                      keepChildrenMounted={false}
+                      transitionDuration={100}
                     >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className="selected"
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </Blueprint.Collapse>,
-                  "className": "col-sm-12",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                    >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className="selected"
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>,
-                    "className": "col-sm-12",
-                    "component": "table",
-                    "isOpen": false,
-                    "keepChildrenMounted": false,
-                    "transitionDuration": 100,
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
+                      <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
                         <thead>
                           <tr>
                             <th>
                               Contract Address
                             </th>
                           </tr>
-                        </thead>,
+                        </thead>
                         <tbody>
                           <tr
                             className="selected"
@@ -2370,55 +2304,71 @@ ShallowWrapper {
                               />
                             </td>
                           </tr>
-                        </tbody>,
-                      ],
-                      "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <tr>
+                        </tbody>
+                      </table>
+                    </Blueprint.Collapse>,
+                    undefined,
+                  ],
+                  "className": "col-sm-12",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
+                        <thead>
+                          <tr>
                             <th>
                               Contract Address
                             </th>
-                          </tr>,
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <th>
-                              Contract Address
-                            </th>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "Contract Address",
-                            },
-                            "ref": null,
-                            "rendered": "Contract Address",
-                            "type": "th",
-                          },
-                          "type": "tr",
-                        },
-                        "type": "thead",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": Array [
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            className="selected"
+                            onClick={[Function]}
+                          >
+                            <td
+                              style={
+                                Object {
+                                  "border": "none",
+                                }
+                              }
+                            >
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>,
+                      "className": "col-sm-12",
+                      "component": "table",
+                      "isOpen": false,
+                      "keepChildrenMounted": false,
+                      "transitionDuration": 100,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <thead>
+                            <tr>
+                              <th>
+                                Contract Address
+                              </th>
+                            </tr>
+                          </thead>,
+                          <tbody>
                             <tr
                               className="selected"
                               onClick={[Function]}
@@ -2435,30 +2385,33 @@ ShallowWrapper {
                                   value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 />
                               </td>
+                            </tr>
+                          </tbody>,
+                        ],
+                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <tr>
+                              <th>
+                                Contract Address
+                              </th>
                             </tr>,
-                          ],
-                        },
-                        "ref": null,
-                        "rendered": Array [
-                          Object {
+                          },
+                          "ref": null,
+                          "rendered": Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                            "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": <td
-                                style={
-                                  Object {
-                                    "border": "none",
-                                  }
-                                }
-                              >
-                                <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />
-                              </td>,
-                              "className": "selected",
-                              "onClick": [Function],
+                              "children": <th>
+                                Contract Address
+                              </th>,
                             },
                             "ref": null,
                             "rendered": Object {
@@ -2466,39 +2419,104 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />,
-                                "style": Object {
-                                  "border": "none",
-                                },
+                                "children": "Contract Address",
+                              },
+                              "ref": null,
+                              "rendered": "Contract Address",
+                              "type": "th",
+                            },
+                            "type": "tr",
+                          },
+                          "type": "thead",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": Array [
+                              <tr
+                                className="selected"
+                                onClick={[Function]}
+                              >
+                                <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>
+                              </tr>,
+                            ],
+                          },
+                          "ref": null,
+                          "rendered": Array [
+                            Object {
+                              "instance": null,
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>,
+                                "className": "selected",
+                                "onClick": [Function],
                               },
                               "ref": null,
                               "rendered": Object {
                                 "instance": null,
                                 "key": undefined,
-                                "nodeType": "class",
+                                "nodeType": "host",
                                 "props": Object {
-                                  "classes": "small smd-pad-4",
-                                  "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  "children": <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />,
+                                  "style": Object {
+                                    "border": "none",
+                                  },
                                 },
                                 "ref": null,
-                                "rendered": null,
-                                "type": [Function],
+                                "rendered": Object {
+                                  "instance": null,
+                                  "key": undefined,
+                                  "nodeType": "class",
+                                  "props": Object {
+                                    "classes": "small smd-pad-4",
+                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  },
+                                  "ref": null,
+                                  "rendered": null,
+                                  "type": [Function],
+                                },
+                                "type": "td",
                               },
-                              "type": "td",
+                              "type": "tr",
                             },
-                            "type": "tr",
-                          },
-                        ],
-                        "type": "tbody",
-                      },
-                    ],
-                    "type": "table",
+                          ],
+                          "type": "tbody",
+                        },
+                      ],
+                      "type": "table",
+                    },
+                    "type": [Function],
                   },
-                  "type": [Function],
-                },
+                  undefined,
+                ],
                 "type": "div",
               },
               "type": "div",
@@ -4240,102 +4258,24 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <Blueprint.Collapse
-                      className="col-sm-12"
-                      component="table"
-                      isOpen={false}
-                      keepChildrenMounted={false}
-                      transitionDuration={100}
-                    >
-                      <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                    "children": Array [
+                      <Blueprint.Collapse
+                        className="col-sm-12"
+                        component="table"
+                        isOpen={false}
+                        keepChildrenMounted={false}
+                        transitionDuration={100}
                       >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className="selected"
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </Blueprint.Collapse>,
-                    "className": "col-sm-12",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "children": <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                      >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className="selected"
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>,
-                      "className": "col-sm-12",
-                      "component": "table",
-                      "isOpen": false,
-                      "keepChildrenMounted": false,
-                      "transitionDuration": 100,
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": Array [
+                        <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
                           <thead>
                             <tr>
                               <th>
                                 Contract Address
                               </th>
                             </tr>
-                          </thead>,
+                          </thead>
                           <tbody>
                             <tr
                               className="selected"
@@ -4354,55 +4294,71 @@ ShallowWrapper {
                                 />
                               </td>
                             </tr>
-                          </tbody>,
-                        ],
-                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                      },
-                      "ref": null,
-                      "rendered": Array [
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <tr>
+                          </tbody>
+                        </table>
+                      </Blueprint.Collapse>,
+                      undefined,
+                    ],
+                    "className": "col-sm-12",
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "children": <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
+                          <thead>
+                            <tr>
                               <th>
                                 Contract Address
                               </th>
-                            </tr>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": <th>
-                                Contract Address
-                              </th>,
-                            },
-                            "ref": null,
-                            "rendered": Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "Contract Address",
-                              },
-                              "ref": null,
-                              "rendered": "Contract Address",
-                              "type": "th",
-                            },
-                            "type": "tr",
-                          },
-                          "type": "thead",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": Array [
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              className="selected"
+                              onClick={[Function]}
+                            >
+                              <td
+                                style={
+                                  Object {
+                                    "border": "none",
+                                  }
+                                }
+                              >
+                                <HexText
+                                  classes="small smd-pad-4"
+                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                />
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>,
+                        "className": "col-sm-12",
+                        "component": "table",
+                        "isOpen": false,
+                        "keepChildrenMounted": false,
+                        "transitionDuration": 100,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <thead>
+                              <tr>
+                                <th>
+                                  Contract Address
+                                </th>
+                              </tr>
+                            </thead>,
+                            <tbody>
                               <tr
                                 className="selected"
                                 onClick={[Function]}
@@ -4419,30 +4375,33 @@ ShallowWrapper {
                                     value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   />
                                 </td>
+                              </tr>
+                            </tbody>,
+                          ],
+                          "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <tr>
+                                <th>
+                                  Contract Address
+                                </th>
                               </tr>,
-                            ],
-                          },
-                          "ref": null,
-                          "rendered": Array [
-                            Object {
+                            },
+                            "ref": null,
+                            "rendered": Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <td
-                                  style={
-                                    Object {
-                                      "border": "none",
-                                    }
-                                  }
-                                >
-                                  <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />
-                                </td>,
-                                "className": "selected",
-                                "onClick": [Function],
+                                "children": <th>
+                                  Contract Address
+                                </th>,
                               },
                               "ref": null,
                               "rendered": Object {
@@ -4450,39 +4409,104 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />,
-                                  "style": Object {
-                                    "border": "none",
-                                  },
+                                  "children": "Contract Address",
+                                },
+                                "ref": null,
+                                "rendered": "Contract Address",
+                                "type": "th",
+                              },
+                              "type": "tr",
+                            },
+                            "type": "thead",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": Array [
+                                <tr
+                                  className="selected"
+                                  onClick={[Function]}
+                                >
+                                  <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>
+                                </tr>,
+                              ],
+                            },
+                            "ref": null,
+                            "rendered": Array [
+                              Object {
+                                "instance": null,
+                                "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                                "nodeType": "host",
+                                "props": Object {
+                                  "children": <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>,
+                                  "className": "selected",
+                                  "onClick": [Function],
                                 },
                                 "ref": null,
                                 "rendered": Object {
                                   "instance": null,
                                   "key": undefined,
-                                  "nodeType": "class",
+                                  "nodeType": "host",
                                   "props": Object {
-                                    "classes": "small smd-pad-4",
-                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    "children": <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />,
+                                    "style": Object {
+                                      "border": "none",
+                                    },
                                   },
                                   "ref": null,
-                                  "rendered": null,
-                                  "type": [Function],
+                                  "rendered": Object {
+                                    "instance": null,
+                                    "key": undefined,
+                                    "nodeType": "class",
+                                    "props": Object {
+                                      "classes": "small smd-pad-4",
+                                      "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    },
+                                    "ref": null,
+                                    "rendered": null,
+                                    "type": [Function],
+                                  },
+                                  "type": "td",
                                 },
-                                "type": "td",
+                                "type": "tr",
                               },
-                              "type": "tr",
-                            },
-                          ],
-                          "type": "tbody",
-                        },
-                      ],
-                      "type": "table",
+                            ],
+                            "type": "tbody",
+                          },
+                        ],
+                        "type": "table",
+                      },
+                      "type": [Function],
                     },
-                    "type": [Function],
-                  },
+                    undefined,
+                  ],
                   "type": "div",
                 },
                 "type": "div",
@@ -6076,84 +6100,24 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <Blueprint.Collapse
-                    className="col-sm-12"
-                    component="table"
-                    isOpen={false}
-                    keepChildrenMounted={false}
-                    transitionDuration={100}
-                  >
-                    <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                  "children": Array [
+                    <Blueprint.Collapse
+                      className="col-sm-12"
+                      component="table"
+                      isOpen={false}
+                      keepChildrenMounted={false}
+                      transitionDuration={100}
                     >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td
-                            className="text-center"
-                            colSpan={2}
-                          >
-                            No Instances
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </Blueprint.Collapse>,
-                  "className": "col-sm-12",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                    >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td
-                            className="text-center"
-                            colSpan={2}
-                          >
-                            No Instances
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>,
-                    "className": "col-sm-12",
-                    "component": "table",
-                    "isOpen": false,
-                    "keepChildrenMounted": false,
-                    "transitionDuration": 100,
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
+                      <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
                         <thead>
                           <tr>
                             <th>
                               Contract Address
                             </th>
                           </tr>
-                        </thead>,
+                        </thead>
                         <tbody>
                           <tr>
                             <td
@@ -6163,55 +6127,62 @@ ShallowWrapper {
                               No Instances
                             </td>
                           </tr>
-                        </tbody>,
-                      ],
-                      "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <tr>
+                        </tbody>
+                      </table>
+                    </Blueprint.Collapse>,
+                    undefined,
+                  ],
+                  "className": "col-sm-12",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
+                        <thead>
+                          <tr>
                             <th>
                               Contract Address
                             </th>
-                          </tr>,
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <th>
-                              Contract Address
-                            </th>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "Contract Address",
-                            },
-                            "ref": null,
-                            "rendered": "Contract Address",
-                            "type": "th",
-                          },
-                          "type": "tr",
-                        },
-                        "type": "thead",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": Array [
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td
+                              className="text-center"
+                              colSpan={2}
+                            >
+                              No Instances
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>,
+                      "className": "col-sm-12",
+                      "component": "table",
+                      "isOpen": false,
+                      "keepChildrenMounted": false,
+                      "transitionDuration": 100,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <thead>
+                            <tr>
+                              <th>
+                                Contract Address
+                              </th>
+                            </tr>
+                          </thead>,
+                          <tbody>
                             <tr>
                               <td
                                 className="text-center"
@@ -6219,22 +6190,33 @@ ShallowWrapper {
                               >
                                 No Instances
                               </td>
+                            </tr>
+                          </tbody>,
+                        ],
+                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <tr>
+                              <th>
+                                Contract Address
+                              </th>
                             </tr>,
-                          ],
-                        },
-                        "ref": null,
-                        "rendered": Array [
-                          Object {
+                          },
+                          "ref": null,
+                          "rendered": Object {
                             "instance": null,
-                            "key": "1",
+                            "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": <td
-                                className="text-center"
-                                colSpan={2}
-                              >
-                                No Instances
-                              </td>,
+                              "children": <th>
+                                Contract Address
+                              </th>,
                             },
                             "ref": null,
                             "rendered": Object {
@@ -6242,24 +6224,72 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": "No Instances",
-                                "className": "text-center",
-                                "colSpan": 2,
+                                "children": "Contract Address",
                               },
                               "ref": null,
-                              "rendered": "No Instances",
-                              "type": "td",
+                              "rendered": "Contract Address",
+                              "type": "th",
                             },
                             "type": "tr",
                           },
-                        ],
-                        "type": "tbody",
-                      },
-                    ],
-                    "type": "table",
+                          "type": "thead",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": Array [
+                              <tr>
+                                <td
+                                  className="text-center"
+                                  colSpan={2}
+                                >
+                                  No Instances
+                                </td>
+                              </tr>,
+                            ],
+                          },
+                          "ref": null,
+                          "rendered": Array [
+                            Object {
+                              "instance": null,
+                              "key": "1",
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <td
+                                  className="text-center"
+                                  colSpan={2}
+                                >
+                                  No Instances
+                                </td>,
+                              },
+                              "ref": null,
+                              "rendered": Object {
+                                "instance": null,
+                                "key": undefined,
+                                "nodeType": "host",
+                                "props": Object {
+                                  "children": "No Instances",
+                                  "className": "text-center",
+                                  "colSpan": 2,
+                                },
+                                "ref": null,
+                                "rendered": "No Instances",
+                                "type": "td",
+                              },
+                              "type": "tr",
+                            },
+                          ],
+                          "type": "tbody",
+                        },
+                      ],
+                      "type": "table",
+                    },
+                    "type": [Function],
                   },
-                  "type": [Function],
-                },
+                  undefined,
+                ],
                 "type": "div",
               },
               "type": "div",
@@ -6739,84 +6769,24 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <Blueprint.Collapse
-                      className="col-sm-12"
-                      component="table"
-                      isOpen={false}
-                      keepChildrenMounted={false}
-                      transitionDuration={100}
-                    >
-                      <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                    "children": Array [
+                      <Blueprint.Collapse
+                        className="col-sm-12"
+                        component="table"
+                        isOpen={false}
+                        keepChildrenMounted={false}
+                        transitionDuration={100}
                       >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td
-                              className="text-center"
-                              colSpan={2}
-                            >
-                              No Instances
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </Blueprint.Collapse>,
-                    "className": "col-sm-12",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "children": <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                      >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            <td
-                              className="text-center"
-                              colSpan={2}
-                            >
-                              No Instances
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>,
-                      "className": "col-sm-12",
-                      "component": "table",
-                      "isOpen": false,
-                      "keepChildrenMounted": false,
-                      "transitionDuration": 100,
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": Array [
+                        <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
                           <thead>
                             <tr>
                               <th>
                                 Contract Address
                               </th>
                             </tr>
-                          </thead>,
+                          </thead>
                           <tbody>
                             <tr>
                               <td
@@ -6826,55 +6796,62 @@ ShallowWrapper {
                                 No Instances
                               </td>
                             </tr>
-                          </tbody>,
-                        ],
-                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                      },
-                      "ref": null,
-                      "rendered": Array [
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <tr>
+                          </tbody>
+                        </table>
+                      </Blueprint.Collapse>,
+                      undefined,
+                    ],
+                    "className": "col-sm-12",
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "children": <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
+                          <thead>
+                            <tr>
                               <th>
                                 Contract Address
                               </th>
-                            </tr>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": <th>
-                                Contract Address
-                              </th>,
-                            },
-                            "ref": null,
-                            "rendered": Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "Contract Address",
-                              },
-                              "ref": null,
-                              "rendered": "Contract Address",
-                              "type": "th",
-                            },
-                            "type": "tr",
-                          },
-                          "type": "thead",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": Array [
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr>
+                              <td
+                                className="text-center"
+                                colSpan={2}
+                              >
+                                No Instances
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>,
+                        "className": "col-sm-12",
+                        "component": "table",
+                        "isOpen": false,
+                        "keepChildrenMounted": false,
+                        "transitionDuration": 100,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <thead>
+                              <tr>
+                                <th>
+                                  Contract Address
+                                </th>
+                              </tr>
+                            </thead>,
+                            <tbody>
                               <tr>
                                 <td
                                   className="text-center"
@@ -6882,22 +6859,33 @@ ShallowWrapper {
                                 >
                                   No Instances
                                 </td>
+                              </tr>
+                            </tbody>,
+                          ],
+                          "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <tr>
+                                <th>
+                                  Contract Address
+                                </th>
                               </tr>,
-                            ],
-                          },
-                          "ref": null,
-                          "rendered": Array [
-                            Object {
+                            },
+                            "ref": null,
+                            "rendered": Object {
                               "instance": null,
-                              "key": "1",
+                              "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <td
-                                  className="text-center"
-                                  colSpan={2}
-                                >
-                                  No Instances
-                                </td>,
+                                "children": <th>
+                                  Contract Address
+                                </th>,
                               },
                               "ref": null,
                               "rendered": Object {
@@ -6905,24 +6893,72 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": "No Instances",
-                                  "className": "text-center",
-                                  "colSpan": 2,
+                                  "children": "Contract Address",
                                 },
                                 "ref": null,
-                                "rendered": "No Instances",
-                                "type": "td",
+                                "rendered": "Contract Address",
+                                "type": "th",
                               },
                               "type": "tr",
                             },
-                          ],
-                          "type": "tbody",
-                        },
-                      ],
-                      "type": "table",
+                            "type": "thead",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": Array [
+                                <tr>
+                                  <td
+                                    className="text-center"
+                                    colSpan={2}
+                                  >
+                                    No Instances
+                                  </td>
+                                </tr>,
+                              ],
+                            },
+                            "ref": null,
+                            "rendered": Array [
+                              Object {
+                                "instance": null,
+                                "key": "1",
+                                "nodeType": "host",
+                                "props": Object {
+                                  "children": <td
+                                    className="text-center"
+                                    colSpan={2}
+                                  >
+                                    No Instances
+                                  </td>,
+                                },
+                                "ref": null,
+                                "rendered": Object {
+                                  "instance": null,
+                                  "key": undefined,
+                                  "nodeType": "host",
+                                  "props": Object {
+                                    "children": "No Instances",
+                                    "className": "text-center",
+                                    "colSpan": 2,
+                                  },
+                                  "ref": null,
+                                  "rendered": "No Instances",
+                                  "type": "td",
+                                },
+                                "type": "tr",
+                              },
+                            ],
+                            "type": "tbody",
+                          },
+                        ],
+                        "type": "table",
+                      },
+                      "type": [Function],
                     },
-                    "type": [Function],
-                  },
+                    undefined,
+                  ],
                   "type": "div",
                 },
                 "type": "div",
@@ -7491,102 +7527,24 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <Blueprint.Collapse
-                    className="col-sm-12"
-                    component="table"
-                    isOpen={false}
-                    keepChildrenMounted={false}
-                    transitionDuration={100}
-                  >
-                    <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                  "children": Array [
+                    <Blueprint.Collapse
+                      className="col-sm-12"
+                      component="table"
+                      isOpen={false}
+                      keepChildrenMounted={false}
+                      transitionDuration={100}
                     >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className=""
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </Blueprint.Collapse>,
-                  "className": "col-sm-12",
-                },
-                "ref": null,
-                "rendered": Object {
-                  "instance": null,
-                  "key": undefined,
-                  "nodeType": "class",
-                  "props": Object {
-                    "children": <table
-                      className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                    >
-                      <thead>
-                        <tr>
-                          <th>
-                            Contract Address
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          className=""
-                          onClick={[Function]}
-                        >
-                          <td
-                            style={
-                              Object {
-                                "border": "none",
-                              }
-                            }
-                          >
-                            <HexText
-                              classes="small smd-pad-4"
-                              value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                            />
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>,
-                    "className": "col-sm-12",
-                    "component": "table",
-                    "isOpen": false,
-                    "keepChildrenMounted": false,
-                    "transitionDuration": 100,
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "host",
-                    "props": Object {
-                      "children": Array [
+                      <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
                         <thead>
                           <tr>
                             <th>
                               Contract Address
                             </th>
                           </tr>
-                        </thead>,
+                        </thead>
                         <tbody>
                           <tr
                             className=""
@@ -7605,55 +7563,71 @@ ShallowWrapper {
                               />
                             </td>
                           </tr>
-                        </tbody>,
-                      ],
-                      "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                    },
-                    "ref": null,
-                    "rendered": Array [
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": <tr>
+                        </tbody>
+                      </table>
+                    </Blueprint.Collapse>,
+                    undefined,
+                  ],
+                  "className": "col-sm-12",
+                },
+                "ref": null,
+                "rendered": Array [
+                  Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "class",
+                    "props": Object {
+                      "children": <table
+                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                      >
+                        <thead>
+                          <tr>
                             <th>
                               Contract Address
                             </th>
-                          </tr>,
-                        },
-                        "ref": null,
-                        "rendered": Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <th>
-                              Contract Address
-                            </th>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": "Contract Address",
-                            },
-                            "ref": null,
-                            "rendered": "Contract Address",
-                            "type": "th",
-                          },
-                          "type": "tr",
-                        },
-                        "type": "thead",
-                      },
-                      Object {
-                        "instance": null,
-                        "key": undefined,
-                        "nodeType": "host",
-                        "props": Object {
-                          "children": Array [
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            className=""
+                            onClick={[Function]}
+                          >
+                            <td
+                              style={
+                                Object {
+                                  "border": "none",
+                                }
+                              }
+                            >
+                              <HexText
+                                classes="small smd-pad-4"
+                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                              />
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>,
+                      "className": "col-sm-12",
+                      "component": "table",
+                      "isOpen": false,
+                      "keepChildrenMounted": false,
+                      "transitionDuration": 100,
+                    },
+                    "ref": null,
+                    "rendered": Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <thead>
+                            <tr>
+                              <th>
+                                Contract Address
+                              </th>
+                            </tr>
+                          </thead>,
+                          <tbody>
                             <tr
                               className=""
                               onClick={[Function]}
@@ -7670,30 +7644,33 @@ ShallowWrapper {
                                   value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                 />
                               </td>
+                            </tr>
+                          </tbody>,
+                        ],
+                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <tr>
+                              <th>
+                                Contract Address
+                              </th>
                             </tr>,
-                          ],
-                        },
-                        "ref": null,
-                        "rendered": Array [
-                          Object {
+                          },
+                          "ref": null,
+                          "rendered": Object {
                             "instance": null,
-                            "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                            "key": undefined,
                             "nodeType": "host",
                             "props": Object {
-                              "children": <td
-                                style={
-                                  Object {
-                                    "border": "none",
-                                  }
-                                }
-                              >
-                                <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />
-                              </td>,
-                              "className": "",
-                              "onClick": [Function],
+                              "children": <th>
+                                Contract Address
+                              </th>,
                             },
                             "ref": null,
                             "rendered": Object {
@@ -7701,39 +7678,104 @@ ShallowWrapper {
                               "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <HexText
-                                  classes="small smd-pad-4"
-                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                />,
-                                "style": Object {
-                                  "border": "none",
-                                },
+                                "children": "Contract Address",
+                              },
+                              "ref": null,
+                              "rendered": "Contract Address",
+                              "type": "th",
+                            },
+                            "type": "tr",
+                          },
+                          "type": "thead",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": Array [
+                              <tr
+                                className=""
+                                onClick={[Function]}
+                              >
+                                <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>
+                              </tr>,
+                            ],
+                          },
+                          "ref": null,
+                          "rendered": Array [
+                            Object {
+                              "instance": null,
+                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": <td
+                                  style={
+                                    Object {
+                                      "border": "none",
+                                    }
+                                  }
+                                >
+                                  <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />
+                                </td>,
+                                "className": "",
+                                "onClick": [Function],
                               },
                               "ref": null,
                               "rendered": Object {
                                 "instance": null,
                                 "key": undefined,
-                                "nodeType": "class",
+                                "nodeType": "host",
                                 "props": Object {
-                                  "classes": "small smd-pad-4",
-                                  "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  "children": <HexText
+                                    classes="small smd-pad-4"
+                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                  />,
+                                  "style": Object {
+                                    "border": "none",
+                                  },
                                 },
                                 "ref": null,
-                                "rendered": null,
-                                "type": [Function],
+                                "rendered": Object {
+                                  "instance": null,
+                                  "key": undefined,
+                                  "nodeType": "class",
+                                  "props": Object {
+                                    "classes": "small smd-pad-4",
+                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                  },
+                                  "ref": null,
+                                  "rendered": null,
+                                  "type": [Function],
+                                },
+                                "type": "td",
                               },
-                              "type": "td",
+                              "type": "tr",
                             },
-                            "type": "tr",
-                          },
-                        ],
-                        "type": "tbody",
-                      },
-                    ],
-                    "type": "table",
+                          ],
+                          "type": "tbody",
+                        },
+                      ],
+                      "type": "table",
+                    },
+                    "type": [Function],
                   },
-                  "type": [Function],
-                },
+                  undefined,
+                ],
                 "type": "div",
               },
               "type": "div",
@@ -8259,102 +8301,24 @@ ShallowWrapper {
                   "key": undefined,
                   "nodeType": "host",
                   "props": Object {
-                    "children": <Blueprint.Collapse
-                      className="col-sm-12"
-                      component="table"
-                      isOpen={false}
-                      keepChildrenMounted={false}
-                      transitionDuration={100}
-                    >
-                      <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                    "children": Array [
+                      <Blueprint.Collapse
+                        className="col-sm-12"
+                        component="table"
+                        isOpen={false}
+                        keepChildrenMounted={false}
+                        transitionDuration={100}
                       >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className=""
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </Blueprint.Collapse>,
-                    "className": "col-sm-12",
-                  },
-                  "ref": null,
-                  "rendered": Object {
-                    "instance": null,
-                    "key": undefined,
-                    "nodeType": "class",
-                    "props": Object {
-                      "children": <table
-                        className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
-                      >
-                        <thead>
-                          <tr>
-                            <th>
-                              Contract Address
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr
-                            className=""
-                            onClick={[Function]}
-                          >
-                            <td
-                              style={
-                                Object {
-                                  "border": "none",
-                                }
-                              }
-                            >
-                              <HexText
-                                classes="small smd-pad-4"
-                                value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                              />
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>,
-                      "className": "col-sm-12",
-                      "component": "table",
-                      "isOpen": false,
-                      "keepChildrenMounted": false,
-                      "transitionDuration": 100,
-                    },
-                    "ref": null,
-                    "rendered": Object {
-                      "instance": null,
-                      "key": undefined,
-                      "nodeType": "host",
-                      "props": Object {
-                        "children": Array [
+                        <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
                           <thead>
                             <tr>
                               <th>
                                 Contract Address
                               </th>
                             </tr>
-                          </thead>,
+                          </thead>
                           <tbody>
                             <tr
                               className=""
@@ -8373,55 +8337,71 @@ ShallowWrapper {
                                 />
                               </td>
                             </tr>
-                          </tbody>,
-                        ],
-                        "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
-                      },
-                      "ref": null,
-                      "rendered": Array [
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": <tr>
+                          </tbody>
+                        </table>
+                      </Blueprint.Collapse>,
+                      undefined,
+                    ],
+                    "className": "col-sm-12",
+                  },
+                  "ref": null,
+                  "rendered": Array [
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "class",
+                      "props": Object {
+                        "children": <table
+                          className="pt-table pt-interactive pt-condensed pt-striped smd-full-width"
+                        >
+                          <thead>
+                            <tr>
                               <th>
                                 Contract Address
                               </th>
-                            </tr>,
-                          },
-                          "ref": null,
-                          "rendered": Object {
-                            "instance": null,
-                            "key": undefined,
-                            "nodeType": "host",
-                            "props": Object {
-                              "children": <th>
-                                Contract Address
-                              </th>,
-                            },
-                            "ref": null,
-                            "rendered": Object {
-                              "instance": null,
-                              "key": undefined,
-                              "nodeType": "host",
-                              "props": Object {
-                                "children": "Contract Address",
-                              },
-                              "ref": null,
-                              "rendered": "Contract Address",
-                              "type": "th",
-                            },
-                            "type": "tr",
-                          },
-                          "type": "thead",
-                        },
-                        Object {
-                          "instance": null,
-                          "key": undefined,
-                          "nodeType": "host",
-                          "props": Object {
-                            "children": Array [
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              className=""
+                              onClick={[Function]}
+                            >
+                              <td
+                                style={
+                                  Object {
+                                    "border": "none",
+                                  }
+                                }
+                              >
+                                <HexText
+                                  classes="small smd-pad-4"
+                                  value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                />
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>,
+                        "className": "col-sm-12",
+                        "component": "table",
+                        "isOpen": false,
+                        "keepChildrenMounted": false,
+                        "transitionDuration": 100,
+                      },
+                      "ref": null,
+                      "rendered": Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <thead>
+                              <tr>
+                                <th>
+                                  Contract Address
+                                </th>
+                              </tr>
+                            </thead>,
+                            <tbody>
                               <tr
                                 className=""
                                 onClick={[Function]}
@@ -8438,30 +8418,33 @@ ShallowWrapper {
                                     value="0293f9b10a4453667db7fcfe74728c9d821add4b"
                                   />
                                 </td>
+                              </tr>
+                            </tbody>,
+                          ],
+                          "className": "pt-table pt-interactive pt-condensed pt-striped smd-full-width",
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <tr>
+                                <th>
+                                  Contract Address
+                                </th>
                               </tr>,
-                            ],
-                          },
-                          "ref": null,
-                          "rendered": Array [
-                            Object {
+                            },
+                            "ref": null,
+                            "rendered": Object {
                               "instance": null,
-                              "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                              "key": undefined,
                               "nodeType": "host",
                               "props": Object {
-                                "children": <td
-                                  style={
-                                    Object {
-                                      "border": "none",
-                                    }
-                                  }
-                                >
-                                  <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />
-                                </td>,
-                                "className": "",
-                                "onClick": [Function],
+                                "children": <th>
+                                  Contract Address
+                                </th>,
                               },
                               "ref": null,
                               "rendered": Object {
@@ -8469,39 +8452,104 @@ ShallowWrapper {
                                 "key": undefined,
                                 "nodeType": "host",
                                 "props": Object {
-                                  "children": <HexText
-                                    classes="small smd-pad-4"
-                                    value="0293f9b10a4453667db7fcfe74728c9d821add4b"
-                                  />,
-                                  "style": Object {
-                                    "border": "none",
-                                  },
+                                  "children": "Contract Address",
+                                },
+                                "ref": null,
+                                "rendered": "Contract Address",
+                                "type": "th",
+                              },
+                              "type": "tr",
+                            },
+                            "type": "thead",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": Array [
+                                <tr
+                                  className=""
+                                  onClick={[Function]}
+                                >
+                                  <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>
+                                </tr>,
+                              ],
+                            },
+                            "ref": null,
+                            "rendered": Array [
+                              Object {
+                                "instance": null,
+                                "key": "card-data-0293f9b10a4453667db7fcfe74728c9d821add4b-0",
+                                "nodeType": "host",
+                                "props": Object {
+                                  "children": <td
+                                    style={
+                                      Object {
+                                        "border": "none",
+                                      }
+                                    }
+                                  >
+                                    <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />
+                                  </td>,
+                                  "className": "",
+                                  "onClick": [Function],
                                 },
                                 "ref": null,
                                 "rendered": Object {
                                   "instance": null,
                                   "key": undefined,
-                                  "nodeType": "class",
+                                  "nodeType": "host",
                                   "props": Object {
-                                    "classes": "small smd-pad-4",
-                                    "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    "children": <HexText
+                                      classes="small smd-pad-4"
+                                      value="0293f9b10a4453667db7fcfe74728c9d821add4b"
+                                    />,
+                                    "style": Object {
+                                      "border": "none",
+                                    },
                                   },
                                   "ref": null,
-                                  "rendered": null,
-                                  "type": [Function],
+                                  "rendered": Object {
+                                    "instance": null,
+                                    "key": undefined,
+                                    "nodeType": "class",
+                                    "props": Object {
+                                      "classes": "small smd-pad-4",
+                                      "value": "0293f9b10a4453667db7fcfe74728c9d821add4b",
+                                    },
+                                    "ref": null,
+                                    "rendered": null,
+                                    "type": [Function],
+                                  },
+                                  "type": "td",
                                 },
-                                "type": "td",
+                                "type": "tr",
                               },
-                              "type": "tr",
-                            },
-                          ],
-                          "type": "tbody",
-                        },
-                      ],
-                      "type": "table",
+                            ],
+                            "type": "tbody",
+                          },
+                        ],
+                        "type": "table",
+                      },
+                      "type": [Function],
                     },
-                    "type": [Function],
-                  },
+                    undefined,
+                  ],
                   "type": "div",
                 },
                 "type": "div",

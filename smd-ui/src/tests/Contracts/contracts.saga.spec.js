@@ -34,14 +34,14 @@ describe('Contracts: saga', () => {
     }
 
     test('inspection', () => {
-      const gen = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId, limit: data.limit, offset: data.offset , name: data.name});
-      expect(gen.next().value).toEqual(call(getContracts, data.chainId, data.limit, data.offset, data.name));
+      const gen = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId, limit: data.limit, offset: data.offset , name: data.name, instanceOffset: undefined, instanceLimit: undefined});
+      expect(gen.next().value).toEqual(call(getContracts, data.chainId, data.limit, data.offset, data.name, undefined, undefined));
       expect(gen.next(contracts).value).toEqual(put(fetchContractsSuccess(contracts)));
       expect(gen.throw(error).value).toEqual(put(fetchContractsFailure(error)));
       expect(gen.next().done).toBe(true);
 
-      const gen2 = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId, limit: data.limit, offset: data.offset , name: '001222'});
-      expect(gen2.next().value).toEqual(call(getContracts, data.chainId, data.limit, data.offset, '001222'));
+      const gen2 = fetchContracts({ type: "FETCH_CONTRACTS", chainId: data.chainId, limit: data.limit, offset: data.offset , name: '001222', instanceOffset: undefined, instanceLimit: undefined});
+      expect(gen2.next().value).toEqual(call(getContracts, data.chainId, data.limit, data.offset, '001222', undefined, undefined));
       expect(gen2.next(contracts).value).toEqual(put(fetchContractsSuccess(contracts)));
       expect(gen2.throw(error).value).toEqual(put(fetchContractsFailure(error)));
       expect(gen2.next().done).toBe(true);

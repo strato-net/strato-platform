@@ -18,7 +18,7 @@ describe('Contracts: action', () => {
       let chainId = "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9";
       const limit = 10;
       const offset = 0;
-      expect(fetchContracts(chainId, limit, offset)).toMatchSnapshot();
+      expect(fetchContracts(chainId, limit, offset, undefined, undefined, undefined)).toMatchSnapshot();
     });
 
     test('success', () => {

@@ -17,6 +17,8 @@ Object {
 exports[`Contracts: action fetch contracts request 1`] = `
 Object {
   "chainId": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
+  "instanceLimit": undefined,
+  "instanceOffset": undefined,
   "limit": 10,
   "name": undefined,
   "offset": 0,
