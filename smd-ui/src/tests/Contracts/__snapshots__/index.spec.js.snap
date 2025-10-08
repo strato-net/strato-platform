@@ -270,6 +270,7 @@ Object {
     ],
   },
   "filter": "Time",
+  "instancePagination": undefined,
   "isLoading": undefined,
   "selectedChain": "ff7ef45acb7a775018bc765b6fdeea432aaddfcd846cf6dd9442724266b1eac9",
 }

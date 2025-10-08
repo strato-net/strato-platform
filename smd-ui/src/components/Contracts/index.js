@@ -223,6 +223,7 @@ export function mapStateToProps(state) {
     selectedChain: state.chains.selectedChain,
     isLoading: state.contracts.isLoading,
     chainIds: state.chains.chainIds,
+    instancePagination: state.contracts.instancePagination,
   };
 }
 
