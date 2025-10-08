@@ -2,12 +2,12 @@ import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
-import { StratoPaths, constants } from "../../config/constants";
+import { StratoPaths, constants, rewardsChef } from "../../config/constants";
 import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getStakedBalance, getPools } from "./rewardsChef.service";
+import { getStakedBalance, getPools, waitForBalanceUpdate } from "./rewardsChef.service";
 import {
   simulateLoan,
   CollateralInfo,
@@ -41,7 +41,7 @@ const findPoolForMToken = async (
   accessToken: string,
   mToken: string
 ) => {
-  const pools = await getPools(accessToken, config.rewardsChef);
+  const pools = await getPools(accessToken, rewardsChef);
   return pools.find(pool => pool.lpToken === mToken);
 };
 
@@ -159,8 +159,16 @@ export const depositLiquidity = async (
 
   // If staking is requested and deposit was successful, execute staking transaction
   if (stakeMToken && depositResult.status === "Success") {
-    // Get user's mToken balance after deposit to calculate the newly minted amount
-    const mTokenBalanceAfter = await getTokenBalanceForUser(accessToken, mToken, userAddress);
+    // Wait for Cirrus to index the new mToken balance with retry logic
+    const mTokenBalanceAfter = await waitForBalanceUpdate(
+      accessToken,
+      mToken,
+      userAddress,
+      mTokenBalanceBefore,
+      10,  // max retries
+      200  // 200ms delay between retries
+    );
+
     const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
 
     if (BigInt(newlyMintedAmount) > 0n) {
@@ -179,12 +187,12 @@ export const depositLiquidity = async (
           contractName: extractContractName(Token),
           contractAddress: mToken,
           method: "approve",
-          args: { spender: config.rewardsChef, value: newlyMintedAmount },
+          args: { spender: rewardsChef, value: newlyMintedAmount },
         },
         // Then deposit into RewardsChef
         {
           contractName: extractContractName(RewardsChef),
-          contractAddress: config.rewardsChef,
+          contractAddress: rewardsChef,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
         },
@@ -257,7 +265,7 @@ export const withdrawLiquidity = async (
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: extractContractName(RewardsChef),
-        contractAddress: config.rewardsChef,
+        contractAddress: rewardsChef,
         method: "withdraw",
         args: {
           _pid: poolIdx,
@@ -652,7 +660,7 @@ export const liquidityAndBalance = async (
 
   // If no pool found, staked balance is 0
   const stakedMTokenBalance = poolForMToken
-    ? await getStakedBalance(accessToken, config.rewardsChef, poolForMToken.poolIdx, userAddress)
+    ? await getStakedBalance(accessToken, rewardsChef, poolForMToken.poolIdx, userAddress)
     : "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
