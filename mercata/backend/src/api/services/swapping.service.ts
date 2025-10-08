@@ -19,7 +19,7 @@ import {
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getPools as getRewardsChefPools, getStakedBalance } from "./rewardsChef.service";
-import * as config from "../../config/config";
+import { rewardsChef } from "../../config/constants";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -77,7 +77,7 @@ export const getPools = async (
   let stakedBalanceMap: Map<string, string> | undefined;
   if (userAddress) {
     // Get all RewardsChef pools
-    const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
+    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
 
     // Build a map of lpToken address -> rewards pool index
     const lpTokenToPoolIdx = new Map<string, number>();
@@ -93,7 +93,7 @@ export const getPools = async (
         if (poolIdx !== undefined) {
           const stakedBalance = await getStakedBalance(
             accessToken,
-            config.rewardsChef,
+            rewardsChef,
             poolIdx,
             userAddress
           );

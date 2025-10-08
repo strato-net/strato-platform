@@ -1,8 +1,7 @@
 import { strato, cirrus, bloc } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { StratoPaths, constants } from "../../config/constants";
-import * as config from "../../config/config";
+import { StratoPaths, constants, rewardsChef } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { getTokenBalanceForUser } from "./tokens.service";
@@ -18,7 +17,7 @@ const findPoolForSToken = async (
   accessToken: string,
   sToken: string
 ) => {
-  const pools = await getPools(accessToken, config.rewardsChef);
+  const pools = await getPools(accessToken, rewardsChef);
   return pools.find(pool => pool.lpToken === sToken);
 };
 
@@ -206,7 +205,7 @@ export const getSafetyModuleInfo = async (
 
     // If no pool found, staked balance is 0
     const stakedSTokenBalance = poolForSToken
-      ? await getStakedBalance(accessToken, config.rewardsChef, poolForSToken.poolIdx, userAddress)
+      ? await getStakedBalance(accessToken, rewardsChef, poolForSToken.poolIdx, userAddress)
       : "0";
 
     // Calculate exchange rate (assets per share)
@@ -363,12 +362,12 @@ export const stakeSafetyModule = async (
           contractName: extractContractName(Token),
           contractAddress: sTokenAddress,
           method: "approve",
-          args: { spender: config.rewardsChef, value: newlyMintedAmount },
+          args: { spender: rewardsChef, value: newlyMintedAmount },
         },
         // Then deposit into RewardsChef
         {
           contractName: "RewardsChef",
-          contractAddress: config.rewardsChef,
+          contractAddress: rewardsChef,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
         },
@@ -443,7 +442,7 @@ export const redeemSafetyModule = async (
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: "RewardsChef",
-        contractAddress: config.rewardsChef,
+        contractAddress: rewardsChef,
         method: "withdraw",
         args: {
           _pid: poolIdx,
