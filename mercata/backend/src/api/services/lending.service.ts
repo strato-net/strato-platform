@@ -7,7 +7,7 @@ import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getStakedBalance, getPools } from "./rewardsChef.service";
+import { getStakedBalance, getPools, waitForBalanceUpdate } from "./rewardsChef.service";
 import {
   simulateLoan,
   CollateralInfo,
@@ -159,8 +159,16 @@ export const depositLiquidity = async (
 
   // If staking is requested and deposit was successful, execute staking transaction
   if (stakeMToken && depositResult.status === "Success") {
-    // Get user's mToken balance after deposit to calculate the newly minted amount
-    const mTokenBalanceAfter = await getTokenBalanceForUser(accessToken, mToken, userAddress);
+    // Wait for Cirrus to index the new mToken balance with retry logic
+    const mTokenBalanceAfter = await waitForBalanceUpdate(
+      accessToken,
+      mToken,
+      userAddress,
+      mTokenBalanceBefore,
+      10,  // max retries
+      200  // 200ms delay between retries
+    );
+
     const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
 
     if (BigInt(newlyMintedAmount) > 0n) {
