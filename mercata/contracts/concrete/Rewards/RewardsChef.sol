@@ -156,6 +156,7 @@ contract record RewardsChef is Ownable {
     event AllocationPointsUpdated(uint256 indexed pid, uint256 oldAllocPoint, uint256 newAllocPoint);
     event BonusPeriodAdded(uint256 indexed pid, uint256 startTimestamp, uint256 bonusMultiplier);
     event MinFutureTimeUpdated(uint256 oldMinFutureTime, uint256 newMinFutureTime);
+    event CataPerSecondUpdated(uint256 oldCataPerSecond, uint256 newCataPerSecond);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -210,10 +211,15 @@ contract record RewardsChef is Ownable {
     // CONSTRUCTOR
     // ═════════════════════════════════════════════════════════════════════════
 
-    constructor(address initialOwner,
-		address _rewardToken,
-		uint256 _cataPerSecond
-	        ) Ownable(initialOwner) {
+    constructor(address initialOwner) Ownable(initialOwner) { }
+
+    function initialize(address _rewardToken, uint256 _cataPerSecond) external onlyOwner {
+        // important: must be set here for proxied instances; ensure consistency
+        // with desired initial values
+        MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
+        PRECISION_MULTIPLIER = 1e18;
+
+        require(_rewardToken != address(0), "Invalid reward token address");
         rewardToken = Token(_rewardToken);
         cataPerSecond = _cataPerSecond;
         pools = [];
@@ -271,6 +277,20 @@ contract record RewardsChef is Ownable {
         pools[_pid].allocPoint = _allocPoint;
 
         emit AllocationPointsUpdated(_pid, oldAllocPoint, _allocPoint);
+    }
+
+    function updateCataPerSecond(uint256 _cataPerSecond) public onlyOwner {
+        // See 'PRECISION LOSS PREVENTION' section in top comment
+        require(_cataPerSecond >= totalAllocPoint, "cataPerSecond must be >= totalAllocPoint to prevent precision loss");
+
+        // Update all pools first to ensure all pending rewards are calculated
+        // with the old cataPerSecond rate before we change it
+        massUpdatePools();
+
+        uint256 oldCataPerSecond = cataPerSecond;
+        cataPerSecond = _cataPerSecond;
+
+        emit CataPerSecondUpdated(oldCataPerSecond, _cataPerSecond);
     }
 
     function addBonusPeriod(

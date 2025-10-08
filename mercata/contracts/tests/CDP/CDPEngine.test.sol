@@ -1460,4 +1460,182 @@ contract Describe_CDPEngine {
         
         
     }
+
+    function it_cdp_engine_accrue_interest_with_fastForward() {
+        // log("=== Testing Interest Accrual with FastForward ===");
+        
+        // // Fast forward a bit to avoid timestamp 0 issues
+        fastForward(1);
+        
+        // Set up collateral and mint debt
+        uint256 collateralAmount = 1000e18;
+        uint256 debtAmount = 100e18; // 100 USDST
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, debtAmount);
+        
+        // // Get initial state
+        (, uint256 initialScaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 initialRateAccumulator ,uint256 initialLastAccrual, ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 initialDebt = (initialScaledDebt * initialRateAccumulator) / RAY;
+        
+        // log("Initial scaledDebt", initialScaledDebt);
+        // log("Initial rateAccumulator", initialRateAccumulator);
+        // log("Initial lastAccrual", initialLastAccrual);
+        // log("Initial debt (USD)", initialDebt);
+        
+        // // Fast forward 1 year (365 days)
+        uint256 secondsInYear = 365 * 24 * 60 * 60;
+        uint256 timestampBefore = block.timestamp;
+        fastForward(secondsInYear);
+        uint256 timestampAfter = block.timestamp;
+        
+        // log("Time before fastForward", timestampBefore);
+        // log("Time after fastForward", timestampAfter);
+        require(timestampAfter == timestampBefore + secondsInYear, "FastForward did not work correctly");
+        
+        // // Trigger accrual by minting a tiny amount
+        cdpEngine.mint(collateralTokenAddress, 1); // 1 wei of USDST
+        
+        // // Get state after accrual
+        ( ,uint256 afterScaledDebt) =  cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 afterRateAccumulator,uint256 afterLastAccrual , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 debtAfterAccrual = (afterScaledDebt * afterRateAccumulator) / RAY;
+        
+        // log("After scaledDebt", afterScaledDebt);
+        // log("After rateAccumulator", afterRateAccumulator);
+        // log("After lastAccrual timestamp", afterLastAccrual);
+        // log("After debt (USD)", debtAfterAccrual);
+        
+        // Verify interest accrued
+        require(afterRateAccumulator > initialRateAccumulator, "Rate accumulator should increase");
+        require(debtAfterAccrual > initialDebt + 1, "Debt should increase by more than just the 1 wei minted");
+        
+        // Calculate expected interest
+        // With 5% APR stability fee rate
+        uint256 actualInterest = debtAfterAccrual - initialDebt - 1; // Subtract the 1 wei we minted to trigger accrual
+
+        uint interestRate = (actualInterest * 100) / debtAmount;
+        // log("Actual interest accrued", actualInterest);
+        // log("Interest rate achieved", interestRate); // As percentage
+        
+        require(interestRate == 5, "Interest rate should be at 5%");
+    }
+
+    function it_should_compound_interest_over_multiple_periods() {
+        
+        // Fast forward to avoid timestamp 0
+        fastForward(1);
+        
+        // Set up initial position
+        uint256 collateralAmount = 1000e18;
+        uint256 debtAmount = 100e18;
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, debtAmount);
+        
+        (, uint256 initialScaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 initialRateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 initialDebt = (initialScaledDebt * initialRateAccumulator) / RAY;
+        // log("Initial scaledDebt", initialScaledDebt);
+        // log("Initial debt", initialDebt);
+        
+        // Fast forward 6 months
+        uint256 sixMonths = 182 * 24 * 60 * 60; // ~6 months
+        fastForward(sixMonths);
+        
+        // Trigger accrual
+        cdpEngine.mint(collateralTokenAddress, 1);
+        
+        ( ,uint256 midScaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 midRateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 debtAfterSixMonths = (midScaledDebt * midRateAccumulator) / RAY;
+        // log("Debt after 6 months", debtAfterSixMonths);
+        
+        // Fast forward another 6 months
+        fastForward(sixMonths);
+        
+        // Trigger accrual again
+        cdpEngine.mint(collateralTokenAddress, 1);
+        
+        ( ,uint256 finalScaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 finalRateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 debtAfterOneYear = (finalScaledDebt * finalRateAccumulator) / RAY;
+        // log("Debt after 1 year (compound)", debtAfterOneYear);
+        
+        // Interest should compound - debt after 1 year should be more than simple interest
+        uint256 totalInterest = (debtAfterOneYear - initialDebt - 2) / WAD; 
+        // log("Total compound interest", totalInterest);
+        
+        require(totalInterest == 5, "Compound interest should be 5"); 
+    }
+
+    function it_should_calculate_correct_repayment_after_interest() {
+        // log("=== Testing Repayment After Interest Accrual ===");
+        
+        // Fast forward to avoid timestamp 0
+        fastForward(1);
+        
+        // Set up position
+        uint256 collateralAmount = 1000e18;
+        uint256 debtAmount = 100e18;
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, debtAmount);
+        
+        
+        // Fast forward 30 days to accrue some interest
+        uint256 thirtyDays = 30 * 24 * 60 * 60;
+        fastForward(thirtyDays);
+        
+        // Trigger accrual with a small mint
+        cdpEngine.mint(collateralTokenAddress, 1);
+        
+        // Get debt after interest accrual
+        ( ,uint256 scaledDebtBefore) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 rateAccumulatorBefore, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 debtBefore = (scaledDebtBefore * rateAccumulatorBefore) / RAY;
+        // log("Debt after 30 days", debtBefore);
+        
+        // Interest for 30 days at 5% APR should be roughly 0.41% (5% / 12)
+        uint256 expectedInterest = debtAmount * 41 / 10000; // ~0.41%
+        // log("Expected interest (rough)", expectedInterest);
+        // log("Actual interest", (debtBefore - debtAmount) * 100 / WAD);
+        // log("Expected interest", expectedInterest * 100 / WAD);
+        require((debtBefore - debtAmount) * 100 / WAD == (expectedInterest * 100 / WAD), "Debt after a month should be roughly 0.41%");
+        
+        // Prepare to repay the exact amount owed
+        require(
+            ERC20(usdstAddress).approve(address(cdpEngine), debtBefore),
+            "USDST approval failed"
+        );
+        
+        // Repay all debt
+        cdpEngine.repayAll(collateralTokenAddress);
+        
+        // Verify debt is fully repaid
+        ( ,uint256 scaledDebtAfter) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 rateAccumulatorAfter, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 debtAfter = (scaledDebtAfter * rateAccumulatorAfter) / RAY;
+        // log("Debt after repayAll", debtAfter);
+        
+        require(debtAfter == 0, "Debt should be fully repaid");
+        
+        // Verify the correct amount was burned (principal + interest)
+        uint256 totalRepaid = debtBefore;
+        // log("Total amount repaid", totalRepaid);
+        require(totalRepaid > debtAmount, "Should have paid interest on top of principal");
+    }
 }

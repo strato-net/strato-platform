@@ -33,34 +33,29 @@ describe('SideBar: index', () => {
       expect(wrapper.find('NavLink').get(0)).toMatchSnapshot();
     });
 
-    test('third position /blocks', () => {
+    test('second position /transactions', () => {
+      wrapper.find('NavLink').at(1).simulate('click');
+      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
+    });
+
+    test('third position /contracts', () => {
       wrapper.find('NavLink').at(2).simulate('click');
       expect(wrapper.find('NavLink').get(2)).toMatchSnapshot();
     });
 
-    test('fourth position /transactions', () => {
+    test('fourth position /blocks', () => {
       wrapper.find('NavLink').at(3).simulate('click');
       expect(wrapper.find('NavLink').get(3)).toMatchSnapshot();
     });
 
-    test('fifth position /accounts', () => {
+    test('fifth position /code_editor', () => {
       wrapper.find('NavLink').at(4).simulate('click');
       expect(wrapper.find('NavLink').get(4)).toMatchSnapshot();
     });
-
-    test('sixth position /contracts', () => {
+    
+    test('sixth position /external-storage', () => {
       wrapper.find('NavLink').at(5).simulate('click');
       expect(wrapper.find('NavLink').get(5)).toMatchSnapshot();
-    });
-
-    test('seventh position /code_editor', () => {
-      wrapper.find('NavLink').at(6).simulate('click');
-      expect(wrapper.find('NavLink').get(6)).toMatchSnapshot();
-    });
-    
-    test('eighth position /external-storage', () => {
-      wrapper.find('NavLink').at(1).simulate('click');
-      expect(wrapper.find('NavLink').get(1)).toMatchSnapshot();
     });
 
   });

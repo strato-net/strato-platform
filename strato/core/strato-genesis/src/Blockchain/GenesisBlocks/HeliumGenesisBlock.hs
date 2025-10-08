@@ -265,6 +265,9 @@ cdpReserveImplAddress = 0x1114
 safetyModuleImplAddress :: Address
 safetyModuleImplAddress = 0x1115
 
+rewardsChefImplAddress :: Address
+rewardsChefImplAddress = 0x111f
+
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
@@ -294,7 +297,7 @@ supportedCollaterals = Set.toList
                      $ GE.assetRootAddress <$> combinedEscrows
 
 mercataContract :: String -> CodePtr
-mercataContract = CodeAtAccount mercataAddress
+mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts)
 
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
@@ -332,6 +335,7 @@ genesisBlock  =
             ContractNoStorage cdpVaultImplAddress 0 (mercataContract "CDPVault"),
             ContractNoStorage cdpReserveImplAddress 0 (mercataContract "CDPReserve"),
             ContractNoStorage safetyModuleImplAddress 0 (mercataContract "SafetyModule"),
+            ContractNoStorage rewardsChefImplAddress 0 (mercataContract "RewardsChef"),
             SolidVMContractWithStorage
               mercataAddress
               720
@@ -352,6 +356,7 @@ genesisBlock  =
               , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
               , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
               , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
+              , (".rewardsChef", BContract "RewardsChef" $ unspecifiedChain rewardsChefAddress)
               , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
               , (".cdpRegistry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
               , (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
@@ -425,6 +430,7 @@ genesisBlock  =
              , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
              , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress "BlockApps" "Mercata" "CDPReserve")
              , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
+             , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress "BlockApps" "Mercata" "RewardsChef")
              , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
              , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
              , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
@@ -850,10 +856,11 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ ownedByBlockApps mer
      ]
 
 rewardsChef :: AccountInfo
-rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mercataAddress "RewardsChef") $ ownedByBlockApps mercataAddress
+rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [ (".MAX_INT", BInteger 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
      , (".PRECISION_MULTIPLIER", BInteger oneE18)
      , (".rewardToken", BContract "Token" $ unspecifiedChain cataAddress)
+     , (".logicContract", BAccount $ unspecifiedChain rewardsChefImplAddress)
      , (".cataPerSecond", BInteger 100000000000000)
      , (".totalAllocPoint", BInteger 600)
      , (".minFutureTime", BInteger 3600)
