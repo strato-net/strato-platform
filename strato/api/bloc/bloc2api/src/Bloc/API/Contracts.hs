@@ -90,6 +90,9 @@ instance ToParam (QueryParam "instLimit" Integer) where
 instance ToParam (QueryParam "instancesPreviewLimit" Integer) where
   toParam _ = DocQueryParam "instancesPreviewLimit" [] "Maximum number of preview instances to return" Normal
 
+instance ToSample Value where
+  toSamples _ = singleSample $ object ["message" .= ("Sample response" :: Text)]
+
 data AddressCreatedAt = AddressCreatedAt
   { createdAt :: Int64,
     address :: Address,
