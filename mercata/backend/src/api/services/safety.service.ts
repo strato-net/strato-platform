@@ -6,7 +6,7 @@ import * as config from "../../config/config";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getStakedBalance, getPools } from "./rewardsChef.service";
+import { getStakedBalance, getPools, waitForBalanceUpdate } from "./rewardsChef.service";
 
 const SafetyModule = "mercata/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
 const { Token } = constants;
@@ -335,8 +335,16 @@ export const stakeSafetyModule = async (
 
   // If staking is requested and stake was successful, execute staking transaction
   if (stakeSToken && stakeResult.status === "Success") {
-    // Get user's sUSDST balance after stake to calculate the newly minted amount
-    const sTokenBalanceAfter = await getTokenBalanceForUser(accessToken, sTokenAddress, userAddress);
+    // Wait for Cirrus to index the new sUSDST balance with retry logic
+    const sTokenBalanceAfter = await waitForBalanceUpdate(
+      accessToken,
+      sTokenAddress,
+      userAddress,
+      sTokenBalanceBefore,
+      10,  // max retries
+      200  // 200ms delay between retries
+    );
+
     const newlyMintedAmount = (BigInt(sTokenBalanceAfter) - BigInt(sTokenBalanceBefore)).toString();
 
     if (BigInt(newlyMintedAmount) > 0n) {
