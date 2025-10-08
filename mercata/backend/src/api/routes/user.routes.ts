@@ -8,18 +8,22 @@ const router = Router();
  * @openapi
  * /user/me:
  *   get:
- *     summary: Get current user information
+ *     summary: Retrieve profile information for the signed-in user
  *     tags: [User]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Current user details
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 userAddress:
+ *                   type: string
+ *                 isAdmin:
+ *                   type: boolean
+ *                 userName:
+ *                   type: string
  */
 router.get("/me", authHandler.authorizeRequest(), UserController.me);
 
@@ -27,44 +31,66 @@ router.get("/me", authHandler.authorizeRequest(), UserController.me);
  * @openapi
  * /user/admin:
  *   get:
- *     summary: Get admin information
+ *     summary: List registered protocol administrators
  *     tags: [Admin]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Administrator addresses
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 admins:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *   post:
- *     summary: Add new admin
+ *     summary: Grant administrator access
  *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userAddress
+ *             properties:
+ *               userAddress:
+ *                 type: string
+ *                 description: Address to promote to admin
  *     responses:
- *       200:
- *         description: Success
+ *       201:
+ *         description: Admin grant transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  *   delete:
- *     summary: Remove admin
+ *     summary: Revoke administrator access
  *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - userAddress
+ *             properties:
+ *               userAddress:
+ *                 type: string
+ *                 description: Address to revoke admin rights from
  *     responses:
  *       200:
- *         description: Success
+ *         description: Admin revoke transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/admin", authHandler.authorizeRequest(), UserController.admin);
 router.post("/admin", authHandler.authorizeRequest(), UserController.addAdmin);
@@ -74,18 +100,23 @@ router.delete("/admin", authHandler.authorizeRequest(), UserController.removeAdm
  * @openapi
  * /user/admin/contract/search:
  *   get:
- *     summary: Search contracts (admin)
+ *     summary: Search contracts by name or address
  *     tags: [Admin]
+ *     parameters:
+ *       - name: search
+ *         in: query
+ *         required: true
+ *         description: Search term for contract discovery
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Search results
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               additionalProperties: true
  */
 router.get("/admin/contract/search", authHandler.authorizeRequest(), UserController.contractSearch);
 
@@ -93,18 +124,23 @@ router.get("/admin/contract/search", authHandler.authorizeRequest(), UserControl
  * @openapi
  * /user/admin/contract/details:
  *   get:
- *     summary: Get contract details (admin)
+ *     summary: Retrieve contract metadata by address
  *     tags: [Admin]
+ *     parameters:
+ *       - name: address
+ *         in: query
+ *         required: true
+ *         description: Contract address to inspect
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Contract detail payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/admin/contract/details", authHandler.authorizeRequest(), UserController.getContractDetails);
 
@@ -112,18 +148,38 @@ router.get("/admin/contract/details", authHandler.authorizeRequest(), UserContro
  * @openapi
  * /user/admin/vote:
  *   post:
- *     summary: Cast vote on issue (admin)
+ *     summary: Cast an administrative vote
  *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - target
+ *               - func
+ *               - args
+ *             properties:
+ *               target:
+ *                 type: string
+ *                 description: Contract address to call
+ *               func:
+ *                 type: string
+ *                 description: Function signature being approved
+ *               args:
+ *                 type: array
+ *                 description: Encoded function arguments
+ *                 items:
+ *                   type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Vote transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVoteOnIssue);
 
@@ -131,18 +187,16 @@ router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVo
  * @openapi
  * /user/admin/issues:
  *   get:
- *     summary: Get open issues (admin)
+ *     summary: List open administrative issues
  *     tags: [Admin]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Governance issue overview
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               additionalProperties: true
  */
 router.get("/admin/issues", authHandler.authorizeRequest(), UserController.getOpenIssues);
 

@@ -8,18 +8,31 @@ const router = Router();
  * @openapi
  * /tokens/balance:
  *   get:
- *     summary: Get token balance
+ *     summary: Retrieve token balances for the signed-in user
  *     tags: [Tokens]
+ *     parameters:
+ *       - name: select
+ *         in: query
+ *         required: false
+ *         description: Optional field selection forwarded to Cirrus
+ *         schema:
+ *           type: string
+ *       - name: address
+ *         in: query
+ *         required: false
+ *         description: Optional token address filter
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Token balance entries
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/balance", authHandler.authorizeRequest(), TokensController.getBalance);
 
@@ -27,23 +40,23 @@ router.get("/balance", authHandler.authorizeRequest(), TokensController.getBalan
  * @openapi
  * /tokens/{address}:
  *   get:
- *     summary: Get token by address
+ *     summary: Fetch token metadata by address
  *     tags: [Tokens]
  *     parameters:
  *       - name: address
  *         in: path
  *         required: true
- *         schema: { type: string }
+ *         description: Token contract address
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Token metadata
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/:address", authHandler.authorizeRequest(true), TokensController.get);
 
@@ -51,31 +64,75 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  * @openapi
  * /tokens:
  *   get:
- *     summary: Get all tokens
+ *     summary: List tokens registered on Mercata
  *     tags: [Tokens]
+ *     parameters:
+ *       - name: select
+ *         in: query
+ *         required: false
+ *         description: Optional field selection forwarded to Cirrus
+ *         schema:
+ *           type: string
+ *       - name: status
+ *         in: query
+ *         required: false
+ *         description: Optional status filter
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Token list
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  *   post:
- *     summary: Create a new token
+ *     summary: Create a new token (admin)
  *     tags: [Tokens]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - description
+ *               - symbol
+ *               - initialSupply
+ *               - customDecimals
+ *             properties:
+ *               name:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               symbol:
+ *                 type: string
+ *               initialSupply:
+ *                 type: string
+ *                 description: Initial supply expressed as a decimal string
+ *               customDecimals:
+ *                 type: integer
+ *               images:
+ *                 type: string
+ *                 description: JSON-encoded array of image URIs
+ *               files:
+ *                 type: string
+ *                 description: JSON-encoded array of file URIs
+ *               fileNames:
+ *                 type: string
+ *                 description: JSON-encoded array of file names
  *     responses:
  *       200:
- *         description: Success
+ *         description: Token creation transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/", authHandler.authorizeRequest(true), TokensController.getAll);
 router.post("/", authHandler.authorizeRequest(), TokensController.create);
@@ -84,7 +141,7 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  * @openapi
  * /tokens/transfer:
  *   post:
- *     summary: Transfer tokens
+ *     summary: Transfer tokens to another address
  *     tags: [Tokens]
  *     requestBody:
  *       required: true
@@ -92,21 +149,28 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  *         application/json:
  *           schema:
  *             type: object
- *             required: [address, to, value]
+ *             required:
+ *               - address
+ *               - to
+ *               - value
  *             properties:
- *               address: { type: string, description: "Token contract address" }
- *               to: { type: string, description: "Recipient address" }
- *               value: { type: string, description: "Amount to transfer" }
+ *               address:
+ *                 type: string
+ *                 description: Token contract address
+ *               to:
+ *                 type: string
+ *                 description: Recipient address
+ *               value:
+ *                 type: string
+ *                 description: Transfer amount (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Transfer transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/transfer", authHandler.authorizeRequest(), TokensController.transfer);
 
@@ -114,7 +178,7 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
  * @openapi
  * /tokens/approve:
  *   post:
- *     summary: Approve token spending
+ *     summary: Approve a spender for token allowances
  *     tags: [Tokens]
  *     requestBody:
  *       required: true
@@ -122,21 +186,28 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
  *         application/json:
  *           schema:
  *             type: object
- *             required: [address, spender, value]
+ *             required:
+ *               - address
+ *               - spender
+ *               - value
  *             properties:
- *               address: { type: string, description: "Token contract address" }
- *               spender: { type: string, description: "Spender address" }
- *               value: { type: string, description: "Amount to approve" }
+ *               address:
+ *                 type: string
+ *                 description: Token contract address
+ *               spender:
+ *                 type: string
+ *                 description: Spender address
+ *               value:
+ *                 type: string
+ *                 description: Allowance amount (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Approval transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/approve", authHandler.authorizeRequest(), TokensController.approve);
 
@@ -144,7 +215,7 @@ router.post("/approve", authHandler.authorizeRequest(), TokensController.approve
  * @openapi
  * /tokens/transferFrom:
  *   post:
- *     summary: Transfer tokens from another address
+ *     summary: Transfer tokens on behalf of another address
  *     tags: [Tokens]
  *     requestBody:
  *       required: true
@@ -152,22 +223,32 @@ router.post("/approve", authHandler.authorizeRequest(), TokensController.approve
  *         application/json:
  *           schema:
  *             type: object
- *             required: [address, from, to, value]
+ *             required:
+ *               - address
+ *               - from
+ *               - to
+ *               - value
  *             properties:
- *               address: { type: string, description: "Token contract address" }
- *               from: { type: string, description: "Source address" }
- *               to: { type: string, description: "Recipient address" }
- *               value: { type: string, description: "Amount to transfer" }
+ *               address:
+ *                 type: string
+ *                 description: Token contract address
+ *               from:
+ *                 type: string
+ *                 description: Source address
+ *               to:
+ *                 type: string
+ *                 description: Recipient address
+ *               value:
+ *                 type: string
+ *                 description: Transfer amount (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Transfer transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/transferFrom", authHandler.authorizeRequest(), TokensController.transferFrom);
 
@@ -175,7 +256,7 @@ router.post("/transferFrom", authHandler.authorizeRequest(), TokensController.tr
  * @openapi
  * /tokens/setStatus:
  *   post:
- *     summary: Set token status
+ *     summary: Update a token's status (admin)
  *     tags: [Tokens]
  *     requestBody:
  *       required: true
@@ -183,20 +264,24 @@ router.post("/transferFrom", authHandler.authorizeRequest(), TokensController.tr
  *         application/json:
  *           schema:
  *             type: object
- *             required: [address, status]
+ *             required:
+ *               - address
+ *               - status
  *             properties:
- *               address: { type: string, description: "Token contract address" }
- *               status: { type: integer, enum: [1, 2, 3], description: "Status: 1=PENDING, 2=ACTIVE, 3=LEGACY" }
+ *               address:
+ *                 type: string
+ *               status:
+ *                 type: integer
+ *                 enum: [1, 2, 3]
+ *                 description: 1=PENDING, 2=ACTIVE, 3=LEGACY
  *     responses:
  *       200:
- *         description: Success
+ *         description: Status update transaction payload
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/setStatus", authHandler.authorizeRequest(), TokensController.setStatus);
 

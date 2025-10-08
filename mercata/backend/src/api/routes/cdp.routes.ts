@@ -8,18 +8,18 @@ const router = Router();
  * @openapi
  * /cdp/vaults:
  *   get:
- *     summary: Get user CDP vaults
+ *     summary: List CDP vaults for the signed-in user
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Vault collection
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/vaults", authHandler.authorizeRequest(), CDPController.getVaults);
 
@@ -27,23 +27,23 @@ router.get("/vaults", authHandler.authorizeRequest(), CDPController.getVaults);
  * @openapi
  * /cdp/vaults/{asset}:
  *   get:
- *     summary: Get vault details for asset
+ *     summary: Fetch a single vault for an asset
  *     tags: [CDP]
  *     parameters:
  *       - name: asset
  *         in: path
  *         required: true
- *         schema: { type: string }
+ *         description: Collateral token address
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Vault information
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/vaults/:asset", authHandler.authorizeRequest(), CDPController.getVault);
 
@@ -51,18 +51,32 @@ router.get("/vaults/:asset", authHandler.authorizeRequest(), CDPController.getVa
  * @openapi
  * /cdp/deposit:
  *   post:
- *     summary: Deposit collateral to vault
+ *     summary: Deposit collateral into a vault
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - amount
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
+ *               amount:
+ *                 type: string
+ *                 description: Amount to deposit (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Deposit transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/deposit", authHandler.authorizeRequest(), CDPController.deposit);
 
@@ -70,18 +84,32 @@ router.post("/deposit", authHandler.authorizeRequest(), CDPController.deposit);
  * @openapi
  * /cdp/withdraw:
  *   post:
- *     summary: Withdraw collateral from vault
+ *     summary: Withdraw collateral from a vault
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - amount
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
+ *               amount:
+ *                 type: string
+ *                 description: Amount to withdraw (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Withdrawal transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/withdraw", authHandler.authorizeRequest(), CDPController.withdraw);
 
@@ -89,18 +117,30 @@ router.post("/withdraw", authHandler.authorizeRequest(), CDPController.withdraw)
  * @openapi
  * /cdp/get-max-mint:
  *   post:
- *     summary: Get maximum mintable USDST
+ *     summary: Calculate maximum mintable USDST
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
  *     responses:
  *       200:
- *         description: Success
+ *         description: Maximum USDST amount
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 maxAmount:
+ *                   type: string
  */
 router.post("/get-max-mint", authHandler.authorizeRequest(), CDPController.getMaxMint);
 
@@ -110,16 +150,29 @@ router.post("/get-max-mint", authHandler.authorizeRequest(), CDPController.getMa
  *   post:
  *     summary: Mint USDST against collateral
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - amount
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               amount:
+ *                 type: string
+ *                 description: USDST amount to mint (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Mint transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
 
@@ -127,18 +180,31 @@ router.post("/mint", authHandler.authorizeRequest(), CDPController.mint);
  * @openapi
  * /cdp/repay:
  *   post:
- *     summary: Repay USDST debt
+ *     summary: Repay outstanding USDST debt
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - amount
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               amount:
+ *                 type: string
+ *                 description: USDST amount to repay (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Repayment transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/repay", authHandler.authorizeRequest(), CDPController.repay);
 
@@ -146,18 +212,30 @@ router.post("/repay", authHandler.authorizeRequest(), CDPController.repay);
  * @openapi
  * /cdp/get-max-withdraw:
  *   post:
- *     summary: Get maximum withdrawable collateral
+ *     summary: Calculate maximum withdrawable collateral
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
  *     responses:
  *       200:
- *         description: Success
+ *         description: Maximum withdrawable amount
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 maxAmount:
+ *                   type: string
  */
 router.post("/get-max-withdraw", authHandler.authorizeRequest(), CDPController.getMaxWithdraw);
 
@@ -165,18 +243,28 @@ router.post("/get-max-withdraw", authHandler.authorizeRequest(), CDPController.g
  * @openapi
  * /cdp/withdraw-max:
  *   post:
- *     summary: Withdraw maximum safe collateral
+ *     summary: Withdraw the maximum safe collateral
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
  *     responses:
  *       200:
- *         description: Success
+ *         description: Withdrawal transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/withdraw-max", authHandler.authorizeRequest(), CDPController.withdrawMax);
 
@@ -184,18 +272,28 @@ router.post("/withdraw-max", authHandler.authorizeRequest(), CDPController.withd
  * @openapi
  * /cdp/mint-max:
  *   post:
- *     summary: Mint maximum safe USDST
+ *     summary: Mint the maximum safe USDST
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
  *     responses:
  *       200:
- *         description: Success
+ *         description: Mint transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/mint-max", authHandler.authorizeRequest(), CDPController.mintMax);
 
@@ -203,18 +301,28 @@ router.post("/mint-max", authHandler.authorizeRequest(), CDPController.mintMax);
  * @openapi
  * /cdp/repay-all:
  *   post:
- *     summary: Repay all debt for asset
+ *     summary: Repay all debt for a vault
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
+ *                 description: Collateral token address
  *     responses:
  *       200:
- *         description: Success
+ *         description: Repayment transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/repay-all", authHandler.authorizeRequest(), CDPController.repayAll);
 
@@ -222,18 +330,36 @@ router.post("/repay-all", authHandler.authorizeRequest(), CDPController.repayAll
  * @openapi
  * /cdp/liquidate:
  *   post:
- *     summary: Execute liquidation
+ *     summary: Liquidate an unhealthy position
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - collateralAsset
+ *               - borrower
+ *               - debtToCover
+ *             properties:
+ *               collateralAsset:
+ *                 type: string
+ *                 description: Collateral asset address
+ *               borrower:
+ *                 type: string
+ *                 description: Borrower address to liquidate
+ *               debtToCover:
+ *                 type: string
+ *                 description: USDST amount to cover (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Liquidation transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidate);
 
@@ -241,18 +367,18 @@ router.post("/liquidate", authHandler.authorizeRequest(), CDPController.liquidat
  * @openapi
  * /cdp/liquidatable:
  *   get:
- *     summary: Get liquidatable positions
+ *     summary: List liquidatable positions
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Liquidatable vaults
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiquidatable);
 
@@ -260,18 +386,32 @@ router.get("/liquidatable", authHandler.authorizeRequest(), CDPController.getLiq
  * @openapi
  * /cdp/max-liquidatable:
  *   post:
- *     summary: Get max liquidatable amount
+ *     summary: Calculate maximum liquidatable debt
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - collateralAsset
+ *               - borrower
+ *             properties:
+ *               collateralAsset:
+ *                 type: string
+ *               borrower:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Maximum repayable amount
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 maxAmount:
+ *                   type: string
  */
 router.post("/max-liquidatable", authHandler.authorizeRequest(), CDPController.getMaxLiquidatable);
 
@@ -279,24 +419,23 @@ router.post("/max-liquidatable", authHandler.authorizeRequest(), CDPController.g
  * @openapi
  * /cdp/config/{asset}:
  *   get:
- *     summary: Get collateral asset config
+ *     summary: Read the collateral configuration for an asset
  *     tags: [CDP]
  *     parameters:
  *       - name: asset
  *         in: path
  *         required: true
- *         schema: { type: string }
- *         description: Asset symbol
+ *         description: Collateral token address
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Collateral configuration
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.getAssetConfig);
 
@@ -304,18 +443,18 @@ router.get("/config/:asset", authHandler.authorizeRequest(true), CDPController.g
  * @openapi
  * /cdp/assets:
  *   get:
- *     summary: Get supported assets
+ *     summary: List supported collateral assets
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Supported asset configurations
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSupportedAssets);
 
@@ -323,18 +462,33 @@ router.get("/assets", authHandler.authorizeRequest(true), CDPController.getSuppo
  * @openapi
  * /cdp/asset-debt-info:
  *   post:
- *     summary: Get asset debt information
+ *     summary: Retrieve global debt metrics for an asset
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *             properties:
+ *               asset:
+ *                 type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Asset debt information
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 currentTotalDebt:
+ *                   type: string
+ *                 debtFloor:
+ *                   type: string
+ *                 debtCeiling:
+ *                   type: string
  */
 router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.getAssetDebtInfo);
 
@@ -342,18 +496,53 @@ router.post("/asset-debt-info", authHandler.authorizeRequest(), CDPController.ge
  * @openapi
  * /cdp/admin/set-collateral-config:
  *   post:
- *     summary: Set collateral config (admin)
+ *     summary: Update collateral parameters (admin)
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - liquidationRatio
+ *               - liquidationPenaltyBps
+ *               - closeFactorBps
+ *               - stabilityFeeRate
+ *               - debtFloor
+ *               - debtCeiling
+ *               - unitScale
+ *               - isPaused
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               liquidationRatio:
+ *                 type: string
+ *                 description: Liquidation ratio in WAD format
+ *               liquidationPenaltyBps:
+ *                 type: integer
+ *               closeFactorBps:
+ *                 type: integer
+ *               stabilityFeeRate:
+ *                 type: string
+ *                 description: Stability fee in RAY format
+ *               debtFloor:
+ *                 type: string
+ *               debtCeiling:
+ *                 type: string
+ *               unitScale:
+ *                 type: string
+ *               isPaused:
+ *                 type: boolean
  *     responses:
  *       200:
- *         description: Success
+ *         description: Configuration transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), CDPController.setCollateralConfig);
 
@@ -361,18 +550,30 @@ router.post("/admin/set-collateral-config", authHandler.authorizeRequest(true), 
  * @openapi
  * /cdp/admin/set-asset-paused:
  *   post:
- *     summary: Set asset pause status (admin)
+ *     summary: Toggle pause for a collateral asset (admin)
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - isPaused
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               isPaused:
+ *                 type: boolean
  *     responses:
  *       200:
- *         description: Success
+ *         description: Pause transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPController.setAssetPaused);
 
@@ -380,18 +581,27 @@ router.post("/admin/set-asset-paused", authHandler.authorizeRequest(true), CDPCo
  * @openapi
  * /cdp/admin/set-global-paused:
  *   post:
- *     summary: Set global pause status (admin)
+ *     summary: Toggle global CDP pause (admin)
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - isPaused
+ *             properties:
+ *               isPaused:
+ *                 type: boolean
  *     responses:
  *       200:
- *         description: Success
+ *         description: Global pause transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/admin/set-global-paused", authHandler.authorizeRequest(true), CDPController.setGlobalPaused);
 
@@ -399,18 +609,18 @@ router.post("/admin/set-global-paused", authHandler.authorizeRequest(true), CDPC
  * @openapi
  * /cdp/admin/global-paused:
  *   get:
- *     summary: Get global pause status
+ *     summary: Check whether the CDP engine is paused
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Pause status flag
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: boolean }
+ *                 isPaused:
+ *                   type: boolean
  */
 router.get("/admin/global-paused", authHandler.authorizeRequest(true), CDPController.getGlobalPaused);
 
@@ -418,18 +628,18 @@ router.get("/admin/global-paused", authHandler.authorizeRequest(true), CDPContro
  * @openapi
  * /cdp/admin/all-configs:
  *   get:
- *     summary: Get all collateral configs (admin)
+ *     summary: List all collateral configurations (admin)
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Collateral configuration list
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPController.getAllCollateralConfigs);
 
@@ -437,18 +647,18 @@ router.get("/admin/all-configs", authHandler.authorizeRequest(true), CDPControll
  * @openapi
  * /cdp/bad-debt:
  *   get:
- *     summary: Get bad debt for all assets
+ *     summary: Retrieve bad-debt balances per asset
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Bad-debt entries
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/bad-debt", authHandler.authorizeRequest(), CDPController.getBadDebt);
 
@@ -456,24 +666,25 @@ router.get("/bad-debt", authHandler.authorizeRequest(), CDPController.getBadDebt
  * @openapi
  * /cdp/bad-debt/juniors/{account}:
  *   get:
- *     summary: Get junior notes for account
+ *     summary: List junior notes for an account
  *     tags: [CDP]
  *     parameters:
  *       - name: account
  *         in: path
  *         required: true
- *         schema: { type: string }
- *         description: Account address
+ *         description: Account address to inspect
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Junior note positions
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
  */
 router.get("/bad-debt/juniors/:account", authHandler.authorizeRequest(), CDPController.getJuniorNotes);
 
@@ -481,18 +692,31 @@ router.get("/bad-debt/juniors/:account", authHandler.authorizeRequest(), CDPCont
  * @openapi
  * /cdp/bad-debt/open-junior-note:
  *   post:
- *     summary: Open junior note
+ *     summary: Open a junior note position
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - asset
+ *               - amountUSDST
+ *             properties:
+ *               asset:
+ *                 type: string
+ *               amountUSDST:
+ *                 type: string
+ *                 description: USDST contribution (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Junior note transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPController.openJuniorNote);
 
@@ -500,18 +724,28 @@ router.post("/bad-debt/open-junior-note", authHandler.authorizeRequest(), CDPCon
  * @openapi
  * /cdp/bad-debt/top-up-junior-note:
  *   post:
- *     summary: Top up junior note
+ *     summary: Top up the active junior note
  *     tags: [CDP]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - amountUSDST
+ *             properties:
+ *               amountUSDST:
+ *                 type: string
+ *                 description: Additional USDST to contribute (decimal string)
  *     responses:
  *       200:
- *         description: Success
+ *         description: Junior note transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPController.topUpJuniorNote);
 
@@ -519,18 +753,16 @@ router.post("/bad-debt/top-up-junior-note", authHandler.authorizeRequest(), CDPC
  * @openapi
  * /cdp/bad-debt/claim-junior-note:
  *   post:
- *     summary: Claim junior note rewards
+ *     summary: Claim proceeds from the junior note
  *     tags: [CDP]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Claim transaction result
  *         content:
  *           application/json:
  *             schema:
  *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               additionalProperties: true
  */
 router.post("/bad-debt/claim-junior-note", authHandler.authorizeRequest(), CDPController.claimJuniorNote);
 

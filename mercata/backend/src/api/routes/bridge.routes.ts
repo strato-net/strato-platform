@@ -8,7 +8,7 @@ const router = Router();
  * @openapi
  * /bridge/bridgeOut:
  *   post:
- *     summary: Bridge tokens out
+ *     summary: Submit a withdrawal request
  *     tags: [Bridge]
  *     requestBody:
  *       required: true
@@ -16,23 +16,46 @@ const router = Router();
  *         application/json:
  *           schema:
  *             type: object
- *             required: [externalChainId, stratoToken, stratoTokenAmount, externalRecipient]
+ *             required:
+ *               - externalChainId
+ *               - stratoToken
+ *               - stratoTokenAmount
+ *               - externalRecipient
  *             properties:
- *               externalChainId: { type: string, description: "External chain ID" }
- *               stratoToken: { type: string, description: "STRATO token address" }
- *               stratoTokenAmount: { type: string, description: "Amount to bridge" }
- *               externalRecipient: { type: string, description: "Recipient address on external chain" }
- *               targetStratoToken: { type: string, description: "Target STRATO token (optional)" }
+ *               externalChainId:
+ *                 type: string
+ *                 description: Destination chain identifier (numeric string)
+ *               stratoToken:
+ *                 type: string
+ *                 description: STRATO token contract address to withdraw
+ *               stratoTokenAmount:
+ *                 type: string
+ *                 description: Amount of the STRATO token to withdraw (decimal string)
+ *               externalRecipient:
+ *                 type: string
+ *                 description: Recipient address on the external chain
+ *               targetStratoToken:
+ *                 type: string
+ *                 description: Optional STRATO token address to mint on redemption
  *     responses:
  *       200:
- *         description: Success
+ *         description: Withdrawal transaction submitted
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ *                     message:
+ *                       type: string
  */
 router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridgeOut);
 
@@ -40,18 +63,54 @@ router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridg
  * @openapi
  * /bridge/redeemOut:
  *   post:
- *     summary: Redeem bridged tokens
+ *     summary: Request redemption on the external chain
  *     tags: [Bridge]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - externalChainId
+ *               - stratoToken
+ *               - stratoTokenAmount
+ *               - externalRecipient
+ *             properties:
+ *               externalChainId:
+ *                 type: string
+ *                 description: Destination chain identifier (numeric string)
+ *               stratoToken:
+ *                 type: string
+ *                 description: STRATO token contract address backing the redemption
+ *               stratoTokenAmount:
+ *                 type: string
+ *                 description: Amount to redeem (decimal string)
+ *               externalRecipient:
+ *                 type: string
+ *                 description: External-chain recipient address
+ *               targetStratoToken:
+ *                 type: string
+ *                 description: Optional STRATO token to mint during redemption
  *     responses:
  *       200:
- *         description: Success
+ *         description: Redemption transaction submitted
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     status:
+ *                       type: string
+ *                     hash:
+ *                       type: string
+ *                     message:
+ *                       type: string
  */
 router.post("/redeemOut", authHandler.authorizeRequest(), BridgeController.redeemOut);
 
@@ -59,23 +118,39 @@ router.post("/redeemOut", authHandler.authorizeRequest(), BridgeController.redee
  * @openapi
  * /bridge/bridgeableTokens/{chainId}:
  *   get:
- *     summary: Get bridgeable tokens for chain
+ *     summary: List tokens that can withdraw to a chain
  *     tags: [Bridge]
  *     parameters:
  *       - name: chainId
  *         in: path
  *         required: true
- *         schema: { type: string }
+ *         description: Destination chain identifier (numeric string)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Available bridgeable assets
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   stratoToken:
+ *                     type: string
+ *                   stratoTokenName:
+ *                     type: string
+ *                   stratoTokenSymbol:
+ *                     type: string
+ *                   externalToken:
+ *                     type: string
+ *                   externalName:
+ *                     type: string
+ *                   externalSymbol:
+ *                     type: string
+ *                   externalChainId:
+ *                     type: string
  */
 router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getBridgeableTokens);
 
@@ -83,23 +158,39 @@ router.get("/bridgeableTokens/:chainId", authHandler.authorizeRequest(false), Br
  * @openapi
  * /bridge/redeemableTokens/{chainId}:
  *   get:
- *     summary: Get redeemable tokens for chain
+ *     summary: List tokens eligible for redemption
  *     tags: [Bridge]
  *     parameters:
  *       - name: chainId
  *         in: path
  *         required: true
- *         schema: { type: string }
+ *         description: External chain identifier (numeric string)
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Tokens that can be redeemed on the target chain
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   stratoToken:
+ *                     type: string
+ *                   stratoTokenName:
+ *                     type: string
+ *                   stratoTokenSymbol:
+ *                     type: string
+ *                   externalToken:
+ *                     type: string
+ *                   externalName:
+ *                     type: string
+ *                   externalSymbol:
+ *                     type: string
+ *                   externalChainId:
+ *                     type: string
  */
 router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), BridgeController.getRedeemableTokens);
 
@@ -107,18 +198,23 @@ router.get("/redeemableTokens/:chainId", authHandler.authorizeRequest(false), Br
  * @openapi
  * /bridge/networkConfigs:
  *   get:
- *     summary: Get network configurations
+ *     summary: Fetch enabled bridge networks
  *     tags: [Bridge]
  *     responses:
  *       200:
- *         description: Success
+ *         description: Enabled network configurations
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               properties:
- *                 success: { type: boolean }
- *                 data: { type: object }
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   externalChainId:
+ *                     type: string
+ *                   chainInfo:
+ *                     type: object
+ *                     additionalProperties: true
  */
 router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeController.getNetworkConfigs);
 
@@ -126,23 +222,61 @@ router.get("/networkConfigs", authHandler.authorizeRequest(false), BridgeControl
  * @openapi
  * /bridge/transactions/{type}:
  *   get:
- *     summary: Get bridge transactions
+ *     summary: Retrieve bridge transaction history
  *     tags: [Bridge]
  *     parameters:
  *       - name: type
  *         in: path
  *         required: true
- *         schema: { type: string, enum: [withdrawal, deposit] }
+ *         description: Transaction direction to query
+ *         schema:
+ *           type: string
+ *           enum: [withdrawal, deposit]
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: Maximum number of records to return
+ *         schema:
+ *           type: string
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         description: Number of records to skip
+ *         schema:
+ *           type: string
+ *       - name: order
+ *         in: query
+ *         required: false
+ *         description: Sort order clause (e.g. block_timestamp.desc)
+ *         schema:
+ *           type: string
+ *       - name: stratoToken
+ *         in: query
+ *         required: false
+ *         description: Filter results by STRATO token address
+ *         schema:
+ *           type: string
+ *       - name: externalChainId
+ *         in: query
+ *         required: false
+ *         description: Filter results by external chain identifier
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Success
+ *         description: Paginated transaction records
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 success: { type: boolean }
- *                 data: { type: array, items: { type: object } }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 totalCount:
+ *                   type: integer
  */
 router.get("/transactions/:type", authHandler.authorizeRequest(), BridgeController.getTransactions);
 
