@@ -107,13 +107,13 @@ getContracts mName mOffset mLimit mInstanceOffset mInstanceLimit chainId = do
       
   -- If we're filtering by a specific contract name AND have instance pagination
   case (mName, mInstanceOffset, mInstanceLimit) of
-    (Just contractName, Just _, Just _) -> do
+    (Just contractNameParam, Just _, Just _) -> do
       -- Get ALL instances for this specific contract first
       allInstancesForContract <- getAccount'
         accountsFilterParams
           { _qaChainId = maybeToList chainId,
             _qaExternal = Just False,
-            _qaSearch = Just contractName, -- Filter by contract name
+            _qaSearch = Just contractNameParam, -- Filter by contract name
             _qaOffset = Nothing,
             _qaLimit = Nothing
           }
@@ -127,7 +127,7 @@ getContracts mName mOffset mLimit mInstanceOffset mInstanceLimit chainId = do
       let paginatedInstances = take instanceLimit $ drop instanceOffset allAddressCreatedAt
       
       -- Return only this contract with paginated instances
-      return . GetContractsResponse $ Map.singleton contractName paginatedInstances
+      return . GetContractsResponse $ Map.singleton contractNameParam paginatedInstances
       
     _ -> do
       -- Original logic for general contract listing (no instance pagination)
