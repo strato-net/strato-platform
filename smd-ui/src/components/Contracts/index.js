@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { fetchContracts, changeContractFilter } from './contracts.actions';
+import { fetchContractsWithPreview, loadMoreContracts, changeContractFilter } from './contracts.actions';
 import { connect } from 'react-redux';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
@@ -51,7 +51,14 @@ class Contracts extends Component {
   componentWillMount() {
     // mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
-    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    this.props.fetchContractsWithPreview(
+      this.props.selectedChain, 
+      this.state.limit, 
+      this.state.offset, 
+      null, // name
+      null, // address
+      10    // instancesPreviewLimit
+    );
     this.props.fetchChainIds(this.chainLimit, this.chainOffset);
   }
 
@@ -61,14 +68,28 @@ class Contracts extends Component {
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
-      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.fetchContractsWithPreview(
+        nextProps.selectedChain, 
+        this.state.limit, 
+        this.state.offset, 
+        this.props.filter,
+        null, // address
+        10    // instancesPreviewLimit
+      );
     }
   }
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
     this.setState({ offset: 0 }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+      this.props.fetchContractsWithPreview(
+        this.props.selectedChain, 
+        this.state.limit, 
+        this.state.offset, 
+        filter,
+        null, // address
+        10    // instancesPreviewLimit
+      );
     });
   }
 
@@ -80,7 +101,13 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = offset + limit;
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.loadMoreContracts(
+        this.props.selectedChain, 
+        this.state.offset, 
+        this.state.limit, 
+        this.props.filter,
+        10    // instancesPreviewLimit
+      );
     });
   };
 
@@ -88,7 +115,14 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = Math.max(0, offset - limit);
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.fetchContractsWithPreview(
+        this.props.selectedChain, 
+        this.state.limit, 
+        this.state.offset, 
+        this.props.filter,
+        null, // address
+        10    // instancesPreviewLimit
+      );
     });
   };
 
@@ -231,7 +265,8 @@ const connected = connect(mapStateToProps, {
   selectChain,
   fetchChainIds,
   fetchChainDetailSelect,
-  fetchContracts, 
+  fetchContractsWithPreview,
+  loadMoreContracts,
   changeContractFilter
 })(formed);
 

@@ -9,6 +9,7 @@ import {
   fetchAccount,
   fetchContractInfoRequest
 } from './contractCard.actions';
+import { loadMoreInstances } from '../../contracts.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 // import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -241,6 +242,26 @@ class ContractCard extends Component {
                     <tbody>{cardData}</tbody>
                   </table>
                 </Collapse>
+                
+                {/* Load More Instances Button */}
+                {this.state.isOpen && contract && contract.instancesNext && (
+                  <div className="text-center" style={{ marginTop: '10px' }}>
+                    <Button
+                      className="pt-intent-primary"
+                      loading={contract.isLoadingInstances}
+                      onClick={() => {
+                        this.props.loadMoreInstances(
+                          name,
+                          contract.instancesNext,
+                          10, // instLimit
+                          this.props.selectedChain
+                        );
+                      }}
+                    >
+                      Load More Instances ({contract.instancesNext} more available)
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -267,6 +288,7 @@ export default withRouter(
     fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
-    fetchAccount
+    fetchAccount,
+    loadMoreInstances
   })(ContractCard)
 );

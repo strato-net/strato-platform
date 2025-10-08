@@ -44,6 +44,8 @@ bloc :: MonadBlocAPI m => ServerT BlocAPI m
 bloc =
   return gitInfo
     :<|> getContracts
+    :<|> getContractInstancesPage
+    :<|> getContractsWithPreview
     :<|> postContractsBatchStates
     :<|> getContractsData
     :<|> getContractsContract

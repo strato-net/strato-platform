@@ -2,6 +2,11 @@ import {
   FETCH_CONTRACTS,
   FETCH_CONTRACTS_SUCCESSFUL,
   FETCH_CONTRACTS_FAILED,
+  FETCH_CONTRACTS_WITH_PREVIEW_SUCCESS,
+  FETCH_CONTRACTS_WITH_PREVIEW_FAILED,
+  LOAD_MORE_CONTRACTS_SUCCESS,
+  LOAD_MORE_INSTANCES_SUCCESS,
+  LOAD_MORE_INSTANCES_FAILED,
   CHANGE_CONTRACT_FILTER,
 } from './contracts.actions';
 import {
@@ -15,7 +20,10 @@ const initialState = {
   contracts: {},
   filter: '',
   error: null,
-  isLoading: false
+  isLoading: false,
+  isLoadingContracts: false,
+  contractsNext: null, // offset for next contracts page
+  __next: {} // pagination metadata
 };
 
 const reducer = function (state = initialState, action) {
@@ -42,10 +50,10 @@ const reducer = function (state = initialState, action) {
         error: null
       };
     case FETCH_CONTRACTS_SUCCESSFUL:
-      const contractNames = Object.getOwnPropertyNames(action.contracts);
-      const updatedContracts = {};
-      contractNames.forEach((name) => {
-          updatedContracts[name] = {
+      const contractNames1 = Object.getOwnPropertyNames(action.contracts);
+      const updatedContracts1 = {};
+      contractNames1.forEach((name) => {
+          updatedContracts1[name] = {
             instances: action.contracts[name]
               .map((instance) => {
                 return {
@@ -56,7 +64,7 @@ const reducer = function (state = initialState, action) {
           };
       });
       return {
-        contracts: updatedContracts,
+        contracts: updatedContracts1,
         filter: state.filter,
         error: state.error,
         isLoading: false
@@ -74,6 +82,107 @@ const reducer = function (state = initialState, action) {
         filter: action.filter,
         error: state.error
       }
+    
+    // New pagination cases
+    case FETCH_CONTRACTS_WITH_PREVIEW_SUCCESS:
+      const contractNames2 = Object.getOwnPropertyNames(action.contracts);
+      const updatedContracts2 = {};
+      contractNames2.forEach((name) => {
+        const instances = action.contracts[name] || [];
+        const instancesNext = action.__next.instances && action.__next.instances[name];
+        
+        updatedContracts2[name] = {
+          instances: instances.map((instance) => ({
+            ...instance,
+            fromBloc: true
+          })),
+          instancesNext: instancesNext,
+          isLoadingInstances: false
+        };
+      });
+      
+      return {
+        contracts: action.isInitialLoad ? updatedContracts2 : { ...state.contracts, ...updatedContracts2 },
+        filter: state.filter,
+        error: null,
+        isLoading: false,
+        isLoadingContracts: false,
+        contractsNext: action.__next.contracts,
+        __next: action.__next
+      };
+    
+    case FETCH_CONTRACTS_WITH_PREVIEW_FAILED:
+      return {
+        contracts: state.contracts,
+        filter: state.filter,
+        error: action.error,
+        isLoading: false,
+        isLoadingContracts: false
+      };
+    
+    case LOAD_MORE_CONTRACTS_SUCCESS:
+      const moreContractNames = Object.getOwnPropertyNames(action.contracts);
+      const moreUpdatedContracts = {};
+      moreContractNames.forEach((name) => {
+        const instances = action.contracts[name] || [];
+        const instancesNext = action.__next.instances && action.__next.instances[name];
+        
+        moreUpdatedContracts[name] = {
+          instances: instances.map((instance) => ({
+            ...instance,
+            fromBloc: true
+          })),
+          instancesNext: instancesNext,
+          isLoadingInstances: false
+        };
+      });
+      
+      return {
+        contracts: { ...state.contracts, ...moreUpdatedContracts },
+        filter: state.filter,
+        error: null,
+        isLoadingContracts: false,
+        contractsNext: action.__next.contracts,
+        __next: action.__next
+      };
+    
+    case LOAD_MORE_INSTANCES_SUCCESS:
+      const existingContract = state.contracts[action.contractName];
+      if (!existingContract) return state;
+      
+      const newInstances = action.instances.map((instance) => ({
+        ...instance,
+        fromBloc: true
+      }));
+      
+      return {
+        ...state,
+        contracts: {
+          ...state.contracts,
+          [action.contractName]: {
+            ...existingContract,
+            instances: [...existingContract.instances, ...newInstances],
+            instancesNext: action.nextOffset,
+            isLoadingInstances: false
+          }
+        }
+      };
+    
+    case LOAD_MORE_INSTANCES_FAILED:
+      const failedContract = state.contracts[action.contractName];
+      if (!failedContract) return state;
+      
+      return {
+        ...state,
+        contracts: {
+          ...state.contracts,
+          [action.contractName]: {
+            ...failedContract,
+            isLoadingInstances: false
+          }
+        },
+        error: action.error
+      };
     case FETCH_STATE_SUCCESS:
       const instances = state.contracts[action.name].instances
         .map(function (instance, i) {

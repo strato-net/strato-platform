@@ -50,6 +50,28 @@ type GetContracts =
     :> QueryParam "chainid" ChainId
     :> Get '[JSON] GetContractsResponse
 
+-- ========= Option A: Progressive Loading API Types =========
+
+-- Instances mode: Get next 10 instances for a specific contract
+type GetContractInstances =
+  "contracts"
+    :> QueryParam "instancesFor" Text
+    :> QueryParam "instOffset" Integer
+    :> QueryParam "instLimit" Integer
+    :> QueryParam "chainid" ChainId
+    :> Get '[JSON] GetContractInstancesResponse
+
+-- Names with preview mode: Get contracts with preview instances and __next metadata
+type GetContractsWithPreview =
+  "contracts"
+    :> QueryParam "name" Text
+    :> QueryParam "address" Address
+    :> QueryParam "offset" Integer
+    :> QueryParam "limit" Integer
+    :> QueryParam "chainid" ChainId
+    :> QueryParam "instancesPreviewLimit" Integer
+    :> Get '[JSON] Value
+
 instance ToParam (QueryParam "limit" Integer) where
   toParam _ = DocQueryParam "limit" [] "Maximum number of entries to return" Normal
 
@@ -123,6 +145,54 @@ instance ToSample GetContractsResponse where
                 chainId = Nothing
               }
           ]
+
+-- Response for instances mode (next 10 instances for one contract)
+data GetContractInstancesResponse = GetContractInstancesResponse
+  { gcirContract :: Text
+  , gcirItems    :: [AddressCreatedAt]
+  , gcirNext     :: Maybe Integer
+  }
+  deriving (Eq, Show, Generic)
+
+instance ToJSON GetContractInstancesResponse
+instance FromJSON GetContractInstancesResponse
+
+instance ToSchema GetContractInstancesResponse where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped . name ?~ "Get Contract Instances Response"
+      & mapped . schema . description ?~ "Response for getting instances of a specific contract"
+      & mapped . schema . example ?~ toJSON ex
+    where
+      ex :: GetContractInstancesResponse
+      ex =
+        GetContractInstancesResponse
+          { gcirContract = "MyContract"
+          , gcirItems = [AddressCreatedAt 1976 (Address 0xdeadbeef) Nothing]
+          , gcirNext = Just 10
+          }
+
+instance Arbitrary GetContractInstancesResponse where arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSample GetContractInstancesResponse where
+  toSamples _ =
+    singleSample $
+      GetContractInstancesResponse
+        { gcirContract = "SampleContract"
+        , gcirItems =
+            [ AddressCreatedAt
+                { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c,
+                  createdAt = 100,
+                  chainId = Nothing
+                },
+              AddressCreatedAt
+                { address = Address 0x409e10eddc6333b82889bfc25a2b107b9c2c9a8d,
+                createdAt = 101,
+                chainId = Nothing
+              }
+            ]
+        , gcirNext = Just 20
+        }
 
 --------------------------------------------------------------------------------
 

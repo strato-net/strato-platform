@@ -3,6 +3,8 @@
 module Bloc.Client
   ( getGitInfo,
     getContracts,
+    getContractInstancesPage,
+    getContractsWithPreview,
     postContractsBatchSeries,
     getContractsData,
     getContractsContract,
@@ -30,6 +32,7 @@ import Bloc.API
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
+import Data.Aeson (Value)
 import Data.Proxy
 import Data.Text
 import Servant.Client
@@ -46,6 +49,24 @@ getContracts ::
   Maybe ChainId ->
   ClientM GetContractsResponse
 getContracts = client (Proxy @GetContracts)
+
+getContractInstancesPage ::
+  Maybe Text ->
+  Maybe Integer ->
+  Maybe Integer ->
+  Maybe ChainId ->
+  ClientM GetContractInstancesResponse
+getContractInstancesPage = client (Proxy @GetContractInstances)
+
+getContractsWithPreview ::
+  Maybe Text ->
+  Maybe Address ->
+  Maybe Integer ->
+  Maybe Integer ->
+  Maybe ChainId ->
+  Maybe Integer ->
+  ClientM Value
+getContractsWithPreview = client (Proxy @GetContractsWithPreview)
 
 postContractsBatchSeries ::
   [PostContractsBatchStatesRequest] ->

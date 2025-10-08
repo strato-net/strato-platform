@@ -31,6 +31,8 @@ type BlocAPI =
   GetGitInfo
     -- /contracts endpoints
     :<|> GetContracts
+    :<|> GetContractInstances
+    :<|> GetContractsWithPreview
     :<|> PostContractsBatchStates
     :<|> GetContractsData
     :<|> GetContractsContract
