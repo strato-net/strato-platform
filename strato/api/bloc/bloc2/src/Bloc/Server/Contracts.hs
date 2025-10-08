@@ -128,8 +128,8 @@ getContractInstances ::
   Maybe Integer ->
   m GetContractInstancesResponse
 getContractInstances (ContractName cName) chainId mOffset mLimit = do
-  let instanceLimit = fromIntegral $ fromMaybe 10 mLimit
-      instanceOffset = fromIntegral $ fromMaybe 0 mOffset
+  let instanceLimit = fromMaybe 10 mLimit
+      instanceOffset = fromMaybe 0 mOffset
       addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
   
   -- Get all instances for this contract

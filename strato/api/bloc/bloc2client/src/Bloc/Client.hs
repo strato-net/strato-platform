@@ -5,6 +5,7 @@ module Bloc.Client
     getContracts,
     postContractsBatchSeries,
     getContractsData,
+    getContractInstances,
     getContractsContract,
     getContractsState,
     getContractsDetails,
@@ -56,6 +57,14 @@ postContractsBatchSeries = client (Proxy @PostContractsBatchStates)
 
 getContractsData :: ContractName -> ClientM [Address]
 getContractsData = client (Proxy @GetContractsData)
+
+getContractInstances ::
+  ContractName ->
+  Maybe ChainId ->
+  Maybe Integer ->
+  Maybe Integer ->
+  ClientM GetContractInstancesResponse
+getContractInstances = client (Proxy @GetContractInstances)
 
 getContractsContract ::
   ContractName ->

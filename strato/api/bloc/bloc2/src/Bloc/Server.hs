@@ -46,6 +46,7 @@ bloc =
     :<|> getContracts
     :<|> postContractsBatchStates
     :<|> getContractsData
+    :<|> getContractInstances
     :<|> getContractsContract
     :<|> getContractsState
     :<|> getContractsDetails

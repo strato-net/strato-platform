@@ -245,7 +245,7 @@ class ContractCard extends Component {
                       })
                     }}
                   >
-                    {this.state.isOpen ? "Hide" : "Show"} Contracts
+                    {this.state.isOpen ? "Hide" : "Show"} Contracts Tanuj
                   </Button>
 
                 </div>
