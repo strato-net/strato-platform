@@ -137,6 +137,7 @@ Object {
   },
   "error": null,
   "filter": "",
+  "instancePagination": undefined,
   "isLoading": false,
 }
 `;
@@ -175,6 +176,7 @@ Object {
   },
   "error": null,
   "filter": "",
+  "instancePagination": undefined,
   "isLoading": false,
 }
 `;
@@ -397,6 +399,7 @@ Object {
   "contracts": Object {},
   "error": null,
   "filter": "",
+  "instancePagination": Object {},
   "isLoading": false,
 }
 `;
