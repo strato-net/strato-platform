@@ -37,9 +37,13 @@ class ContractCard extends Component {
   componentWillMount(){
     const name = this.props.contract.name;
     const searchTerm = this.props.contract.searchTerm;
+    const contract = this.props.contract.contract;
+    const instances = contract && contract.instances && Array.isArray(contract.instances) ? contract.instances : [];
     
-    // Fetch initial instances (first 10)
-    this.props.fetchContractInstances(name, this.props.selectedChain, this.state.instanceOffset, this.state.instanceLimit);
+    // Always fetch initial instances if none are loaded or if we need to refresh
+    if (instances.length === 0) {
+      this.props.fetchContractInstances(name, this.props.selectedChain, this.state.instanceOffset, this.state.instanceLimit);
+    }
     
     if(searchTerm){
       this.props.fetchState(name, searchTerm, this.props.selectedChain);
@@ -105,7 +109,9 @@ class ContractCard extends Component {
       });
 
     cardData = cardData.length === 0 ? [<tr key={1}>
-      <td colSpan={2} className="text-center">No Instances</td>
+      <td colSpan={2} className="text-center">
+        {instances.length === 0 ? "Loading instances..." : "No Instances"}
+      </td>
     </tr>] : cardData;
 
 

@@ -48,13 +48,14 @@ const reducer = function (state = initialState, action) {
       const updatedContracts = {};
       contractNames.forEach((name) => {
           updatedContracts[name] = {
-            instances: action.contracts[name]
-              .map((instance) => {
-                return {
-                  ...instance,
-                  fromBloc: true
-                }
-              })
+            instances: action.contracts[name] && Array.isArray(action.contracts[name])
+              ? action.contracts[name].map((instance) => {
+                  return {
+                    ...instance,
+                    fromBloc: true
+                  }
+                })
+              : [] // Start with empty instances array
           };
       });
       return {

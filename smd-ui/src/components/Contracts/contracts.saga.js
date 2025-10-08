@@ -49,7 +49,16 @@ export async function getContracts(chainid, limit, offset, searchTerm) {
   if (searchTerm) params.set("name", searchTerm);
 
   const listUrl = `${contractsUrl}?${params}`;
-  return fetchJson(listUrl);
+  const response = await fetchJson(listUrl);
+  
+  // Transform response to only include contract names without instances
+  // This prevents loading all instances upfront
+  const transformedResponse = {};
+  Object.keys(response).forEach(contractName => {
+    transformedResponse[contractName] = [];
+  });
+  
+  return transformedResponse;
 }
 
 export function* fetchContracts(action) {
