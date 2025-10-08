@@ -281,7 +281,7 @@ class ContractCard extends Component {
                         type="button"
                         className="pt-button pt-intent-primary pt-icon-chevron-right"
                         onClick={this.loadMoreInstances}
-                        disabled={!this.props.instancePagination[name]?.hasMore}
+                        disabled={!this.props.instancePagination[name] || !this.props.instancePagination[name].hasMore}
                       >
                         Next
                       </Button>
@@ -293,7 +293,7 @@ class ContractCard extends Component {
                     <div className="col-sm-12 text-center">
                       <small className="pt-text-muted">
                         Showing {this.state.instanceOffset + 1}-{this.state.instanceOffset + cardData.length} instances
-                        {this.props.instancePagination[name]?.hasMore && " (more available)"}
+                        {this.props.instancePagination[name] && this.props.instancePagination[name].hasMore && " (more available)"}
                       </small>
                     </div>
                   </div>
