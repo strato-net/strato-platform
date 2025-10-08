@@ -149,7 +149,7 @@ getContractInstances (ContractName cName) chainId mOffset mLimit = do
     pure $ addressToVal ts addressStateRefAddress chainId
   
   -- Apply pagination
-  let paginatedInstances = take instanceLimit $ drop instanceOffset instances
+        let paginatedInstances = take (fromIntegral instanceLimit) $ drop (fromIntegral instanceOffset) instances
   
   return . GetContractInstancesResponse $ paginatedInstances
 
