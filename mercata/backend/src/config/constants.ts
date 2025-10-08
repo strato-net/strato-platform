@@ -14,6 +14,9 @@ export enum StratoPaths {
   result = "/transactions/results",
 }
 
+// Genesis contracts (known at genesis time)
+export const rewardsChef = "000000000000000000000000000000000000101f";
+
 export const constants = (() => {
   const CONTRACT_PREFIX = "BlockApps-Mercata-";
   const Token = `${CONTRACT_PREFIX}Token`;
