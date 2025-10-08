@@ -162,6 +162,22 @@ instance FromJSON GetContractInstancesResponse where
 
 instance Arbitrary GetContractInstancesResponse where arbitrary = GR.genericArbitrary GR.uniform
 
+instance ToSample GetContractInstancesResponse where
+  toSamples _ =
+    singleSample $
+      GetContractInstancesResponse
+        [ AddressCreatedAt
+            { address = Address 0x309e10eddc6333b82889bfc25a2b107b9c2c9a8c,
+              createdAt = 100,
+              chainId = Nothing
+            },
+          AddressCreatedAt
+            { address = Address 0x409e10eddc6333b82889bfc25a2b107b9c2c9a8d,
+              createdAt = 101,
+              chainId = Nothing
+            }
+        ]
+
 instance ToSchema GetContractInstancesResponse where
   declareNamedSchema proxy =
     genericDeclareNamedSchema blocSchemaOptions proxy
