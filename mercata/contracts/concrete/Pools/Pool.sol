@@ -401,8 +401,8 @@ contract record Pool is Ownable {
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
     ) external onlyPoolFactory {
-        require(newSwapFeeRate >= 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
-        require(newLpSharePercent >= 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;

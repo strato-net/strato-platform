@@ -140,8 +140,8 @@ contract record PoolFactory is Ownable {
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
     ) external onlyOwner {
-        require(newSwapFeeRate >= 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
-        require(newLpSharePercent >= 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
@@ -161,8 +161,8 @@ contract record PoolFactory is Ownable {
         uint256 newLpSharePercent
     ) external onlyOwner {
         require(poolAddress != address(0), "Zero pool address");
-        require(newSwapFeeRate >= 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
-        require(newLpSharePercent >= 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         // Verify the pool belongs to this factory
         require(address(Pool(poolAddress).poolFactory()) == address(this), "Pool does not belong to this factory");
