@@ -27,8 +27,6 @@ module Blockchain.SolidVM.SM
     withTempCallInfo,
     withUncheckedCallInfo,
     withLocalVars,
-    getLocal,
-    setLocal,
     getCurrentCallInfo,
     getCurrentCallInfoIfExists,
     getCurrentContract,
@@ -135,7 +133,7 @@ data CallInfo = CallInfo
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
-    localVariables :: NE.NonEmpty (Map SolidString (SVMType.Type, Variable)),
+    localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
     readOnly :: Bool,
@@ -588,7 +586,7 @@ getVariableOfName name = do
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
-  let maybeLocalValue = fmap snd $ M.lookup name vars
+  let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
@@ -743,7 +741,7 @@ withCallInfo ::
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m a ->
@@ -763,7 +761,7 @@ addCallInfo ::
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m ()
@@ -892,24 +890,6 @@ getCurrentFunctionName = do
   case cs of
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
-
-getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
-getLocal name = do
-  currentCallInfo <- getCurrentCallInfo
-  return . M.lookup name . NE.head $ localVariables currentCallInfo
-
-setLocal :: MonadSM m => SolidString -> Variable -> m ()
-setLocal name val = do
-  stack <- Mod.get (Mod.Proxy @[CallInfo])
-  let (info, rest) = case stack of
-        (ci : r) -> (ci, r)
-        [] -> internalError "setLocal stack underflow" ()
-      locals NE.:| locals' = localVariables info
-      (theType, _) =
-        fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name) $
-          M.lookup name locals
-      newVariables = M.insert name (theType, val) locals NE.:| locals'
-  Mod.put (Mod.Proxy @[CallInfo]) $ info {localVariables = newVariables} : rest
 
 addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
 addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do

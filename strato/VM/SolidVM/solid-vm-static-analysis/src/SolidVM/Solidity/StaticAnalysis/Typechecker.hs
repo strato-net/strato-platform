@@ -2023,7 +2023,7 @@ tcExpr (FunctionCall x expr args) = do
   case args of
     NamedArgs es -> apply e a $ Just (fst <$> es)
     _ -> apply e a Nothing
-tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
+tcExpr (Unitary x "-" a) = sumType' (Static (SVMType.Int (Just True) Nothing) x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "--" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
@@ -2037,11 +2037,14 @@ tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
 tcExpr (BoolLiteral x _) = pure $ boolType' x
-tcExpr (NumberLiteral x _ _) = pure $ intType' x
+tcExpr (NumberLiteral x n _) = if n < 0
+                                  then pure $ Static (SVMType.Int (Just True) Nothing) x
+                                  else pure $ intType' x
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AccountLiteral x _) = pure $ accountType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x
+tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
 tcExpr (ArrayExpression x es) = do
