@@ -7,6 +7,94 @@ const auth = require('./auth');
 const { rest, importer } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
+const { execPath } = require('process');
+
+// The owner of the implementation address is ignored in favor of the proxy owner
+const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
+
+/**
+ * Print usage information
+ */
+function printUsage() {
+  console.error('Usage: node upgrade.js [options]');
+  console.error('');
+  console.error('Required arguments:');
+  console.error('  --proxy-address <address>    Address of the proxy contract to upgrade');
+  console.error('  --contract-name <name>       Name of the implementation contract (e.g., PoolFactory)');
+  console.error('  --contract-file <file>       Filename of the contract (e.g., Pools/PoolFactory.sol)');
+  console.error('');
+  console.error('Optional arguments:');
+  console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
+  console.error('');
+  console.error('Required environment variables (.env):');
+  console.error('  OAUTH_CLIENT_SECRET, OAUTH_CLIENT_ID, OAUTH_DISCOVERY_URL, OAUTH_URL, NODE_URL, GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD');
+  console.error('');
+  console.error('Example:');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name PoolFactory --contract-file Pools/PoolFactory.sol');
+  console.error('  node upgrade.js --proxy-address abc123 --contract-name LendingPool --contract-file Lending/LendingPool.sol --constructor-args \'{"param":"value"}\'');
+}
+
+/**
+ * Parse command-line arguments
+ */
+function parseArgs() {
+  const args = process.argv.slice(2);
+  const parsed = {};
+  
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--')) {
+      const key = arg.slice(2);
+      const value = args[i + 1];
+      if (!value || value.startsWith('--')) {
+        throw new Error(`Missing value for argument: ${arg}`);
+      }
+      parsed[key] = value;
+      i++; // Skip the value in next iteration
+    }
+  }
+  
+  return parsed;
+}
+
+/** Get the logic contract address from a proxy (read-only)
+ */
+async function getLogicContract(tokenObj, proxyAddress) {
+    const contract = { address: proxyAddress, name: 'Proxy' };
+    const options = { config };
+    
+    let implementationAddress = null;
+    try {
+        const state = await rest.getState(tokenObj, contract, options);
+        implementationAddress = state.logicContract;
+    } catch (error) {
+        console.error(error.message);
+    }
+    if (!implementationAddress) {
+        throw new Error('Could not retrieve logicContract address from Proxy. Is this address actually a Proxy?');
+    }
+    return implementationAddress;
+}
+
+/** Verify that the proxy exists and has the expected implementation contract name
+ */
+async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName) {
+    console.log('Verifying proxy and implementation...');
+    
+    // Try to get the logic contract address (this will fail if not a proxy)
+    const implementationAddress = await getLogicContract(tokenObj, proxyAddress);
+    console.log(`Old implementation address: ${implementationAddress}`);
+    
+    // Try to get the state of the current implementation with the expected contract name
+    try {
+        const implementationContract = { address: implementationAddress, name: contractName };
+        const options = { config };
+        await rest.getState(tokenObj, implementationContract, options);
+        console.log(`Implementation contract name '${contractName}' matches current implementation`);
+    } catch (error) {
+        throw new Error(`Current implementation at ${implementationAddress} does not match contract name '${contractName}'. Are you upgrading to a different contract type?`);
+    }
+}
 
 /**
  * Main upgrade function
@@ -16,30 +104,41 @@ async function main() {
     console.log('Starting proxy upgrade process...');
     console.log('=====================================\n');
     
-    // Check for required environment variables
-    const requiredVars = ['GLOBAL_ADMIN_NAME', 'GLOBAL_ADMIN_PASSWORD', 'PROXY_ADDRESS', 'CONTRACT_NAME', 'CONTRACT_FILE'];
-    const missingVars = requiredVars.filter(varName => !process.env[varName]);
-    
-    if (missingVars.length > 0) {
-      console.error(`Missing required environment variables: ${missingVars.join(', ')}`);
-      console.error('\nRequired variables:');
-      console.error('  PROXY_ADDRESS - Address of the proxy contract to upgrade');
-      console.error('  CONTRACT_NAME - Name of the implementation contract (e.g., PoolFactory)');
-      console.error('  CONTRACT_FILE - Filename of the contract (e.g., Pools/PoolFactory.sol)');
-      console.error('  GLOBAL_ADMIN_NAME - Admin username');
-      console.error('  GLOBAL_ADMIN_PASSWORD - Admin password');
-      console.error('\nOptional variables:');
-      console.error('  CONSTRUCTOR_ARGS - JSON string of constructor arguments (default: {})');
-      console.error('\nExample:');
-      console.error('  PROXY_ADDRESS=abc123 CONTRACT_NAME=PoolFactory CONTRACT_FILE=Pools/PoolFactory.sol node upgrade.js');
+    // Parse command-line arguments
+    let args;
+    try {
+      args = parseArgs();
+    } catch (error) {
+      console.error(`Error parsing arguments: ${error.message}\n`);
+      printUsage();
       process.exit(1);
     }
     
-    // Get configuration from environment
-    const proxyAddress = process.env.PROXY_ADDRESS;
-    const contractName = process.env.CONTRACT_NAME;
-    const contractFile = process.env.CONTRACT_FILE;
-    const constructorArgs = process.env.CONSTRUCTOR_ARGS ? JSON.parse(process.env.CONSTRUCTOR_ARGS) : {};
+    // Check for required arguments
+    const requiredArgs = ['proxy-address', 'contract-name', 'contract-file'];
+    const missingArgs = requiredArgs.filter(arg => !args[arg]);
+    
+    if (missingArgs.length > 0) {
+      console.error(`Missing required arguments: ${missingArgs.map(a => '--' + a).join(', ')}\n`);
+      printUsage();
+      process.exit(1);
+    }
+    
+    // Check for required environment variables
+    const requiredVars = ['GLOBAL_ADMIN_NAME', 'GLOBAL_ADMIN_PASSWORD', 'OAUTH_CLIENT_SECRET', 'OAUTH_CLIENT_ID', 'OAUTH_DISCOVERY_URL', 'OAUTH_URL', 'NODE_URL'];
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      console.error(`Missing required environment variables: ${missingVars.join(', ')}\n`);
+      printUsage();
+      process.exit(1);
+    }
+    
+    // Get configuration from command-line arguments
+    const proxyAddress = args['proxy-address'];
+    const contractName = args['contract-name'];
+    const contractFile = args['contract-file'];
+    const constructorArgs = args['constructor-args'] ? JSON.parse(args['constructor-args']) : DEFAULT_CONSTRUCTOR_ARGS;
     
     const username = process.env.GLOBAL_ADMIN_NAME;
     const password = process.env.GLOBAL_ADMIN_PASSWORD;
@@ -53,12 +152,13 @@ async function main() {
     // Authenticate
     console.log(`Authenticating as ${username}...`);
     const token = await auth.getUserToken(username, password);
-    console.log(token);
     const tokenObj = { token };
     console.log(`Authenticated as ${username}\n`);
+
+    await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
     
     // Step 1: Deploy new implementation
-    console.log(`Deploying new implementation: ${contractName}...`);
+    console.log(`Deploying new implementation: ${contractName}`);
     
     const contractsDir = config.resolvePath(config.contractsDir);
     const contractFilePath = path.join(contractsDir, contractFile);
