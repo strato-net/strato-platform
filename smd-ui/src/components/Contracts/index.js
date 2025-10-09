@@ -49,6 +49,7 @@ class Contracts extends Component {
   }
 
   componentWillMount() {
+    // commenting on purpose
     // mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
