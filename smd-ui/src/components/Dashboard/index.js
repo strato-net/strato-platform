@@ -336,7 +336,7 @@ class Dashboard extends Component {
               />
             </Popover>
           </div>
-          <div className="col-sm-4">
+          {/* <div className="col-sm-4">
             <Link to="/accounts">
               <NumberCard
                 number={usersCount}
@@ -345,7 +345,7 @@ class Dashboard extends Component {
                 className="smd-pointer"
               />
             </Link>
-          </div>
+          </div> */}
 
           <div className="col-sm-4">
             <Link to="/contracts">
@@ -395,6 +395,15 @@ class Dashboard extends Component {
               textSize="h4"
             />
           </div> */}
+          <div className="col-sm-4">
+            <NumberCard
+              number={env.NODE_HOST}
+              description="Node Host"
+              iconClass="fa-server"
+              className={`smd-pointer`}
+              textSize="h4"
+            />
+          </div>
           <div className="col-sm-8">
             <NodeCard />
           </div>
