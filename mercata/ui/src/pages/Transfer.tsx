@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
+import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
   const { userAddress } = useUser();
@@ -73,50 +74,8 @@ const Transfer = () => {
     const active = tokens.filter(token => token.token?.status === '2');
     const inactive = tokens.filter(token => token.token?.status !== '2');
 
-    // Token sort configuration - defines priority groups for active tokens
-    const getPriority = (token: Token): number => {
-      const symbol = token?.token?._symbol || '';
-      const address = token.address?.toLowerCase() || '';
-
-      // Priority 1: USDST
-      if (address === usdstAddress.toLowerCase()) return 1;
-
-      // Priority 2: Collateral tokens (GOLDST, WBTCST, etc)
-      const collateralTokens = ['GOLDST', 'WBTCST', 'ETHST', 'SILVST'];
-      if (collateralTokens.includes(symbol)) return 2;
-
-      // Priority 3: Special LP Tokens
-      const specialLpTokens = ['MUSDST', 'SUSDST'];
-      if (specialLpTokens.includes(symbol)) return 3;
-
-      // Priority 4: LP Tokens (contains "LP" in symbol)
-      if (symbol.includes('-LP')) return 4;
-
-      // Priority 4: Everything else
-      return 5;
-    };
-
-    const sortActiveTokens = (a: Token, b: Token) => {
-      const priorityA = getPriority(a);
-      const priorityB = getPriority(b);
-
-      // Sort by priority first
-      if (priorityA !== priorityB) {
-        return priorityA - priorityB;
-      }
-
-      // Within same priority, sort alphabetically by symbol
-      return sortAlphabetically(a, b);
-    };
-
-    const sortAlphabetically = (a: Token, b: Token) => {
-      const symbolA = a?.token?._symbol || '';
-      const symbolB = b?.token?._symbol || '';
-      return symbolA.localeCompare(symbolB);
-    };
-
-    active.sort(sortActiveTokens);
-    inactive.sort(sortAlphabetically);
+    active.sort(sortTokensCompareFn);
+    inactive.sort(sortTokensCompareFn);
 
     return { activeTokens: active, inactiveTokens: inactive };
   }, [tokens]);
