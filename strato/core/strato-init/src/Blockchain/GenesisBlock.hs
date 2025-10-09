@@ -385,8 +385,6 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'
         genesisBlockCodePtr (SolidVMCode _ ch') = ch'
-        genesisBlockCodePtr cp =
-          error $ "Could not resolve code ptr in genesis block" ++ show cp
 
         lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
         lookupSolidDiff _ _                 = Nothing

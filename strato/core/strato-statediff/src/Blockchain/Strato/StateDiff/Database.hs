@@ -9,8 +9,7 @@
 
 module Blockchain.Strato.StateDiff.Database
   ( commitSqlDiffs,
-    codePtrHash,
-    codePtrAddress
+    codePtrHash
   )
 where
 

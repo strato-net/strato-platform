@@ -133,4 +133,3 @@ instance RLPSerializable AddressState where
 codePtrToSHA :: CodePtr -> Keccak256
 codePtrToSHA (ExternallyOwned hsh) = hsh
 codePtrToSHA (SolidVMCode _ hsh) = hsh
-codePtrToSHA v = error $ "CodeToAccount is obsolete, yet it is being used in codePtrToSHA: " ++ show v

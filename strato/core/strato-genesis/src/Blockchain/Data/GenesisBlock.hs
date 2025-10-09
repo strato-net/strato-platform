@@ -147,7 +147,6 @@ zipSourceInfo accounts codes =
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor _ = Nothing
    in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock ::

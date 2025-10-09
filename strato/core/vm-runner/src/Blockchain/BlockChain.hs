@@ -821,7 +821,6 @@ completeDiff ::
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m
