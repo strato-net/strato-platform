@@ -532,9 +532,8 @@ startingAction maybeCode env' =
       _actionData = OMap.empty,
       _src =
         case maybeCode of
-          Just (Code theCode) ->
+          Just theCode ->
             Just theCode
-          Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',
       _events = Q.empty,

@@ -197,11 +197,7 @@ create ::
 create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
   isRunningTests <- checkIfRunningTests
 
-  initCode <- case code of
-    Code c -> pure c
-    PtrToCode cp -> do
-      maybeCode <- getCode $ codePtrToSHA cp
-      return $ DT.decodeUtf8 $ fromMaybe "" maybeCode
+  let Code initCode=code
 
   let env' =
         Env.Environment
@@ -210,7 +206,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             Env.proposer = proposer',
             Env.origin = origin',
             Env.txHash = txHash',
-            Env.src = Just initCode,
+            Env.src = Just code,
             Env.name = Just contractName,
             Env.runningTests = isRunningTests
           }

@@ -61,6 +61,7 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -664,7 +665,7 @@ extractCodeCollectionAddedMessages a =
          a ^. Action.name,
          O.assocs $ a ^. Action.actionData
        ) of
-    (Just c, Just n, actionDatas) ->
+    (Just (Code c), Just n, actionDatas) ->
       let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
           cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
             if _actionDataCodeHash == cp

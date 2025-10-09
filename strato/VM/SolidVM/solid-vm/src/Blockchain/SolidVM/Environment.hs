@@ -8,6 +8,7 @@ where
 
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Data.Text (Text)
 
@@ -19,7 +20,7 @@ data Environment = Environment
     proposer :: Address,
     blockHeader :: BlockHeader,
     txHash :: Keccak256,
-    src :: Maybe Text,
+    src :: Maybe Code,
     name :: Maybe Text,
     runningTests :: Bool
   }
