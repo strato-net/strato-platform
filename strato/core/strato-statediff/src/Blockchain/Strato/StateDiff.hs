@@ -389,7 +389,7 @@ lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "add
 lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Address AddressState m) => CodePtr -> m ByteString
 lookupCode (ExternallyOwned ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
-lookupCode cp@(CodeAtAccount _ _) = maybe (pure "") lookupCode =<< unsafeResolveCodePtr cp
+lookupCode cp@(CodeAtAccount _ _) = lookupCode cp
 
 lookupInMPDB ::
   (MonadLogger m, Format a) =>

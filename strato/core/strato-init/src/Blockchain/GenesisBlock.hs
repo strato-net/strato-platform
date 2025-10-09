@@ -322,23 +322,23 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         }
 
     toAction ::
-      ( MonadLogger m
-      , Selectable Ad.Address AddressState m
-      )
+      MonadLogger m
       => S.Seq Event
       -> S.Seq A.Delegatecall
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m VMEvent
     toAction addressEvents delegatecalls a d = do
-      let ch = codeHash d
-      cPtr <- fromMaybe ch <$> resolveCodePtr ch
+      let cPtr = codeHash d
       let
           theMetadata = getMetadata $ genesisBlockCodePtr cPtr
           creator' = fromMaybe "" mkCreator
           originAddress' = mkOriginAddress
 
-      appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
+      let appName' =
+            case cPtr of
+              SolidVMCode n _ -> T.pack n
+              _ -> ""
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =

@@ -200,8 +200,8 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
   initCode <- case code of
     Code c -> pure c
     PtrToCode cp -> do
-      hsh <- codePtrToSHA cp
-      fmap DT.decodeUtf8 $ fromMaybe "" . join <$> traverse getCode hsh
+      maybeCode <- getCode $ codePtrToSHA cp
+      return $ DT.decodeUtf8 $ fromMaybe "" maybeCode
 
   let env' =
         Env.Environment
@@ -238,7 +238,6 @@ getParentName address = fromMaybeM (return "") $
                           pure address -- Code pointer's address
                             >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
                             >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= MaybeT . resolveCodePtrParent -- CodePtr's parent
                             >>= ( \case
                                     SolidVMCode name _ -> pure name -- Name of the parent
                                     _ -> pure ""
@@ -429,8 +428,8 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
     let n = case ch of
               SolidVMCode n' _ -> n' 
               _ -> ""
-    resolveCodePtrParent ch >>= \case -- CodePtr's parent
-      Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
+    case ch of
+      SolidVMCode name _ -> pure (n, stringToLabel name) -- Name of the parent
       _ -> pure (n, "")
 
   let contract = fromMaybe contract' $ mContract >>= \c -> M.lookup c $ CC._contracts cc
@@ -604,8 +603,8 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       let n = case ch of
                 SolidVMCode n' _ -> n'
                 _ -> ""
-      resolveCodePtrParent ch >>= \case -- CodePtr's parent
-        Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
+      case ch of
+        SolidVMCode name _ -> pure (n, stringToLabel name) -- Name of the parent
         _ -> pure (n, "")
     (_, _, codeContractCreator) <- getCreator ccToGet
     addDelegatecall from to' (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
@@ -660,27 +659,21 @@ getCreator caller = do
       let creator' = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
       $logDebugS "getCreator/versioning" . T.pack $ "The creator is " ++ (show creator')
       return (caller, caller, creator')
-    x -> do
-      -- caller is a contract account, so this app already exists
-      -- so we need to find the app contract and get its ":creator"
-      mAppAccount <- getAppAccount caller
-      case mAppAccount of
-        Nothing -> internalError "getCreator/versioning --> the app contract didn't have an AddressState, or was on an inaccessible chain" x
-        Just address -> do
-          $logDebugS "getCreator/versioning" . T.pack $ "They are part of app contract " ++ (format address)
-          appCreatorAddress <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creatorAddress"]
-          appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
-          case (appCreatorAddress, appCreator)  of
-            (MS.BAccount creatorAddress, MS.BString creator') -> do
-              $logDebugS "getCreator/versioning" . T.pack $ "Its creator is " ++ show creator'
-              appOriginAddress <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":originAddress"]
-              let originAddress = case appOriginAddress of
+    _ -> do
+      $logDebugS "getCreator/versioning" . T.pack $ "They are part of app contract " ++ (format caller)
+      appCreatorAddress <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":creatorAddress"]
+      appCreator <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":creator"]
+      case (appCreatorAddress, appCreator)  of
+        (MS.BAccount creatorAddress, MS.BString creator') -> do
+          $logDebugS "getCreator/versioning" . T.pack $ "Its creator is " ++ show creator'
+          appOriginAddress <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":originAddress"]
+          let originAddress = case appOriginAddress of
                     MS.BAccount oa -> oa^.namedAccountAddress
                     _ -> caller
-              return (creatorAddress^.namedAccountAddress, originAddress, BC.unpack creator')
-            (_ , _)-> do
-              $logDebugS "getCreator/versioning" . T.pack $ "Its creator is unset. Returning empty string"
-              return (caller, caller, "") --TODO: have better sane default
+          return (creatorAddress^.namedAccountAddress, originAddress, BC.unpack creator')
+        (_ , _)-> do
+          $logDebugS "getCreator/versioning" . T.pack $ "Its creator is unset. Returning empty string"
+          return (caller, caller, "") --TODO: have better sane default
 
 logFunctionCall :: MonadSM m => ValList -> Address -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -1063,7 +1056,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
                 pure address
                   >>= MaybeT . A.lookup (A.Proxy @AddressState)
                   >>= pure . addressStateCodeHash
-                  >>= MaybeT . resolveCodePtrParent
                   >>= ( \case
                           SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
                           _ -> pure ""
@@ -1993,21 +1985,17 @@ evaluateAccountMember a _ "codehash" = do
   -- Get the chainId for the account
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
-  resolvedCodeHash <- resolveCodePtr codeHash'
-  case resolvedCodeHash of
-    Just (SolidVMCode _ ch') -> return (Constant $ SString . keccak256ToHex $ ch')
-    Just cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
-    Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
+  case codeHash' of
+    SolidVMCode _ ch' -> return (Constant $ SString . keccak256ToHex $ ch')
+    cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
 --Get the whole code collection when nothing is supplied to the code function
 evaluateAccountMember a _ "code" = do
   -- Get the code at the address
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
-  resolvedCodeHash <- resolveCodePtr codeHash'
-  let ch' = case resolvedCodeHash of
-        Just (SolidVMCode _ ch1') -> ch1'
-        Just cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
-        Nothing -> missingCodeCollection "Could not resolve code pointer for address" (format a)
+  let ch' = case codeHash' of
+        SolidVMCode _ ch1' -> ch1'
+        cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
   -- Find the code using the codehash
   cd <- A.lookup (A.Proxy @DBCode) ch'
   let cd' = case cd of
