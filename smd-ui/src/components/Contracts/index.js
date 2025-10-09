@@ -72,9 +72,9 @@ class Contracts extends Component {
     });
   }
 
-  // onChainSearch = () => {
-  //    this.props.fetchChainDetailSelect(this.state.chainQuery, this.state.chainSearchQueryField)
-  // } 
+  onChainSearch = () => {
+     this.props.fetchChainDetailSelect(this.state.chainQuery, this.state.chainSearchQueryField)
+  } 
 
   onNextClick = () => {
     const { offset, limit } = this.state;
@@ -95,28 +95,28 @@ class Contracts extends Component {
   onNextChainClick = () => {
     const { chainOffset, chainLimit } = this.state;
     const newOffset = chainOffset + chainLimit;
-    // this.setState({ chainOffset: newOffset }, () => {
-    //    this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
-    // });
+    this.setState({ chainOffset: newOffset }, () => {
+       this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
   };
 
   onPrevChainClick = () => {
     const { chainOffset, chainLimit } = this.state;
     const newOffset = Math.max(0, chainOffset - chainLimit);
-    // this.setState({ chainOffset: newOffset }, () => {
-    //    this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
-    // });
+    this.setState({ chainOffset: newOffset }, () => {
+       this.props.fetchChainIds(this.state.chainLimit, this.state.chainOffset);
+    });
   };
 
-  // toggleChainQueryType = (e) => {
-  //   this.setState({ useSearch : !this.state.useSearch }, () => {
-  //     if (!this.state.useSearch) {
-  //       this.setState({chainQuery : ""})
-  //        this.props.fetchChainIds(this.chainLimit, this.chainOffset);
-  //     }
+  toggleChainQueryType = (e) => {
+    this.setState({ useSearch : !this.state.useSearch }, () => {
+      if (!this.state.useSearch) {
+        this.setState({chainQuery : ""})
+         this.props.fetchChainIds(this.chainLimit, this.chainOffset);
+      }
 
-  //   })
-  // }
+    })
+  }
 
   render() {
     const contracts = this.props.contracts;
