@@ -56,7 +56,8 @@ export const useNetBalance = ({
         total += totalTokenValue;
 
         if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-          cataTotal += totalTokenValue;
+          // For CATA, track the actual token balance, not USD value
+          cataTotal += (balance + collateralBalance);
         }
       }
     }
