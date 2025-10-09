@@ -80,8 +80,7 @@ getContracts mName mOffset mLimit chainId = do
   allAddrStateRefs <-
     getAccount'
       accountsFilterParams
-        { _qaChainId = maybeToList chainId,
-          _qaExternal = Just False,
+        { _qaExternal = Just False,
           _qaSearch = mName,
           _qaOffset = Nothing,  -- No offset - get all records
           _qaLimit = Nothing    -- No limit - get all records
@@ -140,8 +139,7 @@ getContractsContract name addr chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
       aParams = accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just addr,
+          { _qaAddress = Just addr,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
@@ -258,8 +256,7 @@ getContractsDetails' contractAddress chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
       aParams = accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just contractAddress,
+          { _qaAddress = Just contractAddress,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
