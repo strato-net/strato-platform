@@ -20,6 +20,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
 import { useSafetyContext } from "@/context/SafetyContext";
+import { cataAddress } from "@/lib/constants";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -40,9 +41,15 @@ const Dashboard = () => {
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
   const { safetyInfo } = useSafetyContext();
 
+  // Extract CATA token from inactive tokens by address
+  const cataToken = inactiveTokens?.find(token =>
+    token.address?.toLowerCase() === cataAddress.toLowerCase()
+  );
+
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance, cataBalance, totalBorrowed } = useNetBalance({
     tokens,
+    cataToken,
     loans,
     liquidityInfo,
     totalCDPDebt,

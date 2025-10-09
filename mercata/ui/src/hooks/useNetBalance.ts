@@ -4,10 +4,11 @@ import { Token } from '@/interface';
 
 interface UseNetBalanceProps {
   tokens: Token[];
+  cataToken?: Token | null;
   loans: any;
   liquidityInfo: any;
   totalCDPDebt: string;
-  safetyInfo?: any; 
+  safetyInfo?: any;
 }
 
 interface NetBalanceResult {
@@ -18,6 +19,7 @@ interface NetBalanceResult {
 
 export const useNetBalance = ({
   tokens,
+  cataToken,
   loans,
   liquidityInfo,
   totalCDPDebt,
@@ -30,7 +32,9 @@ export const useNetBalance = ({
   });
 
   useEffect(() => {
-    if (!tokens || tokens.length === 0) return;
+    if (!tokens || tokens.length === 0) {
+      return;
+    }
 
     let total = 0;
     let cataTotal = 0;
@@ -42,23 +46,30 @@ export const useNetBalance = ({
       const rawPrice = token?.price || "0";
       const rawBalance = token?.balance || "0";
       const rawCollateralBalance = token?.collateralBalance || "0";
-      const name = token?._name || "";
-      const symbol = token?._symbol || "";
 
       // Only process tokens with price AND (balance OR collateral)
       if (rawPrice && (rawBalance || rawCollateralBalance)) {
         const price = parseFloat(formatUnits(BigInt(rawPrice), 18));
         const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
         const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
-        
+
         // Calculate: price * (balance + collateralBalance)
         const totalTokenValue = price * (balance + collateralBalance);
         total += totalTokenValue;
+      }
+    }
 
-        if (name.toLowerCase().includes("cata") || symbol.toLowerCase().includes("cata")) {
-          // For CATA, track the actual token balance, not USD value
-          cataTotal += (balance + collateralBalance);
-        }
+    // Calculate CATA balance from the provided cataToken (if it exists)
+    if (cataToken) {
+      const rawBalance = cataToken?.balance || "0";
+      const rawCollateralBalance = cataToken?.collateralBalance || "0";
+
+      if (rawBalance || rawCollateralBalance) {
+        const balance = parseFloat(formatUnits(BigInt(rawBalance || 0), 18));
+        const collateralBalance = parseFloat(formatUnits(BigInt(rawCollateralBalance || 0), 18));
+
+        // For CATA, track the actual token balance, not USD value
+        cataTotal = balance + collateralBalance;
       }
     }
 
@@ -113,7 +124,7 @@ export const useNetBalance = ({
       totalBorrowed: totalDebt
     });
 
-  }, [tokens, loans, liquidityInfo, totalCDPDebt, safetyInfo]);
+  }, [tokens, cataToken, loans, liquidityInfo, totalCDPDebt, safetyInfo]);
 
   return result;
 };
