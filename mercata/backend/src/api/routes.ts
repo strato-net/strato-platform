@@ -13,6 +13,7 @@ import lendingRoutes from "./routes/lending.routes";
 import eventsRoutes from "./routes/events.routes";
 import bridgeRoutes from "./routes/bridge.routes";
 import cdpRoutes from "./routes/cdp.routes";
+import rewardsRoutes from "./routes/rewards.routes";
 
 const router = Router();
 
@@ -52,6 +53,9 @@ router.use("/bridge", bridgeRoutes);
 
 // ----- CDP Routes -----
 router.use("/cdp", cdpRoutes);
+
+// ----- Rewards Routes -----
+router.use("/rewards", rewardsRoutes);
 
 // ----- Health Check -----
 router.get("/health", (_req: Request, res: Response, next: NextFunction) => {

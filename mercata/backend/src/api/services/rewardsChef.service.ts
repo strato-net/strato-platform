@@ -48,11 +48,48 @@ export const waitForBalanceUpdate = async (
 };
 
 /**
- * Helper function to get user's staked balance from RewardsChef using Cirrus events
+ * Helper function to get user's info (staked balance and reward debt) from RewardsChef
  *
- * This function queries the latest CurrentUserAmount event for the given user and pool,
- * which contains the current staked balance. This approach avoids on-chain calls while
- * working around the limitation that nested mappings cannot be queried from Cirrus.
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param poolId - Pool ID to query
+ * @param userAddress - User address to fetch info for
+ * @returns Promise resolving to user info object
+ */
+export const getUserInfo = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string
+): Promise<{ amount: string; rewardDebt: string }> => {
+  try {
+    // Query userInfo mapping from Cirrus
+    // The mapping is indexed with key (poolId) and key2 (userAddress)
+    const response = await cirrus.get(accessToken, `/${RewardsChef}-userInfo`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        key: `eq.${poolId}`,
+        key2: `eq.${userAddress}`,
+        select: "value",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
+    });
+
+    const userInfo = response.data?.[0]?.value;
+    return {
+      amount: userInfo?.amount || "0",
+      rewardDebt: userInfo?.rewardDebt || "0"
+    };
+  } catch (error) {
+    console.error("Failed to fetch user info from RewardsChef:", error);
+    return { amount: "0", rewardDebt: "0" };
+  }
+};
+
+/**
+ * Helper function to get user's staked balance from RewardsChef
+ * Backward compatibility wrapper for getUserInfo
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
@@ -66,26 +103,8 @@ export const getStakedBalance = async (
   poolId: number,
   userAddress: string
 ): Promise<string> => {
-  try {
-    // Query the latest CurrentUserAmount event for this user and pool
-    const response = await cirrus.get(accessToken, `/${RewardsChef}-CurrentUserAmount`, {
-      params: {
-        address: `eq.${rewardsChefAddress}`,
-        user: `eq.${userAddress}`,
-        pid: `eq.${poolId}`,
-        select: "currentAmount::text,block_timestamp",
-        order: "block_timestamp.desc",
-        limit: "1"
-      }
-    });
-
-    // Extract the current amount from the latest event
-    const latestEvent = response.data?.[0];
-    return latestEvent?.currentAmount || "0";
-  } catch (error) {
-    console.error("Failed to fetch staked balance from RewardsChef events:", error);
-    return "0";
-  }
+  const userInfo = await getUserInfo(accessToken, rewardsChefAddress, poolId, userAddress);
+  return userInfo.amount;
 };
 
 /**
@@ -104,28 +123,167 @@ export const getPools = async (
   allocPoint: string;
   accPerToken: string;
   lastRewardTimestamp: string;
+  bonusPeriods: Array<{ startTimestamp: string; bonusMultiplier: string }>;
 }>> => {
   try {
     const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
       params: {
-        address: `eq.${rewardsChefAddress}`
+        address: `eq.${rewardsChefAddress}`,
+        select: "key,value",
+        order: "block_timestamp.desc"
       }
     });
 
-    // Filter out entries with empty values and map to desired format
-    const pools = response.data
-      ?.filter((entry: any) => entry.value && entry.value !== "")
-      .map((entry: any) => ({
-        poolIdx: entry.key,
-        lpToken: entry.value.lpToken,
-        allocPoint: entry.value.allocPoint,
-        accPerToken: entry.value.accPerToken,
-        lastRewardTimestamp: entry.value.lastRewardTimestamp
-      })) || [];
+    // Group by key (poolIdx) and take the latest entry for each pool
+    const poolsMap = new Map();
+    for (const entry of response.data || []) {
+      if (entry.value && !poolsMap.has(entry.key)) {
+        poolsMap.set(entry.key, {
+          poolIdx: entry.key,
+          lpToken: entry.value.lpToken,
+          allocPoint: entry.value.allocPoint,
+          accPerToken: entry.value.accPerToken,
+          lastRewardTimestamp: entry.value.lastRewardTimestamp,
+          bonusPeriods: entry.value.bonusPeriods || []
+        });
+      }
+    }
 
-    return pools;
+    return Array.from(poolsMap.values()).sort((a, b) => a.poolIdx - b.poolIdx);
   } catch (error) {
     console.error("Failed to fetch pools from RewardsChef:", error);
     return [];
+  }
+};
+
+
+/**
+ * Calculates the bonus-adjusted multiplier for a time period
+ * Replicates the getMultiplier() logic from RewardsChef.sol
+ *
+ * @param bonusPeriods - Array of bonus periods sorted by startTimestamp
+ * @param from - Start timestamp
+ * @param to - End timestamp
+ * @returns Bonus-adjusted time multiplier as BigInt
+ */
+const calculateMultiplier = (
+  bonusPeriods: Array<{ startTimestamp: string; bonusMultiplier: string }>,
+  from: bigint,
+  to: bigint
+): bigint => {
+  if (from >= to) {
+    return 0n;
+  }
+
+  const MAX_INT = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+  let totalMultipliedTime = 0n;
+  let currentTime = from;
+
+  for (let i = 0; i < bonusPeriods.length && currentTime < to; i++) {
+    const periodStart = BigInt(bonusPeriods[i].startTimestamp);
+    const periodEnd = (i + 1 < bonusPeriods.length)
+      ? BigInt(bonusPeriods[i + 1].startTimestamp)
+      : MAX_INT;
+
+    if (currentTime < periodStart) {
+      currentTime = periodStart;
+    }
+
+    if (currentTime < to && currentTime < periodEnd) {
+      const segmentEnd = to < periodEnd ? to : periodEnd;
+      const segmentDuration = segmentEnd - currentTime;
+      totalMultipliedTime += segmentDuration * BigInt(bonusPeriods[i].bonusMultiplier);
+      currentTime = segmentEnd;
+    }
+  }
+
+  return totalMultipliedTime;
+};
+
+
+/**
+ * Calculates pending CATA rewards for a user in a specific pool
+ * Replicates the pendingCata() logic from RewardsChef.sol
+ *
+ * This directly queries the userInfo mapping from Cirrus which contains both
+ * the user's staked amount and their rewardDebt. This makes the calculation
+ * accurate and simple.
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param poolId - Pool ID
+ * @param userAddress - User address to calculate rewards for
+ * @param cataPerSecond - CATA tokens created per second (in wei)
+ * @param totalAllocPoint - Sum of all allocation points across pools
+ * @returns Promise resolving to pending CATA amount as string (in wei)
+ */
+export const calculatePendingCata = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string,
+  cataPerSecond: string,
+  totalAllocPoint: string
+): Promise<string> => {
+  try {
+    // Fetch pool data (includes bonusPeriods)
+    const pools = await getPools(accessToken, rewardsChefAddress);
+    const pool = pools.find(p => p.poolIdx === poolId);
+
+    if (!pool) {
+      return "0";
+    }
+
+    // Fetch user info (amount and rewardDebt)
+    const userInfo = await getUserInfo(
+      accessToken,
+      rewardsChefAddress,
+      poolId,
+      userAddress
+    );
+
+    const userAmount = BigInt(userInfo.amount);
+    if (userAmount === 0n) {
+      return "0";
+    }
+
+    const userRewardDebt = BigInt(userInfo.rewardDebt);
+
+    // Constants
+    const PRECISION_MULTIPLIER = BigInt("1000000000000000000"); // 1e18
+    const lastRewardTimestamp = BigInt(pool.lastRewardTimestamp);
+    const currentTimestamp = BigInt(Math.floor(Date.now() / 1000));
+
+    // Get LP token balance in the contract
+    const lpSupply = await getTokenBalanceForUser(accessToken, pool.lpToken, rewardsChefAddress);
+    const lpSupplyBigInt = BigInt(lpSupply);
+
+    // Calculate current accPerToken (as pendingCata does in the contract)
+    let accPerToken = BigInt(pool.accPerToken);
+
+    // If time has passed since last pool update and there's liquidity, simulate the update
+    if (currentTimestamp > lastRewardTimestamp && lpSupplyBigInt !== 0n) {
+      const multiplier = calculateMultiplier(
+        pool.bonusPeriods,
+        lastRewardTimestamp,
+        currentTimestamp
+      );
+      const cataReward = (
+        multiplier *
+        BigInt(cataPerSecond) *
+        BigInt(pool.allocPoint)
+      ) / BigInt(totalAllocPoint);
+
+      accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupplyBigInt;
+    }
+
+    // Calculate pending rewards: (user.amount * accPerToken) / PRECISION - user.rewardDebt
+    const pending = (userAmount * accPerToken) / PRECISION_MULTIPLIER - userRewardDebt;
+
+    // Ensure we don't return negative values
+    return pending > 0n ? pending.toString() : "0";
+  } catch (error) {
+    console.error("Failed to calculate pending CATA:", error);
+    return "0";
   }
 };
