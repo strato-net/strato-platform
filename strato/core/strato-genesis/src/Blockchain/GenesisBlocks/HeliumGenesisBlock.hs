@@ -556,7 +556,7 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ allBalances
 
 assetToEvents :: GA.Asset -> (Address, S.Seq Event)
-assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "Token" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
+assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
     ("Transfer", [("from", show $ Address 0),("to", show blockappsAddress),("value", show totalSupply)]) :
     ((\(a,b) -> ("Transfer", [("from", show blockappsAddress),("to", show a),("value", show b)])) <$> allBalances)
   )
@@ -633,7 +633,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 proxy $ ownedByBlo
   ) (zip [1 :: Integer ..] supportedCollaterals)
 
 lendingPoolEvents :: (Address, S.Seq Event)
-lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "LendingPool" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
+lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (lendingPoolAddress, S.fromList $
   map (\a -> ("AssetConfigured",
     [("asset", show a),
      ("ltv", "7500"),
@@ -652,7 +652,7 @@ poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 proxy $ 
   ]
 
 poolConfiguratorEvents :: (Address, S.Seq Event)
-poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "PoolConfigurator" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
+poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolConfiguratorAddress, S.fromList $
   map (\a -> ("AssetConfigured",
     [("asset", show a),
      ("ltv", "7500"),
@@ -825,7 +825,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ create
      ) GA.assets
 
 adminEvents :: (Address, S.Seq Event)
-adminEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "AdminRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
+adminEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (adminRegistryAddress, S.fromList $
     [("AdminAdded", [("admin", show blockappsAddress)])]
   )
 
@@ -981,7 +981,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ ownedByBlockAp
     ]) combinedEscrows
 
 cdpEngineEvents :: (Address, S.Seq Event)
-cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPEngine" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpEngineAddress, S.fromList $
+cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpEngineAddress, S.fromList $
   map (\GE.Escrow{..} ->
     ("Deposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
   ) combinedEscrows
@@ -1014,7 +1014,7 @@ cdpRegistry = SolidVMContractWithStorage cdpRegistryAddress 0 proxy $ ownedByBlo
      ]
 
 cdpRegistryEvents :: (Address, S.Seq Event)
-cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPRegistry" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpRegistryAddress, S.fromList $
+cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpRegistryAddress, S.fromList $
   [ ("ComponentsUpdated",
       [ ("cdpVault", show cdpVaultAddress)
       , ("cdpEngine", show cdpEngineAddress)
@@ -1037,7 +1037,7 @@ cdpVault = SolidVMContractWithStorage cdpVaultAddress 0 proxy $ ownedByBlockApps
     ]) combinedEscrows
 
 cdpVaultEvents :: (Address, S.Seq Event)
-cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "CDPVault" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpVaultAddress, S.fromList $
+cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (cdpVaultAddress, S.fromList $
   map (\GE.Escrow{..} ->
       ("CollateralDeposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
   ) combinedEscrows
@@ -1068,7 +1068,7 @@ safetyModule = SolidVMContractWithStorage safetyModuleAddress 0 proxy $ ownedByB
      ]
 
 safetyModuleEvents :: (Address, S.Seq Event)
-safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "SafetyModule" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (safetyModuleAddress, S.fromList $
+safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Proxy" "Proxy" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (safetyModuleAddress, S.fromList $
   [ ("ParamsUpdated", [("cooldown", show (1 :: Integer)), ("window", show (432000 :: Integer)), ("maxSlashBps", show (3000 :: Integer))])
   , ("TokensUpdated", [("_asset", show usdstAddress), ("_sToken", show sUsdstAddress)])
   ])
