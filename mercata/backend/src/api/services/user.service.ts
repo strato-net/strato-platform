@@ -112,7 +112,7 @@ export const removeAdmin = async (
   }
 };
 
-// Remove an admin from the registry
+// Cast a vote on an issue in the registry
 export const castVoteOnIssue = async (
   accessToken: string,
   userAddress: string,
@@ -121,19 +121,17 @@ export const castVoteOnIssue = async (
   args: string[],
 ): Promise<{ status: string; hash: string }> => {
   try {
-    let flattenedArgs: any = args;
-    if (args.length === 1) {
-      flattenedArgs = args[0];
-    }
+    const txArgs: Record<string, any> = {
+      _func: func,
+      _target: target,
+      _args: args
+    };
+    
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "castVoteOnIssue",
-      args: {
-        _target: target,
-        _func: func,
-        _args: flattenedArgs,
-      },
+      args: txArgs,
     }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
