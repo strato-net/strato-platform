@@ -7,7 +7,6 @@ const auth = require('./auth');
 const { rest, importer } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
-const { execPath } = require('process');
 
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
@@ -25,6 +24,7 @@ function printUsage() {
   console.error('');
   console.error('Optional arguments:');
   console.error('  --constructor-args <json>    JSON string of constructor arguments (default: ' + JSON.stringify(DEFAULT_CONSTRUCTOR_ARGS) + ')');
+  console.error('  +OVERRIDE-CHECKS             Override the contract name check');
   console.error('');
   console.error('Required environment variables (.env):');
   console.error('  OAUTH_CLIENT_SECRET, OAUTH_CLIENT_ID, OAUTH_DISCOVERY_URL, OAUTH_URL, NODE_URL, GLOBAL_ADMIN_NAME, GLOBAL_ADMIN_PASSWORD');
@@ -52,12 +52,18 @@ function parseArgs() {
       parsed[key] = value;
       i++; // Skip the value in next iteration
     }
+    if (arg.startsWith('+')) {
+        // e.g. +OVERRIDE-CHECKS
+        const key = arg.slice(1);
+        parsed[key] = true;
+    }
   }
   
   return parsed;
 }
 
 /** Get the logic contract address from a proxy (read-only)
+ *  Also used to verify that the address is actually a Proxy
  */
 async function getLogicContract(tokenObj, proxyAddress) {
     const contract = { address: proxyAddress, name: 'Proxy' };
@@ -71,7 +77,7 @@ async function getLogicContract(tokenObj, proxyAddress) {
         console.error(error.message);
     }
     if (!implementationAddress) {
-        throw new Error('Could not retrieve logicContract address from Proxy. Is this address actually a Proxy?');
+        throw new Error('Could not retrieve logicContract address from Proxy.\nIs this address actually a Proxy?');
     }
     return implementationAddress;
 }
@@ -85,14 +91,32 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
     const implementationAddress = await getLogicContract(tokenObj, proxyAddress);
     console.log(`Old implementation address: ${implementationAddress}`);
     
-    // Try to get the state of the current implementation with the expected contract name
+    // Verify the current implementation contract name using Cirrus search
+    console.log(`Verifying implementation contract name '${contractName}'...`);
+    const searchOptions = {
+        config,
+        query: {
+            address: `eq.${implementationAddress}`
+        }
+    };
+    
     try {
-        const implementationContract = { address: implementationAddress, name: contractName };
-        const options = { config };
-        await rest.getState(tokenObj, implementationContract, options);
-        console.log(`Implementation contract name '${contractName}' matches current implementation`);
+        const results = await rest.search(tokenObj, { name: contractName }, searchOptions);
+        
+        if (!results || results.length === 0) {
+            throw new Error(`The previous implementation does not seem to match the new contract name '${contractName}'.\nAre you sure you want to upgrade to a different contract type?`);
+            // @dev if yes, then set +OVERRIDE-CHECKS flag
+        }
+        
+        console.log(`Implementation contract name '${contractName}' verified`);
     } catch (error) {
-        throw new Error(`Current implementation at ${implementationAddress} does not match contract name '${contractName}'. Are you upgrading to a different contract type?`);
+        if (error.message.includes('No contract named')) {
+            throw new Error(`The previous implementation does not seem to match the new contract name '${contractName}'.\nAre you sure you want to upgrade to a different contract type?`);
+        }
+        else {
+            throw error;
+        }
+
     }
 }
 
@@ -155,7 +179,8 @@ async function main() {
     const tokenObj = { token };
     console.log(`Authenticated as ${username}\n`);
 
-    await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
+    // Verify that the proxy exists and the implementation contract name matches the new contract name
+    args['OVERRIDE-CHECKS'] || await verifyProxyAndImplementation(tokenObj, proxyAddress, contractName);
     
     // Step 1: Deploy new implementation
     console.log(`Deploying new implementation: ${contractName}`);
