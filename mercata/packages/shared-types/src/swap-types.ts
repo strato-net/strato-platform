@@ -121,9 +121,11 @@ export interface LPToken {
   _symbol: string;
   customDecimals: number;
   _totalSupply: string; // Total supply of LP tokens
-  balance: string; // User LP token balance
+  balance: string; // User LP token balance (unstaked, in wallet)
   price: string; // LP token price
   images: Array<{ value: string }>; // LP token images (filtered to exclude empty values)
+  stakedBalance?: string; // LP tokens staked in RewardsChef (optional - only if pool exists in rewards)
+  totalBalance: string; // Total LP tokens (balance + stakedBalance if exists, otherwise just balance)
 }
 
 /**

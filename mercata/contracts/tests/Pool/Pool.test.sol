@@ -535,7 +535,7 @@ contract Describe_Pool {
 
     // ============ EDGE CASE TESTS ============
 
-    function it_pool_handles_zero_fee_parameters() {
+    function it_pool_handles_minimal_fee_parameters() {
         uint256 amountA = 1000e18;
         uint256 amountB = 2000e18;
         
@@ -544,18 +544,18 @@ contract Describe_Pool {
         require(ERC20(tokenBAddress).approve(address(pool), amountB), "Token B approval failed");
         pool.addLiquidity(amountB, amountA, block.timestamp + 3600);
         
-        // Test setting minimal fee parameters (can't set 0 for LP share)
-        m.poolFactory().setPoolFeeParameters(address(pool), 0, 1);
+        // Test setting minimal fee parameters (both must be > 0)
+        m.poolFactory().setPoolFeeParameters(address(pool), 1, 1);
         
         // Verify that pool uses the set parameters
-        require(pool.swapFeeRate() == 0, "swapFeeRate should be 0");
+        require(pool.swapFeeRate() == 1, "swapFeeRate should be 1");
         require(pool.lpSharePercent() == 1, "lpSharePercent should be 1");
         
-        // Test that swaps still work with factory default fees
+        // Test that swaps still work with minimal fees
         uint256 swapAmount = 50e18;
         require(ERC20(tokenAAddress).approve(address(pool), swapAmount), "Swap approval failed");
         uint256 output = pool.swap(true, swapAmount, 1, block.timestamp + 3600);
-        require(output > 0, "Swap should work with factory default fees");
+        require(output > 0, "Swap should work with minimal fees");
     }
 
     function it_pool_state_consistency_after_operations() {

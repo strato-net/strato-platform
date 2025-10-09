@@ -1,7 +1,51 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import { getTokenBalanceForUser } from "./tokens.service";
 
 const { RewardsChef } = constants;
+
+/**
+ * Helper function to wait for Cirrus to index the new balance
+ *
+ * This addresses a race condition where a transaction is confirmed on-chain
+ * but Cirrus hasn't indexed the new state yet. When querying immediately after
+ * a transaction, Cirrus may return stale data.
+ *
+ * This is particularly important when:
+ * - Depositing to Safety Module or Lending Pool (mints sToken/mToken)
+ * - Then immediately staking those tokens to RewardsChef
+ *
+ * @param accessToken - User access token for authentication
+ * @param tokenAddress - Address of the token to check balance for
+ * @param userAddress - User address to check balance for
+ * @param previousBalance - The balance before the transaction (in wei)
+ * @param maxRetries - Maximum number of retry attempts (default: 10)
+ * @param delayMs - Delay between retries in milliseconds (default: 200)
+ * @returns Promise resolving to the updated balance as string (in wei)
+ */
+export const waitForBalanceUpdate = async (
+  accessToken: string,
+  tokenAddress: string,
+  userAddress: string,
+  previousBalance: string,
+  maxRetries: number = 10,
+  delayMs: number = 200
+): Promise<string> => {
+  for (let i = 0; i < maxRetries; i++) {
+    const currentBalance = await getTokenBalanceForUser(accessToken, tokenAddress, userAddress);
+
+    if (BigInt(currentBalance) > BigInt(previousBalance)) {
+      return currentBalance;
+    }
+
+    // Wait before next retry
+    if (i < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  return previousBalance;
+};
 
 /**
  * Helper function to get user's staked balance from RewardsChef using Cirrus events
