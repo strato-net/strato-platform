@@ -36,7 +36,7 @@ const DepositsPage = () => {
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
-    token.address?.toLowerCase() === cataAddress.toLowerCase()
+    token.address === cataAddress
   );
 
   // Use centralized net balance calculation hook
