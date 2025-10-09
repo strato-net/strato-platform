@@ -143,13 +143,11 @@ zipSourceInfo accounts codes =
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor (ContractNoStorage _ _ (CodeAtAccount _ _)) = Nothing -- this is only for the main chain genesis block, so we'll stipulate that it cannot contain references by address
       findCodeFor acc@(ContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor (ContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
       findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor (SolidVMContractWithStorage _ _ (CodeAtAccount _ _) _) = Nothing
+      findCodeFor _ = Nothing
    in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock ::
