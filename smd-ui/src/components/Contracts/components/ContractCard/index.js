@@ -33,9 +33,10 @@ class ContractCard extends Component {
     const name = this.props.contract.name;
     const searchTerm = this.props.contract.searchTerm;
     if(searchTerm){
-      this.props.fetchState(name, searchTerm, this.props.selectedChain);
+      const chainId = this.props.selectedChain || 0; // Fallback to chain ID 0 if selectedChain is null
+      this.props.fetchState(name, searchTerm, chainId);
       this.props.fetchAccount(name, searchTerm);
-      this.props.fetchContractInfoRequest(`card-data-${searchTerm}-${this.props.selectedChain}`, name, searchTerm)
+      this.props.fetchContractInfoRequest(`card-data-${searchTerm}-${chainId}`, name, searchTerm)
       this.props.selectContractInstance(name, searchTerm);
     }
   }
@@ -67,9 +68,10 @@ class ContractCard extends Component {
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
               // mixpanelWrapper.track("contract_state_clicked")
-              self.props.fetchState(name, instance.address, self.props.selectedChain);
+              const chainId = self.props.selectedChain || 0; // Fallback to chain ID 0 if selectedChain is null
+              self.props.fetchState(name, instance.address, chainId);
               self.props.fetchAccount(name, instance.address);
-              self.props.fetchContractInfoRequest(`card-data-${instance.address}-${self.props.selectedChain}`, name, instance.address, self.props.selectedChain)
+              self.props.fetchContractInfoRequest(`card-data-${instance.address}-${chainId}`, name, instance.address, chainId)
               self.props.selectContractInstance(name, instance.address);
             }}
             key={`card-data-${instance.address}-${index}`}
@@ -93,7 +95,7 @@ class ContractCard extends Component {
 
     if (selectedInstance.length > 0 && selectedInstance[0].state) {
       const instance = selectedInstance[0];
-      const contractKey = `card-data-${instance.address}-${self.props.selectedChain}`
+      const contractKey = `card-data-${instance.address}-${self.props.selectedChain || 0}`
       const contractInfo = this.props.contractInfos && this.props.contractInfos[contractKey] ? this.props.contractInfos[contractKey] : {}
       const symbolTable = [];
       const symbols = Object.getOwnPropertyNames(instance.state);
@@ -117,7 +119,7 @@ class ContractCard extends Component {
                     symbolName={symbol}
                     fromCirrus={instance.fromCirrus}
                     fromBloc={instance.fromBloc}
-                    chainId={self.props.selectedChain}
+                    chainId={self.props.selectedChain || 0}
                   />
                 </td>
                 :
