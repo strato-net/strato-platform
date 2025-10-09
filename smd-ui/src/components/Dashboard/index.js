@@ -364,7 +364,8 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-4">
+          {/* Commented out Node ID section */}
+          {/* <div className="col-sm-4">
             <NumberCard
               number={
                 this.props.appMetadata && this.props.appMetadata.nodeInfo ? (
@@ -393,7 +394,7 @@ class Dashboard extends Component {
               }
               textSize="h4"
             />
-          </div>
+          </div> */}
           <div className="col-sm-8">
             <NodeCard />
           </div>
