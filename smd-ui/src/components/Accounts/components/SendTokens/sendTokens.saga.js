@@ -13,6 +13,7 @@ import { env } from '../../../../env';
 import { handleErrors } from '../../../../lib/handleErrors';
 import { isOauthEnabled } from '../../../../lib/checkMode';
 import { createUrl } from '../../../../lib/url';
+import { secureFetch } from '../../../../lib/csrf';
 
 const blocSendUrl = env.BLOC_URL + "/users/::user/::address/send";
 const transactionUrl = env.STRATO_URL_V23 + "/transaction";
@@ -40,7 +41,7 @@ export function sendTokensAPICall(from, fromAddress, toAddress, value, password,
 
   const body = isOauthEnabled() ? oauthBody : blocBody;
 
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',
