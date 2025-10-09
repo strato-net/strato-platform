@@ -21,6 +21,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { cataAddress } from "@/lib/constants";
+import { usePendingRewards } from "@/hooks/usePendingRewards";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -55,6 +56,9 @@ const Dashboard = () => {
     totalCDPDebt,
     safetyInfo
   });
+
+  // Fetch pending CATA rewards across all pools
+  const { pendingRewards } = usePendingRewards(true, 10000);
 
 
   // Add visibility states to prevent flashing
@@ -127,7 +131,11 @@ const Dashboard = () => {
 
             <AssetSummary
               title="CATA Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
+              value={
+                pendingRewards !== "0"
+                  ? `${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA (+${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} pending)`
+                  : `${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`
+              }
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />

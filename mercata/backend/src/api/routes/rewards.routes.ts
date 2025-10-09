@@ -8,6 +8,9 @@ const router = Router();
 // Get all pools
 router.get("/pools", authHandler.authorizeRequest(true), RewardsChefController.getPools);
 
+// Get total pending CATA rewards across all pools for a user
+router.get("/pending/total", authHandler.authorizeRequest(), RewardsChefController.getTotalPendingRewards);
+
 // Get pending CATA rewards for a user in a specific pool
 router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.getPendingRewards);
 

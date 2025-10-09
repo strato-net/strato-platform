@@ -202,6 +202,42 @@ const calculateMultiplier = (
 
 
 /**
+ * Fetches RewardsChef global state (cataPerSecond and totalAllocPoint)
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @returns Promise resolving to global state
+ */
+export const getRewardsChefState = async (
+  accessToken: string,
+  rewardsChefAddress: string
+): Promise<{ cataPerSecond: string; totalAllocPoint: string } | null> => {
+  try {
+    const response = await cirrus.get(accessToken, `/${RewardsChef}`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        select: "cataPerSecond::text,totalAllocPoint::text",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
+    });
+
+    const state = response.data?.[0];
+    if (!state) {
+      return null;
+    }
+
+    return {
+      cataPerSecond: state.cataPerSecond,
+      totalAllocPoint: state.totalAllocPoint
+    };
+  } catch (error) {
+    console.error("Failed to fetch RewardsChef state:", error);
+    return null;
+  }
+};
+
+/**
  * Calculates pending CATA rewards for a user in a specific pool
  * Replicates the pendingCata() logic from RewardsChef.sol
  *
@@ -284,6 +320,79 @@ export const calculatePendingCata = async (
     return pending > 0n ? pending.toString() : "0";
   } catch (error) {
     console.error("Failed to calculate pending CATA:", error);
+    return "0";
+  }
+};
+
+/**
+ * Calculates total pending CATA rewards for a user across all pools
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param userAddress - User address to calculate rewards for
+ * @returns Promise resolving to total pending CATA amount as string (in wei)
+ */
+export const calculateTotalPendingCata = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  userAddress: string
+): Promise<string> => {
+  try {
+    // Fetch global state
+    const state = await getRewardsChefState(accessToken, rewardsChefAddress);
+    if (!state) {
+      return "0";
+    }
+
+    // Fetch all pools
+    const pools = await getPools(accessToken, rewardsChefAddress);
+    if (pools.length === 0) {
+      return "0";
+    }
+
+    // Fetch all user positions (userInfo entries for this user)
+    const userInfoResponse = await cirrus.get(accessToken, `/${RewardsChef}-userInfo`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        key2: `eq.${userAddress}`,
+        select: "key,value",
+        order: "block_timestamp.desc"
+      }
+    });
+
+    // Group by pool ID (key) and take the latest entry for each pool
+    const userPositionsMap = new Map();
+    for (const entry of userInfoResponse.data || []) {
+      const poolId = entry.key;
+      if (!userPositionsMap.has(poolId) && entry.value?.amount !== "0") {
+        userPositionsMap.set(poolId, entry.value);
+      }
+    }
+
+    // If user has no positions, return 0
+    if (userPositionsMap.size === 0) {
+      return "0";
+    }
+
+    // Calculate pending for each pool the user has staked in
+    let totalPending = 0n;
+
+    for (const [poolId, _userInfo] of userPositionsMap) {
+      const pending = await calculatePendingCata(
+        accessToken,
+        rewardsChefAddress,
+        Number(poolId),
+        userAddress,
+        state.cataPerSecond,
+        state.totalAllocPoint
+      );
+
+      totalPending += BigInt(pending);
+    }
+
+    return totalPending.toString();
+  } catch (error) {
+    console.error("Failed to calculate total pending CATA:", error);
     return "0";
   }
 };
