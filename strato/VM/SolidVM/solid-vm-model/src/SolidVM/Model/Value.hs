@@ -164,6 +164,7 @@ rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
 rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
 rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
 rlpEncodeValue (SArray v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue (SVariadic vs) = RLPArray <$> traverse rlpEncodeValue vs
 rlpEncodeValue _ = pure $ RLPArray []
 
 rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
