@@ -25,7 +25,7 @@ module Blockchain.SolidVM.SM
     getCurrentAddress,
     getCurrentCodeAddress,
     withCallInfo,
-    withTempCallInfo,
+    withStaticCallInfo,
     withUncheckedCallInfo,
     withLocalVars,
     getCurrentCallInfo,
@@ -623,6 +623,7 @@ getVariableOfName name = do
                        "sha3",
                        "delegatecall",
                        "call",
+                       "staticcall",
                        "derive",
                        "sha256",
                        "ecrecover",
@@ -789,11 +790,6 @@ addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
 
-dupCallInfo :: MonadSM m => Bool -> m ()
-dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci : rest) -> pure $ ci {readOnly = ro} : ci : rest
-
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
@@ -833,14 +829,18 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
     _ -> internalError "popLocalVars was called with an empty stack" ()
 
-withTempCallInfo :: MonadSM m => Bool -> m a -> m a
-withTempCallInfo ro f = do
-  dupCallInfo ro
-  eResult <- try f
-  popCallInfo $ isLeft eResult
-  case eResult of
-    Left (e :: SomeException) -> throwIO e
-    Right result -> pure result
+withStaticCallInfo :: MonadSM m => m a -> m a
+withStaticCallInfo f = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> internalError "withStaticCallInfo was called with an empty stack" ()
+    (curFrame : rest) -> do
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
+      eResult <- try f
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      case eResult of
+        Left (e :: SomeException) -> throwIO e
+        Right result -> pure result
 
 withUncheckedCallInfo :: MonadSM m => m a -> m a
 withUncheckedCallInfo f = do

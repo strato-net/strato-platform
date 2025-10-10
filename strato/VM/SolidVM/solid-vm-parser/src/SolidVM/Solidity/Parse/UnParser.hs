@@ -264,10 +264,8 @@ unparseStatementWith f (AssemblyStatement (MloadAdd32 dst src) a) = f a $ printf
 unparseStatementWith f (EmitStatement eventName extups a) =
   let expVals = map (unparseExpression . snd) extups
    in f a $ "emit " ++ eventName ++ "(" ++ (List.intercalate ", " expVals) ++ ");"
-unparseStatementWith f (RevertStatement customErr (OrderedArgs argList) a) =
+unparseStatementWith f (RevertStatement customErr argList a) =
   f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map unparseExpression argList)) ++ ");\n"
-unparseStatementWith f (RevertStatement customErr (NamedArgs argList) a) =
-  f a $ "revert " ++ fromMaybe "" customErr ++ "(" ++ (List.intercalate ", " (map (unparseExpression . snd) argList)) ++ ");\n"
 unparseStatementWith f (UncheckedStatement code a) =
   f a $
     "unchecked {\n" ++ tab (unlines $ map (unparseStatementWith f) code) ++ "\n}"
@@ -341,9 +339,7 @@ unparseExpression (InlineBoundsCheck _ _ _ a) = unparseExpression a
 unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall _ e args) =
-  let shownArgs = case args of
-        OrderedArgs xs -> List.intercalate "," $ map unparseExpression xs
-        NamedArgs xs -> "{" ++ List.intercalate "," (map (\(n, x) -> printf "%s:%s" n $ unparseExpression x) xs) ++ "}"
+  let shownArgs = List.intercalate "," $ map unparseExpression args
    in unparseExpression e ++ "(" ++ shownArgs ++ ")"
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
 unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x

@@ -131,10 +131,8 @@ statementHelper (Throw e _) =
   expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) _) =
+statementHelper (RevertStatement _ vals _) =
   concat <$> traverse expressionHelper vals
-statementHelper (RevertStatement _ (NamedArgs vals) _) =
-  concat <$> traverse (expressionHelper . snd) vals
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ x) =
@@ -374,9 +372,7 @@ expressionHelper (FunctionCall _ e args) = do
   as <- case e of
     Variable _ _ -> pure []
     _ -> expressionHelper e
-  bs <- case args of
-    OrderedArgs es -> concat <$> traverse expressionHelper es
-    NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
+  bs <- concat <$> traverse expressionHelper args
   pure $ concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) = concat <$> traverse expressionHelper [a, b, c]

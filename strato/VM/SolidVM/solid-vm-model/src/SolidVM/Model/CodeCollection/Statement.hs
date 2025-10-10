@@ -22,7 +22,7 @@ module SolidVM.Model.CodeCollection.Statement
     ExpressionF (..),
     extractExpression,
     Expression,
-    ArgListF (..),
+    ArgListF,
     ArgList,
     NumberUnit (..),
     numLitGen,
@@ -217,8 +217,7 @@ instance ToJSON a => ToJSON (ExpressionF a)
 
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))]
-  deriving (Show, Eq, Generic, NFData, Functor, Foldable, Traversable) --Or String
+type ArgListF a = [ExpressionF a]
 
 genPos :: Gen Integer
 genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
@@ -243,16 +242,7 @@ stringLitGen =
 instance Arbitrary a => Arbitrary (ExpressionF a) where
   arbitrary = oneof [numLitGen, stringLitGen]
 
-instance Arbitrary a => Arbitrary (ArgListF a) where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-type ArgList = Positioned ArgListF
-
-instance Binary a => Binary (ArgListF a)
-
-instance ToJSON a => ToJSON (ArgListF a)
-
-instance FromJSON a => FromJSON (ArgListF a)
+type ArgList = ArgListF (SourceAnnotation ())
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 
