@@ -41,7 +41,7 @@ initP2P = labelTheThread "initP2P" $ do
   wireMessagesRef <- liftIO $ newIORef empty
   cfg <- initConfig wireMessagesRef
   let sSource = seqEventNotificationSource . contextKafkaState
-      runner f = do
+      runner f = runLoggingT $ do
         c' <- initContext
         ctx <- liftIO $ newIORef c'
         let cfg' = cfg { configContext = ctx }
@@ -49,4 +49,4 @@ initP2P = labelTheThread "initP2P" $ do
   liftIO $
     race_
       (run 10248 $ prometheus def p2pApp)
-      (runLoggingT $ stratoP2P runner)
+      (stratoP2P runner)

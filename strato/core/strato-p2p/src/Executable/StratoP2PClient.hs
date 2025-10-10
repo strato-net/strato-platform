@@ -170,7 +170,7 @@ runPeerInList thePeer sSource = do
     Right () -> pure ()
   runPeer thePeer sSource
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m () -> IO ()
 stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main loop" $ do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   forever $ do
@@ -183,8 +183,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
       Right peers -> do
         numActivePeers <- liftIO $ fmap length getPeersByThreads
         forM_ (take (flags_maxConn - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
-          _ <- liftIO . forkIO . runLoggingT . runner $ \_ -> do
-              result <- try . liftIO . runLoggingT . runner $ runPeerInList peer
+          _ <- liftIO . forkIO . runner $ \_ -> do
+              result <- try . liftIO . runner $ runPeerInList peer
               handleRunPeerResult peer result
           return ()
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"

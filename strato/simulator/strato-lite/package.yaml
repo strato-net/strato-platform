@@ -40,6 +40,7 @@ library:
   - conduit-extra
   - containers
   - crypto-pubkey-types
+  - evm-solidity
   - extra
   - filepath
   - hflags

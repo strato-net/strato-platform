@@ -24,7 +24,7 @@ const VoteTab = () => {
     getOpenIssues();
   }, []);
 
-  const handleCastVoteOnIssue = (target: string, func: string, args: any[]) => {
+  const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
   };
 
@@ -102,6 +102,7 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
+                    const issueArgs = JSON.parse(issue.args) || [];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
                     const votesNeeded = Math.floor((admins.length * threshold)/100) + 1;
                     const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
@@ -138,7 +139,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {JSON.parse(issue.args || '[]').join(', ')}
+                          {issueArgs.join(', ')}
                         </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
@@ -152,7 +153,7 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, issue.args)}
+                            onClick={() => handleCastVoteOnIssue(address, issue.func, issueArgs)}
                             disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
@@ -204,6 +205,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
+                    const issueArgs = JSON.parse(issue.args) || [];
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
@@ -237,7 +239,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[300px] truncate">
-                          {JSON.parse(issue.args || '[]').join(', ')}
+                          {issueArgs.join(', ')}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
                           <div className="flex items-center space-x-2">

@@ -196,7 +196,7 @@ const UsdstBalanceBox: React.FC = () => {
             <p className="text-xs text-gray-500 truncate">
               {loadingUsdstBalance
                 ? "Calculating voucher credits…"
-                : `${formatCurrency(formatWeiAmount(voucherBalance,20))} vouchers`}
+                : `${Math.floor(parseFloat(formatWeiAmount(voucherBalance,20))).toLocaleString()} vouchers`}
             </p>
           </div>
           <Button

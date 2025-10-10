@@ -134,11 +134,11 @@ multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy Combi
 cirrusClient :: Client ClientM CirrusAPI
 cirrusClient = client (Proxy @CirrusAPI)
 
-cirrusHandler :: MonadIO m => FilePath -> T.Text -> m Value
-cirrusHandler dbFileName tableName = liftIO $ queryCirrus dbFileName tableName
+cirrusHandler :: MonadIO m => FilesystemPeer -> T.Text -> m Value
+cirrusHandler fPeer tableName = liftIO $ queryCirrus (fPeer ^. filesystemDBs . cirrusSqlPool) tableName
 
-singleNodeRestServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
-singleNodeRestServer dbFileName fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler dbFileName)
+singleNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
+singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler fPeer)
   where
     convertErrors r x = Handler $ do
           y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
@@ -151,7 +151,7 @@ singleNodeRestServer dbFileName fPeer cPeer blocEnv urlMap = hoistServer (Proxy 
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runMemPeerDBMUsingEnv (fPeer ^. filesystemPeerMap)
-        . flip runReaderT (SQLDB . _sqlPool $ _filesystemDBs fPeer)
+        . flip runReaderT (SQLDB . _ethSqlPool $ _filesystemDBs fPeer)
         . flip runReaderT fPeer
         . flip runReaderT cPeer
         $ f

@@ -61,6 +61,7 @@ contract record Mercata {
     CDPRegistry public cdpRegistry;
     CDPReserve public cdpReserve;
     SafetyModule public safetyModule;
+    RewardsChef public rewardsChef;
 
     constructor() public {
         // The owner of the implementation contract is ignored in favor of the proxy owner
@@ -139,6 +140,11 @@ contract record Mercata {
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
         mercataBridge.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
+
+        // Create RewardsChef (without initialization - to be initialized in tests)
+        address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
+        rewardsChef = RewardsChef(address(new Proxy(rewardsChefImpl, this)));
+        Ownable(rewardsChef).transferOwnership(address(adminRegistry));
 
         // Deploy CDP registry, vault, and engine
         address cdpRegistryImpl = address(new CDPRegistry(implOwnerIgnored));

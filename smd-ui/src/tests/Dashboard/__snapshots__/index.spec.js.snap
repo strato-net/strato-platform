@@ -264,9 +264,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>
               }
               defaultIsOpen={false}
@@ -287,9 +287,9 @@ ShallowWrapper {
             >
               <withRouter(Connect(NumberCard))
                 description={<div />}
-                iconClass="fa-triangle-exclamation"
-                mode="danger"
-                number="DISCONNECTED"
+                iconClass="fa-spinner fa-spin"
+                mode="warning"
+                number="LOADING..."
               />
             </Blueprint.Popover>
           </div>
@@ -762,9 +762,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -785,9 +785,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>,
@@ -841,9 +841,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -864,9 +864,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>,
               "className": "col-sm-4",
@@ -880,9 +880,9 @@ ShallowWrapper {
                 "arrowSize": 30,
                 "children": <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />,
                 "className": "full-width",
                 "content": <div
@@ -891,9 +891,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>,
                 "defaultIsOpen": false,
                 "hoverCloseDelay": 300,
@@ -918,9 +918,9 @@ ShallowWrapper {
                 "nodeType": "function",
                 "props": Object {
                   "description": <div />,
-                  "iconClass": "fa-triangle-exclamation",
-                  "mode": "danger",
-                  "number": "DISCONNECTED",
+                  "iconClass": "fa-spinner fa-spin",
+                  "mode": "warning",
+                  "number": "LOADING...",
                 },
                 "ref": null,
                 "rendered": null,
@@ -2072,9 +2072,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -2095,9 +2095,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>
@@ -2570,9 +2570,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -2593,9 +2593,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>
               </div>,
@@ -2649,9 +2649,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -2672,9 +2672,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>,
                 "className": "col-sm-4",
@@ -2688,9 +2688,9 @@ ShallowWrapper {
                   "arrowSize": 30,
                   "children": <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />,
                   "className": "full-width",
                   "content": <div
@@ -2699,9 +2699,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>,
                   "defaultIsOpen": false,
                   "hoverCloseDelay": 300,
@@ -2726,9 +2726,9 @@ ShallowWrapper {
                   "nodeType": "function",
                   "props": Object {
                     "description": <div />,
-                    "iconClass": "fa-triangle-exclamation",
-                    "mode": "danger",
-                    "number": "DISCONNECTED",
+                    "iconClass": "fa-spinner fa-spin",
+                    "mode": "warning",
+                    "number": "LOADING...",
                   },
                   "ref": null,
                   "rendered": null,
@@ -4234,9 +4234,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>
               }
               defaultIsOpen={false}
@@ -4257,9 +4257,9 @@ ShallowWrapper {
             >
               <withRouter(Connect(NumberCard))
                 description={<div />}
-                iconClass="fa-triangle-exclamation"
-                mode="danger"
-                number="DISCONNECTED"
+                iconClass="fa-spinner fa-spin"
+                mode="warning"
+                number="LOADING..."
               />
             </Blueprint.Popover>
           </div>
@@ -4732,9 +4732,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -4755,9 +4755,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>,
@@ -4811,9 +4811,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -4834,9 +4834,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>,
               "className": "col-sm-4",
@@ -4850,9 +4850,9 @@ ShallowWrapper {
                 "arrowSize": 30,
                 "children": <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />,
                 "className": "full-width",
                 "content": <div
@@ -4861,9 +4861,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>,
                 "defaultIsOpen": false,
                 "hoverCloseDelay": 300,
@@ -4888,9 +4888,9 @@ ShallowWrapper {
                 "nodeType": "function",
                 "props": Object {
                   "description": <div />,
-                  "iconClass": "fa-triangle-exclamation",
-                  "mode": "danger",
-                  "number": "DISCONNECTED",
+                  "iconClass": "fa-spinner fa-spin",
+                  "mode": "warning",
+                  "number": "LOADING...",
                 },
                 "ref": null,
                 "rendered": null,
@@ -6042,9 +6042,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -6065,9 +6065,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>
@@ -6540,9 +6540,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -6563,9 +6563,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>
               </div>,
@@ -6619,9 +6619,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -6642,9 +6642,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>,
                 "className": "col-sm-4",
@@ -6658,9 +6658,9 @@ ShallowWrapper {
                   "arrowSize": 30,
                   "children": <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />,
                   "className": "full-width",
                   "content": <div
@@ -6669,9 +6669,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>,
                   "defaultIsOpen": false,
                   "hoverCloseDelay": 300,
@@ -6696,9 +6696,9 @@ ShallowWrapper {
                   "nodeType": "function",
                   "props": Object {
                     "description": <div />,
-                    "iconClass": "fa-triangle-exclamation",
-                    "mode": "danger",
-                    "number": "DISCONNECTED",
+                    "iconClass": "fa-spinner fa-spin",
+                    "mode": "warning",
+                    "number": "LOADING...",
                   },
                   "ref": null,
                   "rendered": null,
@@ -7899,9 +7899,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>
               }
               defaultIsOpen={false}
@@ -7922,9 +7922,9 @@ ShallowWrapper {
             >
               <withRouter(Connect(NumberCard))
                 description={<div />}
-                iconClass="fa-triangle-exclamation"
-                mode="danger"
-                number="DISCONNECTED"
+                iconClass="fa-spinner fa-spin"
+                mode="warning"
+                number="LOADING..."
               />
             </Blueprint.Popover>
           </div>
@@ -8291,9 +8291,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -8314,9 +8314,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>,
@@ -8370,9 +8370,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -8393,9 +8393,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>,
               "className": "col-sm-4",
@@ -8409,9 +8409,9 @@ ShallowWrapper {
                 "arrowSize": 30,
                 "children": <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />,
                 "className": "full-width",
                 "content": <div
@@ -8420,9 +8420,9 @@ ShallowWrapper {
                   <h5
                     className="pt-callout-title"
                   >
-                    API Disconnected
+                    Loading...
                   </h5>
-                  Cannot connect to the Node's API
+                  Fetching metadata from API...
                 </div>,
                 "defaultIsOpen": false,
                 "hoverCloseDelay": 300,
@@ -8447,9 +8447,9 @@ ShallowWrapper {
                 "nodeType": "function",
                 "props": Object {
                   "description": <div />,
-                  "iconClass": "fa-triangle-exclamation",
-                  "mode": "danger",
-                  "number": "DISCONNECTED",
+                  "iconClass": "fa-spinner fa-spin",
+                  "mode": "warning",
+                  "number": "LOADING...",
                 },
                 "ref": null,
                 "rendered": null,
@@ -9291,9 +9291,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>
                 }
                 defaultIsOpen={false}
@@ -9314,9 +9314,9 @@ ShallowWrapper {
               >
                 <withRouter(Connect(NumberCard))
                   description={<div />}
-                  iconClass="fa-triangle-exclamation"
-                  mode="danger"
-                  number="DISCONNECTED"
+                  iconClass="fa-spinner fa-spin"
+                  mode="warning"
+                  number="LOADING..."
                 />
               </Blueprint.Popover>
             </div>
@@ -9683,9 +9683,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -9706,9 +9706,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>
               </div>,
@@ -9762,9 +9762,9 @@ ShallowWrapper {
                       <h5
                         className="pt-callout-title"
                       >
-                        API Disconnected
+                        Loading...
                       </h5>
-                      Cannot connect to the Node's API
+                      Fetching metadata from API...
                     </div>
                   }
                   defaultIsOpen={false}
@@ -9785,9 +9785,9 @@ ShallowWrapper {
                 >
                   <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />
                 </Blueprint.Popover>,
                 "className": "col-sm-4",
@@ -9801,9 +9801,9 @@ ShallowWrapper {
                   "arrowSize": 30,
                   "children": <withRouter(Connect(NumberCard))
                     description={<div />}
-                    iconClass="fa-triangle-exclamation"
-                    mode="danger"
-                    number="DISCONNECTED"
+                    iconClass="fa-spinner fa-spin"
+                    mode="warning"
+                    number="LOADING..."
                   />,
                   "className": "full-width",
                   "content": <div
@@ -9812,9 +9812,9 @@ ShallowWrapper {
                     <h5
                       className="pt-callout-title"
                     >
-                      API Disconnected
+                      Loading...
                     </h5>
-                    Cannot connect to the Node's API
+                    Fetching metadata from API...
                   </div>,
                   "defaultIsOpen": false,
                   "hoverCloseDelay": 300,
@@ -9839,9 +9839,9 @@ ShallowWrapper {
                   "nodeType": "function",
                   "props": Object {
                     "description": <div />,
-                    "iconClass": "fa-triangle-exclamation",
-                    "mode": "danger",
-                    "number": "DISCONNECTED",
+                    "iconClass": "fa-spinner fa-spin",
+                    "mode": "warning",
+                    "number": "LOADING...",
                   },
                   "ref": null,
                   "rendered": null,

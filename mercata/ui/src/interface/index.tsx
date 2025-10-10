@@ -367,6 +367,8 @@ export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;
   userShares: string;
+  userSharesStaked: string;
+  userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
   unstakeWindow: string;
@@ -375,4 +377,8 @@ export interface SafetyModuleData {
   cooldownActive: boolean;
   cooldownTimeRemaining: string;
   unstakeWindowTimeRemaining: string;
+  maxRedeemable: string;
+  maxRedeemableTotal: string;
+  redeemValue: string;
+  redeemValueTotal: string;
 }

@@ -9,6 +9,8 @@ module BlockApps.Logging
     LoggingT,
     runLoggingT,
     runLoggingTWithLevel,
+    runLoggingTWithHandle,
+    runLoggingTWithHandleWithLevel,
     runNoLoggingT,
     module Control.Monad.Logger,
     logDebugLS,
@@ -42,7 +44,13 @@ runLoggingT :: LoggingT m a -> m a
 runLoggingT = runLoggingTWithLevel flags_minLogLevel
 
 runLoggingTWithLevel :: LogLevel -> LoggingT m a -> m a
-runLoggingTWithLevel level = flip ML.runLoggingT (commonLog level)
+runLoggingTWithLevel = runLoggingTWithHandleWithLevel stdout
+
+runLoggingTWithHandle :: Handle -> LoggingT m a -> m a
+runLoggingTWithHandle h = runLoggingTWithHandleWithLevel h flags_minLogLevel
+
+runLoggingTWithHandleWithLevel :: Handle -> LogLevel -> LoggingT m a -> m a
+runLoggingTWithHandleWithLevel h level = flip ML.runLoggingT (commonLog h level)
 
 runNoLoggingT :: LoggingT m a -> m a
 runNoLoggingT = flip ML.runLoggingT devNull
@@ -52,13 +60,13 @@ runNoLoggingT = flip ML.runLoggingT devNull
 devNull :: Loc -> LogSource -> LogLevel -> LogStr -> IO ()
 devNull _ _ _ _ = return ()
 
-commonLog :: LogLevel -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()
-commonLog minLogLevel loc logSource level msg = do
+commonLog :: Handle -> LogLevel -> Loc -> LogSource -> LogLevel -> LogStr -> IO ()
+commonLog h minLogLevel loc logSource level msg = do
   when (level >= minLogLevel) $ do
     myTID <- myThreadId
     timestamp <- getCurrentTime
-    lock $ formatLogOutput timestamp myTID loc logSource level msg
-    hFlush stdout
+    lock . hPutStr h $ formatLogOutput timestamp myTID loc logSource level msg
+    hFlush h
 
 formatLogOutput ::
   PrintfType r =>

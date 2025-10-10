@@ -5,6 +5,7 @@
     "main": "deploy/deploy.js",
     "scripts": {
         "deploy": "node deploy/deploy.js",
+        "upgrade": "node deploy/upgrade.js",
         "test": "echo \"Error: no test specified\" && exit 1"
     },
     "dependencies": {

@@ -33,7 +33,7 @@ contract Describe_TokenFactory {
     }
 
     function it_factory_starts_with_empty_token_list() {
-        require(factory.allTokens().length == 0, "Factory should start with empty token list");
+        require(factory.allTokens(0) == address(0), "Factory should start with empty token list");
     }
 
     // ============ TOKEN CREATION ============
@@ -52,7 +52,7 @@ contract Describe_TokenFactory {
         
         require(tokenAddress != address(0), "Token should be created");
         require(factory.isFactoryToken(tokenAddress), "Token should be registered as factory token");
-        require(factory.allTokens().length == 1, "Token should be added to allTokens array");
+        require(factory.allTokens(0) != address(0) && factory.allTokens(1) == address(0), "Token should be added to allTokens array");
     }
 
     function it_factory_can_create_token_with_initial_owner() {
@@ -96,7 +96,7 @@ contract Describe_TokenFactory {
             18
         );
         
-        require(factory.allTokens().length == 2, "Should have 2 tokens");
+        require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens");
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
     }
@@ -233,7 +233,7 @@ contract Describe_TokenFactory {
         
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
-        require(factory.allTokens().length == 2, "Should have 2 tokens in allTokens array");
+        require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens in allTokens array");
     }
 
     // ============ FACTORY EDGE CASES ============
@@ -311,7 +311,7 @@ contract Describe_TokenFactory {
             );
         }
         
-        require(factory.allTokens().length == 5, "Should have created 5 tokens");
+        require(factory.allTokens(4) != address(0) && factory.allTokens(5) == address(0), "Should have created 5 tokens");
     }
 
     // ============ FACTORY INTEGRATION ============
@@ -342,7 +342,7 @@ contract Describe_TokenFactory {
         );
         
         // 2. Verify tokens are registered
-        require(factory.allTokens().length == 2, "Should have 2 tokens");
+        require(factory.allTokens(1) != address(0) && factory.allTokens(2) == address(0), "Should have 2 tokens");
         require(factory.isFactoryToken(token1), "Token 1 should be registered");
         require(factory.isFactoryToken(token2), "Token 2 should be registered");
         

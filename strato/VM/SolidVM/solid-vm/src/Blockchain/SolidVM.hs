@@ -230,7 +230,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
         !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
     argVals <- argsToVals argExps
 
-    create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals False
+    create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals
 
 getParentName :: MonadSM m => Address -> m String
 getParentName address = fromMaybeM (return "") $
@@ -244,8 +244,8 @@ getParentName address = fromMaybeM (return "") $
                                     _ -> pure ""
                             )
 
-create' :: MonadSM m => Address -> Maybe Code -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> Bool -> m ExecResults
-create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch cc contractName' valList createBuiltinCall = do
+create' :: MonadSM m => Address -> Maybe Code -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
+create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch cc contractName' valList = do
   
   -- Get parentName and cc_creator from maybeCodePtr or creator
   (parentName, cc_creator) <- case maybeCodePtr of
@@ -267,17 +267,13 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
   !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
 
-  let ptr2InitialContract = case maybeCodePtr of
-        Just (PtrToCode (CodeAtAccount cp _)) -> cp
-        _ -> creator
-
   initializeAction newAddress (labelToString contractName') issuerName cc_creator (show originAddress) parentName ch cc abstracts
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
       newAddressState
         { addressStateContractRoot = MP.emptyTriePtr,
-          addressStateCodeHash = if (contractName' /= stringToLabel parentName && not (null parentName) && not createBuiltinCall) then CodeAtAccount ptr2InitialContract (labelToString contractName') else SolidVMCode (labelToString contractName') ch
+          addressStateCodeHash = SolidVMCode (labelToString contractName') ch
         }
 
   -- get the gasLeft from the environment
@@ -291,7 +287,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
       ]
 
-  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ pure ()
+  void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
   env <- getEnv
   let -- metadata = Env.metadata env
@@ -307,7 +303,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
-  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ do
+  void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
     setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
@@ -518,7 +514,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
               Nothing -> False
               Just ci -> readOnly ci
         pure . bool (pushSender from) id (from == to) $
-          runTheCall to contract functionName' hsh cc theFunction valList ro False
+          runTheCall to to contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
@@ -531,7 +527,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract functionName' hsh cc theFunction' valList' ro False
+              runTheCall to ccToGet contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
@@ -539,7 +535,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                     Nothing -> False
                     Just ci -> readOnly ci
               pure . bool (pushSender from) id (from == to) $
-                runTheCall to contract functionName' hsh cc fallbackFunc valList ro False
+                runTheCall to ccToGet contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -551,20 +547,48 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                 ((SVMType.Mapping _ _ _), OrderedVals oa) ->
                   traverse convertValueToStoragePathPiece oa
                 _ -> Nothing
+              returnType = \case
+                SVMType.Array t _ -> returnType t
+                SVMType.Mapping _ _ t -> returnType t
+                t -> t
               isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
+              handleStruct s path = do
+                mFields <- case M.lookup s $ contract ^. CC.structs of
+                  Just vals -> pure . Just $ (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals
+                  Nothing -> do
+                    let !vals' = M.lookup s $ cc ^. CC.flStructs
+                    pure $ map (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals'
+                for mFields $ \fields -> do
+                  let fieldsToLoad = catMaybes $ (\(n, t) -> case t of
+                          SVMType.Error{} -> Nothing
+                          SVMType.Array{} -> Nothing
+                          SVMType.Mapping{} -> Nothing
+                          _ -> Just n
+                        ) <$> fields
+                  fieldVals <- for fieldsToLoad $ \fieldName ->
+                    getVar $ Constant $ SReference $ path `apSnoc` MS.Field (BC.pack $ labelToString fieldName)
+                  fieldVars <- traverse createVar fieldVals
+                  pure . STuple $ V.fromList fieldVars
+              handleSimple path = do
+                v <- getVar $ Constant $ SReference path
+                pure $ Just v
           when ((from /= to) && isForbidden) $
             unknownFunction "logFunctionCall" (functionName, "asdf4" :: String) -- contract ^. CC.contractName)
           -- TODO: this should only exist if the storage variable is declared "public",
           -- right now I just ignore this and allow anything to be called as a getter
           case args' of
             [] -> do
-              val <- withCallInfo to contract functionName hsh cc M.empty True False $ do
-                fmap Just $ getVar $ Constant $ SReference $ AccountPath to . MS.singleton $ BC.pack $ labelToString functionName
-              pure $ pure val
+              let path = AccountPath to $ MS.singleton $ BC.pack $ labelToString functionName
+              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> pure $ handleSimple path
             _ -> do
-              valPath' <- withCallInfo to contract functionName hsh cc M.empty True False $ do
-                pure . Just $ SReference $ apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
-              pure $ pure valPath'
+              let path = apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
+              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
+                SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
+                _ -> pure $ handleSimple path
         Nothing -> case M.lookup "fallback" functionsIncludingConstructor of
           Just fallbackFunc -> do
             mCallInfo <- getCurrentCallInfoIfExists
@@ -572,13 +596,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract functionName hsh cc fallbackFunc valList ro False
+              runTheCall to ccToGet contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when
     isRCC
     ( do
-        void . withCallInfo to contract' "constructor" hsh cc M.empty False False $ do
+        void . withCallInfo to to contract' "constructor" hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
             setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -1047,11 +1071,12 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
           let address = currentAddress curInfo
-          (_, _, ctrName) <- getCreator address
+          codeAddress <- getCurrentCodeAddress
+          (_, _, ctrName) <- getCreator codeAddress
           parentName <-
             fromMaybeM (return "") $
               runMaybeT $
-                pure address
+                pure codeAddress
                   >>= MaybeT . A.lookup (A.Proxy @AddressState)
                   >>= pure . addressStateCodeHash
                   >>= MaybeT . resolveCodePtrParent
@@ -1080,8 +1105,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addr <- getCurrentAddress
-          contractName' <- fst <$> getContractNameAndHash addr
+          codeAddr <- getCurrentCodeAddress
+          contractName' <- fst <$> getContractNameAndHash codeAddr
           addEvent $ Event bHash ctrName parentName (labelToString contractName') address eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
@@ -1403,9 +1428,9 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       let parents' = either (throw . fst) id $ CC.getParents cc ctract
       case filter (elem method . M.keys . CC._functions) parents' of
         [] -> typeError "cannot use super without a parent contract" (method, ctract)
-        ps -> do
+        (p:_) -> do
           addr <- getCurrentAddress
-          return $ Constant $ SContractFunction (Just $ CC._contractName $ last ps) (NamedAccount addr UnspecifiedChain) method
+          return $ Constant $ SContractFunction (Just $ CC._contractName p) (NamedAccount addr UnspecifiedChain) method
     (SAccount a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContractItem a _, n) -> evaluateAccountMember (a^.namedAccountAddress) False n
     (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n
@@ -1589,7 +1614,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddress creator
   (issuerAcct, originAddress, issuerName) <- getCreator creator
   argVals <- argsToVals args
-  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
   return $
     Constant $
       SContract contractName' $
@@ -1606,7 +1631,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals False
+  execResults <- create' creator Nothing originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
   onTraced $ do
     liftIO $
       putStrLn $
@@ -1735,23 +1760,24 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               ro <- readOnly <$> getCurrentCallInfo
               contract' <- getCurrentContract
               address <- getCurrentAddress
+              codeAddr <- getCurrentCodeAddress
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
               res <- do
                 if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
-                      Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                      Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro True
                   else do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro False
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
-                            Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                        Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                            Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                            Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
+                        Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
@@ -2491,7 +2517,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   theEnv <- getEnv
   let origin = Env.origin theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
-  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals) True
+  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals)
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2512,7 +2538,7 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   let constructorArgVals = OrderedVals argVals
   newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals True
+  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2638,7 +2664,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
           var <- createVar correctedVal
           return (n, (t, var))
 
-  void . withCallInfo to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
+  void . withCallInfo to to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
@@ -2700,6 +2726,7 @@ addLocalVariable theType name value = do
 runTheCall ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -2709,7 +2736,7 @@ runTheCall ::
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
+runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro ff = do
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
   !returns <- traverse (\(n, t) -> ((n,) . (t,)) <$> createDefaultValue cc contract' t) returnNamesAndTypes
@@ -2763,7 +2790,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
       newVar <- liftIO $ fmap Variable $ newIORef v
       return (n, (t, newVar))
 
-  val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
             CC.OrderedArgs

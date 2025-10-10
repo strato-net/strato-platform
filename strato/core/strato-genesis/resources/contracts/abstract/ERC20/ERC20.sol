@@ -129,7 +129,7 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 value) public override returns (bool) {
+    function approve(address spender, uint256 value) public virtual override returns (bool) {
         address owner = _msgSender();
         _approve(owner, spender, value);
         return true;

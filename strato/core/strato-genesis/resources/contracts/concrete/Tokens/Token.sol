@@ -130,7 +130,11 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         return customDecimals;
     }
 
-    function _transfer(address from, address to, uint256 amount) internal override whenNotPausedOrOwner {
-        super._transfer(from, to, amount);
+    function transfer(address to, uint256 value) public override whenNotPausedOrOwner returns (bool) {
+        return super.transfer(to, value);
+    }
+
+    function transferFrom(address from, address to, uint256 value) public override whenNotPausedOrOwner returns (bool) {
+        return super.transferFrom(from, to, value);
     }
 }

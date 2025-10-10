@@ -175,7 +175,7 @@ instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => RunsClient (MonadSimu
         atomically $ writeTQueue s (v, myIP)
         f $ P2pConduits pSource pSink sSource
 
-instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => RunsServer (MonadSimulator m) (LoggingT IO) where
+instance {-# OVERLAPPING #-} (MonadUnliftIO m, MonadLogger m) => RunsServer (MonadSimulator m) where
   runServer tcpPort@(TCPPort p) runner f = runner $ \sSource -> do
     inet <- asks _simulatorPeerInternet
     myIP@(Host ip) <- asks _simulatorPeerIPAddress

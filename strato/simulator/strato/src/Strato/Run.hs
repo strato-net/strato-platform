@@ -1,5 +1,6 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeOperators #-}
 
@@ -18,6 +19,7 @@ import Blockchain.Strato.Model.Options (flags_network)
 import Blockchain.Strato.Model.Validator
 import Blockchain.VMOptions ()
 import Common.API
+import Control.Monad (unless, when)
 import Control.Monad.Trans.Resource
 import Crypto.Random.Entropy
 import qualified Data.Binary as Binary
@@ -96,11 +98,26 @@ header = do
 runStrato :: (JSM () -> IO ()) -> IO ()
 runStrato runUI = do
   -- createHaskoinMultiSigScript
-  let sqlitePath = "strato.sqlite"
   runLoggingT . runResourceT $ do
+    if flags_logs /= ""
+      then getFilesystemLogs flags_directory flags_network flags_username flags_logs flags_tail
+      else runStratoNode runUI
+
+runStratoNode :: (JSM () -> IO ()) -> ResourceT (LoggingT IO) ()
+runStratoNode runUI = do
+  when (flags_wipe || flags_resync) $ do
+    catch (wipeFilesystemNode flags_directory flags_network flags_username)
+          (\(_ :: SomeException) -> pure ())
+    liftIO . putStrLn $ concat
+      [ "Node "
+      , flags_username
+      , " on network "
+      , flags_network
+      , " successfully wiped"
+      ]
+  unless flags_wipe $ do
     (f,c) <- createFilesystemNode
                flags_directory
-               sqlitePath
                flags_network
                flags_private_key
                (Validator $ T.pack flags_username)
@@ -125,19 +142,20 @@ runStrato runUI = do
               userRegistryCodeHash = Nothing,
               useWalletsByDefault = False
             }
-    as <- runFilesystemNode f c
-    a <- liftIO . async $ Wai.run flags_backend_port $ app sqlitePath f c env M.empty
+    as <- liftIO $ runFilesystemNode f c
+    a <- liftIO . async $ Wai.run flags_backend_port $
+      app f c env M.empty
     let finalize = do
           putStrLn "Cancelling threads..."
           traverse_ cancel $ a:as
           putStrLn "Done cancelling threads"
     finally (liftIO . runUI $ mainWidgetWithHead header App.mainWidget) $ liftIO finalize
 
-fullServer :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
-fullServer d f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer d f c blocEnv urlMap)
+fullServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
+fullServer f c blocEnv urlMap = bitcoinBridgeServer :<|> mercataServer :<|> (singleNodeRestServer f c blocEnv urlMap)
 
 api :: Proxy (BitcoinBridgeAPI :<|> MercataAPI :<|> (CombinedAPI :<|> CirrusAPI))
 api = Proxy
 
-app :: FilePath -> FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
-app d f c blocEnv urlMap = serve api $ fullServer d f c blocEnv urlMap
+app :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Application
+app f c blocEnv urlMap = serve api $ fullServer f c blocEnv urlMap

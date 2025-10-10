@@ -16,6 +16,7 @@
 module Bloc.Database.Queries
   ( sourceToContractDetails,
     getContractByAddress,
+    getContractByAccountsFilterParams,
     getContractDetailsForContract,
     getContractDetailsByCodeHash,
     getCodeCollectionByCodePtr,
@@ -33,13 +34,14 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
-import Control.Lens ((&), (?~))
+import Control.Lens ((^.), (&), (?~))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class (lift)
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Data.Foldable (foldl')
 import qualified Data.Map.Strict as Map
-import Data.Maybe (listToMaybe)
+import Data.Maybe (catMaybes, listToMaybe)
 import Data.Source.Annotation
 import Data.Source.Map
 import Data.Text (Text)
@@ -63,16 +65,24 @@ getContractByAddress ::
     A.Selectable StorageFilterParams [StorageAddress] m
   ) =>
   Address ->
-  Text ->
   m (Maybe Contract)
-getContractByAddress a funcName = runMaybeT $ do
-  (AddressStateRef' r _) <-
-    MaybeT
-      . fmap listToMaybe
-      . getAccount'
-      $ accountsFilterParams
-        & qaAddress ?~ a
-  codePtr <- case addressStateRefContractName r of
+getContractByAddress a = getContractByAccountsFilterParams
+  $ accountsFilterParams
+  & qaAddress ?~ a
+
+getContractByAccountsFilterParams ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m
+  ) =>
+  AccountsFilterParams ->
+  m (Maybe Contract)
+getContractByAccountsFilterParams aParams = runMaybeT $ do
+  (AddressStateRef' r _) <- MaybeT . fmap listToMaybe $ getAccount' aParams
+  proxyCodePtr <- case addressStateRefContractName r of
     -- TODO: This block of code is a hack. Figure out a better solution
     --
     -- This is a quick hack to get around the issues with calling Proxy 
@@ -84,7 +94,8 @@ getContractByAddress a funcName = runMaybeT $ do
     -- Ideally, we wouldn't have to hardcode any of these names in 
     -- the API, but this should get us back up and running for the
     --  time being. 
-    Just "Proxy" | funcName `notElem` ["setLogicContract", "owner", "renounceOwnership", "transferOwnership"] -> do
+    Just "Proxy" -> do
+      a <- MaybeT . pure $ aParams ^. qaAddress
       (StorageAddress _ v _) <- MaybeT
         . fmap listToMaybe
         . getStorage'
@@ -98,10 +109,15 @@ getContractByAddress a funcName = runMaybeT $ do
         . getAccount'
         $ accountsFilterParams
           & qaAddress ?~ logicContract
-      MaybeT . pure $ addressStateRefCodePtr l
+      MaybeT . pure $ (:[]) <$> addressStateRefCodePtr l
 
-    _ -> MaybeT . pure $ addressStateRefCodePtr r
-  MaybeT $ either (const Nothing) (Just . snd) <$> getContractDetailsByCodeHash codePtr
+    _ -> MaybeT . pure $ Just []
+  codePtr <- MaybeT . pure $ addressStateRefCodePtr r
+  MaybeT $ do
+    eContracts <- traverse getContractDetailsByCodeHash $ codePtr : proxyCodePtr
+    case catMaybes $ either (const Nothing) (Just . snd) <$> eContracts of
+      [] -> pure Nothing
+      (c:cs) -> pure . Just $ foldl' (<>) c cs
 
 getContractDetailsByCodeHash ::
   ( MonadIO m,

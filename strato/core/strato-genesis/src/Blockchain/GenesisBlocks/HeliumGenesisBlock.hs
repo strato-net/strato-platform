@@ -259,6 +259,9 @@ cdpReserveImplAddress = 0x1114
 safetyModuleImplAddress :: Address
 safetyModuleImplAddress = 0x1115
 
+rewardsChefImplAddress :: Address
+rewardsChefImplAddress = 0x111f
+
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
@@ -288,7 +291,7 @@ supportedCollaterals = Set.toList
                      $ GE.assetRootAddress <$> combinedEscrows
 
 mercataContract :: String -> CodePtr
-mercataContract = CodeAtAccount mercataAddress
+mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode mercataContracts)
 
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
@@ -325,6 +328,7 @@ genesisBlock  =
             ContractNoStorage cdpVaultImplAddress 0 (mercataContract "CDPVault"),
             ContractNoStorage cdpReserveImplAddress 0 (mercataContract "CDPReserve"),
             ContractNoStorage safetyModuleImplAddress 0 (mercataContract "SafetyModule"),
+            ContractNoStorage rewardsChefImplAddress 0 (mercataContract "RewardsChef"),
             SolidVMContractWithStorage
               mercataAddress
               720
@@ -344,6 +348,8 @@ genesisBlock  =
               , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
               , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
               , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
+              , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
+              , (".rewardsChef", BContract "RewardsChef" $ unspecifiedChain rewardsChefAddress)
               , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
               , (".cdpRegistry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
               , (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
@@ -415,6 +421,7 @@ genesisBlock  =
              , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
              , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress "BlockApps" "Mercata" "CDPReserve")
              , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
+             , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress "BlockApps" "Mercata" "RewardsChef")
              , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
              , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
              , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
@@ -791,6 +798,7 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ create
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setRateStrategy\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setPriceOracle\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS lendingRegistryAddress <> "><\"setAllComponents\"><a:" <> addrBS poolConfiguratorAddress <> ">", BBool True)
+     , (".whitelist<a:" <> addrBS cataAddress <> "><\"mint\"><a:" <> addrBS rewardsChefAddress <> ">", BBool True)
      ]
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
@@ -838,13 +846,22 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ ownedByBlockApps mer
      ]
 
 rewardsChef :: AccountInfo
-rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mercataAddress "RewardsChef") $ ownedByBlockApps mercataAddress
+rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [ (".MAX_INT", BInteger 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
      , (".PRECISION_MULTIPLIER", BInteger oneE18)
      , (".rewardToken", BContract "Token" $ unspecifiedChain cataAddress)
+     , (".logicContract", BAccount $ unspecifiedChain rewardsChefImplAddress)
      , (".cataPerSecond", BInteger 100000000000000)
-     , (".totalAllocPoint", BInteger 100)
+     , (".totalAllocPoint", BInteger 600)
      , (".minFutureTime", BInteger 3600)
+     -- lpTokenInUse mapping entries
+     , (".lpTokenInUse<a:" <> addrBS mTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS sUsdstAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS goldstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS silvstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS ethstLpTokenAddress <> ">", BBool True)
+     , (".lpTokenInUse<a:" <> addrBS wbtcstLpTokenAddress <> ">", BBool True)
+     -- mUSDST
      , (".pools[0].lpToken", BAccount $ unspecifiedChain mTokenAddress)
      , (".pools[0].allocPoint", BInteger 100)
      , (".pools[0].lastRewardTimestamp", BInteger lastAccrual)
@@ -852,7 +869,48 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 (CodeAtAccount mer
      , (".pools[0].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
      , (".pools[0].bonusPeriods[0].bonusMultiplier", BInteger 1)
      , (".pools[0].bonusPeriods.length", BInteger 1)
-     , (".pools.length", BInteger 1)
+     -- sUSDST
+     , (".pools[1].lpToken", BAccount $ unspecifiedChain sUsdstAddress)
+     , (".pools[1].allocPoint", BInteger 100)
+     , (".pools[1].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[1].accPerToken", BInteger 0)
+     , (".pools[1].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[1].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[1].bonusPeriods.length", BInteger 1)
+     -- goldst
+     , (".pools[2].lpToken", BAccount $ unspecifiedChain goldstLpTokenAddress)
+     , (".pools[2].allocPoint", BInteger 100)
+     , (".pools[2].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[2].accPerToken", BInteger 0)
+     , (".pools[2].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[2].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[2].bonusPeriods.length", BInteger 1)
+     -- silvst
+     , (".pools[3].lpToken", BAccount $ unspecifiedChain silvstLpTokenAddress)
+     , (".pools[3].allocPoint", BInteger 100)
+     , (".pools[3].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[3].accPerToken", BInteger 0)
+     , (".pools[3].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[3].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[3].bonusPeriods.length", BInteger 1)
+     -- ethst
+     , (".pools[4].lpToken", BAccount $ unspecifiedChain ethstLpTokenAddress)
+     , (".pools[4].allocPoint", BInteger 100)
+     , (".pools[4].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[4].accPerToken", BInteger 0)
+     , (".pools[4].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[4].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[4].bonusPeriods.length", BInteger 1)
+     -- wbtcst
+     , (".pools[5].lpToken", BAccount $ unspecifiedChain wbtcstLpTokenAddress)
+     , (".pools[5].allocPoint", BInteger 100)
+     , (".pools[5].lastRewardTimestamp", BInteger lastAccrual)
+     , (".pools[5].accPerToken", BInteger 0)
+     , (".pools[5].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , (".pools[5].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , (".pools[5].bonusPeriods.length", BInteger 1)
+     -- pools length
+     , (".pools.length", BInteger 6)
      ]
 
 cdpEngine :: AccountInfo

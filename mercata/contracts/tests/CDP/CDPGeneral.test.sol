@@ -560,7 +560,7 @@ contract Describe_CDPGeneral {
         
         // Test that vault balances match engine state
         uint vaultBalance = IERC20(ETHST).balanceOf(address(vault));
-        uint userVaultCollateral = engine.vaults(address(user1), ETHST).collateral;
+        (uint userVaultCollateral, uint _) = engine.vaults(address(user1), ETHST);
         
         require(vaultBalance >= userVaultCollateral, "Vault balance mismatch");
         log("✅ Vault balance integrity maintained");
