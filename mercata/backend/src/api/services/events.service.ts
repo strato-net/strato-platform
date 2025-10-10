@@ -12,12 +12,7 @@ export const getEvents = async (
     order: query.order || "block_timestamp.desc"
   };
 
-  const countParams = {
-    ...params,
-    limit: undefined,
-    offset: undefined,
-    order: undefined
-  };
+  const countParams = { ...params, limit: undefined, offset: undefined, order: undefined };
   
   const [countResponse, eventsResponse] = await Promise.all([
     cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
@@ -43,32 +38,25 @@ export const getContractInfo = async (
   const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
       creator: "eq.BlockApps",
-      select: "event_name,event_name.count(),storage(contract(contract_name,contract_name.count()))",
-      "storage.contract.contract_name": "neq.Proxy",
-      order: "event_name.asc"
+      select: "contract_name,event_name,event_name.count()",
+      order: "contract_name.asc,event_name.asc"
     }
   });
 
   (data as EventData[])?.forEach(event => {
-    const eventName = event?.event_name?.trim();
-    if (!eventName) return;
-
-    event?.storage?.contract?.forEach(contract => {
-      const contractName = contract?.contract_name?.trim();
-      if (!contractName) return;
-
-      if (!contracts.has(contractName)) {
-        contracts.set(contractName, new Set());
-      }
-      contracts.get(contractName)!.add(eventName);
-    });
+    if (!event?.event_name || !event?.contract_name) return;
+    
+    if (!contracts.has(event.contract_name)) {
+      contracts.set(event.contract_name, new Set());
+    }
+    contracts.get(event.contract_name)!.add(event.event_name);
   });
 
   return {
     contracts: Array.from(contracts.entries())
       .map(([name, events]) => ({
         name,
-        events: Array.from(events).sort()
+        events: [...events].sort()
       }))
       .sort((a, b) => a.name.localeCompare(b.name))
   };
