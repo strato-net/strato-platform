@@ -23,6 +23,7 @@ module Blockchain.SolidVM.SM
     action,
     runSM,
     getCurrentAddress,
+    getCurrentCodeAddress,
     withCallInfo,
     withTempCallInfo,
     withUncheckedCallInfo,
@@ -132,6 +133,7 @@ import qualified Prelude as Ordering (Ordering (..))
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
     currentAddress :: Address,
+    currentCodeAddress :: Address,
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
@@ -739,6 +741,7 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 withCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -748,8 +751,8 @@ withCallInfo ::
   Bool ->
   m a ->
   m a
-withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
-  addCallInfo a c fn hsh cc initialLocalVariables ro ff
+withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
   popCallInfo $ isLeft eRes
   case eRes of
@@ -759,6 +762,7 @@ withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
 addCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
@@ -767,11 +771,12 @@ addCallInfo ::
   Bool ->
   Bool ->
   m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
+addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
             currentAddress = a,
+            currentCodeAddress = codeAddr,
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
@@ -878,6 +883,13 @@ getCurrentAddress = do
   case cs of
     (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentCodeAddress :: MonadSM m => m Address
+getCurrentCodeAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentCodeAddress currentCallInfo
+    _ -> internalError "getCurrentCodeAddress called with an empty stack" ()
 {-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
