@@ -134,6 +134,7 @@ const Dashboard = () => {
               value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA `}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
+              tooltip={cataBalance === 0 ? "No rewards yet - start staking to earn CATA!" : undefined}
             />
 
 
