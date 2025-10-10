@@ -96,6 +96,6 @@ export function* getMetadata(action) {
 export default function* watchGetHealth() {
     yield [
       takeLatest(GET_HEALTH_REQUEST, getHealth),
-      takeLatest(GET_METADATA_REQUEST, getMetadata),
+      // takeLatest(GET_METADATA_REQUEST, getMetadata),
     ]
 }
