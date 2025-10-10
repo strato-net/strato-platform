@@ -433,7 +433,20 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
         CC.DefaultCall -> (to', to')
         CC.RawCall -> (to', to')
         CC.DelegateCall -> (from, to')
-  (contract', hsh, cc) <- getCodeAndCollection ccToGet
+  
+  -- Check if this is a self-call while in a delegatecall context
+  -- If so, preserve the logic contract address
+  actualCodeAddr <- case fnCalltype of
+    CC.DefaultCall | from == to -> do
+      -- This is a self-call, check if we're in a delegatecall context
+      mCallInfo <- getCurrentCallInfoIfExists
+      case mCallInfo of
+        Just callInfo | currentCodeAddress callInfo /= currentAddress callInfo ->
+          -- We're in a delegatecall context, preserve the logic contract address
+          return $ currentCodeAddress callInfo
+        _ -> return ccToGet
+    _ -> return ccToGet
+  (contract', hsh, cc) <- getCodeAndCollection actualCodeAddr
   (toName, parentName) <- do
     ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to
     let n = case ch of
@@ -456,7 +469,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
         addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) to >>= \case
           CodeAtAccount {} -> pure to
           _ -> pure from
-      else pure to
+      else pure actualCodeAddr
   (ctr, oAddr, ctrName) <- getCreator cnAccount
   !abstracts <- M.fromList <$> traverse (resolveNameParts to (T.pack ctrName) (T.pack parentName')) abstracts'
 
@@ -513,7 +526,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
               Nothing -> False
               Just ci -> readOnly ci
         pure . bool (pushSender from) id (from == to) $
-          runTheCall to to contract functionName' hsh cc theFunction valList ro False
+          runTheCall to actualCodeAddr contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
@@ -526,7 +539,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to ccToGet contract functionName' hsh cc theFunction' valList' ro False
+              runTheCall to actualCodeAddr contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
@@ -534,7 +547,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                     Nothing -> False
                     Just ci -> readOnly ci
               pure . bool (pushSender from) id (from == to) $
-                runTheCall to ccToGet contract functionName' hsh cc fallbackFunc valList ro False
+                runTheCall to actualCodeAddr contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -578,13 +591,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
           case args' of
             [] -> do
               let path = AccountPath to $ MS.singleton $ BC.pack $ labelToString functionName
-              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
+              withCallInfo to actualCodeAddr contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> pure $ handleSimple path
             _ -> do
               let path = apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
-              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
+              withCallInfo to actualCodeAddr contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> pure $ handleSimple path
@@ -595,13 +608,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to ccToGet contract functionName hsh cc fallbackFunc valList ro False
+              runTheCall to actualCodeAddr contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when
     isRCC
     ( do
-        void . withCallInfo to to contract' "constructor" hsh cc M.empty False False $ do
+        void . withCallInfo to actualCodeAddr contract' "constructor" hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
             setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -613,7 +626,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
     )
   when (fnCalltype == CC.DelegateCall) $ do
     (codeContractName, codeContractParentName) <- do
-      ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) ccToGet
+      ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) actualCodeAddr
       let n = case ch of
                 SolidVMCode n' _ -> n'
                 CodeAtAccount _ n' -> n'
@@ -621,7 +634,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       resolveCodePtrParent ch >>= \case -- CodePtr's parent
         Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
         _ -> pure (n, "")
-    (_, _, codeContractCreator) <- getCreator ccToGet
+    (_, _, codeContractCreator) <- getCreator actualCodeAddr
     addDelegatecall from to' (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
   ((ctrName, parentName'),) <$> logFunctionCall valList to contract functionName f
   where
