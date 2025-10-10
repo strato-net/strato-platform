@@ -499,7 +499,6 @@ runCodeForTransaction b availableGas tAddr t proposer =
 
           lift $
             SolidVM.call
-                  False  --isRCC
                   b -- blockData
                   (transactionTo ut) -- codeAddress
                   tAddr -- sender
@@ -526,7 +525,6 @@ payFees b availableGas tAddr t proposer = do
 
   lift $
     SolidVM.call
-      False  -- isRCC
       b  -- blockData
       (Address 0xDEC1DE)  --codeAddress
       tAddr -- sender
