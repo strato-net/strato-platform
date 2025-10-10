@@ -218,7 +218,6 @@ const ActivityFeedList = () => {
       const headers = [
         'Event Name',
         'Contract Name',
-        'Application',
         'Block Number',
         'Block Timestamp',
         'Transaction Hash',
@@ -242,7 +241,6 @@ const ActivityFeedList = () => {
           const baseData = [
             `"${event.event_name}"`,
             `"${event.contract_name}"`,
-            `"${event.application}"`,
             event.block_number,
             `"${formatTimestamp(event.block_timestamp)}"`,
             `"${event.transaction_hash}"`,
@@ -354,8 +352,6 @@ const ActivityFeedList = () => {
               <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{event?.contract_name ? event?.contract_name : 'N/A'}</span>
-                <span>•</span>
-                <span>{event?.application ? event?.application : 'N/A'}</span>
               </div>
             </div>
           </div>
