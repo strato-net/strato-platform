@@ -511,7 +511,11 @@ literal =
       do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
-      uncurry StringLiteral <$> withPosition stringLiteral,
+      do
+        (a, str) <- withPosition stringLiteral
+        pure $ case readMaybe str of
+          Just addr -> AccountLiteral a (NamedAccount addr UnspecifiedChain)
+          _ -> StringLiteral a str,
       uncurry AccountLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),
       uncurry BoolLiteral <$> withPosition (True <$ reserved "true"),
