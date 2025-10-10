@@ -172,4 +172,136 @@ contract Describe_SafetyModule {
         }
         require(reverted, "startCooldown should fail after transferring all tokens");
     }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // REWARDSCHEF INTEGRATION TESTS
+    // ═════════════════════════════════════════════════════════════════════════
+
+    function it_should_prevent_cooldown_when_tokens_staked_in_rewardschef_without_config() public {
+        // ensure block.timestamp is not 0
+        fastForward(10);
+
+        uint amount = 1000e18;
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+
+        // Setup RewardsChef
+        RewardsChef chef = m.rewardsChef();
+
+        // Transfer ownership to test contract
+        m.adminRegistry().castVoteOnIssue(address(chef), "transferOwnership", address(this));
+        Ownable(address(chef)).transferOwnership(address(this));
+
+        // Create rewards token for RewardsChef
+        address rewardsTokenAddress = m.tokenFactory().createToken(
+            "CATA",
+            "CATA Token",
+            [], [], [], "CATA", 0, 18
+        );
+        Token rewardsToken = Token(rewardsTokenAddress);
+
+        // Initialize RewardsChef
+        chef.initialize(rewardsTokenAddress, 1000);
+
+        // Transfer ownership of rewards token to chef so it can mint
+        Ownable(rewardsTokenAddress).transferOwnership(address(chef));
+
+        // Add pool with sUSDST as LP token
+        chef.addPool(allocationPoints, sUSDST, multiplier);
+
+        // Mint USDST to user1 and stake to SafetyModule
+        Token(USDST).mint(address(user1), amount);
+        TestUtils.callAs(user1, USDST, "approve(address, uint256)", address(sm), amount);
+        TestUtils.callAs(user1, address(sm), "stake(uint256, uint256)", amount, 0);
+
+        // User should have sUSDST
+        uint sUSDSTBalance = IERC20(sUSDST).balanceOf(address(user1));
+        require(sUSDSTBalance > 0, "User should have sUSDST tokens");
+
+        // User stakes all sUSDST to RewardsChef
+        TestUtils.callAs(user1, sUSDST, "approve(address, uint256)", address(chef), sUSDSTBalance);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, sUSDSTBalance);
+
+        // Verify user has no sUSDST in wallet
+        require_equal(IERC20(sUSDST).balanceOf(address(user1)), 0, "User should have no sUSDST in wallet");
+
+        // Verify user has sUSDST staked in RewardsChef
+        uint256 stakedBalance = chef.getBalance(poolId, address(user1));
+        require(stakedBalance > 0, "User should have sUSDST staked in RewardsChef");
+
+        // Try to start cooldown - should FAIL because RewardsChef is not configured in SafetyModule
+        bool reverted = false;
+        try user1.do(address(sm), "startCooldown") {
+            reverted = false;
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "startCooldown should fail when tokens are in RewardsChef but SafetyModule not configured");
+    }
+
+    function it_should_allow_cooldown_when_tokens_staked_in_rewardschef_with_config() public {
+        // ensure block.timestamp is not 0
+        fastForward(10);
+
+        uint amount = 1000e18;
+        uint256 allocationPoints = 100;
+        uint256 multiplier = 1;
+        uint256 poolId = 0;
+
+        // Setup RewardsChef
+        RewardsChef chef = m.rewardsChef();
+
+        // Transfer ownership to test contract
+        m.adminRegistry().castVoteOnIssue(address(chef), "transferOwnership", address(this));
+        Ownable(address(chef)).transferOwnership(address(this));
+
+        // Create rewards token for RewardsChef
+        address rewardsTokenAddress = m.tokenFactory().createToken(
+            "CATA",
+            "CATA Token",
+            [], [], [], "CATA", 0, 18
+        );
+        Token rewardsToken = Token(rewardsTokenAddress);
+
+        // Initialize RewardsChef
+        chef.initialize(rewardsTokenAddress, 1000);
+
+        // Transfer ownership of rewards token to chef so it can mint
+        Ownable(rewardsTokenAddress).transferOwnership(address(chef));
+
+        // Add pool with sUSDST as LP token
+        chef.addPool(allocationPoints, sUSDST, multiplier);
+
+        // Configure RewardsChef in SafetyModule
+        sm.setRewardsChef(address(chef), poolId);
+
+        // Mint USDST to user1 and stake to SafetyModule
+        Token(USDST).mint(address(user1), amount);
+        TestUtils.callAs(user1, USDST, "approve(address, uint256)", address(sm), amount);
+        TestUtils.callAs(user1, address(sm), "stake(uint256, uint256)", amount, 0);
+
+        // User should have sUSDST
+        uint sUSDSTBalance = IERC20(sUSDST).balanceOf(address(user1));
+        require(sUSDSTBalance > 0, "User should have sUSDST tokens");
+
+        // User stakes all sUSDST to RewardsChef
+        TestUtils.callAs(user1, sUSDST, "approve(address, uint256)", address(chef), sUSDSTBalance);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, sUSDSTBalance);
+
+        // Verify user has no sUSDST in wallet
+        require_equal(IERC20(sUSDST).balanceOf(address(user1)), 0, "User should have no sUSDST in wallet");
+
+        // Verify user has sUSDST staked in RewardsChef
+        uint256 stakedBalance = chef.getBalance(poolId, address(user1));
+        require(stakedBalance > 0, "User should have sUSDST staked in RewardsChef");
+
+        // Try to start cooldown - should SUCCEED because RewardsChef is configured
+        user1.do(address(sm), "startCooldown");
+
+        // Verify cooldown was started
+        uint cooldownStart = sm.cooldownStart(address(user1));
+        require(cooldownStart > 0, "Cooldown should be started");
+        require_equal(cooldownStart, block.timestamp, "Cooldown start should be current timestamp");
+    }
 }

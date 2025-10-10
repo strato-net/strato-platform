@@ -3,6 +3,7 @@ import "./LendingRegistry.sol";
 import "./LiquidityPool.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
+import "../Rewards/RewardsChef.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
@@ -11,6 +12,11 @@ import "../../abstract/ERC20/IERC20.sol";
 ///         - Rewards in USDST via notifyReward() raise price (exchangeRate).
 ///         - coverShortfall() transfers USDST to LendingPool and writes down system debt; price drops.
 ///         - Cooldown + unstake window enforce exit discipline.
+
+struct RewardsChefInfo {
+    address rewardsChef;
+    uint256 poolId;
+}
 
 contract record SafetyModule is Ownable {
     // ─── Events
@@ -24,12 +30,14 @@ contract record SafetyModule is Ownable {
     event TokenFactoryUpdated(address _tokenFactory);
     event EndpointsSynced(address _lendingPool, address _liquidityPool, address newAsset);
     event RegistryUpdated(address _lendingRegistry);
+    event RewardsChefUpdated(address _rewardsChef, uint256 _poolId);
 
     // ─── Core
     LendingRegistry public lendingRegistry;
     LendingPool public  lendingPool;
     LiquidityPool public liquidityPool;
     TokenFactory public tokenFactory;
+    RewardsChefInfo public record rewardsChefInfo;
     address public  asset;   // USDST
     address public  sToken;  // sUSDST (ERC-20)
 
@@ -108,17 +116,17 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // Views / math
     // Vault TVL in underlying (pulls live ERC20 balance)
-    function totalAssets() public view returns (uint) 
-    { 
+    function totalAssets() public view returns (uint)
+    {
         require(asset != address(0), "SM:asset not set");
-        return IERC20(asset).balanceOf(address(this)); 
+        return IERC20(asset).balanceOf(address(this));
     }
 
     // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
-    function totalShares() public view returns (uint) 
-    { 
+    function totalShares() public view returns (uint)
+    {
         require(sToken != address(0), "SM:sToken not set");
-        return IERC20(sToken).totalSupply(); 
+        return IERC20(sToken).totalSupply();
     }
 
     /// @notice Current sUSDST price in USDST units (1e18 = 1.0).
@@ -132,7 +140,7 @@ contract record SafetyModule is Ownable {
         if (s == 0) return 1e18;
         return (totalAssets() * 1e18) / s;
     }
-    
+
     /// @notice Pure estimate of shares minted for depositing `assetsIn` right now.
     /// @dev
     ///  - Uses the CURRENT ratio only; ignores transfer fees and donation guard.
@@ -146,7 +154,7 @@ contract record SafetyModule is Ownable {
         uint s = totalShares();
         uint a = totalAssets();
         if (s == 0) return assetsIn;           // initial 1:1
-        require(a > 0, "SM:price=0");          // shares exist but vault has no assets 
+        require(a > 0, "SM:price=0");          // shares exist but vault has no assets
         return (assetsIn * s) / a;             // floor by design
     }
 
@@ -160,7 +168,7 @@ contract record SafetyModule is Ownable {
     function previewRedeem(uint sharesIn) external view returns (uint) {
         require(sharesIn > 0, "SM:zero");
         uint s = totalShares();
-        require(s > 0, "SM:no shares"); 
+        require(s > 0, "SM:no shares");
         return (sharesIn * totalAssets()) / s;
     }
 
@@ -180,7 +188,7 @@ contract record SafetyModule is Ownable {
         if (s == 0) {
             require(beforeBal == 0, "SM:init stray funds"); // donation guard
         } else {
-            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
+            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0)
         }
 
         IERC20(asset).transferFrom(msg.sender, address(this), assetsIn);
@@ -200,9 +208,18 @@ contract record SafetyModule is Ownable {
     }
 
     /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
-    /// @dev Overwrites previous starts. Requires wallet-held shares (not Chef).
+    /// @dev Overwrites previous starts. Checks both wallet-held shares and RewardsChef staked shares.
     function startCooldown() external {
-        require(IERC20(sToken).balanceOf(msg.sender) > 0, "SM:no shares");
+        uint walletBalance = IERC20(sToken).balanceOf(msg.sender);
+        uint stakedBalance = 0;
+
+        // Check RewardsChef staked balance if configured
+        if (rewardsChefInfo.rewardsChef != address(0)) {
+            RewardsChef chef = RewardsChef(rewardsChefInfo.rewardsChef);
+            stakedBalance = chef.getBalance(rewardsChefInfo.poolId, msg.sender);
+        }
+
+        require(walletBalance > 0 || stakedBalance > 0, "SM:no shares");
         uint start = block.timestamp;
         cooldownStart[msg.sender] = start;
         emit UnstakeCooldown(msg.sender, start, start + COOLDOWN_SECONDS);
@@ -247,7 +264,7 @@ contract record SafetyModule is Ownable {
     /// @notice Slash vault to cover protocol shortfall.
     /// @dev Data plane: send USDST to LiquidityPool.
     /// Control plane: tell LendingPool to consume badDebt (accounting).
- 
+
     function coverShortfall(uint256 amount) external onlyOwner returns (uint256 covered) {
         require(amount > 0, "SM:zero");
 
@@ -272,7 +289,7 @@ contract record SafetyModule is Ownable {
 
         emit ShortfallCovered(covered);
     }
-    
+
     // ─────────────────────────────────────────
     // Admin
 
@@ -299,6 +316,16 @@ contract record SafetyModule is Ownable {
         sToken = _sToken;
         asset = _asset;
         emit TokensUpdated(_asset, _sToken);
+    }
+
+    /// @notice Set the RewardsChef reference and poolId for checking staked balances
+    /// @dev Used to check both wallet and staked balances when starting cooldown.
+    ///      Note: Owner should ensure the pool exists and uses sToken as LP token.
+    function setRewardsChef(address _rewardsChef, uint256 _poolId) external onlyOwner {
+        require(_rewardsChef != address(0), "SM:zero addr");
+        rewardsChefInfo.rewardsChef = _rewardsChef;
+        rewardsChefInfo.poolId = _poolId;
+        emit RewardsChefUpdated(_rewardsChef, _poolId);
     }
 
     /// @notice Rescue stray tokens (not the vault asset).
