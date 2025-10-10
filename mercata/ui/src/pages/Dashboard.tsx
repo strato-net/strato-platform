@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
@@ -121,7 +121,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
@@ -131,13 +131,17 @@ const Dashboard = () => {
 
             <AssetSummary
               title="CATA Rewards"
-              value={
-                pendingRewards !== "0"
-                  ? `${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA (+${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} pending)`
-                  : `${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`
-              }
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA `}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
+            />
+
+
+            <AssetSummary
+              title="Pending CATA"
+              value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA `}
+              icon={<Banknote className="text-white" size={18} />}
+              color="bg-green-500"
             />
 
             <AssetSummary
@@ -152,10 +156,10 @@ const Dashboard = () => {
           {isDataInitialized && (
             <>
               <div className="mb-8">
-                <AssetsList 
-                  loading={loading} 
-                  tokens={tokens} 
-                  inActiveTokens={inactiveTokens} 
+                <AssetsList
+                  loading={loading}
+                  tokens={tokens}
+                  inActiveTokens={inactiveTokens}
                   shouldPreventFlash={true}
                 />
               </div>
@@ -190,4 +194,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
