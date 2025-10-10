@@ -11,12 +11,6 @@ const router = Router();
  *     summary: Query Mercata blockchain events
  *     tags: [Events]
  *     parameters:
- *       - name: application
- *         in: query
- *         required: false
- *         description: Filter by application (defaults to eq.Mercata)
- *         schema:
- *           type: string
  *       - name: creator
  *         in: query
  *         required: false
