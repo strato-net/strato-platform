@@ -141,7 +141,7 @@ const Dashboard = () => {
               title="Pending CATA"
               value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA `}
               icon={<Banknote className="text-white" size={18} />}
-              color="bg-green-500"
+              color={pendingRewards == "0" ? "bg-gray-500" : "bg-green-500"}
             />
 
             <AssetSummary
