@@ -3393,6 +3393,8 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAccount a _, SVMType.Address b) -> pure . Just $ SAccount a b
         (SAccount a _, SVMType.Account b) -> pure . Just $ SAccount a b
+        (SAccount (NamedAccount a _) _, SVMType.String _) -> pure . Just . SString $ show a
+        (SAccount (NamedAccount a _) _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
         (SStruct r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
         (SContract r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SContract r x) $ r == u
