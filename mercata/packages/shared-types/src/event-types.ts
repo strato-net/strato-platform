@@ -36,8 +36,8 @@ export interface Event {
   transaction_sender: string;
   event_index: number;
   creator: string;
+  application: string;
   contract_name: string;
-  imp_contract_name?: string;
   event_name: string;
   attributes: Record<string, string>;
 }

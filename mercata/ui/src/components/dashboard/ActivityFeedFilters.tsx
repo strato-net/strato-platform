@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 
 export interface FilterOptions {
-  "storage.contract.contract_name"?: string;
+  contract_name?: string;
   event_name?: string;
   transaction_sender?: string;
 }
@@ -35,7 +35,7 @@ const ActivityFeedFilters = memo(({
   const handleContractChange = (value: string) => {
     const newFilters = {
       ...filters,
-      "storage.contract.contract_name": value === "all" ? undefined : value,
+      contract_name: value === "all" ? undefined : value,
       event_name: undefined // Reset event filter when contract changes
     };
     onFiltersChange(newFilters);
@@ -61,11 +61,11 @@ const ActivityFeedFilters = memo(({
     onFiltersChange({});
   };
 
-  const hasActiveFilters = filters["storage.contract.contract_name"] || filters.event_name || filters.transaction_sender;
+  const hasActiveFilters = filters.contract_name || filters.event_name || filters.transaction_sender;
 
   // Filter events based on selected contract
-  const availableEvents = filters["storage.contract.contract_name"] 
-    ? eventNames.filter(event => event.contract === filters["storage.contract.contract_name"])
+  const availableEvents = filters.contract_name 
+    ? eventNames.filter(event => event.contract === filters.contract_name)
     : eventNames;
 
   // Deduplicate event names to prevent "DepositedDeposited" when "All Contracts" is selected
@@ -95,7 +95,7 @@ const ActivityFeedFilters = memo(({
         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 w-full sm:w-auto">
           <label className="text-xs sm:text-sm font-medium text-gray-700 sm:min-w-fit">Contract:</label>
           <Select
-            value={filters["storage.contract.contract_name"] || "all"}
+            value={filters.contract_name || "all"}
             onValueChange={handleContractChange}
           >
             <SelectTrigger className="w-full sm:w-48">
@@ -165,9 +165,9 @@ const ActivityFeedFilters = memo(({
 
       {hasActiveFilters && (
         <div className="mt-2 sm:mt-3 flex flex-wrap gap-1 sm:gap-2">
-          {filters["storage.contract.contract_name"] && (
+          {filters.contract_name && (
             <Badge variant="secondary" className="text-xs">
-              Contract: {filters["storage.contract.contract_name"]}
+              Contract: {filters.contract_name}
             </Badge>
           )}
           {filters.event_name && (

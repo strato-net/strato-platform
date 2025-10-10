@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import type { EventData, EventResponse, ContractInfoResponse, Event } from "@mercata/shared-types";
+import type { EventData, EventResponse, ContractInfoResponse } from "@mercata/shared-types";
 
 export const getEvents = async (
   accessToken: string,
@@ -9,7 +9,6 @@ export const getEvents = async (
   const params = {
     ...query,
     creator: query.creator || "eq.BlockApps",
-    select: "*,storage(contract(*))",
     order: query.order || "block_timestamp.desc"
   };
 
@@ -21,8 +20,8 @@ export const getEvents = async (
   };
   
   const [countResponse, eventsResponse] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.Event}`, { 
-      params: { ...countParams, select: "*,storage(contract(*)),count()" }
+    cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
+      params: countParams 
     }),
     cirrus.get(accessToken, `/${constants.Event}`, { params })
   ]);
@@ -31,10 +30,7 @@ export const getEvents = async (
   const data = eventsResponse.data;
   
   return {
-    events: data?.map((event: Event & { storage?: any }) => {
-      const contractName = event.storage?.contract?.[0]?.contract_name;
-      return { ...event, contract_name: contractName, storage: undefined };
-    }) || [],
+    events: data || [],
     total: total
   };
 };
