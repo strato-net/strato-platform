@@ -972,8 +972,9 @@ getTypeErrors (Bottom ts) = NE.toList ts
 getTypeErrors _ = []
 
 const' :: Type' -> Type' -> Type'
-const' _ (Bottom e) = Bottom e
-const' t _ = t
+const' (Bottom es) (Bottom ess) = Bottom $ es <> ess
+const' _           (Bottom ess) = Bottom ess
+const' t           _            = t
 
 detector :: CompilerDetector
 detector = detector' False
@@ -1603,7 +1604,7 @@ getFunctionByNameRecursively name ctx = do
       Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
       Nothing -> case M.lookup name $ c ^. events of
         Just theEvent -> pure $ eventType ctx theEvent
-        Nothing -> pure . bottom $ "Could not find contract function " <> T.pack name <$ ctx
+        Nothing -> pure . bottom $ "Unknown variable " <> T.pack name <$ ctx
 
 getModifierByNameRecursively :: SolidString -> SolidString -> SourceAnnotation Text -> SSS Type'
 getModifierByNameRecursively funcName name ctx = recursively ctx $ do
@@ -1916,6 +1917,18 @@ tcExpr (IndexAccess _ a (Just b)) = do
   b' <- tcExpr b
   typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
+tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall", "derive"] =
+  sumType' (accountType' x) (addressType' x) ~> tcExpr var !> (pure $
+      Function (Product [stringType' x, Static SVMType.Variadic x] x)
+               (Static SVMType.Variadic x)
+               x [] [] False
+    )
+tcExpr (MemberAccess x var "truncate") = do
+  decimalType' x ~> tcExpr var !> (pure $
+      Function (Product [intType' x] x)
+               (decimalType' x)
+               x [] [] False
+    )
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
@@ -1982,39 +1995,10 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
           _ -> bottom $ "Not supported for casting such type to user defined type" <$ spot
         else bottom $ "Wrong User defined type" <$ spot
     checkerUserDefinedGetType _ _ spot = bottom $ "Wrong User defined type" <$ spot
-tcExpr (FunctionCall x (Variable _ "type") args) =
-  pure $ case args of
-    (OrderedArgs _) -> Static (SVMType.UnknownLabel "type" Nothing) x
-    _ -> bottom $ "Improper use of type function" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "delegatecall") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use .delegatecall() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ ".delegatecall() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ ".delegatecall() does not take named arguements" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "call") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use .call() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ ".call() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ ".call() does not take named arguments" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "derive") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use derive() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ "derive() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ "derive() does not take named arguments" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "truncate") args) = do
-  res <- decimalType' x ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use truncate() as a method on a decimal number" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ "truncate() requires at least one argument" <$ x
-    (OrderedArgs [a], _) -> (intType' x) ~> tcExpr a !> (pure $ topType' x)
-    (OrderedArgs (_ : _), _) -> pure $ bottom $ "truncate() only takes one argument" <$ x
-    _ -> pure $ bottom $ "truncate() does not take named arguments" <$ x
+tcExpr (Variable x "type") =
+  pure $ Function (Product [Static SVMType.Variadic x] x)
+                  (Static (SVMType.UnknownLabel "type" Nothing) x)
+                  x [] [] False
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
   a <- case args of
