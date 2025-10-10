@@ -397,7 +397,18 @@ class Dashboard extends Component {
            
            <div className="col-sm-4">
             <NumberCard
-              number={env.NODE_HOST}
+              number={
+                <div className="d-flex align-items-center justify-content-between">
+                  <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 5) + "..." : "N/A"}</span>
+                  <button
+                    className="btn btn-sm btn-outline-secondary ml-2"
+                    onClick={() => navigator.clipboard.writeText(env.NODE_HOST)}
+                    title="Copy Node Host"
+                  >
+                    <i className="fa fa-copy"></i>
+                  </button>
+                </div>
+              }
               description="Node Host"
               iconClass="fa-server"
               className={`smd-pointer`}
@@ -407,7 +418,19 @@ class Dashboard extends Component {
 
           <div className="col-sm-4">
             <NumberCard
-              number={metadata ? metadata.nodeAddress : "Loading..."}
+              number={
+                <div className="d-flex align-items-center justify-content-between">
+                  <span>{metadata ? metadata.nodeAddress.substring(0, 5) + "..." : "Loading..."}</span>
+                  <button
+                    className="btn btn-sm btn-outline-secondary ml-2"
+                    onClick={() => navigator.clipboard.writeText(metadata?.nodeAddress)}
+                    disabled={!metadata?.nodeAddress}
+                    title="Copy Node Address"
+                  >
+                    <i className="fa fa-copy"></i>
+                  </button>
+                </div>
+              }
               description="Node Address"
               iconClass="fa-id-card"
               className={`smd-pointer`}
