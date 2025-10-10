@@ -4,7 +4,7 @@ import type { EventResponse, ContractInfoResponse } from '@mercata/shared-types'
 export interface EventsFilters {
   limit?: number;
   offset?: number;
-  contract_name?: string;
+  "storage.contract.contract_name"?: string;
   event_name?: string;
   transaction_sender?: string;
 }
@@ -19,7 +19,7 @@ export const activityFeedApi = {
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.offset) params.append('offset', filters.offset.toString());
     
-    if (filters.contract_name) params.append('contract_name', filters.contract_name);
+    if (filters["storage.contract.contract_name"]) params.append('storage.contract.contract_name', filters["storage.contract.contract_name"]);
     if (filters.event_name) params.append('event_name', filters.event_name);
     if (filters.transaction_sender) params.append('transaction_sender', filters.transaction_sender);
 
