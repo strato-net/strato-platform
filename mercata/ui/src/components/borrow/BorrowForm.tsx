@@ -138,17 +138,11 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
           <div>
             <button
               type="button"
-              onClick={async () => {
+              onClick={() => {
                 try {
-                  await borrowMax();
-                  // After borrowMax, clear input and rely on refresh from parent
-                  setBorrowAmount("");
+                  setBorrowAmount(formatUnits(BigInt(maxAmount)));
                   setBorrowAmountError("");
-                  setFeeError("");
-                  handlePollingUpdate("");
-                } catch {
-                  // noop
-                }
+                } catch {}
               }}
               disabled={safeParseFloat(formatUnits(loans?.maxAvailableToBorrowUSD || 0, 18)) === 0}
               className="px-2 py-1 mr-1 bg-gray-100 hover:bg-gray-200 rounded-full text-gray-700 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-gray-100"
@@ -181,6 +175,7 @@ const BorrowForm = ({ loans, borrowLoading, onBorrow, usdstBalance, voucherBalan
             setBorrowAmount(val);
           }}
           className="mt-2"
+          disabled={BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
         />
       </div>
 

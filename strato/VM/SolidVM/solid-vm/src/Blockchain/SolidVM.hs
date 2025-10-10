@@ -286,7 +286,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
         "Gas left: " ++ (C.red $ show (_gasLeft gasInfo))
       ]
 
-  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ pure ()
+  void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
   env <- getEnv
   let -- metadata = Env.metadata env
@@ -302,7 +302,7 @@ create' creator maybeCodePtr originAddress issuerAcct issuerName newAddress ch c
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
-  void . withCallInfo newAddress contract' "constructor" ch cc M.empty False False $ do
+  void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ do
     -- set creator again, in case the caller's cert changed during constructor execution
     setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
@@ -513,7 +513,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
               Nothing -> False
               Just ci -> readOnly ci
         pure . bool (pushSender from) id (from == to) $
-          runTheCall to contract functionName' hsh cc theFunction valList ro False
+          runTheCall to to contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
@@ -526,7 +526,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract functionName' hsh cc theFunction' valList' ro False
+              runTheCall to ccToGet contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
               mCallInfo <- getCurrentCallInfoIfExists
@@ -534,7 +534,7 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                     Nothing -> False
                     Just ci -> readOnly ci
               pure . bool (pushSender from) id (from == to) $
-                runTheCall to contract functionName' hsh cc fallbackFunc valList ro False
+                runTheCall to ccToGet contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
@@ -578,13 +578,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
           case args' of
             [] -> do
               let path = AccountPath to $ MS.singleton $ BC.pack $ labelToString functionName
-              withCallInfo to contract functionName hsh cc M.empty True False $ case returnType _varType of
+              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> pure $ handleSimple path
             _ -> do
               let path = apSnocList (AccountPath to . MS.singleton $ BC.pack $ labelToString functionName) args'
-              withCallInfo to contract functionName hsh cc M.empty True False $ case returnType _varType of
+              withCallInfo to to contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> pure $ handleSimple path
@@ -595,13 +595,13 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
                   Nothing -> False
                   Just ci -> readOnly ci
             pure . bool (pushSender from) id (from == to) $
-              runTheCall to contract functionName hsh cc fallbackFunc valList ro False
+              runTheCall to ccToGet contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
   when
     isRCC
     ( do
-        void . withCallInfo to contract' "constructor" hsh cc M.empty False False $ do
+        void . withCallInfo to to contract' "constructor" hsh cc M.empty False False $ do
           forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
             v <- expToVar e Nothing
             setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
@@ -881,22 +881,20 @@ runStatement s@(CC.SimpleStatement (CC.VariableDefinition entries maybeExpressio
       printf "             creating and setting variables: (%s)\n" $
         intercalate ", " (map (labelToString . toName) entries)
     withSrcPos pos $ printf "             to: %s\n" valueString
-  let ensureType :: Maybe SVMType.Type -> SVMType.Type
-      ensureType = fromMaybe (todo "type inference not implemented" s)
 
   case (entries, value) of
-    ([CC.VarDefEntry mType _ name _], _) -> addLocalVariable (ensureType mType) name value
+    ([CC.VarDefEntry _ _ name _], _) -> addLocalVariable name value
     ([CC.BlankEntry], _) -> parseError "cannot declare single nameless variable" s
     (_, STuple variables) -> do
       checkArity "var declaration tuple" (V.length variables) (length entries)
-      let nonBlanks = [(ensureType t, n, v) | (CC.VarDefEntry t _ n _, v) <- zip entries $ V.toList variables]
+      let nonBlanks = [(n, v) | (CC.VarDefEntry _ _ n _, v) <- zip entries $ V.toList variables]
       --We get the values first so in the case of (x,y) = (y,x) we can still set the variables to the correct values
-      nonBlanks' <- forM nonBlanks $ \(t, n, v) -> do
+      nonBlanks' <- forM nonBlanks $ \(n, v) -> do
         v' <- getVar v
-        return (t, n, v')
-      forM_ nonBlanks' $ \(theType', name', v) -> do
+        return (n, v')
+      forM_ nonBlanks' $ \(name', v) -> do
         logAssigningVariable v
-        addLocalVariable theType' name' v
+        addLocalVariable name' v
     _ -> typeError "VariableDefinition expected a tuple" value
 
   return Nothing
@@ -923,9 +921,9 @@ runStatement (CC.SolidityTryCatchStatement tryExpression returnsDecl statementsF
               if length vars /= length returnsDecl
                 then typeError "try/catch statement expected a tuple of the same length as the returns statement" (tryExpression, aRealVal)
                 else do
-                  forM_ (zip vars xs) $ \(var, (name, ty)) -> do
+                  forM_ (zip vars xs) $ \(var, (name, _)) -> do
                     val <- getVar var
-                    addLocalVariable ty name val
+                    addLocalVariable name val
                   sfsRes' <- runStatementBlock statementsForSuccess
                   return sfsRes'
             _ -> typeError "try/catch statement expected a tuple" (tryExpression, aRealVal)
@@ -1047,11 +1045,12 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
           let address = currentAddress curInfo
-          (_, _, ctrName) <- getCreator address
+          codeAddress <- getCurrentCodeAddress
+          (_, _, ctrName) <- getCreator codeAddress
           parentName <-
             fromMaybeM (return "") $
               runMaybeT $
-                pure address
+                pure codeAddress
                   >>= MaybeT . A.lookup (A.Proxy @AddressState)
                   >>= pure . addressStateCodeHash
                   >>= MaybeT . resolveCodePtrParent
@@ -1080,8 +1079,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          addr <- getCurrentAddress
-          contractName' <- fst <$> getContractNameAndHash addr
+          codeAddr <- getCurrentCodeAddress
+          contractName' <- fst <$> getContractNameAndHash codeAddr
           addEvent $ Event bHash ctrName parentName (labelToString contractName') address eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
@@ -1162,7 +1161,7 @@ expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack $ labelToString x
   case x `M.lookup` NE.head (localVariables callInfo) of
-    Just (_, var) -> do
+    Just var -> do
       val <- weakGetVar var
       case val of
         SReference apt -> return apt
@@ -1239,6 +1238,12 @@ expToVar' (CC.DecimalLiteral _ v) _ = return $ Constant $ SDecimal $ CC.unwrapDe
 expToVar' (CC.AccountLiteral _ a) _ = return $ Constant $ SAccount a False
 expToVar' (CC.BoolLiteral _ b) _ = return $ Constant $ SBool b
 expToVar' (CC.HexaLiteral _ a) _ = return $ Constant $ SString $ BC.unpack . either (parseError "Couldn't parse hexadecimal literal: ") id . B16.decode $ BC.pack a
+expToVar' (CC.InlineBoundsCheck _ mL mU expr) _ = do
+  var <- expToVar expr Nothing
+  value <- getInt var
+  when (fromMaybe False $ (value <) <$> mL) $ arithmeticException "underflow: " (mL, value)
+  when (fromMaybe False $ (value >) <$> mU) $ arithmeticException "overflow: " (mU, value)
+  pure . Constant $ SInteger value
 expToVar' (CC.Variable _ "bytes32ToString") _ = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") _ = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") _ = return $ Constant $ SFunction "identity" Nothing
@@ -1335,7 +1340,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       callInfo <- getCurrentCallInfo
       let argList = maybe [] CC._funcArgs $ contract' ^. CC.functions . at functionName
           localVars = NE.head $ localVariables callInfo
-      argVals <- forM argList (\(n, _) -> getVar . snd $ localVars M.! (fromMaybe "" n))
+      argVals <- forM argList (\(n, _) -> getVar $ localVars M.! (fromMaybe "" n))
       return . Constant $ SVariadic argVals
     (SBuiltinVariable "msg", "sig") -> do
       functionName <- getCurrentFunctionName
@@ -1737,23 +1742,24 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               ro <- readOnly <$> getCurrentCallInfo
               contract' <- getCurrentContract
               address <- getCurrentAddress
+              codeAddr <- getCurrentCodeAddress
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
               res <- do
                 if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
-                      Nothing -> runTheCall address contract' funcName hsh cc func argVals ro True
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                      Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro True
                   else do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro False
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCall address contract' funcName hsh cc mo argVals' ro True
-                            Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
-                        Nothing -> runTheCall address contract' funcName hsh cc func argVals ro False
+                            Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                            Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
+                        Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
@@ -2609,9 +2615,9 @@ runTheConstructors from to hsh cc contractName' argVals' = do
               let correctedVal = coerceType contract' t v
               var <- createVar correctedVal
               ((n,(t,var)):) <$> go tns vs' 
-        go argTypeNames argVals
+        map (fmap snd) <$> go argTypeNames argVals
 
-  void . withCallInfo to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
+  void . withCallInfo to to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
 
     forM_ [(n, e, theType) | (n, CC.VariableDecl theType _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e, theType) -> do
       v <- expToVar e $ Just theType
@@ -2653,8 +2659,8 @@ runTheConstructors from to hsh cc contractName' argVals' = do
   return ()
 
 -- Note: this is intentionally nonstrict in `theType`
-addLocalVariable :: MonadSM m => SVMType.Type -> SolidString -> Value -> m ()
-addLocalVariable theType name value = do
+addLocalVariable :: MonadSM m => SolidString -> Value -> m ()
+addLocalVariable name value = do
   --  initializeStorage (AddressedPath (Left LocalVar) . MS.singleton $ BC.pack name) value
   newVariable <- liftIO $ fmap Variable $ newIORef value
   cs <- Mod.get (Mod.Proxy @[CallInfo])
@@ -2665,13 +2671,14 @@ addLocalVariable theType name value = do
       Mod.put (Mod.Proxy @[CallInfo]) $
         currentSlice
           { localVariables =
-              M.insert name (theType, newVariable) lvs
+              M.insert name newVariable lvs
                 NE.:| lvs'
           } :
         rest
 
 runTheCall ::
   MonadSM m =>
+  Address ->
   Address ->
   CC.Contract ->
   SolidString ->
@@ -2682,10 +2689,10 @@ runTheCall ::
   Bool ->
   Bool ->
   m (Maybe Value)
-runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
+runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro ff = do
   let !returnNamesAndTypes = [(n, t) | (Just n, CC.IndexedType _ t) <- CC._funcVals theFunction]
       !theModifierNames = map fst $ (CC._funcModifiers theFunction)
-  !returns <- traverse (\(n, t) -> ((n,) . (t,)) <$> createDefaultValue cc contract' t) returnNamesAndTypes
+  !returns <- traverse (\(n, t) -> (n,) <$> createDefaultValue cc contract' t) returnNamesAndTypes
 
   theModifiers' <- forM theModifierNames $ \name -> do
     case M.lookup name (contract' ^. CC.modifiers) of
@@ -2711,21 +2718,21 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               go ((n,t):nts) (v:vs') =
                 let v' = coerceType contract' t v
                  in (n,(t,v')) : go nts vs' 
-           in go argMeta argVals
+           in fmap snd <$> go argMeta argVals
   let locals = args ++ returns
   localVars1 <-
-    forM locals $ \(n, (t, v)) -> do
+    forM locals $ \(n, v) -> do
       newVar <- liftIO $ fmap Variable $ newIORef v
-      return (n, (t, newVar))
+      return (n, newVar)
 
-  val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
+  val' <- withCallInfo address' codeAddr contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
               fromMaybe []
               $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
       vs <- argsToVals margList
-      let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ CC._modifierArgs modi
-      return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
+      let argMeta = fst <$> CC._modifierArgs modi
+      return $ zip argMeta vs
     -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
     onTraced $ do
@@ -2737,8 +2744,8 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
     --       newVar <- liftIO $ fmap Variable $ newIORef v
     --       myCombinerForEfficiency ((n, (t, newVar)) : xs) ys
 
-    forM_ (map (\(x, y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, (t, v)) -> do
-      addLocalVariable t n v
+    forM_ (map (\(x, y) -> (T.unpack x, y)) (concat matchedArgvals)) $ \(n, v) -> do
+      addLocalVariable n v
 
     -- theCallInfo <- getCurrentCallInfo
     -- when (True || (not $ null matchedArgvals)) $ error (show theCallInfo)
@@ -2757,7 +2764,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
-                Just returnVar -> fmap Just . forceLoadVar =<< getVar (snd returnVar)
+                Just returnVar -> fmap Just . forceLoadVar =<< getVar returnVar
             xs ->
               Just . STuple . V.fromList <$> do
                 currentCallInfo <- getCurrentCallInfo
@@ -2765,7 +2772,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
                   let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
-                    Just returnVar -> fmap Constant . forceLoadVar =<< getVar (snd returnVar)
+                    Just returnVar -> fmap Constant . forceLoadVar =<< getVar returnVar
     val' <- case val of
       Nothing -> findNamedReturns
       Just SNULL -> findNamedReturns
@@ -2860,8 +2867,8 @@ solidityExceptionHandlerHelper cbm s1 s2 errCode errFunc = do
         Nothing -> do
           res' <-  runStatementBlock block
           return res'
-        Just (varName, varType) -> do
-          addLocalVariable varType varName (SInteger errCode)
+        Just (varName, _) -> do
+          addLocalVariable varName (SInteger errCode)
           res <- runStatementBlock block
           return res
 
@@ -2879,8 +2886,8 @@ solidityExceptionHandlerHelper' cbm s1 errCode errFunc = do
         Nothing -> do
           res' <-  runStatementBlock block
           return res'
-        Just (varName, varType) -> do
-          addLocalVariable varType varName (SInteger errCode)
+        Just (varName, _) -> do
+          addLocalVariable varName (SInteger errCode)
           res <- runStatementBlock block
           return res
 
@@ -2898,8 +2905,8 @@ solidityExceptionHandlerHelper'' cbm s1 s2 vals errCode errFunc = do
         Nothing -> do
           res' <-  runStatementBlock block
           return res'
-        Just (varName, varType) -> do
-          addLocalVariable varType varName (SInteger errCode)
+        Just (varName, _) -> do
+          addLocalVariable varName (SInteger errCode)
           res <- runStatementBlock block
           return res
 
@@ -2919,8 +2926,8 @@ solidityExceptionHandlerHelperRequire cbm s1  = do
               Nothing -> do
                 res' <-  runStatementBlock block
                 return res'
-              Just (varName, varType) -> do
-                addLocalVariable varType varName (SString (fromMaybe "Require Error" s1))
+              Just (varName, _) -> do
+                addLocalVariable varName (SString (fromMaybe "Require Error" s1))
                 res <- runStatementBlock block
                 return res
 
@@ -2940,8 +2947,8 @@ solidityExceptionHandlerHelperAssert cbm  = do
             Nothing -> do
               res' <-  runStatementBlock block
               return res'
-            Just (varName, varType) -> do
-              addLocalVariable varType varName (SString "Assertion Error")
+            Just (varName, _) -> do
+              addLocalVariable varName (SString "Assertion Error")
               res <- runStatementBlock block
               return res
 {- BEN WILL REFACTOR THIS SOMEDAY -}
@@ -2953,6 +2960,9 @@ solidityExceptionHandler catchBlockMap ex =
       return res
     (TypeError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 2 typeError
+      return res
+    (ArithmeticException s1 s2) -> do
+      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 4 arithmeticException
       return res
     (InvalidArguments s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 3 invalidArguments
@@ -3058,8 +3068,8 @@ solidityExceptionHandler catchBlockMap ex =
       case M.lookup name catchBlockMap of
         Nothing -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
         Just (Nothing, _) -> solidityExceptionHandlerHelper'' catchBlockMap s1 name vals 34 customError 
-        Just (Just (name', type'), block) -> do
-          mapM_ (\x -> addLocalVariable type' name' x) $ map fromBasic vals
+        Just (Just (name', _), block) -> do
+          mapM_ (\x -> addLocalVariable name' x) $ map fromBasic vals
           res <- runStatementBlock block
           return res
     (DuplicateContract s1) -> do
@@ -3082,6 +3092,12 @@ solidVMExceptionHandler catchBlockMap ex =
     (InternalError s1 s2) -> do
       case M.lookup "InternalError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ internalError s1 s2
+        Just (_, block) -> do
+          res <- runStatementBlock block
+          return res
+    (ArithmeticException s1 s2) ->
+      case M.lookup "ArithmeticException" catchBlockMap of
+        Nothing -> solidVMExceptionHelper catchBlockMap $ arithmeticException s1 s2
         Just (_, block) -> do
           res <- runStatementBlock block
           return res
@@ -3243,7 +3259,7 @@ solidVMExceptionHandler catchBlockMap ex =
                 Nothing -> []
           _ <-
             if length args > 0
-              then mapM (\(x, ((_, (CC.IndexedType _ y), _), z)) -> addLocalVariable y x z) $ zip argsToSolidString zipped
+              then mapM (\(x, (_, z)) -> addLocalVariable x z) $ zip argsToSolidString zipped
               else pure $ [()]
           res <- runStatementBlock block
           return res

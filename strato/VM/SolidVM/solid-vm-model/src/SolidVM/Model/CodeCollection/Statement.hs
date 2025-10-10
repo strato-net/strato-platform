@@ -181,6 +181,10 @@ data ExpressionF a
   | Variable a SolidString
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
   | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
+    -- I wanted to make this a generic InlineAssert, but that would require either adding redundant
+    -- expressions to the AST, introducing partially-applied expressions, or some other phantom
+    -- expressions that I want to avoid. Instead, I give you InlineBoundsCheck as a compromise
+  | InlineBoundsCheck a (Maybe Integer) (Maybe Integer) (ExpressionF a)
   deriving (Show, Eq, Generic, Generic1, NFData, Functor, Foldable, Traversable)
 
 extractExpression :: ExpressionF a -> a
@@ -202,6 +206,7 @@ extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
 extractExpression (HexaLiteral a _) = a
+extractExpression (InlineBoundsCheck a _ _ _) = a
 extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF
