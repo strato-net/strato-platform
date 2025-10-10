@@ -23,6 +23,7 @@ import { useSafetyContext } from '@/context/SafetyContext';
 import AssetsList from '@/components/dashboard/AssetsList';
 import ExchangeCart from './ExchangeCart';
 import { useSearchParams } from 'react-router-dom';
+import { cataAddress } from '@/lib/constants';
 
 const DepositsPage = () => {
   const { userAddress } = useUser();
@@ -32,10 +33,16 @@ const DepositsPage = () => {
   const { userPools } = useSwapContext();
   const { safetyInfo, refreshSafetyInfo } = useSafetyContext();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  
+
+  // Extract CATA token from inactive tokens by address
+  const cataToken = inactiveTokens?.find(token =>
+    token.address === cataAddress
+  );
+
   // Use centralized net balance calculation hook
   const { netBalance: totalBalance } = useNetBalance({
     tokens,
+    cataToken,
     loans,
     liquidityInfo,
     totalCDPDebt,
