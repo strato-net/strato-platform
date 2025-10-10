@@ -198,13 +198,13 @@ revertStatement = try $ do
     e <-
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- lol
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
     pure (i, e)
   _ <- semi
@@ -279,13 +279,13 @@ functionCall = do
     withPosition $
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- haha
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
   return $ flip (FunctionCall a) args
 

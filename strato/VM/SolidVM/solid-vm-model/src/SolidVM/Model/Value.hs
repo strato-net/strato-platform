@@ -7,7 +7,7 @@ module SolidVM.Model.Value
     BasicType (..),
     AccountPath (..),
     Typo (..),
-    ValList (..),
+    ValList,
     IndexType (..),
     rlpEncodeVariable,
     rlpEncodeValue,
@@ -336,7 +336,4 @@ data BasicType
   deriving (Show, Eq)
 
 -- Evaluated ArgLists
-data ValList
-  = OrderedVals [Value]
-  | NamedVals [(SolidString, Value)]
-  deriving (Show, Eq)
+type ValList = [Value]

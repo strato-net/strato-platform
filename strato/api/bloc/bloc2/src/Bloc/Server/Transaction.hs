@@ -479,7 +479,7 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                 ]
       userCert <- maybe (throwIO err) pure =<<
         A.select (A.Proxy @Certificate) addr
-      pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just . show $ SMV.OrderedVals [SMV.SString $ certificateCommonName userCert])
+      pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just $ show [SMV.SString $ certificateCommonName userCert])
     else pure addr
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =

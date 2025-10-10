@@ -260,13 +260,13 @@ optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") a
   case mc of
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args
     Just c -> case args of
-      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
+      [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "wrap") args)
 optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args) _ = do
   mc <- asks contract
   case mc of
     Just c -> case args of
-      OrderedArgs [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
+      [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
 

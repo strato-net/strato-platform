@@ -1812,12 +1812,8 @@ statementHelper (RevertStatement mErrorName args x) = do
   e <- case mErrorName of
          Nothing -> pure $ sumType' (Function (Product [] x) (Product [] x) x [] [Nothing] False) (Function (Product [stringType' x] x) (Product [] x) x [] [Nothing] False)
          Just errorName -> tcExpr $ Variable x errorName
-  a <- case args of
-    OrderedArgs es -> productType' x <$> traverse tcExpr es
-    NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-  case args of
-    NamedArgs es -> apply e a $ Just (fst <$> es)
-    _ -> apply e a Nothing
+  a <- productType' x <$> traverse tcExpr args
+  apply e a Nothing
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
@@ -1935,10 +1931,10 @@ tcExpr (MemberAccess _ a fieldName) = do
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) = do
   -- This is a special check for user defined types
   c <- asks contract
-  if M.member nam (_userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
+  if M.member nam (_userDefined c) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
     then do
       case args of
-        OrderedArgs (e:_) -> do
+        [e] -> do
           let check = case M.lookup nam (_userDefined c) of
                 Just "uint" -> intType' x ~> tcExpr e
                 Just "int" -> intType' x ~> tcExpr e
@@ -1948,22 +1944,18 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) = do
                 _ -> pure . bottom $ "type not supported for user defined types" <$ x
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           check !> (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
-        _ -> pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
+        _ -> pure . bottom $ "'wrap' must take one argument" <$ x
     else do
       e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
-      a <- case args of
-        OrderedArgs es -> productType' x <$> traverse tcExpr es
-        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
+      a <- productType' x <$> traverse tcExpr args
+      apply e a Nothing
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
   -- Special function to catch user defined types using unwrap
   c <- asks contract
-  if (M.member nam $ _userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False)
+  if M.member nam $ _userDefined c
     then do
       case args of
-        OrderedArgs (e:_) -> do
+        [e] -> do
           expressionResult <- tcExpr e
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           let check =
@@ -1973,16 +1965,12 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
                     _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x
                 )
           check !> (pure $ (Static (actualTypeOfUserDefinedVar) x))
-        _ -> pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+        _ -> pure . bottom $ "'unwrap' must take one argument" <$ x
     else do
       --Case of not user defines, for other functions that define a wrap and unwrap
       e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
-      a <- case args of
-        OrderedArgs es -> productType' x <$> traverse tcExpr es
-        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
+      a <- productType' x <$> traverse tcExpr args
+      apply e a Nothing
   where
     checkerUserDefinedGetType :: Type -> SolidString -> SourceAnnotation Text -> Type'
     checkerUserDefinedGetType (SVMType.UserDefined nameOfVar actuall) namm spot =
@@ -2001,12 +1989,8 @@ tcExpr (Variable x "type") =
                   x [] [] False
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
-  a <- case args of
-    OrderedArgs es -> productType' x <$> traverse tcExpr es
-    NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-  case args of
-    NamedArgs es -> apply e a $ Just (fst <$> es)
-    _ -> apply e a Nothing
+  a <- productType' x <$> traverse tcExpr args
+  apply e a Nothing
 tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "--" a) = intType' x ~> (mutable <$> tcExpr a)

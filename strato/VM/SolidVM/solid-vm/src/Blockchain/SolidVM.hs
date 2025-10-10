@@ -88,7 +88,6 @@ import Data.Foldable (for_)
 import Data.List
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as M
-import qualified Data.Map.Merge.Lazy as M
 import Data.Maybe
 import qualified Data.Sequence as Q
 import qualified Data.Set as S
@@ -227,7 +226,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
     (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
-        !argExps = either (parseError "create arguments") CC.OrderedArgs eArgExps
+        !argExps = either (parseError "create arguments") id eArgExps
     argVals <- argsToVals argExps
 
     create' sender' (Just code) newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals
@@ -387,7 +386,7 @@ call isRCC blockData codeAddress sender' proposer' availableGas origin' txHash' 
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
         srcLength = 0
         eArgExps = traverse (runParser parseArg (initialParserStateWithLength srcLength) "" . T.unpack) argsStrings
-        !argExps = either (parseError "call arguments") CC.OrderedArgs eArgExps
+        !argExps = either (parseError "call arguments") id eArgExps
     argVals <- argsToVals argExps
 
     ((creator, appName), returnVal) <-
@@ -541,10 +540,10 @@ call' from to' fnCalltype mContract functionName isRCC valList = do
       _ -> case M.lookup functionName $ contract ^. CC.storageDefs of
         Just CC.VariableDecl {..} -> do
           let args' = fromMaybe [] $ case (_varType, valList) of
-                ((SVMType.Array _ _), OrderedVals oa) -> for oa $ \case
+                ((SVMType.Array _ _), oa) -> for oa $ \case
                   SInteger n -> Just . MS.ArrayIndex $ fromIntegral n
                   _ -> Nothing
-                ((SVMType.Mapping _ _ _), OrderedVals oa) ->
+                ((SVMType.Mapping _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
                 _ -> Nothing
               returnType = \case
@@ -700,14 +699,7 @@ getCreator caller = do
 logFunctionCall :: MonadSM m => ValList -> Address -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
   onTracedSM contract $ do
-    argStrings <-
-      case args of
-        OrderedVals argList -> fmap (intercalate ", ") $ forM argList showSM
-        NamedVals argMap ->
-          fmap (intercalate ", ") $
-            forM argMap $ \(n, v) -> do
-              valString <- showSM v
-              return $ labelToString n ++ ": " ++ valString
+    argStrings <- fmap (intercalate ", ") $ forM args showSM
 
     let shownFunc = labelToString functionName ++ "(" ++ argStrings ++ ")"
     multilineLog "Calling function" $
@@ -725,13 +717,11 @@ logFunctionCall args address contract functionName f = do
   return result
 
 argsToVals :: MonadSM m => CC.ArgList -> m ValList
-argsToVals args = case args of
-  CC.OrderedArgs xs -> do
-    vals <- traverse (getVar <=< flip expToVar Nothing) xs
-    pure . OrderedVals $ case reverse vals of
+argsToVals args = do
+    vals <- traverse (getVar <=< flip expToVar Nothing) args
+    pure $ case reverse vals of
       SVariadic vs : rest -> reverse rest ++ vs
       _ -> vals
-  CC.NamedArgs xs -> NamedVals <$> traverse (\(n,v) -> fmap (n,) . getVar =<< expToVar v Nothing) xs
 
 runModifiersAndStatements :: MonadSM m => [[CC.Statement]] -> [CC.Statement] -> m (Maybe Value)
 runModifiersAndStatements []   stmts = runStatementBlock stmts
@@ -773,35 +763,25 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
   --    revert();
 
   --    revert(args);
-  --    revert("error message") i.e. OrderedArgs
-  --    revert({x:"Message"}) i.e. NamedArgs
+  --    revert("error message")
 
   --    revert customError(args);
-  --    revert customError("error message") i.e. OrderedArgs
-  --    revert customError({x:"Message"}) i.e. NamedArgs
+  --    revert customError("error message")
   solidVMBreakpoint pos
   g <- getCurrentContract
   case mString of
     Just name -> do
       err <- case M.lookup name $ CC._errors g of
         Just _ -> do
-          argVals <- case theArgs of
-            CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) as
-            CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< flip expToVar Nothing) ns
-          let listOfVals = case argVals of
-                OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
-                NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
+          argVals <- mapM (getVar <=< flip expToVar Nothing) theArgs
+          let listOfVals = mapMaybe (\x -> toBasic x) argVals
 
           return $ customError "Reverting based on  Error Method:" name listOfVals
         Nothing -> do revertError "REVERT: to initial state" name
       pure $ err
     Nothing -> do
-      argVals <- case theArgs of
-        CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) as
-        CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< flip expToVar Nothing) ns
-      let listOfVals = case argVals of
-            OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
-            NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
+      argVals <- mapM (getVar <=< flip expToVar Nothing) theArgs
+      let listOfVals = mapMaybe (\x -> toBasic x) argVals
       return $ revertError "REVERT" listOfVals
 
 -- Assignment to an index into an array or mapping
@@ -1035,12 +1015,8 @@ runStatement (CC.Throw expr pos) = do
     case expr of
       CC.FunctionCall _ (CC.Variable _ n) a -> pure (n, a)
       _ -> invalidArguments "Invalid argument for throw." expr
-  argVals <- case args of
-    CC.OrderedArgs as -> OrderedVals <$> mapM (getVar <=< flip expToVar Nothing) as
-    CC.NamedArgs ns -> NamedVals <$> mapM (mapM $ getVar <=< flip expToVar Nothing) ns
-  let listOfVals = case argVals of
-        OrderedVals ov -> mapMaybe (\x -> toBasic x) ov
-        NamedVals nv -> mapMaybe (\(_, y) -> toBasic y) nv
+  argVals <- mapM (getVar <=< flip expToVar Nothing) args
+  let listOfVals = mapMaybe (\x -> toBasic x) argVals
   customError "Custom user error thrown" name listOfVals
 runStatement (CC.AssemblyStatement (CC.MloadAdd32 dst src) pos) = do
   solidVMBreakpoint pos
@@ -1321,7 +1297,7 @@ expToVar' (CC.Binary _ "<<=" lhs rhs) _ = do
   binopAssign (\x i -> x `shiftL` fromInteger i) lhs rhs
 expToVar' (CC.Binary _ ">>>=" lhs rhs) _ = do
   binopAssign (\x i -> fromInteger (toInteger ((fromInteger x) :: Word256)) `shiftR` fromInteger i) lhs rhs
-expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") (CC.OrderedArgs [CC.Variable _ name])) "runTimeCode") _ = do
+expToVar' (CC.MemberAccess _ (CC.FunctionCall x (CC.Variable _ "type") [CC.Variable _ name]) "runTimeCode") _ = do
   (_, cc) <- getCurrentCodeCollection
   return $
     Constant $
@@ -1586,15 +1562,13 @@ expToVar' (CC.ArrayExpression _ exps) _ = do
 expToVar' (CC.Ternary _ condition expr1 expr2) _ = do
   c <- getBool =<< expToVar condition Nothing
   flip expToVar Nothing $ if c then expr1 else expr2
-expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) (CC.OrderedArgs args)) _ = do
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) args) _ = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a Nothing
       return . Constant . SString $ replicate (fromIntegral len) '\NUL'
     _ -> arityMismatch "newBytes" 1 (length args)
-expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) (CC.NamedArgs {})) _ =
-  typeError "cannot create new bytes with named arguments" x
-expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t})) (CC.OrderedArgs args)) _ = do
+expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t})) args) _ = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a Nothing
@@ -1603,8 +1577,6 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry =
       v <- createDefaultValue cc ctract t
       Constant . SArray . V.fromList <$> traverse (const $ createVar v) [1..len]
     _ -> arityMismatch "new array" 1 (length args)
-expToVar' x@(CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {})) CC.NamedArgs {}) _ =
-  typeError "cannot create new array with named arguments" x
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' Nothing)) args) _ = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid contract creation during read-only access" $ "contractName: " ++ show contractName' ++ ", args: " ++ show args
@@ -1676,7 +1648,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
             (SAccount (NamedAccount addr _) _, "derive") -> do
               (_, hsh, _) <- getCodeAndCollection addr
               let (salt, args'') = case argVals of
-                    OrderedVals (SString s:vs) -> (s,) . OrderedVals $ case reverse vs of
+                    (SString s:vs) -> (s,) $ case reverse vs of
                       SVariadic v : rest -> reverse rest ++ v
                       _ -> vs
                     _ -> typeError "first arugment must be a string " args
@@ -1700,9 +1672,8 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               return . Constant $ SAccount (NamedAccount newAddress UnspecifiedChain) False
             (SAccount addr _, "delegatecall") -> do
               let (funcName, args') = case argVals of
-                    OrderedVals (SString fname : a) -> (fname, (OrderedVals a))
-                    OrderedVals _ -> typeError "delegate call needs first argument to be a string" args
-                    NamedVals _ -> typeError "Cannot provide named args to delegate call" args
+                    (SString fname : a) -> (fname, a)
+                    _ -> typeError "delegate call needs first argument to be a string" args
               fromAddress <- getCurrentAddress
               let toAddress = addr ^. namedAccountAddress
               res <- callWithResult fromAddress toAddress CC.DelegateCall Nothing funcName False args'
@@ -1711,9 +1682,8 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, "call") -> do
               let (funcName, args') = case argVals of
-                    OrderedVals (SString fname : as) -> (fname, OrderedVals as)
-                    OrderedVals _ -> typeError "call needs first argument to be a string" args
-                    NamedVals _ -> typeError "Cannot provide named args to call" args
+                    (SString fname : as) -> (fname, as)
+                    _ -> typeError "call needs first argument to be a string" args
               fromAddress <- getCurrentAddress
               let toAddress = addr ^. namedAccountAddress
               res <- callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
@@ -1723,7 +1693,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall argVals $ Just (return $ Constant $ SContractItem addr itemName)
             (SDecimal v, "truncate") -> case argVals of
-              OrderedVals (SInteger n:_) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
+              (SInteger n:_) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
               _ -> invalidArguments ("truncate() called with non-integer value as argument") args
             _ -> regularFunctionCall argVals Nothing
         _ -> regularFunctionCall argVals Nothing
@@ -1752,9 +1722,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                     Just v -> return $ Constant $ v
                     Nothing -> return $ Constant SNULL
                 x -> todo "expToVar'/FunctionCall" x
-            Constant (SFunction name Nothing) -> case argVals of
-              OrderedVals vs -> Constant <$> callBuiltin name vs
-              NamedVals {} -> invalidArguments (printf "expToVar'/builtinfunction: cannot used namedvals with builtin %s" name) argVals
+            Constant (SFunction name Nothing) -> Constant <$> callBuiltin name argVals
             Constant (SFunction funcName (Just func)) -> do
               ro <- readOnly <$> getCurrentCallInfo
               contract' <- getCurrentContract
@@ -1782,25 +1750,21 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               case M.lookup structName $ contract' ^. CC.structs of
                 Just vals -> do
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    case argVals of
-                      OrderedVals as -> zip (map (\(a, _, _) -> a) vals) as
-                      NamedVals ns -> ns
+                    zip (map (\(a, _, _) -> a) vals) argVals
                 Nothing -> do
                   cc <- getCurrentCodeCollection
                   let !vals' = fromMaybe (missingType "struct constructor not found" structName) $ M.lookup structName $ (snd cc) ^. CC.flStructs
                   return . Constant . SStruct structName . fmap Constant . M.fromList $
-                    case argVals of
-                      OrderedVals as -> zip (map (\(a, _, _) -> a) vals') as
-                      NamedVals ns -> ns
+                    zip (map (\(a, _, _) -> a) vals') argVals
             Constant (SContractDef contractName') -> do
               decrementGas 500
               case argVals of
-                OrderedVals [SInteger address] ->
+                [SInteger address] ->
                   --TODO- clean up this ambiguity between SAddress and SInteger....
                   return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
-                OrderedVals [SAccount address _] ->
+                [SAccount address _] ->
                   return $ Constant $ SContract contractName' address
-                OrderedVals [SContract _ addr] ->
+                [SContract _ addr] ->
                   return $ Constant $ SContract contractName' $ addr
                 _ -> typeError "contract variable creation" argVals
 
@@ -1810,7 +1774,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
             Constant (SContractItem address' "transfer") -> do
               from <- getCurrentAddress
               case argVals of
-                OrderedVals [SInteger amount] -> do
+                [SInteger amount] -> do
                   res <- pay "built-in transfer function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return $ Constant SNULL
@@ -1825,7 +1789,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
             Constant (SContractItem address' "send") -> do
               from <- getCurrentAddress
               success <- case argVals of
-                OrderedVals [SInteger amount] -> do
+                [SInteger amount] -> do
                   res <- pay "built-in send function" from (address' ^. namedAccountAddress) amount
                   case res of
                     True -> return True
@@ -1838,9 +1802,9 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               -- Collect a potential item to search
               searchTerms <- case argVals of
                 -- catch only the SStrings
-                OrderedVals [SString arguments] -> pure $ Just arguments
+                [SString arguments] -> pure $ Just arguments
                 -- Throw an error if too many arguments are passed
-                OrderedVals as | length as > 1 -> tooManyCooks 1 (length as)
+                as@(_:_:_) -> tooManyCooks 1 (length as)
                 --If nothing was given or something else, then just return the entire code
                 _ -> pure $ Nothing
               --get only the contract containing the sweet succulent ContractF definition
@@ -1908,7 +1872,7 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               return . Constant . fromMaybe SNULL $ result
             Constant (SEnum enumName) -> do
               case argVals of
-                OrderedVals [SInteger i] -> do
+                [SInteger i] -> do
                   c <- getCurrentContract
                   case M.lookup enumName $ c ^. CC.enums of
                     Just theEnum -> do
@@ -1926,27 +1890,24 @@ expToVar' (CC.FunctionCall _ e args) _ = do
                 _ -> typeError "called enum constructor with improper args" argVals
             Constant (SPush theArray mvar) -> Builtins.push theArray mvar argVals
             Constant SStringConcat -> do
-              case argVals of
-                OrderedVals xs -> do
                   when
                     ( any
                         ( \x -> case x of
                             (SString _) -> False
                             _ -> True
                         )
-                        xs
+                        argVals
                     )
                     $ typeError "string concat" argVals
-                  return $ Constant $ SString $ concatMap (\x -> case x of (SString s) -> s; _ -> "") xs
-                _ -> typeError "called string concat with improper args" argVals
+                  return $ Constant $ SString $ concatMap (\x -> case x of (SString s) -> s; _ -> "") argVals
             Constant SHexDecodeAndTrim ->
               case argVals of
                 -- bytes should already be hex decoded when appropriate
-                OrderedVals [s@SString {}] -> return $ Constant s
+                [s@SString {}] -> return $ Constant s
                 _ -> typeError "bytes32ToString with incorrect arguments" argVals
             Constant SAddressToAscii ->
               case argVals of
-                OrderedVals [SAccount a _] -> return . Constant . SString $ show a
+                [SAccount a _] -> return . Constant . SString $ show a
                 _ -> typeError "addressToAsciiString with incorrect arguments" argVals
             -- It would be nice to reinterpret two element paths as a function.
             -- How can we get a to resolve to a local variable instead of a path?
@@ -2052,7 +2013,7 @@ evaluateAccountMember a True funcName = return $ Constant $ SContractFunction No
 evaluateAccountMember a False itemName = do
   --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAddress
-  result <- callWithResult from a CC.DefaultCall Nothing itemName False (OrderedVals [])
+  result <- callWithResult from a CC.DefaultCall Nothing itemName False []
   return . Constant . fromMaybe SNULL $ result
 
 defaultToInt :: Value -> Value
@@ -2515,7 +2476,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   theEnv <- getEnv
   let origin = Env.origin theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
-  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' (OrderedVals argVals)
+  execResults <- create' creator Nothing newAddress ctr ctrName newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2533,10 +2494,9 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
-  let constructorArgVals = OrderedVals argVals
-  newAddress <- getNewAddressWithSalt creator salt hsh $ show constructorArgVals
+  newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
   (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' constructorArgVals
+  execResults <- create' creator Nothing originAddress ctr ctrName newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2626,10 +2586,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
       Just (_, vals) -> pure vals
       Nothing -> invalidArguments "constructor arguments don't match" (contractName', argVals')
 
-  let einval = invalidArguments "named arguments to contract without constructor" (contractName', argVals)
-  zipped <-
-    case argVals of
-      OrderedVals vals -> do
+  zipped <- do
         let go [(SVMType.Variadic, n)] [SVariadic vs'] = do
               let var = Constant $ SVariadic vs'
               pure [(n, (SVMType.Variadic, var))]
@@ -2642,25 +2599,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
               let correctedVal = coerceType contract' t v
               var <- createVar correctedVal
               ((n,(t,var)):) <$> go tns vs' 
-        go argTypeNames vals
-      NamedVals ns -> do
-        let argTypes =
-              M.fromList $
-                map (\(k, v) -> (fromMaybe "" $ k, v)) $
-                  maybe einval CC._funcArgs $ contract' ^. CC.constructor
-
-            typeAndVal =
-              M.merge
-                (M.mapMissing (curry $ invalidArguments "missing argument"))
-                (M.mapMissing (curry $ invalidArguments "extra argument"))
-                (M.zipWithMatched $ \_k t v -> (t, v))
-                argTypes
-                (M.fromList ns)
-
-        forM (M.toList typeAndVal) $ \(n, (CC.IndexedType _ t, v)) -> do
-          let correctedVal = coerceType contract' t v
-          var <- createVar correctedVal
-          return (n, (t, var))
+        go argTypeNames argVals
 
   void . withCallInfo to contract' "constructor" hsh cc (M.fromList zipped) False False . pushSender from $ do
 
@@ -2680,7 +2619,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
       for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
         vals <- traverse (getVar <=< flip expToVar Nothing) args''
-        runTheConstructors from to hsh cc parent $ OrderedVals vals
+        runTheConstructors from to hsh cc parent vals
 
     case contract' ^. CC.constructor of
       Just theFunction -> do
@@ -2749,11 +2688,9 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
     Just (_, av) -> pure av
     Nothing -> typeError
       "the argument values do not match up with the function signature" 
-      (let valList' = case argVals' of OrderedVals xs -> xs; NamedVals ys -> map snd ys 
-       in show $ zip (valList') (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
+      (show $ zip argVals' (map (CC.indexedTypeType . snd) (CC._funcArgs theFunction)))
 
-  let !args = case argVals of
-        OrderedVals vs ->
+  let !args =
           let argMeta =
                 map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
                   CC._funcArgs theFunction
@@ -2764,23 +2701,7 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
               go ((n,t):nts) (v:vs') =
                 let v' = coerceType contract' t v
                  in (n,(t,v')) : go nts vs' 
-           in go argMeta vs
-        NamedVals ns ->
-          let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunction
-              typeAndVal =
-                M.merge
-                  (M.mapMissing (curry $ invalidArguments "missing argument"))
-                  (M.mapMissing (curry $ invalidArguments "extra argument"))
-                  (M.zipWithMatched $ \_k t v -> (t, v))
-                  strTypes
-                  $ M.fromList ns
-              -- These probably don't need to be sorted by argument index, as they are turned into a map
-              -- when added to the call info.
-              sortedArgs =
-                map snd . sortWith fst
-                  . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                  $ M.toList typeAndVal
-           in sortedArgs
+           in go argMeta argVals
   let locals = args ++ returns
   localVars1 <-
     forM locals $ \(n, (t, v)) -> do
@@ -2790,30 +2711,11 @@ runTheCall address' contract' funcName hsh cc theFunction argVals' ro ff = do
   val' <- withCallInfo address' contract' funcName hsh cc (M.fromList localVars1) ro ff $ do -- [(n, (t, Constant v)) | (n, (t, v)) <- locals]
     matchedArgvals <- forM theModifiers $ \modi -> do
       let !margList =
-            CC.OrderedArgs
-              . fromMaybe []
+              fromMaybe []
               $ M.lookup (T.unpack (CC._modifierSelector modi)) $ M.fromList $ CC._funcModifiers theFunction
-      margVals <- argsToVals margList
-      case margVals of
-        OrderedVals vs -> do
-          let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ CC._modifierArgs modi
-          return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
-        NamedVals ns -> do
-          let strTypes = M.fromList $ CC._modifierArgs modi
-              typeAndVal =
-                M.merge
-                  (M.mapMissing (curry $ invalidArguments "missing argument"))
-                  (M.mapMissing (curry $ invalidArguments "extra argument"))
-                  (M.zipWithMatched $ \_k t v -> (t, v))
-                  strTypes
-                  $ M.mapKeys T.pack $ M.fromList ns
-              -- These probably don't need to be sorted by argument index, as they are turned into a map
-              -- when added to the call info.
-              !sortedArgs =
-                map snd . sortWith fst
-                  . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                  $ M.toList typeAndVal
-          return sortedArgs
+      vs <- argsToVals margList
+      let argMeta = map (\(n, CC.IndexedType _ t) -> (n, t)) $ CC._modifierArgs modi
+      return (zipWith (\(n, t) v -> (n, (t, v))) argMeta vs)
     -- ++ (map (\(x,y) -> (T.unpack x, y)) (concat matchedArgvals)) --modArgsToBeLocals
 
     onTraced $ do
@@ -3434,14 +3336,12 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
     checkFunc (x:xs) = testMatch x >>= \case
       Just argVals' -> pure $ Just (x, argVals') 
       Nothing -> checkFunc xs
-    argValsLength = case argVals of
-      OrderedVals xs -> length xs
-      NamedVals xs -> length xs
+    argValsLength = length argVals
     testMatch :: MonadSM m => CC.Func -> m (Maybe ValList)
     testMatch tf = mapArgs tf >>= \case
       Nothing -> pure Nothing
       Just argMapping -> sequence <$> traverse marshalValue (snd <$> argMapping) >>= \case
-        Just vals' -> pure . Just $ OrderedVals vals'
+        Just vals' -> pure $ Just vals'
         Nothing -> pure . bool Nothing (Just argVals) $ testValidVariadic tf
     testValidVariadic :: CC.Func -> Bool
     testValidVariadic tf =
@@ -3490,8 +3390,7 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
               _ -> pure Nothing
         _ -> pure Nothing
     mapArgs :: MonadSM m => CC.FuncF a -> m (Maybe [(String, (SVMType.Type, Value))])
-    mapArgs theFunc = case argVals of
-      OrderedVals vs ->
+    mapArgs theFunc =
         let go [(n, SVMType.Variadic)] [SVariadic args] = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
             go [(n, SVMType.Variadic)] args = pure $ Just [(n, (SVMType.Variadic, SVariadic args))]
             go nts [SVariadic args] = go nts args
@@ -3502,18 +3401,4 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
             argMeta =
               map (\(n, CC.IndexedType _ t) -> (fromMaybe "" n, t)) $
                 CC._funcArgs theFunc
-         in go argMeta vs
-      NamedVals ns ->
-        let strTypes = M.fromList $ map (\(maybeName, y) -> (fromMaybe "" maybeName, y)) $ CC._funcArgs theFunc
-            typeAndVal =
-              M.merge
-                (M.dropMissing)
-                (M.dropMissing)
-                (M.zipWithMatched $ \_k t v -> (t, v))
-                strTypes
-                $ M.fromList ns
-            sortedArgs =
-              map snd . sortWith fst
-                . map (\(n, (CC.IndexedType i t, v)) -> (i, (n, (t, v))))
-                $ M.toList typeAndVal
-          in pure $ Just sortedArgs
+         in go argMeta argVals
