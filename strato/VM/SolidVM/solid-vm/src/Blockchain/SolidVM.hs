@@ -153,7 +153,7 @@ withSrcPos pos str =
       ]
 
 runExpr :: MonadSM m => EvaluationRequest -> m EvaluationResponse
-runExpr exprText = withoutDebugging . withTempCallInfo True $ do
+runExpr exprText = withoutDebugging . withStaticCallInfo $ do
   -- TODO: allow write access once we figure out how to discard changes
   let eExpr = runParser expression initialParserState "" (T.unpack exprText)
   case eExpr of
@@ -1689,6 +1689,16 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               res <- callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
               case res of
                 -- TODO: call() should return (bool, variadic)... (Constant BBool , Constant a)
+                Just a -> return $ Constant a
+                Nothing -> return $ Constant SNULL
+            (SAccount addr _, "staticcall") -> do
+              let (funcName, args') = case argVals of
+                    (SString fname : a) -> (fname, a)
+                    _ -> typeError "staticcall needs first argument to be a string" args
+              fromAddress <- getCurrentAddress
+              let toAddress = addr ^. namedAccountAddress
+              res <- withStaticCallInfo $ callWithResult fromAddress toAddress CC.RawCall Nothing funcName False args'
+              case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
             (SAccount addr _, itemName) -> regularFunctionCall argVals $ Just (return $ Constant $ SContractItem addr itemName)

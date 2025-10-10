@@ -221,7 +221,7 @@ contract Describe_Mercata {
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         require(didIt, "Contract was not created correctly");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
@@ -234,7 +234,7 @@ contract Describe_Mercata {
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         require(didIt, "Contract was not created correctly");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
@@ -251,7 +251,7 @@ contract Describe_Mercata {
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
