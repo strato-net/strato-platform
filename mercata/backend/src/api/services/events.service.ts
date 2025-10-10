@@ -1,84 +1,63 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
+import type { EventData, EventResponse, ContractInfoResponse } from "@mercata/shared-types";
 
 export const getEvents = async (
   accessToken: string,
   query: Record<string, string> = {}
-): Promise<{ events: any[], total: number }> => {
-  try {
-    // Add default filters unless explicitly provided
-    const params = {
-      ...query,
-      application: query.application || "eq.Mercata",
-      creator: query.creator || "eq.BlockApps",
-      order: query.order || "block_timestamp.desc"
-    };
+): Promise<EventResponse> => {
+  const params = {
+    ...query,
+    creator: query.creator || "eq.BlockApps",
+    order: query.order || "block_timestamp.desc"
+  };
 
-    // Get total count - include all filter parameters
-    const countParams = {
-      ...params,
-      // Remove pagination parameters from count query
-      limit: undefined,
-      offset: undefined,
-      order: undefined
-    };
-    
-    // Make both API calls in parallel
-    const [countResponse, eventsResponse] = await Promise.all([
-      cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
-        params: countParams 
-      }),
-      cirrus.get(accessToken, `/${constants.Event}`, { params })
-    ]);
-    
-    const total = countResponse.data?.[0]?.count || 0;
-    const data = eventsResponse.data;
-    
-    return {
-      events: data || [],
-      total: total
-    };
-  } catch (error) {
-    console.error("Error fetching events:", error);
-    throw new Error("Failed to fetch events from the blockchain");
-  }
+  const countParams = { ...params, limit: undefined, offset: undefined, order: undefined };
+  
+  const [countResponse, eventsResponse] = await Promise.all([
+    cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
+      params: countParams 
+    }),
+    cirrus.get(accessToken, `/${constants.Event}`, { params })
+  ]);
+  
+  const total = countResponse.data?.[0]?.count || 0;
+  const data = eventsResponse.data;
+  
+  return {
+    events: data || [],
+    total: total
+  };
 };
 
 export const getContractInfo = async (
   accessToken: string
-): Promise<{ contracts: Array<{ name: string; events: string[] }> }> => {
+): Promise<ContractInfoResponse> => {
   const contracts = new Map<string, Set<string>>();
 
-  const params: Record<string, string> = {
-    application: "eq.Mercata",
-    creator: "eq.BlockApps",
-    select: "contract_name,event_name,event_name.count()",
-    order: "contract_name.asc,event_name.asc"
-  };
-
-  const { data } = await cirrus.get(accessToken, `/${constants.Event}`, { params });
-
-  if (Array.isArray(data)) {
-    for (const event of data) {
-      const contractName = typeof event?.contract_name === "string" ? event.contract_name.trim() : "";
-      const eventName = typeof event?.event_name === "string" ? event.event_name.trim() : "";
-
-      if (!contractName || !eventName) continue;
-
-      if (!contracts.has(contractName)) {
-        contracts.set(contractName, new Set());
-      }
-
-      contracts.get(contractName)!.add(eventName);
+  const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
+    params: {
+      creator: "eq.BlockApps",
+      select: "contract_name,event_name,event_name.count()",
+      order: "contract_name.asc,event_name.asc"
     }
-  }
+  });
 
-  const contractList = Array.from(contracts.entries())
-    .map(([name, events]) => ({
-      name,
-      events: Array.from(events).sort((a, b) => a.localeCompare(b))
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  (data as EventData[])?.forEach(event => {
+    if (!event?.event_name || !event?.contract_name) return;
+    
+    if (!contracts.has(event.contract_name)) {
+      contracts.set(event.contract_name, new Set());
+    }
+    contracts.get(event.contract_name)!.add(event.event_name);
+  });
 
-  return { contracts: contractList };
+  return {
+    contracts: Array.from(contracts.entries())
+      .map(([name, events]) => ({
+        name,
+        events: [...events].sort()
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+  };
 };

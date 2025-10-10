@@ -30,11 +30,12 @@ import {
   Download
 } from "lucide-react";
 import { formatUnits } from "viem";
-import { activityFeedApi, BlockchainEvent } from "@/lib/activityFeed";
+import { activityFeedApi } from "@/lib/activityFeed";
+import type { Event } from "@mercata/shared-types";
 import { useUser } from "@/context/UserContext";
 
 const ActivityFeedList = () => {
-  const [events, setEvents] = useState<BlockchainEvent[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -117,8 +118,8 @@ const ActivityFeedList = () => {
         });
         
         setEvents(response.events || []);
-        setTotalPages(response.totalPages || 1);
         setTotalEvents(response.total || 0);
+        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
         setError(null);
       } catch (err) {
         setError(`Failed to fetch events: ${err.response?.data?.message || err.message}`);
@@ -340,7 +341,7 @@ const ActivityFeedList = () => {
   }, [currentPage, totalPages]);
 
   // Memoized event card renderer to prevent unnecessary re-renders
-  const renderEventCard = useCallback((event: BlockchainEvent) => (
+  const renderEventCard = useCallback((event: Event) => (
     <Card key={`${event.transaction_hash}-${event.event_index}`} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
