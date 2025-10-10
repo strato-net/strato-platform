@@ -242,9 +242,11 @@ export const withdrawLiquidity = async (
     const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
 
     // Convert withdrawal amount (USDST) to required mTokens
+    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
     const amountWei = BigInt(amount);
     const exchangeRateWei = BigInt(exchangeRate);
-    const requiredMTokenWei = (amountWei * (10n ** 18n)) / exchangeRateWei;
+    const numerator = amountWei * (10n ** 18n);
+    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
 
     // Check if we need to unstake
     const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
