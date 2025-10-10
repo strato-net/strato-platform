@@ -11,7 +11,7 @@
 
 module Bloc.Server.Contracts where
 
-import Bloc.API.Contracts
+import Bloc.API.Contracts (ContractsNextMetadata(..))
 import Bloc.API.Utils
 import Bloc.Database.Queries
 import Bloc.XabiHelper
@@ -34,6 +34,7 @@ import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
+import Data.Aeson (ToJSON, Value, toJSON, (.=), object)
 import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -44,6 +45,7 @@ import qualified Data.Text as Text
 import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
 import Data.List (sort)
+import GHC.Generics (Generic)
 import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
@@ -56,11 +58,45 @@ getContracts ::
     A.Selectable AccountsFilterParams [AddressStateRef] m -- ,
   ) =>
   Maybe Text ->
+  Maybe Address ->
+  Maybe Integer ->
+  Maybe Integer ->
+  Maybe ChainId ->
+  Maybe Integer ->
+  Maybe Text ->
+  Maybe Integer ->
+  Maybe Integer ->
+  m GetContractsResponse
+getContracts mName mAddress mOffset mLimit chainId mPrevLimit mInstancesFor mInstOffset mInstLimit = do
+  -- Route to appropriate handler based on parameters
+  case mInstancesFor of
+    -- Instances mode: get next instances for specific contract
+    Just contractName -> do
+      response <- getContractInstancesPage (ContractName contractName) chainId mInstOffset mInstLimit
+      -- Convert GetContractInstancesResponse to GetContractsResponse for backward compatibility
+      let instancesMap = Map.singleton (gcirContract response) (gcirItems response)
+      return $ GetContractsResponse instancesMap
+    
+    -- Names mode: get contracts with preview
+    _ -> case mPrevLimit of
+      Just _ -> do
+        -- New preview mode with __next metadata
+        getContractsWithPreview mName mAddress mOffset mLimit chainId mPrevLimit
+      Nothing -> do
+        -- Legacy mode: get all instances for each contract
+        getContractsLegacy mName mOffset mLimit chainId
+
+-- Legacy function for backward compatibility
+getContractsLegacy ::
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  Maybe Text ->
   Maybe Integer ->
   Maybe Integer ->
   Maybe ChainId ->
   m GetContractsResponse
-getContracts mName mOffset mLimit chainId = do
+getContractsLegacy mName mOffset mLimit chainId = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM
@@ -100,6 +136,116 @@ getContracts mName mOffset mLimit chainId = do
   let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
   
   return . GetContractsResponse $ paginatedContractsMap
+
+-- New function for contract instances pagination
+getContractInstancesPage ::
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  ContractName ->
+  Maybe ChainId ->
+  Maybe Integer ->  -- instOffset (default 0)
+  Maybe Integer ->  -- instLimit  (default 10)
+  m GetContractInstancesResponse
+getContractInstancesPage (ContractName cName) mChainId mInstOffset mInstLimit = do
+  now <- liftIO getCurrentTime
+  let ts          = round (utcTimeToPOSIXSeconds now)
+      instOffset  = fromIntegral (fromMaybe 0  mInstOffset) :: Int
+      instLimit   = fromIntegral (fromMaybe 10 mInstLimit ) :: Int
+      fetchLimit  = instLimit + 1
+
+  refs <-
+    getAccount'
+      accountsFilterParams
+        { _qaChainId      = maybeToList mChainId
+        , _qaExternal     = Just False
+        , _qaContractName = Just cName
+        , _qaOffset       = Just instOffset
+        , _qaLimit        = Just fetchLimit
+        }
+
+  let addrs = [ addressStateRefAddress r | AddressStateRef' r _ <- refs ]
+      (pageAddrs, hasMore) =
+        if length addrs > instLimit
+          then (take instLimit addrs, True)
+          else (addrs, False)
+      items = [ AddressCreatedAt ts addr mChainId | addr <- pageAddrs ]
+      next  = if hasMore then Just (toInteger (instOffset + instLimit)) else Nothing
+
+  pure GetContractInstancesResponse
+        { gcirContract = Text.pack cName
+        , gcirItems    = items
+        , gcirNext     = next
+        }
+
+-- New function for contracts with preview and __next metadata
+getContractsWithPreview ::
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
+  Maybe Text      ->  -- mName
+  Maybe Address   ->  -- mAddress (optional; keep Nothing if you don't want address search)
+  Maybe Integer   ->  -- mOffset (names page)
+  Maybe Integer   ->  -- mLimit  (names page)
+  Maybe ChainId   ->
+  Maybe Integer   ->  -- instancesPreviewLimit
+  m GetContractsResponse  -- Returns GetContractsResponse with __next metadata
+getContractsWithPreview mName mAddress mOffset mLimit chainId mPrevLimit = do
+  let contractLimit  = fromIntegral $ fromMaybe 10 mLimit
+      contractOffset = fromIntegral $ fromMaybe 0  mOffset
+      prevLimitI     = fromIntegral $ fromMaybe 10 mPrevLimit :: Int
+
+  -- 1) Fetch all rows (your current behavior). If performance becomes an issue,
+  --    switch to DISTINCT names + per-name limited queries at the SQL layer.
+  allRefs <-
+    getAccount'
+      accountsFilterParams
+        { _qaChainId  = maybeToList chainId
+        , _qaExternal = Just False
+        , _qaSearch   = mName
+        , _qaAddress  = mAddress
+        , _qaOffset   = Nothing
+        , _qaLimit    = Nothing
+        }
+
+  -- 2) Group: Map name -> [AddressCreatedAt]
+  now <- liftIO getCurrentTime
+  let ts = round (utcTimeToPOSIXSeconds now)
+      addressToVal addr = AddressCreatedAt ts addr chainId
+      insertOne (AddressStateRef' AddressStateRef{..} _) acc =
+        case addressStateRefContractName of
+          Nothing -> acc
+          Just n  ->
+            let k = Text.pack n
+                v = addressToVal addressStateRefAddress
+            in Map.insertWith (++) k [v] acc
+
+      allContractsMap = foldr insertOne Map.empty allRefs
+      allNames        = sort (Map.keys allContractsMap)
+
+  -- 3) Names pagination
+  let paginatedNames = take contractLimit $ drop contractOffset allNames
+      hasMoreNames   = contractOffset + contractLimit < length allNames
+      contractsNext  = if hasMoreNames
+                        then Just (toInteger (contractOffset + contractLimit))
+                        else Nothing
+
+      pageMap = Map.filterWithKey (\k _ -> k `elem` paginatedNames) allContractsMap
+
+  -- 4) Trim instances to preview-limit & compute per-name "next" offsets
+  let trimmed      = Map.map (take prevLimitI) pageMap
+      instancesNxt = Map.map (\xs -> if length xs > prevLimitI
+                                     then Just (toInteger prevLimitI)
+                                     else Nothing) pageMap
+
+  -- 5) Build the contracts map with trimmed instances and metadata
+  let trimmedContractsMap = Map.map (take prevLimitI) pageMap
+      instancesNext = Map.map (\xs -> if length xs > prevLimitI
+                                     then Just (toInteger prevLimitI)
+                                     else Nothing) pageMap
+      nextMetadata = ContractsNextMetadata instancesNext contractsNext
+  
+  return $ GetContractsResponse trimmedContractsMap
 
 getContractsData ::
   ( MonadLogger m,

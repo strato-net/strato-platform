@@ -9,6 +9,7 @@ import {
   fetchAccount,
   fetchContractInfoRequest
 } from './contractCard.actions';
+import { fetchContractInstances } from '../../contracts.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
 // import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
@@ -224,6 +225,24 @@ class ContractCard extends Component {
                   >
                     {this.state.isOpen ? "Hide" : "Show"} Contracts
                   </Button>
+                  
+                  {/* Instance pagination controls */}
+                  {this.props.pagination?.instancesNext?.[name] && (
+                    <Button 
+                      type="button"
+                      className="pt-icon-arrow-right btn-sm"
+                      onClick={() => {
+                        this.props.fetchContractInstances(
+                          name, 
+                          this.props.selectedChain, 
+                          this.props.pagination.instancesNext[name], 
+                          10
+                        );
+                      }}
+                    >
+                      More Instances
+                    </Button>
+                  )}
 
                 </div>
 
@@ -257,7 +276,8 @@ class ContractCard extends Component {
 export function mapStateToProps(state, ownProps) {
   return {
     contractInfos: state.contractCard.contractInfos,
-    selectedChain: state.chains.selectedChain
+    selectedChain: state.chains.selectedChain,
+    pagination: state.contracts.pagination
   };
 }
 
@@ -267,6 +287,7 @@ export default withRouter(
     fetchContractInfoRequest,
     fetchState,
     fetchCirrusInstances,
-    fetchAccount
+    fetchAccount,
+    fetchContractInstances
   })(ContractCard)
 );

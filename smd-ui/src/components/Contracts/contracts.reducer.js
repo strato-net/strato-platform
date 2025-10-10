@@ -3,6 +3,9 @@ import {
   FETCH_CONTRACTS_SUCCESSFUL,
   FETCH_CONTRACTS_FAILED,
   CHANGE_CONTRACT_FILTER,
+  FETCH_CONTRACT_INSTANCES,
+  FETCH_CONTRACT_INSTANCES_SUCCESS,
+  FETCH_CONTRACT_INSTANCES_FAILURE,
 } from './contracts.actions';
 import {
   FETCH_STATE_SUCCESS,
@@ -15,7 +18,11 @@ const initialState = {
   contracts: {},
   filter: '',
   error: null,
-  isLoading: false
+  isLoading: false,
+  pagination: {
+    contractsNext: null,
+    instancesNext: {} // contractName -> nextOffset
+  }
 };
 
 const reducer = function (state = initialState, action) {
@@ -45,6 +52,8 @@ const reducer = function (state = initialState, action) {
       const contractNames = Object.getOwnPropertyNames(action.contracts);
       const updatedContracts = {};
       contractNames.forEach((name) => {
+        // Skip __next metadata
+        if (name !== '__next') {
           updatedContracts[name] = {
             instances: action.contracts[name]
               .map((instance) => {
@@ -54,12 +63,21 @@ const reducer = function (state = initialState, action) {
                 }
               })
           };
+        }
       });
+      
+      // Extract pagination metadata
+      const pagination = {
+        contractsNext: action.contracts.__next?.contracts || null,
+        instancesNext: action.contracts.__next?.instances || {}
+      };
+      
       return {
         contracts: updatedContracts,
         filter: state.filter,
         error: state.error,
-        isLoading: false
+        isLoading: false,
+        pagination: pagination
       };
     case FETCH_CONTRACTS_FAILED:
       return {
@@ -145,6 +163,39 @@ const reducer = function (state = initialState, action) {
         filter: state.filter,
         error: state.error
       }
+    
+    case FETCH_CONTRACT_INSTANCES_SUCCESS:
+      // Append new instances to existing contract
+      const existingInstances = state.contracts[action.contractName]?.instances || [];
+      const newInstances = action.instances.map(instance => ({
+        ...instance,
+        fromBloc: true
+      }));
+      
+      return {
+        contracts: {
+          ...state.contracts,
+          [action.contractName]: {
+            instances: [...existingInstances, ...newInstances]
+          }
+        },
+        filter: state.filter,
+        error: state.error,
+        pagination: {
+          ...state.pagination,
+          instancesNext: {
+            ...state.pagination.instancesNext,
+            [action.contractName]: action.instances.length === 10 ? 
+              (state.pagination.instancesNext[action.contractName] || 0) + 10 : null
+          }
+        }
+      };
+    
+    case FETCH_CONTRACT_INSTANCES_FAILURE:
+      return {
+        ...state,
+        error: action.error
+      };
 
     default:
       return state;

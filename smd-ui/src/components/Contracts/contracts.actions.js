@@ -4,13 +4,46 @@ export const FETCH_CONTRACTS_FAILED = 'FETCH_CONTRACTS_FAILED';
 export const CHANGE_CONTRACT_FILTER = 'CHANGE_CONTRACT_FILTER';
 export const TOGGLE_COLLAPSE_TABLE = 'TOGGLE_COLLAPSE_TABLE';
 
-export const fetchContracts = function (chainId, limit, offset, name) {
+// New actions for contract instances pagination
+export const FETCH_CONTRACT_INSTANCES = 'FETCH_CONTRACT_INSTANCES';
+export const FETCH_CONTRACT_INSTANCES_SUCCESS = 'FETCH_CONTRACT_INSTANCES_SUCCESS';
+export const FETCH_CONTRACT_INSTANCES_FAILURE = 'FETCH_CONTRACT_INSTANCES_FAILURE';
+
+export const fetchContracts = function (chainId, limit, offset, name, instancesPreviewLimit = 10) {
   return {
     type: FETCH_CONTRACTS,
     chainId,
     limit,
     offset,
-    name
+    name,
+    instancesPreviewLimit
+  }
+};
+
+// New action creators for contract instances pagination
+export const fetchContractInstances = function (contractName, chainId, instOffset = 0, instLimit = 10) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES,
+    contractName,
+    chainId,
+    instOffset,
+    instLimit
+  }
+};
+
+export const fetchContractInstancesSuccess = function (contractName, instances) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES_SUCCESS,
+    contractName,
+    instances
+  }
+};
+
+export const fetchContractInstancesFailure = function (contractName, error) {
+  return {
+    type: FETCH_CONTRACT_INSTANCES_FAILURE,
+    contractName,
+    error
   }
 };
 

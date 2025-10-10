@@ -51,7 +51,7 @@ class Contracts extends Component {
   componentWillMount() {
     // mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
-    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
+    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, '', 10);
     this.props.fetchChainIds(this.chainLimit, this.chainOffset);
   }
 
@@ -61,14 +61,14 @@ class Contracts extends Component {
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
-      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.fetchContracts(nextProps.selectedChain, this.state.limit, this.state.offset, this.props.filter, 10);
     }
   }
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
     this.setState({ offset: 0 }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter, 10);
     });
   }
 
@@ -80,7 +80,7 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = offset + limit;
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter, 10);
     });
   };
 
@@ -88,7 +88,7 @@ class Contracts extends Component {
     const { offset, limit } = this.state;
     const newOffset = Math.max(0, offset - limit);
     this.setState({ offset: newOffset }, () => {
-      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter);
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, this.props.filter, 10);
     });
   };
 
@@ -206,7 +206,7 @@ class Contracts extends Component {
                 onClick={this.onNextClick}
                 className="pt-icon-arrow-right"
                 text="Next"
-                disabled={contractNames.length < this.state.limit}
+                disabled={!this.props.pagination?.contractsNext}
               />
             </div>
           </div>
@@ -223,6 +223,7 @@ export function mapStateToProps(state) {
     selectedChain: state.chains.selectedChain,
     isLoading: state.contracts.isLoading,
     chainIds: state.chains.chainIds,
+    pagination: state.contracts.pagination,
   };
 }
 

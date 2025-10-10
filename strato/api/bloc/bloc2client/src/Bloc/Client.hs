@@ -41,9 +41,14 @@ getGitInfo = client (Proxy @GetGitInfo)
 ------------- /contracts endpoints -------------
 getContracts ::
   Maybe Text ->
+  Maybe Address ->
   Maybe Integer ->
   Maybe Integer ->
   Maybe ChainId ->
+  Maybe Integer ->
+  Maybe Text ->
+  Maybe Integer ->
+  Maybe Integer ->
   ClientM GetContractsResponse
 getContracts = client (Proxy @GetContracts)
 

@@ -1,8 +1,11 @@
 import { takeEvery, put, call } from "redux-saga/effects";
 import {
   FETCH_CONTRACTS,
+  FETCH_CONTRACT_INSTANCES,
   fetchContractsSuccess,
   fetchContractsFailure,
+  fetchContractInstancesSuccess,
+  fetchContractInstancesFailure,
 } from "./contracts.actions";
 import { env } from "../../env";
 import { handleErrors } from "../../lib/handleErrors";
@@ -31,22 +34,32 @@ async function fetchJson(url) {
   return res.json();
 }
 
-export async function getContracts(chainid, limit, offset, searchTerm) {
-  const params = new URLSearchParams({ limit, offset });
+export async function getContracts(chainid, limit, offset, searchTerm, instancesPreviewLimit = 10) {
+  const params = new URLSearchParams({ limit, offset, instancesPreviewLimit });
 
   if (chainid) params.set("chainid", chainid);
 
-  // if (searchTerm && isValidContractAddress(searchTerm)) {
-  //   const detailUrl = `${contractsUrl}/contract/${searchTerm}/details?${params}`;
-  //   const { _contractName } = await fetchJson(detailUrl);
-    
-  //   if (_contractName) params.set("name", searchTerm);
+  // Handle address search
+  if (searchTerm && isValidContractAddress(searchTerm)) {
+    params.set("address", searchTerm);
+  } else if (searchTerm) {
+    // Handle name search
+    params.set("name", searchTerm);
+  }
 
-  //   const listUrl = `${contractsUrl}?${params}`;
-  //   return fetchJson(listUrl);
-  // }
+  const listUrl = `${contractsUrl}?${params}`;
+  return fetchJson(listUrl);
+}
 
-  if (searchTerm) params.set("name", searchTerm);
+// New function for fetching contract instances
+export async function getContractInstances(contractName, chainid, instOffset = 0, instLimit = 10) {
+  const params = new URLSearchParams({ 
+    instancesFor: contractName,
+    instOffset: instOffset,
+    instLimit: instLimit
+  });
+
+  if (chainid) params.set("chainid", chainid);
 
   const listUrl = `${contractsUrl}?${params}`;
   return fetchJson(listUrl);
@@ -59,7 +72,8 @@ export function* fetchContracts(action) {
       action.chainId,
       action.limit,
       action.offset,
-      action.name
+      action.name,
+      action.instancesPreviewLimit || 10
     );
     yield put(fetchContractsSuccess(response));
   } catch (err) {
@@ -67,6 +81,23 @@ export function* fetchContracts(action) {
   }
 }
 
+// New saga for fetching contract instances
+export function* fetchContractInstances(action) {
+  try {
+    let response = yield call(
+      getContractInstances,
+      action.contractName,
+      action.chainId,
+      action.instOffset,
+      action.instLimit
+    );
+    yield put(fetchContractInstancesSuccess(action.contractName, response));
+  } catch (err) {
+    yield put(fetchContractInstancesFailure(action.contractName, err));
+  }
+}
+
 export default function* watchFetchContracts() {
   yield takeEvery(FETCH_CONTRACTS, fetchContracts);
+  yield takeEvery(FETCH_CONTRACT_INSTANCES, fetchContractInstances);
 }

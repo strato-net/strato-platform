@@ -45,9 +45,14 @@ import Web.FormUrlEncoded hiding (fieldLabelModifier)
 type GetContracts =
   "contracts"
     :> QueryParam "name" Text
+    :> QueryParam "address" Address
     :> QueryParam "offset" Integer
     :> QueryParam "limit" Integer
     :> QueryParam "chainid" ChainId
+    :> QueryParam "instancesPreviewLimit" Integer
+    :> QueryParam "instancesFor" Text
+    :> QueryParam "instOffset" Integer
+    :> QueryParam "instLimit" Integer
     :> Get '[JSON] GetContractsResponse
 
 instance ToParam (QueryParam "limit" Integer) where
@@ -105,6 +110,64 @@ instance FromJSON GetContractsResponse where
   parseJSON = fmap GetContractsResponse . parseJSON
 
 instance Arbitrary GetContractsResponse where arbitrary = GR.genericArbitrary GR.uniform
+
+-- New response type for contract instances pagination
+data GetContractInstancesResponse = GetContractInstancesResponse
+  { gcirContract :: Text
+  , gcirItems    :: [AddressCreatedAt]
+  , gcirNext     :: Maybe Integer
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON GetContractInstancesResponse
+
+instance FromJSON GetContractInstancesResponse
+
+instance Arbitrary GetContractInstancesResponse where arbitrary = GR.genericArbitrary GR.uniform
+
+instance ToSchema GetContractInstancesResponse where
+  declareNamedSchema proxy =
+    genericDeclareNamedSchema blocSchemaOptions proxy
+      & mapped . name ?~ "Get Contract Instances Response"
+      & mapped . schema . description ?~ "Response for contract instances pagination"
+      & mapped . schema . example ?~ toJSON ex
+    where
+      ex :: GetContractInstancesResponse
+      ex =
+        GetContractInstancesResponse
+          { gcirContract = "MySampleContract",
+            gcirItems = [AddressCreatedAt 1976 (Address 0xdeadbeef) Nothing],
+            gcirNext = Just 10
+          }
+
+-- Enhanced response type with pagination metadata
+data GetContractsWithPreviewResponse = GetContractsWithPreviewResponse
+  { gcwprContracts :: Map Text [AddressCreatedAt]
+  , gcwprNext :: Maybe ContractsNextMetadata
+  } deriving (Eq, Show, Generic)
+
+data ContractsNextMetadata = ContractsNextMetadata
+  { cnmInstances :: Map Text (Maybe Integer)
+  , cnmContracts :: Maybe Integer
+  } deriving (Eq, Show, Generic)
+
+instance ToJSON GetContractsWithPreviewResponse where
+  toJSON GetContractsWithPreviewResponse{..} = 
+    case gcwprNext of
+      Nothing -> toJSON gcwprContracts
+      Just nextMeta -> object 
+        [ "contracts" .= gcwprContracts
+        , "__next" .= nextMeta
+        ]
+
+instance FromJSON GetContractsWithPreviewResponse
+
+instance ToJSON ContractsNextMetadata
+
+instance FromJSON ContractsNextMetadata
+
+instance Arbitrary GetContractsWithPreviewResponse where arbitrary = GR.genericArbitrary GR.uniform
+
+instance Arbitrary ContractsNextMetadata where arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToSample GetContractsResponse where
   toSamples _ =
