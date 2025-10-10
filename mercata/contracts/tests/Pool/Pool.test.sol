@@ -774,6 +774,7 @@ contract Describe_Pool {
     }
 
     function it_pool_handles_expired_deadlines() {
+        fastForward(3600);
         uint256 amountA = 1000e18;
         uint256 amountB = 2000e18;
         

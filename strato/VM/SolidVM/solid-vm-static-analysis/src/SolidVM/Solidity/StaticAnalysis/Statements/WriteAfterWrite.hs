@@ -195,6 +195,7 @@ expressionHelper (DecimalLiteral _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
 expressionHelper (AccountLiteral _ _) = pure []
 expressionHelper (HexaLiteral _ _) = pure []
+expressionHelper (InlineBoundsCheck _ _ _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

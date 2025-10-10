@@ -296,6 +296,10 @@ mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode m
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
 
+implContract :: Address -> String -> AccountInfo
+implContract implAddress contractName =
+  SolidVMContractWithStorage implAddress 0 (mercataContract contractName) $ ownedByBlockApps implAddress
+
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
@@ -308,27 +312,27 @@ genesisBlock  =
         genesisInfoCoinbase=Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,
-            ContractNoStorage rateStrategyImplAddress 0 (mercataContract "RateStrategy"),
-            ContractNoStorage priceOracleImplAddress 0 (mercataContract "PriceOracle"),
-            ContractNoStorage collateralVaultImplAddress 0 (mercataContract "CollateralVault"),
-            ContractNoStorage liquidityPoolImplAddress 0 (mercataContract "LiquidityPool"),
-            ContractNoStorage lendingPoolImplAddress 0 (mercataContract "LendingPool"),
-            ContractNoStorage poolConfiguratorImplAddress 0 (mercataContract "PoolConfigurator"),
-            ContractNoStorage lendingRegistryImplAddress 0 (mercataContract "LendingRegistry"),
-            ContractNoStorage mercataBridgeImplAddress 0 (mercataContract "MercataBridge"),
-            ContractNoStorage poolFactoryImplAddress 0 (mercataContract "PoolFactory"),
-            ContractNoStorage tokenFactoryImplAddress 0 (mercataContract "TokenFactory"),
-            ContractNoStorage adminRegistryImplAddress 0 (mercataContract "AdminRegistry"),
-            ContractNoStorage feeCollectorImplAddress 0 (mercataContract "FeeCollector"),
-            ContractNoStorage voucherImplAddress 0 (mercataContract "Voucher"),
-            ContractNoStorage tokenImplAddress 0 (mercataContract "Token"),
-            ContractNoStorage poolImplAddress 0 (mercataContract "Pool"),
-            ContractNoStorage cdpEngineImplAddress 0 (mercataContract "CDPEngine"),
-            ContractNoStorage cdpRegistryImplAddress 0 (mercataContract "CDPRegistry"),
-            ContractNoStorage cdpVaultImplAddress 0 (mercataContract "CDPVault"),
-            ContractNoStorage cdpReserveImplAddress 0 (mercataContract "CDPReserve"),
-            ContractNoStorage safetyModuleImplAddress 0 (mercataContract "SafetyModule"),
-            ContractNoStorage rewardsChefImplAddress 0 (mercataContract "RewardsChef"),
+            implContract rateStrategyImplAddress "RateStrategy",
+            implContract priceOracleImplAddress "PriceOracle",
+            implContract collateralVaultImplAddress "CollateralVault",
+            implContract liquidityPoolImplAddress "LiquidityPool",
+            implContract lendingPoolImplAddress "LendingPool",
+            implContract poolConfiguratorImplAddress "PoolConfigurator",
+            implContract lendingRegistryImplAddress "LendingRegistry",
+            implContract mercataBridgeImplAddress "MercataBridge",
+            implContract poolFactoryImplAddress "PoolFactory",
+            implContract tokenFactoryImplAddress "TokenFactory",
+            implContract adminRegistryImplAddress "AdminRegistry",
+            implContract feeCollectorImplAddress "FeeCollector",
+            implContract voucherImplAddress "Voucher",
+            implContract tokenImplAddress "Token",
+            implContract poolImplAddress "Pool",
+            implContract cdpEngineImplAddress "CDPEngine",
+            implContract cdpRegistryImplAddress "CDPRegistry",
+            implContract cdpVaultImplAddress "CDPVault",
+            implContract cdpReserveImplAddress "CDPReserve",
+            implContract safetyModuleImplAddress "SafetyModule",
+            implContract rewardsChefImplAddress "RewardsChef",
             SolidVMContractWithStorage
               mercataAddress
               720
