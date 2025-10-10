@@ -423,8 +423,8 @@ class Dashboard extends Component {
                   <span>{metadata ? metadata.nodeAddress.substring(0, 5) + "..." : "Loading..."}</span>
                   <button
                     className="btn btn-sm btn-outline-secondary ml-2"
-                    onClick={() => navigator.clipboard.writeText(metadata?.nodeAddress)}
-                    disabled={!metadata?.nodeAddress}
+                    onClick={() => navigator.clipboard.writeText(metadata && metadata.nodeAddress)}
+                    disabled={!metadata || !metadata.nodeAddress}
                     title="Copy Node Address"
                   >
                     <i className="fa fa-copy"></i>
