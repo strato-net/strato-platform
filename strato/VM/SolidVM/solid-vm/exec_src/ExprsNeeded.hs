@@ -80,6 +80,10 @@ expressionCrawler = \case
       expressionCrawler expr
   BoolLiteral {} -> ["BoolLiteral"]
   HexaLiteral {} -> ["HexaLiteral"]
+  InlineBoundsCheck _ mL mU expr ->
+    let l = maybe "" (T.pack . show) mL
+        u = maybe "" (T.pack . show) mU
+     in ("InlineBoundsCheck (" <> l <> "," <> u <> ")") : expressionCrawler expr
   NumberLiteral {} -> ["NumberLiteral"]
   DecimalLiteral {} -> ["DecimalLiteral"]
   StringLiteral {} -> ["StringLiteral"]

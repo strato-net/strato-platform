@@ -62,9 +62,9 @@ statement =
     <|> (Break <$> (position (reserved "break") <* semi))
     <|> (reserved "assembly" >> inlineAssembly)
     <|> (ModifierExecutor <$> (position (reserved "_") <* semi)) -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
-    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
     <|> revertStatement
     <|> uncheckedStatement
+    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -139,7 +139,7 @@ ifStatement = do
   pure $ IfStatement i t e a
 
 uncheckedStatement :: SolidityParser Statement
-uncheckedStatement = do
+uncheckedStatement = try $ do
   ~(a, s) <- withPosition $ do
     reserved "unchecked"
     statements

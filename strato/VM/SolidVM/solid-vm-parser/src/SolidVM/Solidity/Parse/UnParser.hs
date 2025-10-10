@@ -337,6 +337,7 @@ unparseExpression (DecimalLiteral _ v) = show $ unwrapDecimal v
 unparseExpression (StringLiteral _ s) = ('"' :) . (++ "\"") $ s
 unparseExpression (AccountLiteral _ a) = ('<' :) . (++ ">") $ show a
 unparseExpression (HexaLiteral _ a) = "hex\"" ++ (labelToString a) ++ "\""
+unparseExpression (InlineBoundsCheck _ _ _ a) = unparseExpression a
 unparseExpression (TupleExpression _ vals) = "(" ++ List.intercalate ", " (map (maybe "" unparseExpression) vals) ++ ")"
 unparseExpression (IndexAccess _ e maybeVal) = unparseExpression e ++ "[" ++ fromMaybe "" (fmap unparseExpression maybeVal) ++ "]"
 unparseExpression (FunctionCall _ e args) =

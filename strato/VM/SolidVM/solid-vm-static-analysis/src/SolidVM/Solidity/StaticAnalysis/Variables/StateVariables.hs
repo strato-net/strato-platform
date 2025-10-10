@@ -242,3 +242,4 @@ expressionHelper (Variable x name) =
   [] <$ stateVarReadHelper name x
 expressionHelper (ObjectLiteral _ _) = pure []
 expressionHelper (HexaLiteral _ _) = pure []
+expressionHelper (InlineBoundsCheck _ _ _ _) = pure []
