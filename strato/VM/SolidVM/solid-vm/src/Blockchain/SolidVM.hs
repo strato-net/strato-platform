@@ -1760,23 +1760,24 @@ expToVar' (CC.FunctionCall _ e args) _ = do
               ro <- readOnly <$> getCurrentCallInfo
               contract' <- getCurrentContract
               address <- getCurrentAddress
+              codeAddr <- getCurrentCodeAddress
               (hsh, cc) <- getCurrentCodeCollection
               -- when (True) (internalError "IT'S MORBIN TIME" matchingFuncOverload)
               res <- do
                 if (CC._funcIsFree func)
                   then do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address address contract' funcName hsh cc mo argVals' ro True
-                      Nothing -> runTheCall address address contract' funcName hsh cc func argVals ro True
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                      Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro True
                   else do
                     validateFunctionArguments func argVals >>= \case
-                      Just (mo, argVals') -> runTheCall address address contract' funcName hsh cc mo argVals' ro False
+                      Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro False
                       Nothing -> case M.lookup funcName $ cc ^. CC.flFuncs of
                         Just ff -> do
                           validateFunctionArguments ff argVals >>= \case
-                            Just (mo, argVals') -> runTheCall address address contract' funcName hsh cc mo argVals' ro True
-                            Nothing -> runTheCall address address contract' funcName hsh cc func argVals ro False
-                        Nothing -> runTheCall address address contract' funcName hsh cc func argVals ro False
+                            Just (mo, argVals') -> runTheCall address codeAddr contract' funcName hsh cc mo argVals' ro True
+                            Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
+                        Nothing -> runTheCall address codeAddr contract' funcName hsh cc func argVals ro False
               return . Constant . fromMaybe SNULL $ res
             Constant (SStructDef structName) -> do
               contract' <- getCurrentContract
