@@ -364,7 +364,7 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-4">
+          {/* <div className="col-sm-4">
             <NumberCard
               number={
                 this.props.appMetadata && this.props.appMetadata.nodeInfo ? (
@@ -393,8 +393,29 @@ class Dashboard extends Component {
               }
               textSize="h4"
             />
+          </div> */}
+           
+           <div className="col-sm-4">
+            <NumberCard
+              number={env.NODE_HOST}
+              description="Node Host"
+              iconClass="fa-server"
+              className={`smd-pointer`}
+              textSize="h4"
+            />
           </div>
-          <div className="col-sm-8">
+
+          <div className="col-sm-4">
+            <NumberCard
+              number={metadata ? metadata.nodeAddress : "Loading..."}
+              description="Node Address"
+              iconClass="fa-id-card"
+              className={`smd-pointer`}
+              textSize="h4"
+            />
+          </div>
+
+          <div className="col-sm-4">
             <NodeCard />
           </div>
         </div>
