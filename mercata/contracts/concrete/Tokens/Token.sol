@@ -2,7 +2,6 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/ERC20.sol";
 import "../../abstract/ERC20/utils/Pausable.sol";
 import "../Admin/AdminRegistry.sol";
-import "../Rewards/RewardsManager.sol";
 import "./TokenMetadata.sol";
 import "./TokenFactory.sol";
 
@@ -42,7 +41,6 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     uint8 public customDecimals;
     TokenStatus public status;
     TokenFactory public tokenFactory;
-    RewardsManager public rewardsManager;
 
     event StatusChanged(TokenStatus newStatus);
 
@@ -95,10 +93,6 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
-    function setRewardsManager(address _rewardsManager) external onlyOwner {
-        rewardsManager = RewardsManager(_rewardsManager);
-    }
-
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
@@ -142,17 +136,5 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
 
     function transferFrom(address from, address to, uint256 value) public override whenNotPausedOrOwner returns (bool) {
         return super.transferFrom(from, to, value);
-    }
-
-    function _update(address from, address to, uint256 value) internal override {
-        if (address(rewardsManager) != address(0)) {
-            if (from != address(0)) {
-                rewardsManager.updateRewardsBalanceFor(address(this), from);
-            }
-            if (to != address(0)) {
-                rewardsManager.updateRewardsBalanceFor(address(this), to);
-            }
-        }
-        super._update(from, to, value);
     }
 }
