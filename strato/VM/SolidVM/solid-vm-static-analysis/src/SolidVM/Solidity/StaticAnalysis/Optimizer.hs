@@ -345,9 +345,9 @@ optimizeExpression (FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap")
       [x] | M.member nam (_userDefined c) -> optimizeExpression x Nothing
       _ -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
     Nothing -> pure $ FunctionCall x1 (MemberAccess x2 (Variable x3 nam) "unwrap") args
-optimizeExpression (FunctionCall x1 (Variable x3 f@('u':'i':'n':'t':_)) (OrderedArgs (xp:args))) _ = do
+optimizeExpression (FunctionCall x1 (Variable x3 f@('u':'i':'n':'t':_)) (xp:args)) _ = do
   let xp' = Ternary x3 (Binary x3 "<" xp (NumberLiteral x3 0 Nothing)) (Unitary x3 "-" xp) xp
-  pure $ FunctionCall x1 (Variable x3 f) (OrderedArgs (xp':args))
+  pure $ FunctionCall x1 (Variable x3 f) (xp':args)
 
 -- This needs further research before letting loose on the code base
 -- This function as of now is neutured
