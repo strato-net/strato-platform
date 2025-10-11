@@ -448,8 +448,7 @@ call' from to' fnCalltype functionName valList = do
       _ -> pure (n, "")
 
   let parentName' = if parentName == (CC._contractName contract) then "" else parentName
-
-  let !abstracts' = getAbstractParentsFromContract contract cc
+      !abstracts' = getAbstractParentsFromContract contract cc
 
   (_, oAddr, ctrName) <- getCreator codeAddress
   !abstracts <- M.fromList <$> traverse (resolveNameParts storageAddress (T.pack ctrName) (T.pack parentName')) abstracts'
@@ -1058,10 +1057,8 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
-          codeAddr <- getCurrentCodeAddress
-          contractName' <- fst <$> getContractNameAndHash codeAddr
-          $logInfoS "Event args" . T.pack $ show (address, codeAddress, codeAddr, ctrName, parentName, contractName')
-          addEvent $ Event bHash ctrName parentName (labelToString contractName') address eventName evArgs
+          let contractName' = labelToString $ CC._contractName curCnct
+          addEvent $ Event bHash ctrName parentName contractName' address eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
