@@ -428,13 +428,14 @@ call' ::
 call' from to' fnCalltype functionName valList = do
   (storageAddress, codeAddress) <- case fnCalltype of
     CC.DelegateCall -> return (from, to')
-    _ | from == to' -> do
-      mCallInfo <- getCurrentCallInfoIfExists
-      case mCallInfo of
-        Just callInfo | currentCodeAddress callInfo /= currentAddress callInfo ->
-          return (to', currentCodeAddress callInfo)
-        _ -> return (to', to')
-    _ -> return (to', to')
+    _ -> (to',) <$> do
+      if from == to'
+        then do
+          mCallInfo <- getCurrentCallInfoIfExists
+          case mCallInfo of
+            Just callInfo -> pure $ currentCodeAddress callInfo
+            _ -> pure to'
+        else pure to'
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
   (toName, parentName) <- do
     ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) storageAddress
@@ -600,7 +601,7 @@ call' from to' fnCalltype functionName valList = do
         Just (SolidVMCode name _) -> pure (n, stringToLabel name) -- Name of the parent
         _ -> pure (n, "")
     (_, _, codeContractCreator) <- getCreator codeAddress
-    addDelegatecall from storageAddress (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
+    addDelegatecall storageAddress codeAddress (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
   ((ctrName, parentName'),) <$> logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
