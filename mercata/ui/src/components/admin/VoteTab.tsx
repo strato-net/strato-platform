@@ -55,6 +55,52 @@ const VoteTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* List of Admins */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Admins</CardTitle>
+          <CardDescription>Current administrators with voting rights</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <span className="text-sm text-gray-500">
+              {admins.length} admin{admins.length !== 1 ? 's' : ''} registered
+            </span>
+          </div>
+          
+          {admins.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No admins found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {admins.map((admin: {address: string}, index: number) => (
+                <div 
+                  key={`${admin.address}-${index}`}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-sm">
+                      {admin && admin.address !== 'Unknown' 
+                        ? `${admin.address.slice(0, 6)}...${admin.address.slice(-4)}`
+                        : admin.address
+                      }
+                    </span>
+                    {admin?.address && admin.address !== 'Unknown' && (
+                      <CopyButton address={admin.address} />
+                    )}
+                  </div>
+                  {admin.address === userAddress && (
+                    <span className="text-xs bg-strato-blue text-white px-2 py-1 rounded">You</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       { }
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
