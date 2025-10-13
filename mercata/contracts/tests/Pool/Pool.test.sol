@@ -1,6 +1,7 @@
 import "../../concrete/BaseCodeCollection.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 
-contract Describe_Pool {
+contract Describe_Pool is Authorizable {
     Mercata m;
     string[] emptyArray;
     
@@ -11,6 +12,7 @@ contract Describe_Pool {
     Pool pool;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);
