@@ -4,7 +4,7 @@ import { executeTransaction } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { constants } from "../../config/constants";
 import { poolFactory } from "../../config/config";
-import { 
+import {
   calculateImpliedPrice,
   buildPoolParams,
   extractTokenAddresses,
@@ -19,6 +19,7 @@ import {
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
 import { getPools as getRewardsChefPools, getStakedBalance, waitForBalanceUpdate } from "./rewardsChef.service";
+import { getTokenBalanceForUser } from "./tokens.service";
 import { rewardsChef } from "../../config/constants";
 import {
   SwapHistoryEntry,
@@ -81,24 +82,6 @@ const findRewardsChefPoolIdx = async (
   const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
   const rewardsPool = rewardsChefPools.find(p => p.lpToken === lpTokenAddress);
   return rewardsPool?.poolIdx;
-};
-
-/**
- * Gets the user's LP token balance from Cirrus
- */
-const getUserLPTokenBalance = async (
-  accessToken: string,
-  lpTokenAddress: string,
-  userAddress: string
-): Promise<string> => {
-  const { data: lpTokenData } = await cirrus.get(accessToken, `/BlockApps-Mercata-Token`, {
-    params: {
-      address: `eq.${lpTokenAddress}`,
-      select: `balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
-      "balances.key": `eq.${userAddress.toLowerCase()}`
-    }
-  });
-  return lpTokenData?.[0]?.balances?.[0]?.balance || "0";
 };
 
 /**
@@ -385,7 +368,7 @@ export const addLiquidityDualToken = async (
     rewardsPoolIdx = await findRewardsChefPoolIdx(accessToken, lpTokenAddress);
 
     if (rewardsPoolIdx !== undefined) {
-      lpTokenBalanceBefore = await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress);
+      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
     }
   }
 
@@ -431,7 +414,7 @@ export const addLiquiditySingleToken = async (
     rewardsPoolIdx = await findRewardsChefPoolIdx(accessToken, lpTokenAddress);
 
     if (rewardsPoolIdx !== undefined) {
-      lpTokenBalanceBefore = await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress);
+      lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
     }
   }
 
@@ -487,7 +470,7 @@ export const removeLiquidity = async (
 
     if (rewardsPoolIdx !== undefined) {
       // Get user's wallet LP token balance
-      const walletLPBalance = BigInt(await getUserLPTokenBalance(accessToken, lpTokenAddress, userAddress));
+      const walletLPBalance = BigInt(await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress));
 
       // Get staked LP token balance
       const stakedLPBalance = BigInt(await getStakedBalance(accessToken, rewardsChef, rewardsPoolIdx, userAddress));
