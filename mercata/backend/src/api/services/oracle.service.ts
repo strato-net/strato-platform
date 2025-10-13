@@ -29,7 +29,7 @@ export const getPrice = async (
   accessToken: string,
   asset?: string
 ) => {
-  const registry = await getPool(accessToken, undefined, { 
+  const registry = await getPool(accessToken, { 
     select: `priceOracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(asset:key,price:value::text))` 
   });
 
@@ -54,7 +54,7 @@ export const setPrice = async (
   body: Record<string, string | undefined>
 ) => {
   try {
-    const registry = await getPool(accessToken, undefined, {
+    const registry = await getPool(accessToken, {
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;
@@ -88,7 +88,7 @@ export const getPriceHistory = async (
 ): Promise<PriceHistoryResponse> => {
   try {
     // Get the oracle address from the lending registry
-    const registry = await getPool(accessToken, undefined, {
+    const registry = await getPool(accessToken, {
       select: "priceOracle",
     });
     

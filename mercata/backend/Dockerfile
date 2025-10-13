@@ -29,6 +29,7 @@ COPY --from=builder packages/shared-types/ ../packages/shared-types/
 RUN npm ci
 
 COPY --from=builder /build/dist ./dist
+COPY --from=builder /build/src/public ./src/public
 
 EXPOSE 3001
 

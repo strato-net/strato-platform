@@ -148,9 +148,6 @@ voucherAddress = 0x100e
 mTokenAddress :: Address
 mTokenAddress = 0x100f
 
-rewardsManagerAddress :: Address
-rewardsManagerAddress = 0x1010
-
 cdpEngineAddress :: Address
 cdpEngineAddress = 0x1011
 
@@ -247,9 +244,6 @@ tokenImplAddress = 0x110f
 poolImplAddress :: Address
 poolImplAddress = 0x1117
 
-rewardsManagerImplAddress :: Address
-rewardsManagerImplAddress = 0x1110
-
 cdpEngineImplAddress :: Address
 cdpEngineImplAddress = 0x1111
 
@@ -308,6 +302,10 @@ mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode m
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
 
+implContract :: Address -> String -> AccountInfo
+implContract implAddress contractName =
+  SolidVMContractWithStorage implAddress 0 (mercataContract contractName) $ ownedByBlockApps implAddress
+
 genesisBlock :: GenesisInfo
 genesisBlock  =
   insertMercataGovernanceContract validators admins
@@ -320,28 +318,27 @@ genesisBlock  =
         genesisInfoCoinbase=Org "00000000000000000000" True,
         genesisInfoAccountInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,
-            ContractNoStorage rateStrategyImplAddress 0 (mercataContract "RateStrategy"),
-            ContractNoStorage priceOracleImplAddress 0 (mercataContract "PriceOracle"),
-            ContractNoStorage collateralVaultImplAddress 0 (mercataContract "CollateralVault"),
-            ContractNoStorage liquidityPoolImplAddress 0 (mercataContract "LiquidityPool"),
-            ContractNoStorage lendingPoolImplAddress 0 (mercataContract "LendingPool"),
-            ContractNoStorage poolConfiguratorImplAddress 0 (mercataContract "PoolConfigurator"),
-            ContractNoStorage lendingRegistryImplAddress 0 (mercataContract "LendingRegistry"),
-            ContractNoStorage mercataBridgeImplAddress 0 (mercataContract "MercataBridge"),
-            ContractNoStorage poolFactoryImplAddress 0 (mercataContract "PoolFactory"),
-            ContractNoStorage tokenFactoryImplAddress 0 (mercataContract "TokenFactory"),
-            ContractNoStorage adminRegistryImplAddress 0 (mercataContract "AdminRegistry"),
-            ContractNoStorage feeCollectorImplAddress 0 (mercataContract "FeeCollector"),
-            ContractNoStorage voucherImplAddress 0 (mercataContract "Voucher"),
-            ContractNoStorage tokenImplAddress 0 (mercataContract "Token"),
-            ContractNoStorage poolImplAddress 0 (mercataContract "Pool"),
-            ContractNoStorage rewardsManagerImplAddress 0 (mercataContract "RewardsManager"),
-            ContractNoStorage cdpEngineImplAddress 0 (mercataContract "CDPEngine"),
-            ContractNoStorage cdpRegistryImplAddress 0 (mercataContract "CDPRegistry"),
-            ContractNoStorage cdpVaultImplAddress 0 (mercataContract "CDPVault"),
-            ContractNoStorage cdpReserveImplAddress 0 (mercataContract "CDPReserve"),
-            ContractNoStorage safetyModuleImplAddress 0 (mercataContract "SafetyModule"),
-            ContractNoStorage rewardsChefImplAddress 0 (mercataContract "RewardsChef"),
+            implContract rateStrategyImplAddress "RateStrategy",
+            implContract priceOracleImplAddress "PriceOracle",
+            implContract collateralVaultImplAddress "CollateralVault",
+            implContract liquidityPoolImplAddress "LiquidityPool",
+            implContract lendingPoolImplAddress "LendingPool",
+            implContract poolConfiguratorImplAddress "PoolConfigurator",
+            implContract lendingRegistryImplAddress "LendingRegistry",
+            implContract mercataBridgeImplAddress "MercataBridge",
+            implContract poolFactoryImplAddress "PoolFactory",
+            implContract tokenFactoryImplAddress "TokenFactory",
+            implContract adminRegistryImplAddress "AdminRegistry",
+            implContract feeCollectorImplAddress "FeeCollector",
+            implContract voucherImplAddress "Voucher",
+            implContract tokenImplAddress "Token",
+            implContract poolImplAddress "Pool",
+            implContract cdpEngineImplAddress "CDPEngine",
+            implContract cdpRegistryImplAddress "CDPRegistry",
+            implContract cdpVaultImplAddress "CDPVault",
+            implContract cdpReserveImplAddress "CDPReserve",
+            implContract safetyModuleImplAddress "SafetyModule",
+            implContract rewardsChefImplAddress "RewardsChef",
             ContractNoStorage transactionParametersImplAddress 0 (mercataContract "TransactionParameters"),
             SolidVMContractWithStorage
               mercataAddress
@@ -362,7 +359,6 @@ genesisBlock  =
               , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
               , (".feeCollector", BContract "FeeCollector" $ unspecifiedChain feeCollectorAddress)
               , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
-              , (".rewardsManager", BContract "RewardsManager" $ unspecifiedChain rewardsManagerAddress)
               , (".rewardsChef", BContract "RewardsChef" $ unspecifiedChain rewardsChefAddress)
               , (".cdpEngine", BContract "CDPEngine" $ unspecifiedChain cdpEngineAddress)
               , (".cdpRegistry", BContract "CDPRegistry" $ unspecifiedChain cdpRegistryAddress)
@@ -386,7 +382,6 @@ genesisBlock  =
             , feeCollector
             , voucher
             , mToken
-            , rewardsManager
             , rewardsChef
             , cdpEngine
             , cdpRegistry
@@ -434,7 +429,6 @@ genesisBlock  =
              , (feeCollectorAddress, Delegatecall feeCollectorAddress feeCollectorImplAddress "BlockApps" "Mercata" "FeeCollector")
              , (voucherAddress, Delegatecall voucherAddress voucherImplAddress "BlockApps" "Mercata" "Voucher")
              , (mTokenAddress, Delegatecall mTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
-             , (rewardsManagerAddress, Delegatecall rewardsManagerAddress rewardsManagerImplAddress "BlockApps" "Mercata" "RewardsManager")
              , (cdpEngineAddress, Delegatecall cdpEngineAddress cdpEngineImplAddress "BlockApps" "Mercata" "CDPEngine")
              , (cdpRegistryAddress, Delegatecall cdpRegistryAddress cdpRegistryImplAddress "BlockApps" "Mercata" "CDPRegistry")
              , (cdpVaultAddress, Delegatecall cdpVaultAddress cdpVaultImplAddress "BlockApps" "Mercata" "CDPVault")
@@ -563,7 +557,6 @@ assetToAccountInfos asset@GA.Asset{..} =
             ++ [(maybe (".status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3)
                 (const (".status", if not (name `elem` ["USDCST", "USDTST"]) then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3))
                 $ find (== root) supportedCollaterals)]
-            ++ [(".rewardsManager", BContract "RewardsManager" $ unspecifiedChain (maybe 0x0 (const rewardsManagerAddress) $ find (== root) supportedCollaterals))]
             ++ allBalances
 
 assetToEvents :: GA.Asset -> (Address, S.Seq Event)
@@ -792,8 +785,6 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ create
      , (".admins.length", BInteger 1)
      , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS mercataBridgeAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS voucherAddress <> "><\"mint\"><a:" <> addrBS bridgeRelayerAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS cataAddress <> "><\"mint\"><a:" <> addrBS rewardsManagerAddress <> ">", BBool True)
-     , (".whitelist<a:" <> addrBS cataAddress <> "><\"burn\"><a:" <> addrBS rewardsManagerAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"mint\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS mTokenAddress <> "><\"burn\"><a:" <> addrBS liquidityPoolAddress <> ">", BBool True)
      , (".whitelist<a:" <> addrBS sUsdstAddress <> "><\"mint\"><a:" <> addrBS safetyModuleAddress <> ">", BBool True)
@@ -933,21 +924,6 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 proxy $ ownedByBlo
      -- pools length
      , (".pools.length", BInteger 6)
      ]
-
-rewardsManager :: AccountInfo
-rewardsManager = SolidVMContractWithStorage rewardsManagerAddress 0 proxy $ ownedByBlockApps mercataAddress
-  ++ [ (".rewardTokens[0]", BContract "Token" $ unspecifiedChain cataAddress)
-     , (".logicContract", BAccount $ unspecifiedChain rewardsManagerImplAddress)
-     , (".rewardTokens.length", BInteger 1)
-     , (".rewardTokenMap<a:" <> addrBS cataAddress <> ">", BInteger 1)
-     , (".rewardDelegate", BAccount $ unspecifiedChain 0x0)
-     , (".eligibleTokens.length", BInteger . fromIntegral $ length supportedCollaterals)
-     ]
-  ++ concatMap (\(i, a) ->
-    [ (".eligibleTokens[" <> BC.pack (show i) <> "]", BContract "Token" $ unspecifiedChain a)
-    , (".eligibleTokenMap<a:" <> addrBS a <> ">", BInteger $ i + 1)
-    ]
-  ) (zip [0..] supportedCollaterals)
 
 cdpEngine :: AccountInfo
 cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ ownedByBlockApps mercataAddress

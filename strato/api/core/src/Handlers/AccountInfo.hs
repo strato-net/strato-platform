@@ -61,9 +61,6 @@ type API =
     -- :> QueryParam "code" Text
     :> QueryParam "codeHash" Keccak256
     :> QueryParam "contractName" Text
-    :> QueryParam "codePtrAddress" Address
-    :> QueryParam "codePtrChainId" ChainId
-    :> QueryParams "chainid" ChainId
     :> QueryParam "external" Bool
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
@@ -83,9 +80,6 @@ data AccountsFilterParams = AccountsFilterParams
     -- , _qaCode           :: Maybe Text
     _qaCodeHash :: Maybe Keccak256,
     _qaContractName :: Maybe Text,
-    _qaCodePtrAddress :: Maybe Address,
-    _qaCodePtrChainId :: Maybe ChainId,
-    _qaChainId :: [ChainId],
     _qaExternal :: Maybe Bool,
     _qaLimit :: Maybe Natural,
     _qaOffset :: Maybe Natural,
@@ -111,9 +105,6 @@ accountsFilterParams =
     Nothing
     Nothing
     Nothing
-    []
-    Nothing
-    Nothing
     Nothing
     Nothing
     Nothing
@@ -133,9 +124,6 @@ uncurryAccountsFilterParams ::
     -- -> Maybe Text
     Maybe Keccak256 ->
     Maybe Text ->
-    Maybe Address ->
-    Maybe ChainId ->
-    [ChainId] ->
     Maybe Bool ->
     Maybe Natural ->
     Maybe Natural ->
@@ -157,9 +145,6 @@ uncurryAccountsFilterParams f AccountsFilterParams {..} =
     _qaMaxNumber
     _qaCodeHash
     _qaContractName
-    _qaCodePtrAddress
-    _qaCodePtrChainId
-    _qaChainId
     _qaExternal
     _qaLimit
     _qaOffset
@@ -205,7 +190,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams 
                       -- fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) _qaCode,
                       fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) _qaCodeHash,
                       fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) _qaContractName,
-                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress,
                       fmap (\search ->
                           let isWhiteSpace c = c `elem` [' ', '\n', '\t']
                               searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
@@ -236,17 +220,14 @@ getAccount ::
   Maybe Natural ->
   Maybe Keccak256 ->
   Maybe Text ->
-  Maybe Address ->
-  Maybe ChainId ->
-  [ChainId] ->
   Maybe Bool ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe Bool ->
   Maybe Text ->
   m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n o p q r =
-  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q r)
+getAccount a b c d e f g h i j k l m n o =
+  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o)
 
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -268,8 +249,6 @@ accountQueryParams =
     "codeHash",
     "contractName",
     "codePtrAddress",
-    "codePtrChainId",
-    "chainid",
     "external",
     "limit",
     "offset",

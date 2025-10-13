@@ -43,7 +43,6 @@ data VMEvent
 vmType :: CodePtr -> String
 vmType (SolidVMCode _ _) = "SolidVM"
 vmType (ExternallyOwned _) = "EVM"
-vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)

@@ -17,6 +17,7 @@ import { COMPILE_CHAIN_CONTRACT_REQUEST, compileChainContractSuccess, compileCha
 import { handleErrors } from '../../lib/handleErrors';
 import { isOauthEnabled } from '../../lib/checkMode';
 import { createUrl } from '../../lib/url';
+import { secureFetch } from '../../lib/csrf';
 
 const getXabiUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
@@ -43,7 +44,7 @@ export function createContractApiCall(contract, src, username, address, password
   }
 
   const body = isOauthEnabled() ? oauthBody : blocBody;
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',
@@ -76,7 +77,7 @@ export function createContractApiCall(contract, src, username, address, password
 }
 
 export function compileContractApiCall(contractName, source, solidvm) {
-  fetch(blocCompileUrl, {
+  secureFetch(blocCompileUrl, {
     method: 'POST',
     credentials: "include",
     headers: {
@@ -104,7 +105,7 @@ export function compileContractApiCall(contractName, source, solidvm) {
       throw error;
     });
 
-  return fetch(getXabiUrl, {
+  return secureFetch(getXabiUrl, {
     method: 'POST',
     credentials: "include",
     headers: {

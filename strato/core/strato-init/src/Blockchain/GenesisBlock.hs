@@ -46,6 +46,7 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
@@ -322,23 +323,23 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         }
 
     toAction ::
-      ( MonadLogger m
-      , Selectable Ad.Address AddressState m
-      )
+      MonadLogger m
       => S.Seq Event
       -> S.Seq A.Delegatecall
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m VMEvent
     toAction addressEvents delegatecalls a d = do
-      let ch = codeHash d
-      cPtr <- fromMaybe ch <$> resolveCodePtr ch
+      let cPtr = codeHash d
       let
           theMetadata = getMetadata $ genesisBlockCodePtr cPtr
           creator' = fromMaybe "" mkCreator
           originAddress' = mkOriginAddress
 
-      appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
+      let appName' =
+            case cPtr of
+              SolidVMCode n _ -> T.pack n
+              _ -> ""
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
@@ -359,7 +360,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     storageDiff
                     Map.empty
                     [A.Create]),
-              A._src = join $ fmap (Map.lookup "src") theMetadata,
+              A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
@@ -385,8 +386,6 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'
         genesisBlockCodePtr (SolidVMCode _ ch') = ch'
-        genesisBlockCodePtr cp =
-          error $ "Could not resolve code ptr in genesis block" ++ show cp
 
         lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
         lookupSolidDiff _ _                 = Nothing

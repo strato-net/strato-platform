@@ -2,11 +2,34 @@
 import axios from "axios";
 import { toast } from "@/hooks/use-toast";
 import { getErrorTitle } from "./errorConfig";
+import { getCsrfToken } from "./csrf";
 
 const api = axios.create({
   baseURL: "/api",
   withCredentials: true,
 });
+
+// Request interceptor to add CSRF token to state-changing requests
+api.interceptors.request.use(
+  (config) => {
+    const method = (config.method || "get").toLowerCase();
+    const needsCsrf = ["post", "put", "delete", "patch"].includes(method);
+
+    if (needsCsrf) {
+      const csrfToken = getCsrfToken();
+      if (csrfToken) {
+        config.headers["X-CSRF-Token"] = csrfToken;
+      } else {
+        console.warn("CSRF token not found. Request may fail.");
+      }
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
 
 // Helper: Extract error message from backend response
 function extractApiErrorMessage(error: any): string {
@@ -19,11 +42,24 @@ function extractApiErrorMessage(error: any): string {
   );
 }
 
-// Response interceptor to catch 401 and show global toast for all APIs
+// Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const url = error?.config?.url || "";
+    
+    // Handle CSRF validation errors (403 with CSRF message)
+    if (error.response?.status === 403) {
+      const errorMessage = extractApiErrorMessage(error);
+      if (typeof errorMessage === "string" && errorMessage.includes("CSRF protection")) {
+        toast({
+          title: "Security Validation Failed",
+          description: "Please refresh the page and try again.",
+          variant: "destructive",
+        });
+        return Promise.reject(error);
+      }
+    }
     
     // Show toast for all API errors (except 401 which is handled separately)
     if (error.response?.status !== 401) {
