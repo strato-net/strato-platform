@@ -16,14 +16,14 @@ export const calculateImpliedPrice = (
 ): string => {
   const inBig = safeBigInt(amountIn);
   const outBig = safeBigInt(amountOut);
-  
+
   if (inBig === 0n || outBig === 0n) return '0.00';
-  
+
   // Always calculate as TokenB/TokenA
-  const price = isAToB 
+  const price = isAToB
     ? safeBigIntDivide(outBig * 10n**18n, inBig, "A to B price calculation")  // A→B: out/in
     : safeBigIntDivide(inBig * 10n**18n, outBig, "B to A price calculation"); // B→A: in/out
-  
+
   return (Number(price) / 1e18).toFixed(6);
 };
 
@@ -161,16 +161,16 @@ export const getTradingVolume24hForPools = async (
   (swapEvents as RawSwapEvent[]).forEach(event => {
     const poolAddress = event.address;
     const currentVolume = volumeMap.get(poolAddress) || "0";
-    
+
     const tokenInAddress = event.tokenIn;
     const tokenInPrice = priceMap.get(tokenInAddress) || "0";
-    
+
     const tokenInVolume = safeBigIntDivide(
       safeBigInt(event.amountIn) * safeBigInt(tokenInPrice),
       safeBigInt(10 ** 18),
       "Volume calculation"
     );
-    
+
     const newVolume = safeBigInt(currentVolume) + tokenInVolume;
     volumeMap.set(poolAddress, newVolume.toString());
   });
@@ -179,10 +179,10 @@ export const getTradingVolume24hForPools = async (
 };
 
 export const calculatePoolMetrics = (
-  pool: RawGetPool, 
-  tokenAPrice: string, 
-  tokenBPrice: string, 
-  volume24h: string, 
+  pool: RawGetPool,
+  tokenAPrice: string,
+  tokenBPrice: string,
+  volume24h: string,
   factoryData?: RawPoolFactory
 ): {
   totalLiquidityUSD: string;
@@ -192,23 +192,23 @@ export const calculatePoolMetrics = (
   lpSharePercent: number;
 } => {
   const tokenAValue = safeBigIntDivide(
-    safeBigInt(pool.tokenABalance) * safeBigInt(tokenAPrice), 
-    safeBigInt(10 ** 18), 
+    safeBigInt(pool.tokenABalance) * safeBigInt(tokenAPrice),
+    safeBigInt(10 ** 18),
     "Token A value calculation"
   );
   const tokenBValue = safeBigIntDivide(
-    safeBigInt(pool.tokenBBalance) * safeBigInt(tokenBPrice), 
-    safeBigInt(10 ** 18), 
+    safeBigInt(pool.tokenBBalance) * safeBigInt(tokenBPrice),
+    safeBigInt(10 ** 18),
     "Token B value calculation"
   );
   const totalLiquidityUSD = (tokenAValue + tokenBValue).toString();
-  
+
   const swapFeeRate = pool.swapFeeRate || factoryData?.swapFeeRate || 30;
   const lpSharePercent = pool.lpSharePercent || factoryData?.lpSharePercent || 7000;
-  
+
   const fees24h = calculateLPFees24h(volume24h, swapFeeRate, lpSharePercent);
   const apy = calculatePoolAPY(fees24h, totalLiquidityUSD);
-  
+
   const lpTokenPrice = calculateLPTokenPrice(
     pool.tokenABalance,
     pool.tokenBBalance,
@@ -216,7 +216,7 @@ export const calculatePoolMetrics = (
     tokenBPrice,
     pool.lpToken._totalSupply
   );
-  
+
   return { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent };
 };
 
@@ -233,9 +233,9 @@ export const calculateOracleRatios = (tokenAPrice: string, tokenBPrice: string):
 // ============================================================================
 
 export const buildSwapToken = (
-  token: RawToken, 
-  price: string, 
-  poolBalance: string, 
+  token: RawToken,
+  price: string,
+  poolBalance: string,
   userBalance: string
 ): SwapToken => ({
   address: token.address,
@@ -344,7 +344,7 @@ export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: 
       select: "tokenA,tokenB"
     }
   });
-  
+
   return poolData[0];
 };
 
@@ -359,8 +359,31 @@ export const fetchPoolBalances = async (accessToken: string, poolAddress: string
       select: "tokenABalance::text,tokenBBalance::text,lpToken:lpToken_fkey(_totalSupply::text)"
     }
   });
-  
+
   return poolData[0];
+};
+
+/**
+ * Fetches the LP token address for a given pool
+ */
+export const fetchLPTokenAddress = async (
+  accessToken: string,
+  poolAddress: string
+): Promise<string> => {
+  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
+    params: {
+      poolFactory: "eq." + constants.poolFactory,
+      address: "eq." + poolAddress,
+      select: "lpToken"
+    }
+  });
+  const lpTokenAddress = poolData?.[0]?.lpToken;
+
+  if (!lpTokenAddress) {
+    throw new Error("Could not fetch LP token address for pool");
+  }
+
+  return lpTokenAddress;
 };
 
 // ============================================================================

@@ -13,6 +13,7 @@ import {
   buildPoolList,
   fetchPoolTokenAddresses,
   fetchPoolBalances,
+  fetchLPTokenAddress,
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
   getTokenBalance
@@ -43,33 +44,6 @@ import {
 } from "@mercata/shared-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
-
-// ============================================================================
-// HELPER FUNCTIONS FOR LP TOKEN STAKING
-// ============================================================================
-
-/**
- * Fetches the LP token address for a given pool
- */
-const fetchLPTokenAddress = async (
-  accessToken: string,
-  poolAddress: string
-): Promise<string> => {
-  const { data: poolData } = await cirrus.get(accessToken, `/${Pool}`, {
-    params: {
-      poolFactory: "eq." + constants.poolFactory,
-      address: "eq." + poolAddress,
-      select: "lpToken"
-    }
-  });
-  const lpTokenAddress = poolData?.[0]?.lpToken;
-
-  if (!lpTokenAddress) {
-    throw new Error("Could not fetch LP token address for pool");
-  }
-
-  return lpTokenAddress;
-};
 
 /**
  * Stakes newly minted LP tokens into RewardsChef
@@ -195,14 +169,14 @@ export const getSwapableTokens = async (
   });
 
   const tokenMap = new Map<string, SwapToken>();
-  
+
   validatedPools.forEach((pool: PoolWithTokens) => {
     [pool.tokenA, pool.tokenB].forEach((token: RawToken, index: number) => {
 
       if (!tokenMap.has(token.address)) {
         const price = priceMap.get(token.address) || "0";
         const poolBalance = index === 0 ? pool.tokenABalance : pool.tokenBBalance;
-        
+
         tokenMap.set(token.address, buildSwapToken(token, price, poolBalance, getTokenBalance(token, userAddress)));
       }
     });
@@ -250,7 +224,7 @@ export const getSwapableTokenPairs = async (
   });
 
   const tokenMap = new Map<string, SwapToken>();
-  
+
   allTokens.forEach(({token, poolBalance}) => {
     if (!tokenMap.has(token.address)) {
       const price = priceMap.get(token.address) || "0";
@@ -299,7 +273,7 @@ export const getSwapHistory = async (
   const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
     const { tokenA, tokenB } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
-    
+
     return {
       id: event.id,
       timestamp: new Date(event.block_timestamp),
