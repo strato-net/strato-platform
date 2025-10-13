@@ -84,8 +84,9 @@ export function* getHealth(action) {
 
 export function* getMetadata(action) {
     try {
-      // const response = yield call(getMetadataApi);
-      yield put(fetchMetadataSuccess(response));
+      console.log("getMetadata action", action);
+      //  const response = yield call(getMetadataApi);
+      //  yield put(fetchMetadataSuccess(response));
     }
     catch (err) {
       yield put(fetchMetadataFailure(err));
