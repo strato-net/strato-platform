@@ -1207,11 +1207,16 @@ silvstLpToken = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ ownedB
 
 validators :: [Validator]
 validators = [
-  Validator 0x3dc1e4bdb54f6cce80c92d5d494160545a78db35 --Jamshid's machine
+  Validator 0x0c4cecae296c33f71f9a6e6fb57f418f9d5f7e82, --Node1
+  Validator 0xbdd3fe1b9a87a88cff8259528c0a4d6464625713, --Node2
+  Validator 0xebcd85c4212e53a2546cbcea765c1de531b14fb1, --Node3
+  Validator 0xf1e4082464ff5c399e43f2c9177904db9547d6a2 --Node4
   ]
 
 admins :: [Address]
 admins = [
+  0x7630b673862a2807583834908f10192e00c58b00, --Kieren
+  0x292dd9591f506845ef05a9f3b8116e641cbcb4bb, --Victor
   0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
   ]
 
