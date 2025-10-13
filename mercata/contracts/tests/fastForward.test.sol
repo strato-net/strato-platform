@@ -5,7 +5,7 @@ import "../concrete/BaseCodeCollection.sol";
 
 /// @title Test to verify fastForward behavior in beforeEach
 /// @notice This test demonstrates a bug where fastForward in beforeEach doesn't persist to test execution
-contract Describe_BeforeEach_FastForward_Bug {
+contract Describe_FastForward {
 
     constructor() {
     }
@@ -31,5 +31,15 @@ contract Describe_BeforeEach_FastForward_Bug {
 
         // Now block.timestamp should be 30
         require(block.timestamp == 30, "block.timestamp should be 30 after fastForward(10) in test. Got: " + string(block.timestamp));
+    }
+
+    function it_can_call_fastForward() {
+      log("Testing fastForward function");
+      uint256 before = block.timestamp;
+      fastForward(100);
+      uint256 after = block.timestamp;
+      log("Before timestamp", before);
+      log("After timestamp", after);
+      require(after == before + 100, "FastForward did not work");
     }
 }
