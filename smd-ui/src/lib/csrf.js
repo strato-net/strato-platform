@@ -53,7 +53,7 @@ export async function initializeCsrfToken() {
   try {
     // Make a GET request to a CSRF-protected endpoint to trigger token generation
     // Using /strato-api/ which has CSRF protection enabled
-    await fetch('/strato-api/', { credentials: 'include' });
+    await fetch('/csrf-init', { credentials: 'include' });
   } catch (error) {
     console.warn('Failed to initialize CSRF token:', error);
   }

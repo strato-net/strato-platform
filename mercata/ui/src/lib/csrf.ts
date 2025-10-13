@@ -18,7 +18,7 @@ export async function initializeCsrfToken(): Promise<void> {
   try {
     // Make any GET request to trigger CSRF token generation
     // Using a lightweight endpoint
-    await fetch('/api/health', { credentials: 'include' });
+    await fetch('/csrf-init', { credentials: 'include' });
   } catch (error) {
     console.warn('Failed to initialize CSRF token:', error);
   }
