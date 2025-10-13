@@ -113,36 +113,6 @@ contract Describe_Token {
     // Note: Token factory can only be set by the current factory, not by the owner
     // These tests are covered in TokenFactory.test.sol
 
-    // ============ TOKEN-SPECIFIC REWARDS INTEGRATION ============
-
-    function it_token_initializes_with_zero_rewards_manager() {
-        require(address(token.rewardsManager()) == address(0), "Initial rewards manager should be zero address");
-    }
-
-    function it_token_can_set_rewards_manager() {
-        address rewardsManager = address(0x123);
-        token.setRewardsManager(rewardsManager);
-        require(address(token.rewardsManager()) == rewardsManager, "Rewards manager not set correctly");
-    }
-
-    function it_token_can_update_rewards_manager() {
-        address rewardsManager1 = address(0x123);
-        address rewardsManager2 = address(0x456);
-        
-        token.setRewardsManager(rewardsManager1);
-        require(address(token.rewardsManager()) == rewardsManager1, "First rewards manager not set");
-        
-        token.setRewardsManager(rewardsManager2);
-        require(address(token.rewardsManager()) == rewardsManager2, "Rewards manager not updated correctly");
-    }
-
-    function it_token_can_set_rewards_manager_to_zero() {
-        address rewardsManager = address(0x123);
-        token.setRewardsManager(rewardsManager);
-        token.setRewardsManager(address(0));
-        require(address(token.rewardsManager()) == address(0), "Rewards manager should be set to zero address");
-    }
-
     // ============ TOKEN-SPECIFIC METADATA INTEGRATION ============
 
     function it_token_can_set_metadata() {

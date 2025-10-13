@@ -50,7 +50,7 @@ createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
   let genesisInfo = 
         case network of
-          "helium" -> HELIUM.genesisBlock
+          'h':'e':'l':'i':'u':'m':_ -> HELIUM.genesisBlock
           "mercata-uranium" -> URANIUM.genesisBlock
           "uranium" -> HELIUM.genesisBlock -- Don't worry, be happy
           _ -> productionGenesisBlock

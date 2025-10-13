@@ -18,7 +18,6 @@ import "./Pools/PoolFactory.sol";
 // import "Admin/FeeCollector.sol";
 
 //Rewards
-import "./Rewards/RewardsManager.sol";
 import "./Rewards/RewardsChef.sol";
 
 //Lending
@@ -57,7 +56,6 @@ contract record Mercata {
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
-    RewardsManager public rewardsManager;
     CDPEngine public cdpEngine;
     CDPVault public cdpVault;
     CDPRegistry public cdpRegistry;
@@ -142,11 +140,6 @@ contract record Mercata {
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
         mercataBridge.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
-
-        address rewardsManagerImpl = address(new RewardsManager(implOwnerIgnored));
-        rewardsManager = RewardsManager(address(new Proxy(rewardsManagerImpl, this)));
-        rewardsManager.initialize(RewardsManagerArgs([], [], [], [], address(0)));
-        Ownable(rewardsManager).transferOwnership(address(adminRegistry));
 
         // Create RewardsChef (without initialization - to be initialized in tests)
         address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));

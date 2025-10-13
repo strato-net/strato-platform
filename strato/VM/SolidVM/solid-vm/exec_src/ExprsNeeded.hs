@@ -65,9 +65,7 @@ expressionCrawler = \case
   MemberAccess _ expr _ -> "MemberAccess" : expressionCrawler expr
   FunctionCall _ func args ->
     "FunctionCall" : do
-      expr <- case args of
-        OrderedArgs args' -> func : args'
-        NamedArgs args' -> func : map snd args'
+      expr <- func : args
       expressionCrawler expr
   Unitary _ n expr -> T.pack ("Unitary: " ++ n) : expressionCrawler expr
   Binary _ n lhs rhs ->
@@ -80,6 +78,10 @@ expressionCrawler = \case
       expressionCrawler expr
   BoolLiteral {} -> ["BoolLiteral"]
   HexaLiteral {} -> ["HexaLiteral"]
+  InlineBoundsCheck _ mL mU expr ->
+    let l = maybe "" (T.pack . show) mL
+        u = maybe "" (T.pack . show) mU
+     in ("InlineBoundsCheck (" <> l <> "," <> u <> ")") : expressionCrawler expr
   NumberLiteral {} -> ["NumberLiteral"]
   DecimalLiteral {} -> ["DecimalLiteral"]
   StringLiteral {} -> ["StringLiteral"]
