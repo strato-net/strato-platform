@@ -10,18 +10,21 @@ const { RewardsChef } = constants;
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
  * @param additionalParams - Optional additional Cirrus query parameters for filtering
+ * @param includePeriods - Whether to include bonusPeriods in the result (default: false)
  * @returns Promise resolving to array of pool information
  */
 export const getPoolsCirrus = async (
   accessToken: string,
   rewardsChefAddress: string,
-  additionalParams?: Record<string, string>
+  additionalParams?: Record<string, string>,
+  includePeriods: boolean = false
 ): Promise<Array<{
   poolIdx: number;
   lpToken: string;
   allocPoint: string;
   accPerToken: string;
   lastRewardTimestamp: string;
+  bonusPeriods?: Array<{ startTimestamp: string; bonusMultiplier: string }>;
 }>> => {
   try {
     const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
@@ -34,13 +37,24 @@ export const getPoolsCirrus = async (
     // Filter out entries with empty values and map to desired format
     const pools = response.data
       ?.filter((entry: any) => entry.value && entry.value !== "")
-      .map((entry: any) => ({
-        poolIdx: entry.key,
-        lpToken: entry.value.lpToken,
-        allocPoint: entry.value.allocPoint,
-        accPerToken: entry.value.accPerToken,
-        lastRewardTimestamp: entry.value.lastRewardTimestamp
-      })) || [];
+      .map((entry: any) => {
+        const pool: any = {
+          poolIdx: entry.key,
+          lpToken: entry.value.lpToken,
+          allocPoint: entry.value.allocPoint,
+          accPerToken: entry.value.accPerToken,
+          lastRewardTimestamp: entry.value.lastRewardTimestamp
+        };
+
+        // Include bonusPeriods if requested, sorted by startTimestamp
+        if (includePeriods && entry.value.bonusPeriods) {
+          pool.bonusPeriods = [...entry.value.bonusPeriods].sort(
+            (a: any, b: any) => BigInt(a.startTimestamp) < BigInt(b.startTimestamp) ? -1 : 1
+          );
+        }
+
+        return pool;
+      }) || [];
 
     return pools;
   } catch (error) {
