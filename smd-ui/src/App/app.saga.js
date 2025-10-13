@@ -39,7 +39,7 @@ export function getHealthApi() {
 
 export function getMetadataApi() {
 
-   const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
+  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
   
   return fetch(
     metadataUrl,
@@ -66,7 +66,7 @@ export function getMetadataApi() {
       )
       const responseJson = await nodeInfoRaw.json()
       return {metadata, nodeInfo:responseJson[0]}
-     })
+    })
     .catch(function (error) {
       throw error;
     })
@@ -82,20 +82,20 @@ export function* getHealth(action) {
     }
 }
 
-export function* getMetadata(action) {
-    try {
-      const response = yield call(getMetadataApi);
-      yield put(fetchMetadataSuccess(response));
-    }
-    catch (err) {
-      yield put(fetchMetadataFailure(err));
-    }
-}
+// export function* getMetadata(action) {
+//     try {
+//       const response = yield call(getMetadataApi);
+//       yield put(fetchMetadataSuccess(response));
+//     }
+//     catch (err) {
+//       yield put(fetchMetadataFailure(err));
+//     }
+// }
 
 
 export default function* watchGetHealth() {
     yield [
       takeLatest(GET_HEALTH_REQUEST, getHealth),
-      // takeLatest(GET_METADATA_REQUEST, getMetadata),
+      takeLatest(GET_METADATA_REQUEST, getMetadata),
     ]
 }
