@@ -1157,7 +1157,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable
 expToVar x t = do
-  -- liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
+  liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
   v <- expToVar' x t
   decrementGas 1
   return v
@@ -1193,7 +1193,7 @@ expToVar' (CC.InlineBoundsCheck _ mL mU expr) _ = do
   value <- getInt var
   when (fromMaybe False $ (value <) <$> mL) $ arithmeticException "underflow: " (mL, value)
   when (fromMaybe False $ (value >) <$> mU) $ arithmeticException "overflow: " (mU, value)
-  pure . Constant $ SInteger value
+  pure var
 expToVar' (CC.Variable _ "bytes32ToString") _ = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") _ = return $ Constant SAddressToAscii
 expToVar' (CC.Variable _ "bytes") _ = return $ Constant $ SFunction "identity" Nothing
