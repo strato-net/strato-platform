@@ -7,7 +7,7 @@ import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getStakedBalance, getPools, waitForBalanceUpdate } from "./rewardsChef.service";
+import { getStakedBalance, getPools, waitForBalanceUpdate, findPoolByLpToken } from "./rewardsChef.service";
 import {
   simulateLoan,
   CollateralInfo,
@@ -33,17 +33,6 @@ const {
   PriceOracle,
   RewardsChef,
 } = constants;
-
-/**
- * Helper function to find the RewardsChef pool for a given mToken
- */
-const findPoolForMToken = async (
-  accessToken: string,
-  mToken: string
-) => {
-  const pools = await getPools(accessToken, rewardsChef);
-  return pools.find(pool => pool.lpToken === mToken);
-};
 
 /**
  * Get the latest exchange rate for the lending pool from Cirrus events
@@ -173,13 +162,11 @@ export const depositLiquidity = async (
 
     if (BigInt(newlyMintedAmount) > 0n) {
       // Find the pool for this mToken
-      const poolForMToken = await findPoolForMToken(accessToken, mToken);
+      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
 
-      if (!poolForMToken) {
+      if (!rewardsPool) {
         throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot stake after deposit.`);
       }
-
-      const poolIdx = poolForMToken.poolIdx;
 
       const stakingTx: FunctionInput[] = [
         // First approve mToken for RewardsChef
@@ -194,7 +181,7 @@ export const depositLiquidity = async (
           contractName: extractContractName(RewardsChef),
           contractAddress: rewardsChef,
           method: "deposit",
-          args: { _pid: poolIdx, _amount: newlyMintedAmount },
+          args: { _pid: rewardsPool.poolIdx, _amount: newlyMintedAmount },
         },
       ];
 
@@ -256,13 +243,11 @@ export const withdrawLiquidity = async (
       const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
 
       // Find the pool for this mToken
-      const poolForMToken = await findPoolForMToken(accessToken, mToken);
+      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
 
-      if (!poolForMToken) {
+      if (!rewardsPool) {
         throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
       }
-
-      const poolIdx = poolForMToken.poolIdx;
 
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
@@ -270,7 +255,7 @@ export const withdrawLiquidity = async (
         contractAddress: rewardsChef,
         method: "withdraw",
         args: {
-          _pid: poolIdx,
+          _pid: rewardsPool.poolIdx,
           _amount: amountToUnstake.toString()
         }
       }, userAddress, accessToken);
@@ -658,11 +643,11 @@ export const liquidityAndBalance = async (
 
   // Get user's staked balance from RewardsChef
   // Find the pool for this mToken
-  const poolForMToken = await findPoolForMToken(accessToken, mToken);
+  const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
 
   // If no pool found, staked balance is 0
-  const stakedMTokenBalance = poolForMToken
-    ? await getStakedBalance(accessToken, rewardsChef, poolForMToken.poolIdx, userAddress)
+  const stakedMTokenBalance = rewardsPool
+    ? await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress)
     : "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
