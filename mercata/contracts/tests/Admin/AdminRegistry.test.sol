@@ -3,6 +3,7 @@ pragma solidity ^0.8.30;
 
 import "../../concrete/Admin/AdminRegistry.sol";
 import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract TestERC20 is ERC20, Ownable {
@@ -25,7 +26,7 @@ contract User {
     }
 }
 
-contract Describe_AdminRegistry {
+contract Describe_AdminRegistry is Authorizable {
     AdminRegistry adminRegistry;
     TestERC20 token;
     User user1;
@@ -38,6 +39,7 @@ contract Describe_AdminRegistry {
     address zeroAddress;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         admin1 = address(this);
         admin2 = address(0x2);
         admin3 = address(0x3);

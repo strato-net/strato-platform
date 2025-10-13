@@ -1,4 +1,5 @@
 //ERC20
+import "../abstract/ERC20/access/Authorizable.sol";
 import "../abstract/ERC20/ERC20.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
@@ -43,7 +44,7 @@ import "CDP/CDPReserve.sol";
 import "Proxy/Proxy.sol";
 
 //TODO
-contract record Mercata {
+contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;
@@ -133,6 +134,7 @@ contract record Mercata {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setRateStrategy", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setPriceOracle", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setAllComponents", address(poolConfigurator));
+        authorizations[address(adminRegistry)][address(poolConfigurator)] = 1;
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
@@ -168,6 +170,6 @@ contract record Mercata {
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
-        adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
+        adminRegistry.swapAdmin(this, msg.sender);
     }
 }

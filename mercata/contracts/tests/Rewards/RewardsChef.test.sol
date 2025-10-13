@@ -3,9 +3,10 @@ pragma solidity ^0.8.30;
 
 import "../../concrete/BaseCodeCollection.sol";
 import "../Util.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Describe_TokenPausable {
+contract Describe_TokenPausable is Authorizable {
     using TestUtils for User;
 
     constructor() {
@@ -23,6 +24,7 @@ contract Describe_TokenPausable {
     uint256 currentTimestamp;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         // Create test users once
         user1 = new User();
         user2 = new User();

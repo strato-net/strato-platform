@@ -7,9 +7,10 @@ import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Describe_PoolFactory {
+contract Describe_PoolFactory is Authorizable {
     Mercata m;
     address tokenAAddress;
     address tokenBAddress;
@@ -20,6 +21,7 @@ contract Describe_PoolFactory {
     string[] emptyArray;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         m = new Mercata();
     }
 

@@ -27,6 +27,7 @@ import qualified Data.Set as S
 import Data.Source
 import Data.String (IsString, fromString)
 import Data.Text (Text)
+import Data.Traversable (for)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection hiding (modifierContext)
 import qualified SolidVM.Model.CodeCollection.Contract as Con
@@ -90,6 +91,10 @@ data TypeF' a
   deriving (Eq, Show, Functor)
 
 type Type' = Annotated TypeF'
+
+withAnn :: Text -> Type' -> Type'
+withAnn msg (Bottom x) = Bottom $ (msg <$) <$> x
+withAnn _   t          = t
 
 showType :: Type -> Text
 showType (SVMType.Int s b) =
@@ -1191,7 +1196,17 @@ functionHelper test cc c funcName f@Func {..} =
                       )
                         <$> (catMaybes $ sequence . swap <$> _funcVals)
                     argVals = M.fromList $ args ++ vals
-                 in runReader (statementsHelper argVals stmts) r
+                 in flip runReader r $ do
+                      argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                        fmap catMaybes . for (M.elems argVals) $ \case
+                          VarDefEntry mType _ _ x -> for mType $ \case
+                            SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                            t -> pure $ Static t x
+                          _ -> pure Nothing
+                      mods <- flip evalStateT ((Nothing, argVals) :| []) $
+                        reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
+                      ret <- statementsHelper argVals stmts
+                      pure . reduceType' (f ^. funcContext) $ ret : mods : argTypes
               ([fArg], _, _, _) ->
                 bottom $
                   ( T.concat
@@ -1231,7 +1246,17 @@ functionHelper test cc c funcName f@Func {..} =
                           )
                             <$> (catMaybes $ sequence . swap <$> _funcVals)
                         argVals = M.fromList $ args ++ vals
-                     in runReader (statementsHelper argVals stmts) r
+                     in flip runReader r $ do
+                          argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                            fmap catMaybes . for (M.elems argVals) $ \case
+                              VarDefEntry mType _ _ x -> for mType $ \case
+                                SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                                t -> pure $ Static t x
+                              _ -> pure Nothing
+                          mods <- flip evalStateT ((Nothing, argVals) :| []) $
+                            reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
+                          ret <- statementsHelper argVals stmts
+                          pure . reduceType' (f ^. funcContext) $ ret : mods : argTypes
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               let r =
@@ -1253,10 +1278,16 @@ functionHelper test cc c funcName f@Func {..} =
                       <$> (catMaybes $ sequence . swap <$> _funcVals)
                   argVals = M.fromList $ args ++ vals
                in flip runReader r $ do
+                    argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                      fmap catMaybes . for (M.elems argVals) $ \case
+                        VarDefEntry mType _ _ x -> for mType $ \case
+                          SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                          t -> pure $ Static t x
+                        _ -> pure Nothing
                     mods <- flip evalStateT ((Nothing, argVals) :| []) $
                       reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
                     ret <- statementsHelper argVals stmts
-                    pure $ reduceType' _funcContext [ret, mods]
+                    pure . reduceType' _funcContext $ ret : mods : argTypes
                   where checkModifier modName modArgs = do
                           e <- getModifierByNameRecursively funcName modName _funcContext
                           a <- productType' _funcContext <$> traverse tcExpr modArgs
