@@ -175,3 +175,11 @@ CodeInfoRef
     contractCode String
     contractName String Maybe
     deriving Eq Generic Show
+
+NetworkParameter
+    parameterName Text
+    parameterValue Text
+    blockNumber Integer sqltype=numeric(1000,0)
+    timestamp Integer sqltype=numeric(1000,0)
+    UniqueParameterName parameterName
+    deriving Eq Read Show Generic

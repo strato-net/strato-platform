@@ -28,12 +28,14 @@ import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef (updateSQLBalanceAndNonce)
 import Blockchain.Data.BlockHeader
+import Blockchain.Data.DataDefs (EventDB, eventDBContractAddress, eventDBName, eventDBArgs)
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
 import Blockchain.Model.SyncState
 import Blockchain.Model.WrappedBlock
+import Blockchain.NetworkParameters (initializeTxSizeLimitCache, updateCachedTxSizeLimit, transactionParametersAddress)
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
@@ -73,6 +75,9 @@ ethereumVM d = runResourceT $ do
 --    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     initializeBestBlock
+    
+    -- Initialize transaction size limit cache from LevelDB on startup
+    initializeTxSizeLimitCache
 
     failures <- runConsume "evm/loop" consumerGroup seqVmEventsTopicName $ \_ seqEvents -> do
 
@@ -185,7 +190,11 @@ sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
-sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
+sendOutEvent (OutEvent events) = do
+  -- Process TransactionSizeLimitChanged events to update cache
+  processTransactionParameterEvents events
+  -- Emit events to indexer
+  loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> events)
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
@@ -204,4 +213,29 @@ sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepare
 
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
+
+-- Process TransactionSizeLimitChanged events and update cache
+processTransactionParameterEvents :: (MonadLogger m, HasContext m) => [EventDB] -> m ()
+processTransactionParameterEvents events = do
+  forM_ events $ \event -> do
+    when (eventDBContractAddress event == transactionParametersAddress && 
+          eventDBName event == "TransactionSizeLimitChanged") $ do
+      $logInfoS "processTransactionParameterEvents" $ T.pack $
+        "Received TransactionSizeLimitChanged event from contract " ++ show transactionParametersAddress
+      -- Parse the newLimit from event args
+      -- Event args: [previousLimit, newLimit, blockNumber, timestamp]
+      let args = eventDBArgs event
+      case args of
+        (_:newLimitStr:_) -> do
+          case reads newLimitStr :: [(Int, String)] of
+            [(newLimit, _)] -> do
+              $logInfoS "processTransactionParameterEvents" $ T.pack $
+                "Updating transaction size limit cache to: " ++ show newLimit
+              updateCachedTxSizeLimit newLimit
+            _ -> do
+              $logWarnS "processTransactionParameterEvents" $ T.pack $
+                "Failed to parse newLimit from event args: " ++ newLimitStr
+        _ -> do
+          $logWarnS "processTransactionParameterEvents" $
+            "TransactionSizeLimitChanged event missing expected args structure"
 

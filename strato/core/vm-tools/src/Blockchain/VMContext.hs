@@ -44,6 +44,7 @@ module Blockchain.VMContext
     runningTests,
     txRunResultsCache,
     debugSettings,
+    cachedTxSizeLimit,
     dbs,
     state,
     stateDiffQueue,
@@ -269,7 +270,8 @@ data ContextState = ContextState
     _runningTests :: !Bool,
     _txRunResultsCache :: TRC.Cache,
     _debugSettings :: !(Maybe DebugSettings),
-    _selfAddress :: !Address
+    _selfAddress :: !Address,
+    _cachedTxSizeLimit :: !(Maybe Int)
   }
   deriving (Generic, NFData)
 
@@ -287,7 +289,8 @@ instance Default ContextState where
         _runningTests = False,
         _txRunResultsCache = error "Default ContextState: accessing uninitialized txRunResultsCache",
         _debugSettings = Nothing,
-        _selfAddress = Address 0
+        _selfAddress = Address 0,
+        _cachedTxSizeLimit = Nothing
       }
 
 data QueueEvent
@@ -443,7 +446,8 @@ runTestContextM f = withSystemTempDirectory "test_evm_context" $ \tmpdir ->
               _runningTests = True,
               _txRunResultsCache = cache,
               _debugSettings = Nothing,
-              _selfAddress = Address 0
+              _selfAddress = Address 0,
+              _cachedTxSizeLimit = Nothing
             }
       que <- newTQueueIO
       let ctx =

@@ -6,7 +6,7 @@
     "node": ">=21.7.1 <22.0.0"
   },
   "scripts": {
-    "start:prod": "export NODE_ENV=production; npm run db-create && npm run db-migrate && npm-run-all --parallel start:prod:www start:node-health start:network-health start:stall-check start:email-notifications start:db-cleaner",
+    "start:prod": "export NODE_ENV=production; npm run db-create && npm run db-migrate && npm-run-all --parallel start:prod:www start:node-health start:network-health start:stall-check start:email-notifications start:db-cleaner start:tx-params-processor",
     "start:prod:www": "NODE_ENV=production; PORT=3009 node ./bin/www",
     "start:dev": "NODE_ENV=development; npm run db-create && npm run db-migrate && PORT=${PORT:-3009} node $NODE_DEBUG_OPTION ./bin/www",
     "start:node-health": "NODE_ENV=${NODE_ENV:-development} node $NODE_DEBUG_OPTION daemons/node-health-check-daemon.js",
@@ -14,6 +14,7 @@
     "start:stall-check": "NODE_ENV=${NODE_ENV:-development} node $NODE_DEBUG_OPTION daemons/stall-check-daemon.js",
     "start:email-notifications": "NODE_ENV=${NODE_ENV:-development} node daemons/email-notifications-daemon.js",
     "start:db-cleaner": "NODE_ENV=${NODE_ENV:-development} node $NODE_DEBUG_OPTION daemons/db-cleaner.js",
+    "start:tx-params-processor": "NODE_ENV=${NODE_ENV:-development} node $NODE_DEBUG_OPTION daemons/transaction-parameters-processor.js",
     "db-create": "NODE_ENV=${NODE_ENV:-development} node -e 'require(\"./migrations/init-script/createdb.js\").createdb()'",
     "db-migrate": "NODE_ENV=${NODE_ENV:-development} sequelize db:migrate",
     "test": "NODE_ENV=${NODE_ENV:-development} ./run-tests.sh",

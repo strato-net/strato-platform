@@ -111,3 +111,5 @@ instance ToSchema LogDB where
 instance BIN.Binary LogDB
 
 instance BIN.Binary EventDB
+
+instance NFData NetworkParameter

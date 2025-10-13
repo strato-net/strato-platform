@@ -37,6 +37,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Timing
 import qualified Blockchain.TxRunResultCache as TRC
+import Blockchain.NetworkParameters (getTxSizeLimit)
 import Blockchain.VMContext hiding (state)
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
@@ -494,9 +495,10 @@ isValidForPool t@OutputTx {otSigner = address, otBaseTx = bt} = runExceptT $ do
   when (addressBalance < txFee)
     . throwE
     $ BalanceTooLow Validation Incoming txFee addressBalance t
-  when (txSize >= toInteger flags_txSizeLimit)
+  txSizeLimit <- lift getTxSizeLimit
+  when (txSize >= toInteger txSizeLimit)
     . throwE
-    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger flags_txSizeLimit) t
+    $ TXSizeLimitExceeded Validation Incoming txSize (toInteger txSizeLimit) t
   when (otHash t `S.member` knownFailedTxs) $ do
     liftIO $ putStrLn $ "################################ otHash = " ++ format (otHash t)
     throwE $ KnownFailedTX Validation Incoming t

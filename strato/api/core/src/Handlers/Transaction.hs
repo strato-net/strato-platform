@@ -38,11 +38,13 @@ import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
+import Core.ApiContext (ApiContext, getTxSizeLimitCached)
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
 import qualified Control.Exception as E
 import Control.Monad (unless, when)
+import Control.Monad.Catch (MonadCatch)
 import Control.Monad.Change.Alter
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.SQL
@@ -149,13 +151,16 @@ txsFilterParams =
     Nothing
     Nothing
 
+
 server ::
-  ( MonadIO m
-  , MonadLogger m
+  ( MonadLogger m
   , Selectable TxsFilterParams [RawTransaction] m
   , m `Mod.Outputs` [IngestEvent]
-  ) => Int -> ServerT API m
-server txSizeLimit = getTransaction :<|> postTransaction (Just txSizeLimit)
+  , Mod.Accessible ApiContext m
+  , HasSQLDB m
+  , MonadCatch m
+  ) => ServerT API m
+server = getTransaction :<|> postTransaction Nothing
 
 ---------------------------
 
@@ -228,11 +233,20 @@ postTransactionC _ _ =
   throwIO $ DeprecatedError "The 'next' parameter is no longer supported"
 
 postTransaction ::
-  (MonadIO m, MonadLogger m, m `Mod.Outputs` [IngestEvent]) =>
+  ( MonadLogger m
+  , m `Mod.Outputs` [IngestEvent]
+  , Mod.Accessible ApiContext m
+  , HasSQLDB m
+  , MonadCatch m
+  ) =>
   Maybe Int ->
   RawTransaction' ->
   m Keccak256
-postTransaction limit rt = runConduit $ postTransactionC limit rt `fuseUpstream` emitTransactions
+postTransaction Nothing rt = do
+  apiCtx <- Mod.access (Mod.Proxy @ApiContext)
+  limit <- getTxSizeLimitCached apiCtx  -- TTL-based cache with auto-refresh
+  runConduit $ postTransactionC (Just limit) rt `fuseUpstream` emitTransactions
+postTransaction (Just limit) rt = runConduit $ postTransactionC (Just limit) rt `fuseUpstream` emitTransactions
 
 postTransactionListC :: (MonadIO m, MonadLogger m) => Maybe Int -> [RawTransaction'] -> ConduitT a IngestEvent m [Keccak256]
 postTransactionListC limit raws = do

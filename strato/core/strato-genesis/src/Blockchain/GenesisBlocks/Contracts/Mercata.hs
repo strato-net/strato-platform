@@ -20,6 +20,7 @@ filesToEmbed = [
   "contracts/abstract/ERC20/utils/Pausable.sol",
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
+  "contracts/concrete/Admin/TransactionParameters.sol",
   "contracts/concrete/BaseCodeCollection.sol",
   "contracts/concrete/Bridge/MercataBridge.sol",
   "contracts/concrete/CDP/CDPEngine.sol",

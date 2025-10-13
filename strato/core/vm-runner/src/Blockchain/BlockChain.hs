@@ -72,6 +72,7 @@ import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
+import Blockchain.NetworkParameters (getTxSizeLimit)
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
 import Blockchain.VMConstants
@@ -407,9 +408,10 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   when (transactionGasLimit bt > min remainingBlockGas maxGas) $ throwE $ TFBlockGasLimitExceeded (transactionGasLimit bt) remainingBlockGas t
   unless nonceValid $ throwE $ TFNonceMismatch (transactionNonce bt) acctNonce t
   let txSize = toInteger $ B.length $ BL.toStrict $ Bin.encode $ otBaseTx t
-  when (txSize >= toInteger flags_txSizeLimit)
+  txSizeLimit <- lift getTxSizeLimit
+  when (txSize >= toInteger txSizeLimit)
     . throwE
-    $ TFTXSizeLimitExceeded txSize (toInteger flags_txSizeLimit) t
+    $ TFTXSizeLimitExceeded txSize (toInteger txSizeLimit) t
 
   let isKnownToBeSlow = otHash t `S.member` knownExpensiveTxs
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
