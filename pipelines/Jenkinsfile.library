@@ -1106,85 +1106,28 @@ def removeBeanstalkApp() {
  * @param stratoGSPath - relative path to strato-getting-started directory (default 'strato-getting-started')
  * @return
  */
-def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started',nodeData) {
+def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started') {
 
   // TODO: refactor to make it clear what is nodeData = null vs nodeData != null. Looks like !=null is only used in the big pre-release testing pipeline (as part of `deployStratoWithApp`) - Remove it entirely?
   
   // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
   sh "echo ${stratoPlatformPath} > _platform_path_tmp"
   sh "echo ${stratoGSPath} > _stratogs_path_tmp"
-  if(nodeData == null){
-    sh '''#!/bin/bash -le
-      set -x
-      cd $(<_stratogs_path_tmp)
-      myPub=$(./strato --get-pubkey)
-      cd ..
-      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
-      sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/x509-generator strato-strato-1:/usr/local/bin/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
-          --issuer=/x509-generator/rootCert.pem \\
-          --subject=/x509-generator/subject.json \\
-          --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCert.pem
-      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
-      sudo docker cp reformat-cert.sh strato-strato-1:/genesis-builder/
-      sudo docker exec strato-strato-1 bash /genesis-builder/reformat-cert.sh
-      sudo docker exec strato-strato-1 genesis-builder \\
-          --input=/genesis-builder/genesis-block.tpl.json \\
-          --faucets=/genesis-builder/faucets.json \\
-          --validators=/genesis-builder/validators.json \\
-          --admins=/genesis-builder/admins.json \\
-          --certs=/genesis-builder/certs.json \\
-          --output=/genesis-builder/genesis-block.json
-      sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
-    '''
-  }
-  else{
-    // TODO: the following code is broken because it's hardcoded t call multinode101 and should be refactored if used (move to a separate function)
-    echo "Code is broken and can't be used, fix if you need it. See TODO comment in the pipeline!"
-    /*
-    sh '''#!/bin/bash -le
-      set -x
-      cd $(<_stratogs_path_tmp)
-      myPub=$(./strato --get-pubkey)
-      token=$(curl -s -X POST 'https://keycloak.blockapps.net/auth/realms/beanstalk/protocol/openid-connect/token' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Authorization: Basic YmVhbnN0YWxrLWludGVybmFsLW5vZGVzOjViOTEzMGUwLTAxYzctNGM4Yy1iMjgxLTg4MmUxNDNhMjQ0Yg==' --data-urlencode 'grant_type=password' --data-urlencode 'username=admin' --data-urlencode 'password=1234' | jq -r .access_token)
-      userPub=$(curl -X POST -H "Authorization: Bearer $token" -H "Accept: application/json" "https://multinode101.ci.blockapps.net:8080/strato/v2.3/key" | jq -r .pubkey)
-      cd ..
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
-      sudo docker cp $(<_platform_path_tmp)/strato/tools/x509-generator strato-strato-1:/
-      sudo docker exec -e pubkey="${myPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
-          --issuer=/x509-generator/rootCert.pem \\
-          --subject=/x509-generator/subject.json \\
-          --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCert.pem
-      sudo docker exec -e pubkey="${userPub}" strato-strato-1 bash -c 'sed "s/<PUBKEY>/$pubkey/g" /x509-generator/subject.tpl.json > /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/Engineering/Marketing/g" /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/BlockApps/AppsBlock/g"   /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 bash -c 'sed -i "s/Test/User/g"             /x509-generator/subject.json'
-      sudo docker exec strato-strato-1 x509-generator \\
-          --issuer=/x509-generator/rootCert.pem \\
-          --subject=/x509-generator/subject.json \\
-          --key=/x509-generator/rootPriv.pem \\
-          --output=/x509-generator/OutputCertUser.pem
-      echo """myCert=\\$(cat /x509-generator/OutputCert.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; myUserCert=\\$(cat /x509-generator/OutputCertUser.pem | perl -pe 's/\\\\n/\\\\\\\\n/g') ; echo \\"[\\\\\\"\\$(echo \\$myCert)\\\\\\",\\\\\\"\\$(echo \\$myUserCert)\\\\\\"]\\" > /genesis-builder/certs.json""" > reformat-cert.sh
-      echo "[{"orgName":"BlockApps","orgUnit":"Engineering","commonName":"Test"},{"orgName":"AppsBlock","orgUnit":"Marketing","commonName":"User"}]" > admins.json
-      sudo docker cp reformat-cert.sh strato-strato-1:/genesis-builder/
-      sudo docker exec strato-strato-1 bash /genesis-builder/reformat-cert.sh
-      sudo docker exec strato-strato-1 genesis-builder \\
-          --input=/genesis-builder/genesis-block.tpl.json \\
-          --faucets=/genesis-builder/faucets.json \\
-          --validators=/genesis-builder/validators.json \\
-          --admins=/genesis-builder/admins.json \\
-          --certs=/genesis-builder/certs.json \\
-          --output=/genesis-builder/genesis-block.json
-      sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
-    '''
-    */
-  }
+  sh '''#!/bin/bash -le
+    set -x
+    cd $(<_stratogs_path_tmp)
+    myPub=$(./strato --get-pubkey)
+    cd ..
+    sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
+    sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
+    sudo docker exec strato-strato-1 genesis-builder \\
+        --input=/genesis-builder/genesis-block.tpl.json \\
+        --faucets=/genesis-builder/faucets.json \\
+        --validators=/genesis-builder/validators.json \\
+        --admins=/genesis-builder/admins.json \\
+        --output=/genesis-builder/genesis-block.json
+    sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
+  '''
   sh "rm _*_path_tmp"
 }
 
