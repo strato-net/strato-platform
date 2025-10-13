@@ -33,13 +33,12 @@ import {
   SwapHistoryResponse,
   SwapToken,
   RawToken,
+  RawGetPool,
+  RawPoolFactory,
+  RawSwapEvent,
   PoolWithTokens,
-  validateGetPoolArray,
-  validateSwapEventArray,
-  validatePoolWithTokensArray,
-  validatePoolWithTokenAArray,
-  validatePoolWithTokenBArray,
-  validateSinglePoolFactory
+  PoolWithTokenA,
+  PoolWithTokenB
 } from "@mercata/shared-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
@@ -64,8 +63,8 @@ export const getPools = async (
     })
   ]);
 
-  const validatedPools = validateGetPoolArray(poolData);
-  const validatedFactory = validateSinglePoolFactory(factoryData);
+  const validatedPools = poolData as RawGetPool[];
+  const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -121,7 +120,7 @@ export const getSwapableTokens = async (
     }
   });
 
-  const validatedPools = validatePoolWithTokensArray(poolData);
+  const validatedPools = poolData as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -169,8 +168,8 @@ export const getSwapableTokenPairs = async (
     })
   ]);
 
-  const validatedPoolsA = validatePoolWithTokenBArray(poolDataA);
-  const validatedPoolsB = validatePoolWithTokenAArray(poolDataB);
+  const validatedPoolsA = poolDataA as PoolWithTokenB[];
+  const validatedPoolsB = poolDataB as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
     ...validatedPoolsA.map(pool => ({ token: pool.tokenB, poolBalance: pool.tokenBBalance })),
@@ -230,8 +229,7 @@ export const getSwapHistory = async (
     return { data: [], totalCount: 0 };
   }
 
-  const validatedEvents = validateSwapEventArray(swapEvents);
-  const swapHistory: SwapHistoryEntry[] = validatedEvents.map(event => {
+  const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
     const { tokenA, tokenB } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
     

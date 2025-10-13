@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, validatePoolWithTokenAddressesArray, validateSinglePoolWithBalances, validateSwapEventArray, OraclePriceMap } from "@mercata/shared-types";
+import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
@@ -156,10 +156,9 @@ export const getTradingVolume24hForPools = async (
     return new Map();
   }
 
-  const validatedEvents = validateSwapEventArray(swapEvents);
   const volumeMap = new Map<string, string>();
 
-  validatedEvents.forEach(event => {
+  (swapEvents as RawSwapEvent[]).forEach(event => {
     const poolAddress = event.address;
     const currentVolume = volumeMap.get(poolAddress) || "0";
     
@@ -346,7 +345,7 @@ export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: 
     }
   });
   
-  return validatePoolWithTokenAddressesArray(poolData);
+  return poolData[0];
 };
 
 /**
@@ -361,7 +360,7 @@ export const fetchPoolBalances = async (accessToken: string, poolAddress: string
     }
   });
   
-  return validateSinglePoolWithBalances(poolData);
+  return poolData[0];
 };
 
 // ============================================================================
