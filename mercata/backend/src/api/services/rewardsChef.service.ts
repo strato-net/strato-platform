@@ -89,15 +89,18 @@ export const getStakedBalance = async (
 };
 
 /**
- * Fetches all pools from RewardsChef contract using Cirrus
+ * Low-level function to fetch pools from RewardsChef contract using Cirrus
+ * with optional additional query parameters
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param additionalParams - Optional additional Cirrus query parameters for filtering
  * @returns Promise resolving to array of pool information
  */
-export const getPools = async (
+const getPoolsCirrus = async (
   accessToken: string,
-  rewardsChefAddress: string
+  rewardsChefAddress: string,
+  additionalParams?: Record<string, string>
 ): Promise<Array<{
   poolIdx: number;
   lpToken: string;
@@ -108,7 +111,8 @@ export const getPools = async (
   try {
     const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
       params: {
-        address: `eq.${rewardsChefAddress}`
+        address: `eq.${rewardsChefAddress}`,
+        ...additionalParams
       }
     });
 
@@ -131,7 +135,28 @@ export const getPools = async (
 };
 
 /**
+ * Fetches all pools from RewardsChef contract using Cirrus
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @returns Promise resolving to array of pool information
+ */
+export const getPools = async (
+  accessToken: string,
+  rewardsChefAddress: string
+): Promise<Array<{
+  poolIdx: number;
+  lpToken: string;
+  allocPoint: string;
+  accPerToken: string;
+  lastRewardTimestamp: string;
+}>> => {
+  return getPoolsCirrus(accessToken, rewardsChefAddress);
+};
+
+/**
  * Finds the RewardsChef pool for a given LP token address
+ * Uses Cirrus filtering for efficient database-level query
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
@@ -149,6 +174,8 @@ export const findPoolByLpToken = async (
   accPerToken: string;
   lastRewardTimestamp: string;
 } | undefined> => {
-  const pools = await getPools(accessToken, rewardsChefAddress);
-  return pools.find(p => p.lpToken === lpTokenAddress);
+  const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, {
+    "value->>lpToken": `eq.${lpTokenAddress}`
+  });
+  return pools[0]; // Should return at most one pool
 };
