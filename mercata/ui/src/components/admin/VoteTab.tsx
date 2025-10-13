@@ -150,7 +150,7 @@ const VoteTab = () => {
                     const address = issue.target;
                     const issueArgs = JSON.parse(issue.args) || [];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
-                    const votesNeeded = Math.floor((admins.length * threshold)/100) + 1;
+                    const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
