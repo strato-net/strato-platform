@@ -2,6 +2,10 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
+import { buildFunctionTx } from "../../utils/txBuilder";
+import { executeTransaction } from "../../utils/txHelper";
+import { waitForBalanceUpdate } from "../services/rewardsChef.service";
+import { rewardsChef } from "../../config/constants";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
 
@@ -399,3 +403,42 @@ export const buildTokenApprovalTx = (tokenAddress: string, spender: string, amou
   method: "approve",
   args: { spender, value: amount }
 });
+
+/**
+ * Stakes newly minted LP tokens into RewardsChef
+ */
+export const stakeNewLPTokens = async (
+  accessToken: string,
+  userAddress: string,
+  lpTokenAddress: string,
+  rewardsPoolIdx: number,
+  lpTokenBalanceBefore: string
+): Promise<void> => {
+  // Wait for Cirrus to index the new LP token balance with retry logic
+  const lpTokenBalanceAfter = await waitForBalanceUpdate(
+    accessToken,
+    lpTokenAddress,
+    userAddress,
+    lpTokenBalanceBefore,
+    10,  // max retries
+    200  // 200ms delay between retries
+  );
+
+  // Calculate newly minted LP tokens
+  const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
+
+  if (BigInt(newlyMintedAmount) > 0n) {
+    // Stake the newly minted LP tokens
+    const stakingTx = await buildFunctionTx([
+      buildTokenApprovalTx(lpTokenAddress, rewardsChef, newlyMintedAmount),
+      {
+        contractName: "RewardsChef",
+        contractAddress: rewardsChef,
+        method: "deposit",
+        args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
+      }
+    ], userAddress, accessToken);
+
+    await executeTransaction(accessToken, stakingTx);
+  }
+};

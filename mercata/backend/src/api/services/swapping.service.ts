@@ -16,10 +16,11 @@ import {
   fetchLPTokenAddress,
   buildTokenApprovalTx,
   getTradingVolume24hForPools,
-  getTokenBalance
+  getTokenBalance,
+  stakeNewLPTokens
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools, getStakedBalance, waitForBalanceUpdate, findPoolByLpToken } from "./rewardsChef.service";
+import { getPools as getRewardsChefPools, getStakedBalance, findPoolByLpToken } from "./rewardsChef.service";
 import { getTokenBalanceForUser } from "./tokens.service";
 import { rewardsChef } from "../../config/constants";
 import {
@@ -44,45 +45,6 @@ import {
 } from "@mercata/shared-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
-
-/**
- * Stakes newly minted LP tokens into RewardsChef
- */
-const stakeNewLPTokens = async (
-  accessToken: string,
-  userAddress: string,
-  lpTokenAddress: string,
-  rewardsPoolIdx: number,
-  lpTokenBalanceBefore: string
-): Promise<void> => {
-  // Wait for Cirrus to index the new LP token balance with retry logic
-  const lpTokenBalanceAfter = await waitForBalanceUpdate(
-    accessToken,
-    lpTokenAddress,
-    userAddress,
-    lpTokenBalanceBefore,
-    10,  // max retries
-    200  // 200ms delay between retries
-  );
-
-  // Calculate newly minted LP tokens
-  const newlyMintedAmount = (BigInt(lpTokenBalanceAfter) - BigInt(lpTokenBalanceBefore)).toString();
-
-  if (BigInt(newlyMintedAmount) > 0n) {
-    // Stake the newly minted LP tokens
-    const stakingTx = await buildFunctionTx([
-      buildTokenApprovalTx(lpTokenAddress, rewardsChef, newlyMintedAmount),
-      {
-        contractName: "RewardsChef",
-        contractAddress: rewardsChef,
-        method: "deposit",
-        args: { _pid: rewardsPoolIdx, _amount: newlyMintedAmount }
-      }
-    ], userAddress, accessToken);
-
-    await executeTransaction(accessToken, stakingTx);
-  }
-};
 
 // ============================================================================
 // READ OPERATIONS
