@@ -62,3 +62,43 @@ export const getPoolsCirrus = async (
     return [];
   }
 };
+
+/**
+ * Get user's info (staked balance and reward debt) from RewardsChef
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param poolId - Pool ID to query
+ * @param userAddress - User address to fetch info for
+ * @returns Promise resolving to user info object
+ */
+export const getUserInfo = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string
+): Promise<{ amount: string; rewardDebt: string }> => {
+  try {
+    // Query userInfo mapping from Cirrus
+    // The mapping is indexed with key (poolId) and key2 (userAddress)
+    const response = await cirrus.get(accessToken, `/${RewardsChef}-userInfo`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        key: `eq.${poolId}`,
+        key2: `eq.${userAddress}`,
+        select: "value",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
+    });
+
+    const userInfo = response.data?.[0]?.value;
+    return {
+      amount: userInfo?.amount || "0",
+      rewardDebt: userInfo?.rewardDebt || "0"
+    };
+  } catch (error) {
+    console.error("Failed to fetch user info from RewardsChef:", error);
+    return { amount: "0", rewardDebt: "0" };
+  }
+};
