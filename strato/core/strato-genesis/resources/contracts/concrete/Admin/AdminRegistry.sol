@@ -129,7 +129,7 @@ contract record AdminRegistry {
     function _getIssueId(address _target, string _func, variadic _args) internal returns (string) {
         address delegate = delegates["_getIssueId"];
         if (delegate != address(0)) {
-            return delegate.delegatecall("_getIssueId", _issueId, _target, _func, _args);
+            return delegate.delegatecall("_getIssueId", _target, _func, _args);
         } else {
             return keccak256(_target, _func, _args);
         }

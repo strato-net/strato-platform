@@ -331,12 +331,8 @@ showSM (SContract name address) = do
   return $ "Contract: " ++ labelToString name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
-showSM (SContractFunction maybeContractName address functionName) = do
-  contractName <- case maybeContractName of
-    Just name -> return name
-    Nothing -> do
-      contract <- getCurrentContract
-      return $ CC._contractName contract
+showSM (SContractFunction address functionName) = do
+  contractName <- CC._contractName <$> getCurrentContract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x

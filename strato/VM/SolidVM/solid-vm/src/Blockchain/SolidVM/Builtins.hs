@@ -20,7 +20,7 @@ import SolidVM.Model.Value
 
 -- Pushes a new value to an array and returns the length of the new array
 push :: MonadSM m => Value -> Maybe Variable -> ValList -> m Variable
-push (SReference apt) _ (OrderedVals [av]) = do
+push (SReference apt) _ [av] = do
   let lenPath = apt `apSnoc` MS.Field "length"
   len' <- getInt $ Constant $ SReference lenPath
   let len :: Int = fromIntegral len'
@@ -29,7 +29,7 @@ push (SReference apt) _ (OrderedVals [av]) = do
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen
-push (SArray vec) (Just (Variable ref)) (OrderedVals [av]) = do
+push (SArray vec) (Just (Variable ref)) [av] = do
   newVar <- createVar av
   let newArr = V.snoc vec newVar
   setVar (Variable ref) (SArray newArr)

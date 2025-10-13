@@ -73,10 +73,10 @@ spec = do
                 )
                 (Just $ Variable () "c")
             ),
-            ("int(8824)", FunctionCall () (Variable () "int") $ OrderedArgs [NumberLiteral () 8824 Nothing]),
-            ("int32(8824)", FunctionCall () (Variable () "int32") $ OrderedArgs [NumberLiteral () 8824 Nothing]),
+            ("int(8824)", FunctionCall () (Variable () "int") $ [NumberLiteral () 8824 Nothing]),
+            ("int32(8824)", FunctionCall () (Variable () "int32") $ [NumberLiteral () 8824 Nothing]),
             ( "int(x)[y]",
-              IndexAccess () (FunctionCall () (Variable () "int") $ OrderedArgs [Variable () "x"]) $
+              IndexAccess () (FunctionCall () (Variable () "int") $ [Variable () "x"]) $
                 Just $ Variable () "y"
             ),
             ( "xs[y].z",
@@ -85,23 +85,23 @@ spec = do
                 (IndexAccess () (Variable () "xs") (Just $ Variable () "y"))
                 "z"
             ),
-            ("x.f()", FunctionCall () (MemberAccess () (Variable () "x") "f") $ OrderedArgs [])
+            ("x.f()", FunctionCall () (MemberAccess () (Variable () "x") "f") $ [])
           ]
     forM_ cases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseExpr input `shouldBe` Right want
 
     it "can parse function calls" $ do
       let f = FunctionCall () (Variable () "f")
-          true = OrderedArgs [BoolLiteral () True]
-          ok = OrderedArgs [StringLiteral () "ok"]
+          true = [BoolLiteral () True]
+          ok = [StringLiteral () "ok"]
           fcases =
             [ ("f(true)", f true),
               ("f(true\n)", f true),
               ("f(\"ok\")", f ok),
               ("f(\"ok\"\n)", f ok),
-              ("f({})", f $ NamedArgs []),
-              ("f({ x : y})", f $ NamedArgs [("x", Variable () "y")]),
-              ("f ( { x : y , q : z } )", f $ NamedArgs [("x", Variable () "y"), ("q", Variable () "z")])
+              ("f({})", f []),
+              ("f({ x : y})", f [Variable () "y"]),
+              ("f ( { x : y , q : z } )", f [Variable () "y", Variable () "z"])
             ]
       forM_ fcases $ \(input, want) -> do
         assertEqual input (Right want) (parseExpr input)
@@ -201,9 +201,9 @@ spec = do
                   Just $
                     ArrayExpression () []
             ),
-            ("revert f(x, y);", RevertStatement (Just "f") (OrderedArgs [(Variable () "x"), (Variable () "y")])),
-            ("revert(\"e\");", RevertStatement (Nothing) (OrderedArgs [StringLiteral () "e"])),
-            ("revert f({ x: y , q: z });", RevertStatement (Just "f") (NamedArgs [("x", Variable () "y"), ("q", Variable () "z")]))
+            ("revert f(x, y);", RevertStatement (Just "f") ([(Variable () "x"), (Variable () "y")])),
+            ("revert(\"e\");", RevertStatement (Nothing) ([StringLiteral () "e"])),
+            ("revert f({ x: y , q: z });", RevertStatement (Just "f") ([Variable () "y", Variable () "z"]))
           ]
     forM_ scases $ \(input, want) -> do
       it ("can parse " ++ input) $ parseStatement input `shouldBe` Right (want ())

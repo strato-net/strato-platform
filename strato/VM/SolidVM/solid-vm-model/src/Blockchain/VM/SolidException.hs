@@ -6,6 +6,7 @@ module Blockchain.VM.SolidException
     showSolidException,
     typeError,
     todo,
+    arithmeticException,
     indexOutOfBounds,
     checkArity,
     arityMismatch,
@@ -57,6 +58,7 @@ import Text.Printf (printf)
 data SolidException
   = TypeError String String
   | InternalError String String
+  | ArithmeticException String String
   | InvalidArguments String String
   | IndexOutOfBounds String String
   | TODO String String
@@ -101,6 +103,7 @@ instance Show SolidException where
 showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
+showSolidException (ArithmeticException a b) = printf "integer out of bounds: %s: %s" a b
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
 showSolidException (IndexOutOfBounds a b) = printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
@@ -150,6 +153,9 @@ todo = toThrower TODO
 
 internalError :: (Show v) => String -> v -> a
 internalError = toThrower InternalError
+
+arithmeticException :: (Show v) => String -> v -> a
+arithmeticException = toThrower ArithmeticException
 
 invalidArguments :: (Show v) => String -> v -> a
 invalidArguments = toThrower InvalidArguments
