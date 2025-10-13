@@ -65,7 +65,7 @@ export function getMetadataApi() {
           }
       )
       const responseJson = await nodeInfoRaw.json()
-      return {metadata, nodeInfo:responseJson[0]}
+      return {metadata, nodeInfo: responseJson[0]}
     })
     .catch(function (error) {
       throw error;
@@ -82,15 +82,15 @@ export function* getHealth(action) {
     }
 }
 
-// export function* getMetadata(action) {
-//     try {
-//       const response = yield call(getMetadataApi);
-//       yield put(fetchMetadataSuccess(response));
-//     }
-//     catch (err) {
-//       yield put(fetchMetadataFailure(err));
-//     }
-// }
+export function* getMetadata(action) {
+    try {
+      // const response = yield call(getMetadataApi);
+      yield put(fetchMetadataSuccess(response));
+    }
+    catch (err) {
+      yield put(fetchMetadataFailure(err));
+    }
+}
 
 
 export default function* watchGetHealth() {
