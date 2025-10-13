@@ -238,7 +238,6 @@ data ContractPayload = ContractPayload
     contractpayloadContract :: Maybe Text,
     contractpayloadArgs :: Maybe (Map Text ArgValue),
     contractpayloadTxParams :: Maybe TxParams,
-    contractpayloadCodePtr :: Maybe Address,
     contractpayloadMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -275,7 +274,6 @@ instance ToJSON ContractPayload where
         "src" .= contractpayloadSrc,
         "args" .= contractpayloadArgs,
         "txParams" .= contractpayloadTxParams,
-        "codePtr" .= contractpayloadCodePtr,
         "metadata" .= contractpayloadMetadata
       ]
 
@@ -292,7 +290,6 @@ instance FromJSON ContractPayload where
       <*> (o .:? "contract")
       <*> (o .:? "args")
       <*> (o .:? "txParams")
-      <*> (o .:? "codePtr")
       <*> (o .:? "metadata")
   parseJSON o = fail $ "parseJSON ContractPayload: Expected Object, got " ++ show o
 
@@ -317,7 +314,6 @@ instance ToSchema BlocTransactionPayload where
               contractpayloadContract = Nothing,
               contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
               contractpayloadTxParams = Nothing,
-              contractpayloadCodePtr = Nothing,
               contractpayloadMetadata = Nothing
             }
 
@@ -335,7 +331,6 @@ instance ToSchema ContractPayload where
             contractpayloadContract = Nothing,
             contractpayloadArgs = Just $ Map.fromList [("_x", ArgInt 1)],
             contractpayloadTxParams = Nothing,
-            contractpayloadCodePtr = Nothing,
             contractpayloadMetadata = Nothing
           }
 

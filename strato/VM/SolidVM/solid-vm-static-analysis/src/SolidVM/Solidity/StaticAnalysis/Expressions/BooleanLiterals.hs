@@ -64,10 +64,8 @@ statementHelper (Throw e _) =
   expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concatMap (expressionHelper . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) _) =
+statementHelper (RevertStatement _ vals _) =
   concatMap expressionHelper vals
-statementHelper (RevertStatement _ (NamedArgs vals) _) =
-  concatMap (expressionHelper . snd) vals
 statementHelper (UncheckedStatement body _) =
   concat $ statementHelper <$> body
 statementHelper (AssemblyStatement _ _) = []
@@ -97,9 +95,7 @@ expressionHelper (IndexAccess _ a b) =
 expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) =
   let as = expressionHelper e
-      bs = case args of
-        OrderedArgs es -> concat $ expressionHelper <$> es
-        NamedArgs nes -> concat $ expressionHelper . snd <$> nes
+      bs = concat $ expressionHelper <$> args
    in concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
 expressionHelper (Ternary _ a b c) =
@@ -115,3 +111,4 @@ expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es
 expressionHelper (Variable _ _) = []
 expressionHelper (ObjectLiteral _ _) = []
 expressionHelper (HexaLiteral _ _) = []
+expressionHelper (InlineBoundsCheck _ _ _ _) = []

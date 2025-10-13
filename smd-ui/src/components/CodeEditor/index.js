@@ -1,21 +1,21 @@
 import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import MonacoEditor from 'react-monaco-editor';
 import { Button, Tab2, Tabs2, Popover, Position, Icon, Switch } from '@blueprintjs/core';
 import { onCompileFileLocally, onChangeFileName, contractNameChange, compileCodeFromEditor, changeCreateActionState, addNewFileTab, removeTab, onTabChange } from './codeEditor.actions';
 import { getSelectedTabContent } from './codeEditor.selector';
 import CreateContract from '../CreateContract';
-import DeployDapp from '../DeployDapp';
+// import DeployDapp from '../DeployDapp';
 import { getImportStatements, getFileAndReplaceWithImport } from '../../lib/FileParser.js';
 import { downloadFile } from '../../lib/fileHandler.js';
 import Dropzone from 'react-dropzone';
 import { toasts } from "../Toasts";
 import debounce from 'lodash/debounce';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 import { fetchChainDetailSelect, selectChain, fetchChainIds } from "../Chains/chains.actions"
-import HexText from '../HexText';
+// import HexText from '../HexText';
 import { Field, reduxForm } from 'redux-form';
 
 class CodeEditor extends Component {
@@ -33,8 +33,8 @@ class CodeEditor extends Component {
   }
 
   componentDidMount() {
-    mixpanelWrapper.track('code_editor_load');
-    ReactGA.send({hitType: "pageview", page: "/code_editor", title: "Contract Editor"});
+    // mixpanelWrapper.track('code_editor_load');
+    // ReactGA.send({hitType: "pageview", page: "/code_editor", title: "Contract Editor"});
     // this.props.fetchChainIds(this.chainLimit, this.chainOffset);
     this.saveLocalState = debounce(this.saveToLocalStorage, 500)
     window.onbeforeunload = (e) => {
@@ -143,7 +143,7 @@ class CodeEditor extends Component {
       // if (newFileList.length > 0) {
       //   throw new Error("Can't find the imported file.")
       // }
-      mixpanelWrapper.track("compile_contract_code_click");
+      // mixpanelWrapper.track("compile_contract_code_click");
       this.props.compileCodeFromEditor(code, codeType);
     } catch (e) {
       this.props.onCompileFileLocally(`${e}`)

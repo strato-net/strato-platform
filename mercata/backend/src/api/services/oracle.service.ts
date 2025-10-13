@@ -4,7 +4,7 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths, constants } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { getPool } from "./lending.service";
-import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "../../types";
+import { PriceHistoryEntry, PriceHistoryResponse, OraclePriceEntry, OraclePriceMap } from "@mercata/shared-types";
 
 const {
   PriceOracle,
@@ -50,6 +50,7 @@ export const getPrice = async (
 
 export const setPrice = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | undefined>
 ) => {
   try {
@@ -57,7 +58,7 @@ export const setPrice = async (
       select: "priceOracle",
     });
     const priceOracle = registry.priceOracle;
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(PriceOracle),
       contractAddress: priceOracle,
       method: "setAssetPrice",
@@ -65,7 +66,7 @@ export const setPrice = async (
         asset: body.token,
         price: body.price,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -144,13 +145,15 @@ export const getPriceHistory = async (
     // --- Normalize batch events ---
     if (Array.isArray(batchResponse.data)) {
       batchResponse.data.forEach((event: any) => {
-        const idx = event.assets.indexOf(assetAddress);
-        if (idx !== -1) {
+        const assets = JSON.parse(event.assets);
+        const priceValues = JSON.parse(event.priceValues);
+        const idx = assets.indexOf(assetAddress);
+        if (idx !== -1 && priceValues[idx] !== undefined) {
           priceEvents.push({
             id: event.id.toString(),
             timestamp: new Date(parseInt(event.timestamp) * 1000),
             asset: assetAddress,
-            price: toPlainString(event.priceValues[idx]), // normalize to string
+            price: toPlainString(priceValues[idx]), // normalize to string
             blockTimestamp: new Date(event.block_timestamp),
           });
         }

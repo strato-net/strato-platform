@@ -3,34 +3,38 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@/context/UserContext';
 import { useUserTokens } from '@/context/UserTokensContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
-import { LiquidityPool } from '@/interface';
+import { Pool } from '@/interface';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 
 
 const SwapPoolsSection = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPool, setSelectedPool] = useState<LiquidityPool | null>(null);
+  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
-  const [pools, setPools] = useState<LiquidityPool[]>([]);
+  const [pools, setPools] = useState<Pool[]>([]);
   const [loading, setLoading] = useState(false);
   const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const operationInProgressRef = useRef(false);
 
-  const { fetchPools, getPoolByAddress, enrichPools } = useSwapContext();
-  const { fetchUsdstBalance } = useUserTokens();
+  const { fetchPools, getPoolByAddress } = useSwapContext();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
   const { userAddress } = useUser();
-  const { toast } = useToast();
 
   useEffect(() => {
     fetchAndEnrichPools();
   }, [fetchPools]);
+
+  useEffect(() => {
+    if (userAddress) {
+      fetchUsdstBalance(userAddress);
+    }
+  }, [userAddress, fetchUsdstBalance]);
 
   useEffect(() => {
     if (selectedPool && isDepositModalOpen) {
@@ -38,13 +42,9 @@ const SwapPoolsSection = () => {
         try {
           const updatedPool = await getPoolByAddress(selectedPool.address);
           if (updatedPool) {
-            setSelectedPool(prev => ({
-              ...prev,
-              ...updatedPool,
-              _name: prev?._name,
-              _symbol: prev?._symbol
-            }));
+            setSelectedPool(updatedPool);
           }
+          await fetchUsdstBalance(userAddress);
         } catch (error) {
           console.error('Error polling pool:', error);
         }
@@ -60,7 +60,7 @@ const SwapPoolsSection = () => {
         }
       };
     }
-  }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress]);
+  }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress, fetchUsdstBalance]);
 
   const fetchAndEnrichPools = async () => {
     if (operationInProgressRef.current) return;
@@ -68,8 +68,7 @@ const SwapPoolsSection = () => {
     try {
       setLoading(true);
       const tempPools = await fetchPools();
-      const enrichedPools = enrichPools(tempPools);
-      setPools(enrichedPools);
+      setPools(tempPools);
     } catch (err) {
       console.error("Failed to fetch pools:", err);
     } finally {
@@ -77,14 +76,14 @@ const SwapPoolsSection = () => {
     }
   };
 
-  const handleOpenDepositModal = async (pool: LiquidityPool) => {
+  const handleOpenDepositModal = async (pool: Pool) => {
     if (operationInProgressRef.current) return;
     
     setSelectedPool(pool);
     setIsDepositModalOpen(true);
   };
 
-  const handleOpenWithdrawModal = async (pool: LiquidityPool): Promise<void> => {
+  const handleOpenWithdrawModal = async (pool: Pool): Promise<void> => {
     if (operationInProgressRef.current) return;
 
     setSelectedPool(pool);
@@ -119,7 +118,7 @@ const SwapPoolsSection = () => {
 
 
   const filteredPools = pools.filter(pool => 
-    pool._name?.toLowerCase().includes(searchQuery.toLowerCase())
+    pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   useEffect(() => {
@@ -163,7 +162,7 @@ const SwapPoolsSection = () => {
                       {pool.tokenA?.images?.[0]?.value ? (
                         <img
                           src={pool.tokenA.images[0].value}
-                          alt={pool.tokenA.name || pool._name?.split('/')[0]}
+                          alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
                           className="w-8 h-8 rounded-full z-10 border-2 border-white object-cover"
                         />
                       ) : (
@@ -171,13 +170,13 @@ const SwapPoolsSection = () => {
                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
                           style={{ backgroundColor: "red" }}
                         >
-                          {pool._name?.slice(0, 2)}
+                          {pool.poolName?.slice(0, 2)}
                         </div>
                       )}
                       {pool.tokenB?.images?.[0]?.value ? (
                         <img
                           src={pool.tokenB.images[0].value}
-                          alt={pool.tokenB.name || pool._name?.split('/')[1]}
+                          alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
                           className="w-8 h-8 rounded-full border-2 border-white object-cover"
                         />
                       ) : (
@@ -185,18 +184,28 @@ const SwapPoolsSection = () => {
                           className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
                           style={{ backgroundColor: "red" }}
                         >
-                          {pool._name?.split('/')[1].slice(0, 2)}
+                          {pool.poolName?.split('/')[1].slice(0, 2)}
                         </div>
                       )}
                     </div>
                     <div>
-                      <h3 className="font-medium">{pool._name}</h3>
+                      <h3 className="font-medium">{pool.poolName}</h3>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
                       <div className="flex items-center text-xs text-gray-500 mt-1">
-                      <span>Your Liquidity: {formatBalance(pool.lpToken.balances?.[0]?.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
+                      {pool.lpToken.stakedBalance !== undefined && (
+                        <>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center justify-between sm:justify-end space-x-4">
@@ -219,8 +228,8 @@ const SwapPoolsSection = () => {
                         variant="outline"
                         className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
                         onClick={() => handleOpenWithdrawModal(pool)}
-                        disabled={!pool.lpToken.balances?.length}
-                        title={!pool.lpToken.balances?.length ? "No stake in this pool" : "Withdraw"}
+                        disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                        title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
                       >
                         <CircleArrowUp className="mr-1 h-4 w-4" />
                         <span className="hidden sm:inline">Withdraw</span>
@@ -241,6 +250,8 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onDepositSuccess={handleDepositSuccess}
         operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
       />
 
       <LiquidityWithdrawModal
@@ -249,6 +260,8 @@ const SwapPoolsSection = () => {
         selectedPool={selectedPool}
         onWithdrawSuccess={handleWithdrawSuccess}
         operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
       />
     </div>
   );

@@ -209,5 +209,6 @@ export const subscribeRoomMock = [
   ['TRANSACTIONS_TYPE'],
   ['GET_SHARD_COUNT'],
   ['GET_SYSTEM_INFO'],
-  ['GET_NETWORK_HEALTH']
+  ['GET_NETWORK_HEALTH'],
+  ['GET_NODE_UPTIME']
 ]

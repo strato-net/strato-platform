@@ -1,3 +1,6 @@
+import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
+
 contract record Voucher is ERC20, Ownable {
     
     constructor(

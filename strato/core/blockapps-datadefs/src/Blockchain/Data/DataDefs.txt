@@ -60,7 +60,6 @@ AddressStateRef
     contractRoot StateRoot
     codeHash Keccak256 Maybe
     contractName String Maybe
-    codePtrAddress Address Maybe
     latestBlockDataRefNumber Integer
     UniqueAddress address
     deriving Eq Read Show

@@ -24,7 +24,7 @@ const VoteTab = () => {
     getOpenIssues();
   }, []);
 
-  const handleCastVoteOnIssue = (target: string, func: string, args: any[]) => {
+  const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
   };
 
@@ -55,6 +55,52 @@ const VoteTab = () => {
 
   return (
     <div className="space-y-6">
+      {/* List of Admins */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Admins</CardTitle>
+          <CardDescription>Current administrators with voting rights</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <span className="text-sm text-gray-500">
+              {admins.length} admin{admins.length !== 1 ? 's' : ''} registered
+            </span>
+          </div>
+          
+          {admins.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No admins found</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {admins.map((admin: {address: string}, index: number) => (
+                <div 
+                  key={`${admin.address}-${index}`}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center space-x-2">
+                    <span className="font-mono text-sm">
+                      {admin && admin.address !== 'Unknown' 
+                        ? `${admin.address.slice(0, 6)}...${admin.address.slice(-4)}`
+                        : admin.address
+                      }
+                    </span>
+                    {admin?.address && admin.address !== 'Unknown' && (
+                      <CopyButton address={admin.address} />
+                    )}
+                  </div>
+                  {admin.address === userAddress && (
+                    <span className="text-xs bg-strato-blue text-white px-2 py-1 rounded">You</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+
       { }
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">
@@ -102,8 +148,9 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
+                    const issueArgs = JSON.parse(issue.args) || [];
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
-                    const votesNeeded = Math.floor((admins.length * threshold)/100) + 1;
+                    const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
@@ -138,7 +185,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {issue.args.join(', ')}
+                          {issueArgs.join(', ')}
                         </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
@@ -152,7 +199,7 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, issue.args)}
+                            onClick={() => handleCastVoteOnIssue(address, issue.func, issueArgs)}
                             disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
@@ -204,6 +251,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
+                    const issueArgs = JSON.parse(issue.args) || [];
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
@@ -237,7 +285,7 @@ const VoteTab = () => {
                           {issue.func}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[300px] truncate">
-                          {issue.args.join(', ')}
+                          {issueArgs.join(', ')}
                         </TableCell>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
                           <div className="flex items-center space-x-2">

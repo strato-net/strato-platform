@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Text, Position, Tooltip } from '@blueprintjs/core';
@@ -14,7 +14,7 @@ class BlockView extends Component {
   }
 
   handleClick(hash) {
-    mixpanelWrapper.track('transactions_row_click');
+    // mixpanelWrapper.track('transactions_row_click');
     const history = this.props.history;
     history.push('/transactions/' + hash);
   }
@@ -158,7 +158,7 @@ class BlockView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => { mixpanelWrapper.track('block_view_go_back_click'); this.props.history.goBack() }}
+              onClick={(e) => { /*mixpanelWrapper.track('block_view_go_back_click'); this.props.history.goBack()*/ }}
               className="pt-icon-arrow-left"
               text="Back"
             />

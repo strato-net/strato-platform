@@ -9,7 +9,9 @@
 {-# LANGUAGE TupleSections #-}
 
 module SolidVM.Solidity.Fuzzer
-  ( runFuzzer,
+  ( defaultHook,
+    runFuzzer,
+    runFuzzerWithHook,
     module SolidVM.Solidity.Fuzzer.Types,
   )
 where
@@ -19,7 +21,7 @@ import Blockchain.Data.BlockHeader
 import Blockchain.MemVMContext
 import Blockchain.SolidVM.Simple
 import Blockchain.Strato.Model.Address
-import Blockchain.VMContext (VMBase)
+import Blockchain.VMContext (VMBase, runningTests)
 import Control.Lens
 import Control.Monad.Catch (MonadCatch)
 import qualified Control.Monad.Change.Alter as A
@@ -28,8 +30,11 @@ import Control.Monad.Trans.Reader
 import qualified Data.Aeson as Aeson
 import Data.Bool (bool)
 import qualified Data.ByteString.Lazy as BL
+import Data.Foldable (foldlM)
+import Data.List (sortBy)
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes, fromMaybe, maybeToList)
+import Data.Maybe (fromMaybe, maybeToList)
+import Data.Ord (comparing)
 import Data.Source
 import qualified Data.Text as T
 import Data.Text.Encoding as T
@@ -71,32 +76,62 @@ withTestName = fmap . fmap . (,) . formatTestName
 success :: Applicative f => SourceAnnotation a -> f FuzzerResult
 success ctx = pure . FuzzerSuccess $ "Test succeeded" <$ ctx
 
+defaultHook :: Monad m => Int -> FuzzerTestAndResult -> m FuzzerTestAndResult
+defaultHook _ r = pure r
+
 runFuzzer :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
   Maybe DebugSettings ->
   (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
   SourceMap ->
   m [FuzzerTestAndResult]
-runFuzzer dSettings compile src = compile src >>= \case
+runFuzzer dSettings compile src = runFuzzerWithHook dSettings compile src defaultHook
+
+runFuzzerWithHook :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Either String String) m) =>
+  Maybe DebugSettings ->
+  (SourceMap -> m (Either [SourceAnnotation T.Text] CodeCollection)) ->
+  SourceMap ->
+  (Int -> FuzzerTestAndResult -> m FuzzerTestAndResult) ->
+  m [FuzzerTestAndResult]
+runFuzzerWithHook dSettings compile src hook = compile src >>= \case
   Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
-    runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $
-      fmap concat . for (M.toList $ _contracts cc) $ \(cName, c) ->
+    runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $ do
+      lift . modify' $ runningTests .~ True
+      let contractsInSourceOrder =
+            sortBy (comparing (\(_, c') -> c' ^. contractContext . sourceAnnotationStart)) (M.toList $ _contracts cc)
+       in fmap concat . for contractsInSourceOrder $ \(cName, c) ->
         if not (describePrefix `T.isPrefixOf` labelToText cName)
           then pure []
           else case _funcArgs <$> _constructor c of
             Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
-              _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
-              fmap catMaybes . for (M.toList $ _functions c) $ \(fName, f) -> fmap (fmap (withTestName $ T.pack fName)) $
-                if
-                    | testPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> test bh addr fName f
-                    | propertyPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        Just <$> prop bh addr fName f
-                    | otherwise -> pure Nothing
+              beforeAllRes <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
+              case beforeAllRes of
+                Just ff@FuzzerFailure{} -> do
+                  let res = withTestName "beforeAll" ff
+                  _ <- lift . lift . lift $ hook 0 res
+                  pure []
+                _ -> do
+                  let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
+                  testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
+                    mResult <- fmap (fmap (withTestName $ T.pack fName)) $
+                      if
+                        | testPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
+                            result <- Just <$> test bh addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                            pure result
+                        | propertyPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
+                            result <- Just <$> prop bh addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                            pure result
+                        | otherwise -> pure Nothing
+                    maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
+                    ) (1, []) functionsInSourceOrder
+                  _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
+                  pure testResults
 
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True

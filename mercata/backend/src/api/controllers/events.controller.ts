@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getEvents } from "../services/events.service";
+import { getEvents, getContractInfo } from "../services/events.service";
 
 class EventsController {
   static async getEvents(
@@ -23,101 +23,8 @@ class EventsController {
     next: NextFunction
   ): Promise<void> {
     try {
-      // Hardcoded contract information based on the Mercata contracts
-      const contractInfo = {
-        contracts: [
-          {
-            name: "LendingPool",
-            events: [
-              "Deposited",
-              "Withdrawn", 
-              "Borrowed",
-              "Repaid",
-              "Liquidated",
-              "SuppliedCollateral",
-              "WithdrawnCollateral",
-              "ExchangeRateUpdated",
-              "InterestDistributed",
-              "AssetConfigured"
-            ]
-          },
-          {
-            name: "Pool",
-            events: [
-              "Swap",
-              "AddLiquidity",
-              "RemoveLiquidity"
-            ]
-          },
-          {
-            name: "Token",
-            events: [
-              "Transfer",
-              "Approval",
-              "StatusChanged"
-            ]
-          },
-          {
-            name: "MercataEthBridge",
-            events: [
-              "DepositInitiated",
-              "DepositCompleted",
-              "WithdrawalInitiated",
-              "WithdrawalPendingApproval",
-              "WithdrawalCompleted",
-              "RelayerUpdated",
-              "MinAmountUpdated",
-              "TokenFactoryUpdated"
-            ]
-          },
-          {
-            name: "RewardsManager",
-            events: [
-              "RewardTokenAdded",
-              "RewardTokenRemoved",
-              "EligibleTokenAdded", 
-              "EligibleTokenRemoved",
-              "RewardFactorSet",
-              "RewardBalanceUpdated",
-              "RewardClaimed",
-              "RewardDelegateUpdated"
-            ]
-          },
-          {
-            name: "PoolFactory",
-            events: [
-              "PoolCreated"
-            ]
-          },
-          {
-            name: "TokenFactory",
-            events: [
-              "TokenCreated",
-              "TokenStatusUpdated"
-            ]
-          },
-          {
-            name: "LendingRegistry",
-            events: [
-              "AssetRegistered",
-              "AssetUnregistered"
-            ]
-          },
-          {
-            name: "CollateralVault",
-            events: [
-              "CollateralDeposited",
-              "CollateralWithdrawn"
-            ]
-          },
-          {
-            name: "PriceOracle",
-            events: [
-              "PriceUpdated"
-            ]
-          }
-        ]
-      };
+      const { accessToken } = req;
+      const contractInfo = await getContractInfo(accessToken);
 
       res.status(RestStatus.OK).json(contractInfo);
     } catch (error) {

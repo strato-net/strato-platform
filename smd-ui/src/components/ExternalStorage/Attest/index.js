@@ -4,7 +4,7 @@ import { withRouter } from 'react-router-dom';
 import { closeAttestModal, attestDocument, resetError, changeUsername } from './attest.actions';
 import { Dialog, Button, Intent } from '@blueprintjs/core';
 import { Field, reduxForm } from 'redux-form';
-import mixpanelWrapper from '../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../lib/mixpanelWrapper';
 import validate from './validate';
 import { isOauthEnabled } from '../../../lib/checkMode';
 import { toasts } from '../../Toasts';
@@ -236,7 +236,7 @@ class Attest extends Component {
           <Dialog
             isOpen={this.props.isOpen}
             onClose={() => {
-              mixpanelWrapper.track('close_attest_modal');
+              // mixpanelWrapper.track('close_attest_modal');
               this.props.reset();
               this.props.closeAttestModal();
             }}

@@ -15,7 +15,18 @@ contract record AdminRegistry {
     event IssueVoted(address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
 
-    constructor(address[] _initialAdmins) {
+    bool public initialized = false;
+
+    modifier onlyOnce() {
+        require(!initialized, "AdminRegistry is already initialized");
+        initialized = true;
+        _;
+    }
+
+    constructor() { }
+
+    function initialize(address[] _initialAdmins) external onlyOnce {
+        require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
@@ -118,7 +129,7 @@ contract record AdminRegistry {
     function _getIssueId(address _target, string _func, variadic _args) internal returns (string) {
         address delegate = delegates["_getIssueId"];
         if (delegate != address(0)) {
-            return delegate.delegatecall("_getIssueId", _issueId, _target, _func, _args);
+            return delegate.delegatecall("_getIssueId", _target, _func, _args);
         } else {
             return keccak256(_target, _func, _args);
         }

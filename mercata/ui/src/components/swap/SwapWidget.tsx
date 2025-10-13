@@ -6,7 +6,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ArrowDownUp, Check, ChevronDown } from "lucide-react";
-import { LiquidityPool, SwappableToken } from "@/interface";
+import { Pool, SwapToken } from "@/interface";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from "@/context/SwapContext";
 import { Slider } from "@/components/ui/slider";
 import { usdstAddress, SWAP_FEE } from "@/lib/constants";
-import { safeParseUnits, formatBalance, formatAmount, formatUnits } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalance, formatAmount, formatUnits, toWei } from "@/utils/numberUtils";
 import {
   Dialog,
   DialogContent,
@@ -25,13 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { usePoolPolling } from "@/hooks/useSmartPolling";
 import { calculateSwapOutput, calculateSwapInput } from "@/helpers/swapCalculations";
+import { computeMaxTransferable, handleAmountInputChange } from "@/utils/transferValidation";
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 const DEFAULT_SLIPPAGE = 4; // 4%
 const POLL_INTERVAL = 10000; // 10 seconds
-const DECIMALS = 18;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -41,7 +41,7 @@ const isValidInputAmount = (amount: string): boolean => {
   return amount && amount !== "." && amount !== "0." && !isNaN(Number(amount));
 };
 
-const calculateExchangeRates = (pool: LiquidityPool | null, fromAsset: SwappableToken | null) => {
+const calculateExchangeRates = (pool: Pool | null, fromAsset: SwapToken | null) => {
   if (!pool || !fromAsset?.address) return { exchangeRate: "0", oracleExchangeRate: "0" };
   
   const isAToB = pool.tokenA?.address === fromAsset.address;
@@ -95,9 +95,9 @@ const AnimatedNumber = ({ value, isLoading }: { value: string; isLoading: boolea
 // COMPONENT INTERFACES
 // ============================================================================
 interface TokenSelectorProps {
-  asset?: SwappableToken;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
+  asset?: SwapToken;
+  onSelect: (asset: SwapToken) => void;
+  tokens: SwapToken[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -173,28 +173,30 @@ export const TokenSelector = React.memo(TokenSelectorComponent);
 // ============================================================================
 interface TokenInputProps {
   amount: string;
+  userBalanceWei: string;
+  poolBalanceWei: string;
+  maxAmountWei: string;
   onChange: (value: string) => void;
-  asset?: SwappableToken;
-  wrongAmount: boolean;
-  onSelect: (asset: SwappableToken) => void;
-  tokens: SwappableToken[];
+  asset?: SwapToken;
+  onSelect: (asset: SwapToken) => void;
+  tokens: SwapToken[];
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   label: string;
   onFocus: () => void;
   isFromInput: boolean;
-  pool: LiquidityPool;
-  poolLoading: boolean;
-  showMaxButton: boolean;
   onMaxClick: () => void;
-  disabled?: boolean;
+  amountError?: string;
+  loading: boolean;
 }
 
 const TokenInput = ({
   amount,
+  userBalanceWei,
+  poolBalanceWei,
+  maxAmountWei,
   onChange,
   asset,
-  wrongAmount,
   onSelect,
   tokens,
   isOpen,
@@ -202,77 +204,49 @@ const TokenInput = ({
   label,
   onFocus,
   isFromInput,
-  pool,
-  poolLoading,
-  showMaxButton,
   onMaxClick,
-  disabled = false
-}: TokenInputProps) => {
-  
-  // Get pool balance
-  const poolBalance = useMemo(() => {
-    if (!pool || !asset) return "0";
-    return pool.tokenA?.address === asset.address
-      ? pool.tokenABalance || "0"
-      : pool.tokenB?.address === asset.address
-        ? pool.tokenBBalance || "0"
-        : "0";
-  }, [pool, asset?.address]);
-      
+  amountError,
+  loading,
+}: TokenInputProps) => {      
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
       <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-gray-600 font-semibold">{label}</label>
-        <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${(() => {
-          let balance = asset?.balance || "0";
-          if (asset?.address === usdstAddress && isFromInput) {
-            const fee = safeParseUnits(SWAP_FEE, DECIMALS);
-            const balanceBigInt = BigInt(balance);
-            balance = (balanceBigInt > fee ? balanceBigInt - fee : 0n).toString();
-          }
-          return BigInt(balance) === 0n && isFromInput ? "text-red-600" : "text-gray-600";
-        })()}`}>
-          Available User Balance: {(() => {
-            let balance = asset?.balance || "0";
-            if (asset?.address === usdstAddress && isFromInput) {
-              const fee = safeParseUnits(SWAP_FEE, DECIMALS);
-              const balanceBigInt = BigInt(balance);
-              balance = (balanceBigInt > fee ? balanceBigInt - fee : 0n).toString();
-            }
-            return formatBalance(balance, asset?._symbol || "", DECIMALS, 2, 6);
-          })()}
-          {showMaxButton && (
+        {isFromInput && (
+          <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
+            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-gray-600"
+          }`}>
+            Available for swap: <AnimatedNumber 
+              value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
+              isLoading={loading} 
+            />
             <button
               type="button"
-              className="text-blue-600 text-xs ml-2 underline"
+              className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
               onClick={onMaxClick}
+              disabled={toWei(maxAmountWei) === 0n}
             >
               Max
             </button>
-          )}
-        </span>
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 flex flex-col">
           <input
             type="text"
             value={amount}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (value === '' || /^\d*\.?\d{0,18}$/.test(value)) {
-                onChange(value);
-              }
-            }}
+            onChange={e => onChange(e.target.value)}
             onFocus={onFocus}
             placeholder="0.00"
             inputMode="decimal"
-            disabled={disabled}
+            disabled={toWei(maxAmountWei) === 0n && isFromInput}
             className={`p-2 bg-transparent border-none text-lg font-medium focus:outline-none${
-              wrongAmount ? " border border-red-500 rounded-md" : ""
-              } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+              amountError ? " border border-red-500 rounded-md" : ""
+              } ${(toWei(maxAmountWei) === 0n && isFromInput) ? "opacity-50 cursor-not-allowed" : ""}`}
           />
-          {wrongAmount && (
-            <p className="text-red-600 text-sm mt-1">Insufficient user balance</p>
+          {amountError && (
+            <p className="text-red-600 text-sm mt-1">{amountError}</p>
           )}
         </div>
         <div className="flex-shrink-0">
@@ -286,11 +260,17 @@ const TokenInput = ({
         </div>
       </div>
       {asset && (
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex justify-between">
+          <span className="text-sm text-gray-500">
+            User Balance: <AnimatedNumber 
+              value={userBalanceWei !== "0" ? formatBalance(userBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+              isLoading={loading} 
+            />
+          </span>
           <span className="text-sm text-gray-500">
             Pool Balance: <AnimatedNumber 
-              value={pool && poolBalance !== "0" ? formatBalance(poolBalance, asset._symbol || "") : "0"} 
-              isLoading={poolLoading} 
+              value={poolBalanceWei !== "0" ? formatBalance(poolBalanceWei, asset._symbol || "", undefined, 2, 6) : "0"} 
+              isLoading={loading} 
             />
           </span>
         </div>
@@ -307,8 +287,8 @@ interface SwapDialogProps {
   onOpenChange: (open: boolean) => void;
   fromAmount: string;
   toAmount: string;
-  fromAsset?: SwappableToken;
-  toAsset?: SwappableToken;
+  fromAsset?: SwapToken;
+  toAsset?: SwapToken;
   exchangeRate: string;
   onConfirm: () => void;
   isLoading: boolean;
@@ -455,7 +435,7 @@ const SwapWidget = () => {
     [pairableTokens, fromAsset?.address]
   );
   const { userAddress } = useUser();
-  const { usdstBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
+  const { usdstBalance, voucherBalance, fetchUsdstBalance, fetchTokens } = useUserTokens();
   const { refreshLoans, refreshCollateral } = useLendingContext();
   const { toast } = useToast();
 
@@ -464,12 +444,15 @@ const SwapWidget = () => {
   // ========================================================================
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [fromAmount, setFromAmount] = useState("");
+  const [fromAmountError, setFromAmountError] = useState("");
   const [toAmount, setToAmount] = useState("");
+  const [toAmountError, setToAmountError] = useState("");
   const [fromPopoverOpen, setFromPopoverOpen] = useState(false);
   const [toPopoverOpen, setToPopoverOpen] = useState(false);
   const [slippage, setSlippage] = useState(DEFAULT_SLIPPAGE);
   const [autoSlippage, setAutoSlippage] = useState(true);
   const [editingField, setEditingField] = useState<'from' | 'to' | null>(null);
+  const [maxTransferableError, setMaxTransferableError] = useState("");
 
   // ========================================================================
   // COMPUTED VALUES
@@ -478,13 +461,18 @@ const SwapWidget = () => {
   // Exchange rates (both pool and oracle)
   const { exchangeRate, oracleExchangeRate } = calculateExchangeRates(pool, fromAsset);
 
-  // Validation states
-  const wrongAmount = fromAmount && fromAsset ? (() => {
-    const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
-    const fromBalance = BigInt(fromAsset.balance?.toString() || "0");
-    return fromAmountWei > fromBalance;
-  })() : false;
-
+  // Memoized available balance for fromAsset (similar to Transfer.tsx pattern)
+  const fromAssetAvailableBalance = useMemo(() => {
+    if (!fromAsset) return "0";
+    return computeMaxTransferable(
+      fromAsset.balance || "0",           // already in wei
+      fromAsset.address === usdstAddress,
+      voucherBalance,                     // already in wei
+      usdstBalance,                       // already in wei
+      safeParseUnits(SWAP_FEE).toString(), // already in wei
+      setMaxTransferableError
+    );
+  }, [fromAsset, voucherBalance, usdstBalance]);
 
   // ========================================================================
   // REFS & CUSTOM HOOKS
@@ -502,16 +490,19 @@ const SwapWidget = () => {
   // ========================================================================
   // FEE & WARNING LOGIC
   // ========================================================================
-  const feeAmount = safeParseUnits(SWAP_FEE, DECIMALS);
-  const usdstBalanceBigInt = BigInt(usdstBalance || "0");
-  const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
+  const feeWei = safeParseUnits(SWAP_FEE);
+  const fromAmtWei = safeParseUnits(fromAmount || "0");
+  const usdstWei = BigInt(usdstBalance || "0");
+  const lowThreshWei = safeParseUnits("0.10");
 
-  const hasInsufficientUsdstForFee = usdstBalanceBigInt < feeAmount;
-  const isLowBalanceWarning = fromAsset?.address === usdstAddress && fromAmountWei > 0n ? (() => {
-    const lowBalanceThreshold = safeParseUnits("0.10", DECIMALS);
-    const remainingBalance = usdstBalanceBigInt - fromAmountWei - feeAmount;
-    return remainingBalance >= 0n && remainingBalance <= lowBalanceThreshold;
-  })() : false;
+  const canSubtract = usdstWei >= fromAmtWei + feeWei;
+  const remaining = canSubtract ? usdstWei - fromAmtWei - feeWei : 0n;
+
+  const isLowBalanceWarning =
+    fromAsset?.address === usdstAddress &&
+    fromAmtWei > 0n &&
+    canSubtract &&
+    remaining <= lowThreshWei;
 
   // ========================================================================
   // EFFECTS
@@ -592,15 +583,15 @@ const SwapWidget = () => {
 
     // Check if pool has liquidity
     const inputPoolBalance = pool.tokenA?.address === inputAsset.address
-      ? pool.tokenABalance || "0"
+      ? pool.tokenA.poolBalance || "0"
       : pool.tokenB?.address === inputAsset.address
-        ? pool.tokenBBalance || "0"
+        ? pool.tokenB.poolBalance || "0"
         : "0";
 
     const outputPoolBalance = pool.tokenA?.address === outputAsset.address
-      ? pool.tokenABalance || "0"
+      ? pool.tokenA.poolBalance || "0"
       : pool.tokenB?.address === outputAsset.address
-        ? pool.tokenBBalance || "0"
+        ? pool.tokenB.poolBalance || "0"
         : "0";
 
     // If either pool balance is 0, no liquidity available - don't clear amounts, just don't calculate
@@ -620,14 +611,22 @@ const SwapWidget = () => {
       if (isFromInput) {
         // Forward calculation: input -> output
         const swapAmount = calculateSwapOutput(parsedValue.toString(), pool, isAToB);
-        setToAmount(formatUnits(swapAmount));
+        handleAmountInputChange(formatUnits(swapAmount), setToAmount, setToAmountError, toAsset?.poolBalance || "0");
       } else {
         // Reverse calculation: output -> input
         const requiredInput = calculateSwapInput(parsedValue.toString(), pool, isAToB);
-        setFromAmount(formatUnits(requiredInput));
+        handleAmountInputChange(formatUnits(requiredInput), setFromAmount, setFromAmountError, fromAssetAvailableBalance);
       }
     } catch (err) {
-      // Don't clear amounts on error, just don't calculate
+      // Show the exact error message
+      if (err instanceof Error) {
+        if (isFromInput) {
+          setFromAmountError(err.message);
+        } else {
+          setToAmountError(err.message);
+        }
+      }
+      console.error(err);
       return;
     }
   };
@@ -638,13 +637,13 @@ const SwapWidget = () => {
   const handleAmountChange = (isFromInput: boolean, value: string) => {
     setEditingField(isFromInput ? 'from' : 'to');
     if (isFromInput) {
-      setFromAmount(value);
+      handleAmountInputChange(value, setFromAmount, setFromAmountError, fromAssetAvailableBalance);
       // Calculate swap amount immediately
       if (isValidInputAmount(value) && fromAsset && toAsset && pool) {
         calculateSwapAmount(value, true);
       }
     } else {
-      setToAmount(value);
+      handleAmountInputChange(value, setToAmount, setToAmountError, toAsset?.poolBalance || "0");
       // Calculate swap amount immediately
       if (isValidInputAmount(value) && fromAsset && toAsset && pool) {
         calculateSwapAmount(value, false);
@@ -659,22 +658,19 @@ const SwapWidget = () => {
     const prevFromAmount = fromAmount;
     const prevToAmount = toAmount;
 
-    let newEditingField: 'from' | 'to' | null = null;
-
-    if (editingField === 'from') {
-      newEditingField = 'to';
-    } else if (editingField === 'to') {
-      newEditingField = 'from';
-    }
-
     const newFrom = prevTo;
     const newTo = prevFrom;
 
-    setFromAmount(prevToAmount);
-    setToAmount(prevFromAmount);
+    // Set new assets first
     setFromAsset(newFrom);
     setToAsset(newTo);
     setEditingField(editingField === 'from' ? 'to' : editingField === 'to' ? 'from' : null);
+
+    // Then validate amounts against the NEW assets' balances
+    // prevToAmount becomes the new from amount, validate against newFrom's balance
+    handleAmountInputChange(prevToAmount, setFromAmount, setFromAmountError, newFrom?.balance || "0");
+    // prevFromAmount becomes the new to amount, validate against newTo's pool balance
+    handleAmountInputChange(prevFromAmount, setToAmount, setToAmountError, newTo?.poolBalance || "0");
 
     if (!newFrom?.address) return;
 
@@ -695,14 +691,14 @@ const SwapWidget = () => {
         throw new Error("Invalid amount values");
       }
 
-      const toAmountInWei = safeParseUnits(toAmount, DECIMALS);
+      const toAmountInWei = safeParseUnits(toAmount);
       const slippageBps = Math.round(slippage * 100);
       const minTokens = (toAmountInWei * BigInt(10000 - slippageBps)) / 10000n;
 
       await swap({
         poolAddress: pool.address,
         isAToB,
-        amountIn: safeParseUnits(fromAmount, DECIMALS).toString(),
+        amountIn: safeParseUnits(fromAmount).toString(),
         minAmountOut: minTokens.toString(),
       });
 
@@ -716,6 +712,9 @@ const SwapWidget = () => {
       setIsDialogOpen(false);
       setFromAmount('');
       setToAmount('');
+      setFromAmountError('');
+      setToAmountError('');
+      setMaxTransferableError('');
       setEditingField(null);
 
       await refreshSwapHistory()
@@ -734,72 +733,37 @@ const SwapWidget = () => {
   // ========================================================================
   // VALIDATION HELPERS
   // ========================================================================
-  const getAvailableBalance = (asset: SwappableToken | null) => {
-    if (!asset) return 0n;
-    let balance = BigInt(asset.balance || "0");
-    if (asset.address === usdstAddress) {
-      const fee = safeParseUnits(SWAP_FEE, DECIMALS);
-      balance = balance > fee ? balance - fee : 0n;
-    }
-    return balance;
-  };
-
-  const isSwapDisabled = () => {
+  const isSwapDisabled = useCallback(() => {
     // Basic validations
-    if (!fromAmount || !toAmount || !fromAsset || !toAsset || wrongAmount) {
+    if (!fromAmount || !toAmount || !fromAsset || !toAsset) {
       return true;
     }
 
-    // Check if user has enough USDST for fee
-    if (usdstBalanceBigInt < feeAmount) {
+    // Check if there's an error from computeMaxTransferable
+    if (maxTransferableError) {
       return true;
     }
 
-    // Check if swapping USDST and leaving enough for fee
-    if (fromAsset.address === usdstAddress) {
-      // Validate fromAmount before parsing
-      if (!fromAmount || isNaN(Number(fromAmount))) {
-        return true;
-      }
-      
-      const fromAmountWei = safeParseUnits(fromAmount, DECIMALS);
-      const balance = BigInt(fromAsset.balance || "0");
-
-      if (fromAmountWei > balance - feeAmount && fromAmountWei <= balance) {
-        return true;
-      }
+    // Check if there's an amount validation error
+    if (fromAmountError || toAmountError) {
+      return true;
     }
 
     return false;
-  };
+  }, [fromAmount, toAmount, fromAsset, toAsset, maxTransferableError, fromAmountError, toAmountError]);
 
-  const handleMaxClick = useCallback((isFrom: boolean) => {
-    const asset = isFrom ? fromAsset : toAsset;
-    if (!asset) return;
-
-    let balance = BigInt(asset.balance || "0");
-
-    if (asset.address === usdstAddress) {
-      const fee = safeParseUnits(SWAP_FEE, DECIMALS);
-      balance = balance > fee ? balance - fee : 0n;
+  const handleMaxClick = useCallback(() => {
+    if (!fromAsset) return;
+    
+    setEditingField('from');
+    const formatted = formatUnits(fromAssetAvailableBalance);
+    setFromAmount(formatted);
+    setFromAmountError('');
+    // Calculate swap amount immediately
+    if (fromAsset && toAsset && pool) {
+      calculateSwapAmount(formatted, true);
     }
-
-    const formatted = formatUnits(balance, DECIMALS);
-    setEditingField(isFrom ? 'from' : 'to');
-    if (isFrom) {
-      setFromAmount(formatted);
-      // Calculate swap amount immediately
-      if (isValidInputAmount(formatted) && fromAsset && toAsset && pool) {
-        calculateSwapAmount(formatted, true);
-      }
-    } else {
-      setToAmount(formatted);
-      // Calculate swap amount immediately
-      if (isValidInputAmount(formatted) && fromAsset && toAsset && pool) {
-        calculateSwapAmount(formatted, false);
-      }
-    }
-  }, [fromAsset, toAsset, pool]);
+  }, [fromAsset, toAsset, pool, fromAssetAvailableBalance]);
 
   // ========================================================================
   // RENDER
@@ -808,9 +772,11 @@ const SwapWidget = () => {
     <div className="space-y-6">
       <TokenInput
         amount={fromAmount}
+        userBalanceWei={fromAsset?.balance || "0"}
+        poolBalanceWei={fromAsset?.poolBalance || "0"}
+        maxAmountWei={fromAssetAvailableBalance}
         onChange={(value) => handleAmountChange(true, value)}
         asset={fromAsset}
-        wrongAmount={wrongAmount}
         onSelect={(asset) => asset.address !== toAsset?.address && setFromAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={fromOptions}
         isOpen={fromPopoverOpen}
@@ -818,11 +784,9 @@ const SwapWidget = () => {
         label="From"
         onFocus={() => setEditingField('from')}
         isFromInput={true}
-        pool={pool}
-        poolLoading={poolLoading}
-        showMaxButton={getAvailableBalance(fromAsset) > 0n}
-        onMaxClick={() => handleMaxClick(true)}
-        disabled={getAvailableBalance(fromAsset) === 0n}
+        onMaxClick={() => handleMaxClick()}
+        amountError={fromAmountError}
+        loading={poolLoading}
       />
 
       <div className="flex justify-center">
@@ -838,9 +802,11 @@ const SwapWidget = () => {
 
       <TokenInput
         amount={toAmount}
+        userBalanceWei={toAsset?.balance || "0"}
+        poolBalanceWei={toAsset?.poolBalance || "0"}
+        maxAmountWei={toAsset?.poolBalance || "0"}
         onChange={(value) => handleAmountChange(false, value)}
         asset={toAsset}
-        wrongAmount={false}
         onSelect={(asset) => asset.address !== fromAsset?.address && setToAsset({ ...asset, balance: asset.balance || "0" })}
         tokens={toOptions}
         isOpen={toPopoverOpen}
@@ -848,10 +814,9 @@ const SwapWidget = () => {
         label="To"
         onFocus={() => setEditingField('to')}
         isFromInput={false}
-        pool={pool}
-        poolLoading={poolLoading}
-        showMaxButton={false}
-        onMaxClick={() => handleMaxClick(false)}
+        onMaxClick={() => {}}
+        amountError={toAmountError}
+        loading={poolLoading}
       />
 
       <div className="flex flex-col gap-2 bg-gray-50 p-4 rounded-lg">
@@ -874,13 +839,13 @@ const SwapWidget = () => {
         <div className="my-1"></div>
         <div className="flex justify-between text-sm">
           <span className="text-gray-600">Transaction Fee</span>
-          <span className="font-medium">{SWAP_FEE} USDST</span>
+          <span className="font-medium">{SWAP_FEE} USDST ({parseFloat(SWAP_FEE) * 100} voucher)</span>
         </div>
         
         {/* Fee Warnings */}
-        {hasInsufficientUsdstForFee && (
+        {maxTransferableError && (
           <p className="text-yellow-600 text-sm mt-1">
-            Insufficient USDST balance for transaction fee ({SWAP_FEE} USDST)
+            {maxTransferableError}
           </p>
         )}
         {isLowBalanceWarning && (

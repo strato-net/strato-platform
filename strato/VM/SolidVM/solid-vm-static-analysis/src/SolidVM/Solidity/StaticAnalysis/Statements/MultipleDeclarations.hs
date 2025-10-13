@@ -107,8 +107,7 @@ statementHelper (Break _) = pure []
 statementHelper (Return _ _) = pure []
 statementHelper (Throw _ _) = pure []
 statementHelper (EmitStatement _ _ _) = pure []
-statementHelper (RevertStatement _ (OrderedArgs _) _) = pure []
-statementHelper (RevertStatement _ (NamedArgs _) _) = pure []
+statementHelper (RevertStatement _ _ _) = pure []
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []

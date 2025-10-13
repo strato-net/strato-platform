@@ -7,35 +7,12 @@ import { cdpService, VaultData, AssetConfig, TransactionResponse } from "@/servi
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { formatWeiToDecimalHP, formatNumber } from "@/utils/numberUtils";
 
 interface LiquidationsViewProps {
-  onBack: () => void;
+  // Props can be added here if needed in the future
+  children?: never; // Placeholder to make interface non-empty
 }
-
-// Format large numbers for display
-const formatNumber = (num: number | string, decimals: number = 2): string => {
-  const value = typeof num === 'string' ? parseFloat(num) : num;
-  if (isNaN(value)) return '0';
-  
-  // For very large numbers, use scientific notation
-  if (value >= 1e21) {
-    return value.toExponential(2);
-  }
-  
-  // For large numbers, use K/M/B notation
-  if (value >= 1e9) {
-    return (value / 1e9).toFixed(1) + 'B';
-  }
-  if (value >= 1e6) {
-    return (value / 1e6).toFixed(1) + 'M';
-  }
-  if (value >= 1e3) {
-    return (value / 1e3).toFixed(1) + 'K';
-  }
-  
-  // For normal numbers, limit decimal places
-  return value.toFixed(decimals);
-};
 
 // Format percentage with reasonable precision
 const formatPercentage = (num: number, decimals: number = 2): string => {
@@ -43,31 +20,7 @@ const formatPercentage = (num: number, decimals: number = 2): string => {
   return num.toFixed(decimals) + '%';
 };
 
-// Convert wei string to decimal for display (handles raw integer strings from backend)
-const formatWeiToDecimal = (weiString: string, decimals: number): string => {
-  if (!weiString || weiString === '0') return '0';
-  
-  const wei = BigInt(weiString);
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const quotient = wei / divisor;
-  const remainder = wei % divisor;
-  
-  if (remainder === 0n) {
-    return quotient.toString();
-  }
-  
-  // For non-zero remainder, show decimal places
-  const decimalPart = remainder.toString().padStart(decimals, '0');
-  const trimmedDecimal = decimalPart.replace(/0+$/, ''); // Remove trailing zeros
-  
-  if (trimmedDecimal === '') {
-    return quotient.toString();
-  }
-  
-  return `${quotient}.${trimmedDecimal}`;
-};
-
-const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
+const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [liquidatableVaults, setLiquidatableVaults] = useState<VaultData[]>([]);
   const [assetConfigs, setAssetConfigs] = useState<Record<string, AssetConfig>>({});
   const [loading, setLoading] = useState(true);
@@ -115,7 +68,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
         if (userAddress) {
           await fetchUsdstBalance(userAddress);
           const availableUsdstWei = BigInt(usdstBalance || "0");
-          const availableUsdstDecimal = parseFloat(formatWeiToDecimal(availableUsdstWei.toString(), 18));
+          const availableUsdstDecimal = parseFloat(formatWeiToDecimalHP(availableUsdstWei.toString(), 18));
           setAvailableUsdstBalance(availableUsdstDecimal);
         }
         
@@ -134,11 +87,39 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
     fetchData();
   }, [toast, userAddress, fetchUsdstBalance, usdstBalance]);
 
-  const toggleExpanded = (vaultKey: string) => {
+  const toggleExpanded = async (vaultKey: string) => {
+    const isCurrentlyExpanded = expandedVaults[vaultKey];
+    
     setExpandedVaults(prev => ({
       ...prev,
       [vaultKey]: !prev[vaultKey]
     }));
+    
+    // If expanding the vault and we don't have max value yet, fetch it
+    if (!isCurrentlyExpanded && !maxValues[vaultKey]) {
+      const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
+      const vault = liquidatableVaults[vaultIndex];
+      
+      if (vault && vault.borrower) {
+        try {
+          // Fetch max liquidatable amount from backend
+          const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower);
+          const backendMaxWei = result.maxAmount;
+          
+          // Convert backend max from wei to decimal (18 decimals for USDST)
+          const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+          
+          // Calculate actual max as minimum of backend max and available USDST balance
+          const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          
+          // Store the max value
+          setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          
+        } catch (error) {
+          console.error("Error fetching max liquidatable amount:", error);
+        }
+      }
+    }
   };
 
   const handleLiquidationAmountChange = (vaultKey: string, value: string) => {
@@ -180,58 +161,94 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
       setMaxStates(prev => ({ ...prev, [vaultKey]: false }));
       setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));
     } else {
-      try {
-        // Fetch max liquidatable amount from backend
-        const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
-        const backendMaxWei = result.maxAmount;
-        
-        // Convert backend max from wei to decimal (18 decimals for USDST)
-        const backendMaxDecimal = parseFloat(formatWeiToDecimal(backendMaxWei, 18));
-        
-        
-        // Check if balance is insufficient
-        if (availableUsdstBalance < 0.02) {
+      // Check if balance is insufficient
+      if (availableUsdstBalance < 0.02) {
+        return;
+      }
+      
+      // Use already-fetched max value if available, otherwise fetch it
+      let actualMaxDecimal = maxValues[vaultKey];
+      
+      if (!actualMaxDecimal) {
+        try {
+          // Fetch max liquidatable amount from backend if not already available
+          const result = await cdpService.getMaxLiquidatable(vault.asset, vault.borrower!);
+          const backendMaxWei = result.maxAmount;
+          
+          // Convert backend max from wei to decimal (18 decimals for USDST)
+          const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+          
+          // Calculate actual max as minimum of backend max and available USDST balance
+          actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+          
+          // Store the max value
+          setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          
+        } catch (error) {
+          console.error("Error fetching max liquidatable amount:", error);
+          toast({
+            title: "Error",
+            description: "Failed to calculate maximum liquidation amount",
+            variant: "destructive",
+          });
           return;
         }
-        
-        // Calculate actual max as minimum of backend max and available USDST balance
-        const actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
-        
-        // Store the max value and set max state
-        setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
-        setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
-        setLiquidationAmounts(prev => ({ 
-          ...prev, 
-          [vaultKey]: actualMaxDecimal.toString() 
-        }));
-        
-      } catch (error) {
-        console.error("Error fetching max liquidatable amount:", error);
-        toast({
-          title: "Error",
-          description: "Failed to calculate maximum liquidation amount",
-          variant: "destructive",
-        });
+      } else {
+        // Recalculate based on current USDST balance in case it changed
+        const vaultIndex = parseInt(vaultKey.split('-').pop() || '0');
+        const currentVault = liquidatableVaults[vaultIndex];
+        if (currentVault && currentVault.borrower) {
+          try {
+            const result = await cdpService.getMaxLiquidatable(currentVault.asset, currentVault.borrower);
+            const backendMaxWei = result.maxAmount;
+            const backendMaxDecimal = parseFloat(formatWeiToDecimalHP(backendMaxWei, 18));
+            actualMaxDecimal = Math.min(backendMaxDecimal, availableUsdstBalance - 0.02);
+            setMaxValues(prev => ({ ...prev, [vaultKey]: actualMaxDecimal }));
+          } catch (error) {
+            console.error("Error updating max liquidatable amount:", error);
+            // Use the cached value if update fails
+          }
+        }
       }
+      
+      // Set max state and update input amount
+      setMaxStates(prev => ({ ...prev, [vaultKey]: true }));
+      setLiquidationAmounts(prev => ({ 
+        ...prev, 
+        [vaultKey]: actualMaxDecimal.toString() 
+      }));
     }
   };
 
   const calculateExpectedProfit = (vault: VaultData, liquidationAmount: string): string => {
+    const vaultKey = `${vault.borrower || 'unknown'}-${vault.asset}-${liquidatableVaults.findIndex(v => v.borrower === vault.borrower && v.asset === vault.asset)}`;
     const amount = parseFloat(liquidationAmount);
-    if (isNaN(amount) || amount <= 0) return "$0.00";
+    
+    // If no valid amount provided, use the maximum liquidatable amount instead of 0
+    let calculationAmount = amount;
+    if (isNaN(amount) || amount <= 0) {
+      const maxAmount = maxValues[vaultKey];
+      if (maxAmount && maxAmount > 0) {
+        calculationAmount = maxAmount;
+      } else {
+        return "$0.00";
+      }
+    } else {
+      calculationAmount = amount;
+    }
     
     // Get the actual liquidation penalty from asset config
     const assetConfig = assetConfigs[vault.asset];
     if (!assetConfig) {
       console.warn(`No asset config found for ${vault.asset}, using fallback 5% penalty`);
       const fallbackBonus = 0.05;
-      const profit = amount * fallbackBonus;
+      const profit = calculationAmount * fallbackBonus;
       return `$${formatNumber(profit)}`;
     }
     
     // Convert basis points to decimal (e.g., 500 bps = 5% = 0.05)
     const liquidationBonus = assetConfig.liquidationPenaltyBps / 10000;
-    const profit = amount * liquidationBonus;
+    const profit = calculationAmount * liquidationBonus;
     return `$${formatNumber(profit)}`;
   };
 
@@ -288,7 +305,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           
           // Update the global USDST balance after fetching
           const updatedUsdstWei = BigInt(usdstBalance || "0");
-          const updatedUsdstDecimal = parseFloat(formatWeiToDecimal(updatedUsdstWei.toString(), 18));
+          const updatedUsdstDecimal = parseFloat(formatWeiToDecimalHP(updatedUsdstWei.toString(), 18));
           setAvailableUsdstBalance(updatedUsdstDecimal);
         }
       }
@@ -307,11 +324,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
   if (loading) {
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={onBack}>
-            ← Back to Borrow
-          </Button>
-        </div>
         <Card>
           <CardContent className="p-6">
             <div className="text-center">Loading liquidatable positions...</div>
@@ -334,14 +346,6 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
           -moz-appearance: textfield;
         }
       `}</style>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button variant="outline" onClick={onBack}>
-          ← Back to Borrow
-        </Button>
-        <div /> {/* Spacer for center alignment */}
-      </div>
-
       {/* Main Card */}
       <Card>
         <CardHeader>
@@ -378,7 +382,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                       </div>
                       <div>
                         <span className="text-gray-500">Borrowed</span>
-                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimal(vault.debtAmount, 18)))} USDST</div>
+                        <div className="font-medium">{formatNumber(parseFloat(formatWeiToDecimalHP(vault.debtAmount, 18)))} USDST</div>
                       </div>
                       <div>
                         <span className="text-gray-500">Health Factor</span>
@@ -406,8 +410,8 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = ({ onBack }) => {
                           </div>
                           <span className="font-medium truncate min-w-[80px]">{vault.symbol}</span>
                         </div>
-                        <div>{formatNumber(parseFloat(formatWeiToDecimal(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
-                        <div>${formatNumber(parseFloat(formatWeiToDecimal(vault.collateralValueUSD, 18)))}</div>
+                        <div>{formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralAmount, vault.collateralAmountDecimals)))}</div>
+                        <div>${formatNumber(parseFloat(formatWeiToDecimalHP(vault.collateralValueUSD, 18)))}</div>
                         <div className="text-green-600 font-medium">
                           {calculateExpectedProfit(vault, liquidationAmount)}
                         </div>

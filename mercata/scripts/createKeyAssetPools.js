@@ -64,6 +64,34 @@ require("dotenv").config();
   const headers = { Authorization: `Bearer ${ADMIN_TOKEN}`, "Content-Type": "application/json" };
   const buildCall = (name, addr, method, args = {}) => ({ type: "FUNCTION", payload: { contractName: name, contractAddress: addr, method, args } });
 
+  const cirrusGet = async (table, params) => {
+    const url = `${cirrusBase}${table}`;
+    // console.log(`cirrusGet: ${url}`);
+    const { data } = await axios.get(url, { headers, params });
+    // console.log(`cirrusGet data: ${JSON.stringify(data)}`);
+    return data;
+  };
+
+  // Helper for direct contract calls using transaction endpoint
+  const callContract = async (contractName, address, method, args = []) => {
+    let callArgs = {};
+    if (method === "balanceOf" && args.length > 0) {
+      // balanceOf expects the address as accountAddress parameter
+      callArgs = { accountAddress: args[0] };
+    } else if (args.length > 0) {
+      callArgs = { args: args };
+    }
+    const tx = buildCall(contractName, address, method, callArgs);
+    const url = `${BASE}/transaction/parallel?resolve=true`;
+    const body = { txs: [tx] };
+    const { data } = await axios.post(url, body, { headers });
+    if (data[0].status !== "Success") {
+      throw new Error(`Contract call failed: ${JSON.stringify(data[0])}`);
+    }
+    const result = data[0].data.contents[0];
+    return result;
+  };
+
   /* ---------------------------------------------------------
      Sanity-check: make sure PoolFactory is wired to the same
      TokenFactory instance we are about to use. If mismatched,
@@ -71,11 +99,19 @@ require("dotenv").config();
      tokensActive() modifier passes.
   --------------------------------------------------------- */
   try {
-    const { data: tfAddr } = await axios.get(`${BASE}/contract/PoolFactory/${POOL_FACTORY}/call`, {
-      headers,
-      params: { method: "tokenFactory" },
+    const poolFactoryRows = await cirrusGet("/BlockApps-Mercata-PoolFactory", {
+      address: `eq.${POOL_FACTORY}`,
+      select: "tokenFactory",
+      limit: 1,
     });
+    
+    if (poolFactoryRows.length === 0) {
+      throw new Error(`PoolFactory ${POOL_FACTORY} not found in Cirrus`);
+    }
+    
+    const tfAddr = poolFactoryRows[0].tokenFactory;
     const tfCurrent = String(tfAddr).toLowerCase();
+    // console.log(`tfCurrent: ${tfCurrent}`);
     if (tfCurrent !== TOKEN_FACTORY) {
       console.log(`\nPoolFactory.tokenFactory mismatch – fixing (was ${tfCurrent}, want ${TOKEN_FACTORY})…`);
       const tx = buildCall("PoolFactory", POOL_FACTORY, "setTokenFactory", { _tokenFactory: TOKEN_FACTORY });
@@ -93,7 +129,7 @@ require("dotenv").config();
   const poolExists = async (tokenB) => {
     const path = `/BlockApps-Mercata-Pool`; // pool table name
     const params = {
-      _owner: `eq.${POOL_FACTORY}`,
+      poolFactory: `eq.${POOL_FACTORY}`,
       tokenA: `eq.${USDST.toLowerCase()}`,
       tokenB: `eq.${tokenB.toLowerCase()}`,
       select: "address",
@@ -108,13 +144,6 @@ require("dotenv").config();
   };
 
   /* NEW helper ------------ */
-  // generic read-only contract call helper (no gas, view functions only)
-  const callContract = async (contractName, address, method, args = []) => {
-    const url = `${BASE}/contract/${contractName}/${address}/call`;
-    const params = { method, args: JSON.stringify(args) };
-    const { data } = await axios.get(url, { headers, params });
-    return data;
-  };
 
   // return the LP token address for a given pool (lower-case)
   const getLpTokenAddr = async (poolAddr) => {
@@ -145,11 +174,6 @@ require("dotenv").config();
   --------------------------------------------------------- */
   const allTokens = [USDST, ...Object.values(addrs)];
 
-  const cirrusGet = async (table, params) => {
-    const url = `${cirrusBase}${table}`;
-    const { data } = await axios.get(url, { headers, params });
-    return data;
-  };
 
   console.log("\nEnsuring tokens are ACTIVE and registered in TokenFactory…");
 

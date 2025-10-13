@@ -158,12 +158,14 @@ getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> do
-      typeHint <- getValueType addressedPath
-      case typeHint of
-        TStruct{} -> return $ SReference addressedPath
-        TArray{} -> return $ SReference addressedPath
-        TMapping -> return $ SReference addressedPath
-        _ -> return $ findDefault typeHint
+      eTypeHint <- getValueType' addressedPath
+      case eTypeHint of
+        Right typeHint -> case typeHint of
+          TStruct{} -> return $ SReference addressedPath
+          TArray{} -> return $ SReference addressedPath
+          TMapping -> return $ SReference addressedPath
+          _ -> return $ findDefault typeHint
+        _ -> return $ SInteger 0
     MS.BString bs -> do
       t <- getXabiValueType addressedPath
       case t of
@@ -251,6 +253,7 @@ getBool p = do
   v <- getVar p
   case v of
     SBool b -> return b
+    SInteger i -> return $ i /= 0
     SNULL -> return False
     _ -> typeError "getBool" (p, v)
 
@@ -328,12 +331,8 @@ showSM (SContract name address) = do
   return $ "Contract: " ++ labelToString name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
-showSM (SContractFunction maybeContractName address functionName) = do
-  contractName <- case maybeContractName of
-    Just name -> return name
-    Nothing -> do
-      contract <- getCurrentContract
-      return $ CC._contractName contract
+showSM (SContractFunction address functionName) = do
+  contractName <- CC._contractName <$> getCurrentContract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x

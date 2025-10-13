@@ -149,7 +149,7 @@ nix:
   enable: false
   pure: false
   # See https://docs.haskellstack.org/en/stable/nix_integration/#using-a-custom-shellnix-file
-  shell-file: nix/stack-integration.nix
+  shell-file: nix/stack.nix
 
 notify-if-nix-on-path: false
 

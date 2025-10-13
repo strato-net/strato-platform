@@ -169,7 +169,6 @@ call ::
   m ExecResults
 call s =
   SolidVM.call
-    False
     (s ^. callArgs . argsBlockData)
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)

@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button } from '@blueprintjs/core';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import HexText from '../../../HexText';
 import { parseDateFromString } from '../../../../lib/dateUtils';
 import { executeQuery, getTransactionResultRequest} from '../../../QueryEngine/queryEngine.actions';
@@ -45,7 +45,7 @@ class TransactionView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => { mixpanelWrapper.track("transactions_view_go_back_click"); this.props.history.goBack() }}
+              onClick={(e) => { /*mixpanelWrapper.track("transactions_view_go_back_click");*/ this.props.history.goBack() }}
               className="pt-icon-arrow-left"
               text="Back"
             />

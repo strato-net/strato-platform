@@ -26,7 +26,6 @@ import BlockApps.SolidityVarReader
 import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
@@ -44,6 +43,7 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.List (sort)
 import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
@@ -71,17 +71,34 @@ getContracts mName mOffset mLimit chainId = do
                 pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
           )
           Map.empty
-  addrStateRefs <-
+  
+  -- Step 1: Get all unique contract names (without pagination)
+  let contractLimit = fromIntegral $ fromMaybe 10 mLimit
+      contractOffset = fromIntegral $ fromMaybe 0 mOffset
+  
+  -- Get all records to extract unique contract names
+  allAddrStateRefs <-
     getAccount'
       accountsFilterParams
-        { _qaChainId = maybeToList chainId,
-          _qaExternal = Just False,
+        { _qaExternal = Just False,
           _qaSearch = mName,
-          _qaOffset = fromIntegral <$> mOffset,
-          _qaLimit = fromIntegral <$> mLimit
+          _qaOffset = Nothing,  -- No offset - get all records
+          _qaLimit = Nothing    -- No limit - get all records
         }
-  reducedResponseMap <- addressesToMap addrStateRefs
-  return . GetContractsResponse $ reducedResponseMap
+  
+  -- Group by contract name to get unique contracts
+  allContractsMap <- addressesToMap allAddrStateRefs
+  let allContractNames = Map.keys allContractsMap
+      sortedContractNames = sort allContractNames
+      
+  -- Apply pagination to contract names (exactly 10 contracts per page)
+  let paginatedContractNames = take contractLimit $ drop contractOffset sortedContractNames
+  
+  -- Step 2: Get all instances for the paginated contract names
+  -- Filter the original map to only include the paginated contracts
+  let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
+  
+  return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::
   ( MonadLogger m,
@@ -102,6 +119,7 @@ getContractsContract ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -120,23 +138,14 @@ getContractsContract name addr chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just addr,
+      aParams = accountsFilterParams
+          { _qaAddress = Just addr,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
+    Just contract -> pure contract
 
 getContractsState ::
   ( MonadIO m,
@@ -230,6 +239,7 @@ getContractsDetails' ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -245,28 +255,20 @@ getContractsDetails' contractAddress chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just contractAddress,
+      aParams = accountsFilterParams
+          { _qaAddress = Just contractAddress,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
+    Just contract -> pure contract
 
 getContractsDetails ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -279,6 +281,7 @@ getContractsFunctions ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -294,6 +297,7 @@ getContractsSymbols ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -309,6 +313,7 @@ getContractsEnum ::
   ( MonadIO m,
     A.Selectable Address AddressState m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
     (Keccak256 `A.Selectable` SourceMap) m
   ) =>
@@ -400,21 +405,3 @@ completeXabi :: Text -> Xabi -> Either String Xabi
 completeXabi name xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi name c
-
-getSourceMapFromAddress :: 
-  ( MonadIO m,
-    (Keccak256 `A.Selectable` SourceMap) m, 
-    (Address `A.Selectable` AddressState) m
-  ) => Address -> m SourceMap
-getSourceMapFromAddress cptr = do
-  addressState <- A.select (A.Proxy @AddressState) cptr
-  mCodeHash <- case addressState of
-    Nothing -> throwIO $ UserError "Could not find code hash for contract"
-    Just as -> return $ addressStateCodeHash as
-  keccak <- case mCodeHash of
-    SolidVMCode _ k -> pure k
-    _ -> throwIO $ UserError "Could not find code hash for contract"
-  sourcy <- A.select (A.Proxy @SourceMap) keccak
-  case sourcy of
-    Nothing -> throwIO $ UserError "Could not find source map for contract"
-    Just sm -> pure sm

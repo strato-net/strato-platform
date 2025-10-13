@@ -63,17 +63,18 @@ export const getAdmin = async (
 // Add a new admin to the registry
 export const addAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "addAdmin",
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -88,17 +89,18 @@ export const addAdmin = async (
 // Remove an admin from the registry
 export const removeAdmin = async (
   accessToken: string,
+  userAddress: string,
   adminAddress: string
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const tx = buildFunctionTx({
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "removeAdmin",
       args: {
         admin: adminAddress,
       },
-    });
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -110,28 +112,27 @@ export const removeAdmin = async (
   }
 };
 
-// Remove an admin from the registry
+// Cast a vote on an issue in the registry
 export const castVoteOnIssue = async (
   accessToken: string,
+  userAddress: string,
   target: string,
   func: string, 
   args: string[],
 ): Promise<{ status: string; hash: string }> => {
   try {
-    let flattenedArgs: any = args;
-    if (args.length === 1) {
-      flattenedArgs = args[0];
-    }
-    const tx = buildFunctionTx({
+    const txArgs: Record<string, any> = {
+      _func: func,
+      _target: target,
+      _args: args
+    };
+    
+    const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
       method: "castVoteOnIssue",
-      args: {
-        _target: target,
-        _func: func,
-        _args: flattenedArgs,
-      },
-    });
+      args: txArgs,
+    }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
       strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -149,8 +150,9 @@ export const getOpenIssues = async (
   try {
     const response = await cirrus.get(accessToken, "/" + AdminRegistry, {
       params: {
+        address: `eq.${adminRegistry}`,
         select: `*,admins:${AdminRegistry}-admins(address:value),votes:${AdminRegistry}-votes(block_timestamp,issueId:key,index:key2,voter:value),thresholds:${AdminRegistry}-votingThresholds(target:key,func:key2,threshold:value),executed:${AdminRegistry}-IssueExecuted(*)`,
-        ['votes.value']: 'neq.',
+        ['votes.value']: 'neq.""',
         ['executed.limit']: 10,
         ['executed.order']: 'block_timestamp.desc',
       },
@@ -164,7 +166,8 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins, votes, thresholds, executed } = response.data[0];
+    const { admins: adminsRaw, votes, thresholds, executed } = response.data[0];
+    const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
@@ -176,6 +179,7 @@ export const getOpenIssues = async (
 
     return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
   } catch (error) {
+    console.log(error);
     return [];
   }
 };

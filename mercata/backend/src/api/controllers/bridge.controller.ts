@@ -8,6 +8,7 @@ import {
 } from "../services/bridge.service";
 import { validateRequestWithdrawal, validateTransactionType } from "../validators/bridge.validators";
 import { validateRawParams } from "../validators/common.validators";
+import { NetworkConfig, BridgeToken, BridgeTransactionResponse, WithdrawalRequestParams, WithdrawalRequestResponse } from "@mercata/shared-types";
 
 class BridgeController {
   static async bridgeOut(
@@ -16,10 +17,10 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body, address } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result = await requestWithdrawal(accessToken, body, address, false);
+      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string, false);
 
       res.json({
         success: true,
@@ -36,10 +37,10 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, body, address } = req;
+      const { accessToken, body, address: userAddress } = req;
       validateRequestWithdrawal(body);
       
-      const result = await requestWithdrawal(accessToken, body, address, true);
+      const result: WithdrawalRequestResponse = await requestWithdrawal(accessToken, body as WithdrawalRequestParams, userAddress as string, true);
 
       res.json({
         success: true,
@@ -64,7 +65,7 @@ class BridgeController {
         return;
       }
       
-      const result = await getBridgeableTokens(accessToken, chainId);
+      const result: BridgeToken[] = await getBridgeableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -85,7 +86,7 @@ class BridgeController {
         return;
       }
       
-      const result = await getRedeemableTokens(accessToken, chainId);
+      const result: BridgeToken[] = await getRedeemableTokens(accessToken, chainId);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -99,7 +100,7 @@ class BridgeController {
   ): Promise<void> {
     try {
       const { accessToken } = req;
-      const result = await getNetworkConfigs(accessToken);
+      const result: NetworkConfig[] = await getNetworkConfigs(accessToken);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -112,12 +113,12 @@ class BridgeController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const { accessToken, address } = req;
+      const { accessToken, address: userAddress } = req;
       const { type } = req.params;
       const queryParams = validateRawParams(req.query);
       
       const validatedType = validateTransactionType(type);
-      const result = await getBridgeTransactions(accessToken, validatedType, address, queryParams);
+      const result: BridgeTransactionResponse = await getBridgeTransactions(accessToken, validatedType, userAddress, queryParams);
       res.json(result);
     } catch (error: any) {
       next(error);
@@ -126,3 +127,4 @@ class BridgeController {
 }
 
 export default BridgeController;
+

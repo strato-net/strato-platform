@@ -5,6 +5,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -60,6 +61,7 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -72,7 +74,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException( TooMuchGas ))
+import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
@@ -80,6 +82,7 @@ import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.VMOptions
 import Blockchain.Verifier
 import Conduit
+import Control.Applicative ((<|>))
 import Control.Lens hiding (filtered)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
@@ -92,7 +95,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.DList as DL
-import Data.Foldable (toList)
 import Data.List
 import qualified Data.Map as M
 import qualified Data.Map.Ordered as O
@@ -370,6 +372,10 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
                   putAddressStateTxDBMap M.empty
                   putMemRawStorageTxMap M.empty
                   return $ Bagger.TxMiningResult (Just $ TFTransactionGasExceeded limit actual tx) (DL.toList ran) unran remGas
+                Just (Left (PaymentError limit (_, actual))) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFInsufficientFunds limit actual tx) (DL.toList ran) unran remGas
                 _ -> do
                   let nextRemGas = remGas - (transactionGasLimit bt - calculateReturned bt execResult)
                   flushMemAddressStateTxToBlockDB
@@ -408,11 +414,12 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
 
   feeResult' <- payFees b availableGas tAddr t proposer
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
+      combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
-        { erAction = (maybe id (\era ->
+        { erAction = combineA (\era ->
               (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
             . (events %~ (_events era Seq.><))
-          ) $ erAction feeResult) <$> erAction er
+          ) (erAction feeResult) $ erAction er
         , erTrace = erTrace feeResult ++ erTrace er
         , erLogs = erLogs feeResult ++ erLogs er
         , erEvents = erEvents feeResult ++ erEvents er
@@ -450,7 +457,9 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
             lift $ A.delete (Proxy @AddressState) address'
           lift $ P.incCounter vmTxsSuccessful
       return $ attachFeeResult execResults
-    else throwE $ TFInsufficientFunds 100000000000000000 0 t -- TODO: Get the actual tx cost and user's USDST balance
+    else case erException feeResult of
+      Just (Left PaymentError{}) -> pure feeResult
+      _ -> pure $ feeResult{ erException = Just . Left $ PaymentError 10_000_000_000_000_000 (show tAddr, 0) } -- TODO: Make Fee contract throw a PaymentError and remove this case
 
 runCodeForTransaction ::
   (VMBase m) =>
@@ -487,7 +496,6 @@ runCodeForTransaction b availableGas tAddr t proposer =
 
           lift $
             SolidVM.call
-                  False  --isRCC
                   b -- blockData
                   (transactionTo ut) -- codeAddress
                   tAddr -- sender
@@ -514,7 +522,6 @@ payFees b availableGas tAddr t proposer = do
 
   lift $
     SolidVM.call
-      False  -- isRCC
       b  -- blockData
       (Address 0xDEC1DE)  --codeAddress
       tAddr -- sender
@@ -641,10 +648,9 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
     else case erAction <$> result of
       Right (Just act) ->
         let ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-            dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
             act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
             actionEvents = [NewAction act']
-         in ccEvents ++ dcEvents ++ actionEvents
+         in ccEvents ++ actionEvents
       _ -> []
 
 extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
@@ -653,7 +659,7 @@ extractCodeCollectionAddedMessages a =
          a ^. Action.name,
          O.assocs $ a ^. Action.actionData
        ) of
-    (Just c, Just n, actionDatas) ->
+    (Just (Code c), Just n, actionDatas) ->
       let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
           cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
             if _actionDataCodeHash == cp
@@ -672,8 +678,7 @@ extractCodeCollectionAddedMessages a =
                 codePtr = cp,
                 creator = cn,
                 application = n,
-                abstracts = abstracts',
-                recordMappings = []
+                abstracts = abstracts'
               }
     _ -> Nothing
 
@@ -811,7 +816,6 @@ completeDiff ::
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m

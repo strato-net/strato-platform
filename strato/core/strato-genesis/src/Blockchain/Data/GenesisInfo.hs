@@ -23,6 +23,7 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Address
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Stream.Action (Delegatecall)
 import Control.Lens
 import Control.Monad.IO.Class
 import Data.Aeson
@@ -55,7 +56,8 @@ data GenesisInfo = GenesisInfo
     genesisInfoExtraData :: Integer,
     genesisInfoMixHash :: Keccak256,
     genesisInfoNonce :: Word64,
-    genesisInfoEvents :: M.Map Address (S.Seq Event)
+    genesisInfoEvents :: M.Map Address (S.Seq Event),
+    genesisInfoDelegatecalls :: M.Map Address (S.Seq Delegatecall)
   }
   deriving (Show, Read, Eq, Generic)
 
@@ -108,7 +110,8 @@ defaultGenesisInfo =
       genesisInfoExtraData = 0,
       genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
       genesisInfoNonce = 42,
-      genesisInfoEvents = M.empty
+      genesisInfoEvents = M.empty,
+      genesisInfoDelegatecalls = M.empty
     }
 
 instance FromJSON GenesisInfo where
@@ -130,6 +133,7 @@ instance FromJSON GenesisInfo where
       <*> o .: "mixHash"
       <*> o .: "nonce"
       <*> o .:? "events" .!= M.empty
+      <*> o .:? "delegatecalls" .!= M.empty
   parseJSON x = error $ "couldn't parse JSON for genesis block: " ++ show x
 
 instance ToJSON GenesisInfo where
@@ -155,6 +159,7 @@ genesisParser =
     <*> "mixHash" JS..: JS.value
     <*> "nonce" JS..: JS.value
     <*> ("events" JS..: JS.value JS..| M.empty)
+    <*> ("delegatecalls" JS..: JS.value JS..| M.empty)
 
 getGenesisInfo :: MonadIO m => m GenesisInfo
 getGenesisInfo = do

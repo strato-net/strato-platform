@@ -6,7 +6,17 @@ module Blockchain.Slipstream.QueryFormatHelper where
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Key as AesonKey
 import qualified Data.Map as Map
+import Data.Text (Text)
 import qualified Data.Text as T
+
+data SqlType = SqlBool | SqlDecimal | SqlText | SqlJsonb | SqlSerial deriving (Eq, Ord, Show)
+
+sqlTypePostgres :: SqlType -> Text
+sqlTypePostgres SqlBool    = "bool"
+sqlTypePostgres SqlDecimal = "decimal"
+sqlTypePostgres SqlText    = "text"
+sqlTypePostgres SqlJsonb   = "jsonb"
+sqlTypePostgres SqlSerial  = "serial"
 
 -- TODO: Refactor this type before someone external sees it
 data TableName
@@ -46,7 +56,7 @@ data TableName
       }
   deriving (Show, Eq, Ord)
 
-type TableColumns = [T.Text]
+type TableColumns = [(T.Text, SqlType)]
 
 tshow :: Show a => a -> T.Text
 tshow = T.pack . show
@@ -75,11 +85,17 @@ wrapParens = wrap "(" ")"
 wrapAndEscape :: [T.Text] -> T.Text
 wrapAndEscape = wrapParens . csv
 
+wrapEscapeSingle :: T.Text -> T.Text
+wrapEscapeSingle = wrapSingleQuotes . escapeSingleQuotes
+
+wrapEscapeDouble :: T.Text -> T.Text
+wrapEscapeDouble = wrapDoubleQuotes . escapeDoubleQuotes
+
 wrapAndEscapeSingle :: [T.Text] -> T.Text
-wrapAndEscapeSingle = wrapParens . csv . map (wrapSingleQuotes . escapeSingleQuotes)
+wrapAndEscapeSingle = wrapParens . csv . map wrapEscapeSingle
 
 wrapAndEscapeDouble :: [T.Text] -> T.Text
-wrapAndEscapeDouble = wrapParens . csv . map (wrapDoubleQuotes . escapeDoubleQuotes)
+wrapAndEscapeDouble = wrapParens . csv . map wrapEscapeDouble
 
 unwrapDoubleQuotes :: T.Text -> T.Text
 unwrapDoubleQuotes = T.dropAround (== '"')
@@ -151,6 +167,71 @@ tableShortName (HistoryTableName _ _ n) = "history@" <> n
 tableShortName (EventTableName _ _ n e) = n <> "-" <> e
 tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
 tableShortName (AbstractTableName _ _ n) = n
+
+-- discard app if org is null
+constructTableNameParameters :: Text -> Text -> Text -> (Text, Text, Text)
+constructTableNameParameters crtr app contract
+  | T.null crtr = ("", "", contract)
+  | app == contract = (crtr, "", contract)
+  | otherwise = (crtr, app, contract)
+
+historyTableName :: Text -> Text -> Text -> TableName
+historyTableName creator a n = uncurry3 HistoryTableName $ constructTableNameParameters creator a n
+
+indexTableName :: Text -> Text -> Text -> TableName
+indexTableName creator a n = uncurry3 IndexTableName $ constructTableNameParameters creator a n
+
+collectionTableName :: Text -> Text -> Text -> Text -> TableName
+collectionTableName creator a n m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in CollectionTableName c' a' n' m
+
+eventTableName :: Text -> Text -> Text -> Text -> TableName
+eventTableName creator a n e =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventTableName c' a' n' e
+
+eventCollectionTableName :: Text -> Text -> Text -> Text -> Text -> TableName
+eventCollectionTableName creator a n e m =
+  let (c', a', n') = constructTableNameParameters creator a n
+   in EventCollectionTableName c' a' n' e m
+
+uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
+uncurry3 f (x, y, z) = f x y z
+
+tableNameCreator :: TableName -> T.Text
+tableNameCreator (IndexTableName c _ _) = c
+tableNameCreator (CollectionTableName c _ _ _) = c
+tableNameCreator (HistoryTableName c _ _) = c
+tableNameCreator (EventTableName c _ _ _) = c
+tableNameCreator (EventCollectionTableName c _ _ _ _) = c
+tableNameCreator (AbstractTableName c _ _) = c
+
+tableNameApplication :: TableName -> T.Text
+tableNameApplication (IndexTableName _ a _) = a
+tableNameApplication (CollectionTableName _ a _ _) = a
+tableNameApplication (HistoryTableName _ a _) = a
+tableNameApplication (EventTableName _ a _ _) = a
+tableNameApplication (EventCollectionTableName _ a _ _ _) = a
+tableNameApplication (AbstractTableName _ a _) = a
+
+tableNameContractName :: TableName -> T.Text
+tableNameContractName (IndexTableName _ _ n) = n
+tableNameContractName (CollectionTableName _ _ n _) = n
+tableNameContractName (HistoryTableName _ _ n) = n
+tableNameContractName (EventTableName _ _ n _) = n
+tableNameContractName (EventCollectionTableName _ _ n _ _) = n
+tableNameContractName (AbstractTableName _ _ n) = n
+
+tableNameCollectionName :: TableName -> T.Text
+tableNameCollectionName (CollectionTableName _ _ _ c) = c
+tableNameCollectionName (EventCollectionTableName _ _ _ _ c) = c
+tableNameCollectionName _ = ""
+
+tableNameEventName :: TableName -> T.Text
+tableNameEventName (EventTableName _ _ _ e) = e
+tableNameEventName (EventCollectionTableName _ _ _ e _) = e
+tableNameEventName _ = ""
 
 tableNameToTextPostgres :: TableName -> T.Text
 tableNameToTextPostgres = T.take 63 . tableNameToText -- max table name len in psql is 63 char

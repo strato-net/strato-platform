@@ -1,20 +1,16 @@
 const { GET_SHARD_COUNT,} = require('../rooms');
 const { emitter, ON_SOCKET_PUBLISH_EVENTS } = require('../eventBroker');
-const ChainInfoRef = require('../../models/strato/eth/chainInfoRef');
-const db = require('../../models/strato/eth/connection');
 const config = require('../../config/app.config');
 
-let shardCount = 0
-function getShardCount() {
-    return ChainInfoRef
-      .count()
-      .then((count) => {
-        shardCount = count
-        emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SHARD_COUNT, count)
-        return
-      })
-}
+// NOTE: chain_info_ref table was removed from schema. 
+// Stubbing with fixed value until proper replacement mechanism is implemented.
+let shardCount = 1
 
+function getShardCount() {
+    // Currently returns fixed value since chain_info_ref table no longer exists
+    emitter.emit(ON_SOCKET_PUBLISH_EVENTS, GET_SHARD_COUNT, shardCount)
+    return Promise.resolve(shardCount)
+}
 
 getShardCount()
 setInterval(getShardCount, config.webSockets.dbPollFrequency)

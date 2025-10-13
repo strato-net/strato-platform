@@ -7,11 +7,10 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 
 /// @title SafetyModule (clean, 4626-lite)
-/// @notice Holds USDST and issues non-transferable "shares" (sUSDST) via internal accounting.
+/// @notice Holds USDST and issues sUSDST tokens via internal accounting.
 ///         - Rewards in USDST via notifyReward() raise price (exchangeRate).
 ///         - coverShortfall() transfers USDST to LendingPool and writes down system debt; price drops.
 ///         - Cooldown + unstake window enforce exit discipline.
-///         - No Pausable/ReentrancyGuard. Assumes USDST is a well-behaved ERC20.
 
 contract record SafetyModule is Ownable {
     // ─── Events
@@ -42,7 +41,14 @@ contract record SafetyModule is Ownable {
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
 
-    constructor(address _lendingRegistry, address _tokenFactory, address _owner) Ownable(_owner) {
+    constructor(address _owner) Ownable(_owner) { }
+
+    function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
+        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        COOLDOWN_SECONDS = 259200;
+        UNSTAKE_WINDOW = 172800;
+        MAX_SLASH_BPS = 3000;
+
         require(_lendingRegistry != address(0)  && _tokenFactory != address(0), "SM:zero addr");
         lendingRegistry = LendingRegistry(_lendingRegistry);
         tokenFactory = TokenFactory(_tokenFactory);
@@ -68,12 +74,14 @@ contract record SafetyModule is Ownable {
         emit TokenFactoryUpdated(_tokenFactory);
     }
 
-    /// @notice Pull latest endpoints from registry and cache them.
+    /// @notice Pull latest values from registry and cache them.
     /// @dev Validates that LendingPool.borrowableAsset() matches cached (or initializes if first time).
     function syncFromRegistry() external onlyOwner {
         _syncFromRegistry();
     }
 
+    /// @dev call this before setTokens()
+    /// @dev call this after the LendingPool configuration, particularly `poolConfigurator.setBorrowableAsset(USDST)`
     function _syncFromRegistry() internal {
         address _lendingPool = lendingRegistry.getLendingPool();
         address _liquidityPool = lendingRegistry.getLiquidityPool();
@@ -239,19 +247,32 @@ contract record SafetyModule is Ownable {
     /// @notice Slash vault to cover protocol shortfall.
     /// @dev Data plane: send USDST to LiquidityPool.
     /// Control plane: tell LendingPool to consume badDebt (accounting).
-    function coverShortfall(uint amount) external onlyOwner {
+ 
+    function coverShortfall(uint256 amount) external onlyOwner returns (uint256 covered) {
         require(amount > 0, "SM:zero");
-        uint ta = totalAssets();
-        require(amount <= ta, "SM:>assets");
-        uint maxSlash = (ta * MAX_SLASH_BPS) / 10000;
-        require(amount <= maxSlash, "SM:>maxSlash");
 
-        IERC20(asset).transfer(address(liquidityPool), amount);
-        lendingPool.coverShortfall(amount);
+        // Live caps
+        uint256 ta        = totalAssets();                         // SM TVL
+        uint256 bd        = lendingPool.badDebt();                 // live bad debt in base units
+        require(bd > 0, "SM:no bad debt");
 
-        emit ShortfallCovered(amount);
+        uint256 maxSlash  = (ta * MAX_SLASH_BPS) / 10000;
+
+        // Compute the actual amount we are willing & able to cover
+        covered = amount;
+        if (covered > ta)        covered = ta;        // cannot send more than vault assets
+        if (covered > maxSlash)  covered = maxSlash;  // per-event slash cap
+        if (covered > bd)        covered = bd;        // don't overfund beyond bad debt
+
+        require(covered > 0, "SM:nothing to cover");
+
+        // Push exactly what will be consumed, then notify LendingPool
+        IERC20(asset).transfer(address(liquidityPool), covered);
+        lendingPool.coverShortfall(covered);
+
+        emit ShortfallCovered(covered);
     }
-
+    
     // ─────────────────────────────────────────
     // Admin
 
@@ -266,6 +287,7 @@ contract record SafetyModule is Ownable {
     }
 
     /// @notice set the tokens - typically one-time
+    /// @dev call this after syncFromRegistry() so that lendingPool is set
     function setTokens(address _sToken, address _asset) external onlyOwner {
         require(_sToken != address(0), "Invalid sToken address");
         require(_asset != address(0), "Invalid underlyingAsset address");

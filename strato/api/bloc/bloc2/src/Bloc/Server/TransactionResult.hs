@@ -18,7 +18,6 @@ module Bloc.Server.TransactionResult
     getBatchBlocTransactionResult',
     getBlocTransactionResult',
     forStateT,
-    constructArgValuesAndSource,
     recurseTRDs,
     TRD (..),
   )
@@ -34,7 +33,6 @@ import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.Contract ()
 import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
@@ -50,7 +48,6 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
 import Data.Either
 import Data.Foldable
 import Data.Int (Int32)
@@ -350,25 +347,6 @@ expressionToValue _ = Nothing
 
 -- TODO: implement expressionToValue for tuples and mappings
 --expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
-
-constructArgValuesAndSource ::
-  (MonadIO m, MonadLogger m) =>
-  Maybe (Map Text ArgValue) ->
-  Map Text Xabi.IndexedType ->
-  m (ByteString, Text)
-constructArgValuesAndSource args argNamesTypes = do
-  case args of
-    Nothing ->
-      if Map.null argNamesTypes
-        then return (ByteString.empty, "()")
-        else throwIO (UserError "no arguments provided to function.")
-    Just argsMap -> do
-      vals <- getArgValues argsMap argNamesTypes
-      let valsAsText = map valueToText vals
-      return $
-        ( toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-          "(" <> Text.intercalate "," valsAsText <> ")"
-        )
 
 getArgValues ::
   (MonadIO m, MonadLogger m) =>

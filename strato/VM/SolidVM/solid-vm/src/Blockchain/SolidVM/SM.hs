@@ -23,12 +23,11 @@ module Blockchain.SolidVM.SM
     action,
     runSM,
     getCurrentAddress,
+    getCurrentCodeAddress,
     withCallInfo,
-    withTempCallInfo,
+    withStaticCallInfo,
     withUncheckedCallInfo,
     withLocalVars,
-    getLocal,
-    setLocal,
     getCurrentCallInfo,
     getCurrentCallInfoIfExists,
     getCurrentContract,
@@ -42,7 +41,9 @@ module Blockchain.SolidVM.SM
     getTypeOfName,
     getXabiType,
     getXabiValueType,
+    getXabiValueType',
     getValueType,
+    getValueType',
     pushSender,
     initializeAction,
     -- lookupX509AddrFromCBHash,
@@ -101,6 +102,8 @@ import Control.Monad.Trans.Reader
 import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
+import Data.Either (isLeft)
+import Data.Foldable (for_)
 import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
@@ -128,10 +131,13 @@ import qualified Prelude as Ordering (Ordering (..))
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
     currentAddress :: Address,
+    currentCodeAddress :: Address,
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
-    localVariables :: NE.NonEmpty (Map SolidString (SVMType.Type, Variable)),
+    localVariables :: NE.NonEmpty (Map SolidString Variable),
+    stateMap :: !(M.Map Address AddressStateModification),
+    storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -188,6 +194,7 @@ type MonadSM m =
     Mod.Accessible VariableSet m,
     Mod.Modifiable GasInfo m,
     Mod.Modifiable MemDBs m,
+    Mod.Modifiable Env.Environment m,
     Mod.Modifiable Env.Sender m,
     Mod.Modifiable [CallInfo] m,
     Mod.Modifiable Action m,
@@ -232,10 +239,49 @@ instance
   ) =>
   (RawStorageKey `A.Alters` RawStorageValue) (SM m)
   where
-  lookup _ = genericLookupRawStorageDB
-  insert _ = genericInsertRawStorageDB
-  delete _ = genericDeleteRawStorageDB
-  lookupWithDefault _ = genericLookupWithDefaultRawStorageDB
+  lookup _ k   = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+      Just v -> pure $ Just v
+      Nothing -> genericLookupRawStorageDB k
+  lookupWithDefault _ k   = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup k . storageMap <$> cs of
+      Just v -> pure v
+      Nothing -> genericLookupWithDefaultRawStorageDB k
+  insert _ k v = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertRawStorageDB k v
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.insert k v $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ kvs = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericInsertManyRawStorageDB kvs
+      (c:cs') -> do
+        let c' = c {
+              storageMap = kvs `M.union` storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ k   = do
+    cs <- gets callStack
+    case cs of
+      [] -> genericDeleteRawStorageDB k
+      (c:cs') -> do
+        let c' = c {
+              storageMap = M.delete k $ storageMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
 
 instance
   ( MonadUnliftIO m,
@@ -246,9 +292,57 @@ instance
   ) =>
   (Address `A.Alters` AddressState) (SM m)
   where
-  lookup _ = getAddressStateMaybe
-  insert _ = putAddressState
-  delete _ = deleteAddressState
+  lookup _ a = do
+    cs <- gets callStack
+    case foldr (<|>) Nothing $ M.lookup a . stateMap <$> cs of
+      Just (ASModification s) -> pure $ Just s
+      Just ASDeleted -> pure $ Just blankAddressState
+      Nothing -> getAddressStateMaybe a
+  insert _ a s = do
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressState a s
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a (ASModification s) $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  insertMany _ as = do
+    let asMods = M.map ASModification as
+    cs <- gets callStack
+    case cs of
+      [] -> putAddressStates asMods
+      (c:cs') -> do
+        let c' = c {
+              stateMap = asMods `M.union` stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  delete _ a = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressState a
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.insert a ASDeleted $ stateMap c
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
+  deleteMany _ as = do
+    cs <- gets callStack
+    case cs of
+      [] -> deleteAddressStates as
+      (c:cs') -> do
+        let c' = c {
+              stateMap = M.difference (stateMap c) . M.fromList $ (,ASDeleted) <$> as
+            }
+        modify $ \ss -> ss{
+          callStack = c':cs'
+        }
 
 instance
   ( MonadUnliftIO m,
@@ -259,7 +353,7 @@ instance
   ) =>
   A.Selectable Address AddressState (SM m)
   where
-  select _ = getAddressStateMaybe
+  select = A.lookup
 
 instance
   (MonadUnliftIO m, (Maybe Word256 `A.Alters` MP.StateRoot) m) =>
@@ -312,6 +406,10 @@ instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alte
 
 instance MonadUnliftIO m => Mod.Accessible Env.Environment (SM m) where
   access _ = gets env
+
+instance MonadUnliftIO m => Mod.Modifiable Env.Environment (SM m) where
+  get _   = gets env
+  put _ m = modify $ \ss -> ss{ env = m }
 
 instance
   (Mod.Modifiable (Maybe DebugSettings) m) =>
@@ -434,9 +532,8 @@ startingAction maybeCode env' =
       _actionData = OMap.empty,
       _src =
         case maybeCode of
-          Just (Code theCode) ->
+          Just theCode ->
             Just theCode
-          Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',
       _events = Q.empty,
@@ -490,7 +587,7 @@ getVariableOfName name = do
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
-  let maybeLocalValue = fmap snd $ M.lookup name vars
+  let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
@@ -525,6 +622,7 @@ getVariableOfName name = do
                        "sha3",
                        "delegatecall",
                        "call",
+                       "staticcall",
                        "derive",
                        "sha256",
                        "ecrecover",
@@ -540,7 +638,8 @@ getVariableOfName name = do
                        "parseCert",
                        "verifyCert",
                        "verifyCertSignedBy",
-                       "verifySignature"
+                       "verifySignature",
+                       "fastForward"
                      ]
           )
           $ t "builtin function" $ Constant $ SFunction name Nothing
@@ -640,19 +739,20 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 withCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m a ->
   m a
-withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
-  addCallInfo a c fn hsh cc initialLocalVariables ro ff
+withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
-  popCallInfo
+  popCallInfo $ isLeft eRes
   case eRes of
     Left (e :: SomeException) -> throwIO e
     Right res -> pure res
@@ -660,23 +760,27 @@ withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
 addCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
+addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
             currentAddress = a,
+            currentCodeAddress = codeAddr,
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
             localVariables = NE.singleton initialLocalVariables,
+            stateMap = M.empty,
+            storageMap = M.empty,
             readOnly = ro,
             isUncheckedSection = False, -- The rationale here is that unchecked sections only apply to the current stack frame
             currentSourcePos = Nothing,
@@ -685,20 +789,25 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
 
-dupCallInfo :: MonadSM m => Bool -> m ()
-dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci : rest) -> pure $ ci {readOnly = ro} : ci : rest
-
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
   [] -> internalError "uncheckedCallInfo was called on an already empty stack" ()
   (ci : rest) -> pure $ ci {isUncheckedSection = True} : ci : rest
 
-popCallInfo :: MonadSM m => m ()
-popCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "popCallInfo was called on an already empty stack" ()
-  (_ : rest) -> pure rest
+popCallInfo :: MonadSM m => Bool -> m ()
+popCallInfo reverted = do
+  cci <- getCurrentCallInfoIfExists
+  Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
+    [] -> internalError "popCallInfo was called on an already empty stack" ()
+    (_ : rest) -> pure rest
+
+  unless reverted . for_ cci $ \ci -> do
+    A.insertMany (A.Proxy @RawStorageValue) $ storageMap ci
+    let fromASM ASDeleted = Left ()
+        fromASM (ASModification as) = Right as
+        (deletes, inserts) = M.mapEither fromASM $ stateMap ci
+    A.insertMany (A.Proxy @AddressState) $ inserts
+    A.deleteMany (A.Proxy @AddressState) $ M.keys deletes
 
 withLocalVars :: MonadSM m => m a -> m a
 withLocalVars = bracket_ pushLocalVars popLocalVars
@@ -719,20 +828,24 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
     _ -> internalError "popLocalVars was called with an empty stack" ()
 
-withTempCallInfo :: MonadSM m => Bool -> m a -> m a
-withTempCallInfo ro f = do
-  dupCallInfo ro
-  eResult <- try f
-  popCallInfo
-  case eResult of
-    Left (e :: SomeException) -> throwIO e
-    Right result -> pure result
+withStaticCallInfo :: MonadSM m => m a -> m a
+withStaticCallInfo f = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> internalError "withStaticCallInfo was called with an empty stack" ()
+    (curFrame : rest) -> do
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
+      eResult <- try f
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      case eResult of
+        Left (e :: SomeException) -> throwIO e
+        Right result -> pure result
 
 withUncheckedCallInfo :: MonadSM m => m a -> m a
 withUncheckedCallInfo f = do
   uncheckedCallInfo
   eResult <- try f
-  popCallInfo
+  popCallInfo $ isLeft eResult
   case eResult of
     Left (e :: SomeException) -> throwIO e
     Right result -> pure result
@@ -767,6 +880,13 @@ getCurrentAddress = do
   case cs of
     (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentCodeAddress :: MonadSM m => m Address
+getCurrentCodeAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentCodeAddress currentCallInfo
+    _ -> internalError "getCurrentCodeAddress called with an empty stack" ()
 {-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
@@ -781,24 +901,6 @@ getCurrentFunctionName = do
   case cs of
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
-
-getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
-getLocal name = do
-  currentCallInfo <- getCurrentCallInfo
-  return . M.lookup name . NE.head $ localVariables currentCallInfo
-
-setLocal :: MonadSM m => SolidString -> Variable -> m ()
-setLocal name val = do
-  stack <- Mod.get (Mod.Proxy @[CallInfo])
-  let (info, rest) = case stack of
-        (ci : r) -> (ci, r)
-        [] -> internalError "setLocal stack underflow" ()
-      locals NE.:| locals' = localVariables info
-      (theType, _) =
-        fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name) $
-          M.lookup name locals
-      newVariables = M.insert name (theType, val) locals NE.:| locals'
-  Mod.put (Mod.Proxy @[CallInfo]) $ info {localVariables = newVariables} : rest
 
 addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
 addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
@@ -872,13 +974,19 @@ getXabiType acct field = do
   pure $ getXabiTypeFromContract field ctract
 
 getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
-getXabiValueType (AccountPath loc path) = do
+getXabiValueType a = getXabiValueType' a >>= \case
+  Left (Left e) -> typeError "getXabiValueType/invalid storage path" e
+  Left (Right field) -> todo "getXabiValueType/unknown storage reference" field
+  Right t -> pure t
+
+getXabiValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) SVMType.Type)
+getXabiValueType' (AccountPath loc path) = do
   ccs' <- codeCollection <$> getCurrentCallInfo
   case MS.getField path of
-    Left e -> typeError "getXabiValueType/invalid storage path" e
+    Left e -> pure . Left $ Left e
     Right field -> getXabiType loc field >>= \case
-      Nothing -> todo "getXabiValueType/unknown storage reference" field
-      Just v -> return $!!  case MS.toList path of
+      Nothing -> pure . Left $ Right field
+      Just v -> pure . Right $!!  case MS.toList path of
                   [] -> v
                   (_:xs) -> loop ccs' xs v
   where
@@ -891,6 +999,7 @@ getXabiValueType (AccountPath loc path) = do
       SVMType.Array {SVMType.entry = v} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
         MS.ArrayIndex {} -> v
+        MS.MapIndex MS.INum{} -> v
         _ -> typeError "non-length or array index attribute of array" x
       SVMType.String {} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
@@ -926,6 +1035,9 @@ getXabiValueType (AccountPath loc path) = do
 getValueType :: MonadSM m => AccountPath -> m BasicType
 getValueType p = hintFromType =<< getXabiValueType p
 
+getValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) BasicType)
+getValueType' p = traverse hintFromType =<< getXabiValueType' p
+
 initializeAction :: MonadSM m
                  => Address
                  -> String
@@ -936,11 +1048,9 @@ initializeAction :: MonadSM m
                  -> Keccak256
                  -> CC.CodeCollection
                  -> Map (Address, T.Text) (T.Text, T.Text, [T.Text])
-                 -> [T.Text]
-                 -> [T.Text]
                  -> m ()
-initializeAction acct name crtr cc_crtr root appName hsh cc ab maps arrs = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab maps arrs []
+initializeAction acct name crtr cc_crtr root appName hsh cc ab = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab []
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
@@ -957,8 +1067,8 @@ markDiffForAction owner key' val' = do
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)
 
-addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> m ()
-addDelegatecall s c o a = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a)
+addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
+addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do
@@ -978,28 +1088,34 @@ getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
 getContractNameAndHash address' = do
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-  resolvedCodeHash <- resolveCodePtr codeHash
-  case resolvedCodeHash of
-    Just (SolidVMCode cn ch') -> return (stringToLabel cn, ch')
-    Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
-    Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+  case codeHash of
+    SolidVMCode cn ch' -> return (stringToLabel cn, ch')
+    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
-  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeCI = find (\ci -> currentAddress ci == address') callStack'
+getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
+  Just ci | currentAddress ci == address' -> pure (currentContract ci, collectionHash ci, codeCollection ci)
+  _ -> do
+    callStack' <- Mod.get (Mod.Proxy @[CallInfo])
+    let maybeCI = find (\ci -> currentAddress ci == address') callStack'
 
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-  case maybeCI of
-    Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
-    Nothing -> do
-      (contractName', ch) <- getContractNameAndHash address'
-      cc <- codeCollectionFromHash True ch
+    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+    (contractName', ch) <- getContractNameAndHash address'
+    case maybeCI of
+      Just ci -> do
+        let contract = fromMaybe (currentContract ci)
+                     . M.lookup contractName'
+                     . CC._contracts
+                     $ codeCollection ci
+        return (contract, collectionHash ci, codeCollection ci)
+      Nothing -> do
+        isRunningTests <- Env.runningTests <$> getEnv
+        cc <- codeCollectionFromHash isRunningTests True ch
 
-      let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+        let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
-      return (contract', ch, cc)
+        return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
 getContractsForParents parents' cc =
@@ -1047,8 +1163,8 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for address " ++ show address
           pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
+          case addressStateCodeHash s of
+            SolidVMCode appName _ -> do
               appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
                 MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))

@@ -6410,8 +6410,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"]
-      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]"),
-                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SString \"xNum\"]"),
+                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SInteger 100]")
                      ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -6437,7 +6437,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "[SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields ["x"]
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
@@ -8125,7 +8125,7 @@ contract qq {
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
@@ -8887,7 +8887,7 @@ contract qq {
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3

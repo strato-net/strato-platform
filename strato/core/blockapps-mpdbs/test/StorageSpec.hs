@@ -227,30 +227,3 @@ storageSpec = do
       got <- addressStateContractRoot <$> lookupWithDefault Proxy (Address 0x1234)
       want `shouldNotBe` got
       got `shouldBe` "\223\231^\"\234'\233\249\208*D\163\210\237\147\ETXq\202\EM\208\195\140\223\&7J\SI\201\250\&9\165\177\141"
-
-  describe "resolveCodePtr" $ do
-    it "should resolve direct code pointers" . runStorM $ do
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef
-            ]
-      let codePtrs =
-            [ SolidVMCode "Code_0" $ unsafeCreateKeccak256FromWord256 0x123,
-              ExternallyOwned $ unsafeCreateKeccak256FromWord256 0x456
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (codePtrs !! 0) `shouldReturn` Just (codePtrs !! 0)
-      resolveCodePtr (codePtrs !! 1) `shouldReturn` Just (codePtrs !! 1)
-    it "should detect cycles in codeptrs (pointer1 to pointer2, pointer2 to pointer1)" . runStorM $ do
-      let accts =
-            [ Address 0xabc,
-              Address 0xdef,
-              Address 0xfff
-            ]
-      let codePtrs =
-            [ CodeAtAccount (accts !! 1) "Ptr_0",
-              CodeAtAccount (accts !! 0) "Ptr_1",
-              CodeAtAccount (accts !! 0) "Ptr_2"
-            ]
-      insertMany (Proxy @AddressState) . M.fromList $ zip accts $ map (\cp -> blankAddressState {addressStateCodeHash = cp}) codePtrs
-      resolveCodePtr (codePtrs !! 2) `shouldReturn` Nothing

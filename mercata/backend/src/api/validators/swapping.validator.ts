@@ -52,8 +52,9 @@ export function validateAddLiquidityDualTokenArgs(args: any) {
   const schema = Joi.object({
     tokenBAmount: numericStringField("TokenBAmount").required(),
     maxTokenAAmount: numericStringField("MaxTokenAAmount").required(),
+    stakeLPToken: Joi.boolean().optional(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Add Liquidity Dual Token Argument Validation Error: " + error.message);
@@ -64,8 +65,9 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
   const schema = Joi.object({
     singleTokenAmount: numericStringField("SingleTokenAmount").required(),
     isAToB: Joi.boolean().required(),
+    stakeLPToken: Joi.boolean().optional(),
   });
-  
+
   const { error } = schema.validate(args);
   if (error) {
     throw new Error("Add Liquidity Argument Validation Error: " + error.message);
@@ -75,6 +77,7 @@ export function validateAddLiquiditySingleTokenArgs(args: any) {
 export function validateRemoveLiquidityArgs(args: any) {
   const schema = Joi.object({
     lpTokenAmount: numericStringField("LpTokenAmount"),
+    includeStakedLPToken: Joi.boolean().optional(),
   });
 
   const { error } = schema.validate(args);
@@ -133,7 +136,7 @@ export function validateSwapHistoryArgs(args: any) {
 
 export function validateSetPoolRatesArgs(args: any) {
   const schema = Joi.object({
-    poolAddress: Joi.string().required(),
+    poolAddress: validateAddressField("poolAddress"),
     swapFeeRate: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
     lpSharePercent: Joi.number().min(0).max(10000).required(), // 0-100% with 2 decimals (10000 = 100%)
   });

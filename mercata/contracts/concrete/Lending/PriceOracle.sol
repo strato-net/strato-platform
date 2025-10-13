@@ -14,24 +14,25 @@ import "../../abstract/ERC20/access/Ownable.sol";
     // Events
     event PriceUpdated(address indexed asset, uint256 price, uint256 timestamp);
     event BatchPricesUpdated(address[] assets, uint256[] priceValues, uint256 timestamp);
-    event OracleAuthorized(address indexed oracle);
-    event OracleRevoked(address indexed oracle);
     
-    constructor(address _authorizedOracle) {
-        // Owner is automatically authorized
-        require(_authorizedOracle != address(0), "Invalid oracle address");
+    constructor(address _owner) Ownable(_owner) {}
+    
+    /**
+     * @dev Internal helper to set price for a single asset with validation
+     */
+    function _setAssetPrice(address asset, uint256 price) internal {
+        require(asset != address(0), "Invalid asset address");
+        require(price > 0, "Price must be greater than 0");
+        
+        prices[asset] = price;
+        lastUpdated[asset] = block.timestamp;
     }
     
     /**
      * @dev Set price for a single asset
      */
     function setAssetPrice(address asset, uint256 price) external onlyOwner {
-        require(asset != address(0), "Invalid asset address");
-        require(price > 0, "Price must be greater than 0");
-        
-        prices[asset] = price;
-        lastUpdated[asset] = block.timestamp;
-        
+        _setAssetPrice(asset, price);
         emit PriceUpdated(asset, price, block.timestamp);
     }
     
@@ -43,11 +44,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
         require(assets.length > 0, "Empty arrays");
         
         for (uint256 i = 0; i < assets.length; i++) {
-            require(assets[i] != address(0), "Invalid asset address");
-            require(priceValues[i] > 0, "Price must be greater than 0");
-            
-            prices[assets[i]] = priceValues[i];
-            lastUpdated[assets[i]] = block.timestamp;
+            _setAssetPrice(assets[i], priceValues[i]);
         }
         
         emit BatchPricesUpdated(assets, priceValues, block.timestamp);

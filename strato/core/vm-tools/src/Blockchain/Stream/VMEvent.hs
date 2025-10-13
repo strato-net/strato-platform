@@ -5,6 +5,8 @@
 module Blockchain.Stream.VMEvent
   ( VMEvent(..),
     produceVMEvents,
+    produceVMEvents',
+    runKafkaVMEvents,
     fetchVMEvents
   )
 where
@@ -14,7 +16,7 @@ import Blockchain.EthConf
 import Blockchain.KafkaTopics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Stream.Action (Action, Delegatecall)
+import Blockchain.Stream.Action (Action)
 import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
@@ -33,25 +35,19 @@ data VMEvent
         codePtr :: CodePtr,
         creator :: Text,
         application :: Text,
-        abstracts :: Map (Address, Text) (Text, Text, [Text]),
-        recordMappings :: [Text]
+        abstracts :: Map (Address, Text) (Text, Text, [Text])
       }
-  | DelegatecallMade Delegatecall
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
 
 vmType :: CodePtr -> String
 vmType (SolidVMCode _ _) = "SolidVM"
 vmType (ExternallyOwned _) = "EVM"
-vmType (CodeAtAccount _ _) = "CodeAtAccount"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cp cr ap _ rm) =
+  format (CodeCollectionAdded _ cp cr ap _) =
     "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
-      ++ (if (not $ null rm) then " " ++ show rm else "")
-  format (DelegatecallMade d) =
-    "DelegatecallMade: " ++ format d
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 instance Binary VMEvent
@@ -61,7 +57,13 @@ instance JSON.ToJSON VMEvent
 instance JSON.FromJSON VMEvent
 
 produceVMEvents :: MonadIO m => [VMEvent] -> m [ProduceResponse]
-produceVMEvents = runKafkaMConfigured "blockapps-data" . produceItems (lookupTopic "vmevents")
+produceVMEvents = runKafkaVMEvents . produceVMEvents'
+
+produceVMEvents' :: HasKafka k => [VMEvent] -> k [ProduceResponse]
+produceVMEvents' = produceItems (lookupTopic "vmevents")
+
+runKafkaVMEvents :: MonadIO m => KafkaM m a -> m a
+runKafkaVMEvents = runKafkaMConfigured "blockapps-data"
 
 fetchVMEvents :: HasKafka k => Offset -> k [VMEvent]
 fetchVMEvents = fetchItems $ lookupTopic "vmevents"

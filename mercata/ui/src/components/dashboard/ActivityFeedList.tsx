@@ -30,11 +30,12 @@ import {
   Download
 } from "lucide-react";
 import { formatUnits } from "viem";
-import { activityFeedApi, BlockchainEvent } from "@/lib/activityFeed";
+import { activityFeedApi } from "@/lib/activityFeed";
+import type { Event } from "@mercata/shared-types";
 import { useUser } from "@/context/UserContext";
 
 const ActivityFeedList = () => {
-  const [events, setEvents] = useState<BlockchainEvent[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -117,8 +118,8 @@ const ActivityFeedList = () => {
         });
         
         setEvents(response.events || []);
-        setTotalPages(response.totalPages || 1);
         setTotalEvents(response.total || 0);
+        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
         setError(null);
       } catch (err) {
         setError(`Failed to fetch events: ${err.response?.data?.message || err.message}`);
@@ -136,7 +137,8 @@ const ActivityFeedList = () => {
   }, [currentPage, isLoggedIn, filters]);
 
   // Memoized utility functions to prevent unnecessary re-renders
-  const formatAddress = useCallback((address: string) => {
+  const formatAddress = useCallback((address: string | null) => {
+    if (!address) return "N/A";
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }, []);
 
@@ -216,7 +218,6 @@ const ActivityFeedList = () => {
       const headers = [
         'Event Name',
         'Contract Name',
-        'Application',
         'Block Number',
         'Block Timestamp',
         'Transaction Hash',
@@ -240,7 +241,6 @@ const ActivityFeedList = () => {
           const baseData = [
             `"${event.event_name}"`,
             `"${event.contract_name}"`,
-            `"${event.application}"`,
             event.block_number,
             `"${formatTimestamp(event.block_timestamp)}"`,
             `"${event.transaction_hash}"`,
@@ -339,30 +339,28 @@ const ActivityFeedList = () => {
   }, [currentPage, totalPages]);
 
   // Memoized event card renderer to prevent unnecessary re-renders
-  const renderEventCard = useCallback((event: BlockchainEvent) => (
+  const renderEventCard = useCallback((event: Event) => (
     <Card key={`${event.transaction_hash}-${event.event_index}`} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
             <div className={`p-1.5 sm:p-2 rounded-full ${getEventColor(event.event_name)}`}>
-              {getEventIcon(event.event_name)}
+              {getEventIcon(event?.event_name ? event?.event_name : 'N/A')}
             </div>
             <div>
-              <CardTitle className="text-base sm:text-lg font-semibold">{event.event_name}</CardTitle>
+              <CardTitle className="text-base sm:text-lg font-semibold">{event?.event_name ? event?.event_name : 'N/A'}</CardTitle>
               <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                <span>{event.contract_name}</span>
-                <span>•</span>
-                <span>{event.application}</span>
+                <span>{event?.contract_name ? event?.contract_name : 'N/A'}</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:block sm:text-right">
             <Badge variant="outline" className="text-xs inline-flex">
-              Block #{event.block_number}
+              Block #{event?.block_number ? event?.block_number : 'N/A'}
             </Badge>
             <div className="text-xs text-gray-500 sm:mt-1">
-              {formatTimestamp(event.block_timestamp)}
+              {formatTimestamp(event?.block_timestamp ? event?.block_timestamp : 'N/A')}
             </div>
           </div>
         </div>
@@ -378,11 +376,11 @@ const ActivityFeedList = () => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
-                      {formatAddress(event.transaction_hash)}
+                      {event?.transaction_hash ? formatAddress(event?.transaction_hash) : 'N/A'}
                     </code>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="font-mono text-xs">{event.transaction_hash}</p>
+                    <p className="font-mono text-xs">{event?.transaction_hash ? event?.transaction_hash : 'N/A'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -394,11 +392,11 @@ const ActivityFeedList = () => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
-                      {formatAddress(event.transaction_sender)}
+                      {event?.transaction_sender ? formatAddress(event?.transaction_sender) : 'N/A'}
                     </code>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="font-mono text-xs">{event.transaction_sender}</p>
+                    <p className="font-mono text-xs">{event?.transaction_sender ? event?.transaction_sender : 'N/A'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -410,11 +408,11 @@ const ActivityFeedList = () => {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
-                      {formatAddress(event.address)}
+                      {event?.address ? formatAddress(event?.address) : 'N/A'}
                     </code>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="font-mono text-xs">{event.address}</p>
+                    <p className="font-mono text-xs">{event?.address ? event?.address : 'N/A'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -424,7 +422,7 @@ const ActivityFeedList = () => {
           <div className="space-y-2">
             <div className="text-xs sm:text-sm font-medium text-gray-700">Event Attributes:</div>
             <div className="space-y-1">
-              {Object.entries(event.attributes).map(([key, value]) => (
+              {Object.entries(event?.attributes).map(([key, value]) => (
                 <div key={key} className="flex justify-between text-xs sm:text-sm">
                   <span className="text-gray-600 capitalize">{key}:</span>
                   <span className="font-mono text-xs">
@@ -436,11 +434,11 @@ const ActivityFeedList = () => {
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <span className="cursor-help">
-                                  {formatAddress(value)}
+                                  {value ? formatAddress(value) : 'N/A'}
                                 </span>
                               </TooltipTrigger>
                               <TooltipContent>
-                                <p className="font-mono text-xs">{value}</p>
+                                <p className="font-mono text-xs">{value ? value : 'N/A'}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>

@@ -1257,11 +1257,11 @@ call' noValueTransfer = do
   return (fromMaybe B.empty $ returnVal vmState)
   where
     insertFunc2 :: Keccak256 -> Maybe Action.ActionData -> Maybe Action.ActionData
-    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty [] [] []
+    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty []
 
 
 insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty [] [] []
+insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty []
 
 callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
 callPrecompiled' noValueTransfer precompiled = do

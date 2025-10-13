@@ -31,14 +31,8 @@ singletonTransactionList t = M.singleton (transactionNonce $ otBaseTx t) t
 insertTransaction :: OutputTx -> TransactionList -> (Maybe OutputTx, OutputTx, TransactionList)
 insertTransaction t tl =
   let nonce' = nonce t
-      oldTx = M.lookup nonce' tl
-   in case oldTx of
-        Nothing -> (Nothing, t, M.insert nonce' t tl)
-        Just existing ->
---          if gasPrice existing <= gasPrice t
-          if False
-            then (oldTx, t, M.insert nonce' t tl)
-            else (Just t, existing, tl)
+      (oldTx, newTL) = M.insertLookupWithKey (\_ a _ -> a) nonce' t tl
+   in (oldTx, t, newTL)
 
 trimBelowNonce :: Integer -> TransactionList -> ([OutputTx], TransactionList)
 trimBelowNonce nonce' tl = let (lt, gte) = M.partitionWithKey (\k _ -> k < nonce') tl in (M.elems lt, gte)

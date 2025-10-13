@@ -1,7 +1,8 @@
 import "../../abstract/ERC20/access/Ownable.sol";
-import "./TokenMetadata.sol";
 import "../../abstract/ERC20/ERC20.sol";
-import "../Rewards/RewardsManager.sol";
+import "../../abstract/ERC20/utils/Pausable.sol";
+import "../Admin/AdminRegistry.sol";
+import "./TokenMetadata.sol";
 import "./TokenFactory.sol";
 
 /**
@@ -36,16 +37,27 @@ import "./TokenFactory.sol";
 
 enum TokenStatus { NULL, PENDING, ACTIVE, LEGACY }
 
-contract record Token is ERC20, Ownable, TokenMetadata {
+contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     uint8 public customDecimals;
     TokenStatus public status;
     TokenFactory public tokenFactory;
-    RewardsManager public rewardsManager;
 
     event StatusChanged(TokenStatus newStatus);
 
     modifier onlyTokenFactory() {
         require(msg.sender == address(tokenFactory), "Token: caller is not token factory");
+        _;
+    }
+
+    modifier whenNotPausedOrOwner() {
+        if (paused()) {
+            try {
+                _checkOwner();
+            } catch {
+                AdminRegistry admin = AdminRegistry(Ownable(tokenFactory).owner());
+                require(admin.whitelist(address(this), msg.sig, _msgSender()), "not whitelisted");
+            }
+        }
         _;
     }
 
@@ -63,7 +75,6 @@ contract record Token is ERC20, Ownable, TokenMetadata {
         customDecimals = _customDecimals;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
-
         _mint(_tokenCreator, _initialSupply);
 
         emit StatusChanged(status);
@@ -82,16 +93,20 @@ contract record Token is ERC20, Ownable, TokenMetadata {
         tokenFactory = TokenFactory(_tokenFactory);
     }
 
-    function setRewardsManager(address _rewardsManager) external onlyOwner {
-        rewardsManager = RewardsManager(_rewardsManager);
-    }
-
     function mint(address to, uint256 amount) external onlyOwner {
         _mint(to, amount);
     }
 
     function burn(address from, uint256 amount) external onlyOwner {
         _burn(from, amount);
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function addWhitelist(address _admin, string _func, address _accountToWhitelsit) external onlyOwner {
@@ -115,15 +130,11 @@ contract record Token is ERC20, Ownable, TokenMetadata {
         return customDecimals;
     }
 
-    function _update(address from, address to, uint256 value) internal override {
-        if (address(rewardsManager) != address(0)) {
-            if (from != address(0)) {
-                rewardsManager.updateRewardsBalanceFor(address(this), from);
-            }
-            if (to != address(0)) {
-                rewardsManager.updateRewardsBalanceFor(address(this), to);
-            }
-        }
-        super._update(from, to, value);
+    function transfer(address to, uint256 value) public override whenNotPausedOrOwner returns (bool) {
+        return super.transfer(to, value);
+    }
+
+    function transferFrom(address from, address to, uint256 value) public override whenNotPausedOrOwner returns (bool) {
+        return super.transferFrom(from, to, value);
     }
 }

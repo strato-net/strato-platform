@@ -1,10 +1,13 @@
-import { cirrus, strato } from "../../utils/mercataApiHelper";
+import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
+
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
-import { StratoPaths, constants } from "../../config/constants";
-import { getBalance, getTokens } from "./tokens.service";
+import { StratoPaths, constants, rewardsChef } from "../../config/constants";
+import * as config from "../../config/config";
+import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
+import { getStakedBalance, getPools, waitForBalanceUpdate, findPoolByLpToken } from "./rewardsChef.service";
 import {
   simulateLoan,
   CollateralInfo,
@@ -18,7 +21,6 @@ import {
   debtFromScaled,
   totalDebtFromScaled,
   previewBorrowIndexFromFlatApr,
-  exchangeRateFromComponents,
 } from "../helpers/lending.helper";
 
 const {
@@ -29,7 +31,45 @@ const {
   Token,
   CollateralVault,
   PriceOracle,
+  RewardsChef,
 } = constants;
+
+/**
+ * Get the latest exchange rate for the lending pool from Cirrus events
+ */
+export const getExchangeRateFromCirrus = async (
+  accessToken: string,
+): Promise<string> => {
+  const oneToOne = (10n ** 18n).toString();
+  try {
+    // Query the most recent ExchangeRateUpdated event from the lending pool
+    const response = await cirrus.get(
+      accessToken,
+      `/${LendingPool}-ExchangeRateUpdated`,
+      {
+        params: {
+          select: "newRate::text,block_timestamp",
+          order: "block_timestamp.desc",
+          limit: "1"
+        }
+      }
+    );
+
+    const events = response?.data || [];
+    if (events.length === 0) {
+      return oneToOne; // Default 1:1 exchange rate
+    }
+
+    const latestEvent = events[0];
+    const exchangeRate = latestEvent?.newRate || oneToOne;
+
+    return exchangeRate;
+  } catch (error) {
+    console.error(`Error fetching exchange rate from Cirrus for lending pool: `, error);
+    return oneToOne;
+  }
+};
+
 
 /**
  * Generic Cirrus fetch for the LendingRegistry row.
@@ -66,21 +106,27 @@ export const getPool = async (
 
 export const depositLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
+  stakeMToken: boolean,
 ) => {
-  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
+  const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
     undefined,
     {
-      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
+      select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset),mToken:lendingPool_fkey(mToken)`,
     } as Record<string, string>
   );
 
-  if (!liquidityPool || !lendingPool || !borrowableAsset) {
-    throw new Error("Liquidity pool, lending pool or borrowable asset address not found");
+  if (!liquidityPool || !lendingPool || !borrowableAsset || (stakeMToken && !mToken)) {
+    throw new Error("Liquidity pool, lending pool, borrowable asset or mToken address not found");
   }
 
-  const tx: FunctionInput[] = [
+  // Get user's mToken balance before deposit
+  const mTokenBalanceBefore = stakeMToken ? await getTokenBalanceForUser(accessToken, mToken, userAddress) : "0";
+
+  // First transaction: deposit liquidity
+  const depositTx: FunctionInput[] = [
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
@@ -95,49 +141,168 @@ export const depositLiquidity = async (
     },
   ];
 
-  return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+  const builtDepositTx = await buildFunctionTx(depositTx, userAddress, accessToken);
+  const depositResult = await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtDepositTx)
   );
+
+  // If staking is requested and deposit was successful, execute staking transaction
+  if (stakeMToken && depositResult.status === "Success") {
+    // Wait for Cirrus to index the new mToken balance with retry logic
+    const mTokenBalanceAfter = await waitForBalanceUpdate(
+      accessToken,
+      mToken,
+      userAddress,
+      mTokenBalanceBefore,
+      10,  // max retries
+      200  // 200ms delay between retries
+    );
+
+    const newlyMintedAmount = (BigInt(mTokenBalanceAfter) - BigInt(mTokenBalanceBefore)).toString();
+
+    if (BigInt(newlyMintedAmount) > 0n) {
+      // Find the pool for this mToken
+      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+
+      if (!rewardsPool) {
+        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot stake after deposit.`);
+      }
+
+      const stakingTx: FunctionInput[] = [
+        // First approve mToken for RewardsChef
+        {
+          contractName: extractContractName(Token),
+          contractAddress: mToken,
+          method: "approve",
+          args: { spender: rewardsChef, value: newlyMintedAmount },
+        },
+        // Then deposit into RewardsChef
+        {
+          contractName: extractContractName(RewardsChef),
+          contractAddress: rewardsChef,
+          method: "deposit",
+          args: { _pid: rewardsPool.poolIdx, _amount: newlyMintedAmount },
+        },
+      ];
+
+      const builtStakingTx = await buildFunctionTx(stakingTx, userAddress, accessToken);
+      const stakingResult = await postAndWaitForTx(accessToken, () =>
+        bloc.post(accessToken, StratoPaths.transactionParallel, builtStakingTx)
+      );
+
+      // Fail the entire operation if staking fails
+      if (stakingResult.status !== "Success") {
+        throw new Error("Deposit succeeded but staking failed");
+      }
+    }
+  }
+
+  return depositResult;
 };
 
 export const withdrawLiquidity = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
+  includeStakedMToken: boolean = false
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
+  // If includeStakedMToken is enabled, we might need to unstake first
+  if (includeStakedMToken) {
+    // Get mToken address first
+    const { mToken: { mToken } } = await getPool(accessToken, undefined, {
+      select: "mToken:lendingPool_fkey(mToken)"
+    });
+    if (!mToken) {
+      throw new Error("mToken address not found");
+    }
+
+    // Get current mUSDST balance in wallet
+    const unstakedMTokenBalance = await getTokenBalanceForUser(accessToken, mToken, userAddress);
+
+    // Get exchange rate to convert withdrawal amount (USDST) to required mTokens
+    const exchangeRateResponse = await getExchangeRateFromCirrus(accessToken);
+    const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
+
+    // Convert withdrawal amount (USDST) to required mTokens
+    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
+    const amountWei = BigInt(amount);
+    const exchangeRateWei = BigInt(exchangeRate);
+    const numerator = amountWei * (10n ** 18n);
+    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
+
+    // Check if we need to unstake
+    const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
+
+    if (requiredMTokenWei > unstakedMTokenWei) {
+      // We need to unstake some mTokens first
+      const amountToUnstake = requiredMTokenWei - unstakedMTokenWei;
+
+      // Find the pool for this mToken
+      const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+
+      if (!rewardsPool) {
+        throw new Error(`No RewardsChef pool found for mToken ${mToken}. Cannot unstake before withdrawal.`);
+      }
+
+      // Build unstaking transaction
+      const unstakeTx = await buildFunctionTx({
+        contractName: extractContractName(RewardsChef),
+        contractAddress: rewardsChef,
+        method: "withdraw",
+        args: {
+          _pid: rewardsPool.poolIdx,
+          _amount: amountToUnstake.toString()
+        }
+      }, userAddress, accessToken);
+
+      // Execute unstaking transaction first
+      await postAndWaitForTx(accessToken, () =>
+        strato.post(accessToken, StratoPaths.transactionParallel, unstakeTx)
+      );
+    }
+  }
+
+  // Now proceed with the normal withdrawal
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawLiquidity",
+    args: { amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawLiquidity",
-      args: { amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const withdrawLiquidityAll = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawLiquidityAll",
+    args: {},
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawLiquidityAll",
-      args: {},
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const supplyCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -161,13 +326,15 @@ export const supplyCollateral = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const withdrawCollateral = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
   amount: string,
 ) => {
@@ -176,55 +343,63 @@ export const withdrawCollateral = async (
     throw new Error("Lending pool address not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawCollateral",
+    args: { asset, amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawCollateral",
-      args: { asset, amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const borrow = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
-  
+
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
 
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "borrow",
+    args: { amount },
+  }, userAddress, accessToken);
+
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "borrow",
-      args: { amount },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const borrowMax = async (
   accessToken: string,
+  userAddress: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "borrowMax",
+    args: {},
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "borrowMax",
-      args: {},
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
 
 export const repay = async (
   accessToken: string,
+  userAddress: string,
   amount: string,
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
@@ -254,8 +429,9 @@ export const repay = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   const result = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
   return { ...result, amountSent: amount };
 };
@@ -264,7 +440,7 @@ export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const registry = await getPool(accessToken, undefined, { 
+  const registry = await getPool(accessToken, undefined, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
@@ -294,7 +470,7 @@ export const collateralAndBalance = async (
   // Create maps for asset configs and prices
   const assetConfigMap = new Map();
   const priceMap = new Map();
-  
+
   // Build asset config map
   (registry.lendingPool?.assetConfigs || []).forEach((config: any) => {
     assetConfigMap.set(config.asset, config.AssetConfig);
@@ -355,7 +531,7 @@ export const liquidityAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
-        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,` +
+        `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
@@ -378,8 +554,8 @@ export const liquidityAndBalance = async (
   }
 
   // Fetch token metadata with balances included
-  const tokenData = await getTokens(accessToken, { 
-    address: `in.(${borrowableAsset},${mToken})`, 
+  const tokenData = await getTokens(accessToken, {
+    address: `in.(${borrowableAsset},${mToken})`,
     select: `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,balances:${Token}-_balances(user:key,balance:value::text)`,
     "balances.key": `in.(${userAddress},${registry.liquidityPool?.address || ''})`
   });
@@ -415,6 +591,7 @@ export const liquidityAndBalance = async (
   const totalScaledDebtStr = registry.lendingPool?.totalScaledDebt || "0";
   const reservesAccruedStr = registry.lendingPool?.reservesAccrued || "0";
   const lastAccrualStr     = registry.lendingPool?.lastAccrual     || "0";
+  const badDebtStr         = registry.lendingPool?.badDebt         || "0";
 
   const interestRateBps = borrowableAssetConfig?.interestRate || 0;
 
@@ -440,12 +617,8 @@ export const liquidityAndBalance = async (
   // System totals and exchange rate
   const systemTotalDebt = totalDebtFromScaled(totalScaledDebtStr.toString(), borrowIndexStr.toString());
 
-  const exchangeRate = exchangeRateFromComponents(
-    availableLiquidity,
-    systemTotalDebt,
-    reservesAccruedStr.toString(),
-    totalMTokenSupply
-  );
+  // Get exchange rate from Cirrus events instead of calculating manually
+  const exchangeRate = await getExchangeRateFromCirrus(accessToken);
 
   const totalUSDSTSupplied = (BigInt(availableLiquidity) + BigInt(systemTotalDebt)).toString();
 
@@ -468,14 +641,23 @@ export const liquidityAndBalance = async (
     )
   );
 
-  // User’s withdrawable underlying (min of user mToken value and pool cash)
+  // Get user's staked balance from RewardsChef
+  // Find the pool for this mToken
+  const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, mToken);
+
+  // If no pool found, staked balance is 0
+  const stakedMTokenBalance = rewardsPool
+    ? await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress)
+    : "0";
+
+  // User's withdrawable underlying (min of user mToken value and pool cash)
   const userMTokenBalance = BigInt(mTokenBalance);
-  const userUSDSTValue = userMTokenBalance > 0n 
+  const userUSDSTValue = userMTokenBalance > 0n
     ? ((userMTokenBalance * BigInt(exchangeRate)) / (10n ** 18n))
     : 0n;
 
   const poolAvailableLiquidity = BigInt(availableLiquidity);
-  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity 
+  const maxWithdrawableUSDST = userUSDSTValue < poolAvailableLiquidity
     ? userUSDSTValue.toString()
     : poolAvailableLiquidity.toString();
 
@@ -493,7 +675,9 @@ export const liquidityAndBalance = async (
     },
     withdrawable: {
       ...mTokenInfoClean,
-      userBalance: mTokenBalance,
+      userBalance: mTokenBalance, // This is the unstaked (wallet) balance
+      userBalanceStaked: stakedMTokenBalance, // Staked balance from RewardsChef
+      userBalanceTotal: (BigInt(mTokenBalance) + BigInt(stakedMTokenBalance)).toString(), // Total = wallet + staked
       maxWithdrawableUSDST,
       withdrawValue: userUSDSTValue.toString(),
     },
@@ -628,8 +812,9 @@ export const repayAll = async (
     },
   ];
 
+  const builtTx = await buildFunctionTx(tx, userAddress, accessToken);
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx(tx))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 
   return {
@@ -642,6 +827,7 @@ export const repayAll = async (
 
 export const executeLiquidation = async (
   accessToken: string,
+  userAddress: string,
   loanId: string,
   options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
@@ -753,7 +939,9 @@ export const executeLiquidation = async (
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
-  const tx = buildFunctionTx([
+  const repayAmountAtomic = repayAmount.toString();
+
+  const tx = await buildFunctionTx([
     {
       contractName: extractContractName(Token),
       contractAddress: borrowableAsset,
@@ -770,10 +958,10 @@ export const executeLiquidation = async (
       } : {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
-        debtToCover: repayAmount.toString(),
+        debtToCover: repayAmountAtomic,
       },
     },
-  ]);
+  ], userAddress, accessToken);
 
   try {
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -793,12 +981,13 @@ export const executeLiquidation = async (
 
 export const configureAsset = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.asset || body.ltv === undefined || body.liquidationThreshold === undefined || 
       body.liquidationBonus === undefined || body.interestRate === undefined || 
-      body.reserveFactor === undefined) {
-    throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor");
+      body.reserveFactor === undefined || body.perSecondFactorRAY === undefined) {
+    throw new Error("Missing required parameters: asset, ltv, liquidationThreshold, liquidationBonus, interestRate, reserveFactor, perSecondFactorRAY");
   }
 
   const ltv = Number(body.ltv);
@@ -806,6 +995,7 @@ export const configureAsset = async (
   const liquidationBonus = Number(body.liquidationBonus);
   const interestRate = Number(body.interestRate);
   const reserveFactor = Number(body.reserveFactor);
+  const perSecondFactorRAY = String(body.perSecondFactorRAY); // Keep as string for BigInt precision
 
   if (isNaN(ltv) || ltv < 100 || ltv > 9500) throw new Error("LTV must be between 100 and 9500 basis points (1% to 95%)");
   if (isNaN(liquidationThreshold) || liquidationThreshold < 100 || liquidationThreshold > 9500) throw new Error("Liquidation threshold must be between 100 and 9500 basis points (1% to 95%)");
@@ -813,14 +1003,16 @@ export const configureAsset = async (
   if (isNaN(interestRate) || interestRate < 0 || interestRate > 10000) throw new Error("Interest rate must be between 0 and 10000 basis points (0% to 100%)");
   if (isNaN(reserveFactor) || reserveFactor < 0 || reserveFactor > 5000) throw new Error("Reserve factor must be between 0 and 5000 basis points (0% to 50%)");
   if (ltv > liquidationThreshold) throw new Error("LTV cannot be higher than liquidation threshold");
+  
+  // Validate perSecondFactorRAY
+  if (!/^\d+$/.test(perSecondFactorRAY)) throw new Error("perSecondFactorRAY must be a valid integer string");
+  const rayValue = BigInt(perSecondFactorRAY);
+  const minRAY = BigInt('1000000000000000000000000000'); // 1e27
+  if (rayValue < minRAY) throw new Error("perSecondFactorRAY must be >= 1e27 (1 RAY)");
 
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = registry._owner;
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
-
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "configureAsset",
     args: {
       asset: body.asset,
@@ -829,8 +1021,9 @@ export const configureAsset = async (
       liquidationBonus,
       interestRate,
       reserveFactor,
+      perSecondFactorRAY,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -841,6 +1034,7 @@ export const configureAsset = async (
 
 export const sweepReserves = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.amount) {
@@ -854,18 +1048,14 @@ export const sweepReserves = async (
     throw new Error("Amount must be a valid positive integer");
   }
 
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
-
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "sweepReserves",
     args: {
       amount,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -876,6 +1066,7 @@ export const sweepReserves = async (
 
 export const setDebtCeilings = async (
   accessToken: string,
+  userAddress: string,
   body: Record<string, string | number>
 ) => {
   if (!body.assetUnits || !body.usdValue) {
@@ -893,19 +1084,15 @@ export const setDebtCeilings = async (
     throw new Error("USD value must be a valid number"); // convert to BigInt before making the API call.
   }
 
-  const registry = await getPool(accessToken, undefined, { select: "_owner" });
-  const poolConfiguratorAddress = "0000000000000000000000000000000000001006"; // TODO pull properly, also in configureAsset
-  if (!poolConfiguratorAddress) throw new Error("Pool configurator address not found in lending registry");
-
-  const tx = buildFunctionTx({
+  const tx = await buildFunctionTx({
     contractName: extractContractName(constants.PoolConfigurator),
-    contractAddress: poolConfiguratorAddress,
+    contractAddress: config.poolConfigurator,
     method: "setDebtCeilings",
     args: {
       assetUnits,
       usdValue,
     },
-  });
+  }, userAddress, accessToken);
 
   const { status, hash } = await postAndWaitForTx(accessToken, () =>
     strato.post(accessToken, StratoPaths.transactionParallel, tx)
@@ -1101,18 +1288,20 @@ export const listNearUnhealthyLoans = async (accessToken: string, margin: number
 
 export const withdrawCollateralMax = async (
   accessToken: string,
+  userAddress: string,
   asset: string,
 ) => {
   const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "withdrawCollateralMax",
+    args: { asset },
+  }, userAddress, accessToken);
   return await postAndWaitForTx(accessToken, () =>
-    strato.post(accessToken, StratoPaths.transactionParallel, buildFunctionTx({
-      contractName: extractContractName(LendingPool),
-      contractAddress: lendingPool,
-      method: "withdrawCollateralMax",
-      args: { asset },
-    }))
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };

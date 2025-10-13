@@ -22,7 +22,9 @@ contract record CDPReserve is Ownable {
     _;
   }
 
-  constructor(address _registry, address _owner) Ownable(_owner) {
+  constructor(address _owner) Ownable(_owner) { }
+
+  function initialize(address _registry) external onlyOwner {
     require(_registry != address(0), "CDPReserve: Invalid registry");
     registry = CDPRegistry(_registry);
   }
@@ -36,7 +38,7 @@ contract record CDPReserve is Ownable {
   /// @notice Called by Engine to pay out USDST to `to`.
   function transferTo(address to, uint256 amount) external onlyEngine {
     require(to != address(0), "Reserve: to=0");
-    require(ERC20(address(_usdst())).transfer(to, amount), "Reserve: transfer failed");
+    require(_usdst().transfer(to, amount), "Reserve: transfer failed");
     emit Transferred(to, amount);
   }
 

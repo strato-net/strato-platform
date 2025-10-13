@@ -48,7 +48,7 @@ forSource detector c = case parseSourceWithAnnotations "" $ T.pack c of
 
 forContract :: CompilerDetector -> String -> IO [SourceAnnotation Text]
 forContract detector c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
-  eCC <- compileSourceWithAnnotations True (M.fromList [("", T.pack c)])
+  eCC <- compileSourceWithAnnotations True True (M.fromList [("", T.pack c)])
   pure $ case eCC of
     Left anns -> anns
     Right cc -> detector cc

@@ -123,8 +123,8 @@ spec = do
                   genesisInfoExtraData = 0,
                   genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
                   genesisInfoNonce = 42,
-                  genesisInfoEvents = M.empty
-
+                  genesisInfoEvents = M.empty,
+                  genesisInfoDelegatecalls = M.empty
                 }
           got = eitherDecode input
        in got `shouldBe` want
@@ -180,7 +180,8 @@ spec = do
                   genesisInfoExtraData = 0,
                   genesisInfoMixHash = unsafeCreateKeccak256FromWord256 0,
                   genesisInfoNonce = 42,
-                  genesisInfoEvents = M.empty
+                  genesisInfoEvents = M.empty,
+                  genesisInfoDelegatecalls = M.empty
                 }
             ]
           got = JS.parseLazyByteString genesisParser input

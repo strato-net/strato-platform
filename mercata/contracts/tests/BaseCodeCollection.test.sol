@@ -184,7 +184,8 @@ contract Describe_Mercata {
 
     function it_can_execute_issues() {
         User adminUser = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         User u = new User();
         bool didExecute = false;
         try {
@@ -203,57 +204,62 @@ contract Describe_Mercata {
     function it_can_execute_internal_issues() {
         User adminUser = new User();
         User u = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins().length == 2, "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
-        require(admin.admins().length == 3, "New admin was not added correctly");
+        require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
     }
 
     function it_can_execute_contract_creations() {
         User adminUser = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         require(didIt, "Contract was not created correctly");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
     function it_can_execute_contract_creations_from_code_collection() {
         User adminUser = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         string src = '{"A.sol":"contract A{}","Blob.sol":"import \\"A.sol\\"; contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; new A(); }}"}';
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
         require(didIt, "Contract was not created correctly");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
     function it_can_allow_new_admin_to_vote() {
         User adminUser = new User();
         User u = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         admin.addAdmin(address(u));
-        require(admin.admins().length == 2, "Admin was added before enough votes were cast");
+        require(admin.admins(1) == address(adminUser) && admin.admins(2) == address(0), "Admin was added before enough votes were cast");
         adminUser.do(address(admin), "addAdmin", address(u));
-        require(admin.admins().length == 3, "New admin was not added correctly");
+        require(admin.admins(2) == address(u) && admin.admins(3) == address(0), "New admin was not added correctly");
         string src = "contract Blob { string public val; constructor(uint x, string _val) { val = string(x) + _val; }}";
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "Blob", src, 7, "hello");
         require(!didntDoIt, "Contract was created before enough votes were cast");
         (bool didIt, address blob) = adminUser.do(address(admin), "castVoteOnIssue", address(admin), "createContract", "Blob", src, 7, "hello");
-        string blobOutput = blob.call("val");
+        string blobOutput = blob.staticcall("val");
         require(blobOutput == "7hello", "blobOutput was not set correctly");
     }
 
     function it_can_change_voting_logic() {
         User adminUser = new User();
         User u = new User();
-        AdminRegistry admin = new AdminRegistry([this, address(adminUser)]);
+        AdminRegistry admin = new AdminRegistry();
+        admin.initialize([this, address(adminUser)]);
         string src = 'contract VotingRule { function _shouldExecute(variadic _args) internal returns (bool) {  return true; } }';
         (bool didntDoIt, ) = admin.castVoteOnIssue(address(admin), "createContract", "VotingRule", src);
         require(!didntDoIt, "Contract was created before enough votes were cast");
@@ -262,6 +268,6 @@ contract Describe_Mercata {
         admin.castVoteOnIssue(address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         adminUser.do(address(admin), "castVoteOnIssue", address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         admin.removeAdmin(address(adminUser));
-        require(admin.admins().length == 1, "Voting logic was not overwritten properly");
+        require(admin.admins(0) == address(this) && admin.admins(1) == address(0), "Voting logic was not overwritten properly");
     }
 }

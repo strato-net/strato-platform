@@ -23,8 +23,8 @@ export interface Token {
   creator?: string;
   root?: string;
   contract_name?: string;
-  collectionname?: string;
-  collectiontype?: string;
+  collection_name?: string;
+  collection_type?: string;
   token?: {
     _name: string;
     _symbol: string;
@@ -105,18 +105,6 @@ export interface WithdrawableToken {
   _symbol: string;
   value?: string;
 }
-export interface SwappableToken {
-  address: string;
-  _name: string;
-  _symbol: string;
-  balance?: string;
-  _totalSupply: string;
-  images?: Array<{ value: string }>;
-  "BlockApps-Mercata-ERC20-_balances": {
-    key: string;
-    value: string;
-  }[];
-};
 
 export interface LoanData {
   active: boolean;
@@ -146,14 +134,6 @@ export interface PriceFormValues {
 };
 
 /*-------- Pool Values --------*/
-
-export interface PoolFormValues {
-  tokenA: string;
-  tokenB: string;
-  // initialLiquidityA: string;
-  // initialLiquidityB: string;
-  // poolName?: string;
-}
 
 /*-------- Withdraw Interfaces --------*/
 export interface RawWithdrawData {
@@ -290,6 +270,7 @@ export interface AssetConfig {
   liquidationThreshold: string;
   ltv: string;
   reserveFactor: string;
+  perSecondFactorRAY: string;
 }
 
 export interface LendData {
@@ -316,35 +297,8 @@ export interface LendingPoolResponse {
   };
 }
 
-export interface LiquidityPool {
-  address: string;
-  _owner: string;
-  swapFeeRate: number;
-  lpSharePercent: number;
-  aToBRatio: string;
-  bToARatio: string;
-  tokenABalance: string;
-  tokenBBalance: string;
-  tokenA: Token;
-  tokenB: Token;
-  lpToken: Token;
-  tokenAPrice: string;
-  tokenBPrice: string;
-  lpTokenPrice: string;
-  totalLiquidityUSD?: string;
-  tradingVolume24h?: string;
-  apy?: string;
-  oracleAToBRatio?: string;
-  oracleBToARatio?: string;
-  _name?: string;
-  _symbol?: string;
-}
-
-export interface SetPoolRatesData {
-  poolAddress: string;
-  swapFeeRate: number;
-  lpSharePercent: number;
-}
+// Export all swap-related types from dedicated swap interface
+export * from './swap';
 
 export type NewLoanData = {
   totalAmountOwed: string;             // current debt (index-based)
@@ -362,103 +316,14 @@ export type NewLoanData = {
   maxRepay?: string;
   assetSymbol?: string;
 };
-
-export interface ApiErrorResponse {
-  message: string;
-  code?: string;
-  errors?: Record<string, string[]>;
-}
-
-export interface PaymentProviderValue {
-  name: string;
-  exists: boolean;
-  endpoint: string;
-  providerAddress: string;
-}
-
-export interface PaymentProvider {
-  key: string;
-  value: PaymentProviderValue;
-}
-
-export interface AddPaymentProviderData {
-  providerAddress: string;
-  name: string;
-  endpoint: string;
-}
 export interface ApprovedToken {
   token: string;
   _name: string;
   _symbol: string;
 }
 
-export interface ListingInfo {
-  id: string;
-  token: string;
-  amount: string;
-  seller: string;
-  marginBps: string;
-  providers: PaymentProviderValue[];
-  _name: string;
-  _symbol: string;
-  tokenOracleValue: { price: string } | null;
-}
-
-export interface Listing {
-  key: string;
-  ListingInfo: ListingInfo;
-}
-
-export interface Pool {
-  address: string;
-  aToBRatio: string;
-  bToARatio: string;
-  tokenABalance: string;
-  tokenBBalance: string;
-  lpToken: {
-    _name: string;
-    _symbol: string;
-    address: string;
-    _totalSupply: string;
-    balances?: Array<{ balance: string }>;
-  };
-  tokenA: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  tokenB: {
-    _name: string;
-    _symbol: string;
-    address: string;
-  };
-  _name?: string;
-  _symbol?: string;
-}
-
-export interface SwapHistoryEntry {
-  id: string;
-  timestamp: Date;
-  tokenIn: string;
-  tokenOut: string;
-  amountIn: string;
-  amountOut: string;
-  impliedPrice: string;
-  sender: string;
-}
-
-export interface PriceHistoryEntry {
-  id: string;
-  timestamp: Date;
-  asset: string;
-  price: string;
-  blockTimestamp: Date;
-}
-
-export interface PriceHistoryResponse {
-  data: PriceHistoryEntry[];
-  totalCount: number;
-}
+// Re-export oracle types from shared-types package
+export type { PriceHistoryEntry, PriceHistoryResponse } from '@mercata/shared-types';
 
 export interface HealthImpactData {
   currentHealthFactor: number;
@@ -489,55 +354,21 @@ export interface PollingReturn {
   error: any;
 }
 
-export interface SwapPollingConfig {
-  fromAsset?: any; 
-  toAsset?: any; 
-  fromAmount: string; 
-  editingField: 'from' | 'to' | null;
-  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  setPool: (pool: any) => void; 
-  setToAsset: (asset: any) => void; 
-  setToAmount: (amount: string) => void; 
-  setExchangeRate: (rate: string) => void;
-  lastCalculatedFromRef: React.MutableRefObject<string>; 
-  interval?: number;
-}
-
-// New interfaces for focused hooks
 export interface PoolPollingConfig {
   fromAsset: any;
   toAsset: any;
-  getPoolByTokenPair: (fromAddress: string, toAddress: string) => Promise<any>;
-  fetchUsdstBalance?: (userAddress: string) => Promise<void>;
-  userAddress?: string;
+  getPoolByTokenPair: (tokenA: string, tokenB: string, signal?: AbortSignal) => Promise<any>;
+  fetchUsdstBalance: (userAddress: string) => Promise<void>;
+  userAddress: string;
   interval?: number;
-}
-
-export interface ExchangeRateConfig {
-  poolData: any;
-  fromAsset: any;
-  setExchangeRate: (rate: string) => void;
-}
-
-export interface SwapCalculationConfig {
-  poolData: any;
-  fromAsset: any;
-  fromAmount: string;
-  editingField: 'from' | 'to' | null;
-  setToAmount: (amount: string) => void;
-  lastCalculatedFromRef: React.MutableRefObject<string>;
-}
-
-export interface SwapStateCleanupConfig {
-  poolData: any;
-  setToAsset: (asset: any) => void;
-  setExchangeRate: (rate: string) => void;
 }
 
 export interface SafetyModuleData {
   totalAssets: string;
   totalShares: string;
   userShares: string;
+  userSharesStaked: string;
+  userSharesTotal: string;
   userCooldownStart: string;
   cooldownSeconds: string;
   unstakeWindow: string;
@@ -546,4 +377,8 @@ export interface SafetyModuleData {
   cooldownActive: boolean;
   cooldownTimeRemaining: string;
   unstakeWindowTimeRemaining: string;
+  maxRedeemable: string;
+  maxRedeemableTotal: string;
+  redeemValue: string;
+  redeemValueTotal: string;
 }

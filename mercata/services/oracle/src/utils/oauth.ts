@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { logInfo, logError } from './logger';
 
+
+const TOKEN_LIFETIME_THRESHOLD_SECONDS = 10;
+
 class OAuthClient {
     private discoveryUrl: string;
     private clientId: string;
@@ -45,7 +48,7 @@ class OAuthClient {
 
     async getAccessToken(): Promise<string> {
         // Return cached token if still valid
-        if (this.accessToken && this.tokenExpiry && Date.now() < this.tokenExpiry) {
+        if (this.accessToken && this.tokenExpiry && Date.now() < (this.tokenExpiry - (TOKEN_LIFETIME_THRESHOLD_SECONDS * 1000))) {
             return this.accessToken;
         }
 
@@ -77,9 +80,8 @@ class OAuthClient {
 
             if (response.data.access_token) {
                 this.accessToken = response.data.access_token;
-                // Set expiry to 90% of actual expiry for safety margin
                 const expiresIn = response.data.expires_in || 3600; // Default 1 hour
-                this.tokenExpiry = Date.now() + (expiresIn * 1000 * 0.9);
+                this.tokenExpiry = Date.now() + (expiresIn * 1000);
                 
                 return this.accessToken!;
             } else {

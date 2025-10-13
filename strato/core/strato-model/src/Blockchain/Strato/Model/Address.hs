@@ -270,7 +270,7 @@ deriveAddressWithSalt sender salt srcHash args = do
                 rlpEncode theAddress,
                 rlpEncode salt,
                 rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
-                rlpEncode $ fromMaybe "OrderedVals []" args
+                rlpEncode $ fromMaybe "[]" args
               ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show srcHash) ++ " " ++ show args) $
   (decode $ BL.drop 12 $ encode theHash)

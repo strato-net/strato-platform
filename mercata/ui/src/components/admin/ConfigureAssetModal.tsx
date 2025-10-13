@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
@@ -17,6 +18,7 @@ interface ConfigureAssetFormValues {
   liquidationBonus: string;
   interestRate: string;
   reserveFactor: string;
+  perSecondFactorRAY: string;
 }
 
 interface ConfigureAssetModalProps {
@@ -33,6 +35,7 @@ interface ConfigureAssetModalProps {
     liquidationBonus?: string;
     interestRate?: string;
     reserveFactor?: string;
+    perSecondFactorRAY?: string;
   };
   onSuccess?: () => Promise<void>;
 }
@@ -46,16 +49,41 @@ const ConfigureAssetModal = ({
 }: ConfigureAssetModalProps) => {
   const { toast } = useToast();
   const { configureAsset, loading } = useLendingContext();
+
+  const defaultValues = {
+    "ltv": "75",
+    "liquidationThreshold": "80",
+    "liquidationBonus": "105",
+    "interestRate": "5",
+    "reserveFactor": "10",
+    "perSecondFactorRAY":
+    "1000000001547125956666413085"
+  };
   
   const form = useForm<ConfigureAssetFormValues>({
     defaultValues: {
-      ltv: currentConfig?.ltv?.replace('%', '') || '75',
-      liquidationThreshold: currentConfig?.liquidationThreshold?.replace('%', '') || '80',
-      liquidationBonus: currentConfig?.liquidationBonus?.replace('%', '') || '105',
-      interestRate: currentConfig?.interestRate?.replace('%', '') || '5',
-      reserveFactor: currentConfig?.reserveFactor?.replace('%', '') || '10',
+      ltv: currentConfig?.ltv?.replace('%', '') || defaultValues.ltv,
+      liquidationThreshold: currentConfig?.liquidationThreshold?.replace('%', '') || defaultValues.liquidationThreshold,
+      liquidationBonus: currentConfig?.liquidationBonus?.replace('%', '') || defaultValues.liquidationBonus,
+      interestRate: currentConfig?.interestRate?.replace('%', '') || defaultValues.interestRate,
+      reserveFactor: currentConfig?.reserveFactor?.replace('%', '') || defaultValues.reserveFactor,
+      perSecondFactorRAY: currentConfig?.perSecondFactorRAY || defaultValues.perSecondFactorRAY,
     },
   });
+
+  // Reset form values when token or config changes
+  useEffect(() => {
+    if (open && currentConfig) {
+      form.reset({
+        ltv: currentConfig.ltv?.replace('%', '') || defaultValues.ltv,
+        liquidationThreshold: currentConfig.liquidationThreshold?.replace('%', '') || defaultValues.liquidationThreshold,
+        liquidationBonus: currentConfig.liquidationBonus?.replace('%', '') || defaultValues.liquidationBonus,
+        interestRate: currentConfig.interestRate?.replace('%', '') || defaultValues.interestRate,
+        reserveFactor: currentConfig.reserveFactor?.replace('%', '') || defaultValues.reserveFactor,
+        perSecondFactorRAY: currentConfig.perSecondFactorRAY || defaultValues.perSecondFactorRAY,
+      });
+    }
+  }, [open, currentConfig, form]);
 
   const validateForm = (data: ConfigureAssetFormValues) => {
     const ltv = parseFloat(data.ltv);
@@ -63,6 +91,7 @@ const ConfigureAssetModal = ({
     const liquidationBonus = parseFloat(data.liquidationBonus);
     const interestRate = parseFloat(data.interestRate);
     const reserveFactor = parseFloat(data.reserveFactor);
+    const perSecondFactorRAY = data.perSecondFactorRAY;
 
     // Validate ranges
     if (ltv < 1 || ltv > 95) return 'LTV must be between 1% and 95%';
@@ -70,6 +99,11 @@ const ConfigureAssetModal = ({
     if (liquidationBonus < 100 || liquidationBonus > 125) return 'Liquidation bonus must be between 100% and 125%';
     if (interestRate < 0 || interestRate > 100) return 'Interest rate must be between 0% and 100%';
     if (reserveFactor < 0 || reserveFactor > 50) return 'Reserve factor must be between 0% and 50%';
+    
+    // Validate perSecondFactorRAY (must be >= 1e27 RAY)
+    if (!/^\d+$/.test(perSecondFactorRAY)) return 'Per Second Factor RAY must be a valid integer';
+    if (BigInt(perSecondFactorRAY) < 1000000000000000000000000000n)
+      {return 'Per Second Factor RAY must be >= 1e27 (1 RAY)';}
 
     // Validate relationships
     if (ltv > liquidationThreshold) return 'LTV cannot be higher than liquidation threshold';
@@ -97,6 +131,7 @@ const ConfigureAssetModal = ({
       liquidationBonus: Math.round(parseFloat(data.liquidationBonus) * 100),
       interestRate: Math.round(parseFloat(data.interestRate) * 100),
       reserveFactor: Math.round(parseFloat(data.reserveFactor) * 100),
+      perSecondFactorRAY: data.perSecondFactorRAY, // Already in RAY format
     };
 
       await configureAsset(payload);
@@ -168,7 +203,7 @@ const ConfigureAssetModal = ({
                             <FormControl>
                               <div className="relative">
                                 <Input
-                                  placeholder="75"
+                                  placeholder={defaultValues.ltv}
                                   {...field}
                                   className="pr-8"
                                 />
@@ -202,7 +237,7 @@ const ConfigureAssetModal = ({
                             <FormControl>
                               <div className="relative">
                                 <Input
-                                  placeholder="80"
+                                  placeholder={defaultValues.liquidationThreshold}
                                   {...field}
                                   className="pr-8"
                                 />
@@ -237,7 +272,7 @@ const ConfigureAssetModal = ({
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="105"
+                                placeholder={defaultValues.liquidationBonus}
                                 {...field}
                                 className="pr-8"
                               />
@@ -281,12 +316,12 @@ const ConfigureAssetModal = ({
                         <FormItem>
                           <FormLabel className="flex items-center gap-2">
                             <TrendingUp className="h-4 w-4" />
-                            Interest Rate
+                            Interest Rate (note: ignored in favor of Per Second Factor)
                           </FormLabel>
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="5.0"
+                                placeholder={defaultValues.interestRate}
                                 {...field}
                                 className="pr-8"
                               />
@@ -295,6 +330,36 @@ const ConfigureAssetModal = ({
                           </FormControl>
                           <FormDescription>
                             Annual borrowing interest rate (0-100%)
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="perSecondFactorRAY"
+                      rules={{ 
+                        required: 'Per Second Factor RAY is required',
+                        pattern: {
+                          value: /^\d+$/,
+                          message: 'Enter a valid RAY value (integer only)'
+                        }
+                      }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4" />
+                            Per Second Factor RAY
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder={defaultValues.perSecondFactorRAY}
+                              {...field}
+                              className="font-mono text-sm"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Per-second compound factor in RAY (1e27).
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -335,7 +400,7 @@ const ConfigureAssetModal = ({
                           <FormControl>
                             <div className="relative">
                               <Input
-                                placeholder="10"
+                                placeholder={defaultValues.reserveFactor}
                                 {...field}
                                 className="pr-8"
                               />

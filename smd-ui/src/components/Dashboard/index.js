@@ -4,7 +4,7 @@ import { withRouter, Link } from "react-router-dom";
 import NodeCard from "../NodeCard";
 import TransactionList from "../TransactionList";
 import NumberCard from "../NumberCard";
-import mixpanelWrapper from "../../lib/mixpanelWrapper";
+// import mixpanelWrapper from "../../lib/mixpanelWrapper";
 import { endTour } from "../Tour/tour.actions";
 // import { callAfterTour } from '../Tour/tour.helpers';
 // import Tour from '../Tour';
@@ -33,7 +33,7 @@ import {
   GET_NETWORK_HEALTH,
 } from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
-import ReactGA from "react-ga4";
+// import ReactGA from "react-ga4";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
 
@@ -66,6 +66,9 @@ class Dashboard extends Component {
     super(props);
     this.state = {
       isHovering: false,
+      clientUptime: 0,
+      lastServerUptime: 0,
+      lastUpdateTime: Date.now(),
     };
   }
   componentDidMount() {
@@ -80,13 +83,41 @@ class Dashboard extends Component {
     this.props.subscribeRoom(GET_SHARD_COUNT);
     this.props.subscribeRoom(GET_SYSTEM_INFO);
     this.props.subscribeRoom(GET_NETWORK_HEALTH);
+    this.props.subscribeRoom(GET_NODE_UPTIME);
 
-    mixpanelWrapper.track("dashboard_page_load");
-    ReactGA.send({
-      hitType: "pageview",
-      page: "/smd",
-      title: "Dashboard",
-    });
+    // Start client-side uptime timer
+    this.startUptimeTimer();
+
+    // mixpanelWrapper.track("dashboard_page_load");
+    // ReactGA.send({
+    //   hitType: "pageview",
+    //   page: "/smd",
+    //   title: "Dashboard",
+    // });
+  }
+
+  startUptimeTimer = () => {
+    this.uptimeInterval = setInterval(() => {
+      const now = Date.now();
+      const timeDiff = Math.floor((now - this.state.lastUpdateTime) / 1000);
+      const newClientUptime = this.state.lastServerUptime + timeDiff;
+      
+      this.setState({
+        clientUptime: newClientUptime,
+        lastUpdateTime: now
+      });
+    }, 1000);
+  }
+
+  componentDidUpdate(prevProps) {
+    // Update client timer when server uptime changes
+    if (prevProps.dashboard.uptime !== this.props.dashboard.uptime && this.props.dashboard.uptime > 0) {
+      this.setState({
+        lastServerUptime: this.props.dashboard.uptime,
+        clientUptime: this.props.dashboard.uptime,
+        lastUpdateTime: Date.now()
+      });
+    }
   }
 
   displaySystemMetrics(cpu, memory, filesystem, networkStats, systemHealth) {
@@ -180,6 +211,11 @@ class Dashboard extends Component {
     this.props.unSubscribeRoom(GET_SYSTEM_INFO);
     this.props.unSubscribeRoom(GET_SHARD_COUNT);
     this.props.unSubscribeRoom(GET_NETWORK_HEALTH);
+    
+    // Clear uptime timer
+    if (this.uptimeInterval) {
+      clearInterval(this.uptimeInterval);
+    }
   }
 
   render() {
@@ -189,7 +225,7 @@ class Dashboard extends Component {
     const txTypeData = this.props.dashboard.transactionTypes;
     const { usersCount, contractsCount, lastBlockNumber } =
       this.props.dashboard;
-    const uptime = this.props.dashboard.uptime;
+    const uptime = this.state.clientUptime || this.props.dashboard.uptime;
     const health = this.props.dashboard.health;
     const healthStatus = this.props.dashboard.healthStatus;
     const healthIssues = this.props.dashboard.healthIssues;
@@ -201,6 +237,7 @@ class Dashboard extends Component {
       ? this.props.appMetadata.metadata.isSynced
       : false;
     const metadata = this.props.appMetadata.metadata;
+    const isMetadataLoading = this.props.appMetadata.loading;
     const networkHealth = this.props.dashboard.networkStatus;
     const networkStatusMessage = this.props.dashboard.networkStatusMessage;
 
@@ -239,7 +276,7 @@ class Dashboard extends Component {
               content={
                 <div
                   className={`pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-${
-                    !metadata
+                    isMetadataLoading || (!metadata && !this.props.appMetadata.error)
                       ? "danger"
                       : !health || !systemHealth || !synced
                       ? "warning"
@@ -247,9 +284,15 @@ class Dashboard extends Component {
                   }`}
                 >
                   <h5 className="pt-callout-title">
-                    {!metadata ? "API Disconnected" : healthStatus}
+                    {isMetadataLoading || (!metadata && !this.props.appMetadata.error)
+                      ? "Loading..." 
+                      : !metadata 
+                      ? "API Disconnected" 
+                      : healthStatus}
                   </h5>
-                  {!metadata
+                  {isMetadataLoading || (!metadata && !this.props.appMetadata.error)
+                    ? "Fetching metadata from API..."
+                    : !metadata
                     ? "Cannot connect to the Node's API"
                     : !health || !systemHealth
                     ? `Health issues: ${
@@ -262,17 +305,27 @@ class Dashboard extends Component {
               }
             >
               <NumberCard
-                number={!metadata ? "DISCONNECTED" : healthStatus}
+                number={
+                  isMetadataLoading || (!metadata && !this.props.appMetadata.error)
+                    ? "LOADING..." 
+                    : !metadata 
+                    ? "DISCONNECTED" 
+                    : healthStatus
+                }
                 description={sec2Date(uptime)}
                 mode={
-                  !metadata
+                  isMetadataLoading || (!metadata && !this.props.appMetadata.error)
+                    ? "warning"
+                    : !metadata
                     ? "danger"
                     : !health || !systemHealth || !synced
                     ? "warning"
                     : "success"
                 }
                 iconClass={
-                  !metadata
+                  isMetadataLoading || (!metadata && !this.props.appMetadata.error)
+                    ? "fa-spinner fa-spin"
+                    : !metadata
                     ? "fa-triangle-exclamation"
                     : !health || !systemHealth
                     ? "fa-exclamation-circle"

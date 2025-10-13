@@ -221,7 +221,7 @@ services:
   postgres:
     environment:
       - POSTGRES_PASSWORD=${postgres_password:-api}
-    image: postgres:9.6
+    image: postgres:14.18
     volumes:
       - pgdata:/var/lib/postgresql/data
     command:
@@ -286,8 +286,8 @@ services:
         max-file: "3"
   docs:
     environment:
-    - API_URL=/strato-api/eth/v1.2/swagger.json
-    image: swaggerapi/swagger-ui:v3.22.1
+    - API_URL=/docs/swagger.yaml
+    image: swaggerapi/swagger-ui:v5.29.2
     restart: unless-stopped
     logging:
       driver: "json-file"

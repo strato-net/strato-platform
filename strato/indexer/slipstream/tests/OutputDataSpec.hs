@@ -11,7 +11,6 @@
 module OutputDataSpec where
 
 import Conduit
-import Control.Monad
 import qualified Data.ByteString as B
 import Data.Default (def)
 import qualified Data.IntMap as I
@@ -25,7 +24,6 @@ import Text.RawString.QQ
 import BlockApps.Logging
 import qualified Blockchain.Slipstream.Events as SE
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.QueryFormatHelper
 import qualified BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
@@ -53,8 +51,7 @@ createInserts :: OutputM m
 createInserts  (a,b) = do
     let cc = createDummyCodeCollection b 
     _ <- createIndexTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    createHistoryTable b cc (SE.creator $ a, SE.application $ a, SE.contractName $ a)
-    insertIndexTable $ (a,[])
+    insertIndexTable a
     -- insertHistoryTable $ [a]
 
 createInsertsCollection :: OutputM m
@@ -63,19 +60,8 @@ createInsertsCollection :: OutputM m
 createInsertsCollection = \case
   [] -> pure ()
   collections@(collection:_) -> do
-    _ <- createCollectionTable  (creator collection, application collection, contractname collection) def def (collectionname collection, [SVMType.String Nothing], SVMType.String Nothing)
+    _ <- createCollectionTable  (creator collection, application collection, contractname collection) def def (collection_name collection, [SVMType.String Nothing], SVMType.String Nothing)
     insertCollectionTable collections
-
-createInsertsAbstract :: OutputM m
-              => (SE.ProcessedContract, ContractF())
-              -> [(SE.ProcessedContract, [T.Text], TableName, [T.Text])]
-              -> ConduitM () SlipstreamQuery m ()
-createInsertsAbstract abstract inherited = do
-    let contract = snd abstract
-        cc = createDummyCodeCollection contract
-    _ <- createAbstractTable  (contract) (SE.creator $ fst abstract, SE.application $ fst abstract, SE.contractName $ fst abstract) M.empty cc
-    unless (null inherited) $ do 
-      insertAbstractTable inherited
 
 createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
@@ -599,8 +585,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         cc =  createDummyCodeCollection (snd input)
      
 
-    (_, cs1) <- runLoggingT . runConduit $ createExpandIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
-    cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input, []) .| sinkList
+    (_, cs1) <- runLoggingT . runConduit $ createIndexTable  (snd input) cc (SE.creator $ fst input, SE.application $ fst input, SE.contractName $ fst input) `fuseBoth` sinkList
+    cs2 <- runLoggingT . runConduit $ insertIndexTable (fst input) .| sinkList
     (cs1 ++ cs2) `shouldNotBe` []
 
   it "can use solidvm without application nor organization" $ do
@@ -608,7 +594,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
+                  SE.codehash = SolidVMCode "SwissArmy" (hash ""), -- hash "<CODEHASH>",
+--                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
                   SE.cc_creator = Nothing,
                   SE.root = "",
@@ -742,8 +729,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
           application = "",
           contractname = "SwissArmy",
           eventInfo = Nothing,
-          collectionname = "SwissArmyMapping",
-          collectiontype = "Mapping",
+          collection_name = "SwissArmyMapping",
+          collection_type = "Mapping",
           blockHash = hash "<BLOCKHASH>",
           blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
           blockNumber = 123,
@@ -766,8 +753,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "creator" text,
     "root" text,
     "contract_name" text,
-    "collectionname" text,
-    "collectiontype" text,
+    "collection_name" text,
+    "collection_type" text,
     "key" text,
     "value" text,
   PRIMARY KEY ("address", "key"));|]
@@ -781,8 +768,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     "creator",
     "root",
     "contract_name",
-    "collectionname",
-    "collectiontype",
+    "collection_name",
+    "collection_type",
     "key",
     "value")
   VALUES ('000000000000000000000000000000098eaddede',
@@ -806,93 +793,6 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
     transaction_hash = excluded.transaction_hash,
     transaction_sender = excluded.transaction_sender,
     contract_name = excluded.contract_name,
-    collectionname = excluded.collectionname,
-    collectiontype = excluded.collectiontype,
+    collection_name = excluded.collection_name,
+    collection_type = excluded.collection_type,
     value = excluded.value;|]
-
-  it "can create and insert into abstract tables" $ do
-    let testAdd = Address 0x98eaddede
-        input = (SE.ProcessedContract {
-          SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- $ hash "<CODEHASH>",
-          SE.creator = "",
-          SE.cc_creator = Nothing,
-          SE.root = "",
-          SE.application = "",
-          SE.contractName = "SwissArmy",
-          SE.chain = "<CHAIN>",
-          SE.blockHash = hash "<BLOCKHASH>",
-          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          SE.blockNumber = 123,
-          SE.transactionHash = hash "<TRANSACTIONHASH>",
-          SE.transactionSender = testAdd,
-          SE.contractData = M.fromList
-            [ ("addr", addr 0xdeadbeef)
-            ]
-          }, createDummyContract [
-               ("addr", SVMType.Address False)
-            ])
-        inherited = [(SE.ProcessedContract {
-          SE.address = testAdd,
-          SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmyz", -- $ hash "<CODEHASH>",
-          SE.creator = "",
-          SE.cc_creator = Nothing,
-          SE.root = "",
-          SE.application = "",
-          SE.contractName = "SwissArmyz",
-          SE.chain = "<CHAIN>",
-          SE.blockHash = hash "<BLOCKHASH>",
-          SE.blockTimestamp = (read "2018-09-16 18:28:52.607875 UTC")::UTCTime,
-          SE.blockNumber = 123,
-          SE.transactionHash = hash "<TRANSACTIONHASH>",
-          SE.transactionSender = testAdd,
-          SE.contractData = M.fromList
-            [ ("addr2", addr 0xdeadbeef)
-            ]
-          }, [], IndexTableName "" "" "SwissArmy", [])]
-
-
-     
-    [swissArmyCreateAbstract, swissArmyInsertAbstract] <-
-        runLoggingT . runConduit $ createInsertsAbstract  input inherited .| sinkList
-
-    slipstreamQueryPostgres swissArmyCreateAbstract `shouldBe` [r|CREATE TABLE IF NOT EXISTS "SwissArmy" ("address" text,
-    "block_hash" text,
-    "block_timestamp" text,
-    "block_number" text,
-    "transaction_hash" text,
-    "transaction_sender" text,
-    "creator" text,
-    "root" text,
-    "contract_name" text,
-    "data" jsonb,
-    "addr" text,
-  PRIMARY KEY ("address"));|]
-
-    slipstreamQueryPostgres swissArmyInsertAbstract `shouldBe` [r|INSERT INTO SwissArmy ("address",
-    "block_hash",
-    "block_timestamp",
-    "block_number",
-    "transaction_hash",
-    "transaction_sender",
-    "creator",
-    "root",
-    "contract_name",
-    "data")
-  VALUES ('000000000000000000000000000000098eaddede',
-    '2b47410f675ac98038c44d14a87eac6855e0bfcbb0473649c22e147a789a9f08',
-    '2018-09-16 18:28:52.607875 UTC',
-    '123',
-    '242d201a68fa4440fcb3c77610785eb207b5a8b9f88208a3525efe6a7677ed59',
-    '000000000000000000000000000000098eaddede',
-    '',
-    '',
-    'SwissArmyz',
-    '{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb) ON CONFLICT ("address") DO UPDATE SET
-    "block_hash" = excluded."block_hash",
-    "block_timestamp" = excluded."block_timestamp",
-    "block_number" = excluded."block_number",
-    "transaction_hash" = excluded."transaction_hash",
-    "transaction_sender" = excluded."transaction_sender",
-    "contract_name" = excluded."contract_name",
-    data = "SwissArmy".data || ('{"addr2":"00000000000000000000000000000000deadbeef"}'::jsonb);|]

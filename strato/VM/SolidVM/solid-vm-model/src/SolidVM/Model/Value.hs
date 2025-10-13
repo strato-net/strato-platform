@@ -7,7 +7,7 @@ module SolidVM.Model.Value
     BasicType (..),
     AccountPath (..),
     Typo (..),
-    ValList (..),
+    ValList,
     IndexType (..),
     rlpEncodeVariable,
     rlpEncodeValue,
@@ -99,7 +99,7 @@ data Value
   | -- | SBuiltinTypeF SolidString SolidString CodeCollection
     SContractItem NamedAccount SolidString
   | SContract SolidString NamedAccount
-  | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName
+  | SContractFunction NamedAccount SolidString -- address, functionName
   | SPush Value (Maybe Variable) -- The array function
   | -- | SSend Value (Maybe Variable)
     -- | STransfer Value (Maybe Variable)
@@ -164,6 +164,7 @@ rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
 rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
 rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
 rlpEncodeValue (SArray v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
+rlpEncodeValue (SVariadic vs) = RLPArray <$> traverse rlpEncodeValue vs
 rlpEncodeValue _ = pure $ RLPArray []
 
 rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
@@ -176,6 +177,7 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger {} n = SInteger n
 coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
+coerceFromInt _ SBool {} n = SBool $ n /= 0
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
 coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
@@ -335,7 +337,4 @@ data BasicType
   deriving (Show, Eq)
 
 -- Evaluated ArgLists
-data ValList
-  = OrderedVals [Value]
-  | NamedVals [(SolidString, Value)]
-  deriving (Show, Eq)
+type ValList = [Value]
