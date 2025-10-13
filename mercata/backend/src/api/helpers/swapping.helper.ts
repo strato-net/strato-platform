@@ -1,6 +1,6 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
-import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, validatePoolWithTokenAddressesArray, validateSinglePoolWithBalances, validateSwapEventArray, OraclePriceMap } from "@mercata/shared-types";
+import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, RawSwapEvent, OraclePriceMap } from "@mercata/shared-types";
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
@@ -156,10 +156,9 @@ export const getTradingVolume24hForPools = async (
     return new Map();
   }
 
-  const validatedEvents = validateSwapEventArray(swapEvents);
   const volumeMap = new Map<string, string>();
 
-  validatedEvents.forEach(event => {
+  (swapEvents as RawSwapEvent[]).forEach(event => {
     const poolAddress = event.address;
     const currentVolume = volumeMap.get(poolAddress) || "0";
     
@@ -251,52 +250,72 @@ export const buildSwapToken = (
 });
 
 export const buildLPToken = (
-  lpToken: RawLPToken, 
-  price: string, 
-  userBalance: string
-): LPToken => ({
-  address: lpToken.address,
-  _name: lpToken._name,
-  _symbol: lpToken._symbol,
-  customDecimals: lpToken.customDecimals,
-  _totalSupply: lpToken._totalSupply,
-  balance: userBalance,
-  price,
-  images: lpToken.images.filter(img => img.value && img.value.trim() !== "")
-});
+  lpToken: RawLPToken,
+  price: string,
+  userBalance: string,
+  stakedBalance?: string
+): LPToken => {
+  // Always calculate totalBalance
+  const totalBalance = stakedBalance !== undefined
+    ? (BigInt(userBalance) + BigInt(stakedBalance)).toString()
+    : userBalance;
+
+  const result: LPToken = {
+    address: lpToken.address,
+    _name: lpToken._name,
+    _symbol: lpToken._symbol,
+    customDecimals: lpToken.customDecimals,
+    _totalSupply: lpToken._totalSupply,
+    balance: userBalance,
+    price,
+    images: lpToken.images.filter(img => img.value && img.value.trim() !== ""),
+    totalBalance
+  };
+
+  // Only add stakedBalance if pool exists in rewards program
+  if (stakedBalance !== undefined) {
+    result.stakedBalance = stakedBalance;
+  }
+
+  return result;
+};
 
 export const buildPoolList = (
   pools: RawGetPool[],
   priceMap: OraclePriceMap,
   volumeMap: Map<string, string>,
   factoryData: RawPoolFactory | undefined,
-  userAddress: string | undefined
+  userAddress: string | undefined,
+  stakedBalanceMap?: Map<string, string>
 ) => {
   return pools.map((pool: RawGetPool) => {
     const tokenAPrice = priceMap.get(pool.tokenA.address) || "0";
     const tokenBPrice = priceMap.get(pool.tokenB.address) || "0";
     const volume24h = volumeMap.get(pool.address) || "0";
-    
-    const { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent } = 
+
+    const { totalLiquidityUSD, apy, lpTokenPrice, swapFeeRate, lpSharePercent } =
       calculatePoolMetrics(pool, tokenAPrice, tokenBPrice, volume24h, factoryData);
-    
-    const { aToB: oracleAToBRatio, bToA: oracleBToARatio } = 
+
+    const { aToB: oracleAToBRatio, bToA: oracleBToARatio } =
       calculateOracleRatios(tokenAPrice, tokenBPrice);
-    
+
     const tokenABalance = getTokenBalance(pool.tokenA, userAddress || "");
     const tokenBBalance = getTokenBalance(pool.tokenB, userAddress || "");
     const lpTokenBalance = getTokenBalance(pool.lpToken, userAddress || "");
-    
+
+    // Get staked balance for this LP token from the map (if available)
+    const stakedBalance = stakedBalanceMap?.get(pool.lpToken.address);
+
     const symbolA = pool.tokenA._symbol;
     const symbolB = pool.tokenB._symbol;
-    
+
     return {
       address: pool.address,
       poolName: `${symbolA}-${symbolB}`,
       poolSymbol: `${symbolA}-${symbolB}`,
       tokenA: buildSwapToken(pool.tokenA, tokenAPrice, pool.tokenABalance, tokenABalance),
       tokenB: buildSwapToken(pool.tokenB, tokenBPrice, pool.tokenBBalance, tokenBBalance),
-      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance),
+      lpToken: buildLPToken(pool.lpToken, lpTokenPrice, lpTokenBalance, stakedBalance),
       totalLiquidityUSD,
       tradingVolume24h: volume24h,
       apy: apy.toFixed(2),
@@ -326,7 +345,7 @@ export const fetchPoolTokenAddresses = async (accessToken: string, poolAddress: 
     }
   });
   
-  return validatePoolWithTokenAddressesArray(poolData);
+  return poolData[0];
 };
 
 /**
@@ -341,7 +360,7 @@ export const fetchPoolBalances = async (accessToken: string, poolAddress: string
     }
   });
   
-  return validateSinglePoolWithBalances(poolData);
+  return poolData[0];
 };
 
 // ============================================================================

@@ -61,6 +61,7 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -499,7 +500,6 @@ runCodeForTransaction b availableGas tAddr t proposer =
 
           lift $
             SolidVM.call
-                  False  --isRCC
                   b -- blockData
                   (transactionTo ut) -- codeAddress
                   tAddr -- sender
@@ -526,7 +526,6 @@ payFees b availableGas tAddr t proposer = do
 
   lift $
     SolidVM.call
-      False  -- isRCC
       b  -- blockData
       (Address 0xDEC1DE)  --codeAddress
       tAddr -- sender
@@ -664,7 +663,7 @@ extractCodeCollectionAddedMessages a =
          a ^. Action.name,
          O.assocs $ a ^. Action.actionData
        ) of
-    (Just c, Just n, actionDatas) ->
+    (Just (Code c), Just n, actionDatas) ->
       let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
           cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
             if _actionDataCodeHash == cp
@@ -821,7 +820,6 @@ completeDiff ::
     HasMemAddressStateDB m,
     (MP.StateRoot `A.Alters` MP.NodeData) m,
     (Address `A.Alters` AddressState) m,
-    A.Selectable Address AddressState m,
     (Maybe Word256 `A.Alters` MP.StateRoot) m,
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m

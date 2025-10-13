@@ -30,11 +30,12 @@ import {
   Download
 } from "lucide-react";
 import { formatUnits } from "viem";
-import { activityFeedApi, BlockchainEvent } from "@/lib/activityFeed";
+import { activityFeedApi } from "@/lib/activityFeed";
+import type { Event } from "@mercata/shared-types";
 import { useUser } from "@/context/UserContext";
 
 const ActivityFeedList = () => {
-  const [events, setEvents] = useState<BlockchainEvent[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -117,8 +118,8 @@ const ActivityFeedList = () => {
         });
         
         setEvents(response.events || []);
-        setTotalPages(response.totalPages || 1);
         setTotalEvents(response.total || 0);
+        setTotalPages(Math.ceil((response.total || 0) / itemsPerPage));
         setError(null);
       } catch (err) {
         setError(`Failed to fetch events: ${err.response?.data?.message || err.message}`);
@@ -217,7 +218,6 @@ const ActivityFeedList = () => {
       const headers = [
         'Event Name',
         'Contract Name',
-        'Application',
         'Block Number',
         'Block Timestamp',
         'Transaction Hash',
@@ -241,7 +241,6 @@ const ActivityFeedList = () => {
           const baseData = [
             `"${event.event_name}"`,
             `"${event.contract_name}"`,
-            `"${event.application}"`,
             event.block_number,
             `"${formatTimestamp(event.block_timestamp)}"`,
             `"${event.transaction_hash}"`,
@@ -340,7 +339,7 @@ const ActivityFeedList = () => {
   }, [currentPage, totalPages]);
 
   // Memoized event card renderer to prevent unnecessary re-renders
-  const renderEventCard = useCallback((event: BlockchainEvent) => (
+  const renderEventCard = useCallback((event: Event) => (
     <Card key={`${event.transaction_hash}-${event.event_index}`} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -353,8 +352,6 @@ const ActivityFeedList = () => {
               <div className="flex flex-wrap items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-600">
                 <Building2 className="h-3 w-3 sm:h-4 sm:w-4" />
                 <span>{event?.contract_name ? event?.contract_name : 'N/A'}</span>
-                <span>•</span>
-                <span>{event?.application ? event?.application : 'N/A'}</span>
               </div>
             </div>
           </div>

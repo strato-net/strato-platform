@@ -972,8 +972,9 @@ getTypeErrors (Bottom ts) = NE.toList ts
 getTypeErrors _ = []
 
 const' :: Type' -> Type' -> Type'
-const' _ (Bottom e) = Bottom e
-const' t _ = t
+const' (Bottom es) (Bottom ess) = Bottom $ es <> ess
+const' _           (Bottom ess) = Bottom ess
+const' t           _            = t
 
 detector :: CompilerDetector
 detector = detector' False
@@ -1603,7 +1604,7 @@ getFunctionByNameRecursively name ctx = do
       Just theFunc -> pure $ filterFuncs cc ctx name theFunc $ External : bool [] [Private] isParent
       Nothing -> case M.lookup name $ c ^. events of
         Just theEvent -> pure $ eventType ctx theEvent
-        Nothing -> pure . bottom $ "Could not find contract function " <> T.pack name <$ ctx
+        Nothing -> pure . bottom $ "Unknown variable " <> T.pack name <$ ctx
 
 getModifierByNameRecursively :: SolidString -> SolidString -> SourceAnnotation Text -> SSS Type'
 getModifierByNameRecursively funcName name ctx = recursively ctx $ do
@@ -1811,12 +1812,8 @@ statementHelper (RevertStatement mErrorName args x) = do
   e <- case mErrorName of
          Nothing -> pure $ sumType' (Function (Product [] x) (Product [] x) x [] [Nothing] False) (Function (Product [stringType' x] x) (Product [] x) x [] [Nothing] False)
          Just errorName -> tcExpr $ Variable x errorName
-  a <- case args of
-    OrderedArgs es -> productType' x <$> traverse tcExpr es
-    NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-  case args of
-    NamedArgs es -> apply e a $ Just (fst <$> es)
-    _ -> apply e a Nothing
+  a <- productType' x <$> traverse tcExpr args
+  apply e a Nothing
 statementHelper (UncheckedStatement body x) =
   statementsHelper' x body
 statementHelper (AssemblyStatement _ x) = pure $ topType' x
@@ -1916,16 +1913,28 @@ tcExpr (IndexAccess _ a (Just b)) = do
   b' <- tcExpr b
   typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
+tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall", "derive"] =
+  sumType' (accountType' x) (addressType' x) ~> tcExpr var !> (pure $
+      Function (Product [stringType' x, Static SVMType.Variadic x] x)
+               (Static SVMType.Variadic x)
+               x [] [] False
+    )
+tcExpr (MemberAccess x var "truncate") = do
+  decimalType' x ~> tcExpr var !> (pure $
+      Function (Product [intType' x] x)
+               (decimalType' x)
+               x [] [] False
+    )
 tcExpr (MemberAccess _ a fieldName) = do
   t <- tcExpr a
   typecheckMember t fieldName
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) = do
   -- This is a special check for user defined types
   c <- asks contract
-  if M.member nam (_userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
+  if M.member nam (_userDefined c) -- If this var is a userDefined and only has one arguemnet, otherwise do usualy fuction handleing with MemeberAccess
     then do
       case args of
-        OrderedArgs (e:_) -> do
+        [e] -> do
           let check = case M.lookup nam (_userDefined c) of
                 Just "uint" -> intType' x ~> tcExpr e
                 Just "int" -> intType' x ~> tcExpr e
@@ -1935,22 +1944,18 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "wrap") args) = do
                 _ -> pure . bottom $ "type not supported for user defined types" <$ x
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           check !> (pure $ (Static (SVMType.UserDefined nam actualTypeOfUserDefinedVar) x))
-        _ -> pure . bottom $ "named arguements not allowed in user defined wrap function" <$ x
+        _ -> pure . bottom $ "'wrap' must take one argument" <$ x
     else do
       e <- tcExpr (MemberAccess g (Variable wow nam) "wrap")
-      a <- case args of
-        OrderedArgs es -> productType' x <$> traverse tcExpr es
-        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
+      a <- productType' x <$> traverse tcExpr args
+      apply e a Nothing
 tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
   -- Special function to catch user defined types using unwrap
   c <- asks contract
-  if (M.member nam $ _userDefined c) && (case args of OrderedArgs es -> length es == 1; _ -> False)
+  if M.member nam $ _userDefined c
     then do
       case args of
-        OrderedArgs (e:_) -> do
+        [e] -> do
           expressionResult <- tcExpr e
           let actualTypeOfUserDefinedVar = userTypeHelper' $ M.lookup nam (_userDefined c)
           let check =
@@ -1960,16 +1965,12 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
                     _ -> pure . bottom $ "Passing a non user defined type inside unwrap function of user defined type" <$ x
                 )
           check !> (pure $ (Static (actualTypeOfUserDefinedVar) x))
-        _ -> pure . bottom $ "Cannot use object literals within contract definitions" <$ x
+        _ -> pure . bottom $ "'unwrap' must take one argument" <$ x
     else do
       --Case of not user defines, for other functions that define a wrap and unwrap
       e <- tcExpr (MemberAccess g (Variable wow nam) "unwrap")
-      a <- case args of
-        OrderedArgs es -> productType' x <$> traverse tcExpr es
-        NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-      case args of
-        NamedArgs es -> apply e a $ Just (fst <$> es)
-        _ -> apply e a Nothing
+      a <- productType' x <$> traverse tcExpr args
+      apply e a Nothing
   where
     checkerUserDefinedGetType :: Type -> SolidString -> SourceAnnotation Text -> Type'
     checkerUserDefinedGetType (SVMType.UserDefined nameOfVar actuall) namm spot =
@@ -1982,48 +1983,15 @@ tcExpr (FunctionCall x (MemberAccess g (Variable wow nam) "unwrap") args) = do
           _ -> bottom $ "Not supported for casting such type to user defined type" <$ spot
         else bottom $ "Wrong User defined type" <$ spot
     checkerUserDefinedGetType _ _ spot = bottom $ "Wrong User defined type" <$ spot
-tcExpr (FunctionCall x (Variable _ "type") args) =
-  pure $ case args of
-    (OrderedArgs _) -> Static (SVMType.UnknownLabel "type" Nothing) x
-    _ -> bottom $ "Improper use of type function" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "delegatecall") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use .delegatecall() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ ".delegatecall() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ ".delegatecall() does not take named arguements" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "call") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use .call() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ ".call() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ ".call() does not take named arguments" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "derive") args) = do
-  res <- sumType' (accountType' x) (addressType' x) ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use derive() as a method on an account or address" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ "derive() requires at least one argument" <$ x
-    (OrderedArgs (a : _), _) -> (stringType' x) ~> tcExpr a !> (pure $ topType' x)
-    _ -> pure $ bottom $ "derive() does not take named arguments" <$ x
-tcExpr (FunctionCall x (MemberAccess _ var "truncate") args) = do
-  res <- decimalType' x ~> tcExpr var
-  case (args, res) of
-    (_, Bottom _) -> pure $ bottom $ "Can only use truncate() as a method on a decimal number" <$ x
-    (OrderedArgs [], _) -> pure $ bottom $ "truncate() requires at least one argument" <$ x
-    (OrderedArgs [a], _) -> (intType' x) ~> tcExpr a !> (pure $ topType' x)
-    (OrderedArgs (_ : _), _) -> pure $ bottom $ "truncate() only takes one argument" <$ x
-    _ -> pure $ bottom $ "truncate() does not take named arguments" <$ x
+tcExpr (Variable x "type") =
+  pure $ Function (Product [Static SVMType.Variadic x] x)
+                  (Static (SVMType.UnknownLabel "type" Nothing) x)
+                  x [] [] False
 tcExpr (FunctionCall x expr args) = do
   e <- tcExpr expr
-  a <- case args of
-    OrderedArgs es -> productType' x <$> traverse tcExpr es
-    NamedArgs es -> productType' x <$> traverse (tcExpr . snd) es
-  case args of
-    NamedArgs es -> apply e a $ Just (fst <$> es)
-    _ -> apply e a Nothing
-tcExpr (Unitary x "-" a) = sumType' (intType' x) (decimalType' x) ~> tcExpr a
+  a <- productType' x <$> traverse tcExpr args
+  apply e a Nothing
+tcExpr (Unitary x "-" a) = sumType' (Static (SVMType.Int (Just True) Nothing) x) (decimalType' x) ~> tcExpr a
 tcExpr (Unitary x "++" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "--" a) = intType' x ~> (mutable <$> tcExpr a)
 tcExpr (Unitary x "!" a) = boolType' x ~> tcExpr a
@@ -2037,11 +2005,14 @@ tcExpr (Unitary _ _ a) = tcExpr a
 tcExpr (Ternary x a b c) =
   boolType' x ~> tcExpr a !> tcExpr b <~> tcExpr c
 tcExpr (BoolLiteral x _) = pure $ boolType' x
-tcExpr (NumberLiteral x _ _) = pure $ intType' x
+tcExpr (NumberLiteral x n _) = if n < 0
+                                  then pure $ Static (SVMType.Int (Just True) Nothing) x
+                                  else pure $ intType' x
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
 tcExpr (AccountLiteral x _) = pure $ accountType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x
+tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =
   productType' x <$> traverse (maybe (pure $ topType' x) tcExpr) es
 tcExpr (ArrayExpression x es) = do

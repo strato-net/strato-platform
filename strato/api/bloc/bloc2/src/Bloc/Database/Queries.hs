@@ -25,7 +25,7 @@ module Bloc.Database.Queries
 where
 
 import Blockchain.DB.CodeDB
-import Blockchain.Data.AddressStateDB (AddressState, unsafeResolveCodePtr)
+import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs (AddressStateRef(..))
 import Blockchain.Model.JsonBlock
@@ -130,7 +130,6 @@ getContractDetailsByCodeHash ::
 getContractDetailsByCodeHash codePtr = runExceptT $ do
   nameStr <- case codePtr of
     SolidVMCode n _ -> pure n
-    CodeAtAccount _ n -> pure n
     _ -> throwE "EVM contracts no longer supported"
   (cHash, cc) <- getCodeHashAndCollection codePtr
   details <- case Map.lookup nameStr $ _contracts cc of
@@ -156,14 +155,10 @@ getCodeHashAndCollection ::
   ) =>
   CodePtr ->
   ExceptT Text m (Keccak256, CodeCollection)
-getCodeHashAndCollection codePtr =
-  lift (unsafeResolveCodePtr codePtr) >>= \case
-    Nothing -> throwE . Text.pack $ "Could not resolve code pointer: " ++ show codePtr
-    Just codeHash -> do
-      ch <- case codeHash of
+getCodeHashAndCollection codePtr = do
+      ch <- case codePtr of
         ExternallyOwned _ -> throwE $ "EVM contracts no longer supported"
         SolidVMCode _ ch -> pure ch
-        CodeAtAccount acct _ -> throwE $ "Could not resolve code at account " <> Text.pack (show acct)
       srcMap <-
         lift (A.select (A.Proxy @SourceMap) ch) >>= \case
           Nothing -> throwE $ "Could not find source code for code hash " <> Text.pack (format ch)

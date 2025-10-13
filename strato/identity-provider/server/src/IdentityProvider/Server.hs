@@ -58,7 +58,7 @@ import Network.HTTP.Types.Header (hAuthorization, hContentType)
 import Network.HTTP.Types.Status
 import Servant
 import Servant.Client hiding (manager, responseBody)
-import SolidVM.Model.Value (ValList (..), Value (..))
+import SolidVM.Model.Value (Value (..))
 import Strato.Strato23.API
 import Strato.Strato23.Client
 import UnliftIO hiding (Handler)
@@ -377,7 +377,7 @@ walletInCirrus
     where
       cirrusSearchPath :: (MonadLogger m) => m String
       cirrusSearchPath = do
-        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
+        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just $ show [SString $ commonName])
             derivedAddr' = show derivedAddr
             path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
         $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'

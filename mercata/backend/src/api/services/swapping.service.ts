@@ -18,9 +18,11 @@ import {
   getTokenBalance
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { 
-  SwapHistoryEntry, 
-  PoolList, 
+import { getPools as getRewardsChefPools, getStakedBalance } from "./rewardsChef.service";
+import { rewardsChef } from "../../config/constants";
+import {
+  SwapHistoryEntry,
+  PoolList,
   SwapParams,
   LiquidityParams,
   RemoveLiquidityParams,
@@ -31,13 +33,12 @@ import {
   SwapHistoryResponse,
   SwapToken,
   RawToken,
+  RawGetPool,
+  RawPoolFactory,
+  RawSwapEvent,
   PoolWithTokens,
-  validateGetPoolArray,
-  validateSwapEventArray,
-  validatePoolWithTokensArray,
-  validatePoolWithTokenAArray,
-  validatePoolWithTokenBArray,
-  validateSinglePoolFactory
+  PoolWithTokenA,
+  PoolWithTokenB
 } from "@mercata/shared-types";
 
 const { Pool, PoolFactory, PoolSwap, swapHistorySelectFields, swapTokenSelectFields } = constants;
@@ -62,16 +63,46 @@ export const getPools = async (
     })
   ]);
 
-  const validatedPools = validateGetPoolArray(poolData);
-  const validatedFactory = validateSinglePoolFactory(factoryData);
+  const validatedPools = poolData as RawGetPool[];
+  const validatedFactory = factoryData[0] as RawPoolFactory;
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
     key: `in.(${tokenAddresses.join(',')})`
   });
   const volumeMap = await getTradingVolume24hForPools(accessToken, validatedPools.map(pool => pool.address), priceMap);
-  
-  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress);
+
+  // Fetch staked balances from RewardsChef if userAddress is provided
+  let stakedBalanceMap: Map<string, string> | undefined;
+  if (userAddress) {
+    // Get all RewardsChef pools
+    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
+
+    // Build a map of lpToken address -> rewards pool index
+    const lpTokenToPoolIdx = new Map<string, number>();
+    rewardsChefPools.forEach(pool => {
+      lpTokenToPoolIdx.set(pool.lpToken, pool.poolIdx);
+    });
+
+    // For each swap pool, check if it has a matching rewards pool and get staked balance
+    stakedBalanceMap = new Map<string, string>();
+    await Promise.all(
+      validatedPools.map(async (pool) => {
+        const poolIdx = lpTokenToPoolIdx.get(pool.lpToken.address);
+        if (poolIdx !== undefined) {
+          const stakedBalance = await getStakedBalance(
+            accessToken,
+            rewardsChef,
+            poolIdx,
+            userAddress
+          );
+          stakedBalanceMap!.set(pool.lpToken.address, stakedBalance);
+        }
+      })
+    );
+  }
+
+  return buildPoolList(validatedPools, priceMap, volumeMap, validatedFactory, userAddress, stakedBalanceMap);
 };
 
 // --- Token Queries ---
@@ -89,7 +120,7 @@ export const getSwapableTokens = async (
     }
   });
 
-  const validatedPools = validatePoolWithTokensArray(poolData);
+  const validatedPools = poolData as PoolWithTokens[];
   const tokenAddresses = extractTokenAddresses(validatedPools);
   const priceMap = await getOraclePrices(accessToken, {
     select: "asset:key,price:value::text",
@@ -137,8 +168,8 @@ export const getSwapableTokenPairs = async (
     })
   ]);
 
-  const validatedPoolsA = validatePoolWithTokenBArray(poolDataA);
-  const validatedPoolsB = validatePoolWithTokenAArray(poolDataB);
+  const validatedPoolsA = poolDataA as PoolWithTokenB[];
+  const validatedPoolsB = poolDataB as PoolWithTokenA[];
 
   const allTokens: Array<{token: RawToken, poolBalance: string}> = [
     ...validatedPoolsA.map(pool => ({ token: pool.tokenB, poolBalance: pool.tokenBBalance })),
@@ -198,8 +229,7 @@ export const getSwapHistory = async (
     return { data: [], totalCount: 0 };
   }
 
-  const validatedEvents = validateSwapEventArray(swapEvents);
-  const swapHistory: SwapHistoryEntry[] = validatedEvents.map(event => {
+  const swapHistory: SwapHistoryEntry[] = (swapEvents as RawSwapEvent[]).map(event => {
     const { tokenA, tokenB } = event.pool;
     const isAToB = event.tokenIn === tokenA.address;
     

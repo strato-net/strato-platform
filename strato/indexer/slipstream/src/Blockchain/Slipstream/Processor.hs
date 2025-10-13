@@ -75,7 +75,7 @@ data BatchedInserts = BatchedInserts
 matters :: AggregateAction -> Bool
 matters AggregateAction {..} =
   (actionType == Action.Create || (not $ diffNull actionStorage))
-    && (resolvedCodePtrToSHA actionCodeHash /= emptyHash)
+    && (codePtrToSHA actionCodeHash /= emptyHash)
 
 
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]

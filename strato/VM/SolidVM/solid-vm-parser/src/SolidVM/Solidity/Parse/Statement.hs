@@ -62,9 +62,9 @@ statement =
     <|> (Break <$> (position (reserved "break") <* semi))
     <|> (reserved "assembly" >> inlineAssembly)
     <|> (ModifierExecutor <$> (position (reserved "_") <* semi)) -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
-    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
     <|> revertStatement
     <|> uncheckedStatement
+    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -139,7 +139,7 @@ ifStatement = do
   pure $ IfStatement i t e a
 
 uncheckedStatement :: SolidityParser Statement
-uncheckedStatement = do
+uncheckedStatement = try $ do
   ~(a, s) <- withPosition $ do
     reserved "unchecked"
     statements
@@ -198,13 +198,13 @@ revertStatement = try $ do
     e <-
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- lol
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
     pure (i, e)
   _ <- semi
@@ -279,13 +279,13 @@ functionCall = do
     withPosition $
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- haha
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
   return $ flip (FunctionCall a) args
 
@@ -511,7 +511,11 @@ literal =
       do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
-      uncurry StringLiteral <$> withPosition stringLiteral,
+      do
+        (a, str) <- withPosition stringLiteral
+        pure $ case readMaybe str of
+          Just addr -> AccountLiteral a (NamedAccount addr UnspecifiedChain)
+          _ -> StringLiteral a str,
       uncurry AccountLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),
       uncurry BoolLiteral <$> withPosition (True <$ reserved "true"),

@@ -98,7 +98,7 @@ class UserController {
 
       const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({ 
-        message: "Admin removed successfully", 
+        message: "Vote cast successfully", 
         target,
         func,
         args,

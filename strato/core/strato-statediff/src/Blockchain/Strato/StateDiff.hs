@@ -34,7 +34,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Monad (when)
-import Control.Monad.Change (Alters, Modifiable, Selectable)
+import Control.Monad.Change (Alters, Modifiable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
@@ -170,8 +170,7 @@ stateDiff ::
     HasCodeDB m,
     HasHashDB m,
     HasStateDB m,
-    Modifiable BestBlockRoot m,
-    Selectable Address AddressState m
+    Modifiable BestBlockRoot m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -190,8 +189,7 @@ stateDiff' ::
   ( MonadLogger m,
     HasCodeDB m,
     HasHashDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -235,8 +233,7 @@ accountEnd ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   [N.Nibble] ->
   Val ->
@@ -271,8 +268,7 @@ eventualAccountState ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   AddressState ->
   m (AccountDiff 'Eventual)
@@ -386,10 +382,9 @@ decodeStorageKV k v = do
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Address AddressState m) => CodePtr -> m ByteString
+lookupCode :: (MonadLogger m, HasCodeDB m) => CodePtr -> m ByteString
 lookupCode (ExternallyOwned ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
 lookupCode (SolidVMCode _ ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
-lookupCode cp@(CodeAtAccount _ _) = maybe (pure "") lookupCode =<< unsafeResolveCodePtr cp
 
 lookupInMPDB ::
   (MonadLogger m, Format a) =>

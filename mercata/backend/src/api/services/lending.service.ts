@@ -2,7 +2,7 @@ import { cirrus, strato, bloc } from "../../utils/mercataApiHelper";
 
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx, until } from "../../utils/txHelper";
-import { StratoPaths, constants } from "../../config/constants";
+import { StratoPaths, constants, rewardsChef } from "../../config/constants";
 import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
@@ -41,7 +41,7 @@ const findPoolForMToken = async (
   accessToken: string,
   mToken: string
 ) => {
-  const pools = await getPools(accessToken, config.rewardsChef);
+  const pools = await getPools(accessToken, rewardsChef);
   return pools.find(pool => pool.lpToken === mToken);
 };
 
@@ -187,12 +187,12 @@ export const depositLiquidity = async (
           contractName: extractContractName(Token),
           contractAddress: mToken,
           method: "approve",
-          args: { spender: config.rewardsChef, value: newlyMintedAmount },
+          args: { spender: rewardsChef, value: newlyMintedAmount },
         },
         // Then deposit into RewardsChef
         {
           contractName: extractContractName(RewardsChef),
-          contractAddress: config.rewardsChef,
+          contractAddress: rewardsChef,
           method: "deposit",
           args: { _pid: poolIdx, _amount: newlyMintedAmount },
         },
@@ -242,9 +242,11 @@ export const withdrawLiquidity = async (
     const exchangeRate = exchangeRateResponse || "1000000000000000000"; // Default 1:1 if not available
 
     // Convert withdrawal amount (USDST) to required mTokens
+    // Use ceiling division to ensure we unstake enough mTokens to cover the withdrawal
     const amountWei = BigInt(amount);
     const exchangeRateWei = BigInt(exchangeRate);
-    const requiredMTokenWei = (amountWei * (10n ** 18n)) / exchangeRateWei;
+    const numerator = amountWei * (10n ** 18n);
+    const requiredMTokenWei = (numerator + exchangeRateWei - 1n) / exchangeRateWei; // Ceiling division
 
     // Check if we need to unstake
     const unstakedMTokenWei = BigInt(unstakedMTokenBalance);
@@ -265,7 +267,7 @@ export const withdrawLiquidity = async (
       // Build unstaking transaction
       const unstakeTx = await buildFunctionTx({
         contractName: extractContractName(RewardsChef),
-        contractAddress: config.rewardsChef,
+        contractAddress: rewardsChef,
         method: "withdraw",
         args: {
           _pid: poolIdx,
@@ -660,7 +662,7 @@ export const liquidityAndBalance = async (
 
   // If no pool found, staked balance is 0
   const stakedMTokenBalance = poolForMToken
-    ? await getStakedBalance(accessToken, config.rewardsChef, poolForMToken.poolIdx, userAddress)
+    ? await getStakedBalance(accessToken, rewardsChef, poolForMToken.poolIdx, userAddress)
     : "0";
 
   // User's withdrawable underlying (min of user mToken value and pool cash)
