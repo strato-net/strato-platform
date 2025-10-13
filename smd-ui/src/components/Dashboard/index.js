@@ -240,7 +240,6 @@ class Dashboard extends Component {
     const isMetadataLoading = this.props.appMetadata.loading;
     const networkHealth = this.props.dashboard.networkStatus;
     const networkStatusMessage = this.props.dashboard.networkStatusMessage;
-console.log("metadata api calling",this.props.appMetadata);
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour
