@@ -129,3 +129,26 @@ export const getPools = async (
     return [];
   }
 };
+
+/**
+ * Finds the RewardsChef pool for a given LP token address
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param lpTokenAddress - Address of the LP token to find
+ * @returns Promise resolving to the pool object, or undefined if not found
+ */
+export const findPoolByLpToken = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  lpTokenAddress: string
+): Promise<{
+  poolIdx: number;
+  lpToken: string;
+  allocPoint: string;
+  accPerToken: string;
+  lastRewardTimestamp: string;
+} | undefined> => {
+  const pools = await getPools(accessToken, rewardsChefAddress);
+  return pools.find(p => p.lpToken === lpTokenAddress);
+};
