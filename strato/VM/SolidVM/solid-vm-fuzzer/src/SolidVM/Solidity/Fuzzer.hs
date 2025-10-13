@@ -106,26 +106,32 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
           else case _funcArgs <$> _constructor c of
             Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
             _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
-              _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
-              let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
-              testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
-                mResult <- fmap (fmap (withTestName $ T.pack fName)) $
-                  if
-                    | testPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        result <- Just <$> test bh addr fName f
-                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
-                        pure result
-                    | propertyPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        result <- Just <$> prop bh addr fName f
-                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
-                        pure result
-                    | otherwise -> pure Nothing
-                maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
-                ) (1, []) functionsInSourceOrder
-              _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
-              pure testResults
+              beforeAllRes <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
+              case beforeAllRes of
+                Just ff@FuzzerFailure{} -> do
+                  let res = withTestName "beforeAll" ff
+                  _ <- lift . lift . lift $ hook 0 res
+                  pure []
+                _ -> do
+                  let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
+                  testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
+                    mResult <- fmap (fmap (withTestName $ T.pack fName)) $
+                      if
+                        | testPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
+                            result <- Just <$> test bh addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                            pure result
+                        | propertyPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
+                            result <- Just <$> prop bh addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
+                            pure result
+                        | otherwise -> pure Nothing
+                    maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
+                    ) (1, []) functionsInSourceOrder
+                  _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
+                  pure testResults
 
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True

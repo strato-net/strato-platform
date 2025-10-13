@@ -99,7 +99,7 @@ data Value
   | -- | SBuiltinTypeF SolidString SolidString CodeCollection
     SContractItem NamedAccount SolidString
   | SContract SolidString NamedAccount
-  | SContractFunction (Maybe SolidString) NamedAccount SolidString -- contractName, address, functionName
+  | SContractFunction NamedAccount SolidString -- address, functionName
   | SPush Value (Maybe Variable) -- The array function
   | -- | SSend Value (Maybe Variable)
     -- | STransfer Value (Maybe Variable)
