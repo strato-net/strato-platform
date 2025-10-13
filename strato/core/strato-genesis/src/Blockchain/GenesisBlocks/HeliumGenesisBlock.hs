@@ -339,7 +339,7 @@ genesisBlock  =
             implContract cdpReserveImplAddress "CDPReserve",
             implContract safetyModuleImplAddress "SafetyModule",
             implContract rewardsChefImplAddress "RewardsChef",
-            ContractNoStorage transactionParametersImplAddress 0 (mercataContract "TransactionParameters"),
+            implContract transactionParametersImplAddress "TransactionParameters",
             SolidVMContractWithStorage
               mercataAddress
               720
