@@ -14,6 +14,7 @@ filesToEmbed :: [String]
 filesToEmbed = [
   "contracts/abstract/ERC20/ERC20.sol",
   "contracts/abstract/ERC20/IERC20.sol",
+  "contracts/abstract/ERC20/access/Authorizable.sol",
   "contracts/abstract/ERC20/access/Ownable.sol",
   "contracts/abstract/ERC20/extensions/IERC20Metadata.sol",
   "contracts/abstract/ERC20/utils/Context.sol",

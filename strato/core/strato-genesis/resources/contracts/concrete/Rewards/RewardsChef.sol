@@ -214,7 +214,8 @@ contract record RewardsChef is Ownable {
     constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _rewardToken, uint256 _cataPerSecond) external onlyOwner {
-        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
+        // important: must be set here for proxied instances; ensure consistency
+        // with desired initial values
         MAX_INT = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
         PRECISION_MULTIPLIER = 1e18;
 
@@ -395,7 +396,7 @@ contract record RewardsChef is Ownable {
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
             if (pending > 0) {
-                ERC20(rewardToken).transfer(msg.sender, pending);
+                rewardToken.transfer(msg.sender, pending);
             }
         }
 

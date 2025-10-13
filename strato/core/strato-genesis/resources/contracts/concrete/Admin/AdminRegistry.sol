@@ -1,6 +1,6 @@
-contract record AdminRegistry {
-    mapping (string => address) public record delegates;
+import "../../abstract/ERC20/access/Authorizable.sol";
 
+contract record AdminRegistry {
     address[] public record admins;
     mapping (address => uint) public record adminMap;
 
@@ -11,9 +11,9 @@ contract record AdminRegistry {
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
-    event IssueCreated(address creator, string issueId, address target, string func, variadic args);
-    event IssueVoted(address voter, string issueId, address target, string func, variadic args);
-    event IssueExecuted(address executor, string issueId, address target, string func, variadic args);
+    event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
+    event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
+    event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
 
     bool public initialized = false;
 
@@ -41,8 +41,8 @@ contract record AdminRegistry {
         castVoteOnIssue(this, "_removeAdmin", _admin);
     }
 
-    function swapAdmin(address _admin) external {
-        castVoteOnIssue(this, "_swapAdmin", _admin);
+    function swapAdmin(address _adminToReplace, address _newAdmin) external {
+        castVoteOnIssue(this, "_swapAdmin", _adminToReplace, _newAdmin);
     }
 
     function isAdminAddress(address _admin) external returns (bool) {
@@ -53,6 +53,15 @@ contract record AdminRegistry {
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
+                if (_target != tx.origin) {
+                    bool authorizationGranted = false;
+                    try {
+                        authorizationGranted = Authorizable(_target).isAuthorized(msg.sender);
+                    } catch {
+
+                    }
+                    require(authorizationGranted, "Cannot forge a vote on behalf of an admin without their consent");
+                }
                 sender = _target;
                 _target = msg.sender;
             }
@@ -60,25 +69,25 @@ contract record AdminRegistry {
             require(votesMap[issueId][sender] == 0, "Cannot cast multiple votes for the same issue");
 
             try {
-                _createIssue(issueId, _target, _func, _args);
+                _createIssue(sender, issueId, _target, _func, _args);
             } catch {
 
             }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
-                variadic ret = _executeIssue(issueId, _target, _func, _args);
+                variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
             } else {
                 votes[issueId].push(sender);
                 votesMap[issueId][sender] = votes[issueId].length;
-                emit IssueVoted(sender, issueId, _target, _func, _args);
+                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
                 return (false, issueId);
             }
         } else {
             try {
                 if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
                     string issueId = _getIssueId(_target, _func, _args);
-                    variadic ret = _executeIssue(issueId, _target, _func, _args);
+                    variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
                     return (true, ret);
                 }
             } catch {
@@ -93,33 +102,28 @@ contract record AdminRegistry {
             }
             string issueId = _getIssueId(target, _func, _args);
             if (whitelist[target][_func][sender]) {
-                variadic ret = _executeIssue(issueId, target, _func, _args);
+                variadic ret = _executeIssue(sender, issueId, target, _func, _args);
                 return (true, ret);
             } else {
-                _createIssue(issueId, target, _func, _args);
+                _createIssue(sender, issueId, target, _func, _args);
             }
             return (false, issueId);
         }
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
-        address delegate = delegates["_shouldExecute"];
-        if (delegate != address(0)) {
-            return delegate.delegatecall("_shouldExecute", _issueId, _target, _func, _args);
+        uint issueVotes = votes[_issueId].length;
+        uint votingThresholdBps = votingThresholds[_target][_func];
+        if (votingThresholdBps > 0) {
+            return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
         } else {
-            uint issueVotes = votes[_issueId].length;
-            uint votingThresholdBps = votingThresholds[_target][_func];
-            if (votingThresholdBps > 0) {
-                return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
-            } else {
-                return 3 * (issueVotes + 1) >= 2 * admins.length;
-            }
+            return 3 * (issueVotes + 1) >= 2 * admins.length;
         }
     }
 
-    function _createIssue(string _issueId, address _target, string _func, variadic _args) internal {
+    function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
         require(votes[_issueId].length == 0, "Issue already exists");
-        emit IssueCreated(msg.sender, _issueId, _target, _func, _args);
+        emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
     }
 
     function getIssueId(address _target, string _func, variadic _args) external returns (string) {
@@ -127,32 +131,17 @@ contract record AdminRegistry {
     }
 
     function _getIssueId(address _target, string _func, variadic _args) internal returns (string) {
-        address delegate = delegates["_getIssueId"];
-        if (delegate != address(0)) {
-            return delegate.delegatecall("_getIssueId", _target, _func, _args);
-        } else {
-            return keccak256(_target, _func, _args);
-        }
+        return keccak256(_target, _func, _args);
     }
 
-    function _executeIssue(string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
-        address delegate = delegates["_executeIssue"];
-        if (delegate != address(0)) {
-            return delegate.delegatecall("_executeIssue", _issueId, _target, _func, _args);
-        } else {
-            variadic ret = "";
-            if (_target == this && delegates[_func] != address(0)) {
-                ret = delegates[_func].delegatecall(_func, _args);
-            } else {
-                ret = _target.call(_func, _args);
-            }
-            for (uint i = 0; i < votes[_issueId].length; i++) {
-                votesMap[_issueId][votes[_issueId][i]] = 0;
-            }
-            delete votes[_issueId];
-            emit IssueExecuted(msg.sender, _issueId, _target, _func, _args);
-            return ret;
+    function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
+        variadic ret = _target.call(_func, _args);
+        for (uint i = 0; i < votes[_issueId].length; i++) {
+            votesMap[_issueId][votes[_issueId][i]] = 0;
         }
+        delete votes[_issueId];
+        emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
+        return ret;
     }
 
     function _addAdmin(address _admin) internal {
@@ -171,18 +160,31 @@ contract record AdminRegistry {
         admins.length -= 1;
     }
 
-    function _swapAdmin(address _admin) internal {
+    function _swapAdmin(address _adminToReplace, address _admin) internal {
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
-        index = adminMap[msg.sender];
+        index = adminMap[_adminToReplace];
         require(index > 0, "Caller is not an admin");
         address swap = admins[admins.length - 1];
         admins[index - 1] = _admin;
         adminMap[_admin] = index;
-        adminMap[msg.sender] = 0;
+        adminMap[_adminToReplace] = 0;
     }
 
     function addWhitelist(address _target, string _func, address _user) internal {
+        if (_target == address(this)) {
+            require(
+                keccak256(_func) != keccak256("addWhitelist") &&
+                keccak256(_func) != keccak256("removeWhitelist") &&
+                keccak256(_func) != keccak256("_addAdmin") &&
+                keccak256(_func) != keccak256("_removeAdmin") &&
+                keccak256(_func) != keccak256("_swapAdmin") &&
+                keccak256(_func) != keccak256("setVotingThreshold") &&
+                keccak256(_func) != keccak256("createContract") &&
+                keccak256(_func) != keccak256("createSaltedContract"),
+                "Cannot whitelist internal governance functions"
+            );
+        }
         whitelist[_target][_func][_user] = true;
     }
 
@@ -191,6 +193,7 @@ contract record AdminRegistry {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) internal {
+        require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
@@ -200,9 +203,5 @@ contract record AdminRegistry {
 
     function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) internal returns (address) {
         return create2(_salt, _contractName, _contractSrc, _args);
-    }
-
-    function updateDelegate(string _func, address _delegate) internal {
-        delegates[_func] = _delegate;
     }
 }
