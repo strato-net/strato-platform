@@ -51,7 +51,6 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Blockchain.Strato.Model.Code (Code)
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Control.Lens.TH
@@ -337,8 +336,7 @@ data ContractParameters = ContractParameters
     args :: Maybe (Map Text ArgValue),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    resolve :: Bool,
-    ptr2Code :: Maybe Code
+    resolve :: Bool
   }
 
 --------------------------------------------------------------------------------
@@ -347,8 +345,7 @@ data UploadListContract = UploadListContract
     uploadlistcontractSrc :: SourceMap,
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
-    uploadlistcontractMetadata :: Maybe (Map Text Text),
-    uploadlistcontractPtr2Code :: Maybe Code
+    uploadlistcontractMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
 
@@ -363,8 +360,7 @@ instance ToJSON UploadListContract where
         "src" .= uploadlistcontractSrc,
         "args" .= uploadlistcontractArgs,
         "txParams" .= _uploadlistcontractTxParams,
-        "metadata" .= uploadlistcontractMetadata,
-        "ptr2code" .= uploadlistcontractPtr2Code
+        "metadata" .= uploadlistcontractMetadata
       ]
 
 instance FromJSON UploadListContract where
@@ -375,7 +371,6 @@ instance FromJSON UploadListContract where
       <*> (o .: "args")
       <*> (o .:? "txParams")
       <*> (o .:? "metadata")
-      <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
@@ -391,8 +386,7 @@ instance ToSchema UploadListContract where
             uploadlistcontractSrc = mempty,
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
-            uploadlistcontractMetadata = Nothing,
-            uploadlistcontractPtr2Code = Nothing
+            uploadlistcontractMetadata = Nothing
           }
 
 data ContractListParameters = ContractListParameters

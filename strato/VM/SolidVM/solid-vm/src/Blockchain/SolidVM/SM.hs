@@ -532,9 +532,8 @@ startingAction maybeCode env' =
       _actionData = OMap.empty,
       _src =
         case maybeCode of
-          Just (Code theCode) ->
+          Just theCode ->
             Just theCode
-          Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',
       _events = Q.empty,
@@ -1089,11 +1088,9 @@ getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
 getContractNameAndHash address' = do
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-  resolvedCodeHash <- resolveCodePtr codeHash
-  case resolvedCodeHash of
-    Just (SolidVMCode cn ch') -> return (stringToLabel cn, ch')
-    Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
-    Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+  case codeHash of
+    SolidVMCode cn ch' -> return (stringToLabel cn, ch')
+    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
@@ -1166,8 +1163,8 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for address " ++ show address
           pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
+          case addressStateCodeHash s of
+            SolidVMCode appName _ -> do
               appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
                 MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))

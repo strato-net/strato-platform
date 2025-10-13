@@ -9,8 +9,7 @@
 
 module Blockchain.Strato.StateDiff.Database
   ( commitSqlDiffs,
-    codePtrHash,
-    codePtrAddress
+    codePtrHash
   )
 where
 
@@ -89,7 +88,6 @@ createAccount blockNumber accountDiffs =
           -- addressStateRefCode = getField (theError account "code") $ code diff,
           addressStateRefCodeHash = codePtrHash $ codeHash diff,
           addressStateRefContractName = codePtrName $ codeHash diff,
-          addressStateRefCodePtrAddress = codePtrAddress $ codeHash diff,
           addressStateRefLatestBlockDataRefNumber = blockNumber
         }
     theError :: Address -> String -> a
