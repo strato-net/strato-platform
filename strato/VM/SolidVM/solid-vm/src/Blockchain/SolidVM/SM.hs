@@ -478,22 +478,23 @@ runSM ::
   Env.Environment ->
   GasInfo ->
   SM m a ->
-  m (Either SolidException a)
-runSM maybeCode env gi f = do
+  m (Env.Environment, Either SolidException a)
+runSM maybeCode envBefore gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
-          { env = env,
+          { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode env,
+            _action = startingAction maybeCode envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
   eVal <- try $ runReaderT f startingStateRef
   sstateAfter <- readIORef startingStateRef
+  let envAfter = env sstateAfter
   case eVal of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
@@ -506,10 +507,10 @@ runSM maybeCode env gi f = do
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
-        else return $ Left se
+        else return (envAfter, Left se)
     Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
-      return $ Right value
+      return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.

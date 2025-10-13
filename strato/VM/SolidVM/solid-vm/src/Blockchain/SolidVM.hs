@@ -22,6 +22,8 @@ module Blockchain.SolidVM
   ( SolidVMBase,
     call,
     create,
+    callReturnEnv,
+    createReturnEnv,
   )
 where
 
@@ -194,6 +196,22 @@ create ::
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
 create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
+  snd <$> createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings
+
+createReturnEnv ::
+  SolidVMBase m =>
+  BlockHeader ->
+  Address ->
+  Address ->
+  Address ->
+  Gas ->
+  Address ->
+  Code ->
+  Keccak256 ->
+  Text ->
+  [Text] ->
+  m (Env.Environment, ExecResults)
+createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
   isRunningTests <- checkIfRunningTests
 
   initCode <- case code of
@@ -221,7 +239,7 @@ create blockData sender' origin' proposer' availableGas newAddress code txHash' 
             _gasMetadata = ""
           }
 
-  fmap (either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
+  fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
@@ -357,6 +375,22 @@ call ::
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
 call blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
+  snd <$> callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType
+
+callReturnEnv ::
+  SolidVMBase m =>
+  BlockHeader ->
+  Address ->
+  Address ->
+  Address ->
+  Gas ->
+  Address ->
+  Keccak256 ->
+  Text ->
+  [Text] ->
+  Maybe CC.FunctionCallType ->
+  m (Env.Environment, ExecResults)
+callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
   recordCall
   isRunningTests <- checkIfRunningTests
   let env' =
@@ -379,7 +413,7 @@ call blockData codeAddress sender' proposer' availableGas origin' txHash' funcNa
             _gasMetadata = ""
           }
 
-  fmap (either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
+  fmap (fmap $ either solidvmErrorResults id) . runSM Nothing env' gasInfo' $ do
     --requireOriginCert origin'
     let -- maybeSrcLength = M.lookup "srcLength" =<< metadata
         -- !srcLength = maybe 0 (\sl -> read (T.unpack sl) :: Int) maybeSrcLength
