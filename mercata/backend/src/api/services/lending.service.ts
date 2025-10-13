@@ -77,7 +77,6 @@ export const getExchangeRateFromCirrus = async (
  */
 export const getPool = async (
   accessToken: string,
-  _userAddress: string | undefined,
   options: Record<string, string> = {}
 ): Promise<Record<string, any>> => {
   const { select, ...filters } = options;
@@ -112,7 +111,6 @@ export const depositLiquidity = async (
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset }, mToken: { mToken } } = await getPool(
     accessToken,
-    undefined,
     {
       select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset),mToken:lendingPool_fkey(mToken)`,
     } as Record<string, string>
@@ -206,7 +204,7 @@ export const withdrawLiquidity = async (
   amount: string,
   includeStakedMToken: boolean = false
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -214,7 +212,7 @@ export const withdrawLiquidity = async (
   // If includeStakedMToken is enabled, we might need to unstake first
   if (includeStakedMToken) {
     // Get mToken address first
-    const { mToken: { mToken } } = await getPool(accessToken, undefined, {
+    const { mToken: { mToken } } = await getPool(accessToken, {
       select: "mToken:lendingPool_fkey(mToken)"
     });
     if (!mToken) {
@@ -284,7 +282,7 @@ export const withdrawLiquidityAll = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -306,7 +304,7 @@ export const supplyCollateral = async (
   asset: string,
   amount: string,
 ) => {
-  const { lendingPool, collateralVault } = await getPool(accessToken, undefined, { select: "lendingPool,collateralVault" });
+  const { lendingPool, collateralVault } = await getPool(accessToken, { select: "lendingPool,collateralVault" });
   if (!lendingPool || !collateralVault) {
     throw new Error("Lending pool or collateral vault address not found");
   }
@@ -338,7 +336,7 @@ export const withdrawCollateral = async (
   asset: string,
   amount: string,
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -360,7 +358,7 @@ export const borrow = async (
   userAddress: string,
   amount: string,
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
 
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
@@ -382,7 +380,7 @@ export const borrowMax = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }
@@ -404,7 +402,6 @@ export const repay = async (
 ) => {
   const { liquidityPool, lendingPool, borrowableAsset: { borrowableAsset } } = await getPool(
     accessToken,
-    undefined,
     {
       select: `liquidityPool,lendingPool,borrowableAsset:lendingPool_fkey(borrowableAsset)`,
     }
@@ -440,7 +437,7 @@ export const collateralAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  const registry = await getPool(accessToken, undefined, {
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
@@ -527,7 +524,7 @@ export const liquidityAndBalance = async (
   userAddress: string,
 ) => {
   // Fetch pool data with explicit select (index fields + userLoan + prices)
-  const registry = await getPool(accessToken, undefined, {
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
@@ -706,7 +703,7 @@ export const getLoan = async (
   userAddress: string | undefined
 ): Promise<any> => {
   // Fetch registry; explicit select with borrowIndex so simulateLoan can compute debt
-  const registry = await getPool(accessToken, undefined, {
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
@@ -771,7 +768,7 @@ export const repayAll = async (
   accessToken: string,
   userAddress: string
 ) => {
-  const registry = await getPool(accessToken, undefined, {
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,borrowIndex::text,` +
@@ -832,14 +829,14 @@ export const executeLiquidation = async (
   options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
 ) => {
   // LiquidityPool address
-  const { liquidityPool } = await getPool(accessToken, undefined, { select: "liquidityPool" });
+  const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
   if (!liquidityPool || typeof liquidityPool !== "string") {
     throw new Error("Liquidity pool address not found");
   }
   const liquidityPoolAddr = liquidityPool;
 
   // Borrower-specific data
-  const registry = await getPool(accessToken, undefined, {
+  const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,borrowIndex::text,` +
@@ -1143,7 +1140,7 @@ export const listLoansForLiquidation = async (
       `prices:${PriceOracle}-prices(asset:key,price:value::text)` +
     `)`;
 
-  const registry = await getPool(accessToken, undefined, { select });
+  const registry = await getPool(accessToken, { select });
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
   const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
@@ -1291,7 +1288,7 @@ export const withdrawCollateralMax = async (
   userAddress: string,
   asset: string,
 ) => {
-  const { lendingPool } = await getPool(accessToken, undefined, { select: "lendingPool" });
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
   if (!lendingPool) {
     throw new Error("Lending pool address not found");
   }

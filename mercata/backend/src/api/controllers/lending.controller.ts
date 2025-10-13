@@ -44,7 +44,7 @@ class LendingController {
   ): Promise<void> {
     try {
       const { accessToken, address: userAddress, query } = req;
-      const pool = await getPool(accessToken, userAddress as string, query as Record<string, string>);
+      const pool = await getPool(accessToken, query as Record<string, string>);
       res.status(RestStatus.OK).json(pool);
     } catch (error) {
       next(error);
