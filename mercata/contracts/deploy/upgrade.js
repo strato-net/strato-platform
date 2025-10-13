@@ -7,6 +7,7 @@ const auth = require('./auth');
 const { rest, importer } = require('blockapps-rest');
 const fs = require('fs-extra');
 const path = require('path');
+const axios = require('axios');
 
 // The owner of the implementation address is ignored in favor of the proxy owner
 const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
@@ -16,6 +17,7 @@ const DEFAULT_CONSTRUCTOR_ARGS = {"initialOwner": "deadbeef"};
  */
 function printUsage() {
   console.error('Usage: node upgrade.js [options]');
+  console.error(' OR    npm run upgrade -- [options]');
   console.error('');
   console.error('Required arguments:');
   console.error('  --proxy-address <address>    Address of the proxy contract to upgrade');
@@ -121,6 +123,132 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
 }
 
 /**
+ * Looks up all instances of proxies that point to a logicContract named according to the supplied query.
+ * @param contractName The name of the contract for which to search
+ * @return A list of addresses, each of which is the address of a proxy whose logicContract is a <`contractName`>
+ */
+async function getInstancesOfContractProxied(tokenObj, contractName) {
+    // Find all proxy addresses whose logicContract points to an implementation of contractName
+    // Implementation: search for all proxies, check their logicContract, then contract name
+
+    // 1. Find all contracts that are proxies
+    const proxySearchOptions = {
+        config,
+        query: {
+            type: 'Proxy'
+        }
+    };
+
+    let proxies;
+    try {
+        proxies = await rest.search(tokenObj, {}, proxySearchOptions);
+    } catch (err) {
+        throw new Error(`Failed to fetch proxies: ${err.message || err}`);
+    }
+
+    if (!proxies || proxies.length === 0) {
+        return [];
+    }
+
+    // 2. For each proxy, get its logicContract address
+    const results = [];
+    for (const proxy of proxies) {
+        const proxyAddress = proxy.address;
+        let logicContract;
+        try {
+            logicContract = await getLogicContract(tokenObj, proxyAddress);
+        } catch (e) {
+            continue; // skip if not a proxy or error
+        }
+        // 3. Lookup that logicContract address in Cirrus by name
+        const implSearchOptions = {
+            config,
+            query: {
+                address: `eq.${logicContract}`,
+                name: contractName
+            }
+        };
+        let matches;
+        try {
+            matches = await rest.search(tokenObj, {}, implSearchOptions);
+        } catch (e) {
+            continue; // skip broken implementation lookups
+        }
+        if (matches && matches.length > 0) {
+            results.push(proxyAddress);
+        }
+    }
+    return results;
+}
+
+/**
+ * Looks up the current contract code of the logicContract of the proxy at the requested `proxyAddress`.
+ * @param tokenObj Authentication token object
+ * @param proxyAddress The proxy whose implementation code will be fetched
+ * @returns A string of the implementation smart contract source code
+ */
+async function getCurrentImplementationCode(tokenObj, proxyAddress) {
+  // Get the implementation address from the proxy
+  const implementationAddress = await getLogicContract(tokenObj, proxyAddress);
+  
+  const nodeUrl = config.nodes[0].url;
+  const token = tokenObj.token;
+  
+  try {
+    console.log(`Retrieving code for implementation at ${implementationAddress}`);
+    
+    // Step 1: Get the account info to retrieve the code hash
+    const accountUrl = `${nodeUrl}/strato-api/eth/v1.2/account?address=${implementationAddress}`;
+    const accountResponse = await axios.get(accountUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    const accountData = accountResponse.data[0];
+    console.log('Account data received:', accountData ? Object.keys(accountData) : 'null');
+    
+    if (!accountData || !accountData.codeHash) {
+      console.warn('No codeHash found in account data');
+      return null;
+    }
+    
+    const codeHash = accountData.codeHash;
+    console.log(`Code hash: ${codeHash}`);
+    
+    // Step 2: Get the actual source code using the code hash
+    const codeUrl = `${nodeUrl}/strato-api/eth/v1.2/code/${codeHash}`;
+    const codeResponse = await axios.get(codeUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      }
+    });
+    
+    let sourceCode;
+    if (typeof codeResponse.data === 'object') {
+      sourceCode = codeResponse.data.reduce((acc, item) => acc + item[1], '');
+    }
+    else if (typeof codeResponse.data === 'string') {
+      sourceCode = codeResponse.data;
+    }
+    else {
+      throw new Error('Unexpected code response type', typeof codeResponse.data);
+    }
+    if (!sourceCode || sourceCode.length === 0) {
+      console.warn('No source code found in code data');
+      return null;
+    }
+    
+    return sourceCode;
+  } catch (error) {
+    console.error('Error retrieving source code:', error.message);
+    return null;
+  }
+}
+
+/**
  * Main upgrade function
  */
 async function main() {
@@ -136,6 +264,38 @@ async function main() {
       console.error(`Error parsing arguments: ${error.message}\n`);
       printUsage();
       process.exit(1);
+    }
+
+    // Use new mode if requested
+    if (args['new-mode']) {
+      // test getCurrentImplementationCode
+      if (args['proxy-address']) {
+        const token = await auth.getUserToken(process.env.GLOBAL_ADMIN_NAME, process.env.GLOBAL_ADMIN_PASSWORD);
+        const tokenObj = { token };
+        const sourceCode = await getCurrentImplementationCode(
+          tokenObj,
+          args['proxy-address'] || 'e8802b449c47f0d651e2707a31a58f79e5b0d53a'
+        );
+        if (sourceCode) {
+          console.log('Source code retrieved successfully!');
+          console.log('Source length:', sourceCode.length, 'characters');
+          console.log('Source code:', typeof(sourceCode), Object.keys(sourceCode));
+          console.log('First 200 chars:', sourceCode.substring(0, 200));
+        } else {
+          console.log('Source code not available (this is OK - upgrade can proceed without it)');
+        }
+      }
+
+      // Test getInstancesOfContractProxied
+      if (args['contract-name']) {
+        const instances = await getInstancesOfContractProxied(
+          tokenObj,
+          args['contract-name'] || 'LendingPool'
+        );
+        console.log('Instances:', instances);
+      }
+
+      process.exit(0);
     }
     
     // Check for required arguments
