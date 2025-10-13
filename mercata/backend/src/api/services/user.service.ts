@@ -166,7 +166,8 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins, votes, thresholds, executed } = response.data[0];
+    const { admins: adminsRaw, votes, thresholds, executed } = response.data[0];
+    const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
 
