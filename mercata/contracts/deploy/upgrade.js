@@ -134,14 +134,12 @@ async function getInstancesOfContractProxied(tokenObj, contractName) {
     // 1. Find all contracts that are proxies
     const proxySearchOptions = {
         config,
-        query: {
-            type: 'Proxy'
-        }
+        query: {}
     };
 
     let proxies;
     try {
-        proxies = await rest.search(tokenObj, {}, proxySearchOptions);
+        proxies = await rest.search(tokenObj, { name: 'Proxy' }, proxySearchOptions);
     } catch (err) {
         throw new Error(`Failed to fetch proxies: ${err.message || err}`);
     }
@@ -164,13 +162,12 @@ async function getInstancesOfContractProxied(tokenObj, contractName) {
         const implSearchOptions = {
             config,
             query: {
-                address: `eq.${logicContract}`,
-                name: contractName
+                address: `eq.${logicContract}`
             }
         };
         let matches;
         try {
-            matches = await rest.search(tokenObj, {}, implSearchOptions);
+            matches = await rest.search(tokenObj, { name: contractName }, implSearchOptions);
         } catch (e) {
             continue; // skip broken implementation lookups
         }
@@ -268,10 +265,12 @@ async function main() {
 
     // Use new mode if requested
     if (args['new-mode']) {
+      // Authenticate once for all tests
+      const token = await auth.getUserToken(process.env.GLOBAL_ADMIN_NAME, process.env.GLOBAL_ADMIN_PASSWORD);
+      const tokenObj = { token };
+      
       // test getCurrentImplementationCode
       if (args['proxy-address']) {
-        const token = await auth.getUserToken(process.env.GLOBAL_ADMIN_NAME, process.env.GLOBAL_ADMIN_PASSWORD);
-        const tokenObj = { token };
         const sourceCode = await getCurrentImplementationCode(
           tokenObj,
           args['proxy-address'] || 'e8802b449c47f0d651e2707a31a58f79e5b0d53a'
