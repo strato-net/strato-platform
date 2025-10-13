@@ -41,6 +41,7 @@ import { SafetyProvider } from "./context/SafetyContext";
 import Borrow from "./pages/Borrow";
 import { getConfig } from "./lib/config";
 import { useState, useEffect } from "react";
+import { initializeCsrfToken } from "./lib/csrf";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,11 @@ const App = () => {
   const [projectId, setProjectId] = useState('PROJECT_ID_UNSET');
   const [wagmiConfig, setWagmiConfig] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Initialize CSRF token on app startup
+  useEffect(() => {
+    initializeCsrfToken();
+  }, []);
 
   useEffect(() => {
     const fetchConfig = async () => {

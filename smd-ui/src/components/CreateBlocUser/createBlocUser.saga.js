@@ -16,12 +16,13 @@ import {
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
 import { createUrl } from '../../lib/url';
+import { secureFetch } from '../../lib/csrf';
 
 export function createBlocUserApiCall(username, password) {
   const options = { params: { username } };
   const url = env.BLOC_URL + createUrl("/users/::username", options);
 
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',
