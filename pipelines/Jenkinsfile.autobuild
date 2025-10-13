@@ -107,7 +107,7 @@ pipeline {
         }
 
         script {
-          lib.generateGenesisBlock('.', 'strato-getting-started', null)  // overwrites the strato-getting-started/genesis-block.json
+          lib.generateGenesisBlock('.', 'strato-getting-started')  // overwrites the strato-getting-started/genesis-block.json
         }
 
         dir("strato-getting-started") {

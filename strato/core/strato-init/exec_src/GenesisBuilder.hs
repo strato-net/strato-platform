@@ -10,7 +10,7 @@ import BlockApps.X509
 import Blockchain.Data.GenesisInfo
 import Blockchain.GenesisBlocks.Builder
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
@@ -25,8 +25,8 @@ import System.Environment
 
 data Options = Options
   { optCerts :: [X509Certificate],
-    optValidators :: [ChainMemberParsedSet],
-    optAdmins :: [ChainMemberParsedSet],
+    optValidators :: [Validator],
+    optAdmins :: [Address],
     optFaucets :: [Address],
     optInput :: GenesisInfo,
     optOutputName :: String
@@ -66,7 +66,7 @@ options =
       ( ReqArg
           ( \s opts -> do
               valsStr <- readFile s
-              let eVals = Ae.eitherDecodeStrict (C8.pack valsStr) :: Either String [ChainMemberParsedSet]
+              let eVals = Ae.eitherDecodeStrict (C8.pack valsStr) :: Either String [Validator]
                   !vals = either error id eVals
               return opts {optValidators = vals}
           )
@@ -80,7 +80,7 @@ options =
       ( ReqArg
           ( \s opts -> do
               adminsStr <- readFile s
-              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [ChainMemberParsedSet]
+              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [Address]
                   !admins = either error id eAdmins
               return opts {optAdmins = admins}
           )

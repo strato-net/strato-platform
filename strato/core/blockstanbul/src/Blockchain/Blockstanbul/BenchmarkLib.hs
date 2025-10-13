@@ -12,8 +12,9 @@ import Blockchain.Blockstanbul
 import Blockchain.Data.Block
 import Blockchain.Data.TransactionDef
 import Blockchain.Model.JsonBlock
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
+import Blockchain.Strato.Model.Validator
 import Data.Aeson
 import Data.Bits
 import qualified Data.Text as Text
@@ -44,12 +45,12 @@ oneTX size =
 --benchPrivateKey :: PrivateKey
 --benchPrivateKey = fromMaybe (error "could not import private key") (importPrivateKey (LabeledError.b16Decode "benchPrivateKey" $ C8.pack $ "09e910621c2e988e9f7f6ffcd7024f54ec1461fa6e86a4b545e9e1fe21c28866"))
 
-benchChainMember :: ChainMemberParsedSet
-benchChainMember = CommonName "BlockApps" "Engineering" "Admin" True
+benchChainMember :: Address
+benchChainMember = 0x0
 
 benchContext :: BlockstanbulContext
-benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True (Just benchChainMember)
-    where benchValidator = chainMemberParsedSetToValidator benchChainMember
+benchContext = newContext "" (Checkpoint (View 200 40) [benchValidator]) Nothing True
+    where benchValidator = Validator benchChainMember
 
 makeBlock :: Int -> Int -> Block
 makeBlock txcount txsize =

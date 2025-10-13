@@ -11,7 +11,6 @@ import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
 import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Control.Applicative (Alternative, empty)
 import Control.DeepSeq
@@ -89,7 +88,7 @@ defaultMiningCache =
         ( BlockHeader
             (unsafeCreateKeccak256FromWord256 0)
             (unsafeCreateKeccak256FromWord256 0)
-            (Everyone False)
+            0x0
             blankStateRoot
             blankStateRoot
             blankStateRoot

@@ -79,7 +79,7 @@ exMetadataRespone =
    in MetadataResponse
         pubKey
         (fromPublicKey pubKey)
-        ["admin.blockapps.net"]
+        [Validator 0xdeadbeef]
         True
         True
         "0"

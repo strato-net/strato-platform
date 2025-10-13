@@ -10,16 +10,12 @@ module Blockchain.Init.Generator (
 
 import BlockApps.Logging
 import qualified Blockchain.Data.DataDefs as DataDefs
-import Blockchain.Data.GenesisInfo
-import qualified Blockchain.Data.GenesisInfoOld as OLD
 import qualified Blockchain.EthConf as UEC
 import qualified Blockchain.EthConf.Model as EC
 import Blockchain.DB.CodeDB
 import Blockchain.GenesisBlock
 import Blockchain.Init.EthConf
-import Blockchain.GenesisBlocks.ProductionGenesisBlock
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as HELIUM
-import Blockchain.GenesisBlocks.UraniumGenesisBlock as URANIUM
 import Blockchain.Init.Monad
 import Blockchain.Init.Options
 import qualified Blockchain.Network as Net
@@ -51,19 +47,10 @@ createGenesisInfo network = do
   let genesisInfo = 
         case network of
           'h':'e':'l':'i':'u':'m':_ -> HELIUM.genesisBlock
-          "mercata-uranium" -> URANIUM.genesisBlock
-          "uranium" -> HELIUM.genesisBlock -- Don't worry, be happy
-          _ -> productionGenesisBlock
+          _ -> HELIUM.genesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
   liftIO $ putStrLn $ "Done. Output genesis block info was written"
-
-convertGenesisFromOld :: MonadIO m => m ()
-convertGenesisFromOld = do
-  oldGenesis <- OLD.getGenesisInfo
-  liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode $ convertFromOld oldGenesis
-  liftIO $ putStrLn $ "Done. Output genesis block info was written"
-
 
 createCommandsFile :: IO ()
 createCommandsFile = 
@@ -99,19 +86,14 @@ mkAll network = do
   liftIO $ makeReadOnly $ dir </> "ethconf.yaml"
 
   genesisExists <- doesFileExist "genesis.json"
-  genesisOldExists <- doesFileExist "genesisOld.json"
 
-  case (genesisExists, genesisOldExists) of
-    (False, False) -> do
-      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
-      createGenesisInfo network
-    (False, True) -> do
-      $logInfoS "mkAll" "Converting 'genesis.json' from old format 'genesisOld.json'"
-      convertGenesisFromOld
-    (True, _) -> do
+  if genesisExists
+    then do
       $logInfoS "mkAll" "Using provided 'genesis.json'"
       return ()
-
+    else do
+      $logInfoS "mkAll" "Creating 'genesis.json' using network name"
+      createGenesisInfo network
 
   let pgconf = EC.sqlConfig ethconf
       rawConn = EC.postgreSQLConnectionString pgconf {EC.database = ""}

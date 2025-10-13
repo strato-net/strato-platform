@@ -2,7 +2,7 @@
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Text
+    coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -23,25 +23,13 @@ BlockDataRef
 
 BlockValidatorRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     deriving Eq Read Show
 
 ValidatorDeltaRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     direction Bool
-    deriving Eq Read Show
-
-CertificateAddedRef
-    blockDataRefId BlockDataRefId
-    commonName Text
-    userAddress Address
-    certString Text
-    deriving Eq Read Show
-
-CertificateRevokedRef
-    blockDataRefId BlockDataRefId
-    userAddress Address
     deriving Eq Read Show
 
 ProposalSignatureRef

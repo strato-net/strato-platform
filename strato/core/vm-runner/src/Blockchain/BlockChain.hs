@@ -284,10 +284,9 @@ verifyBlock ::
   m [BlockVerificationFailureDetails]
 verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
   validity <- checkValidity parentBSum b
-  let (vDelt, cDelt) = getDeltasFromResults trrs
+  let vDelt = getDeltasFromResults trrs
       blockSR = Just $ stateRoot bh
       bVd = toDelta (newValidators bh) (removedValidators bh)
-      bCd = toDelta (newCerts bh) (revokedCerts bh)
       srCheck =  if derivedSR == blockSR
         then Nothing
         else Just . StateRootMismatch $
@@ -296,12 +295,9 @@ verifyBlock b@Block{blockBlockData = bh} (trrs, derivedSR) parentBSum = do
       validatorCheck = if eqDelta bVd vDelt
         then Nothing
         else Just . ValidatorMismatch $ BlockDelta (fromDelta bVd) (fromDelta vDelt)
-      certCheck = if eqDelta bCd cDelt
-        then Nothing
-        else Just . CertRegistrationMismatch $ BlockDelta (fromDelta bCd) (fromDelta cDelt)
    in return $ validity ++ case blockHeaderVersion bh of
         1 -> catMaybes [srCheck]
-        2 -> catMaybes [srCheck, validatorCheck, certCheck]
+        2 -> catMaybes [srCheck, validatorCheck]
         v -> [VersionMismatch $ BlockDelta v 2]
 
 addBlockTransactions :: (Bagger.MonadBagger m, MonadMonitor m) => OutputBlock -> Address -> ConduitT a VmOutEvent m [TxRunResult]

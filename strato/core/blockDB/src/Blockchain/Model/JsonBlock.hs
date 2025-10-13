@@ -19,16 +19,13 @@ module Blockchain.Model.JsonBlock (
   asrToAsrPrime
   ) where
 
-import           BlockApps.X509
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.DataDefs
 import           Blockchain.Data.Transaction
 import           Blockchain.Data.TXOrigin
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
-import           Blockchain.Strato.Model.Class        (DummyCertRevocation (..),
-                                                       blockHeaderHash)
+import           Blockchain.Strato.Model.Class        (blockHeaderHash)
 import           Blockchain.Strato.Model.ExtendedWord (word256ToBytes)
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -40,7 +37,6 @@ import           Data.Aeson.Types                     (Parser)
 import qualified Data.ByteString                      as B
 import           Data.Maybe
 import           Data.Swagger                         hiding (format)
-import           Data.Text.Encoding                   (encodeUtf8)
 import           Data.Time.Calendar
 import           Data.Time.Clock
 import           Data.Word
@@ -328,20 +324,18 @@ instance ToJSON Block' where
 blockDataRefToBlock :: BlockDataRef ->
                        [BlockValidatorRef] ->
                        [ValidatorDeltaRef] ->
-                       [CertificateAddedRef] ->
-                       [CertificateRevokedRef] ->
                        [ProposalSignatureRef] ->
                        [CommitmentSignatureRef] ->
                        [Transaction] ->
                        Block
-blockDataRefToBlock bdr vs vd ca cr ps sigs txs = case vs of
+blockDataRefToBlock bdr vs vd ps sigs txs = case vs of
   [] -> -- this is a v1 block
     Block
       { blockBlockData =
           BlockHeader
             { parentHash = blockDataRefParentHash bdr,
               ommersHash = blockDataRefUnclesHash bdr,
-              beneficiary = CommonName "" "" (blockDataRefCoinbase bdr) True,
+              beneficiary = blockDataRefCoinbase bdr,
               stateRoot = blockDataRefStateRoot bdr,
               transactionsRoot = blockDataRefTransactionsRoot bdr,
               receiptsRoot = blockDataRefReceiptsRoot bdr,
@@ -373,8 +367,6 @@ blockDataRefToBlock bdr vs vd ca cr ps sigs txs = case vs of
               currentValidators = bvr2v <$> vs,
               newValidators = mapMaybe (vdr2v True) vd,
               removedValidators = mapMaybe (vdr2v False) vd,
-              newCerts = mapMaybe car2x509 ca,
-              revokedCerts = crr2dcr <$> cr,
               proposalSignature = join . listToMaybe $ psr2s <$> ps,
               signatures = mapMaybe csr2s sigs
             },
@@ -420,8 +412,6 @@ instance ToJSON BlockData' where
         "currentValidators" .= currentValidators,
         "newValidators" .= newValidators,
         "removedValidators" .= removedValidators,
-        "newCerts" .= newCerts,
-        "revokedCerts" .= revokedCerts,
         "proposalSignature" .= proposalSignature,
         "signatures" .= signatures
       ]
@@ -490,18 +480,11 @@ bdrToBdrPrime :: BlockDataRef -> BlockDataRef'
 bdrToBdrPrime = BlockDataRef'
 -}
 bvr2v :: BlockValidatorRef -> Validator
-bvr2v (BlockValidatorRef _ cn) = Validator cn
+bvr2v (BlockValidatorRef _ cn) = cn
 
 vdr2v :: Bool -> ValidatorDeltaRef -> Maybe Validator
-vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just $ Validator cn
+vdr2v d' (ValidatorDeltaRef _ cn d) | d' == d = Just cn
 vdr2v _ _ = Nothing
-
-car2x509 :: CertificateAddedRef -> Maybe X509Certificate
-car2x509 (CertificateAddedRef _ _ _ cs) =
-  either (const Nothing) Just . bytesToCert $ encodeUtf8 cs
-
-crr2dcr :: CertificateRevokedRef -> DummyCertRevocation
-crr2dcr (CertificateRevokedRef _ ua) = DummyCertRevocation ua
 
 psr2s :: ProposalSignatureRef -> Maybe Signature
 psr2s (ProposalSignatureRef _ _ r s v) =
