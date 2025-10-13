@@ -39,7 +39,7 @@ export function getHealthApi() {
 
 export function getMetadataApi() {
 
-  const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
+  // const cirrusUrl = env.CIRRUS_URL + "/Certificate?userAddress=eq.";
   
   return fetch(
     metadataUrl,
@@ -53,19 +53,19 @@ export function getMetadataApi() {
     .then(handleErrors)
     .then( async function (response) {
       const metadata = await response.json()
-      const url = cirrusUrl + metadata.nodeAddress
-      const nodeInfoRaw = await fetch (
-          url,
-          {
-              method: 'GET',
-              credentials: "include",
-              headers: {
-              'Accept': 'application/json'
-              },
-          }
-      )
-      const responseJson = await nodeInfoRaw.json()
-      return {metadata, nodeInfo: responseJson[0]}
+      // const url = cirrusUrl + metadata.nodeAddress
+      // const nodeInfoRaw = await fetch (
+      //     url,
+      //     {
+      //         method: 'GET',
+      //         credentials: "include",
+      //         headers: {
+      //         'Accept': 'application/json'
+      //         },
+      //     }
+      // )
+      // const responseJson = await nodeInfoRaw.json()
+      return {metadata}
     })
     .catch(function (error) {
       throw error;
@@ -84,9 +84,8 @@ export function* getHealth(action) {
 
 export function* getMetadata(action) {
     try {
-      console.log("getMetadata action", action);
-      //  const response = yield call(getMetadataApi);
-      //  yield put(fetchMetadataSuccess(response));
+       const response = yield call(getMetadataApi);
+       yield put(fetchMetadataSuccess(response));
     }
     catch (err) {
       yield put(fetchMetadataFailure(err));
