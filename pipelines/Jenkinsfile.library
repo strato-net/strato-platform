@@ -1124,7 +1124,6 @@ def generateGenesisBlock() {
         --output=/genesis-builder/genesis-block.json
     sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json ./
   '''
-  sh "rm _*_path_tmp"
 }
 
 /**
