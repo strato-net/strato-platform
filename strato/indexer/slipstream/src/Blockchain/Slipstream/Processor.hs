@@ -256,11 +256,11 @@ processTheMessages messages = do
 
       -- Create collection tables
       let cc' = SourceAnnotation (initialPosition "") (initialPosition "") () <$ cc
-          inherited <- case getInheritedContracts cc' (_contractName c) of
-            Left err -> do
-              $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
-              pure []
-            Right contracts -> pure $ map (T.pack . _contractName) contracts
+      inherited <- case getInheritedContracts cc' (_contractName c) of
+        Left err -> do
+          $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
+          pure []
+        Right contracts -> pure $ map (T.pack . _contractName) contracts
       indexFkeys <- createIndexTable c cc nameParts inherited
       collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited
