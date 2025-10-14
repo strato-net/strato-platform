@@ -68,6 +68,8 @@ function parseArgs() {
  *  Also used to verify that the address is actually a Proxy
  */
 async function getLogicContract(tokenObj, proxyAddress) {
+    // @dustin: if you have all the addresses, you can query the storage table
+    console.log(`Getting logic contract for proxy ${proxyAddress}`);
     const contract = { address: proxyAddress, name: 'Proxy' };
     const options = { config };
     
@@ -81,6 +83,7 @@ async function getLogicContract(tokenObj, proxyAddress) {
     if (!implementationAddress) {
         throw new Error('Could not retrieve logicContract address from Proxy.\nIs this address actually a Proxy?');
     }
+    console.log(`Logic contract for proxy ${proxyAddress}: ${implementationAddress}`);
     return implementationAddress;
 }
 
@@ -124,57 +127,79 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
 
 /**
  * Looks up all instances of proxies that point to a logicContract named according to the supplied query.
- * @param contractName The name of the contract for which to search
- * @return A list of addresses, each of which is the address of a proxy whose logicContract is a <`contractName`>
+ * @param {Object} tokenObj - Authentication token object
+ * @param {string} contractName - The name of the contract for which to search
+ * @return {Promise<string[]>} A list of addresses, each of which is the address of a proxy whose logicContract is a <`contractName`>
  */
 async function getInstancesOfContractProxied(tokenObj, contractName) {
     // Find all proxy addresses whose logicContract points to an implementation of contractName
-    // Implementation: search for all proxies, check their logicContract, then contract name
-
-    // 1. Find all contracts that are proxies
-    const proxySearchOptions = {
-        config,
-        query: {}
-    };
-
-    let proxies;
+    // Uses BLOC API to get all Proxy contracts (including genesis), then filters by implementation
+    
+    const nodeUrl = config.nodes[0].url;
+    const token = tokenObj.token;
+    const options = { config };
+    
+    // 1. Get ALL Proxy contracts using BLOC API (includes genesis contracts)
+    // The BLOC API endpoint is at /bloc/v2.2/contracts
+    let allProxyAddresses = [];
     try {
-        proxies = await rest.search(tokenObj, { name: 'Proxy' }, proxySearchOptions);
+        const contractsUrl = `${nodeUrl}/bloc/v2.2/contracts?name=Proxy`;
+        const response = await axios.get(contractsUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+        
+        // Response should be an object with contract names as keys
+        if (response.data && response.data.Proxy) {
+            allProxyAddresses = response.data.Proxy.map(p => p.address);
+            console.log(`Found ${allProxyAddresses.length} Proxy contracts from BLOC API`);
+        }
     } catch (err) {
-        throw new Error(`Failed to fetch proxies: ${err.message || err}`);
-    }
-
-    if (!proxies || proxies.length === 0) {
+        console.log(`BLOC API error: ${err.message}`);
         return [];
     }
-
-    // 2. For each proxy, get its logicContract address
+    
+    if (allProxyAddresses.length === 0) {
+        console.log('No Proxy contracts found');
+        return [];
+    }
+    
+    console.log(`Checking ${allProxyAddresses.length} proxies for ${contractName} implementations`);
+    
+    // 2. For each proxy, verify it points to the target contract type
     const results = [];
-    for (const proxy of proxies) {
-        const proxyAddress = proxy.address;
-        let logicContract;
+    
+    for (const proxyAddress of allProxyAddresses) {
         try {
-            logicContract = await getLogicContract(tokenObj, proxyAddress);
-        } catch (e) {
-            continue; // skip if not a proxy or error
-        }
-        // 3. Lookup that logicContract address in Cirrus by name
-        const implSearchOptions = {
-            config,
-            query: {
-                address: `eq.${logicContract}`
+            // Get the logic contract address from the proxy
+            const logicContractAddress = await getLogicContract(tokenObj, proxyAddress);
+            
+            // Get the implementation contract details to check the name
+            const contractDetails = await rest.getContractsDetails(
+                tokenObj,
+                { address: logicContractAddress },
+                options
+            );
+            
+            if (contractDetails && contractDetails._contractName === contractName) {
+                console.log(`✓ ${proxyAddress} -> ${contractName} at ${logicContractAddress}`);
+                results.push(proxyAddress);
             }
-        };
-        let matches;
-        try {
-            matches = await rest.search(tokenObj, { name: contractName }, implSearchOptions);
         } catch (e) {
-            continue; // skip broken implementation lookups
-        }
-        if (matches && matches.length > 0) {
-            results.push(proxyAddress);
+            // Handle specific case: implementation address doesn't exist or isn't deployed
+            if (e.response && e.response.status === 400 && e.response.data && 
+                typeof e.response.data === 'string' && 
+                e.response.data.includes("couldn't find contract details")) {
+                // This is expected for proxies pointing to non-existent implementations
+                continue;
+            }
+            // For other errors, also skip silently
+            continue;
         }
     }
+    
     return results;
 }
 
@@ -273,7 +298,7 @@ async function main() {
       if (args['proxy-address']) {
         const sourceCode = await getCurrentImplementationCode(
           tokenObj,
-          args['proxy-address'] || 'e8802b449c47f0d651e2707a31a58f79e5b0d53a'
+          args['proxy-address']
         );
         if (sourceCode) {
           console.log('Source code retrieved successfully!');
@@ -289,9 +314,10 @@ async function main() {
       if (args['contract-name']) {
         const instances = await getInstancesOfContractProxied(
           tokenObj,
-          args['contract-name'] || 'LendingPool'
+          args['contract-name']
         );
-        console.log('Instances:', instances);
+        console.log(`\nFound ${instances.length} proxies with ${args['contract-name']} implementation:`);
+        console.log(instances);
       }
 
       process.exit(0);
@@ -473,3 +499,4 @@ if (require.main === module) {
 }
 
 module.exports = main;
+
