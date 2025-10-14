@@ -34,9 +34,9 @@ import {
 } from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
 // import ReactGA from "react-ga4";
-import { Popover, PopoverInteractionKind, Position, Intent } from "@blueprintjs/core";
-import { toasts } from "../Toasts";
+import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
+import HexText from "../HexText";
 
 const socket = io(env.SOCKET_SERVER, {
   path: "/apex-ws",
@@ -398,83 +398,24 @@ class Dashboard extends Component {
            <div className="col-sm-4">
             <NumberCard
               number={
-                <div className="d-flex align-items-center">
-                  <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 15) + "..." : "N/A"}</span>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (env.NODE_HOST) {
-                        await navigator.clipboard.writeText(env.NODE_HOST);
-                        toasts.show({
-                          message: "Node Host copied to clipboard!",
-                          intent: Intent.SUCCESS,
-                          timeout: 2000
-                        });
-                      }
-                    }}
-                    className="ml-2 hover:opacity-70 transition-opacity cursor-pointer"
-                    style={{ 
-                      fontSize: '16px', 
-                      background: 'none',
-                      border: 'none',
-                      padding: '0'
-                    }}
-                    title="Copy Node Host"
-                  >
-                    <i className="fa fa-copy"></i>
-                  </button>
-                </div>
+                <HexText value={env.NODE_HOST || "N/A"} shorten={true} />
               }
               description="Node Host"
               iconClass="fa-server"
               className={`smd-pointer`}
               textSize="h4"
-              noTextRight={true}
             />
           </div>
 
           <div className="col-sm-4">
             <NumberCard
               number={
-                <div className="d-flex align-items-center">
-                  <span>{metadata ? metadata.nodeAddress.substring(0, 15) + "..." : "Loading..."}</span>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (metadata && metadata.nodeAddress) {
-                        await navigator.clipboard.writeText(metadata.nodeAddress);
-                        toasts.show({
-                          message: "Node Address copied to clipboard!",
-                          intent: Intent.SUCCESS,
-                          timeout: 2000
-                        });
-                      } else {
-                        toasts.show({
-                          message: "No address available to copy",
-                          intent: Intent.WARNING,
-                          timeout: 2000
-                        });
-                      }
-                    }}
-                    className={`ml-2 transition-opacity cursor-pointer ${(!metadata || !metadata.nodeAddress) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-70'}`}
-                    style={{ 
-                      fontSize: '16px', 
-                      background: 'none',
-                      border: 'none',
-                      padding: '0'
-                    }}
-                    title="Copy Node Address"
-                    disabled={!metadata || !metadata.nodeAddress}
-                  >
-                    <i className="fa fa-copy"></i>
-                  </button>
-                </div>
+                <HexText value={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."} shorten={true} />
               }
               description="Node Address"
               iconClass="fa-id-card"
               className={`smd-pointer`}
               textSize="h4"
-              noTextRight={true}
             />
           </div>
 
