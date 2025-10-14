@@ -1,0 +1,36 @@
+import { Request, Response, NextFunction } from "express";
+import RestStatus from "http-status-codes";
+import { pendingCataAll } from "../helpers/rewards/pending.helpers";
+import { rewardsChef } from "../../config/constants";
+
+class RewardsChefController {
+  static async getPendingRewards(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+
+      const pendingCata = await pendingCataAll(
+        accessToken,
+        rewardsChef,
+        userAddress
+      );
+
+      // Format with proper decimals (wei to CATA with 18 decimals)
+      const pendingCataBigInt = BigInt(pendingCata);
+      const pendingCataFormatted = (Number(pendingCataBigInt) / 1e18).toFixed(2);
+
+      res.status(RestStatus.OK).json({
+        userAddress,
+        pendingCata,
+        pendingCataFormatted
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+export default RewardsChefController;
