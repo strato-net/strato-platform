@@ -689,12 +689,11 @@ insertDelegatecall ::
   OutputM m =>
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall (Delegatecall s _ c a n) = do
+insertDelegatecall (Delegatecall s _ c _ n) = do
   let contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
       contractValsForSQL = map (Just . SimpleValue)
         [ ValueAddress s,
           ValueString c,
-          ValueString a,
           ValueString n
         ]
    in yield $ InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
