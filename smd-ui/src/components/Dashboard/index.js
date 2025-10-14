@@ -34,7 +34,9 @@ import {
 } from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
 // import ReactGA from "react-ga4";
-import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
+import { Popover, PopoverInteractionKind, Position, Button, Intent } from "@blueprintjs/core";
+import { CopyToClipboard } from "react-copy-to-clipboard";
+import { toasts } from "../Toasts";
 import ValidatorsCard from "../ValidatorsCard";
 
 const socket = io(env.SOCKET_SERVER, {
@@ -399,13 +401,25 @@ class Dashboard extends Component {
               number={
                 <div className="d-flex align-items-center justify-content-between">
                   <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 5) + "..." : "N/A"}</span>
-                  <button
-                    className="btn btn-sm btn-outline-secondary ml-2"
-                    onClick={() => navigator.clipboard.writeText(env.NODE_HOST)}
-                    title="Copy Node Host"
+                  <CopyToClipboard
+                    text={env.NODE_HOST || ""}
+                    onCopy={() => {
+                      toasts.show({
+                        message: "Node Host copied to clipboard!",
+                        intent: Intent.SUCCESS,
+                        timeout: 2000
+                      });
+                    }}
                   >
-                    <i className="fa fa-copy"></i>
-                  </button>
+                    <Button
+                      minimal
+                      small
+                      icon="clipboard"
+                      intent={Intent.PRIMARY}
+                      className="ml-2"
+                      title="Copy Node Host"
+                    />
+                  </CopyToClipboard>
                 </div>
               }
               description="Node Host"
@@ -420,14 +434,34 @@ class Dashboard extends Component {
               number={
                 <div className="d-flex align-items-center justify-content-between">
                   <span>{metadata ? metadata.nodeAddress.substring(0, 5) + "..." : "Loading..."}</span>
-                  <button
-                    className="btn btn-sm btn-outline-secondary ml-2"
-                    onClick={() => navigator.clipboard.writeText(metadata && metadata.nodeAddress)}
-                    disabled={!metadata || !metadata.nodeAddress}
-                    title="Copy Node Address"
+                  <CopyToClipboard
+                    text={metadata && metadata.nodeAddress ? metadata.nodeAddress : ""}
+                    onCopy={() => {
+                      if (metadata && metadata.nodeAddress) {
+                        toasts.show({
+                          message: "Node Address copied to clipboard!",
+                          intent: Intent.SUCCESS,
+                          timeout: 2000
+                        });
+                      } else {
+                        toasts.show({
+                          message: "No address available to copy",
+                          intent: Intent.WARNING,
+                          timeout: 2000
+                        });
+                      }
+                    }}
                   >
-                    <i className="fa fa-copy"></i>
-                  </button>
+                    <Button
+                      minimal
+                      small
+                      icon="clipboard"
+                      intent={Intent.PRIMARY}
+                      className="ml-2"
+                      title="Copy Node Address"
+                      disabled={!metadata || !metadata.nodeAddress}
+                    />
+                  </CopyToClipboard>
                 </div>
               }
               description="Node Address"
