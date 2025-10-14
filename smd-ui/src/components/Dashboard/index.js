@@ -34,8 +34,7 @@ import {
 } from "../../sockets/rooms";
 import { sec2Date } from "../../lib/formatSeconds";
 // import ReactGA from "react-ga4";
-import { Popover, PopoverInteractionKind, Position, Button, Intent } from "@blueprintjs/core";
-import { CopyToClipboard } from "react-copy-to-clipboard";
+import { Popover, PopoverInteractionKind, Position, Intent } from "@blueprintjs/core";
 import { toasts } from "../Toasts";
 import ValidatorsCard from "../ValidatorsCard";
 
@@ -399,27 +398,32 @@ class Dashboard extends Component {
            <div className="col-sm-4">
             <NumberCard
               number={
-                <div className="d-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center">
                   <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 5) + "..." : "N/A"}</span>
-                  <CopyToClipboard
-                    text={env.NODE_HOST || ""}
-                    onCopy={() => {
-                      toasts.show({
-                        message: "Node Host copied to clipboard!",
-                        intent: Intent.SUCCESS,
-                        timeout: 2000
-                      });
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (env.NODE_HOST) {
+                        await navigator.clipboard.writeText(env.NODE_HOST);
+                        toasts.show({
+                          message: "Node Host copied to clipboard!",
+                          intent: Intent.SUCCESS,
+                          timeout: 2000
+                        });
+                      }
                     }}
+                    className="ml-2 hover:opacity-70 transition-opacity cursor-pointer"
+                    style={{ 
+                      fontSize: '12px', 
+                      color: 'white',
+                      background: 'none',
+                      border: 'none',
+                      padding: '0'
+                    }}
+                    title="Copy Node Host"
                   >
-                    <Button
-                      minimal
-                      small
-                      icon="clipboard"
-                      intent={Intent.PRIMARY}
-                      className="ml-2"
-                      title="Copy Node Host"
-                    />
-                  </CopyToClipboard>
+                    <i className="fa fa-copy"></i>
+                  </button>
                 </div>
               }
               description="Node Host"
@@ -432,12 +436,13 @@ class Dashboard extends Component {
           <div className="col-sm-4">
             <NumberCard
               number={
-                <div className="d-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center">
                   <span>{metadata ? metadata.nodeAddress.substring(0, 5) + "..." : "Loading..."}</span>
-                  <CopyToClipboard
-                    text={metadata && metadata.nodeAddress ? metadata.nodeAddress : ""}
-                    onCopy={() => {
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
                       if (metadata && metadata.nodeAddress) {
+                        await navigator.clipboard.writeText(metadata.nodeAddress);
                         toasts.show({
                           message: "Node Address copied to clipboard!",
                           intent: Intent.SUCCESS,
@@ -451,17 +456,19 @@ class Dashboard extends Component {
                         });
                       }
                     }}
+                    className={`ml-2 transition-opacity cursor-pointer ${(!metadata || !metadata.nodeAddress) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-70'}`}
+                    style={{ 
+                      fontSize: '12px', 
+                      color: (!metadata || !metadata.nodeAddress) ? '#ccc' : 'white',
+                      background: 'none',
+                      border: 'none',
+                      padding: '0'
+                    }}
+                    title="Copy Node Address"
+                    disabled={!metadata || !metadata.nodeAddress}
                   >
-                    <Button
-                      minimal
-                      small
-                      icon="clipboard"
-                      intent={Intent.PRIMARY}
-                      className="ml-2"
-                      title="Copy Node Address"
-                      disabled={!metadata || !metadata.nodeAddress}
-                    />
-                  </CopyToClipboard>
+                    <i className="fa fa-copy"></i>
+                  </button>
                 </div>
               }
               description="Node Address"
