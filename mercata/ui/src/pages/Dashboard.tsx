@@ -6,10 +6,11 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
+import { usePendingRewards } from "@/hooks/usePendingRewards";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { formatUnits } from "viem";
@@ -40,6 +41,7 @@ const Dashboard = () => {
   const { totalCDPDebt } = useCDP();
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
   const { safetyInfo } = useSafetyContext();
+  const { pendingRewards } = usePendingRewards(true, 30000);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
@@ -117,7 +119,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
@@ -131,6 +133,13 @@ const Dashboard = () => {
               tooltip={cataBalance === 0 ? "No rewards yet - start staking to earn CATA!" : undefined}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
+            />
+
+            <AssetSummary
+              title="Pending CATA"
+              value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
+              icon={<Banknote className="text-white" size={18} />}
+              color={pendingRewards == "0" ? "bg-gray-500" : "bg-green-500"}
             />
 
             <AssetSummary
