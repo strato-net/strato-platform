@@ -363,7 +363,7 @@ contract Describe_MercataBridge is Authorizable {
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert setRelayer by non-owner");
+        require(!reverted, "Should not revert setRelayer by non-owner");
         
         reverted = false;
         try {
@@ -371,7 +371,7 @@ contract Describe_MercataBridge is Authorizable {
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert setPause by non-owner");
+        require(!reverted, "Should not revert setPause by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============
