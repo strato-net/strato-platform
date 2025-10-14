@@ -1122,7 +1122,7 @@ def generateGenesisBlock() {
         --validators=/genesis-builder/validators.json \\
         --admins=/genesis-builder/admins.json \\
         --output=/genesis-builder/genesis-block.json
-    sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json ./
+    sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json ./bootstrap-docker
   '''
 }
 
