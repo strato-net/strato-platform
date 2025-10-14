@@ -484,6 +484,29 @@ contract record RewardsChef is Ownable {
         return ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
     }
 
+    function pendingCataAll(address _user) external view returns (uint256) {
+        uint256 totalPending = 0;
+
+        for (uint256 pid = 0; pid < pools.length; pid++) {
+            PoolInfo storage pool = pools[pid];
+            UserInfo storage user = userInfo[pid][_user];
+
+            uint256 accPerToken = pool.accPerToken;
+            uint256 lpSupply = ERC20(pool.lpToken).balanceOf(address(this));
+
+            if (block.timestamp > pool.lastRewardTimestamp && lpSupply != 0) {
+                uint256 multiplier = getMultiplier(pid, pool.lastRewardTimestamp, block.timestamp);
+                uint256 cataReward = (multiplier * cataPerSecond * pool.allocPoint) / totalAllocPoint;
+                accPerToken += (cataReward * PRECISION_MULTIPLIER) / lpSupply;
+            }
+
+            uint256 pending = ((user.amount * accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
+            totalPending += pending;
+        }
+
+        return totalPending;
+    }
+
     function getBalance(uint256 _pid, address _user) external view returns (uint256) {
         require(_pid < pools.length, "Pool does not exist");
         return userInfo[_pid][_user].amount;
