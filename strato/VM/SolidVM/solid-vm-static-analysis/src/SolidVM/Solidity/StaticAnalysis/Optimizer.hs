@@ -369,11 +369,7 @@ optimizeExpression (FunctionCall x1 (Variable x3 f@('u':'i':'n':'t':_)) (xp:args
   let xp' = Ternary x3 (Binary x3 "<" xp (NumberLiteral x3 0 Nothing)) (Unitary x3 "-" xp) xp
   pure $ FunctionCall x1 (Variable x3 f) (xp':args)
 
--- This needs further research before letting loose on the code base
--- This function as of now is neutured
--- See git blame for code that was here before
 optimizeExpression e@(Variable x name) _ = checkUintUnderflow x name e
-optimizeExpression e@(NewExpression _ _) _ = pure e
 optimizeExpression (Unitary x s a) z = Unitary x s
                                    <$> optimizeExpression a z
 optimizeExpression (Binary x s a b) z = Binary x s
@@ -398,6 +394,8 @@ optimizeExpression (ArrayExpression x es) z = ArrayExpression x
                                           <$> traverse (flip optimizeExpression z) es
 optimizeExpression (ObjectLiteral x m) z = ObjectLiteral x
                                        <$> traverse (flip optimizeExpression z) m
+--  Keeping each case explicitly listed here, so that none are accidentally forgotten in the future
+optimizeExpression e@NewExpression{}     _ = pure e
 optimizeExpression e@BoolLiteral{}       _ = pure e
 optimizeExpression e@NumberLiteral{}     _ = pure e
 optimizeExpression e@DecimalLiteral{}    _ = pure e
@@ -405,26 +403,3 @@ optimizeExpression e@StringLiteral{}     _ = pure e
 optimizeExpression e@AccountLiteral{}    _ = pure e
 optimizeExpression e@HexaLiteral{}       _ = pure e
 optimizeExpression e@InlineBoundsCheck{} _ = pure e
---   = PlusPlus a (ExpressionF a)
---   | MinusMinus a (ExpressionF a)
---   | NewExpression a Type
---   | IndexAccess a (ExpressionF a) (Maybe (ExpressionF a))
---   | MemberAccess a (ExpressionF a) SolidString -- ie- "x.y"
---   | FunctionCall a (ExpressionF a) (ArgListF a)
---   | Unitary a String (ExpressionF a)
---   | Binary a String (ExpressionF a) (ExpressionF a)
---   | Ternary a (ExpressionF a) (ExpressionF a) (ExpressionF a)
---   | BoolLiteral a Bool
---   | NumberLiteral a Integer (Maybe NumberUnit)
---   | DecimalLiteral a WrappedDecimal
---   | StringLiteral a String
---   | AccountLiteral a NamedAccount
---   | TupleExpression a [Maybe (ExpressionF a)]
---   | ArrayExpression a [(ExpressionF a)]
---   | Variable a SolidString
---   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
---   | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
---     -- I wanted to make this a generic InlineAssert, but that would require either adding redundant
---     -- expressions to the AST, introducing partially-applied expressions, or some other phantom
---     -- expressions that I want to avoid. Instead, I give you InlineBoundsCheck as a compromise
---   | InlineBoundsCheck a (Maybe Integer) (Maybe Integer) (ExpressionF a)
