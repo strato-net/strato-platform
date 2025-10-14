@@ -27,7 +27,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const [existingVaultDebt, setExistingVaultDebt] = useState<string>("0"); // Wei format
   const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const [isAssetPaused, setIsAssetPaused] = useState<boolean>(false);
-  const [maxBorrowableUSDST, setMaxBorrowableUSDST] = useState<number>(0);
+  const [maxBorrowableUSD, setMaxBorrowableUSD] = useState<number>(0);
   const [maxBorrowLoading, setMaxBorrowLoading] = useState<boolean>(false);
   const { toast } = useToast();
   const { activeTokens } = useUserTokens();
@@ -44,8 +44,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const getTotalCollateralValue = useCallback((): number => {
     if (!depositAsset) return 0;
     
-    const assetPriceUSDST = getAssetPrice();
-    if (assetPriceUSDST <= 0) return 0;
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return 0;
     
     // Get existing vault data (converted from wei to decimal)
     const existingCollateralDecimal = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18));
@@ -54,16 +54,16 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     // Calculate total collateral in tokens
     const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
     
-    // Convert to USDST
-    return totalCollateralTokens * assetPriceUSDST;
+    // Convert to USD
+    return totalCollateralTokens * assetPriceUSD;
   }, [depositAsset, getAssetPrice, existingVaultCollateral, depositAmount]);
 
   // Calculate projected CR based on current inputs
   const calculateProjectedCR = useCallback((): number => {
     if (!depositAsset) return 0;
     
-    const totalCollateralValueUSDST = getTotalCollateralValue();
-    if (totalCollateralValueUSDST <= 0) return 0;
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) return 0;
     
     // Get existing debt and new borrow amount
     const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
@@ -74,7 +74,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     if (totalDebt <= 0) return 999999; // Infinite CR when no debt
     
     // CR = (total collateral value / total debt value) * 100
-    const projectedCR = (totalCollateralValueUSDST / totalDebt) * 100;
+    const projectedCR = (totalCollateralValueUSD / totalDebt) * 100;
     
     return isFinite(projectedCR) ? projectedCR : 0;
   }, [depositAsset, getTotalCollateralValue, existingVaultDebt, borrowAmount]);
@@ -90,11 +90,11 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       const result = await cdpService.getMaxMint(depositAsset.asset);
       // Convert from wei to decimal format (USDST is 18 decimals)
       const maxAmount = parseFloat(formatWeiToDecimalHP(result.maxAmount, 18));
-      setMaxBorrowableUSDST(maxAmount);
+      setMaxBorrowableUSD(maxAmount);
       return maxAmount;
     } catch (error) {
       console.error("Failed to get max borrow amount from backend:", error);
-      setMaxBorrowableUSDST(0);
+      setMaxBorrowableUSD(0);
       return 0;
     } finally {
       setMaxBorrowLoading(false);
@@ -106,19 +106,19 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   const calculateMaxBorrowableWithDeposit = useCallback((): number => {
     if (!depositAsset) return 0;
     
-    const assetPriceUSDST = getAssetPrice();
-    if (assetPriceUSDST <= 0) return 0;
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return 0;
     
     // Get total collateral value (existing + new deposit input)
-    const totalCollateralValueUSDST = getTotalCollateralValue();
-    if (totalCollateralValueUSDST <= 0) return 0;
+    const totalCollateralValueUSD = getTotalCollateralValue();
+    if (totalCollateralValueUSD <= 0) return 0;
     
     // Get existing debt
     const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
     
-    // Calculate max borrowable USDST based on total collateral and liquidation ratio
+    // Calculate max borrowable USD based on total collateral and liquidation ratio
     const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100; // Convert percentage to decimal
-    const maxBorrowableFromCollateral = totalCollateralValueUSDST / liquidationRatioDecimal;
+    const maxBorrowableFromCollateral = totalCollateralValueUSD / liquidationRatioDecimal;
     
     // Subtract existing debt to get available borrowing power
     const availableBorrowingPower = maxBorrowableFromCollateral - existingDebtDecimal;
@@ -256,7 +256,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         setExistingVaultCollateral("0");
         setExistingVaultDebt("0");
         setIsAssetPaused(false);
-        setMaxBorrowableUSDST(0);
+        setMaxBorrowableUSD(0);
         return;
       }
 
@@ -287,7 +287,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         setExistingVaultCollateral("?");
         setExistingVaultDebt("?");
         setIsAssetPaused(false);
-        setMaxBorrowableUSDST(0);
+        setMaxBorrowableUSD(0);
       }
     };
 
@@ -409,8 +409,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       return;
     }
     
-    const assetPriceUSDST = getAssetPrice();
-    if (assetPriceUSDST <= 0) return;
+    const assetPriceUSD = getAssetPrice();
+    if (assetPriceUSD <= 0) return;
     
     // Get existing vault data and new deposit
     const existingCollateralDecimal = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18));
@@ -419,14 +419,14 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     
     // Calculate total collateral value
     const totalCollateralTokens = existingCollateralDecimal + newDepositAmount;
-    const totalCollateralValueUSDST = totalCollateralTokens * assetPriceUSDST;
+    const totalCollateralValueUSD = totalCollateralTokens * assetPriceUSD;
     
-    if (totalCollateralValueUSDST <= 0) return;
+    if (totalCollateralValueUSD <= 0) return;
     
     // Calculate required total debt for target CR
     // CR = (collateral value / debt value) * 100
     // So debt value = (collateral value * 100) / CR
-    const requiredTotalDebt = (totalCollateralValueUSDST * 100) / targetCR;
+    const requiredTotalDebt = (totalCollateralValueUSD * 100) / targetCR;
     
     // Calculate new borrow amount needed
     const newBorrowAmount = Math.max(0, requiredTotalDebt - existingDebtDecimal);
@@ -606,8 +606,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
     // If borrowing, check if we have sufficient total collateral
     if (borAmount > 0) {
-    const totalCollateralValueUSDST = getTotalCollateralValue();
-    if (totalCollateralValueUSDST <= 0) {
+      const totalCollateralValueUSD = getTotalCollateralValue();
+      if (totalCollateralValueUSD <= 0) {
       toast({
         title: "Insufficient Collateral",
         description: "You need collateral to borrow. Either deposit now or select an asset with existing vault balance.",
