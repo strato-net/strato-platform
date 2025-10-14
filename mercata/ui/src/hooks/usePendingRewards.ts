@@ -27,14 +27,8 @@ export const usePendingRewards = (enabled = true, refreshInterval = 10000) => {
 
     try {
       setLoading(true);
-      setError(null);
-
       const response = await api.get<PendingRewardsData>("/rewards/pending");
       setPendingRewards(response.data.pendingCataFormatted);
-    } catch (err) {
-      console.error("Failed to fetch pending rewards:", err);
-      setError(err instanceof Error ? err : new Error("Unknown error"));
-      setPendingRewards("0");
     } finally {
       setLoading(false);
     }
