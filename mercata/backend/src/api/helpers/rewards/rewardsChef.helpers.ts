@@ -102,3 +102,39 @@ export const getUserInfo = async (
     return { amount: "0", rewardDebt: "0" };
   }
 };
+
+/**
+ * Fetches RewardsChef global state (cataPerSecond and totalAllocPoint)
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @returns Promise resolving to global state
+ */
+export const getRewardsChefState = async (
+  accessToken: string,
+  rewardsChefAddress: string
+): Promise<{ cataPerSecond: string; totalAllocPoint: string } | null> => {
+  try {
+    const response = await cirrus.get(accessToken, `/${RewardsChef}`, {
+      params: {
+        address: `eq.${rewardsChefAddress}`,
+        select: "cataPerSecond::text,totalAllocPoint::text",
+        order: "block_timestamp.desc",
+        limit: "1"
+      }
+    });
+
+    const state = response.data?.[0];
+    if (!state) {
+      return null;
+    }
+
+    return {
+      cataPerSecond: state.cataPerSecond,
+      totalAllocPoint: state.totalAllocPoint
+    };
+  } catch (error) {
+    console.error("Failed to fetch RewardsChef state:", error);
+    return null;
+  }
+};
