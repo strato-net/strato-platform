@@ -10,7 +10,7 @@ contract record Voucher is ERC20, Ownable {
     }
 
     function transfer(address to, uint256 value) public override returns (bool) {
-        return false;
+        require(false, "Voucher transfers are prohibited");
     }
 
     function allowance(address owner, address spender) public view override returns (uint256) {
@@ -18,11 +18,11 @@ contract record Voucher is ERC20, Ownable {
     }
 
     function approve(address spender, uint256 value) public override returns (bool) {
-        return false;
+        require(false, "Voucher approvals are prohibited");
     }
 
     function transferFrom(address from, address to, uint256 value) public override returns (bool) {
-        return false;
+        require(false, "Voucher transfers are prohibited");
     }
 
     function mint(address to, uint256 amount) external onlyOwner {
