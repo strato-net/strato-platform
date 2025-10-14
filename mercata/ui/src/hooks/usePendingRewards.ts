@@ -5,7 +5,6 @@ import { useUser } from "@/context/UserContext";
 interface PendingRewardsData {
   pendingCata: string;
   pendingCataFormatted: string;
-  userAddress: string;
 }
 
 /**

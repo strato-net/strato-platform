@@ -23,7 +23,6 @@ class RewardsChefController {
       const pendingCataFormatted = (Number(pendingCataBigInt) / 1e18).toFixed(2);
 
       res.status(RestStatus.OK).json({
-        userAddress,
         pendingCata,
         pendingCataFormatted
       });
