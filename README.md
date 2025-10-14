@@ -59,14 +59,7 @@
 
 ### Locally:
 - Start:
-  - OPTION A (libraries installed system-wide):
     ```
-    ./start my_node_name
-    ```
-    and follow the steps to provide the OAuth credentials etc.
-  - OPTION B (nix env): the compiled executables still require some of the dependencies at run time - we'll use the nix shell with same environment from build time:
-    ```
-    nix-shell strato/nix/stack.nix  # only required on some setups with nix PATHS not set correctly, otherwise can be skipped
     ./start my_node_name
     ```
 - Wipe:
@@ -77,10 +70,8 @@
   
 ### Dockerized:
 - Start:
-  - `git clone https://github.com/blockapps/strato-getting-started` (***NOTE:*** to be deprecated soon in favor of docker-compose native commands executed directly in strato-platform)
-  - `cp docker-compose.allDocker.yml strato-getting-started/`
-  - `cd strato-getting-started`
-  - edit `strato-run.sh`, e.g. for testnet:
+  - `cd bootstrap-docker`
+  - Create `strato-run.sh`, e.g. for testnet:
     ```
     NODE_HOST='localhost' \
     network='helium' \
@@ -94,6 +85,6 @@
 
 - Wipe:
   ```
-  cd strato-getting-started
+  cd bootstrap-docker
   sudo ./strato --wipe
   ```
