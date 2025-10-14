@@ -31,7 +31,7 @@ The entrypoints are mutually exclusive.
 --set-password  - set or re-enter the STRATO Vault's in-memory password; use PASSWORD env var to skip interactive input.
 --down          - remove strato containers and leave all volumes intact.
 --wipe          - stop and remove STRATO containers and wipe out volumes.
---pull          - pull images used in docker-compose.vault.yml.
+--pull          - pull images used in ../docker-compose.vault.yml.
 
 ${Yellow}Environment variables:${NC}
 PASSWORD           - STRATO Vault's in-memory password. To be requested interactively if skipped.
@@ -200,12 +200,12 @@ if [[ ${HTTP_PORT} == ${HTTPS_PORT} ]]; then
   exit 7
 fi
 
-if [ -f docker-compose.vault.yml ]
+if [ -f ../docker-compose.vault.yml ]
 then
   echo -e "${Red}../docker-compose.vault.yml not found. Please build the platform first with 'make' (see README.md).${NC}"
   exit 3
 else
-  echo -e "${BYellow}Using the existing docker-compose.vault.yml (to download the most recent stable version - remove the file and restart the script)${NC}"
+  echo -e "${BYellow}Using the existing ../docker-compose.vault.yml (to download the most recent stable version - remove the file and restart the script)${NC}"
 fi
 
 # COMPOSE FILE PRE-PROCESSING
@@ -215,12 +215,12 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
+  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' ../docker-compose.vault.yml > docker-compose-vault-temp.yml
 else
   if [ ${HTTPS_PORT} != "8093" ]; then
-    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' docker-compose.vault.yml > docker-compose-vault-temp.yml
+    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' ../docker-compose.vault.yml > docker-compose-vault-temp.yml
   else
-    cp docker-compose.vault.yml docker-compose-vault-temp.yml
+    cp ../docker-compose.vault.yml docker-compose-vault-temp.yml
   fi
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
