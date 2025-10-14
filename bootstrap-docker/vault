@@ -200,7 +200,7 @@ if [[ ${HTTP_PORT} == ${HTTPS_PORT} ]]; then
   exit 7
 fi
 
-if [ -f ../docker-compose.vault.yml ]
+if [ ! -f ../docker-compose.vault.yml ]
 then
   echo -e "${Red}../docker-compose.vault.yml not found. Please build the platform first with 'make' (see README.md).${NC}"
   exit 3
