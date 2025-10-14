@@ -166,6 +166,7 @@ create s =
     (s ^. createArgs . argsTxHash)
     (s ^. createContractName)
     (s ^. createArgs . argsArgs)
+    False
 
 createReturnEnv ::
   (SolidVM.SolidVMBase m) =>
@@ -183,6 +184,7 @@ createReturnEnv s =
     (s ^. createArgs . argsTxHash)
     (s ^. createContractName)
     (s ^. createArgs . argsArgs)
+    False
 
 call ::
   (SolidVM.SolidVMBase m) =>
@@ -200,6 +202,7 @@ call s =
     (s ^. callFuncName)
     (s ^. callArgs . argsArgs)
     Nothing
+    False
 
 callReturnEnv ::
   (SolidVM.SolidVMBase m) =>
@@ -217,3 +220,4 @@ callReturnEnv s =
     (s ^. callFuncName)
     (s ^. callArgs . argsArgs)
     Nothing
+    False

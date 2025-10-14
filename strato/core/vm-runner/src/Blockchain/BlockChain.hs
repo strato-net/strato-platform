@@ -74,7 +74,7 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
 import Blockchain.TheDAOFork
 import Blockchain.Timing
-import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
+import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas, TypeError))
 import Blockchain.VMConstants
 import Blockchain.VMContext
 import Blockchain.VMMetrics
@@ -328,7 +328,7 @@ addTransactions blockData txs proposer =
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
-      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer
+      (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer True
 
       afterMap <- getAddressStateTxDBMap
 
@@ -353,7 +353,7 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
 
   let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
   beforeMap <- getAddressStateTxDBMap
-  (!time', !result) <- timeIt . runExceptT $ addTransaction header remGas tx mSelfAddress
+  (!time', !result) <- timeIt . runExceptT $ addTransaction header remGas tx mSelfAddress False
   afterMap <- getAddressStateTxDBMap
   P.setGauge vmTxMining (realToFrac time')
   printTransactionMessage tx result time'
@@ -368,6 +368,10 @@ mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
               return $ Bagger.TxMiningResult (Just $ TFInvalidPragma invalidPragmas tx) (DL.toList ran) unran remGas -- use invalidPragmasUsed here
             else do 
               case erException execResult of
+                Just (Left (TypeError "Typechecker" _)) -> do
+                  putAddressStateTxDBMap M.empty
+                  putMemRawStorageTxMap M.empty
+                  return $ Bagger.TxMiningResult (Just $ TFKnownFailedTX tx) (DL.toList ran) unran remGas
                 Just (Left (TooMuchGas limit actual)) -> do
                   putAddressStateTxDBMap M.empty
                   putMemRawStorageTxMap M.empty
@@ -392,9 +396,10 @@ addTransaction ::
   BlockHeader ->
   Integer ->
   OutputTx ->
-  Address -> 
+  Address ->
+  Bool ->
   ExceptT TransactionFailureCause m ExecResults
-addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
+addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer isCommitted = do
   nonceValid <- lift $ isNonceValid t
 
   let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
@@ -412,7 +417,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult' <- payFees b availableGas tAddr t proposer
+  feeResult' <- payFees b availableGas tAddr t proposer isCommitted
   let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
       combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
@@ -443,7 +448,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       lift $ P.incCounter txTypeCounter
       when flags_strictGas $ $logInfoS "addTx" . T.pack $ "Strict Gas Mode is on. Adjusted transaction gas limit is " ++ show adjustedTxGasLimit
 
-      execResults <- runCodeForTransaction b availableGas tAddr t proposer
+      execResults <- runCodeForTransaction b availableGas tAddr t proposer isCommitted
       lift $ P.incCounter vmTxsProcessed
 
       case erException execResults of
@@ -468,8 +473,9 @@ runCodeForTransaction ::
   Address ->
   OutputTx ->
   Address ->
+  Bool ->
   ExceptT TransactionFailureCause m ExecResults
-runCodeForTransaction b availableGas tAddr t proposer =
+runCodeForTransaction b availableGas tAddr t proposer isCommitted =
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
    in if isContractCreationTX ut
         then do
@@ -491,6 +497,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
               (txHash ut)
               (fromJust $ txContractName ut)
               (txArgs ut)
+              isCommitted
         else do
           when flags_debug $ $logInfoS "runCodeForTransaction" $ T.pack $ "runCodeForTransaction: MessageTX caller: " ++ format tAddr ++ ", address: " ++ format (transactionTo ut)
 
@@ -506,6 +513,7 @@ runCodeForTransaction b availableGas tAddr t proposer =
                   (transactionFuncName ut)
                   (transactionArgs ut)
                   Nothing
+                  isCommitted
 
 payFees ::
   VMBase m =>
@@ -514,8 +522,9 @@ payFees ::
   Address ->
   OutputTx ->
   Address ->
+  Bool ->
   ExceptT TransactionFailureCause m ExecResults
-payFees b availableGas tAddr t proposer = do
+payFees b availableGas tAddr t proposer isCommitted = do
   let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
@@ -532,6 +541,7 @@ payFees b availableGas tAddr t proposer = do
       "decide"
       []
       (Just DelegateCall)
+      isCommitted
 
 ----------------
 {-

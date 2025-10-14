@@ -1112,7 +1112,8 @@ getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
         return (contract, collectionHash ci, codeCollection ci)
       Nothing -> do
         isRunningTests <- Env.runningTests <$> getEnv
-        cc <- codeCollectionFromHash isRunningTests True ch
+        isCommittedBlock <- Env.isCommittedBlock <$> getEnv
+        cc <- codeCollectionFromHash isRunningTests (not isCommittedBlock) ch
 
         let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 

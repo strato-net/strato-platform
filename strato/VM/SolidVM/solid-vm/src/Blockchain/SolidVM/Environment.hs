@@ -22,5 +22,6 @@ data Environment = Environment
     txHash :: Keccak256,
     src :: Maybe Code,
     name :: Maybe Text,
-    runningTests :: Bool
+    runningTests :: Bool,
+    isCommittedBlock :: Bool
   }

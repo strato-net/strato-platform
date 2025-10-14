@@ -190,11 +190,12 @@ create ::
   Keccak256 ->
   Text ->
   [Text] ->
+  Bool ->
   m ExecResults
 --create isRunningTests' isHomestead preExistingSuicideList b callDepth sender origin
 --       value gasPrice availableGas newAddress initCode txHash chainId metadata =
-create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
-  snd <$> createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings
+create blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings isCommitted = do
+  snd <$> createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings isCommitted
 
 createReturnEnv ::
   SolidVMBase m =>
@@ -208,8 +209,9 @@ createReturnEnv ::
   Keccak256 ->
   Text ->
   [Text] ->
+  Bool ->
   m (Env.Environment, ExecResults)
-createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings = do
+createReturnEnv blockData sender' origin' proposer' availableGas newAddress code txHash' contractName argsStrings isCommitted = do
   isRunningTests <- checkIfRunningTests
 
   let Code initCode=code
@@ -223,7 +225,8 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
             Env.txHash = txHash',
             Env.src = Just code,
             Env.name = Just contractName,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.isCommittedBlock = isCommitted
           }
   let gasInfo' =
         GasInfo
@@ -235,7 +238,7 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
 
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
-    (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
+    (hsh, cc) <- codeCollectionFromSource isRunningTests (not isCommitted) $ DT.encodeUtf8 initCode
     (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
@@ -353,11 +356,12 @@ call ::
   Text ->
   [Text] ->
   Maybe CC.FunctionCallType ->
+  Bool ->
   m ExecResults
 --  call isRunningTests' isHomestead noValueTransfer preExistingSuicideList b callDepth receiveAddress
 --       (Address codeAddress) sender value gasPrice theData availableGas origin txHash chainId metadata =
-call blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
-  snd <$> callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType
+call blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType isCommitted = do
+  snd <$> callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType isCommitted
 
 callReturnEnv ::
   SolidVMBase m =>
@@ -371,8 +375,9 @@ callReturnEnv ::
   Text ->
   [Text] ->
   Maybe CC.FunctionCallType ->
+  Bool ->
   m (Env.Environment, ExecResults)
-callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType = do
+callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHash' funcName argsStrings mFuncCallType isCommitted = do
   recordCall
   isRunningTests <- checkIfRunningTests
   let env' =
@@ -384,7 +389,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
             Env.txHash = txHash',
             Env.src = Nothing,
             Env.name = Nothing,
-            Env.runningTests = isRunningTests
+            Env.runningTests = isRunningTests,
+            Env.isCommittedBlock = isCommitted
           }
 
   let gasInfo' =
@@ -2410,7 +2416,8 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  isCommittedBlock <- Env.isCommittedBlock <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests (not isCommittedBlock) $ BC.pack contractSrc
   newAddress <- getNewAddress creator
   theEnv <- getEnv
   let origin = Env.origin theEnv
@@ -2432,7 +2439,8 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- Thus, when the testnet wipes, this pragma can largely be removed because the old contracts on the
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
-  (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
+  isCommittedBlock <- Env.isCommittedBlock <$> getEnv
+  (hsh, cc) <- codeCollectionFromSource isRunningTests (not isCommittedBlock) $ BC.pack contractSrc
   newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
   (ctr, originAddress, ctrName) <- getCreator creator
   execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' argVals
