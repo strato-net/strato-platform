@@ -702,12 +702,12 @@ export const getLoan = async (
   accessToken: string,
   userAddress: string | undefined
 ): Promise<any> => {
-  // Fetch registry; explicit select with borrowIndex so simulateLoan can compute debt
+  // Fetch registry; explicit select with borrowIndex and lastAccrual so simulateLoan can compute debt with projected interest
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
         `address,borrowableAsset,mToken,` +
-        `borrowIndex::text,` +
+        `borrowIndex::text,lastAccrual::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
@@ -720,7 +720,8 @@ export const getLoan = async (
       `liquidityPool:liquidityPool_fkey(address)`
   });
 
-  const borrowIndex = registry.lendingPool?.borrowIndex || "0";
+  const borrowIndexStale = registry.lendingPool?.borrowIndex || "0";
+  const lastAccrual = registry.lendingPool?.lastAccrual || "0";
   const borrowableAsset = registry.lendingPool?.borrowableAsset;
 
   // Build asset configs map (with prices) for health/limits
@@ -734,6 +735,16 @@ export const getLoan = async (
       price,
     });
   });
+
+  // Project borrow index forward to match what _accrue() will calculate
+  const borrowableAssetConfig = assetConfigs.get(borrowableAsset);
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+  const borrowIndex = previewBorrowIndexFromFlatApr(
+    borrowIndexStale,
+    interestRateBps,
+    lastAccrual,
+    Math.floor(Date.now() / 1000)
+  );
 
   if (userAddress) {
     const userLoanEntry = registry.lendingPool?.userLoan?.find((loan: any) => loan.user === userAddress);
@@ -771,7 +782,8 @@ export const repayAll = async (
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,borrowIndex::text,` +
+        `address,borrowableAsset,borrowIndex::text,lastAccrual::text,` +
+        `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
       `liquidityPool:liquidityPool_fkey(address)`
@@ -786,10 +798,22 @@ export const repayAll = async (
     throw new Error("Required pool addresses not found");
   }
 
-  const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  // Project borrow index forward to match what _accrue() will calculate
+  const borrowIndexStale = registry.lendingPool?.borrowIndex || "0";
+  const lastAccrual = registry.lendingPool?.lastAccrual || "0";
+  const borrowableAssetConfig = (registry.lendingPool?.assetConfigs || [])
+    .find((cfg: any) => cfg.asset === borrowableAsset)?.AssetConfig;
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+  const borrowIndex = previewBorrowIndexFromFlatApr(
+    borrowIndexStale,
+    interestRateBps,
+    lastAccrual,
+    Math.floor(Date.now() / 1000)
+  );
+  
   const loanEntry = (registry.lendingPool?.userLoan || []).find((r: any) => r.user === userAddress);
   const scaledDebt = loanEntry?.LoanInfo?.scaledDebt || "0";
-  const exactDebtWei = BigInt(debtFromScaled(scaledDebt, borrowIndexStr));
+  const exactDebtWei = BigInt(debtFromScaled(scaledDebt, borrowIndex));
 
   const MAX_UINT256 = ((1n << 256n) - 1n).toString();
 
@@ -839,7 +863,7 @@ export const executeLiquidation = async (
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,borrowIndex::text,` +
+        `address,borrowableAsset,borrowIndex::text,lastAccrual::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
       `),` +
@@ -870,11 +894,22 @@ export const executeLiquidation = async (
     .filter((c: any) => c.user === loanId)
     .map((c: any) => ({ asset: c.asset, amount: c.amount })) as CollateralInfo[];
 
-  const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
   const borrowableAsset = registry.lendingPool?.borrowableAsset as string;
   if (!borrowableAsset) {
     throw new Error("Borrowable asset not found");
   }
+
+  // Project borrow index forward to match what _accrue() will calculate
+  const borrowIndexStale = registry.lendingPool?.borrowIndex || "0";
+  const lastAccrual = registry.lendingPool?.lastAccrual || "0";
+  const borrowableAssetConfig = assetConfigMap.get(borrowableAsset);
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+  const borrowIndex = previewBorrowIndexFromFlatApr(
+    borrowIndexStale,
+    interestRateBps,
+    lastAccrual,
+    Math.floor(Date.now() / 1000)
+  );
 
   // Determine repayAmount
   let repayAmount: bigint;
@@ -882,8 +917,8 @@ export const executeLiquidation = async (
   if (!treatAsAll) {
     repayAmount = toBig(options.repayAmount as string | number | bigint);
   } else {
-    // Index-based total owed (exact as of read time)
-    const totalOwed = toBig(debtFromScaled(loan.scaledDebt || "0", borrowIndexStr.toString()));
+    // Index-based total owed (projected to current timestamp)
+    const totalOwed = toBig(debtFromScaled(loan.scaledDebt || "0", borrowIndex));
 
     // Health factor to decide close factor (100% or 50%)
     const healthFactorRaw = calculateHealthFactor(
@@ -1130,6 +1165,7 @@ export const listLoansForLiquidation = async (
       `address,` +
       `borrowableAsset,` +
       `borrowIndex::text,` +
+      `lastAccrual::text,` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
       `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
     `),` +
@@ -1143,7 +1179,6 @@ export const listLoansForLiquidation = async (
   const registry = await getPool(accessToken, { select });
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
-  const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
   const assetConfigsArr = registry.lendingPool?.assetConfigs || [];
   const loansArr = registry.lendingPool?.loans || [];
   const collateralsArr = registry.collateralVault?.userCollaterals || [];
@@ -1153,6 +1188,18 @@ export const listLoansForLiquidation = async (
 
   const assetConfigMap = new Map<string, any>();
   assetConfigsArr.forEach((cfg: any) => assetConfigMap.set(cfg.asset, cfg.AssetConfig));
+
+  // Project borrow index forward to match what _accrue() will calculate
+  const borrowIndexStale = registry.lendingPool?.borrowIndex || "0";
+  const lastAccrual = registry.lendingPool?.lastAccrual || "0";
+  const borrowableAssetConfig = assetConfigMap.get(borrowableAsset);
+  const interestRateBps = borrowableAssetConfig?.interestRate || 0;
+  const borrowIndex = previewBorrowIndexFromFlatApr(
+    borrowIndexStale,
+    interestRateBps,
+    lastAccrual,
+    Math.floor(Date.now() / 1000)
+  );
 
   const collMap = new Map<string, CollateralInfo[]>();
   for (const c of collateralsArr) {
@@ -1181,9 +1228,9 @@ export const listLoansForLiquidation = async (
 
     const userColls = collMap.get(userAddr) || [];
 
-    // Index-based current debt
+    // Index-based current debt (projected to current timestamp)
     const userScaledDebtStr = loanInfo.scaledDebt || "0";
-    const totalAmountOwed = debtFromScaled(userScaledDebtStr, borrowIndexStr.toString());
+    const totalAmountOwed = debtFromScaled(userScaledDebtStr, borrowIndex);
 
     // Health factor
     const hfRaw = calculateHealthFactor(
