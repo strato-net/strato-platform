@@ -15,7 +15,7 @@ class NumberCard extends Component {
             <i className={'fa ' + this.props.iconClass + ' fa-5x smd-pad-8'} aria-hidden="true"></i>
           </div>
           <div className="col-xs-8">
-            <div className={`${textSize} text-right`}>
+            <div className={`${textSize} ${this.props.noTextRight ? '' : 'text-right'}`}>
               <strong>{this.props.number}</strong>
             </div>
             <div className="h4 text-right desc">

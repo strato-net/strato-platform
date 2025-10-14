@@ -399,7 +399,7 @@ class Dashboard extends Component {
             <NumberCard
               number={
                 <div className="d-flex align-items-center">
-                  <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 5) + "..." : "N/A"}</span>
+                  <span>{env.NODE_HOST ? env.NODE_HOST.substring(0, 15) + "..." : "N/A"}</span>
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -429,6 +429,7 @@ class Dashboard extends Component {
               iconClass="fa-server"
               className={`smd-pointer`}
               textSize="h4"
+              noTextRight={true}
             />
           </div>
 
@@ -436,7 +437,7 @@ class Dashboard extends Component {
             <NumberCard
               number={
                 <div className="d-flex align-items-center">
-                  <span>{metadata ? metadata.nodeAddress.substring(0, 5) + "..." : "Loading..."}</span>
+                  <span>{metadata ? metadata.nodeAddress.substring(0, 15) + "..." : "Loading..."}</span>
                   <button
                     onClick={async (e) => {
                       e.stopPropagation();
@@ -473,6 +474,7 @@ class Dashboard extends Component {
               iconClass="fa-id-card"
               className={`smd-pointer`}
               textSize="h4"
+              noTextRight={true}
             />
           </div>
 
