@@ -594,7 +594,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
+                  SE.codehash = SolidVMCode "SwissArmy" (hash ""), -- hash "<CODEHASH>",
+--                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
                   SE.cc_creator = Nothing,
                   SE.root = "",

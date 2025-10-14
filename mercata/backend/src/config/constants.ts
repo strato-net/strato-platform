@@ -14,6 +14,9 @@ export enum StratoPaths {
   result = "/transactions/results",
 }
 
+// Genesis contracts (known at genesis time)
+export const rewardsChef = "000000000000000000000000000000000000101f";
+
 export const constants = (() => {
   const CONTRACT_PREFIX = "BlockApps-Mercata-";
   const Token = `${CONTRACT_PREFIX}Token`;
@@ -52,9 +55,9 @@ export const constants = (() => {
 
   const tokenBalanceSelectFields = [
     "address",
-    "user:key",
+    "user:key", 
     "balance:value::text",
-    `token:${Token}(${tokenSelectFields.join(',')})`,
+    `token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
   ];
 
   const registrySelectFields = [

@@ -17,7 +17,6 @@ import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -98,7 +97,7 @@ main = do
         BlockHeader
           { BlockHeader.parentHash = unsafeCreateKeccak256FromWord256 0xabcd,
             BlockHeader.number = 1,
-            BlockHeader.beneficiary = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,
+            BlockHeader.beneficiary = 0x0,
             BlockHeader.difficulty = 1,
             BlockHeader.ommersHash = unsafeCreateKeccak256FromWord256 0xabcd,
             BlockHeader.stateRoot = MP.blankStateRoot,

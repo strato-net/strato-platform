@@ -21,6 +21,7 @@ export interface LiquidityParams {
   tokenBAmount: string;
   maxTokenAAmount: string;
   deadline: number;
+  stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
 }
 
 /**
@@ -31,6 +32,7 @@ export interface SingleTokenLiquidityParams {
   singleTokenAmount: string;
   isAToB: boolean;
   deadline: number;
+  stakeLPToken?: boolean; // If true, stake minted LP tokens in RewardsChef
 }
 
 /**
@@ -40,6 +42,7 @@ export interface RemoveLiquidityParams {
   poolAddress: string;
   lpTokenAmount: string;
   deadline: number;
+  includeStakedLPToken?: boolean; // If true, unstake LP tokens from RewardsChef before burning
 }
 
 /**
@@ -121,9 +124,11 @@ export interface LPToken {
   _symbol: string;
   customDecimals: number;
   _totalSupply: string; // Total supply of LP tokens
-  balance: string; // User LP token balance
+  balance: string; // User LP token balance (unstaked, in wallet)
   price: string; // LP token price
   images: Array<{ value: string }>; // LP token images (filtered to exclude empty values)
+  stakedBalance?: string; // LP tokens staked in RewardsChef (optional - only if pool exists in rewards)
+  totalBalance: string; // Total LP tokens (balance + stakedBalance if exists, otherwise just balance)
 }
 
 /**
@@ -281,343 +286,4 @@ export interface RawSwapEvent {
       symbol: string;
     };
   };
-}
-
-// ============================================================================
-// TYPE GUARDS
-// ============================================================================
-
-/**
- * Type guard to check if an object is a valid RawToken
- */
-export function isRawToken(obj: any): obj is RawToken {
-  return obj && 
-    typeof obj.address === 'string' &&
-    obj.address.length > 0 &&
-    typeof obj._name === 'string' &&
-    obj._name.length > 0 &&
-    typeof obj._symbol === 'string' &&
-    obj._symbol.length > 0 &&
-    typeof obj._totalSupply === 'string' &&
-    obj._totalSupply.length >= 0 &&
-    typeof obj.customDecimals === 'number' &&
-    obj.customDecimals >= 0 &&
-    Array.isArray(obj.balances) && 
-    obj.balances.every((b: any) => 
-      typeof b.user === 'string' && 
-      typeof b.balance === 'string' &&
-      b.user.length > 0 &&
-      b.balance.length >= 0
-    ) &&
-    Array.isArray(obj.images) &&
-    obj.images.every((img: any) => 
-      typeof img.value === 'string'
-    );
-}
-
-/**
- * Type guard to check if an object is a valid RawLPToken
- */
-export function isRawLPToken(obj: any): obj is RawLPToken {
-  return obj &&
-    typeof obj.address === 'string' &&
-    obj.address.length > 0 &&
-    typeof obj._name === 'string' &&
-    obj._name.length > 0 &&
-    typeof obj._symbol === 'string' &&
-    obj._symbol.length > 0 &&
-    typeof obj._totalSupply === 'string' &&
-    obj._totalSupply.length >= 0 &&
-    typeof obj.customDecimals === 'number' &&
-    obj.customDecimals >= 0 &&
-    Array.isArray(obj.balances) && 
-    obj.balances.every((b: any) => 
-      typeof b.user === 'string' && 
-      typeof b.balance === 'string' &&
-      b.user.length > 0 &&
-      b.balance.length >= 0
-    ) &&
-    Array.isArray(obj.images) &&
-    obj.images.every((img: any) => 
-      typeof img.value === 'string'
-    );
-}
-
-/**
- * Type guard to check if an object is a valid RawGetPool
- */
-export function isRawGetPool(obj: any): obj is RawGetPool {
-  return obj &&
-    typeof obj.address === 'string' &&
-    obj.address.length > 0 &&
-    isRawToken(obj.tokenA) &&
-    isRawToken(obj.tokenB) &&
-    isRawLPToken(obj.lpToken) &&
-    typeof obj.tokenABalance === 'string' &&
-    obj.tokenABalance.length >= 0 &&
-    typeof obj.tokenBBalance === 'string' &&
-    obj.tokenBBalance.length >= 0 &&
-    typeof obj.aToBRatio === 'string' &&
-    obj.aToBRatio.length >= 0 &&
-    typeof obj.bToARatio === 'string' &&
-    obj.bToARatio.length >= 0 &&
-    typeof obj.swapFeeRate === 'number' &&
-    obj.swapFeeRate >= 0 &&
-    obj.swapFeeRate <= 10000 &&
-    typeof obj.lpSharePercent === 'number' &&
-    obj.lpSharePercent >= 0 &&
-    obj.lpSharePercent <= 10000;
-}
-
-/**
- * Type guard to check if an object is a valid RawSwapEvent
- */
-export function isRawSwapEvent(obj: any): obj is RawSwapEvent {
-  return obj &&
-    typeof obj.id === 'number' &&
-    obj.id != null &&
-    typeof obj.address === 'string' &&
-    obj.address.length > 0 &&
-    typeof obj.tokenIn === 'string' &&
-    obj.tokenIn.length > 0 &&
-    typeof obj.tokenOut === 'string' &&
-    obj.tokenOut.length > 0 &&
-    typeof obj.amountIn === 'string' &&
-    obj.amountIn.length >= 0 &&
-    typeof obj.amountOut === 'string' &&
-    obj.amountOut.length >= 0 &&
-    typeof obj.sender === 'string' &&
-    obj.sender.length > 0 &&
-    typeof obj.block_timestamp === 'string' &&
-    obj.block_timestamp.length > 0 &&
-    obj.pool &&
-    obj.pool.tokenA &&
-    obj.pool.tokenB;
-}
-
-/**
- * Type guard to check if an object is a valid RawPoolFactory
- */
-export function isRawPoolFactory(obj: any): obj is RawPoolFactory {
-  return obj &&
-    typeof obj.swapFeeRate === 'number' &&
-    obj.swapFeeRate >= 0 &&
-    typeof obj.lpSharePercent === 'number' &&
-    obj.lpSharePercent >= 0;
-}
-
-/**
- * Type guard to check if an object is a valid PoolWithBalances
- */
-export function isPoolWithBalances(obj: any): obj is PoolWithBalances {
-  return obj &&
-    typeof obj.tokenABalance === 'string' &&
-    obj.tokenABalance.length > 0 &&
-    obj.tokenABalance !== "0" &&
-    typeof obj.tokenBBalance === 'string' &&
-    obj.tokenBBalance.length > 0 &&
-    obj.tokenBBalance !== "0" &&
-    obj.lpToken &&
-    typeof obj.lpToken._totalSupply === 'string' &&
-    obj.lpToken._totalSupply.length > 0 &&
-    obj.lpToken._totalSupply !== "0";
-}
-
-// ============================================================================
-// UNIFIED API VALIDATION HELPERS
-// ============================================================================
-
-/**
- * Validates and transforms an array of raw pool data from getRawPoolData
- */
-export function validateGetPoolArray(data: unknown): RawGetPool[] {
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pools from API");
-  }
-  
-  return data.map((item, index) => {
-    if (!isRawGetPool(item)) {
-      throw new Error(`Invalid pool data at index ${index}: ${JSON.stringify(item)}`);
-    }
-    return item;
-  });
-}
-
-/**
- * Validates and transforms an array of raw swap events
- */
-export function validateSwapEventArray(data: unknown): RawSwapEvent[] {
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of swap events from API");
-  }
-  
-  return data.map((item, index) => {
-    if (!isRawSwapEvent(item)) {
-      throw new Error(`Invalid swap event data at index ${index}: ${JSON.stringify(item)}`);
-    }
-    return item;
-  });
-}
-
-/**
- * Validates and transforms an array of pool data with tokens
- */
-export function validatePoolWithTokensArray(data: unknown): PoolWithTokens[] {
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pools with tokens from API");
-  }
-  
-  return data.map((item, index) => {
-    if (!item.tokenA || !item.tokenB || 
-        typeof item.tokenABalance !== 'string' || 
-        typeof item.tokenBBalance !== 'string') {
-      throw new Error(`Invalid pool with tokens structure at index ${index}: ${JSON.stringify(item)}`);
-    }
-    
-    if (!isRawToken(item.tokenA)) {
-      throw new Error(`Invalid tokenA at index ${index}: ${JSON.stringify(item.tokenA)}`);
-    }
-    
-    if (!isRawToken(item.tokenB)) {
-      throw new Error(`Invalid tokenB at index ${index}: ${JSON.stringify(item.tokenB)}`);
-    }
-    
-    return item as PoolWithTokens;
-  });
-}
-
-/**
- * Validates and transforms an array of pool data with tokenA
- */
-export function validatePoolWithTokenAArray(data: unknown): PoolWithTokenA[] {
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pools with tokenA from API");
-  }
-  
-  return data.map((item, index) => {
-    if (!item.tokenA || typeof item.tokenABalance !== 'string') {
-      throw new Error(`Invalid pool with tokenA structure at index ${index}: ${JSON.stringify(item)}`);
-    }
-    
-    if (!isRawToken(item.tokenA)) {
-      throw new Error(`Invalid tokenA at index ${index}: ${JSON.stringify(item.tokenA)}`);
-    }
-    
-    return item as PoolWithTokenA;
-  });
-}
-
-/**
- * Validates and transforms an array of pool data with tokenB
- */
-export function validatePoolWithTokenBArray(data: unknown): PoolWithTokenB[] {
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pools with tokenB from API");
-  }
-  
-  return data.map((item, index) => {
-    if (!item.tokenB || typeof item.tokenBBalance !== 'string') {
-      throw new Error(`Invalid pool with tokenB structure at index ${index}: ${JSON.stringify(item)}`);
-    }
-    
-    if (!isRawToken(item.tokenB)) {
-      throw new Error(`Invalid tokenB at index ${index}: ${JSON.stringify(item.tokenB)}`);
-    }
-    
-    return item as PoolWithTokenB;
-  });
-}
-
-/**
- * Validates and transforms an array of pool data with token addresses
- */
-export function validatePoolWithTokenAddressesArray(data: unknown): PoolWithTokenAddresses {
-  if (!data) {
-    throw new Error("Pool with token addresses data is required but was not provided");
-  }
-  
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pools with token addresses from API");
-  }
-
-  if (data.length === 0) {
-    throw new Error("No pool with token addresses data found");
-  }
-
-  if (data.length > 1) {
-    throw new Error(`Expected single pool with token addresses, found ${data.length} pools`);
-  }
-  
-  const item = data[0];
-  if (typeof item.tokenA !== 'string' || typeof item.tokenB !== 'string') {
-    throw new Error(`Invalid pool with token addresses structure: ${JSON.stringify(item)}`);
-  }
-  
-  return item as PoolWithTokenAddresses;
-}
-
-/**
- * Validates and transforms a single RawPoolFactory object from API response
- */
-export function validateSinglePoolFactory(data: unknown): RawPoolFactory {
-  if (!data) {
-    throw new Error("Pool factory data is required but was not provided");
-  }
-  
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pool factory data from API");
-  }
-  
-  if (data.length === 0) {
-    throw new Error("No pool factory data found");
-  }
-  
-  if (data.length > 1) {
-    throw new Error(`Expected single pool factory, found ${data.length}`);
-  }
-  
-  const factoryData = data[0];
-  if (!isRawPoolFactory(factoryData)) {
-    throw new Error(`Invalid pool factory data: ${JSON.stringify(factoryData)}`);
-  }
-  
-  return factoryData;
-}
-
-/**
- * Validates and transforms a single PoolWithBalances object from API response
- */
-export function validateSinglePoolWithBalances(data: unknown): PoolWithBalances {
-  if (!data) {
-    throw new Error("Pool balances data is required but was not provided");
-  }
-  
-  if (!Array.isArray(data)) {
-    throw new Error("Expected array of pool balances data from API");
-  }
-  
-  if (data.length === 0) {
-    throw new Error("No pool balances data found");
-  }
-  
-  if (data.length > 1) {
-    throw new Error(`Expected single pool balances, found ${data.length}`);
-  }
-  
-  const poolData = data[0];
-  if (!isPoolWithBalances(poolData)) {
-    // Check for specific zero value errors
-    if (poolData?.tokenABalance === "0") {
-      throw new Error("Pool tokenA balance cannot be zero");
-    }
-    if (poolData?.tokenBBalance === "0") {
-      throw new Error("Pool tokenB balance cannot be zero");
-    }
-    if (poolData?.lpToken?._totalSupply === "0") {
-      throw new Error("Pool LP token total supply cannot be zero");
-    }
-    throw new Error(`Invalid pool balances data: ${JSON.stringify(poolData)}`);
-  }
-  
-  return poolData;
 }

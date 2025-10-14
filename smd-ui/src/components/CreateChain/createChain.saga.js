@@ -17,11 +17,12 @@ import {
 
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { secureFetch } from '../../lib/csrf';
 
 const url = env.BLOC_URL + "/chain"
 
 export function createChainApiCall(label, members, balances, integrations, src, args, vm, contractName) {
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',

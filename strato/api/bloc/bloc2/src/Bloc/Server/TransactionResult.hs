@@ -38,6 +38,7 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.SolidityVarReader
 import Blockchain.Data.DataDefs
+import Blockchain.Strato.Model.Account (namedAccountAddress)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
@@ -333,6 +334,7 @@ convertSvmResultResToVals resp = do
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
+expressionToValue (AccountLiteral _ n) = Just $ SimpleValue $ ValueAddress (n^.namedAccountAddress)
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
 expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)

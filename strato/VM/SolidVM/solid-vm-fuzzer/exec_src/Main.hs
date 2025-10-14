@@ -89,9 +89,11 @@ main = do
           "test" -> do
             let printResult i r = liftIO $ r <$ case r of
                   FuzzerSuccess (SourceAnnotation _ _ (testName, _)) -> do
-                    putStrLn $ "✅ " <> show i <> ". " <> T.unpack testName <> " succeeded"
+                    putStrLn $ "✅ " <> showNum i <> T.unpack testName <> " succeeded"
                   FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
-                    putStrLn $ "❌ " <> show i <> ". " <> T.unpack testName <> " failed: " <> T.unpack msg
+                    putStrLn $ "❌ " <> showNum i <> T.unpack testName <> " failed: " <> T.unpack msg
+                showNum 0 = ""
+                showNum i = show i ++ ". "
             xs <- runCli $ fuzz Nothing srcMap $ if j then defaultHook else printResult
             if j
               then printJSON xs

@@ -9,7 +9,6 @@
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -22,7 +21,6 @@ import qualified Data.Bits as Bits
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import Data.Maybe
-import Data.Ranged
 import qualified Data.Text as T
 import Data.Word ()
 import Database.Persist.Sql
@@ -39,28 +37,6 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "ChainMemberRSets" $ do
-    it "can simplify RSets" $ do
-      let ChainMemberRSet ba = snd . chainMemberParsedSetToChainMemberRSet $ Org "BlockApps" True
-          ChainMemberRSet baEng = snd . chainMemberParsedSetToChainMemberRSet $ OrgUnit "BlockApps" "Engineering" True
-          ChainMemberRSet ms = snd . chainMemberParsedSetToChainMemberRSet $ Org "Microsoft" True
-          unionLBA = rSetUnion ba baEng
-          unionRBA = rSetUnion baEng ba
-          unionBAMS = ba `rSetUnion` ms `rSetUnion` baEng
-          intersectionLBA = rSetIntersection ba baEng
-          intersectionRBA = rSetIntersection baEng ba
-      unionLBA `shouldBe` ba
-      unionRBA `shouldBe` ba
-      intersectionLBA `shouldBe` baEng
-      intersectionRBA `shouldBe` baEng
-      unionBAMS `shouldBe` (ba `rSetUnion` ms)
-    it "can simplify RSets" $ do
-      let ChainMemberRSet ba = snd . chainMemberParsedSetToChainMemberRSet $ CommonName "BlockApps" "Engineering" "Dustin Norwood" True
-          ChainMemberRSet ba' = snd . chainMemberParsedSetToChainMemberRSet $ CommonName "BlockApps" "Engineering" "Dustin Norwood" False
-          ChainMemberRSet ms = snd . chainMemberParsedSetToChainMemberRSet $ Org "Microsoft" True
-          unionLBA = rSetUnion ba ms
-          intersectionLBA = rSetIntersection unionLBA ba'
-      intersectionLBA `shouldBe` ms
   describe "fastSerialize" $ do
     it "works on 0" $ word256ToBytes 0 `shouldBe` B.replicate 32 0
     it "works on ff" $ word256ToBytes 0xff `shouldBe` (B.replicate 31 0 <> B.replicate 1 0xff)

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import "../../concrete/BaseCodeCollection.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 
 // Per‑vault state keyed by (user, asset)
 struct Vault {
@@ -15,7 +16,7 @@ contract User {
     }
 }
 
-contract Describe_CDPEngine {
+contract Describe_CDPEngine is Authorizable {
     Mercata m;
     string[] emptyArray;
 
@@ -46,6 +47,7 @@ contract Describe_CDPEngine {
     uint256 UNIT_SCALE = 1e18; // 18 decimals
 
     function beforeAll() {
+        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
         emptyArray = new string[](0);

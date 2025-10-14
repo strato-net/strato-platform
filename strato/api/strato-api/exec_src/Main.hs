@@ -30,7 +30,6 @@ import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock, WorldBestBlock(..))
 import Blockchain.Strato.Discovery.Data.PeerIOWiring ()
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options
 import Blockchain.Strato.Model.Secp256k1
@@ -53,7 +52,7 @@ import qualified Data.ByteString.Lazy.Char8 as BLC
 import qualified Data.Cache as Cache
 import qualified Data.HashMap.Strict.InsOrd as H
 import Data.Map (fromList, traverseWithKey)
-import Data.Maybe (fromJust, isJust, listToMaybe, maybeToList)
+import Data.Maybe (fromJust, isJust, listToMaybe)
 import Data.Source.Map
 import Data.Swagger hiding (Header, Http, delete)
 import Data.Text (Text)
@@ -108,7 +107,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         . getAccount'
         $ accountsFilterParams
           & qaAddress ?~ a
-          & qaChainId .~ (fmap ChainId . maybeToList $ Nothing)
     codePtr <- MaybeT . pure $ addressStateRefCodePtr r
     pure $
       AddressState
@@ -201,7 +199,7 @@ main = do
           ( "fileServer",
             case (flags_fileServerUrl, flags_network) of
               ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
-              ("", "helium") -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", 'h':'e':'l':'i':'u':'m':_) -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"

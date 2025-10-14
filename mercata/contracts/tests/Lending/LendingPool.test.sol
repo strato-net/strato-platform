@@ -1,5 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -9,7 +10,7 @@ contract User {
     }
 }
 
-contract Describe_LendingPool_Basic {
+contract Describe_LendingPool_Basic is Authorizable {
 
     struct LoanInfo {
         uint scaledDebt;     // user debt in index-scaled units
@@ -35,6 +36,7 @@ contract Describe_LendingPool_Basic {
     address SILVST;
 
     function beforeAll() public {
+        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }

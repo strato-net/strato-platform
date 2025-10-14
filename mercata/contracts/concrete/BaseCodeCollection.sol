@@ -1,4 +1,5 @@
 //ERC20
+import "../abstract/ERC20/access/Authorizable.sol";
 import "../abstract/ERC20/ERC20.sol";
 //import "ERC20/extensions/ERC20Burnable.sol";
 
@@ -18,7 +19,6 @@ import "./Pools/PoolFactory.sol";
 // import "Admin/FeeCollector.sol";
 
 //Rewards
-import "./Rewards/RewardsManager.sol";
 import "./Rewards/RewardsChef.sol";
 
 //Lending
@@ -44,7 +44,7 @@ import "CDP/CDPReserve.sol";
 import "Proxy/Proxy.sol";
 
 //TODO
-contract record Mercata {
+contract record Mercata is Authorizable {
     RateStrategy public rateStrategy;
     PriceOracle public priceOracle;
     CollateralVault public collateralVault;
@@ -57,7 +57,6 @@ contract record Mercata {
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
     AdminRegistry public adminRegistry;
-    RewardsManager public rewardsManager;
     CDPEngine public cdpEngine;
     CDPVault public cdpVault;
     CDPRegistry public cdpRegistry;
@@ -135,6 +134,7 @@ contract record Mercata {
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setRateStrategy", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setPriceOracle", address(poolConfigurator));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lendingRegistry), "setAllComponents", address(poolConfigurator));
+        authorizations[address(adminRegistry)][address(poolConfigurator)] = 1;
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
@@ -142,11 +142,6 @@ contract record Mercata {
         mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
         mercataBridge.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
         Ownable(mercataBridge).transferOwnership(address(adminRegistry));
-
-        address rewardsManagerImpl = address(new RewardsManager(implOwnerIgnored));
-        rewardsManager = RewardsManager(address(new Proxy(rewardsManagerImpl, this)));
-        rewardsManager.initialize(RewardsManagerArgs([], [], [], [], address(0)));
-        Ownable(rewardsManager).transferOwnership(address(adminRegistry));
 
         // Create RewardsChef (without initialization - to be initialized in tests)
         address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
@@ -175,6 +170,6 @@ contract record Mercata {
         cdpRegistry.setAllComponents(address(cdpVault), address(cdpEngine), address(priceOracle), address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010), address(tokenFactory), address(feeCollector), address(cdpReserve));
         Ownable(cdpRegistry).transferOwnership(address(adminRegistry));
 
-        adminRegistry.castVoteOnIssue(address(adminRegistry), "swapAdmin", msg.sender);
+        adminRegistry.swapAdmin(this, msg.sender);
     }
 }

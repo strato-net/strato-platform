@@ -27,7 +27,6 @@ module Blockchain.Data.Transaction
     whoSignedThisTransactionEcrecover,
     whoReallySignedThisTransactionEcrecover,
     getSigVals,
-    codePtrAddress,
     codePtrName,
     codePtrHash
   )
@@ -106,16 +105,10 @@ instance TransactionLike Transaction where
 codePtrHash :: CodePtr -> Maybe Keccak256
 codePtrHash (ExternallyOwned k) = Just k
 codePtrHash (SolidVMCode _ k) = Just k
-codePtrHash _ = Nothing
 
 codePtrName :: CodePtr -> Maybe String
 codePtrName (SolidVMCode n _) = Just n
-codePtrName (CodeAtAccount _ n) = Just n
 codePtrName _ = Nothing
-
-codePtrAddress :: CodePtr -> Maybe Address
-codePtrAddress (CodeAtAccount a _) = Just a
-codePtrAddress _ = Nothing
 
 rawTX2TX :: RawTransaction -> Transaction
 rawTX2TX (RawTransaction _ _ nonce' gl (Just to') (Just funcName) Nothing args network Nothing r s v _ _ _) =

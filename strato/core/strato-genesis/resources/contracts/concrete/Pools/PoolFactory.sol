@@ -15,7 +15,6 @@
 
 import "Pool.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
-import "../Admin/AdminRegistry.sol";
 import "../Proxy/Proxy.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
@@ -140,9 +139,8 @@ contract record PoolFactory is Ownable {
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
     ) external onlyOwner {
-        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
-        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
-        require(newLpSharePercent > 0, "LP share must be greater than 0");
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
@@ -162,9 +160,8 @@ contract record PoolFactory is Ownable {
         uint256 newLpSharePercent
     ) external onlyOwner {
         require(poolAddress != address(0), "Zero pool address");
-        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
-        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
-        require(newLpSharePercent > 0, "LP share must be greater than 0");
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         // Verify the pool belongs to this factory
         require(address(Pool(poolAddress).poolFactory()) == address(this), "Pool does not belong to this factory");

@@ -42,7 +42,6 @@ library:
     - blockDB
     - blockstanbul
     - bytestring
-    - certificateDB
     - composable-monads-base
     - conduit
     - conduit-extra

@@ -7,9 +7,10 @@ import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
-contract Describe_PoolFactory {
+contract Describe_PoolFactory is Authorizable {
     Mercata m;
     address tokenAAddress;
     address tokenBAddress;
@@ -20,6 +21,7 @@ contract Describe_PoolFactory {
     string[] emptyArray;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         m = new Mercata();
     }
 
@@ -280,9 +282,11 @@ contract Describe_PoolFactory {
         require(m.poolFactory().swapFeeRate() == maxSwapFeeRate, "Should accept maximum swap fee rate");
         require(m.poolFactory().lpSharePercent() == maxLpSharePercent, "Should accept maximum LP share percent");
         
-        // Test minimum LP share percent
+        // Test minimum fee parameters (both must be > 0)
+        uint256 minSwapFeeRate = 1; // 0.01%
         uint256 minLpSharePercent = 1; // 0.01%
-        m.poolFactory().setFeeParameters(0, minLpSharePercent);
+        m.poolFactory().setFeeParameters(minSwapFeeRate, minLpSharePercent);
+        require(m.poolFactory().swapFeeRate() == minSwapFeeRate, "Should accept minimum swap fee rate");
         require(m.poolFactory().lpSharePercent() == minLpSharePercent, "Should accept minimum LP share percent");
     }
 

@@ -108,12 +108,6 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived) 
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock) 
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived) 
-      CertRegistrationMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "There was a cert mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found in block header:        " ++ show (fst _inBlock) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found from running block:     " ++ show (fst _derived) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found in block header:    " ++ show (snd _inBlock) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found from running block: " ++ show (snd _derived) 
       VersionMismatch BlockDelta{..} -> do
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock

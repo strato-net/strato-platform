@@ -21,7 +21,6 @@ module Blockchain.Event
   )
 where
 
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul (PreprepareDecision(..))
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.Data.Block (Block(..))
@@ -32,7 +31,6 @@ import Blockchain.Data.TXOrigin
 import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
-import Blockchain.Strato.Model.Class (DummyCertRevocation(..))
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
 import Blockchain.Strato.Model.Validator
@@ -82,7 +80,6 @@ data BlockDelta a = BlockDelta
 data BlockVerificationFailureDetails
   = StateRootMismatch        (BlockDelta StateRoot)
   | ValidatorMismatch        (BlockDelta ([Validator],[Validator]))
-  | CertRegistrationMismatch (BlockDelta ([X509Certificate],[DummyCertRevocation]))
   | VersionMismatch          (BlockDelta Int)
   | UnclesMismatch           (BlockDelta Keccak256)
   | UnexpectedBlockNumber    (BlockDelta Integer)

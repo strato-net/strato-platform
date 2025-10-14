@@ -44,7 +44,7 @@ export const createCompletePriceMap = async (
 
   // Add mToken price using exchange rate from Cirrus events
   try {
-    const lendingData = await getLendingRegistry(accessToken, undefined, {
+    const lendingData = await getLendingRegistry(accessToken, {
       select: "lendingPool:lendingPool_fkey(borrowableAsset,mToken),liquidityPool:liquidityPool_fkey(address)"
     });
     const { borrowableAsset, mToken } = lendingData.lendingPool || {};

@@ -2,7 +2,6 @@
 import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
-import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -401,9 +400,8 @@ contract record Pool is Ownable {
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
     ) external onlyPoolFactory {
-        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
-        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
-        require(newLpSharePercent > 0, "LP share must be greater than 0");
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;

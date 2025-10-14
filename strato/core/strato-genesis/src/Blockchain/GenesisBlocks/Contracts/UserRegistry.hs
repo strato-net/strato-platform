@@ -33,7 +33,7 @@ insertUserRegistryContract certs gi =
     rootSub = fromJust $ getCertSubject rootCert
     rootAcct =
       SolidVMContractWithStorage
-        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName rootSub]))
+        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just $ show [SString $ subCommonName rootSub]))
         123
         (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
         [ (".commonName", fromString $ subCommonName rootSub)
@@ -48,7 +48,7 @@ insertUserRegistryContract certs gi =
                     Nothing -> error "Certificate requires a subject"
                 certSub = certSub' cert
             SolidVMContractWithStorage
-              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just . show $ OrderedVals [SString $ subCommonName certSub]))
+              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just $ show [SString $ subCommonName certSub]))
               0
               (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
               [ (".commonName", fromString $ subCommonName certSub)

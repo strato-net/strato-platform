@@ -6,23 +6,25 @@
 module Blockchain.Strato.Model.Code where
 
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.CodePtr
 import Control.DeepSeq
 import Control.Lens.Operators
 import Data.Aeson
 import Data.Binary
 import Data.Data
-import Data.Swagger
+import Data.Swagger hiding (Format, format)
 import Data.Text (Text)
 import Database.Persist.TH
 import GHC.Generics
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
+import Text.Format
 
 data Code
   = Code {codeBytes :: Text}
-  | PtrToCode {ptrToCode :: CodePtr}
   deriving (Show, Eq, Read, Ord, Generic, Data)
+
+instance Format Code where
+  format (Code c) = format c
 
 instance Binary Code
 
@@ -35,8 +37,6 @@ derivePersistField "Code"
 
 instance RLPSerializable Code where
   rlpEncode (Code bytes) = rlpEncode bytes
-  rlpEncode (PtrToCode codePtr) = RLPArray [rlpEncode codePtr]
-  rlpDecode (RLPArray [x]) = PtrToCode $ rlpDecode x
   rlpDecode x = Code $ rlpDecode x
 
 instance ToSchema Code where
@@ -52,11 +52,10 @@ instance ToSchema Code where
 
 instance ToJSON Code where
   toJSON (Code theText) = String theText
-  toJSON (PtrToCode codePtr) = toJSON codePtr
 
 instance FromJSON Code where
   parseJSON (String text) = return $ Code text
-  parseJSON x = PtrToCode <$> parseJSON x
+  parseJSON _ = error "abcd"
 
 data PrecompiledCode
   = NullContract
