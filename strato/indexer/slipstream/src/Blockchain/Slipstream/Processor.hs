@@ -260,7 +260,7 @@ processTheMessages messages = do
         Left err -> do
           $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
           pure []
-        Right contracts -> pure $ map (T.pack . _contractName) contracts
+        Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
       indexFkeys <- createIndexTable c cc nameParts inherited
       collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited
