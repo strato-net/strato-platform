@@ -414,8 +414,7 @@ class Dashboard extends Component {
                     }}
                     className="ml-2 hover:opacity-70 transition-opacity cursor-pointer"
                     style={{ 
-                      fontSize: '12px', 
-                      color: 'white',
+                      fontSize: '16px', 
                       background: 'none',
                       border: 'none',
                       padding: '0'
@@ -458,8 +457,7 @@ class Dashboard extends Component {
                     }}
                     className={`ml-2 transition-opacity cursor-pointer ${(!metadata || !metadata.nodeAddress) ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-70'}`}
                     style={{ 
-                      fontSize: '12px', 
-                      color: (!metadata || !metadata.nodeAddress) ? '#ccc' : 'white',
+                      fontSize: '16px', 
                       background: 'none',
                       border: 'none',
                       padding: '0'
