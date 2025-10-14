@@ -255,9 +255,12 @@ processTheMessages messages = do
       multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
       -- Create collection tables
-
       let cc' = SourceAnnotation (initialPosition "") (initialPosition "") () <$ cc
-          inherited = either (const []) (map $ T.pack . _contractName) . getInheritedContracts cc' $ _contractName c
+          inherited <- case getInheritedContracts cc' (_contractName c) of
+            Left err -> do
+              $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
+              pure []
+            Right contracts -> pure $ map (T.pack . _contractName) contracts
       indexFkeys <- createIndexTable c cc nameParts inherited
       collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
       eventFkeys <- createExpandEventTables c cc nameParts inherited
