@@ -68,8 +68,6 @@ function parseArgs() {
  *  Also used to verify that the address is actually a Proxy
  */
 async function getLogicContract(tokenObj, proxyAddress) {
-    // @dustin: if you have all the addresses, you can query the storage table
-    console.log(`Getting logic contract for proxy ${proxyAddress}`);
     const contract = { address: proxyAddress, name: 'Proxy' };
     const options = { config };
     
@@ -83,7 +81,6 @@ async function getLogicContract(tokenObj, proxyAddress) {
     if (!implementationAddress) {
         throw new Error('Could not retrieve logicContract address from Proxy.\nIs this address actually a Proxy?');
     }
-    console.log(`Logic contract for proxy ${proxyAddress}: ${implementationAddress}`);
     return implementationAddress;
 }
 
@@ -133,14 +130,13 @@ async function verifyProxyAndImplementation(tokenObj, proxyAddress, contractName
  */
 async function getInstancesOfContractProxied(tokenObj, contractName) {
     // Find all proxy addresses whose logicContract points to an implementation of contractName
-    // Uses BLOC API to get all Proxy contracts (including genesis), then filters by implementation
+    // Uses BLOC API to get all Proxy contracts, batch queries Storage for logicContract values
     
     const nodeUrl = config.nodes[0].url;
     const token = tokenObj.token;
     const options = { config };
     
     // 1. Get ALL Proxy contracts using BLOC API (includes genesis contracts)
-    // The BLOC API endpoint is at /bloc/v2.2/contracts
     let allProxyAddresses = [];
     try {
         const contractsUrl = `${nodeUrl}/bloc/v2.2/contracts?name=Proxy`;
@@ -151,7 +147,6 @@ async function getInstancesOfContractProxied(tokenObj, contractName) {
             }
         });
         
-        // Response should be an object with contract names as keys
         if (response.data && response.data.Proxy) {
             allProxyAddresses = response.data.Proxy.map(p => p.address);
             console.log(`Found ${allProxyAddresses.length} Proxy contracts from BLOC API`);
@@ -166,40 +161,72 @@ async function getInstancesOfContractProxied(tokenObj, contractName) {
         return [];
     }
     
-    console.log(`Checking ${allProxyAddresses.length} proxies for ${contractName} implementations`);
+    // 2. Batch query Cirrus storage table for all logicContract values
+    // The storage table contains contract state data with address and data fields
+    console.log(`Batch querying ${allProxyAddresses.length} proxies for ${contractName} implementations...`);
+    const implementationToProxies = new Map();
     
-    // 2. For each proxy, verify it points to the target contract type
+    try {
+        // Query Cirrus storage table for all proxy addresses at once
+        const addressList = allProxyAddresses.join(',');
+        const storageUrl = `${nodeUrl}/cirrus/search/storage?address=in.(${addressList})&select=address,data`;
+        
+        const response = await axios.get(storageUrl, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (response.data && Array.isArray(response.data)) {
+            response.data.forEach(record => {
+                const proxyAddr = record.address;
+                // The data field contains the contract state as JSON
+                if (record.data && record.data.logicContract) {
+                    const implAddress = record.data.logicContract;
+                    if (proxyAddr && implAddress) {
+                        if (!implementationToProxies.has(implAddress)) {
+                            implementationToProxies.set(implAddress, []);
+                        }
+                        implementationToProxies.get(implAddress).push(proxyAddr);
+                    }
+                }
+            });
+        }
+    } catch (err) {
+        console.log(`Cirrus storage query error: ${err.message}`);
+        if (err.response) {
+            console.log(`Status: ${err.response.status}`);
+        }
+        return [];
+    }
+
+    console.log(`Found ${implementationToProxies.size} unique implementations`);
+
+    // 3. Check only unique implementation addresses for the target contract name
     const results = [];
-    
-    for (const proxyAddress of allProxyAddresses) {
+    for (const [implAddress, proxyAddresses] of implementationToProxies.entries()) {
         try {
-            // Get the logic contract address from the proxy
-            const logicContractAddress = await getLogicContract(tokenObj, proxyAddress);
-            
-            // Get the implementation contract details to check the name
             const contractDetails = await rest.getContractsDetails(
                 tokenObj,
-                { address: logicContractAddress },
+                { address: implAddress },
                 options
             );
-            
+
             if (contractDetails && contractDetails._contractName === contractName) {
-                console.log(`✓ ${proxyAddress} -> ${contractName} at ${logicContractAddress}`);
-                results.push(proxyAddress);
+                // All proxies pointing to this implementation match
+                for (const proxyAddr of proxyAddresses) {
+                    console.log(`✓ ${proxyAddr} -> ${contractName} at ${implAddress}`);
+                    results.push(proxyAddr);
+                }
             }
         } catch (e) {
-            // Handle specific case: implementation address doesn't exist or isn't deployed
-            if (e.response && e.response.status === 400 && e.response.data && 
-                typeof e.response.data === 'string' && 
-                e.response.data.includes("couldn't find contract details")) {
-                // This is expected for proxies pointing to non-existent implementations
-                continue;
-            }
-            // For other errors, also skip silently
+            // Skip implementations that can't be retrieved
+            console.log(`Error retrieving contract details for ${implAddress}: ${e.message}`);
             continue;
         }
     }
-    
+
     return results;
 }
 
