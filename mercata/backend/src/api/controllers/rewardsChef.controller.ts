@@ -19,8 +19,7 @@ class RewardsChefController {
       );
 
       // Format with proper decimals (wei to CATA with 18 decimals)
-      const pendingCataBigInt = BigInt(pendingCata);
-      const pendingCataFormatted = (Number(pendingCataBigInt) / 1e18).toFixed(2);
+      const pendingCataFormatted = (Number(pendingCata) / 1e18).toFixed(2);
 
       res.status(RestStatus.OK).json({
         pendingCata,
