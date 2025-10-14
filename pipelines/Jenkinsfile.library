@@ -1101,36 +1101,28 @@ def removeBeanstalkApp() {
 }
 
 /**
- * Generate genesis-block.json  to add to strato-getting-started/
- * @param stratoPlatformPath - relative path to strato-platform directory (default '.')
- * @param stratoGSPath - relative path to strato-getting-started directory (default 'strato-getting-started')
+ * Generate genesis-block.json
  * @return
  */
-def generateGenesisBlock(stratoPlatformPath='.', stratoGSPath='strato-getting-started') {
-
-  // TODO: refactor to make it clear what is nodeData = null vs nodeData != null. Looks like !=null is only used in the big pre-release testing pipeline (as part of `deployStratoWithApp`) - Remove it entirely?
-  
-  // (using tmp files to avoid replacing quotes with double-quotes which makes escapes even worse)
-  sh "echo ${stratoPlatformPath} > _platform_path_tmp"
-  sh "echo ${stratoGSPath} > _stratogs_path_tmp"
+def generateGenesisBlock() {
   sh '''#!/bin/bash -le
     set -x
-    cd $(<_stratogs_path_tmp)
+    cd bootstrap-docker
     nodeAddress=$(./strato --get-address)
     cd ..
     # TODO: run genesis-builder outside of Docker
-    sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
+    sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     # Inject the nodeAddress into the validators.json file:
     sudo docker exec -e addr="${nodeAddress}" strato-strato-1 bash -c 'echo "[{\"commonName\": \"$nodeAddress\"}]" > /genesis-builder/validators.json'
-    sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
-    sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
+    sudo docker cp ./.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
+    sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     sudo docker exec strato-strato-1 genesis-builder \\
         --input=/genesis-builder/genesis-block.tpl.json \\
         --faucets=/genesis-builder/faucets.json \\
         --validators=/genesis-builder/validators.json \\
         --admins=/genesis-builder/admins.json \\
         --output=/genesis-builder/genesis-block.json
-    sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json $(<_stratogs_path_tmp)/
+    sudo docker cp strato-strato-1:/genesis-builder/genesis-block.json ./
   '''
   sh "rm _*_path_tmp"
 }
