@@ -1,6 +1,7 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
+import { getPoolsCirrus, getUserInfo } from "../helpers/rewards/rewardsChef.helpers";
 
 const { RewardsChef } = constants;
 
@@ -48,11 +49,9 @@ export const waitForBalanceUpdate = async (
 };
 
 /**
- * Helper function to get user's staked balance from RewardsChef using Cirrus events
+ * Helper function to get user's staked balance from RewardsChef
  *
- * This function queries the latest CurrentUserAmount event for the given user and pool,
- * which contains the current staked balance. This approach avoids on-chain calls while
- * working around the limitation that nested mappings cannot be queried from Cirrus.
+ * This function queries the userInfo mapping from Cirrus to get the current staked balance.
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
@@ -66,72 +65,8 @@ export const getStakedBalance = async (
   poolId: number,
   userAddress: string
 ): Promise<string> => {
-  try {
-    // Query the latest CurrentUserAmount event for this user and pool
-    const response = await cirrus.get(accessToken, `/${RewardsChef}-CurrentUserAmount`, {
-      params: {
-        address: `eq.${rewardsChefAddress}`,
-        user: `eq.${userAddress}`,
-        pid: `eq.${poolId}`,
-        select: "currentAmount::text,block_timestamp",
-        order: "block_timestamp.desc",
-        limit: "1"
-      }
-    });
-
-    // Extract the current amount from the latest event
-    const latestEvent = response.data?.[0];
-    return latestEvent?.currentAmount || "0";
-  } catch (error) {
-    console.error("Failed to fetch staked balance from RewardsChef events:", error);
-    return "0";
-  }
-};
-
-/**
- * Low-level function to fetch pools from RewardsChef contract using Cirrus
- * with optional additional query parameters
- *
- * @param accessToken - User access token for authentication
- * @param rewardsChefAddress - Address of the RewardsChef contract
- * @param additionalParams - Optional additional Cirrus query parameters for filtering
- * @returns Promise resolving to array of pool information
- */
-const getPoolsCirrus = async (
-  accessToken: string,
-  rewardsChefAddress: string,
-  additionalParams?: Record<string, string>
-): Promise<Array<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-}>> => {
-  try {
-    const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
-      params: {
-        address: `eq.${rewardsChefAddress}`,
-        ...additionalParams
-      }
-    });
-
-    // Filter out entries with empty values and map to desired format
-    const pools = response.data
-      ?.filter((entry: any) => entry.value && entry.value !== "")
-      .map((entry: any) => ({
-        poolIdx: entry.key,
-        lpToken: entry.value.lpToken,
-        allocPoint: entry.value.allocPoint,
-        accPerToken: entry.value.accPerToken,
-        lastRewardTimestamp: entry.value.lastRewardTimestamp
-      })) || [];
-
-    return pools;
-  } catch (error) {
-    console.error("Failed to fetch pools from RewardsChef:", error);
-    return [];
-  }
+  const userInfo = await getUserInfo(accessToken, rewardsChefAddress, poolId, userAddress);
+  return userInfo.amount;
 };
 
 /**
