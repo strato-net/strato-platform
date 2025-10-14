@@ -9,7 +9,6 @@ class RewardsChefController {
     res: Response,
     next: NextFunction
   ): Promise<void> {
-    try {
       const { accessToken, address: userAddress } = req;
 
       const pendingCata = await pendingCataAll(
@@ -25,9 +24,6 @@ class RewardsChefController {
         pendingCata,
         pendingCataFormatted
       });
-    } catch (error) {
-      next(error);
-    }
   }
 }
 
