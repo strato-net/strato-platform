@@ -1315,7 +1315,7 @@ def spinUpPaymentServer() {
         POSTGRES_USER='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_USER}' \\
         POSTGRES_PASSWORD='${AWS_RDS_PAYMENT_SERVER_CREDENTIALS_DEV_PASSWORD}' \\
         POSTGRES_DBNAME=payments_dev \\
-        TABLE_PREFIX="Test-Mercata-" \\
+        TABLE_PREFIX="Test-" \\
         SKIP_CONTRACT_VALIDATION="true" \\
         SKIP_DEPLOYMENT="true" \\
         USDST_ADDRESS=f19d88d5b88d4948def06fcc12852d4b9e45caf2 \\

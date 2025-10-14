@@ -1,6 +1,6 @@
 // Bridge configuration constants
 export const NODE_URL = process.env.NODE_URL;
-export const MERCATA_URL = "BlockApps-Mercata-MercataEthBridge";
+export const MERCATA_URL = "BlockApps-MercataEthBridge";
 
 // Token configurations
 export const TESTNET_STRATO_TOKENS = [

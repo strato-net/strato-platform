@@ -99,7 +99,7 @@ require("dotenv").config();
      tokensActive() modifier passes.
   --------------------------------------------------------- */
   try {
-    const poolFactoryRows = await cirrusGet("/BlockApps-Mercata-PoolFactory", {
+    const poolFactoryRows = await cirrusGet("/BlockApps-PoolFactory", {
       address: `eq.${POOL_FACTORY}`,
       select: "tokenFactory",
       limit: 1,
@@ -127,7 +127,7 @@ require("dotenv").config();
 
   // helper to query cirrus whether pool exists
   const poolExists = async (tokenB) => {
-    const path = `/BlockApps-Mercata-Pool`; // pool table name
+    const path = `/BlockApps-Pool`; // pool table name
     const params = {
       poolFactory: `eq.${POOL_FACTORY}`,
       tokenA: `eq.${USDST.toLowerCase()}`,
@@ -180,7 +180,7 @@ require("dotenv").config();
   // 1) setStatus(2) where needed
   for (const token of allTokens) {
     try {
-      const rows = await cirrusGet("/BlockApps-Mercata-Token", {
+      const rows = await cirrusGet("/BlockApps-Token", {
         address: `eq.${token}`,
         select: "status",
         limit: 1,

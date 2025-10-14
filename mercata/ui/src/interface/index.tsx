@@ -42,7 +42,7 @@ export interface Token {
   collateralBalance?: string;
   key?: string;
   value?: string;
-  "BlockApps-Mercata-ERC20"?: {
+  "BlockApps-ERC20"?: {
     data: {
       token: string;
       oracle: string;

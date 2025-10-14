@@ -22,7 +22,7 @@ const REDEMPTION_CONTRACT_ADDRESS = deployment.contracts.redemption.address;
 
 const SERVER_URL = `${config.serverHost}`;
 const TABLE_PREFIX = `${
-  process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : "BlockApps-Mercata-"
+  process.env.TABLE_PREFIX ? process.env.TABLE_PREFIX : "BlockApps-"
 }`;
 
 const SERVER_CONFIRM_URL = `${SERVER_URL}/stripe/checkout/confirm`;

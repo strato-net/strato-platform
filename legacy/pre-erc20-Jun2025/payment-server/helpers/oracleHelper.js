@@ -62,7 +62,7 @@ async function fetchAsset(token, args, config) {
   // Get the total count of assets.
   const countResponse = await rest.search(
     token,
-    { name: "BlockApps-Mercata-Asset" },
+    { name: "BlockApps-Asset" },
     searchOptions
   );
   const totalCount = countResponse?.[0]?.count || 0;
@@ -80,7 +80,7 @@ async function fetchAsset(token, args, config) {
       config,
       query: {
         select:
-          "*,BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))",
+          "*,BlockApps-Sale!BlockApps-Sale_BlockApps-Asset_fk(*,BlockApps-Sale-paymentServices(*))",
         root: "eq." + args.address,
         offset,
         limit: batchSize,
@@ -89,13 +89,13 @@ async function fetchAsset(token, args, config) {
 
     const batchUtxos = await rest.search(
       token,
-      { name: "BlockApps-Mercata-Asset" },
+      { name: "BlockApps-Asset" },
       batchOptions
     );
 
     batchUtxos.forEach((utxo) => {
       // Retrieve sale data and look for an open sale.
-      const sales = utxo["BlockApps-Mercata-Sale"] || [];
+      const sales = utxo["BlockApps-Sale"] || [];
       const openSale = sales.find((sale) => sale.isOpen === true);
 
       // Validate UTXO based on sale state.
@@ -111,11 +111,11 @@ async function fetchAsset(token, args, config) {
         bestSalesByRoot.set(
           utxo.root,
           openSale
-            ? { ...utxo, 'BlockApps-Mercata-Sale': [openSale] }
-            : { ...utxo, sale: null, "BlockApps-Mercata-Sale": [] }
+            ? { ...utxo, 'BlockApps-Sale': [openSale] }
+            : { ...utxo, sale: null, "BlockApps-Sale": [] }
         );
       } else if (openSale) {
-        const currentSale = currentBest["BlockApps-Mercata-Sale"]?.find(
+        const currentSale = currentBest["BlockApps-Sale"]?.find(
           (s) => s.isOpen
         );
         if ((currentSale?.quantity || 0) < (openSale.quantity || 0)) {

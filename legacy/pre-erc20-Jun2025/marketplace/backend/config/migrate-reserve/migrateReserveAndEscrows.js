@@ -136,7 +136,7 @@ async function transferCATAToNewReserve(
 
   const reserveResults = await rest.search(
     token,
-    { name: 'BlockApps-Mercata-Reserve', select: 'cataToken' },
+    { name: 'BlockApps-Reserve', select: 'cataToken' },
     reserveQuery
   );
   if (!reserveResults || reserveResults.length === 0) {
@@ -158,7 +158,7 @@ async function transferCATAToNewReserve(
 
   const assetResults = await rest.search(
     token,
-    { name: 'BlockApps-Mercata-Asset' },
+    { name: 'BlockApps-Asset' },
     assetQuery
   );
   if (!assetResults || assetResults.length === 0) {
@@ -266,7 +266,7 @@ async function main() {
 
     const escrowResults = await rest.search(
       token,
-      { name: 'BlockApps-Mercata-Escrow' },
+      { name: 'BlockApps-Escrow' },
       escrowQuery
     );
     const escrowAddresses =

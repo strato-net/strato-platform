@@ -527,9 +527,9 @@ const InventoryCard = ({
               alt={imgMeta}
               title={imgMeta}
               src={
-                inventory['BlockApps-Mercata-Asset-images'] &&
-                  inventory['BlockApps-Mercata-Asset-images'].length > 0
-                  ? inventory['BlockApps-Mercata-Asset-images'][0].value
+                inventory['BlockApps-Asset-images'] &&
+                  inventory['BlockApps-Asset-images'].length > 0
+                  ? inventory['BlockApps-Asset-images'][0].value
                   : image_placeholder
               }
             />

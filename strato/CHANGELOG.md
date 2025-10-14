@@ -177,7 +177,7 @@ so that they could be properly moved to their respective version's subsection.
 - Increase gas consumption for contract creation
 - `VM_DEBUGGER=bool` flag added for connecting to the VM debugger + static analysis websocket
 - Derive service provider URLs from node's network ID for testnet and production nodes
-- Update foreign keys for `BlockApps-Mercata-Asset` + `Sale` contracts whenever there is a table expansion
+- Update foreign keys for `BlockApps-Asset` + `Sale` contracts whenever there is a table expansion
 - Functionality to enumerate threads and their details in `/threads` endpoint of `P2PAPI`
 - `/peers` endpoint in `P2PAPI` to list peer connections and their health
 - POST `/transaction` contract creation calls will now additionally check for address state ref table entry before resolving

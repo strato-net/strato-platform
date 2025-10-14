@@ -153,7 +153,6 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       creator = actionCreator,
       cc_creator = cregator,
       root = actionRoot,
-      application = actionApplication,
       contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,
@@ -211,7 +210,7 @@ duplicateForParentsAndIncludeOriginal :: [ProcessedCollectionRow] -> [(Text,Text
 duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateForSingle collections
   where
     duplicateForSingle :: ProcessedCollectionRow -> [ProcessedCollectionRow]
-    duplicateForSingle row = row : [ row { creator = c, application = a, contractname = n } | (c,a,n) <- parentz ]
+    duplicateForSingle row = row : [ row { creator = c, contractname = n } | (c,_,n) <- parentz ]
 
 processTheMessages ::
   ( MonadIO m
@@ -333,7 +332,7 @@ processTheMessages messages = do
             collViews = (\c ->
               collectionTableName
                 (creator c)
-                (application c)
+                ""
                 (contractname c)
                 (collection_name c)
               : maybe [] (\Action.Delegatecall{..} -> [
@@ -362,7 +361,7 @@ processTheMessages messages = do
       eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
         eventCollectionTableName
           (creator e)
-          (application e)
+          ""
           (contractname e)
           eName
           (collection_name e)

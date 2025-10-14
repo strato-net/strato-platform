@@ -116,7 +116,7 @@ async function get(user, args, options) {
   let searchArgs;
   const newArgs = {
     ...restArgs,
-    queryOptions: { select: '*,BlockApps-Mercata-Sale-paymentServices(*)' },
+    queryOptions: { select: '*,BlockApps-Sale-paymentServices(*)' },
   };
 
   if (assetToBeSold) {
@@ -193,7 +193,7 @@ async function getAll(admin, args = {}, defaultOptions) {
         gtValue: saleGtValue,
         isOpen: isOpen,
         range: range,
-        queryOptions: { select: '*,BlockApps-Mercata-Sale-paymentServices(*)' },
+        queryOptions: { select: '*,BlockApps-Sale-paymentServices(*)' },
       },
       options,
       admin
@@ -204,7 +204,7 @@ async function getAll(admin, args = {}, defaultOptions) {
       {
         address: saleAddresses,
         isOpen: isOpen,
-        queryOptions: { select: '*,BlockApps-Mercata-Sale-paymentServices(*)' },
+        queryOptions: { select: '*,BlockApps-Sale-paymentServices(*)' },
         ...restArgs,
       },
       options,

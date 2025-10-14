@@ -4,7 +4,7 @@ import { ChainInfo } from "../types";
 import { logError } from "../utils/logger";
 import { getBAUserAddress } from "../auth";
 
-const MERCATA_URL = "BlockApps-Mercata-MercataBridge";
+const MERCATA_URL = "BlockApps-MercataBridge";
 
 // Get all enabled chains from the bridge contract
 export const getEnabledChains = async (): Promise<ChainInfo[]> => {

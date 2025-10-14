@@ -116,44 +116,38 @@ tableSeparator :: T.Text
 tableSeparator = "-"
 
 tableNameToText :: TableName -> T.Text
-tableNameToText (IndexTableName c a n) =
+tableNameToText (IndexTableName c _ n) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
    in prefix <> n
-tableNameToText (CollectionTableName c a n m) =
+tableNameToText (CollectionTableName c _ n m) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
       contractAndCollection = n <> "-" <> m
    in prefix <> contractAndCollection
-tableNameToText (HistoryTableName c a n) =
+tableNameToText (HistoryTableName c _ n) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
    in "history@" <> prefix <> n
-tableNameToText (EventTableName c a n e) =
+tableNameToText (EventTableName c _ n e) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
       contractAndEvent = n <> tableSeparator <> e
    in prefix <> contractAndEvent
-tableNameToText (EventCollectionTableName c a n e m) =
+tableNameToText (EventCollectionTableName c _ n e m) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
       contractEventAndCollection = n <> tableSeparator <> e <> tableSeparator <> m
    in prefix <> contractEventAndCollection
-tableNameToText (AbstractTableName c a n) =
+tableNameToText (AbstractTableName c _ n) =
   let prefix
         | T.null c = ""
-        | T.null a = c <> tableSeparator
-        | otherwise = c <> tableSeparator <> a <> tableSeparator
+        | otherwise = c <> tableSeparator
    in prefix <> n
 
 indexedEventTableName :: TableName -> TableName

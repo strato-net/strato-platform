@@ -45,13 +45,13 @@ export default {
   testnetCataAddress: '051cb99bca7c437f4b17dc01bd4ff7c5e09db035',
 
   attachImagesAndFiles:
-    '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*)',
+    '*,BlockApps-Asset-files(*),BlockApps-Asset-images(*),BlockApps-Asset-fileNames(*)',
   attachSalesAndImagesAndFiles:
-    '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*))',
+    '*,BlockApps-Asset-files(*),BlockApps-Asset-images(*),BlockApps-Asset-fileNames(*),BlockApps-Sale!BlockApps-Sale_BlockApps-Asset_fk(*,BlockApps-Sale-paymentServices(*))',
   attachSalesEscrowsAndImagesAndFiles:
-    '*,BlockApps-Mercata-Asset-files(*),BlockApps-Mercata-Asset-images(*),BlockApps-Mercata-Asset-fileNames(*),BlockApps-Mercata-Sale!BlockApps-Mercata-Sale_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Sale-paymentServices(*)),BlockApps-Mercata-Escrow-assets!BlockApps-Mercata-Escrow-assets_BlockApps-Mercata-Asset_fk(*,BlockApps-Mercata-Escrow(*))',
+    '*,BlockApps-Asset-files(*),BlockApps-Asset-images(*),BlockApps-Asset-fileNames(*),BlockApps-Sale!BlockApps-Sale_BlockApps-Asset_fk(*,BlockApps-Sale-paymentServices(*)),BlockApps-Escrow-assets!BlockApps-Escrow-assets_BlockApps-Asset_fk(*,BlockApps-Escrow(*))',
   attach_saleAddresses_Quantities_completedSales_onOrder:
-    '*,BlockApps-Mercata-Order-saleAddresses(*),BlockApps-Mercata-Order-quantities(*),BlockApps-Mercata-Order-completedSales(*)',
+    '*,BlockApps-Order-saleAddresses(*),BlockApps-Order-quantities(*),BlockApps-Order-completedSales(*)',
   baUserNames: [
     'blockapps_carbon',
     'blockapps_metals',

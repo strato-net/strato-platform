@@ -254,7 +254,7 @@ pipeline {
 //                    lib.runSyncTester()
 //                  }
 //                }
-/* TODO: uncomment to enable the slipstream data integrity test, when the 'strato/indexer/slipstream/integrity_tests/slipstream_sync.py' is updated to not rely on the testnet2-specific contracts (e.g. BlockApps-Mercata-PaymentService.Order) */
+/* TODO: uncomment to enable the slipstream data integrity test, when the 'strato/indexer/slipstream/integrity_tests/slipstream_sync.py' is updated to not rely on the testnet2-specific contracts (e.g. BlockApps-PaymentService.Order) */
 //                unstash 'slipstream_integrity_tests'
 //                dir('strato/indexer/slipstream/integrity_tests') {
 //                   withCredentials([

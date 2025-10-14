@@ -180,7 +180,7 @@ function getEnvVar(name) {
 /**
  * Performs a Cirrus search query using username/password authentication.
  * 
- * @param {string} tableName - The Cirrus table name to query (e.g., 'BlockApps-Mercata-Pool')
+ * @param {string} tableName - The Cirrus table name to query (e.g., 'BlockApps-Pool')
  * @param {Object} params - Query parameters for the Cirrus search
  * @returns {Promise<Array>} - The search results
  */

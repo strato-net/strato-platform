@@ -18,7 +18,7 @@ export enum StratoPaths {
 export const rewardsChef = "000000000000000000000000000000000000101f";
 
 export const constants = (() => {
-  const CONTRACT_PREFIX = "BlockApps-Mercata-";
+  const CONTRACT_PREFIX = "BlockApps-";
   const Token = `${CONTRACT_PREFIX}Token`;
   const TokenFactory = `${CONTRACT_PREFIX}TokenFactory`;
   const LendingPool = `${CONTRACT_PREFIX}LendingPool`;
