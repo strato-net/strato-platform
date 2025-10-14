@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { pendingCataAll } from "../helpers/rewards/pending.helpers";
+import { getPendingCataAll } from "../services/rewardsChef.service";
 import { rewardsChef } from "../../config/constants";
 
 class RewardsChefController {
@@ -11,19 +11,13 @@ class RewardsChefController {
   ): Promise<void> {
       const { accessToken, address: userAddress } = req;
 
-      const pendingCata = await pendingCataAll(
+      const result = await getPendingCataAll(
         accessToken,
         rewardsChef,
         userAddress
       );
 
-      // Format with proper decimals (wei to CATA with 18 decimals)
-      const pendingCataFormatted = (Number(pendingCata) / 1e18).toFixed(2);
-
-      res.status(RestStatus.OK).json({
-        pendingCata,
-        pendingCataFormatted
-      });
+      res.status(RestStatus.OK).json(result);
   }
 }
 

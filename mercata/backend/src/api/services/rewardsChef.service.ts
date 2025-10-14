@@ -2,8 +2,33 @@ import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
 import { getPoolsCirrus, getUserInfo } from "../helpers/rewards/rewardsChef.helpers";
+import { pendingCataAll } from "../helpers/rewards/pending.helpers";
+import {
+  PendingRewardsData
+} from "@mercata/shared-types";
 
 const { RewardsChef } = constants;
+
+export const getPendingCataAll = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  userAddress: string
+): Promise<PendingRewardsData> => {
+
+   const pendingCata = await pendingCataAll(
+     accessToken,
+     rewardsChefAddress,
+     userAddress
+   );
+
+   // Format with proper decimals (wei to CATA with 18 decimals)
+   const pendingCataFormatted = (Number(pendingCata) / 1e18).toFixed(2);
+   return {
+     pendingCata,
+     pendingCataFormatted
+   };
+};
+
 
 /**
  * Helper function to wait for Cirrus to index the new balance

@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { api } from "@/lib/axios";
 import { useUser } from "@/context/UserContext";
-
-interface PendingRewardsData {
-  pendingCata: string;
-  pendingCataFormatted: string;
-}
+import {
+  PendingRewardsData
+} from "@mercata/shared-types";
 
 /**
  * Hook to fetch total pending CATA rewards across all pools
