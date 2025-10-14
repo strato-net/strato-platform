@@ -1,5 +1,5 @@
 import { getTokenBalanceForUser } from "../../services/tokens.service";
-import { getUserInfo, getRewardsChefState } from "./rewardsChef.helpers";
+import { getUserInfo, getRewardsChefState, getPoolsCirrus } from "./rewardsChef.helpers";
 
 // PRECISION_MULTIPLIER from RewardsChef.sol
 const PRECISION_MULTIPLIER = BigInt(1e18);
@@ -118,6 +118,39 @@ export const pendingCata = async (
     return pending.toString();
   } catch (error) {
     console.error("Failed to calculate pending CATA:", error);
+    return "0";
+  }
+};
+
+/**
+ * Calculates total pending CATA rewards for a user across all pools
+ * Replicates the pendingCataAll() logic from RewardsChef.sol
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param userAddress - User address to calculate rewards for
+ * @returns Promise resolving to total pending CATA amount as string
+ */
+export const pendingCataAll = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  userAddress: string
+): Promise<string> => {
+  try {
+    // Get all pools with bonus periods
+    const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, undefined, true);
+
+    // Calculate pending rewards for each pool and sum them
+    let totalPending = 0n;
+
+    for (const pool of pools) {
+      const pending = await pendingCata(accessToken, rewardsChefAddress, pool, userAddress);
+      totalPending += BigInt(pending);
+    }
+
+    return totalPending.toString();
+  } catch (error) {
+    console.error("Failed to calculate total pending CATA:", error);
     return "0";
   }
 };
