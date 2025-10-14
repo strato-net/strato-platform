@@ -27,11 +27,13 @@ library:
   - directory
   - esqueleto
   - ethereum-discovery
+  - exceptions
   - extra
   - filepath
   - format
   - hflags
   - http-types
+  - kafka-monad
   - labeled-error
   - lens
   - monad-alter
@@ -49,6 +51,7 @@ library:
   - swagger2
   - template-haskell
   - text
+  - time
   - transformers
   - unliftio
   - unordered-containers
@@ -59,3 +62,4 @@ library:
   - identity-monad
   - strato-redis-blockdb
   - evm-solidity
+  - vm-tools

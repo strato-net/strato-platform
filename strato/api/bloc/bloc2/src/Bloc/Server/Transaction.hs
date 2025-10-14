@@ -23,6 +23,8 @@ where
 import Bloc.API.Transaction
 import Bloc.API.Users
 import Bloc.API.Utils
+import Core.ApiContext (ApiContext)
+import qualified Control.Monad.Change.Modify as Mod
 import Bloc.Database.Queries (getContractByAddress, getContractDetailsForContract)
 import Bloc.Monad
 import Bloc.Server.TransactionResult
@@ -38,7 +40,9 @@ import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
+import Blockchain.DB.SQLDB
 import Blockchain.Data.TXOrigin
+import Control.Monad.Catch (MonadCatch)
 import Blockchain.Data.Transaction (Transaction(..), rawTX2TX, transactionHash, transactionTo, partialTransactionHash, txAndTime2RawTX)
 import Blockchain.Model.JsonBlock
 import Blockchain.Model.SyncState (BestBlock (..), WorldBestBlock(..))
@@ -56,7 +60,6 @@ import Control.Arrow
 import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Control.Monad.Trans.State.Lazy
@@ -369,8 +372,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
 
 postBlocTransactionParallel ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     Mod.Accessible (Maybe SyncStatus) m,
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
@@ -384,7 +386,10 @@ postBlocTransactionParallel ::
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Maybe Bool -> -- use_wallet
   Bool -> -- resolve
@@ -393,8 +398,7 @@ postBlocTransactionParallel ::
 postBlocTransactionParallel = postBlocTransaction' (Do CacheNonce)
 
 postBlocTransaction ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     Mod.Accessible (Maybe SyncStatus) m,
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
@@ -408,7 +412,10 @@ postBlocTransaction ::
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Maybe Bool -> -- use_wallet
   Bool ->
@@ -417,8 +424,7 @@ postBlocTransaction ::
 postBlocTransaction = postBlocTransaction' (Don't CacheNonce)
 
 postBlocTransaction' ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     Mod.Accessible (Maybe SyncStatus) m,
     Mod.Accessible (Maybe BestBlock) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
@@ -432,7 +438,10 @@ postBlocTransaction' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Should CacheNonce ->
   Maybe Bool -> -- use_wallet
@@ -691,14 +700,16 @@ data TransactionHeader = TransactionHeader
 -}
 
 postUsersSend' ::
-  ( MonadUnliftIO m,
-    A.Selectable AccountsFilterParams [AddressStateRef] m,
+  ( A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     m `Mod.Outputs` [IngestEvent],
     MonadLogger m,
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Should CacheNonce ->
   TransferParameters ->
@@ -721,8 +732,7 @@ postUsersSend' cacheNonce TransferParameters {..} = do
   getResultAndRespond [txHash] resolve
 
 postUsersContractSolidVM' ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
     A.Selectable Keccak256 [TransactionResult] m,
@@ -730,7 +740,10 @@ postUsersContractSolidVM' ::
     m `Mod.Outputs` [IngestEvent],
     HasCodeDB m,
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Should CacheNonce ->
   ContractParameters ->
@@ -911,8 +924,7 @@ postUsersContractMethodList' cacheNonce FunctionListParameters {..} = do
       getBatchBlocTransactionResult' hashes resolve
 
 postUsersContractMethod' ::
-  ( MonadUnliftIO m,
-    MonadLogger m,
+  ( MonadLogger m,
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
@@ -922,7 +934,10 @@ postUsersContractMethod' ::
     (Keccak256 `A.Selectable` SourceMap) m,
     m `Mod.Outputs` [IngestEvent],
     HasBlocEnv m,
-    HasVault m
+    HasVault m,
+    Mod.Accessible ApiContext m,
+    HasSQLDB m,
+    MonadCatch m
   ) =>
   Should CacheNonce ->
   FunctionParameters ->

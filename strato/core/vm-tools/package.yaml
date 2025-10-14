@@ -27,6 +27,7 @@ library:
     - Blockchain.Timing
     - Blockchain.TxRunResultCache
     - Blockchain.MemVMContext
+    - Blockchain.NetworkParameters
     - Blockchain.VMContext
     - Blockchain.VMOptions
     - Blockchain.VM.VMException

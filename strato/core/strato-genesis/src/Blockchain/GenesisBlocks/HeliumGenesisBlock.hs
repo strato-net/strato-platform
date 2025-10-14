@@ -259,6 +259,12 @@ safetyModuleImplAddress = 0x1115
 rewardsChefImplAddress :: Address
 rewardsChefImplAddress = 0x111f
 
+transactionParametersImplAddress :: Address
+transactionParametersImplAddress = 0x1116
+
+transactionParametersAddress :: Address
+transactionParametersAddress = 0x1020
+
 combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
@@ -329,6 +335,7 @@ genesisBlock  =
             implContract cdpReserveImplAddress "CDPReserve",
             implContract safetyModuleImplAddress "SafetyModule",
             implContract rewardsChefImplAddress "RewardsChef",
+            implContract transactionParametersImplAddress "TransactionParameters",
             SolidVMContractWithStorage
               mercataAddress
               720
@@ -354,6 +361,7 @@ genesisBlock  =
               , (".cdpVault", BContract "CDPVault" $ unspecifiedChain cdpVaultAddress)
               , (".cdpReserve", BContract "CDPReserve" $ unspecifiedChain cdpReserveAddress)
               , (".safetyModule", BContract "SafetyModule" $ unspecifiedChain safetyModuleAddress)
+              , (".transactionParameters", BContract "TransactionParameters" $ unspecifiedChain transactionParametersAddress)
               ]
             ] ++ mapMaybe assetToAccountInfos GA.assets ++
             [ rateStrategy
@@ -376,6 +384,7 @@ genesisBlock  =
             , cdpVault
             , cdpReserve
             , safetyModule
+            , transactionParameters
             , sUsdst
             , ethstPool
             , ethstLpToken
@@ -398,6 +407,7 @@ genesisBlock  =
              , cdpRegistryEvents
              , cdpVaultEvents
              , safetyModuleEvents
+             , transactionParametersEvents
              ],
         genesisInfoDelegatecalls = M.fromList . map (fmap S.singleton) $
           ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress "BlockApps" "Mercata" "Token")) <$> GA.assets)
@@ -421,6 +431,7 @@ genesisBlock  =
              , (cdpReserveAddress, Delegatecall cdpReserveAddress cdpReserveImplAddress "BlockApps" "Mercata" "CDPReserve")
              , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
              , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress "BlockApps" "Mercata" "RewardsChef")
+             , (transactionParametersAddress, Delegatecall transactionParametersAddress transactionParametersImplAddress "BlockApps" "Mercata" "TransactionParameters")
              , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
              , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
              , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
@@ -1043,6 +1054,19 @@ safetyModuleEvents :: (Address, S.Seq Event)
 safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "SafetyModule" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (safetyModuleAddress, S.fromList $
   [ ("ParamsUpdated", [("cooldown", show (1 :: Integer)), ("window", show (432000 :: Integer)), ("maxSlashBps", show (3000 :: Integer))])
   , ("TokensUpdated", [("_asset", show usdstAddress), ("_sToken", show sUsdstAddress)])
+  ])
+
+transactionParameters :: AccountInfo
+transactionParameters = SolidVMContractWithStorage transactionParametersAddress 0 proxy $ ownedByBlockApps mercataAddress
+  ++ [ (".logicContract", BAccount $ unspecifiedChain transactionParametersImplAddress)
+     , (".txSizeLimit", BInteger 2097152)
+     , (".adminRegistry", BContract "AdminRegistry" $ unspecifiedChain adminRegistryAddress)
+     , (".initialized", BBool True)
+     ]
+
+transactionParametersEvents :: (Address, S.Seq Event)
+transactionParametersEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "TransactionParameters" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (transactionParametersAddress, S.fromList $
+  [ ("TransactionSizeLimitChanged", [("previousLimit", "0"), ("newLimit", "2097152"), ("blockNumber", "0"), ("timestamp", "0")])
   ])
 
 sUsdst :: AccountInfo

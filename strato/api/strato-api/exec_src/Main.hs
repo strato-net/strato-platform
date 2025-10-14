@@ -99,6 +99,9 @@ instance (Keccak256 `Alters` DBCode) m => (Keccak256 `Alters` DBCode) (ReaderT a
   insert p k = lift . insert p k
   delete p = lift . delete p
 
+-- No need for custom Accessible instance - the general instance from Control.Monad.Change.Modify
+-- already provides: instance Monad m => Accessible a (ReaderT a m)
+
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState (SQLM m) where
   select _ a = runMaybeT $ do
     (AddressStateRef' r _) <-
@@ -157,16 +160,17 @@ fullServer jwtToken = hoistServer (Proxy :: Proxy CoreAPI) (flip runReaderT (Acc
 
 ----------------
 
-hoistCoreServer :: BlocEnv -> UrlMap -> Server FullAPI
-hoistCoreServer blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
+hoistCoreServer :: ApiContext -> BlocEnv -> UrlMap -> Server FullAPI
+hoistCoreServer apiCtx blocEnv urlMap = hoistServer (Proxy :: Proxy FullAPI) convertErrors fullServer
   where
-    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (CirrusM (SQLM (LoggingT IO)))))) a -> Handler a
+    convertErrors :: IdentityM (VaultM (ReaderT UrlMap (ReaderT BlocEnv (ReaderT ApiContext (CirrusM (SQLM (LoggingT IO))))))) a -> Handler a
     convertErrors x = Handler $ do
       y <- liftIO 
         . try
         . runLoggingT
         . runSQLM
         . runCirrusM
+        . flip runReaderT apiCtx
         . flip runReaderT blocEnv
         . flip runReaderT urlMap
         . runVaultM ("http://localhost:8013/strato/v2.3")
@@ -241,10 +245,17 @@ main = do
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
             useWalletsByDefault = flags_useWalletsByDefault
           }
-  runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
+  
+  -- Initialize ApiContext with transaction size limit cache
+  apiCtx <- runLoggingT $ runSQLM $ initializeApiContext
+  putStrLn $ "Initialized API context with cached transaction size limit"
+  
+  -- TTL-based cache automatically refreshes when expired (no Kafka needed)
+  
+  runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app apiCtx env theDoc urlMap
 
-app :: BlocEnv -> Swagger -> UrlMap -> Application
-app blocEnv theDoc urlMap =
+app :: ApiContext -> BlocEnv -> Swagger -> UrlMap -> Application
+app apiCtx blocEnv theDoc urlMap =
   prometheus def {prometheusInstrumentApp = False} $
     instrumentApp "core-api" $
       logStdoutDev $
@@ -253,7 +264,7 @@ app blocEnv theDoc urlMap =
         $
           addPathsTo404 $
             serve (Proxy :: Proxy (FullAPI :<|> SwaggerSchemaUI "swagger-ui" "swagger.json")) $
-              hoistCoreServer blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
+              hoistCoreServer apiCtx blocEnv urlMap :<|> swaggerSchemaUIServer theDoc
 
 addPathsTo404 :: Middleware
 addPathsTo404 baseApp req respond' =

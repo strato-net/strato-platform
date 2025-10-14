@@ -17,6 +17,7 @@ module Core.API
   ( CoreAPI
   , MonadCoreAPI
   , coreApiServer
+  , module Core.ApiContext
   , module Handlers.AccountInfo
   , module Handlers.BlkLast
   , module Handlers.Block
@@ -31,14 +32,16 @@ module Core.API
 import           BlockApps.Logging
 import           Blockchain.Data.Block
 import           Blockchain.Data.DataDefs
+import           Blockchain.DB.SQLDB (HasSQLDB)
 import           Blockchain.Sequencer.Event (IngestEvent)
 import           Blockchain.Strato.Discovery.Data.Peer (HasPeerDB)
 import           Blockchain.Strato.Model.Keccak256
-import           Blockchain.Strato.Model.Options
 import           Blockchain.Strato.Model.Secp256k1
+import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Change.Alter
 import           Control.Monad.Change.Modify       (Accessible, Outputs)
 import           Control.Monad.Composable.Identity
+import           Core.ApiContext
 import           Data.Source.Map
 import           Handlers.AccountInfo              hiding (API, server)
 import qualified Handlers.AccountInfo              as Account
@@ -84,7 +87,10 @@ type CoreAPI =
 type MonadCoreAPI m =
   ( MonadUnliftIO m,
     MonadLogger m,
+    MonadCatch m,
     HasPeerDB m,
+    HasSQLDB m,
+    Accessible ApiContext m,
     Accessible Metadata.UrlMap m,
     Accessible IdentityData m,
     Accessible [RawTransaction] m,
@@ -113,6 +119,6 @@ coreApiServer =
     :<|> QueuedTransactions.server
     :<|> Stats.server
     :<|> Storage.server
-    :<|> Transaction.server flags_txSizeLimit
+    :<|> Transaction.server
     :<|> TransactionResult.server
     :<|> TxLast.server
