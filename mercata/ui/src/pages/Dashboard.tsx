@@ -6,7 +6,7 @@ import AssetSummary from "../components/dashboard/AssetSummary";
 import AssetsList from "../components/dashboard/AssetsList";
 import DashboardFAQ from "../components/dashboard/DashboardFAQ";
 import BorrowingSection from "../components/dashboard/BorrowingSection";
-import { Wallet, Coins, Shield, Banknote } from "lucide-react";
+import { Wallet, Coins, Shield, Banknote, Loader2 } from "lucide-react";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
 import { useLendingMetrics } from "@/hooks/useLendingMetrics";
@@ -22,6 +22,7 @@ import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
 import { useSafetyContext } from "@/context/SafetyContext";
 import { cataAddress } from "@/lib/constants";
+import { api } from "@/lib/axios";
 
 const Dashboard = () => {
   const [searchParams] = useSearchParams();
@@ -41,7 +42,8 @@ const Dashboard = () => {
   const { totalCDPDebt } = useCDP();
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
   const { safetyInfo } = useSafetyContext();
-  const { pendingRewards } = usePendingRewards(true, 30000);
+  const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(true, 30000);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   // Extract CATA token from inactive tokens by address
   const cataToken = inactiveTokens?.find(token =>
@@ -99,6 +101,30 @@ const Dashboard = () => {
 
   // Net balance calculation is now handled by the useNetBalance hook above
 
+  const handleClaimRewards = async () => {
+    if (isClaiming || parseFloat(pendingRewards) <= 0) {
+      return;
+    }
+
+    try {
+      setIsClaiming(true);
+      await api.post("/rewards/claim");
+
+      toast?.({
+        title: "Rewards Claimed",
+        description: `Successfully claimed ${pendingRewards} CATA tokens!`,
+      });
+
+      // Refresh data after successful claim
+      await Promise.all([
+        fetchTokens(),
+        refetchPendingRewards(),
+      ]);
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
   // Don't render anything until component is properly mounted
   if (!isComponentMounted) {
     return null;
@@ -138,8 +164,10 @@ const Dashboard = () => {
             <AssetSummary
               title="Pending CATA"
               value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
-              icon={<Banknote className="text-white" size={18} />}
-              color={pendingRewards == "0" ? "bg-gray-500" : "bg-green-500"}
+              icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
+              color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-gray-500"}
+              onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
+              tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
             />
 
             <AssetSummary
