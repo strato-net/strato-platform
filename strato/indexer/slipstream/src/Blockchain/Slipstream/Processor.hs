@@ -53,6 +53,7 @@ import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
 import Data.Ord (Down (..))
+import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Traversable (for)
@@ -254,9 +255,15 @@ processTheMessages messages = do
       multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
       -- Create collection tables
-      indexFkeys <- createIndexTable c cc nameParts
-      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc) collectionNamesAndTypes
-      eventFkeys <- createExpandEventTables c cc nameParts
+      let cc' = SourceAnnotation (initialPosition "") (initialPosition "") () <$ cc
+      inherited <- case getInheritedContracts cc' (_contractName c) of
+        Left err -> do
+          $logWarnS "processTheMessages" $ "Failed to get inherited contracts for " <> T.pack (_contractName c) <> ": " <> T.pack (show err)
+          pure []
+        Right inheritedContracts -> pure $ map (T.pack . _contractName) inheritedContracts
+      indexFkeys <- createIndexTable c cc nameParts inherited
+      collectionFkeys <- catMaybes <$> traverse (createCollectionTable nameParts c cc inherited) collectionNamesAndTypes
+      eventFkeys <- createExpandEventTables c cc nameParts inherited
       pure $ indexFkeys ++ collectionFkeys ++ eventFkeys
 
   inserts <- fmap concat $ do
