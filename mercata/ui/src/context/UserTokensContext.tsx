@@ -12,8 +12,16 @@ type UserTokensContextType = {
   loading: boolean;
   allActiveLoading: boolean;
   error: string | null;
+  allActivePagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
   fetchTokens: (signal?: AbortSignal) => Promise<void>;
-  fetchAllActiveTokens: (signal?: AbortSignal) => Promise<void>;
+  fetchAllActiveTokens: (page?: number, limit?: number, signal?: AbortSignal) => Promise<void>;
   
   // USDST balance
   usdstBalance: string;
@@ -35,6 +43,14 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   const [loading, setLoading] = useState(false);
   const [allActiveLoading, setAllActiveLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [allActivePagination, setAllActivePagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  });
   
   // USDST balance state
   const [usdstBalance, setUsdstBalance] = useState("0");
@@ -119,15 +135,29 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Modified to work like fetchTokens - storing in state
-  const fetchAllActiveTokens = useCallback(async (signal?: AbortSignal): Promise<void> => {
+  const fetchAllActiveTokens = useCallback(async (page = 1, limit = 20, signal?: AbortSignal): Promise<void> => {
     setAllActiveLoading(true);
     setError(null);
     try {
-      const response = await api.get(`/tokens?status=eq.2`, { signal });
+      const offset = (page - 1) * limit;
+      const params = {
+        status: 'eq.2',
+        limit: limit.toString(),
+        offset: offset.toString(),
+      };
+      const response = await api.get(`/tokens`, { signal, params });
       // Only update state if not aborted and data has actually changed
       if (signal?.aborted) return;
-      const tokens = response.data || [];
+      const tokens = response.data.data || [];
       setAllActiveTokens(tokens);
+      setAllActivePagination(response.data.pagination || {
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      });
     } catch (err) {
       if (
         axios.isCancel?.(err) ||
@@ -153,6 +183,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       loading,
       allActiveLoading,
       error,
+      allActivePagination,
       fetchTokens,
       fetchAllActiveTokens,
       
@@ -162,7 +193,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       voucherBalance,
       fetchUsdstBalance,
     }),
-    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, fetchTokens, fetchAllActiveTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
+    [activeTokens, inactiveTokens, allActiveTokens, loading, allActiveLoading, error, allActivePagination, fetchTokens, fetchAllActiveTokens, usdstBalance, voucherBalance, loadingUsdstBalance, fetchUsdstBalance]
   );
 
   return (

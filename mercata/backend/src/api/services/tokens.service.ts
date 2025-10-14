@@ -10,7 +10,7 @@ import { getOraclePrices } from "./oracle.service";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
 
-// Get all tokens
+// Get tokens (original function - no pagination)
 export const getTokens = async (
   accessToken: string,
   rawParams: Record<string, string | undefined> = {}
@@ -26,7 +26,6 @@ export const getTokens = async (
       params.select = tokenSelectFields.join(",");
     }
 
-    // Fetch tokens and lending data in parallel
     const [response, lendingResponse] = await Promise.all([
       cirrus.get(accessToken, "/" + Token, { params }),
       getLendingRegistry(accessToken, {
@@ -55,7 +54,7 @@ export const getTokens = async (
     const rawPrices = lendingResponse.oracle?.prices || [];
     const priceMap = await createCompletePriceMap(accessToken, rawPrices);
 
-    return (response.data as any[]).map((token) => ({
+    const processedTokens = (response.data as any[]).map((token) => ({
       ...token,
       price: priceMap.get(token.address) || "0",
       balances: (token.balances || []).map((balance: any) => {
@@ -73,6 +72,114 @@ export const getTokens = async (
         return balance;
       })
     }));
+
+    return processedTokens;
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Get tokens with pagination (new function for API endpoints)
+export const getTokensPaginated = async (
+  accessToken: string,
+  rawParams: Record<string, string | undefined> = {}
+) => {
+  try {
+    // Filter out undefined
+    let params = Object.fromEntries(
+      Object.entries(rawParams).filter(([_, v]) => v !== undefined)
+    ) as Record<string, string>;
+
+    // Set default pagination parameters
+    const limit = parseInt(params.limit || "20");
+    const offset = parseInt(params.offset || "0");
+    
+    // Validate pagination parameters
+    if (limit > 100) {
+      throw new Error("Limit cannot exceed 100");
+    }
+    if (offset < 0) {
+      throw new Error("Offset cannot be negative");
+    }
+
+    // use tokenBalanceSelectFields if no select is provided
+    if (!params.select) {
+      params.select = tokenSelectFields.join(",");
+    }
+
+    // Add pagination to params
+    params.limit = limit.toString();
+    params.offset = offset.toString();
+
+    // Fetch tokens count and data in parallel
+    const countParams = { ...params };
+    delete countParams.limit;
+    delete countParams.offset;
+
+    const [response, countResponse, lendingResponse] = await Promise.all([
+      cirrus.get(accessToken, "/" + Token, { params }),
+      cirrus.get(accessToken, "/" + Token, { params: { ...countParams, select: "count()" } }),
+      getLendingRegistry(accessToken, {
+        select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`
+      })
+    ]);
+
+    if (response.status !== 200) {
+      throw new Error(`Error fetching tokens: ${response.statusText}`);
+    }
+
+    if (!response.data) {
+      throw new Error("Tokens data is empty");
+    }
+
+    const totalCount = countResponse.data?.[0]?.count || 0;
+    const currentPage = Math.floor(offset / limit) + 1;
+    const totalPages = Math.ceil(totalCount / limit);
+    const hasNext = offset + limit < totalCount;
+
+    // Process collateral data
+    const collateralMap = new Map<string, string>();
+    const userCollaterals = lendingResponse.collateralVault?.userCollaterals || [];
+    userCollaterals
+      .filter((c: any) => c.user && c.asset && c.amount && c.amount !== "0")
+      .forEach((c: any) => {
+        collateralMap.set(`${c.user}-${c.asset}`, c.amount);
+      });
+
+    // Process price data
+    const rawPrices = lendingResponse.oracle?.prices || [];
+    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
+
+    const processedTokens = (response.data as any[]).map((token) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+      balances: (token.balances || []).map((balance: any) => {
+        // If this user has collateral for this token, add collateral info
+        if (balance.user && token.address) {
+          const collateralKey = `${balance.user}-${token.address}`;
+          const collateralAmount = collateralMap.get(collateralKey);
+          if (collateralAmount) {
+            return {
+              ...balance,
+              collateralBalance: collateralAmount
+            };
+          }
+        }
+        return balance;
+      })
+    }));
+
+    return {
+      data: processedTokens,
+      pagination: {
+        total: totalCount,
+        page: currentPage,
+        limit: limit,
+        totalPages: totalPages,
+        hasNext: hasNext,
+        hasPrevious: offset > 0
+      }
+    };
   } catch (error) {
     throw error;
   }

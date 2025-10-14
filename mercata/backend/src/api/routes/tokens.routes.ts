@@ -64,7 +64,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  * @openapi
  * /tokens:
  *   get:
- *     summary: List tokens registered on Mercata
+ *     summary: List tokens registered on Mercata (paginated)
  *     tags: [Tokens]
  *     parameters:
  *       - name: select
@@ -79,16 +79,57 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *         description: Optional status filter
  *         schema:
  *           type: string
+ *       - name: limit
+ *         in: query
+ *         required: false
+ *         description: Number of tokens per page (default: 20, max: 100)
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *       - name: offset
+ *         in: query
+ *         required: false
+ *         description: Number of tokens to skip (default: 0)
+ *         schema:
+ *           type: integer
+ *           minimum: 0
+ *           default: 0
  *     responses:
  *       200:
- *         description: Token list
+ *         description: Paginated token list
  *         content:
  *           application/json:
  *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 additionalProperties: true
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                 pagination:
+ *                   type: object
+ *                   properties:
+ *                     total:
+ *                       type: integer
+ *                       description: Total number of tokens
+ *                     page:
+ *                       type: integer
+ *                       description: Current page number
+ *                     limit:
+ *                       type: integer
+ *                       description: Number of tokens per page
+ *                     totalPages:
+ *                       type: integer
+ *                       description: Total number of pages
+ *                     hasNext:
+ *                       type: boolean
+ *                       description: Whether there are more pages
+ *                     hasPrevious:
+ *                       type: boolean
+ *                       description: Whether there are previous pages
  *   post:
  *     summary: Create a new token (admin)
  *     tags: [Tokens]

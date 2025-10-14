@@ -14,8 +14,24 @@ type TokenContextType = {
   activeTokens: Token[];
   loading: boolean;
   error: string | null;
-  getAllTokens: (query?: Record<string, string>) => Promise<void>;
-  getActiveTokens: () => Promise<void>;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+  activePagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrevious: boolean;
+  };
+  getAllTokens: (page?: number, limit?: number, query?: Record<string, string>) => Promise<void>;
+  getActiveTokens: (page?: number, limit?: number) => Promise<void>;
   getToken: (address: string) => Promise<Token | null>;
   getUserTokensWithBalance: () => Promise<Token[]>;
   createToken: (token: CreateTokenPayload) => Promise<void>;
@@ -32,24 +48,72 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [activeTokens, setActiveTokens] = useState<Token[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  });
+  const [activePagination, setActivePagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0,
+    hasNext: false,
+    hasPrevious: false,
+  });
 
-  const getAllTokens = useCallback(async (query: Record<string, string> = {}) => {
+  const getAllTokens = useCallback(async (page = 1, limit = 20, query: Record<string, string> = {}) => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.get<Token[]>('/tokens', { params: query });
-      setTokens(res.data || []);
-    } catch (err) {
+      const offset = (page - 1) * limit;
+      const params = {
+        ...query,
+        limit: limit.toString(),
+        offset: offset.toString(),
+      };
+      const res = await api.get('/tokens', { params });
+      setTokens(res.data.data || []);
+      setPagination(res.data.pagination || {
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch tokens');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const getActiveTokens = useCallback(async () => {
+  const getActiveTokens = useCallback(async (page = 1, limit = 20) => {
     setLoading(true);
+    setError(null);
     try {
-      const res = await api.get<Token[]>('/tokens', { params: { status: 'eq.2' } });
-      setActiveTokens(res.data || []);
-    } catch (err) {
+      const offset = (page - 1) * limit;
+      const params = {
+        status: 'eq.2',
+        limit: limit.toString(),
+        offset: offset.toString(),
+      };
+      const res = await api.get('/tokens', { params });
+      setActiveTokens(res.data.data || []);
+      setActivePagination(res.data.pagination || {
+        total: 0,
+        page: 1,
+        limit: 20,
+        totalPages: 0,
+        hasNext: false,
+        hasPrevious: false,
+      });
+    } catch (err: any) {
+      setError(err.response?.data?.message || err.message || 'Failed to fetch active tokens');
     } finally {
       setLoading(false);
     }
@@ -157,6 +221,8 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
         activeTokens,
         loading,
         error,
+        pagination,
+        activePagination,
         getAllTokens,
         getActiveTokens,
         getToken,

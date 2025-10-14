@@ -16,7 +16,8 @@ import { useTokenContext } from '@/context/TokenContext';
 import { useLendingContext } from '@/context/LendingContext';
 import { Loader2, Filter, MoreVertical } from 'lucide-react';
 import SetTokenStatusModal from './SetTokenStatusForm';
-import { CollateralRatioItem, InterestRateItem, LendData, Token } from '@/interface';
+import { CollateralRatioItem, InterestRateItem, LendData, Token, LendingPoolResponse } from '@/interface';
+import PaginationControls from '@/components/ui/PaginationControls';
 
 const getStatusLabel = (status?: string | number) => {
   switch (String(status)) {
@@ -32,10 +33,10 @@ const getStatusLabel = (status?: string | number) => {
 };
 
 const AllTokensTable = () => {
-  const { tokens, loading, error, getAllTokens } = useTokenContext();
+  const { tokens, loading, error, pagination, getAllTokens } = useTokenContext();
   const { getLend } = useLendingContext();
   const [statusFilter, setStatusFilter] = useState<string>('2');
-  const [lendData, setLendData] = useState<LendData>(null);
+  const [lendData, setLendData] = useState<LendingPoolResponse | null>(null);
   const [lendLoading, setLendLoading] = useState(false);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<{address: string; symbol: string; name: string} | null>(null);
@@ -57,20 +58,42 @@ const AllTokensTable = () => {
     fetchLendData();
   }, [getAllTokens]);
 
+  const getAssetConfig = (address: string) => {
+    if (!lendData) {
+      return null;
+    }
+        
+    // Check if data is under 'pool' key (backend might return this)
+    const poolData = lendData.pool || lendData.lendingPool;
+    
+    if (poolData?.assetConfigs) {
+      // Handle array structure
+      if (Array.isArray(poolData.assetConfigs)) {
+        const item = poolData.assetConfigs.find(
+          (item: any) => item.asset?.toLowerCase() === address.toLowerCase()
+        );
+        return item?.AssetConfig || null;
+      }
+      // Handle object structure
+      return poolData.assetConfigs[address.toLowerCase()];
+    }
+    return null;
+  };
+
   const getCollateralRatio = (address: string) => {
-    if (!lendData?.lendingPool?.collateralRatio) return '-';
-    const collateralData = lendData.lendingPool.collateralRatio.find(
-      (item: CollateralRatioItem) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return collateralData ? `${collateralData.ratio}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.ltv) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.ltv) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const getInterestRate = (address: string) => {
-    if (!lendData?.lendingPool?.interestRate) return '-';
-    const interestData = lendData.lendingPool.interestRate.find(
-      (item: InterestRateItem) => item.asset.toLowerCase() === address.toLowerCase()
-    );
-    return interestData ? `${interestData.rate}%` : '-';
+    const assetConfig = getAssetConfig(address);
+    if (!assetConfig?.interestRate) return '-';
+    // Convert from basis points to percentage
+    const percentage = (parseInt(assetConfig.interestRate) / 100).toFixed(1);
+    return `${percentage}%`;
   };
 
   const handleSetTokenStatus = (token: {address: string; symbol: string; name: string}) => {
@@ -225,6 +248,16 @@ const AllTokensTable = () => {
             </Table>
           </div>
         )}
+        
+        {/* Pagination */}
+        <PaginationControls
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => getAllTokens(page, pagination.limit)}
+          loading={loading}
+          totalItems={pagination.total}
+          itemsPerPage={pagination.limit}
+        />
       </CardContent>
       
       <SetTokenStatusModal
