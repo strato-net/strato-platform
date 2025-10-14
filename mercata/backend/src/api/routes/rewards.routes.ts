@@ -35,4 +35,31 @@ const router = Router();
  */
 router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.getPendingRewards);
 
+/**
+ * @openapi
+ * /rewards/claim:
+ *   post:
+ *     summary: Claim all pending CATA rewards from all pools
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: Claim transaction result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   description: Transaction status
+ *                   example: "success"
+ *                 hash:
+ *                   type: string
+ *                   description: Transaction hash
+ *                   example: "0x123abc..."
+ *       401:
+ *         description: Unauthorized
+ */
+router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.claimRewards);
+
 export default router;
