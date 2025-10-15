@@ -9,11 +9,15 @@ class NumberCard extends Component {
     classes += this.props.mode ? this.props.mode : 'neutral';
     let textSize = this.props.textSize ? this.props.textSize : 'h2';
     
-    // Check if this is a HexText component using the isHexText prop
-    const isHexText = this.props.isHexText === true;
+    // Check if the number prop contains an EllipsisText component
+    const isEllipsisText = this.props.number && 
+      (typeof this.props.number === 'object' && 
+       this.props.number.type && 
+       (this.props.number.type.name === 'EllipsisText' || 
+        this.props.number.type.displayName === 'EllipsisText'));
     
-    // Use different alignment for HexText vs regular numbers
-    const numberAlignment = isHexText ? 'text-left' : 'text-right';
+    // Use different alignment for EllipsisText vs regular numbers
+    const numberAlignment = isEllipsisText ? 'text-left' : 'text-right';
   
     
     return (

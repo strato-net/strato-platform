@@ -37,6 +37,7 @@ import { sec2Date } from "../../lib/formatSeconds";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
 import HexText from "../HexText";
+import EllipsisText from "../EllipsisText";
 
 const socket = io(env.SOCKET_SERVER, {
   path: "/apex-ws",
@@ -398,26 +399,24 @@ class Dashboard extends Component {
            <div className="col-sm-4">
             <NumberCard
               number={
-                <HexText value={env.NODE_HOST || "N/A"} shorten={true} />
+                <EllipsisText value={env.NODE_HOST || "N/A"} />
               }
               description="Node Host"
               iconClass="fa-server"
               className={`smd-pointer`}
               textSize="h4"
-              isHexText={true}
             />
           </div>
 
           <div className="col-sm-4">
             <NumberCard
               number={
-                <HexText value={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."} shorten={true} />
+                <EllipsisText value={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."} />
               }
               description="Node Address"
               iconClass="fa-id-card"
               className={`smd-pointer`}
               textSize="h4"
-              isHexText={true}
             />
           </div>
 
