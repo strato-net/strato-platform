@@ -80,7 +80,7 @@ router.use("/docs", (req: Request, res: Response, next: NextFunction) => {
   res.setHeader("Expires", "0");
   next();
 }, swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: '.swagger-ui .topbar { display: none }',
+  customCss: 'body { background-color: red !important; } .swagger-ui .topbar { display: none !important; } .swagger-ui { border: 10px solid blue !important; margin: 0 !important; padding: 0 !important; }',
   customSiteTitle: "Mercata API Documentation",
   customJs: '/api/public/swagger-csrf.js',
 }));
