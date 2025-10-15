@@ -1,6 +1,7 @@
 import { cirrus } from "../../../utils/mercataApiHelper";
 import { constants } from "../../../config/constants";
 import { getTokenBalanceForUser } from "../../services/tokens.service";
+import { RewardsPool } from "@mercata/shared-types";
 
 const { RewardsChef } = constants;
 
@@ -19,14 +20,7 @@ export const getPoolsCirrus = async (
   rewardsChefAddress: string,
   additionalParams?: Record<string, string>,
   includePeriods: boolean = false
-): Promise<Array<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-  bonusPeriods?: Array<{ startTimestamp: string; bonusMultiplier: string }>;
-}>> => {
+): Promise<RewardsPool[]> => {
   try {
     const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
       params: {

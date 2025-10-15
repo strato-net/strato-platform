@@ -5,7 +5,8 @@ import { getPoolsCirrus, getStakedBalance } from "../helpers/rewards/rewardsChef
 import { pendingCataAll } from "../helpers/rewards/pending.helpers";
 import {
   PendingRewardsData,
-  StakedBalanceData
+  StakedBalanceData,
+  RewardsPool
 } from "@mercata/shared-types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -74,13 +75,7 @@ export const getStakedBalanceForPool = async (
 export const getPools = async (
   accessToken: string,
   rewardsChefAddress: string
-): Promise<Array<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-}>> => {
+): Promise<RewardsPool[]> => {
   return getPoolsCirrus(accessToken, rewardsChefAddress);
 };
 
@@ -97,13 +92,7 @@ export const findPoolByLpToken = async (
   accessToken: string,
   rewardsChefAddress: string,
   lpTokenAddress: string
-): Promise<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-} | undefined> => {
+): Promise<RewardsPool | undefined> => {
   const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, {
     "value->>lpToken": `eq.${lpTokenAddress}`
   });
