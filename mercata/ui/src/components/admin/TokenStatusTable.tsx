@@ -164,11 +164,6 @@ const TokenStatusTable = () => {
               Refresh
             </Button>
           </div>
-          <div className="text-sm text-gray-500">
-            Showing {filteredTokens.length} of {tokens.length} tokens
-            {searchQuery && ` matching "${searchQuery}"`}
-            {statusFilter !== 'all' && ` with ${getStatusLabel(statusFilter).label} status`}
-          </div>
         </div>
         
         {filteredTokens.length === 0 ? (

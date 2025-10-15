@@ -82,7 +82,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *       - name: limit
  *         in: query
  *         required: false
- *         description: Number of tokens per page (default: 20, max: 100)
+ *         description: "Number of tokens per page (default: 20, max: 100)"
  *         schema:
  *           type: integer
  *           minimum: 1
@@ -91,7 +91,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *       - name: offset
  *         in: query
  *         required: false
- *         description: Number of tokens to skip (default: 0)
+ *         description: "Number of tokens to skip (default: 0)"
  *         schema:
  *           type: integer
  *           minimum: 0
@@ -203,7 +203,7 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  *                 description: Recipient address
  *               value:
  *                 type: string
- *                 description: Transfer amount (decimal string)
+ *                 description: "Transfer amount (decimal string)"
  *     responses:
  *       200:
  *         description: Transfer transaction payload
@@ -240,7 +240,7 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
  *                 description: Spender address
  *               value:
  *                 type: string
- *                 description: Allowance amount (decimal string)
+ *                 description: "Allowance amount (decimal string)"
  *     responses:
  *       200:
  *         description: Approval transaction payload
@@ -281,7 +281,7 @@ router.post("/approve", authHandler.authorizeRequest(), TokensController.approve
  *                 description: Recipient address
  *               value:
  *                 type: string
- *                 description: Transfer amount (decimal string)
+ *                 description: "Transfer amount (decimal string)"
  *     responses:
  *       200:
  *         description: Transfer transaction payload
