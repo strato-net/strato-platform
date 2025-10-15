@@ -154,6 +154,26 @@ export const getStakedBalance = async (
 };
 
 /**
+ * Finds the RewardsChef pool for a given LP token address
+ * Uses Cirrus filtering for efficient database-level query
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param lpTokenAddress - Address of the LP token to find
+ * @returns Promise resolving to the pool object, or undefined if not found
+ */
+export const findPoolByLpToken = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  lpTokenAddress: string
+): Promise<RewardsPool | undefined> => {
+  const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, {
+    "value->>lpToken": `eq.${lpTokenAddress}`
+  });
+  return pools[0]; // Should return at most one pool
+};
+
+/**
  * Helper function to wait for Cirrus to index the new balance
  *
  * This addresses a race condition where a transaction is confirmed on-chain

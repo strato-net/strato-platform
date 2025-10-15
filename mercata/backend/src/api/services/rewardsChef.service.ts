@@ -1,7 +1,7 @@
 import { strato } from "../../utils/mercataApiHelper";
 import { constants, rewardsChef as rewardsChefAddress, StratoPaths } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getPoolsCirrus, getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
+import { getPoolsCirrus, getStakedBalance, findPoolByLpToken as findPoolByLpTokenHelper } from "../helpers/rewards/rewardsChef.helpers";
 import { pendingCataAll } from "../helpers/rewards/pending.helpers";
 import {
   PendingRewardsData,
@@ -81,7 +81,6 @@ export const getPools = async (
 
 /**
  * Finds the RewardsChef pool for a given LP token address
- * Uses Cirrus filtering for efficient database-level query
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
@@ -93,10 +92,7 @@ export const findPoolByLpToken = async (
   rewardsChefAddress: string,
   lpTokenAddress: string
 ): Promise<RewardsPool | undefined> => {
-  const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, {
-    "value->>lpToken": `eq.${lpTokenAddress}`
-  });
-  return pools[0]; // Should return at most one pool
+  return findPoolByLpTokenHelper(accessToken, rewardsChefAddress, lpTokenAddress);
 };
 
 /**

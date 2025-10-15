@@ -20,8 +20,8 @@ import {
   stakeNewLPTokens
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools, findPoolByLpToken } from "./rewardsChef.service";
-import { getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
+import { getPools as getRewardsChefPools } from "./rewardsChef.service";
+import { getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 import { getTokenBalanceForUser } from "./tokens.service";
 import { rewardsChef } from "../../config/constants";
 import {
