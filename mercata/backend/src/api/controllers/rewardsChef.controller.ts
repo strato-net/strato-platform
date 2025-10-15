@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import { getPendingCataAll, getStakedBalanceForPool, claimAll, getPools, findPoolByLpToken, getRewardsChefState } from "../services/rewardsChef.service";
-import { rewardsChef } from "../../config/constants";
+import * as config from "../../config/config";
 
 class RewardsChefController {
   static async getPendingRewards(
@@ -13,7 +13,7 @@ class RewardsChefController {
 
       const result = await getPendingCataAll(
         accessToken,
-        rewardsChef,
+        config.rewardsChef,
         userAddress
       );
 
@@ -53,7 +53,7 @@ class RewardsChefController {
 
       const result = await getStakedBalanceForPool(
         accessToken,
-        rewardsChef,
+        config.rewardsChef,
         poolIdNumber,
         userAddress
       );
@@ -72,7 +72,7 @@ class RewardsChefController {
     try {
       const { accessToken } = req;
 
-      const pools = await getPools(accessToken, rewardsChef);
+      const pools = await getPools(accessToken, config.rewardsChef);
 
       res.status(RestStatus.OK).json({ pools });
     } catch (error) {
@@ -89,7 +89,7 @@ class RewardsChefController {
       const { accessToken } = req;
       const { lpTokenAddress } = req.params;
 
-      const pool = await findPoolByLpToken(accessToken, rewardsChef, lpTokenAddress);
+      const pool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
 
       if (!pool) {
         res.status(RestStatus.NOT_FOUND).json({ error: "Pool not found for the given LP token address" });
@@ -110,7 +110,7 @@ class RewardsChefController {
     try {
       const { accessToken } = req;
 
-      const state = await getRewardsChefState(accessToken, rewardsChef);
+      const state = await getRewardsChefState(accessToken, config.rewardsChef);
 
       if (!state) {
         res.status(RestStatus.NOT_FOUND).json({ error: "RewardsChef state not found" });
