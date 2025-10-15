@@ -7,7 +7,7 @@ import {
 import { env } from '../../env';
 
 const initialState = {
-  name: env.NODE_NAME,
+  name: env.NODE_HOST,
   peers: {},
   coinbase: ''
 };
