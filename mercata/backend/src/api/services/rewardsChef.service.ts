@@ -1,9 +1,37 @@
-import { cirrus } from "../../utils/mercataApiHelper";
-import { constants } from "../../config/constants";
+import { strato } from "../../utils/mercataApiHelper";
+import { constants, rewardsChef as rewardsChefAddress, StratoPaths } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
 import { getPoolsCirrus, getUserInfo } from "../helpers/rewards/rewardsChef.helpers";
+import { pendingCataAll } from "../helpers/rewards/pending.helpers";
+import {
+  PendingRewardsData
+} from "@mercata/shared-types";
+import { buildFunctionTx } from "../../utils/txBuilder";
+import { postAndWaitForTx } from "../../utils/txHelper";
+import { extractContractName } from "../../utils/utils";
 
 const { RewardsChef } = constants;
+
+export const getPendingCataAll = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  userAddress: string
+): Promise<PendingRewardsData> => {
+
+   const pendingCata = await pendingCataAll(
+     accessToken,
+     rewardsChefAddress,
+     userAddress
+   );
+
+   // Format with proper decimals (wei to CATA with 18 decimals)
+   const pendingCataFormatted = (Number(pendingCata) / 1e18).toFixed(2);
+   return {
+     pendingCata,
+     pendingCataFormatted
+   };
+};
+
 
 /**
  * Helper function to wait for Cirrus to index the new balance
@@ -113,4 +141,27 @@ export const findPoolByLpToken = async (
     "value->>lpToken": `eq.${lpTokenAddress}`
   });
   return pools[0]; // Should return at most one pool
+};
+
+/**
+ * Calls claimAll on RewardsChef contract to claim all pending rewards from all pools
+ *
+ * @param accessToken - User access token for authentication
+ * @param userAddress - Address of the user claiming rewards
+ * @returns Promise resolving to transaction result
+ */
+export const claimAll = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> => {
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(RewardsChef),
+    contractAddress: rewardsChefAddress,
+    method: "claimAll",
+    args: {}
+  }, userAddress, accessToken);
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
 };

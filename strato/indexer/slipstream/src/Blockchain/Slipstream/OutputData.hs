@@ -127,6 +127,7 @@ data SlipstreamQuery = CreateTable
                         }
                      | CreateView
                         { viewName :: TableName
+                        , inheritedContractNames :: [Text]
                         , sourceTableName :: TableName
                         , sourceTableColumns :: [Text]
                         , contractTableColumns :: [Text]
@@ -281,9 +282,10 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameToText contractTableName
         , " c ON s.address = c.address WHERE c.creator = '"
         , tableNameCreator viewName
-        , "' AND c.contract_name = '"
+        , "' AND (c.contract_name = '"
         , tableNameContractName viewName
-        , "'"
+        , T.concat $ ("' OR c.contract_name = '" <>) <$> inheritedContractNames
+        , "')"
         , T.concat $ (\(col, val) -> T.concat
             [ " AND s."
             , wrapEscapeDouble col
@@ -571,8 +573,9 @@ createIndexTable ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
+  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createIndexTable contract cc (creator, a, n) = do
+createIndexTable contract cc (creator, a, n) inherited = do
   let tableName = indexTableName creator a n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
@@ -581,6 +584,7 @@ createIndexTable contract cc (creator, a, n) = do
       fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator a f) x t) <$> mf) cols
   yield $ CreateView
     tableName
+    inherited
     storageTableName
     (fst <$> baseColumns)
     contractCols
@@ -595,15 +599,17 @@ createCollectionTable ::
   (Text, Text, Text) ->
   ContractF () ->
   CodeCollectionF () ->
+  [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createCollectionTable (creator, a, n) c cc (collectionName, keyTypes, valueType) = do
+createCollectionTable (creator, a, n) c cc inherited (collectionName, keyTypes, valueType) = do
   let tableName = collectionTableName creator a n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       mappingCols = (fst <$> baseMappingColumns) ++ ["value"]
   yield $ CreateView
     tableName
+    inherited
     mappingTableName
     mappingCols
     []
@@ -619,9 +625,10 @@ createEventArrayTable ::
   OutputM m =>
   (Text, Text, Text, Text) ->
   CodeCollectionF () ->
+  [Text] ->
   (Text, SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createEventArrayTable (creator, a, n, e) cc (arr, arrType) = do
+createEventArrayTable (creator, a, n, e) cc inherited (arr, arrType) = do
   let keyTypes (SVMType.Array t _) = SqlDecimal : keyTypes t
       keyTypes _                   = []
       tableName = eventCollectionTableName creator a n e arr
@@ -636,6 +643,7 @@ createEventArrayTable (creator, a, n, e) cc (arr, arrType) = do
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ CreateView
     tableName
+    inherited
     eventArrayTableName
     cols
     ["creator", "contract_name"]
@@ -894,10 +902,11 @@ createExpandEventTables ::
   ContractF () ->
   CodeCollectionF () ->
   (Text, Text, Text) ->
+  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createExpandEventTables c cc nameParts = fmap concat . mapM go . Map.toList $ c ^. events
+createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
   where
-    go (evName, ev) = createEventTable nameParts evName ev cc
+    go (evName, ev) = createEventTable nameParts evName ev cc inherited
 
 createEventTable ::
   OutputM m =>
@@ -905,8 +914,9 @@ createEventTable ::
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
+  [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createEventTable (creator, a, n) evName ev cc = do
+createEventTable (creator, a, n) evName ev cc inherited = do
   $logInfoS "createEventTable" . T.pack $ show ev
   let (crtr, app, cname) = constructTableNameParameters creator a n
       eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
@@ -922,6 +932,7 @@ createEventTable (creator, a, n) evName ev cc = do
           cols' = (\(x, v, _) -> (x, v)) <$> cols
        in CreateView
             tableName'
+            inherited
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
             ["creator", "contract_name"]
@@ -931,7 +942,7 @@ createEventTable (creator, a, n) evName ev cc = do
             [("event_name", tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable (crtr, app, cname, escapeQuotes $ labelToText evName) cc
+    createEventArrayTable (crtr, app, cname, escapeQuotes $ labelToText evName) cc inherited
   pure $ fcols ++ catMaybes arrayFkeys
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
