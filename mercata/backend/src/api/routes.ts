@@ -20,6 +20,8 @@ import rewardsRoutes from "./routes/rewards.routes";
 
 const router = Router();
 
+// TODO: add /constants route to expose backend constants to the UI
+
 // ----- User Routes -----
 router.use("/user", userRoutes);
 

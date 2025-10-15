@@ -1,3 +1,5 @@
+// TODO: All backend data related constants on a UI side must be fetched from the backend via a /constants route at the app page load time
+
 export const usdstAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
 export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
