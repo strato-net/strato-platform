@@ -396,10 +396,10 @@ class Dashboard extends Component {
             />
           </div> */}
            
-           <div className="col-sm-4">
+           <div className="col-sm-6">
             <NumberCard
               number={
-                <EllipsisText value={env.NODE_HOST || "N/A"} />
+                <HexText value={env.NODE_HOST || "N/A"} />
               }
               description="Node Host"
               iconClass="fa-server"
@@ -408,10 +408,10 @@ class Dashboard extends Component {
             />
           </div>
 
-          <div className="col-sm-4">
+          <div className="col-sm-6">
             <NumberCard
               number={
-                <EllipsisText value={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."} />
+                <HexText value={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."} />
               }
               description="Node Address"
               iconClass="fa-id-card"
@@ -419,12 +419,17 @@ class Dashboard extends Component {
               textSize="h4"
             />
           </div>
-
-          <div className="col-sm-4">
+        </div>
+        <div className="row">
+          <div className="col-sm-12">
+            <br />
+          </div>
+        </div>
+        <div className="row">
+          <div className="col-sm-12">
             <NodeCard />
           </div>
         </div>
-
         <div className="row">
           <div className="col-sm-12">
             <hr />

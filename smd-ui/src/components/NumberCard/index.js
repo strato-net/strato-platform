@@ -10,14 +10,14 @@ class NumberCard extends Component {
     let textSize = this.props.textSize ? this.props.textSize : 'h2';
     
     // Check if the number prop contains an EllipsisText component
-    const isEllipsisText = this.props.number && 
+    const isHexText = this.props.number && 
       (typeof this.props.number === 'object' && 
        this.props.number.type && 
-       (this.props.number.type.name === 'EllipsisText' || 
-        this.props.number.type.displayName === 'EllipsisText'));
+       (this.props.number.type.name === 'HexText' || 
+        this.props.number.type.displayName === 'HexText'));
     
-    // Use different alignment for EllipsisText vs regular numbers
-    const numberAlignment = isEllipsisText ? 'text-left' : 'text-right';
+    // Use different alignment for HexText vs regular numbers
+    const numberAlignment = isHexText ? 'text-left' : 'text-right';
   
     
     return (
