@@ -10,6 +10,8 @@ export * from './oracle-types';
 // Export all event-related types
 export * from './event-types';
 
-
-// Export all event-related types
+// Export all rewards-related types
 export * from './rewards';
+
+// Export all config-related types
+export * from './config-types';

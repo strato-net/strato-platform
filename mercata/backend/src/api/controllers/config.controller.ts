@@ -1,14 +1,14 @@
 import { Request, Response } from "express";
+import { getConfig } from "../services/config.service";
 
 class ConfigController {
   static async getConfig(req: Request, res: Response) {
     try {
-      // Return basic configuration
+      const config = getConfig();
+
       res.json({
         success: true,
-        data: {
-          projectId: process.env.WAGMI_PROJECT_ID || 'PROJECT_ID_UNSET',
-        }
+        data: config
       });
     } catch (error) {
       res.status(500).json({

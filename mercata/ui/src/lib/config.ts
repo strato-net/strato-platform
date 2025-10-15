@@ -1,8 +1,5 @@
 import { api } from "./axios";
-
-export interface ConfigData {
-  projectId: string;
-}
+import { ConfigData } from "@mercata/shared-types";
 
 export const getConfig = async (): Promise<ConfigData> => {
   const response = await api.get("/config");
