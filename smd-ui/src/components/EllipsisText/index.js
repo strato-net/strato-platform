@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip, Position } from '@blueprintjs/core';
-import './ellipsis-text.css'
+import './ellipsis-text.scss'
 
 class EllipsisText extends Component {
   constructor() {
