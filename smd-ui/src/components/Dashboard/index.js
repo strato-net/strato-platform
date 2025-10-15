@@ -404,6 +404,7 @@ class Dashboard extends Component {
               iconClass="fa-server"
               className={`smd-pointer`}
               textSize="h4"
+              isHexText={true}
             />
           </div>
 
@@ -416,6 +417,7 @@ class Dashboard extends Component {
               iconClass="fa-id-card"
               className={`smd-pointer`}
               textSize="h4"
+              isHexText={true}
             />
           </div>
 
