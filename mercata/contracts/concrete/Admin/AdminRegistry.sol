@@ -172,14 +172,17 @@ contract record AdminRegistry {
     function addWhitelist(address _target, string _func, address _user) internal {
         if (_target == address(this)) {
             require(
-                keccak256(_func) != keccak256("addWhitelist") &&
-                keccak256(_func) != keccak256("removeWhitelist") &&
-                keccak256(_func) != keccak256("_addAdmin") &&
-                keccak256(_func) != keccak256("_removeAdmin") &&
-                keccak256(_func) != keccak256("_swapAdmin") &&
-                keccak256(_func) != keccak256("setVotingThreshold") &&
-                keccak256(_func) != keccak256("createContract") &&
-                keccak256(_func) != keccak256("createSaltedContract"),
+                _func != "addWhitelist" &&
+                _func != "removeWhitelist" &&
+                _func != "_addAdmin" &&
+                _func != "_createIssue" &&
+                _func != "_executeIssue" &&
+                _func != "_removeAdmin" &&
+                _func != "_shouldExecute" &&
+                _func != "_swapAdmin" &&
+                _func != "setVotingThreshold" &&
+                _func != "createContract" &&
+                _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
             );
         }
