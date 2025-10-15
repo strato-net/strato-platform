@@ -4,7 +4,7 @@ import { SwapToken, LPToken, RawGetPool, RawPoolFactory, RawToken, RawLPToken, R
 import { safeBigInt, safeBigIntDivide } from "../../utils/bigIntUtils";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
-import { waitForBalanceUpdate } from "../services/rewardsChef.service";
+import { waitForBalanceUpdate } from "./rewards/rewardsChef.helpers";
 import { rewardsChef } from "../../config/constants";
 
 const { Pool, PoolSwap, swapHistorySelectFields } = constants;
