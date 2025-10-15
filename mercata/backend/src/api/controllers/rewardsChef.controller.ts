@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getPendingCataAll, getStakedBalanceForPool, claimAll, getPools, findPoolByLpToken } from "../services/rewardsChef.service";
+import { getPendingCataAll, getStakedBalanceForPool, claimAll, getPools, findPoolByLpToken, getRewardsChefState } from "../services/rewardsChef.service";
 import { rewardsChef } from "../../config/constants";
 
 class RewardsChefController {
@@ -97,6 +97,27 @@ class RewardsChefController {
       }
 
       res.status(RestStatus.OK).json({ pool });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getState(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+
+      const state = await getRewardsChefState(accessToken, rewardsChef);
+
+      if (!state) {
+        res.status(RestStatus.NOT_FOUND).json({ error: "RewardsChef state not found" });
+        return;
+      }
+
+      res.status(RestStatus.OK).json(state);
     } catch (error) {
       next(error);
     }

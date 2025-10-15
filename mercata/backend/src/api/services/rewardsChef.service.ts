@@ -6,7 +6,8 @@ import { pendingCataAll } from "../helpers/rewards/pending.helpers";
 import {
   PendingRewardsData,
   StakedBalanceData,
-  RewardsPool
+  RewardsPool,
+  RewardsChefState
 } from "@mercata/shared-types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -93,6 +94,20 @@ export const findPoolByLpToken = async (
   lpTokenAddress: string
 ): Promise<RewardsPool | undefined> => {
   return Helpers.findPoolByLpToken(accessToken, rewardsChefAddress, lpTokenAddress);
+};
+
+/**
+ * Fetches RewardsChef global state (cataPerSecond and totalAllocPoint)
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @returns Promise resolving to global state
+ */
+export const getRewardsChefState = async (
+  accessToken: string,
+  rewardsChefAddress: string
+): Promise<RewardsChefState | null> => {
+  return Helpers.getRewardsChefState(accessToken, rewardsChefAddress);
 };
 
 /**

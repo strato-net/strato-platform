@@ -199,4 +199,33 @@ router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPo
  */
 router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(), RewardsChefController.findPoolByLpToken);
 
+/**
+ * @openapi
+ * /rewards/state:
+ *   get:
+ *     summary: Get RewardsChef global state
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: RewardsChef global state
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 cataPerSecond:
+ *                   type: string
+ *                   description: CATA tokens emitted per second
+ *                   example: "1000000000000000000"
+ *                 totalAllocPoint:
+ *                   type: string
+ *                   description: Total allocation points across all pools
+ *                   example: "1000"
+ *       404:
+ *         description: RewardsChef state not found
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/state", authHandler.authorizeRequest(), RewardsChefController.getState);
+
 export default router;
