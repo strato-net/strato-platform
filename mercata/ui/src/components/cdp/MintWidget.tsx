@@ -102,30 +102,32 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   }, [depositAsset]);
 
   // Calculate max borrowable including new deposit input
-  // This combines existing vault borrowing power + new collateral being deposited
+  // This combines backend max (from existing collateral) + additional power from new deposits
   const calculateMaxBorrowableWithDeposit = useCallback((): number => {
     if (!depositAsset) return 0;
     
     const assetPriceUSD = getAssetPrice();
     if (assetPriceUSD <= 0) return 0;
     
-    // Get total collateral value (existing + new deposit input)
-    const totalCollateralValueUSD = getTotalCollateralValue();
-    if (totalCollateralValueUSD <= 0) return 0;
+    // Start with backend max from existing collateral (includes safety buffer and constraints)
+    let totalMaxBorrowable = maxBorrowableUSD;
     
-    // Get existing debt
-    const existingDebtDecimal = parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18));
+    // Add additional borrowing power from new deposit input
+    const newDepositAmount = parseFloat(depositAmount || "0");
+    if (newDepositAmount > 0) {
+      // Calculate additional collateral value from new deposit
+      const additionalCollateralValueUSD = newDepositAmount * assetPriceUSD;
+      
+      // Calculate additional borrowing power based on liquidation ratio
+      const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100;
+      const additionalBorrowingPower = additionalCollateralValueUSD / liquidationRatioDecimal;
+      
+      totalMaxBorrowable += additionalBorrowingPower;
+    }
     
-    // Calculate max borrowable USD based on total collateral and liquidation ratio
-    const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100; // Convert percentage to decimal
-    const maxBorrowableFromCollateral = totalCollateralValueUSD / liquidationRatioDecimal;
+    return Math.max(0, totalMaxBorrowable);
     
-    // Subtract existing debt to get available borrowing power
-    const availableBorrowingPower = maxBorrowableFromCollateral - existingDebtDecimal;
-    
-    return Math.max(0, availableBorrowingPower);
-    
-  }, [depositAsset, getAssetPrice, getTotalCollateralValue, existingVaultDebt]);
+  }, [depositAsset, getAssetPrice, maxBorrowableUSD, depositAmount]);
 
   // Get user's balance for the selected deposit asset
   const getUserDepositBalance = (): string => {
@@ -247,7 +249,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       const maxAmountToSet = currentMaxBorrowable.toFixed(2);
       setBorrowAmount(maxAmountToSet);
     }
-  }, [depositAmount, existingVaultCollateral, existingVaultDebt, assetPrices, depositAsset, isBorrowMaxEnabled, borrowAmount, calculateMaxBorrowableWithDeposit]);
+  }, [depositAmount, maxBorrowableUSD, assetPrices, depositAsset, isBorrowMaxEnabled, borrowAmount, calculateMaxBorrowableWithDeposit]);
 
   // Fetch existing vault collateral and max borrowable when asset changes
   useEffect(() => {
