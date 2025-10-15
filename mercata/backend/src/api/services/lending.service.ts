@@ -7,8 +7,8 @@ import * as config from "../../config/config";
 import { getBalance, getTokens, getTokenBalanceForUser } from "./tokens.service";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
-import { getStakedBalance, getPools, findPoolByLpToken } from "./rewardsChef.service";
-import { waitForBalanceUpdate } from "../helpers/rewards/rewardsChef.helpers";
+import { getPools, findPoolByLpToken } from "./rewardsChef.service";
+import { waitForBalanceUpdate, getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
 import {
   simulateLoan,
   CollateralInfo,

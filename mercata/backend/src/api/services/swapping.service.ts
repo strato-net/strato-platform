@@ -20,7 +20,8 @@ import {
   stakeNewLPTokens
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools, getStakedBalance, findPoolByLpToken } from "./rewardsChef.service";
+import { getPools as getRewardsChefPools, findPoolByLpToken } from "./rewardsChef.service";
+import { getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
 import { getTokenBalanceForUser } from "./tokens.service";
 import { rewardsChef } from "../../config/constants";
 import {
@@ -396,7 +397,8 @@ export const removeLiquidity = async (
       const walletLPBalance = BigInt(await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress));
 
       // Get staked LP token balance
-      const stakedLPBalance = BigInt(await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress));
+      const stakedBalance = await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress);
+      const stakedLPBalance = BigInt(stakedBalance);
 
       // Calculate required LP tokens and how much needs to be unstaked
       const requiredLPTokens = lpTokenAmountBigInt;

@@ -5,8 +5,8 @@ import { StratoPaths, constants, rewardsChef } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getStakedBalance, getPools, findPoolByLpToken } from "./rewardsChef.service";
-import { waitForBalanceUpdate } from "../helpers/rewards/rewardsChef.helpers";
+import { getPools, findPoolByLpToken } from "./rewardsChef.service";
+import { waitForBalanceUpdate, getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
 
 const SafetyModule = "mercata/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
 const { Token } = constants;

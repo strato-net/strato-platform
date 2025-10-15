@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getPendingCataAll } from "../services/rewardsChef.service";
+import { getPendingCataAll, getStakedBalanceForPool, claimAll } from "../services/rewardsChef.service";
 import { rewardsChef } from "../../config/constants";
-import { claimAll } from "../services/rewardsChef.service";
 
 class RewardsChefController {
   static async getPendingRewards(
@@ -30,6 +29,34 @@ class RewardsChefController {
       const { accessToken, address: userAddress } = req;
 
       const result = await claimAll(accessToken, userAddress);
+
+      res.status(RestStatus.OK).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getStakedBalanceForPool(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: userAddress } = req;
+      const { poolId } = req.params;
+
+      const poolIdNumber = parseInt(poolId, 10);
+      if (isNaN(poolIdNumber)) {
+        res.status(RestStatus.BAD_REQUEST).json({ error: "Invalid pool ID" });
+        return;
+      }
+
+      const result = await getStakedBalanceForPool(
+        accessToken,
+        rewardsChef,
+        poolIdNumber,
+        userAddress
+      );
 
       res.status(RestStatus.OK).json(result);
     } catch (error) {

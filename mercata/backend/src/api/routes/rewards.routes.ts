@@ -62,4 +62,45 @@ router.get("/pending", authHandler.authorizeRequest(), RewardsChefController.get
  */
 router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.claimRewards);
 
+/**
+ * @openapi
+ * /rewards/pools/{poolId}/balance:
+ *   get:
+ *     summary: Get user's staked balance in a specific RewardsChef pool
+ *     tags: [Rewards]
+ *     parameters:
+ *       - in: path
+ *         name: poolId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: The pool ID to query
+ *         example: 0
+ *     responses:
+ *       200:
+ *         description: User's staked balance in the pool
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 poolId:
+ *                   type: integer
+ *                   description: The pool ID
+ *                   example: 0
+ *                 stakedBalance:
+ *                   type: string
+ *                   description: Staked balance in wei (raw value)
+ *                   example: "1000000000000000000"
+ *                 stakedBalanceFormatted:
+ *                   type: string
+ *                   description: Staked balance formatted with 2 decimals
+ *                   example: "1.00"
+ *       400:
+ *         description: Invalid pool ID
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChefController.getStakedBalanceForPool);
+
 export default router;

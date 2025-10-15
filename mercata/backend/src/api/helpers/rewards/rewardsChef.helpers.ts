@@ -141,6 +141,25 @@ export const getRewardsChefState = async (
 };
 
 /**
+ * Get user's staked balance from RewardsChef for a specific pool
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @param poolId - Pool ID to query
+ * @param userAddress - User address to fetch balance for
+ * @returns Promise resolving to staked balance as string (in wei)
+ */
+export const getStakedBalance = async (
+  accessToken: string,
+  rewardsChefAddress: string,
+  poolId: number,
+  userAddress: string
+): Promise<string> => {
+  const userInfo = await getUserInfo(accessToken, rewardsChefAddress, poolId, userAddress);
+  return userInfo.amount;
+};
+
+/**
  * Helper function to wait for Cirrus to index the new balance
  *
  * This addresses a race condition where a transaction is confirmed on-chain

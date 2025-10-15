@@ -1,10 +1,11 @@
 import { strato } from "../../utils/mercataApiHelper";
 import { constants, rewardsChef as rewardsChefAddress, StratoPaths } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getPoolsCirrus, getUserInfo } from "../helpers/rewards/rewardsChef.helpers";
+import { getPoolsCirrus, getStakedBalance } from "../helpers/rewards/rewardsChef.helpers";
 import { pendingCataAll } from "../helpers/rewards/pending.helpers";
 import {
-  PendingRewardsData
+  PendingRewardsData,
+  StakedBalanceData
 } from "@mercata/shared-types";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
@@ -34,24 +35,33 @@ export const getPendingCataAll = async (
 
 
 /**
- * Helper function to get user's staked balance from RewardsChef
+ * Get user's staked balance from RewardsChef for a specific pool
  *
- * This function queries the userInfo mapping from Cirrus to get the current staked balance.
+ * This function queries the userInfo mapping from Cirrus to get the current staked balance
+ * and returns a rich data object with both raw and formatted values.
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
  * @param poolId - Pool ID to query
  * @param userAddress - User address to fetch balance for
- * @returns Promise resolving to staked balance as string (in wei)
+ * @returns Promise resolving to staked balance data with formatted values
  */
-export const getStakedBalance = async (
+export const getStakedBalanceForPool = async (
   accessToken: string,
   rewardsChefAddress: string,
   poolId: number,
   userAddress: string
-): Promise<string> => {
-  const userInfo = await getUserInfo(accessToken, rewardsChefAddress, poolId, userAddress);
-  return userInfo.amount;
+): Promise<StakedBalanceData> => {
+  const stakedBalance = await getStakedBalance(accessToken, rewardsChefAddress, poolId, userAddress);
+
+  // Format with proper decimals (wei to tokens with 18 decimals)
+  const stakedBalanceFormatted = (Number(stakedBalance) / 1e18).toFixed(2);
+
+  return {
+    poolId,
+    stakedBalance,
+    stakedBalanceFormatted
+  };
 };
 
 /**
