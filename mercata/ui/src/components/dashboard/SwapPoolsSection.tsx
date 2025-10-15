@@ -8,6 +8,7 @@ import { useUserTokens } from '@/context/UserTokensContext';
 import { formatBalance } from '@/utils/numberUtils';
 import { useSwapContext } from '@/context/SwapContext';
 import { Pool } from '@/interface';
+import { rewardsEnabled } from '@/lib/constants';
 import LiquidityDepositModal from './LiquidityDepositModal';
 import LiquidityWithdrawModal from './LiquidityWithdrawModal';
 
@@ -196,7 +197,7 @@ const SwapPoolsSection = () => {
                       <div className="flex items-center text-xs text-gray-500 mt-1">
                         <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
                       </div>
-                      {pool.lpToken.stakedBalance !== undefined && (
+                      {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
                         <>
                           <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
                             <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
