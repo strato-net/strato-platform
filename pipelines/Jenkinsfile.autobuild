@@ -171,7 +171,8 @@ pipeline {
                   '''
                   archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
                   stash includes: 'bootstrap-docker/**', name: 'bootstrapDocker'
-                  stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
+                  stash includes: 'docker-compose.allDocker.yml', name: 'dc-alldocker-yaml'
+                  //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -286,8 +287,9 @@ pipeline {
                 ]) {
                   sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
                 }
-                unstash 'bootStrapDocker'
-                dir("bootstrap-docker"){
+                dir("strato-getting-started"){
+                  unstash 'dc-alldocker-yaml'
+                  sh 'cp docker-compose.allDocker.yml docker-compose.yml'
                   withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
                         NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
