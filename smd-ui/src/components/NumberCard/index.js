@@ -14,7 +14,7 @@ class NumberCard extends Component {
     
     // Use different alignment for HexText vs regular numbers
     const numberAlignment = isHexText ? 'text-left' : 'text-right';
-    const descriptionAlignment = 'text-right'; // Always keep description right-aligned
+  
     
     return (
       <div className={classes}>
@@ -26,7 +26,7 @@ class NumberCard extends Component {
             <div className={`${textSize} ${numberAlignment}`}>
               <strong>{this.props.number}</strong>
             </div>
-            <div className={`h4 ${descriptionAlignment} desc`}>
+            <div className={`h4 text-right desc`}>
               {this.props.description}
             </div>
           </div>
