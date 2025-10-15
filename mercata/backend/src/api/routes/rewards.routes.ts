@@ -103,4 +103,48 @@ router.post("/claim", authHandler.authorizeRequest(), RewardsChefController.clai
  */
 router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChefController.getStakedBalanceForPool);
 
+/**
+ * @openapi
+ * /rewards/pools:
+ *   get:
+ *     summary: Get all RewardsChef pools
+ *     tags: [Rewards]
+ *     responses:
+ *       200:
+ *         description: List of all pools in RewardsChef
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 pools:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       poolIdx:
+ *                         type: integer
+ *                         description: Pool index
+ *                         example: 0
+ *                       lpToken:
+ *                         type: string
+ *                         description: LP token address for this pool
+ *                         example: "0x1234567890abcdef1234567890abcdef12345678"
+ *                       allocPoint:
+ *                         type: string
+ *                         description: Allocation points for this pool
+ *                         example: "100"
+ *                       accPerToken:
+ *                         type: string
+ *                         description: Accumulated rewards per token
+ *                         example: "1000000000000000000"
+ *                       lastRewardTimestamp:
+ *                         type: string
+ *                         description: Last timestamp when rewards were calculated
+ *                         example: "1640000000"
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPools);
+
 export default router;
