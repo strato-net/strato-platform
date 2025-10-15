@@ -61,21 +61,35 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         _;
     }
 
-    constructor(
-        string _name,
-        string _description,
-        string[] _images,
-        string[] _files,
-        string[] _fileNames,
-        string _symbol,
-        uint256 _initialSupply,
-        uint8 _customDecimals,
-        address _tokenCreator
-    ) ERC20(_name, _symbol) TokenMetadata(_description, _images, _files, _fileNames) Ownable(_tokenCreator) {
-        customDecimals = _customDecimals;
+    constructor(address initialOwner)
+        Ownable(initialOwner)
+        ERC20("", "")
+        TokenMetadata("", [], [], [])
+    {}
+
+    function initialize(
+        string name_,
+        string description_,
+        string[] images_,
+        string[] files_,
+        string[] fileNames_,
+        string symbol_,
+        uint256 initialSupply_,
+        uint8 customDecimals_,
+        address tokenCreator_
+    ) external onlyOwner {
+
+        // ERC20(name_, symbol_)
+        _name = name_;
+        _symbol = symbol_;
+
+        // TokenMetadata(description_, images_, files_, fileNames_)
+        _setMetadata(description_, images_, files_, fileNames_);
+
+        customDecimals = customDecimals_;
         status = TokenStatus.PENDING;
         tokenFactory = TokenFactory(msg.sender);
-        _mint(_tokenCreator, _initialSupply);
+        _mint(tokenCreator_, initialSupply_);
 
         emit StatusChanged(status);
     }

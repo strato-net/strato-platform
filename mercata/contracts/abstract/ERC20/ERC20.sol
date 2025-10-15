@@ -38,8 +38,8 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
 
     uint256 private _totalSupply;
 
-    string private _name;
-    string private _symbol;
+    string internal _name;   //MERCATA_COMPATIBILITY: Changed from private to internal to allow for upgradeability
+    string internal _symbol; //MERCATA_COMPATIBILITY: Changed from private to internal to allow for upgradeability
 
     /**
      * @dev Sets the values for {name} and {symbol}.
