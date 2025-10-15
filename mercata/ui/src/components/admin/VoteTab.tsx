@@ -14,10 +14,11 @@ import { useUser } from '@/context/UserContext';
 import { Loader2, MoreVertical } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
+import JSONBig from 'json-bigint';
 
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
@@ -26,6 +27,10 @@ const VoteTab = () => {
 
   const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
+  };
+
+  const handleCastVoteOnIssueById = (issueId: string) => {
+    castVoteOnIssueById(issueId);
   };
 
   if (openIssuesLoading) {
@@ -52,6 +57,7 @@ const VoteTab = () => {
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
   const executed: object[] = (openIssues && openIssues['executed']) || [];
+  const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
   return (
     <div className="space-y-6">
@@ -148,7 +154,7 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
+                    const issueArgs = JSONBigNative.parse(issue.args);
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
@@ -199,7 +205,7 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, issueArgs)}
+                            onClick={() => handleCastVoteOnIssueById(issueId)}
                             disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
@@ -251,8 +257,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
-
+                    const issueArgs = JSONBigNative.parse(issue.args);
                     return (
                       <TableRow key={`${issueId}-${index}`}>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">

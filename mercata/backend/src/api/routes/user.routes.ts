@@ -185,6 +185,35 @@ router.post("/admin/vote", authHandler.authorizeRequest(), UserController.castVo
 
 /**
  * @openapi
+ * /user/admin/vote/by-id:
+ *   post:
+ *     summary: Cast an administrative vote by issue ID
+ *     tags: [Admin]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - issueId
+ *             properties:
+ *               issueId:
+ *                 type: string
+ *                 description: The ID of the issue to vote on
+ *     responses:
+ *       200:
+ *         description: Vote transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/vote/by-id", authHandler.authorizeRequest(), UserController.castVoteOnIssueById);
+
+/**
+ * @openapi
  * /user/admin/issues:
  *   get:
  *     summary: List open administrative issues
