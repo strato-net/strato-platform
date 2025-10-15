@@ -1,7 +1,7 @@
 import { strato } from "../../utils/mercataApiHelper";
 import { constants, rewardsChef as rewardsChefAddress, StratoPaths } from "../../config/constants";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getPoolsCirrus, getStakedBalance, findPoolByLpToken as findPoolByLpTokenHelper } from "../helpers/rewards/rewardsChef.helpers";
+import * as Helpers from "../helpers/rewards/rewardsChef.helpers";
 import { pendingCataAll } from "../helpers/rewards/pending.helpers";
 import {
   PendingRewardsData,
@@ -53,7 +53,7 @@ export const getStakedBalanceForPool = async (
   poolId: number,
   userAddress: string
 ): Promise<StakedBalanceData> => {
-  const stakedBalance = await getStakedBalance(accessToken, rewardsChefAddress, poolId, userAddress);
+  const stakedBalance = await Helpers.getStakedBalance(accessToken, rewardsChefAddress, poolId, userAddress);
 
   // Format with proper decimals (wei to tokens with 18 decimals)
   const stakedBalanceFormatted = (Number(stakedBalance) / 1e18).toFixed(2);
@@ -76,7 +76,7 @@ export const getPools = async (
   accessToken: string,
   rewardsChefAddress: string
 ): Promise<RewardsPool[]> => {
-  return getPoolsCirrus(accessToken, rewardsChefAddress);
+  return Helpers.getPoolsCirrus(accessToken, rewardsChefAddress);
 };
 
 /**
@@ -92,7 +92,7 @@ export const findPoolByLpToken = async (
   rewardsChefAddress: string,
   lpTokenAddress: string
 ): Promise<RewardsPool | undefined> => {
-  return findPoolByLpTokenHelper(accessToken, rewardsChefAddress, lpTokenAddress);
+  return Helpers.findPoolByLpToken(accessToken, rewardsChefAddress, lpTokenAddress);
 };
 
 /**
