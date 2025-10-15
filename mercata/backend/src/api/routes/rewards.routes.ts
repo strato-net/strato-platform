@@ -147,4 +147,56 @@ router.get("/pools/:poolId/balance", authHandler.authorizeRequest(), RewardsChef
  */
 router.get("/pools", authHandler.authorizeRequest(), RewardsChefController.getPools);
 
+/**
+ * @openapi
+ * /rewards/pools/by-lp-token/{lpTokenAddress}:
+ *   get:
+ *     summary: Find RewardsChef pool by LP token address
+ *     tags: [Rewards]
+ *     parameters:
+ *       - in: path
+ *         name: lpTokenAddress
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: The LP token address to search for
+ *         example: "0x1234567890abcdef1234567890abcdef12345678"
+ *     responses:
+ *       200:
+ *         description: Pool found for the LP token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 pool:
+ *                   type: object
+ *                   properties:
+ *                     poolIdx:
+ *                       type: integer
+ *                       description: Pool index
+ *                       example: 0
+ *                     lpToken:
+ *                       type: string
+ *                       description: LP token address for this pool
+ *                       example: "0x1234567890abcdef1234567890abcdef12345678"
+ *                     allocPoint:
+ *                       type: string
+ *                       description: Allocation points for this pool
+ *                       example: "100"
+ *                     accPerToken:
+ *                       type: string
+ *                       description: Accumulated rewards per token
+ *                       example: "1000000000000000000"
+ *                     lastRewardTimestamp:
+ *                       type: string
+ *                       description: Last timestamp when rewards were calculated
+ *                       example: "1640000000"
+ *       404:
+ *         description: Pool not found for the given LP token address
+ *       401:
+ *         description: Unauthorized
+ */
+router.get("/pools/by-lp-token/:lpTokenAddress", authHandler.authorizeRequest(), RewardsChefController.findPoolByLpToken);
+
 export default router;

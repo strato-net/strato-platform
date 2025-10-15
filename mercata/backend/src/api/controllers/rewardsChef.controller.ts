@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getPendingCataAll, getStakedBalanceForPool, claimAll, getPools } from "../services/rewardsChef.service";
+import { getPendingCataAll, getStakedBalanceForPool, claimAll, getPools, findPoolByLpToken } from "../services/rewardsChef.service";
 import { rewardsChef } from "../../config/constants";
 
 class RewardsChefController {
@@ -75,6 +75,28 @@ class RewardsChefController {
       const pools = await getPools(accessToken, rewardsChef);
 
       res.status(RestStatus.OK).json({ pools });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async findPoolByLpToken(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken } = req;
+      const { lpTokenAddress } = req.params;
+
+      const pool = await findPoolByLpToken(accessToken, rewardsChef, lpTokenAddress);
+
+      if (!pool) {
+        res.status(RestStatus.NOT_FOUND).json({ error: "Pool not found for the given LP token address" });
+        return;
+      }
+
+      res.status(RestStatus.OK).json({ pool });
     } catch (error) {
       next(error);
     }
