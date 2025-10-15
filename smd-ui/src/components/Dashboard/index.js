@@ -37,7 +37,7 @@ import { sec2Date } from "../../lib/formatSeconds";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
 import HexText from "../HexText";
-import EllipsisText from "../EllipsisText";
+
 
 const socket = io(env.SOCKET_SERVER, {
   path: "/apex-ws",
