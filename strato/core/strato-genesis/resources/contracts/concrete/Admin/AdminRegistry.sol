@@ -145,6 +145,7 @@ contract record AdminRegistry {
     }
 
     function _addAdmin(address _admin) internal {
+        require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
     }
