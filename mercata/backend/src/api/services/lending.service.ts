@@ -827,7 +827,7 @@ export const executeLiquidation = async (
   accessToken: string,
   userAddress: string,
   loanId: string,
-  options: { collateralAsset?: string; repayAmount?: string | number | bigint } = {}
+  options: { collateralAsset?: string; repayAmount?: string | number | bigint; minCollateralOut?: string | number | bigint } = {}
 ) => {
   // LiquidityPool address
   const { liquidityPool } = await getPool(accessToken, { select: "liquidityPool" });
@@ -938,6 +938,7 @@ export const executeLiquidation = async (
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
   const repayAmountAtomic = repayAmount.toString();
+  const minCollateralOutAtomic = options.minCollateralOut ? toBig(options.minCollateralOut).toString() : "0";
 
   const tx = await buildFunctionTx([
     {
@@ -953,10 +954,12 @@ export const executeLiquidation = async (
       args: treatAsAll ? {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
+        minCollateralOut: minCollateralOutAtomic,
       } : {
         collateralAsset: options.collateralAsset || userCollaterals[0]?.asset,
         borrower: loanId,
         debtToCover: repayAmountAtomic,
+        minCollateralOut: minCollateralOutAtomic,
       },
     },
   ], userAddress, accessToken);

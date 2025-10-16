@@ -159,6 +159,11 @@ export function validateLiquidationArgs(args: any) {
       .messages({
         "alternatives.match": "Repay amount must be a non-negative integer string, 'ALL', or number.",
       }),
+    minCollateralOut: numericStringField("minCollateralOut", {allowZero: true})
+      .optional()
+      .messages({
+        "string.pattern.base": "minCollateralOut must be a valid numeric string.",
+      }),
   });
 
   const { error } = schema.validate(args);

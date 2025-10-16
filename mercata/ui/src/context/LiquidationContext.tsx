@@ -33,7 +33,7 @@ type LiquidationContextType = {
   error: string | null;
   fetchLiquidatable: (signal?: AbortSignal) => Promise<void>;
   fetchWatchlist: (signal?: AbortSignal) => Promise<void>;
-  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string) => Promise<any>;
+  executeLiquidation: (id: string, collateralAsset?: string, repayAmount?: string, minCollateralOut?: string) => Promise<any>;
   refreshData: () => Promise<void>;
 };
 
@@ -81,7 +81,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
     ]);
   }, [fetchLiquidatable, fetchWatchlist]);
 
-  const executeLiquidation = useCallback(async (id: string, collateralAsset?: string, repayAmount?: string) => {
+  const executeLiquidation = useCallback(async (id: string, collateralAsset?: string, repayAmount?: string, minCollateralOut?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -91,6 +91,7 @@ export const LiquidationProvider = ({ children }: { children: ReactNode }) => {
         response = await api.post(`/lend/liquidate/${id}`, {
           collateralAsset,
           repayAmount,
+          minCollateralOut: minCollateralOut || "0",
         });
       } else {
         // Simple liquidation (existing behavior)
