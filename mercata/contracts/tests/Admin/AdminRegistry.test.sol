@@ -168,7 +168,7 @@ contract Describe_AdminRegistry is Authorizable {
         // Test that the function exists and can be called (even if it requires voting)
         bool reverted = false;
         try {
-            adminRegistry.swapAdmin(admin3);
+            adminRegistry.swapAdmin(admin1, admin3);
         } catch {
             reverted = true;
         }
@@ -299,8 +299,9 @@ contract Describe_AdminRegistry is Authorizable {
         require(!executed1, "Should not execute contract creation with one vote");
 
         // Second vote - should execute
-        (bool executed2, address newContract) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "TestContract", src, "hello");
+        (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "TestContract", src, "hello");
         require(executed2, "Should execute contract creation with two votes");
+        address newContract = address(result2);
         require(newContract != address(0), "New contract should be created");
 
         string memory val = newContract.call("val");
@@ -316,8 +317,9 @@ contract Describe_AdminRegistry is Authorizable {
         require(!executed1, "Should not execute salted contract creation with one vote");
 
         // Second vote - should execute
-        (bool executed2, address newContract) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
+        (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
         require(executed2, "Should execute salted contract creation with two votes");
+        address newContract = address(result2);
         require(newContract != address(0), "New contract should be created");
 
         string memory val = newContract.call("val");
@@ -368,10 +370,10 @@ contract Describe_AdminRegistry is Authorizable {
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin after removal");
 
         // Swap admin using the proper swapAdmin function
-        adminRegistry.swapAdmin(admin3);
+        adminRegistry.swapAdmin(admin1, admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was swapped before enough votes were cast");
-        
-        user1.do(address(adminRegistry), "swapAdmin", admin3);
+
+        user1.do(address(adminRegistry), "swapAdmin", admin1, admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin swap should maintain same count");
     }
 
