@@ -352,10 +352,13 @@ pipeline {
         
         stage('Contract tests') {
           steps {
-            catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
-              sh '''#!/bin/bash -lex
-                find mercata/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'cd "$(dirname "{}")" && .docker-work/usr/local/bin/solid-vm-cli test "$(basename "{}")"'
-              '''
+            script {
+              def WORKDIR = pwd()
+              catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                sh """#!/bin/bash -lex
+                  find mercata/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'cd "\$(dirname "{}")" && $WORKDIR/.docker-work/usr/local/bin/solid-vm-cli test "\$(basename "{}")"'
+                """
+              }
             }
           }
         }
