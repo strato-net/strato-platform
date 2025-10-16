@@ -70,7 +70,7 @@ export const addAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "addAdmin", // change this to castVoteOnIssue
+      method: "addAdmin",
       args: {
         _admin: adminAddress,
       },
@@ -96,7 +96,7 @@ export const removeAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "removeAdmin", //change this to castVoteOnIssue
+      method: "removeAdmin", 
       args: {
         _admin: adminAddress,
       },
@@ -169,17 +169,28 @@ export const castVoteOnIssueById = async (
     const issue = issueResponse.data[0];
     let { target, func, args: argsRaw } = issue;
 
-    // Replace internal function names with public function names
-    if (func === '_addAdmin') {
-      func = 'addAdmin';
-    } else if (func === '_removeAdmin') {
-      func = 'removeAdmin';
-    }
-
     // Parse args keeping large numbers as strings (JSONBig with storeAsString)
     const JSONBigString = JSONBig({ storeAsString: true });
     const args = typeof argsRaw === 'string' ? JSONBigString.parse(argsRaw) : argsRaw;
     // console.log("args in castVoteOnIssueById", args);
+
+    // If func is _addAdmin, call the addAdmin endpoint directly
+    if (func === '_addAdmin') {
+      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
+      if (!adminAddress) {
+        throw new Error('Admin address not found in args');
+      }
+      return await addAdmin(accessToken, userAddress, adminAddress);
+    }
+
+    // If func is _removeAdmin, call the removeAdmin endpoint directly
+    if (func === '_removeAdmin') {
+      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
+      if (!adminAddress) {
+        throw new Error('Admin address not found in args');
+      }
+      return await removeAdmin(accessToken, userAddress, adminAddress);
+    }
 
     // Get contract name from Cirrus
     const contractResponse = await cirrus.get(accessToken, "contract", {
