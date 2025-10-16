@@ -35,8 +35,8 @@ push (SArray vec) (Just (Variable ref)) [av] = do
   let newArr = V.snoc vec newVar
   setVar (Variable ref) (SArray newArr)
   return $ Constant (SInteger $ fromIntegral $ V.length newArr)
-push _ _ argVals = do
-  invalidArguments "push" argVals
+push v mv argVals = do
+  invalidArguments "push" (v, mv, argVals)
 
 modExp :: Integer -> Integer -> Integer -> Integer
 modExp b e m =

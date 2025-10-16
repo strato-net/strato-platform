@@ -10,7 +10,7 @@ contract User {
     }
 }
 
-contract Describe_BadDebt_Basic {
+contract Describe_BadDebt_Basic is Authorizable {
 
     struct LoanInfo {
         uint scaledDebt;     // user debt in index-scaled units

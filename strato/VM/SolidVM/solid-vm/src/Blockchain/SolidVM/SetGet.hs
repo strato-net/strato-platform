@@ -57,7 +57,7 @@ fromBasic = \case
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
-  MS.BDefault -> SInteger 0
+  MS.BDefault -> SNULL
 
 toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
@@ -129,8 +129,11 @@ weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
-getVar (Constant (SReference (AccountPath addr key))) = do
-  fromBasic <$> getSolidStorageKeyVal' addr key
+getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
+  theValue <- getSolidStorageKeyVal' addr key
+  case theValue of
+    MS.BDefault -> pure $ SReference addressedPath
+    _ -> pure $ fromBasic theValue
 getVar (Constant (SStruct s ma)) = do
   resolved <-
     mapM
@@ -179,6 +182,7 @@ getInt p = do
   case v of
     SInteger s -> return s
     SNULL -> return 0
+    SReference{} -> pure 0
     _ -> typeError "getInt" (p, v)
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
@@ -188,6 +192,7 @@ getRealNum p = do
     SInteger s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
+    SReference{} -> pure $ Left 0
     _ -> typeError "getRealNum" (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
@@ -197,6 +202,7 @@ getBool p = do
     SBool b -> return b
     SInteger i -> return $ i /= 0
     SNULL -> return False
+    SReference{} -> pure False
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()

@@ -118,21 +118,72 @@ data Value
 --(the move to static typing will probably automatically clean this up)
 
 instance Eq Value where
+  SNULL == SNULL = True
+  SReference{} == SReference{} = True
   (SInteger i1) == (SInteger i2) = i1 == i2
+  SNULL == (SInteger i2) = 0 == i2
+  (SInteger i1) == SNULL = i1 == 0
+  SReference{} == (SInteger i2) = 0 == i2
+  (SInteger i1) == SReference{} = i1 == 0
   (SString s1) == (SString s2) = s1 == s2
+  SNULL == (SString s2) = "" == s2
+  (SString s1) == SNULL = s1 == ""
+  SReference{} == (SString s2) = "" == s2
+  (SString s1) == SReference{} = s1 == ""
   (SDecimal v1) == (SDecimal v2) = v1 == v2
+  SNULL == (SDecimal v2) = 0.0 == v2
+  (SDecimal v1) == SNULL = v1 == 0.0
+  SReference{} == (SDecimal v2) = 0.0 == v2
+  (SDecimal v1) == SReference{} = v1 == 0.0
   (SBool b1) == (SBool b2) = b1 == b2
+  SNULL == (SBool b2) = False == b2
+  (SBool b1) == SNULL = b1 == False
+  SReference{} == (SBool b2) = False == b2
+  (SBool b1) == SReference{} = b1 == False
   (SAccount a1 b1) == (SAccount a2 b2) = (a1 == a2 && b1 == b2)
+  SNULL == (SAccount a2 b2) = (unspecifiedChain 0x0 == a2 && False == b2)
+  (SAccount a1 b1) == SNULL = (a1 == unspecifiedChain 0x0 && b1 == False)
+  SReference{} == (SAccount a2 b2) = (unspecifiedChain 0x0 == a2 && False == b2)
+  (SAccount a1 b1) == SReference{} = (a1 == unspecifiedChain 0x0 && b1 == False)
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
+  SNULL == (SContract c2 a2) = "" == c2 && unspecifiedChain 0x0 == a2
+  (SContract c1 a1) == SNULL = c1 == "" && a1 == unspecifiedChain 0x0
+  SReference{} == (SContract c2 a2) = "" == c2 && unspecifiedChain 0x0 == a2
+  (SContract c1 a1) == SReference{} = c1 == "" && a1 == unspecifiedChain 0x0
   (SEnumVal t1 _ n1) == (SEnumVal t2 _ n2) = t1 == t2 && n1 == n2
+  SNULL == (SEnumVal _ _ n2) = 0 == n2
+  (SEnumVal _ _ n1) == SNULL = n1 == 0
+  SReference{} == (SEnumVal _ _ n2) = 0 == n2
+  (SEnumVal _ _ n1) == SReference{} = n1 == 0
   x == y = todo "Value/Eq" (x, y)
 
 instance Ord Value where
+  compare SNULL SNULL = EQ
   compare (SInteger i1) (SInteger i2) = compare i1 i2
+  compare SNULL (SInteger i2) = compare 0 i2
+  compare (SInteger i1) SNULL = compare i1 0
+  compare SReference{} (SInteger i2) = compare 0 i2
+  compare (SInteger i1) SReference{} = compare i1 0
   compare (SString s1) (SString s2) = compare s1 s2
+  compare SNULL (SString s2) = compare "" s2
+  compare (SString s1) SNULL = compare s1 ""
+  compare SReference{} (SString s2) = compare "" s2
+  compare (SString s1) SReference{} = compare s1 ""
   compare (SDecimal v1) (SDecimal v2) = compare v1 v2
+  compare SNULL (SDecimal v2) = compare 0.0 v2
+  compare (SDecimal v1) SNULL = compare v1 0.0
+  compare SReference{} (SDecimal v2) = compare 0.0 v2
+  compare (SDecimal v1) SReference{} = compare v1 0.0
   compare (SBool b1) (SBool b2) = compare b1 b2
+  compare SNULL (SBool b2) = compare False b2
+  compare (SBool b1) SNULL = compare b1 False
+  compare SReference{} (SBool b2) = compare False b2
+  compare (SBool b1) SReference{} = compare b1 False
   compare (SAccount a1 _) (SAccount a2 _) = compare a1 a2
+  compare SNULL (SAccount a2 _) = compare (unspecifiedChain 0x0) a2
+  compare (SAccount a1 _) SNULL = compare a1 (unspecifiedChain 0x0)
+  compare SReference{} (SAccount a2 _) = compare (unspecifiedChain 0x0) a2
+  compare (SAccount a1 _) SReference{} = compare a1 (unspecifiedChain 0x0)
   compare x y = todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where
@@ -149,6 +200,8 @@ rlpEncodeVariable (Variable r) = rlpEncodeValue =<< liftIO (readIORef r)
 rlpEncodeVariable (Constant v) = rlpEncodeValue v
 
 rlpEncodeValue :: MonadIO m => Value -> m RLPObject
+rlpEncodeValue SNULL = rlpEncodeValue $ SInteger 0
+rlpEncodeValue SReference{} = rlpEncodeValue $ SInteger 0
 rlpEncodeValue (SInteger i) = pure $ rlpEncode i
 rlpEncodeValue (SString s) = pure $ rlpEncode s
 rlpEncodeValue (SDecimal decimal) = pure $ rlpEncode $ show decimal
@@ -182,7 +235,8 @@ coerceFromInt ct (SEnumVal tipe _ _) n' =
     enumDef <- fmap fst . M.lookup tipe $ CC._enums ct
     when (n >= length enumDef) $ fail "enum val out of range"
     return $ SEnumVal tipe (enumDef !! n) $ fromIntegral n'
-coerceFromInt _ SNULL n = if n == 0 then SNULL else SInteger n
+coerceFromInt _ SNULL n = SInteger n
+coerceFromInt _ SReference{} n = SInteger n
 coerceFromInt _ t x = typeError "coerceFromInt: invalid literal for type" (t, x)
 
 -- coerceType allows integer literals to initialize integers, addresses, and
@@ -199,19 +253,10 @@ coerceType ct xt = \case
 
 valEquals :: CC.Contract -> Value -> Value -> Bool
 valEquals ct lhs rhs = case (lhs, rhs) of
+  (SInteger _, SInteger _) -> lhs == rhs
   (SInteger i, _) -> coerceFromInt ct rhs i == rhs
-  (_, SInteger i) -> coerceFromInt ct lhs i == lhs
-  (SBool s1, SBool s2) -> s1 == s2
-  (SString s1, SString s2) -> s1 == s2
-  (SDecimal v1, SDecimal v2) -> v1 == v2
-  (SAccount v1 b1, SAccount v2 b2) -> v1 == v2 && b1 == b2
-  (SEnumVal e1 _ n1, SEnumVal e2 _ n2) -> e1 == e2 && n1 == n2
-  (SContract _ a1, SAccount a2 _) -> a1 == a2
-  (SAccount a1 _, SContract _ a2) -> a1 == a2
-  (SContract _ a1, SContract _ a2) -> a1 == a2
-  (SBuiltinVariable v1, SBuiltinVariable v2) ->
-    todo "comparison of builtin vars requires evaluation: " (v1, v2)
-  _ -> todo "unsupported type combination in valEquals: " (lhs, rhs)
+  (_, SInteger i) -> lhs == coerceFromInt ct lhs i
+  _ -> lhs == rhs
 
 createVar' :: MonadIO m => Value -> m Variable
 createVar' val = liftIO $ Variable <$> newIORef val

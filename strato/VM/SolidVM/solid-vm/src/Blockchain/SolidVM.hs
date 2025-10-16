@@ -1328,8 +1328,12 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SContract _ a, n) -> evaluateAccountMember (a^.namedAccountAddress) True n
     (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
     (a@(SArray _), "push") -> return $ Constant $ SPush a (Just var)
+    (SNULL, "push") -> case var of
+      Constant r -> pure . Constant $ SPush r Nothing
+      _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
     (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
     (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
+    (SNULL, "length") -> return . Constant $ SInteger 0
     (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
@@ -1933,8 +1937,9 @@ evaluateAccountMember a False itemName = do
   return . Constant . fromMaybe SNULL $ result
 
 defaultToInt :: Value -> Value
-defaultToInt SNULL = SInteger 0
-defaultToInt x     = x
+defaultToInt SNULL        = SInteger 0
+defaultToInt SReference{} = SInteger 0
+defaultToInt x            = x
 
 expToVarAdd :: MonadSM m => CC.Expression -> CC.Expression -> m Variable
 expToVarAdd expr1 expr2 = do
@@ -1952,9 +1957,15 @@ expToVarAdd expr1 expr2 = do
         SString a -> case i2 of
           SString b -> return . Constant . SString $ a ++ b
           SNULL -> return . Constant $ SString a
+          SReference{} -> return . Constant $ SString a
           _ -> typeError "expToVarAdd" (i1, i2)
         SNULL -> case i2 of
           SNULL -> return $ Constant SNULL
+          _ -> addEm i2 i1
+        SReference ap1 -> case i2 of
+          SReference ap2 -> if ap1 == ap2
+                              then pure . Constant $ SReference ap1
+                              else pure $ Constant SNULL
           _ -> addEm i2 i1
         _ -> typeError "expToVarAdd" (i1, i2)
   addEm i1' i2'
@@ -2113,6 +2124,7 @@ intBuiltin [SString hex] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString hex, SInteger 16] = integerToValue $ parseBaseInt hex 16
 intBuiltin [SString dec, SInteger 10] = integerToValue $ parseBaseInt dec 10
 intBuiltin [SNULL] = SInteger 0
+intBuiltin [SReference{}] = SInteger 0
 intBuiltin args = typeError "numeric cast - invalid args" args
 
 integerToValue :: Either String Integer -> Value
@@ -2128,6 +2140,7 @@ decimalBuiltin [SString str] =
     Left e -> typeError e str
 decimalBuiltin [SDecimal v] = SDecimal v
 decimalBuiltin [SNULL] = SDecimal $ Decimal 0 0
+decimalBuiltin [SReference{}] = SDecimal $ Decimal 0 0
 decimalBuiltin args = typeError "decimal cast - invalid args" args
 
 parseBaseInt :: String -> Integer -> Either String Integer
@@ -2151,6 +2164,7 @@ callBuiltin "string" [SAccount a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i
 callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SNULL] = return $ SString ""
+callBuiltin "string" [SReference{}] = return $ SString ""
 callBuiltin "string" vs = typeError "string cast" vs
 callBuiltin "address" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
 callBuiltin "address" [SAccount na b] = return $ SAccount (unspecifiedChain (_namedAccountAddress na)) b
@@ -2161,6 +2175,7 @@ callBuiltin "address" [ss@(SString s)] =
     (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain))
     $ readMaybe s
 callBuiltin "address" [SNULL] = return $ SAccount (unspecifiedChain 0) False
+callBuiltin "address" [SReference{}] = return $ SAccount (unspecifiedChain 0) False
 callBuiltin "address" vs = typeError "address cast" vs
 callBuiltin "account" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
 callBuiltin "account" [a@SAccount {}] = return a
@@ -2190,6 +2205,7 @@ callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] = return . ((fl
     base16ToIntegral = foldl' (\n c -> 16 * n + (hexChar $ CHAR.toUpper c)) 0
 callBuiltin "account" [(SAccount a _), SString name] = a `castToAncestor` name
 callBuiltin "account" [SNULL] = return $ SAccount (unspecifiedChain 0) False
+callBuiltin "account" [SReference{}] = return $ SAccount (unspecifiedChain 0) False
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a * b) `mod` c
 callBuiltin ("blockhash") [SInteger blockNum] | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
