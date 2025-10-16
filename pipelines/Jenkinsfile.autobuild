@@ -349,6 +349,16 @@ pipeline {
             '''
           }
         }
+        
+        stage('Contract tests') {
+          steps{
+            sh '''#!/bin/bash -l
+              set -x
+              echo "Running Mercata Contract tests"
+              find mercata/contracts/tests -name '*.test.sol' -print0   | xargs -0 -I {} sh -c 'cd "$(dirname "{}")" && solid-vm-cli test "$(basename "{}")"'
+            '''
+          }
+        }
 
 //        stage('Strato unit tests') {
 //          steps {
