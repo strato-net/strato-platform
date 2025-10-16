@@ -121,17 +121,48 @@ export const castVoteOnIssue = async (
   args: any[],
 ): Promise<{ status: string; hash: string }> => {
   try {
-    const txArgs: Record<string, any> = {
-      _func: func,
-      _target: target,
-      _args: args
-    };
+    // Get contract name from Cirrus
+    const contractResponse = await cirrus.get(accessToken, "contract", {
+      params: {
+        address: `eq.${target}`
+      },
+    });
+
+    if (contractResponse.status !== 200 || !contractResponse.data || !Array.isArray(contractResponse.data) || contractResponse.data.length === 0) {
+      throw new Error('Failed to fetch contract details for target address');
+    }
+    const contractName = contractResponse.data[0].contract_name;
+
+    // Get contract details to retrieve function parameter names
+    const contractDetails = await getContractDetails(accessToken, target);
+    const allFunctions = (contractDetails as any)?._functions || {};
+    const functionInfo = allFunctions[func];
     
+    if (!functionInfo || !functionInfo._funcArgs) {
+      throw new Error(`Function ${func} not found in contract ${contractName}`);
+    }
+
+    // Convert array args to object with parameter names
+    const funcArgs = functionInfo._funcArgs as Array<[string, any]>;
+    const argsObject: Record<string, any> = {};
+    
+    if (Array.isArray(args)) {
+      funcArgs.forEach(([paramName], index) => {
+        if (index < args.length) {
+          argsObject[paramName] = args[index];
+        }
+      });
+    } else {
+      // If args is already an object, use it directly
+      Object.assign(argsObject, args);
+    }
+
+    // Build transaction directly to the target contract
     const tx = await buildFunctionTx({
-      contractName: extractContractName(AdminRegistry),
-      contractAddress: adminRegistry,
-      method: "castVoteOnIssue",
-      args: txArgs,
+      contractName,
+      contractAddress: target,
+      method: func,
+      args: argsObject,
     }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
