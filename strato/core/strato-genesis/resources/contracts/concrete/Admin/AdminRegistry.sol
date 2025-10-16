@@ -66,19 +66,21 @@ contract record AdminRegistry {
                 _target = msg.sender;
             }
             string issueId = _getIssueId(_target, _func, _args);
-            bool hasVoted = votesMap[issueId][sender] != 0;
+            require(votesMap[issueId][sender] == 0, "Cannot cast multiple votes for the same issue");
 
-            _createIssue(sender, issueId, _target, _func, _args);
+            try {
+                _createIssue(sender, issueId, _target, _func, _args);
+            } catch {
+
+            }
 
             if (_shouldExecute(issueId, _target, _func, _args)) {
                 variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
             } else {
-                if (!hasVoted) {
-                    votes[issueId].push(sender);
-                    votesMap[issueId][sender] = votes[issueId].length;
-                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
-                }
+                votes[issueId].push(sender);
+                votesMap[issueId][sender] = votes[issueId].length;
+                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
                 return (false, issueId);
             }
         } else {
@@ -93,7 +95,8 @@ contract record AdminRegistry {
             }
             address sender = msg.sender;
             address target = _target;
-            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
+            if (!whitelist[target][_func][sender]) {
                 sender = _target;
                 target = msg.sender;
             }
@@ -119,9 +122,8 @@ contract record AdminRegistry {
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
-        if(votes[_issueId].length == 0) {
-            emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
-        }
+        require(votes[_issueId].length == 0, "Issue already exists");
+        emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
     }
 
     function getIssueId(address _target, string _func, variadic _args) external returns (string) {
@@ -173,17 +175,14 @@ contract record AdminRegistry {
     function addWhitelist(address _target, string _func, address _user) internal {
         if (_target == address(this)) {
             require(
-                _func != "addWhitelist" &&
-                _func != "removeWhitelist" &&
-                _func != "_addAdmin" &&
-                _func != "_createIssue" &&
-                _func != "_executeIssue" &&
-                _func != "_removeAdmin" &&
-                _func != "_shouldExecute" &&
-                _func != "_swapAdmin" &&
-                _func != "setVotingThreshold" &&
-                _func != "createContract" &&
-                _func != "createSaltedContract",
+                keccak256(_func) != keccak256("addWhitelist") &&
+                keccak256(_func) != keccak256("removeWhitelist") &&
+                keccak256(_func) != keccak256("_addAdmin") &&
+                keccak256(_func) != keccak256("_removeAdmin") &&
+                keccak256(_func) != keccak256("_swapAdmin") &&
+                keccak256(_func) != keccak256("setVotingThreshold") &&
+                keccak256(_func) != keccak256("createContract") &&
+                keccak256(_func) != keccak256("createSaltedContract"),
                 "Cannot whitelist internal governance functions"
             );
         }
