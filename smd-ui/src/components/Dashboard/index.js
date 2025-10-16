@@ -37,6 +37,7 @@ import { sec2Date } from "../../lib/formatSeconds";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
 import HexText from "../HexText";
+import { toasts } from "../Toasts";
 
 
 const socket = io(env.SOCKET_SERVER, {
@@ -366,39 +367,47 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-6">
-            <div className="pt-card pt-elevation-1" style={{ padding: '20px' }}>
-              <div style={{ marginBottom: '15px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                  <span style={{ fontWeight: 'bold' }}>Node Host:</span>
+            <div className="pt-card pt-elevation-1 node-info-card">
+              <div className="node-info-section">
+                <div className="node-info-header">
+                  <span className="node-info-label">Node Host:</span>
                   <button 
-                    className="pt-button pt-minimal pt-small"
+                    className="pt-button pt-minimal pt-small node-info-copy-btn"
                     onClick={() => {
                       navigator.clipboard.writeText(env.NODE_HOST || "N/A");
+                      toasts.show({ 
+                        message: "Node Host copied!", 
+                        intent: "success",
+                        timeout: 2000
+                      });
                     }}
-                    style={{ padding: '2px 8px' }}
                   >
                     <i className="fa fa-copy"></i>
                   </button>
                 </div>
-                <div style={{ fontSize: '14px', color: '#666', wordBreak: 'break-all' }}>
+                <div className="node-info-value">
                   {env.NODE_HOST || "N/A"}
                 </div>
               </div>
               
               <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
-                  <span style={{ fontWeight: 'bold' }}>Node Address:</span>
+                <div className="node-info-header">
+                  <span className="node-info-label">Node Address:</span>
                   <button 
-                    className="pt-button pt-minimal pt-small"
+                    className="pt-button pt-minimal pt-small node-info-copy-btn"
                     onClick={() => {
                       navigator.clipboard.writeText(metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading...");
+                      toasts.show({ 
+                        message: "Node Address copied!", 
+                        intent: "success",
+                        timeout: 2000
+                      });
                     }}
-                    style={{ padding: '2px 8px' }}
                   >
                     <i className="fa fa-copy"></i>
                   </button>
                 </div>
-                <div style={{ fontSize: '14px', color: '#666', wordBreak: 'break-all' }}>
+                <div className="node-info-value">
                   {metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."}
                 </div>
               </div>
@@ -406,13 +415,11 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
+          <div className="col-sm-6">
+            <NodeCard />
+          </div>
           <div className="col-sm-12">
             <br />
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <NodeCard />
           </div>
         </div>
         <div className="row">
