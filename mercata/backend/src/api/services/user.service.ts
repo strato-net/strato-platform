@@ -187,10 +187,7 @@ export const castVoteOnIssueById = async (
       throw new Error('Failed to fetch contract details for target address');
     }
     const contractName = contractResponse.data[0].contract_name;
-    console.log("Contract name:", contractName);
-    console.log("contract address:", target);
-    console.log("args:", args);
-    console.log("func:", func);
+  
 
     // Get contract details to retrieve function parameter names
     const contractDetails = await getContractDetails(accessToken, target);
@@ -216,7 +213,6 @@ export const castVoteOnIssueById = async (
       Object.assign(argsObject, args);
     }
 
-    console.log("Converted args object:", argsObject);
 
     // Build transaction directly to the target contract
     const tx = await buildFunctionTx({

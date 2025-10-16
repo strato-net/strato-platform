@@ -93,7 +93,6 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-      console.log("here we are 4");
       validateAddressField(target);
       
       const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
