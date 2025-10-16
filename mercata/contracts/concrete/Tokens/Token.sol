@@ -67,6 +67,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
         TokenMetadata("", [], [], [])
     {}
 
+    /// @dev This initializer may be called only once, during the first initialization of the token.
     function initialize(
         string name_,
         string description_,
@@ -80,8 +81,7 @@ contract record Token is ERC20, Ownable, TokenMetadata, Pausable {
     ) external onlyOwner {
 
         // ERC20(name_, symbol_)
-        _name = name_;
-        _symbol = symbol_;
+        __ERC20_init(name_, symbol_);
 
         // TokenMetadata(description_, images_, files_, fileNames_)
         _setMetadata(description_, images_, files_, fileNames_);

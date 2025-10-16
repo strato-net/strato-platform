@@ -38,8 +38,18 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
 
     uint256 private _totalSupply;
 
-    string internal _name;   //MERCATA_COMPATIBILITY: Changed from private to internal to allow for upgradeability
-    string internal _symbol; //MERCATA_COMPATIBILITY: Changed from private to internal to allow for upgradeability
+    string private _name;
+    string private _symbol;
+
+    // Follows the initializer pattern,
+    // allowing name and symbol to be set once during the first initialization
+    bool private _erc20Initialized;
+    function __ERC20_init(string name_, string symbol_) internal {
+        require(!_erc20Initialized, "ERC20: already initialized");
+        _name = name_;
+        _symbol = symbol_;
+        _erc20Initialized = true;
+    }
 
     /**
      * @dev Sets the values for {name} and {symbol}.
