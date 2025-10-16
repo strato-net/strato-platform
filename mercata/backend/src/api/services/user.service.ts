@@ -167,7 +167,14 @@ export const castVoteOnIssueById = async (
     }
 
     const issue = issueResponse.data[0];
-    const { target, func, args: argsRaw } = issue;
+    let { target, func, args: argsRaw } = issue;
+
+    // Replace internal function names with public function names
+    if (func === '_addAdmin') {
+      func = 'addAdmin';
+    } else if (func === '_removeAdmin') {
+      func = 'removeAdmin';
+    }
 
     // Parse args keeping large numbers as strings (JSONBig with storeAsString)
     const JSONBigString = JSONBig({ storeAsString: true });
