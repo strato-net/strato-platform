@@ -14,12 +14,23 @@ import { useUser } from '@/context/UserContext';
 import { Loader2, MoreVertical } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
+import CastVoteModal from './CastVoteModal';
 import JSONBig from 'json-bigint';
 
 
 const VoteTab = () => {
   const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
+  const [voteModalOpen, setVoteModalOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<{
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  } | null>(null);
 
   useEffect(() => {
     getOpenIssues();
@@ -29,8 +40,23 @@ const VoteTab = () => {
     castVoteOnIssue(target, func, args);
   };
 
-  const handleCastVoteOnIssueById = (issueId: string) => {
-    castVoteOnIssueById(issueId);
+  const handleOpenVoteModal = (issueData: {
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  }) => {
+    setSelectedIssue(issueData);
+    setVoteModalOpen(true);
+  };
+
+  const handleCastVoteOnIssueById = async (issueId: string) => {
+    await castVoteOnIssueById(issueId);
+    // Refresh the issues after voting
+    getOpenIssues();
   };
 
   if (openIssuesLoading) {
@@ -143,7 +169,6 @@ const VoteTab = () => {
                     <TableHead className="w-[120px]">Issue ID</TableHead>
                     <TableHead className="w-[120px]">Contract</TableHead>
                     <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[180px]">Arguments</TableHead>
                     <TableHead className="w-[60px]">Votes Cast</TableHead>
                     <TableHead className="w-[60px]">Votes Needed</TableHead>
                     <TableHead className="w-[60px]">Voting Threshold</TableHead>
@@ -190,9 +215,6 @@ const VoteTab = () => {
                         <TableCell className="text-sm max-w-[90px]">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {issueArgs.join(', ')}
-                        </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
                         </TableCell>
@@ -205,7 +227,15 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssueById(issueId)}
+                            onClick={() => handleOpenVoteModal({
+                              issueId,
+                              target: address,
+                              func: issue.func,
+                              args: issueArgs,
+                              votesCast: votes.filter((v) => v.issueId === issueId).length,
+                              votesNeeded,
+                              threshold
+                            })}
                             disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
@@ -318,6 +348,12 @@ const VoteTab = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         handleCastVoteOnIssue={handleCastVoteOnIssue}
+      />
+      <CastVoteModal
+        open={voteModalOpen}
+        onOpenChange={setVoteModalOpen}
+        issue={selectedIssue}
+        onCastVote={handleCastVoteOnIssueById}
       />
     </div>
   );
