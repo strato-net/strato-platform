@@ -294,7 +294,8 @@ contract record LendingPool is Ownable {
 
         // 3) update index-based loan storage
         LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amount * RAY) / borrowIndex;
+        uint scaledAdd = (amount * RAY + borrowIndex - 1) / borrowIndex;
+        require(scaledAdd > 0, "Insufficient loan amount");
         loan.scaledDebt += scaledAdd;
         loan.lastUpdated = block.timestamp;
         totalScaledDebt += scaledAdd;
@@ -329,6 +330,12 @@ contract record LendingPool is Ownable {
 
         // Clamp to what's owed
         uint repayAmount = amount > owed ? owed : amount;
+
+        // If partial, prove this will burn at least 1 scaled unit (avoid donation)
+        if (repayAmount < owed) {
+            uint preScaledDelta = (repayAmount * RAY) / borrowIndex; // floor
+            require(preScaledDelta > 0, "Insufficient repayment amount");
+        }
 
         // Move funds into the pool
         LiquidityPool(_liquidityPool()).repay(repayAmount, msg.sender);
@@ -377,7 +384,8 @@ contract record LendingPool is Ownable {
 
         // Update index-based loan storage
         LoanInfo storage loan = userLoan[msg.sender];
-        uint scaledAdd = (amountBorrowed * RAY) / borrowIndex;
+        uint scaledAdd = (amountBorrowed * RAY + borrowIndex - 1) / borrowIndex;
+        require(scaledAdd > 0, "Insufficient loan amount");
         loan.scaledDebt += scaledAdd;
         loan.lastUpdated = block.timestamp;
         totalScaledDebt += scaledAdd;
@@ -553,12 +561,15 @@ contract record LendingPool is Ownable {
         uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
 
+        // Prove this will burn at least 1 scaled unit (avoid donation)
+        LoanInfo storage loan = userLoan[borrower];
+        uint scaledDelta = (debtToCover * RAY) / borrowIndex;
+        require(scaledDelta > 0, "Insufficient repayment amount");
+
         // Collect repayment from liquidator into LiquidityPool
         LiquidityPool(_liquidityPool()).repay(debtToCover, msg.sender);
 
         // NEW: reduce borrower scaled debt (index-based)
-        LoanInfo storage loan = userLoan[borrower];
-        uint scaledDelta = (debtToCover * RAY) / borrowIndex;
         if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
         loan.scaledDebt -= scaledDelta;
         totalScaledDebt -= scaledDelta;
