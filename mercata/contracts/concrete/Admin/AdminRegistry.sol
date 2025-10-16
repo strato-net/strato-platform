@@ -118,7 +118,7 @@ contract record AdminRegistry {
         uint votingThresholdBps = votingThresholds[_target][_func];
         if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
 
-        return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
+        return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
