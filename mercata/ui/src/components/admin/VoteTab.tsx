@@ -198,7 +198,6 @@ const VoteTab = () => {
                     const issueArgs = JSONBigNative.parse(issue.args);
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
-                    const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
@@ -252,10 +251,9 @@ const VoteTab = () => {
                               votesNeeded,
                               threshold
                             })}
-                            disabled={alreadyVoted}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
-                            Cast Vote
+                            View Vote
                           </Button>
                         </TableCell>
                       </TableRow>

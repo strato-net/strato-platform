@@ -60,7 +60,7 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
     <Dialog open={open} onOpenChange={(o) => !isSubmitting && onOpenChange(o)}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Cast Vote on Issue</DialogTitle>
+          <DialogTitle>Vote on Issue</DialogTitle>
           <DialogDescription>
             Review the issue details below and confirm your vote.
           </DialogDescription>
