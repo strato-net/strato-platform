@@ -176,14 +176,7 @@ contract Describe_AdminRegistry is Authorizable {
         require(true, "swapAdmin function should exist");
     }
 
-
-    // ============ DELEGATE TESTS ============
-
-    function it_admin_registry_has_delegate_mapping() {
-        // Test that delegates mapping exists and is accessible
-        address delegate = adminRegistry.delegates("_shouldExecute");
-        require(delegate == address(0), "Initial delegate should be zero address");
-    }
+    // ============ VOTING THRESHOLD TESTS ============
 
     function it_admin_registry_has_voting_thresholds_mapping() {
         // Test that votingThresholds mapping exists and is accessible
@@ -331,24 +324,6 @@ contract Describe_AdminRegistry is Authorizable {
         require(keccak256(val) == keccak256("hello"), "Salted contract constructor should set val correctly");
     }
 
-    function it_admin_registry_handles_delegate_updates() {
-        string memory src = "contract TestDelegate { function _shouldExecute(variadic _args) internal returns (bool) { return true; } }";
-        
-        // Create delegate contract first
-        (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "createContract", "TestDelegate", src);
-        require(!executed1, "Should not execute delegate creation with one vote");
-        
-        (bool executed2, address delegateContract) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "TestDelegate", src);
-        require(executed2, "Should execute delegate creation with two votes");
-        
-        // Update delegate
-        (bool executed3, variadic result3) = adminRegistry.castVoteOnIssue(address(adminRegistry), "updateDelegate", "_shouldExecute", delegateContract);
-        require(!executed3, "Should not execute delegate update with one vote");
-        
-        (bool executed4, variadic result4) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "updateDelegate", "_shouldExecute", delegateContract);
-        require(executed4, "Should execute delegate update with two votes");
-    }
-
     function it_admin_registry_handles_voting_threshold_updates() {
         // First vote - should not execute
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
@@ -474,21 +449,4 @@ contract Describe_AdminRegistry is Authorizable {
         require(executed, "Should execute with 50% threshold and 1 vote");
     }
 
-    function it_admin_registry_handles_delegate_contract_execution() {
-        // Create a delegate that always returns true
-        string memory src = "contract AlwaysExecute { function _shouldExecute(variadic _args) internal returns (bool) { return true; } }";
-        
-        // Create delegate contract
-        adminRegistry.castVoteOnIssue(address(adminRegistry), "createContract", "AlwaysExecute", src);
-        (bool executed1, address delegate) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "AlwaysExecute", src);
-        require(executed1, "Should create delegate contract");
-        
-        // Set delegate
-        adminRegistry.castVoteOnIssue(address(adminRegistry), "updateDelegate", "_shouldExecute", delegate);
-        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "updateDelegate", "_shouldExecute", delegate);
-        
-        // Now any single vote should execute
-        (bool executed2, variadic result2) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        require(executed2, "Should execute with delegate that always returns true");
-    }
 }
