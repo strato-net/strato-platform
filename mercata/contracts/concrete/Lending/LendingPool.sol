@@ -539,7 +539,8 @@ contract record LendingPool is Ownable {
     function liquidationCall(
         address collateralAsset,
         address borrower,
-        uint debtToCover
+        uint debtToCover,
+        uint minCollateralOut
     ) public onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
@@ -561,6 +562,24 @@ contract record LendingPool is Ownable {
         // Determine max allowed repayment
         uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
+
+         // Calculate collateral to seize
+        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
+        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+
+        uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
+        // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
+
+        // Ensure borrower has enough collateral
+        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
+        if (collateralToSeize > borrowerCollateral) {
+            collateralToSeize = borrowerCollateral; // seize all remaining
+        }
+
+        // Enforce minimum collateral out requested from user
+        require(collateralToSeize > 0, "There is no collateral to seize");
+        require(collateralToSeize >= minCollateralOut, "Remaining collateral is less than minimum requested by user");
 
         // Prove this will burn at least 1 scaled unit (avoid donation)
         LoanInfo storage loan = userLoan[borrower];
@@ -585,20 +604,6 @@ contract record LendingPool is Ownable {
             delete userLoan[borrower];
         } else {
             loan.lastUpdated = block.timestamp;
-        }
-
-        // Calculate collateral to seize
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
-        require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
-
-        uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
-        // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
-
-        // Ensure borrower has enough collateral
-        uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
-        if (collateralToSeize > borrowerCollateral) {
-            collateralToSeize = borrowerCollateral; // seize all remaining
         }
 
         // Transfer collateral to liquidator
@@ -639,7 +644,8 @@ contract record LendingPool is Ownable {
      */
     function liquidationCallAll(
         address collateralAsset,
-        address borrower
+        address borrower,
+        uint minCollateralOut
     ) external onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
@@ -672,7 +678,7 @@ contract record LendingPool is Ownable {
         if (debtToCover > coverage) debtToCover = coverage;
         require(debtToCover > 0, "Nothing liquidatable");
 
-        liquidationCall(collateralAsset, borrower, debtToCover);
+        liquidationCall(collateralAsset, borrower, debtToCover, minCollateralOut);
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
