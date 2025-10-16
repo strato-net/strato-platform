@@ -91,7 +91,10 @@ tFormVarDeclToVartype :: SolidVarDec.VariableDecl -> XabiType.VarType
 tFormVarDeclToVartype SolidVarDec.VariableDecl {..} =
   XabiType.VarType
     { varTypeAtBytes = 0 :: Int32, --TODO --> change this to ?
-      varTypePublic = Just _varIsPublic,
+      varTypePublic = case _varVisibility of
+        Just SolidF.Public -> Just True
+        Nothing -> Nothing
+        _ -> Just False,
       varTypeConstant = Nothing,
       varTypeInitialValue = case _varInitialVal of
         Nothing -> Nothing --Not 100% if this is a correct translastion

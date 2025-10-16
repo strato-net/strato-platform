@@ -14,7 +14,7 @@ module SolidVM.Model.CodeCollection.ConstantDecl
   ( ConstantDeclF (..),
     ConstantDecl,
     constType,
-    constIsPublic,
+    constVisibility,
     constInitialVal,
     constContext,
   )
@@ -28,6 +28,7 @@ import Data.Source
 import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.CodeCollection.Statement
+import SolidVM.Model.CodeCollection.Visibility
 import qualified SolidVM.Model.Type as SVMType hiding (Enum)
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -35,7 +36,7 @@ import Test.QuickCheck.Instances ()
 -- Changes to this structure should also have changes in the Unparser :)
 data ConstantDeclF a = ConstantDecl
   { _constType :: SVMType.Type,
-    _constIsPublic :: Bool,
+    _constVisibility :: Maybe Visibility,
     _constInitialVal :: (ExpressionF a),
     _constContext :: a
   }
