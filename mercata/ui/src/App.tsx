@@ -13,7 +13,6 @@ import { createConfig, http } from "wagmi";
 import "@rainbow-me/rainbowkit/styles.css";
 import { UserProvider } from "@/context/UserContext";
 import { UserTokensProvider } from "@/context/UserTokensContext";
-import { SwapProvider } from "@/context/SwapContext";
 import { OracleProvider } from "@/context/OracleContext";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -32,6 +31,7 @@ import Admin from "./pages/Admin";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { coinbaseWallet, metaMaskWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import AdminRoute from "./components/AdminRoute";
+import DashboardWrapper from "./components/layouts/DashboardWrapper";
 import { LendingProvider } from "./context/LendingContext";
 import { CDPProvider } from "./context/CDPContext";
 import { TokenProvider } from "./context/TokenContext";
@@ -113,7 +113,7 @@ const App = () => {
           <UserTokensProvider>
             <LendingProvider>
               <CDPProvider>
-                <SwapProvider>
+                {/* <SwapProvider> */}
                 <OracleProvider>
                   <TokenProvider>
                     <LiquidationProvider>
@@ -129,7 +129,9 @@ const App = () => {
                                   path="/dashboard"
                                   element={
                                     <ProtectedRoute>
-                                      <Dashboard />
+                                      <DashboardWrapper>
+                                        <Dashboard />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -137,7 +139,9 @@ const App = () => {
                                   path="/dashboard/swap"
                                   element={
                                     <ProtectedRoute>
-                                      <SwapAsset />
+                                      <DashboardWrapper>
+                                        <SwapAsset />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -145,7 +149,9 @@ const App = () => {
                                   path="/dashboard/deposits"
                                   element={
                                     <ProtectedRoute>
-                                      <DepositsPage />
+                                      <DashboardWrapper>
+                                        <DepositsPage />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -153,7 +159,9 @@ const App = () => {
                                   path="/dashboard/deposits/:id"
                                   element={
                                     <ProtectedRoute>
-                                      <AssetDetail />
+                                      <DashboardWrapper>
+                                        <AssetDetail />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -161,7 +169,9 @@ const App = () => {
                                   path="/dashboard/borrow"
                                   element={
                                     <ProtectedRoute>
-                                      <Borrow />
+                                      <DashboardWrapper>
+                                        <Borrow />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -169,7 +179,9 @@ const App = () => {
                                   path="/dashboard/pools"
                                   element={
                                     <ProtectedRoute>
-                                      <Pools />
+                                      <DashboardWrapper>
+                                        <Pools />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -177,7 +189,9 @@ const App = () => {
                                   path="/dashboard/activity"
                                   element={
                                     <ProtectedRoute>
-                                      <ActivityFeed />
+                                      <DashboardWrapper>
+                                        <ActivityFeed />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -185,7 +199,9 @@ const App = () => {
                                   path="/dashboard/transfer"
                                   element={
                                     <ProtectedRoute>
-                                      <Transfer />
+                                      <DashboardWrapper>
+                                        <Transfer />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -194,7 +210,9 @@ const App = () => {
                                   element={
                                     <ProtectedRoute>
                                       <AdminRoute>
-                                        <Admin />
+                                        <DashboardWrapper>
+                                          <Admin />
+                                        </DashboardWrapper>
                                       </AdminRoute>
                                     </ProtectedRoute>
                                   }
@@ -204,7 +222,9 @@ const App = () => {
                                   path="/dashboard/bridge-transactions"
                                   element={
                                     <ProtectedRoute>
-                                      <BridgeTransactionsPage />
+                                      <DashboardWrapper>
+                                        <BridgeTransactionsPage />
+                                      </DashboardWrapper>
                                     </ProtectedRoute>
                                   }
                                 />
@@ -219,7 +239,7 @@ const App = () => {
                     </LiquidationProvider>
                   </TokenProvider>
                 </OracleProvider>
-                </SwapProvider>
+                {/* </SwapProvider> */}
               </CDPProvider>
             </LendingProvider>
           </UserTokensProvider>

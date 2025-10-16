@@ -1,9 +1,22 @@
+// TODO: All backend data related constants on a UI side must be fetched from the backend via a /constants route at the app page load time
+
 export const usdstAddress = "937efa7e3a77e20bbdbd7c0d32b6514f368c1010"
 export const safetyModuleAddress = "0000000000000000000000000000000000001015"
 export const sUsdstAddress = "0000000000000000000000000000000000001016"
 export const mUsdstAddress = "000000000000000000000000000000000000100f"
 export const cataAddress = "2680dc6693021cd3fefb84351570874fbef8332a"
+export const rewardsChefAddress = "000000000000000000000000000000000000101f"
 export const DECIMAL = 18
+
+// ============================================
+// Feature Flags
+// ============================================
+
+/**
+ * Enable/disable rewards functionality in the UI
+ * When false, all rewards-related UI elements will be hidden
+ */
+export const rewardsEnabled = false;
 
 // ============================================
 // Input Validation Patterns

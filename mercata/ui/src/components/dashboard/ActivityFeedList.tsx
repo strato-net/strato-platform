@@ -43,7 +43,7 @@ const ActivityFeedList = () => {
   const [totalEvents, setTotalEvents] = useState(0);
   const [filters, setFilters] = useState<FilterOptions>({});
   const itemsPerPage = 10;
-  const { isLoggedIn, userAddress } = useUser();
+  const { isLoggedIn, userAddress, isAdmin } = useUser();
 
   const [filterOptions, setFilterOptions] = useState<{ 
     contractNames: string[]; 
@@ -485,16 +485,18 @@ const ActivityFeedList = () => {
               </span>
             )}
           </div>
-          <Button 
-            onClick={downloadCSV}
-            disabled={loading || events.length === 0}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download CSV
-          </Button>
+          {isAdmin && (
+            <Button 
+              onClick={downloadCSV}
+              disabled={loading || events.length === 0}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Download CSV
+            </Button>
+          )}
         </div>
       </div>
 

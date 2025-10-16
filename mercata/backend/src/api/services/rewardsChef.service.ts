@@ -1,137 +1,70 @@
-import { cirrus } from "../../utils/mercataApiHelper";
-import { constants } from "../../config/constants";
+import { strato } from "../../utils/mercataApiHelper";
+import { constants, StratoPaths } from "../../config/constants";
+import * as config from "../../config/config";
 import { getTokenBalanceForUser } from "./tokens.service";
+import * as Helpers from "../helpers/rewards/rewardsChef.helpers";
+import { pendingCataAll } from "../helpers/rewards/pending.helpers";
+import {
+  PendingRewardsData,
+  StakedBalanceData,
+  RewardsPool,
+  RewardsChefState
+} from "@mercata/shared-types";
+import { buildFunctionTx } from "../../utils/txBuilder";
+import { postAndWaitForTx } from "../../utils/txHelper";
+import { extractContractName } from "../../utils/utils";
 
 const { RewardsChef } = constants;
 
-/**
- * Helper function to wait for Cirrus to index the new balance
- *
- * This addresses a race condition where a transaction is confirmed on-chain
- * but Cirrus hasn't indexed the new state yet. When querying immediately after
- * a transaction, Cirrus may return stale data.
- *
- * This is particularly important when:
- * - Depositing to Safety Module or Lending Pool (mints sToken/mToken)
- * - Then immediately staking those tokens to RewardsChef
- *
- * @param accessToken - User access token for authentication
- * @param tokenAddress - Address of the token to check balance for
- * @param userAddress - User address to check balance for
- * @param previousBalance - The balance before the transaction (in wei)
- * @param maxRetries - Maximum number of retry attempts (default: 10)
- * @param delayMs - Delay between retries in milliseconds (default: 200)
- * @returns Promise resolving to the updated balance as string (in wei)
- */
-export const waitForBalanceUpdate = async (
+export const getPendingCataAll = async (
   accessToken: string,
-  tokenAddress: string,
-  userAddress: string,
-  previousBalance: string,
-  maxRetries: number = 10,
-  delayMs: number = 200
-): Promise<string> => {
-  for (let i = 0; i < maxRetries; i++) {
-    const currentBalance = await getTokenBalanceForUser(accessToken, tokenAddress, userAddress);
+  rewardsChefAddress: string,
+  userAddress: string
+): Promise<PendingRewardsData> => {
 
-    if (BigInt(currentBalance) > BigInt(previousBalance)) {
-      return currentBalance;
-    }
+   const pendingCata = await pendingCataAll(
+     accessToken,
+     rewardsChefAddress,
+     userAddress
+   );
 
-    // Wait before next retry
-    if (i < maxRetries - 1) {
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  return previousBalance;
+   // Format with proper decimals (wei to CATA with 18 decimals)
+   const pendingCataFormatted = (Number(pendingCata) / 1e18).toFixed(2);
+   return {
+     pendingCata,
+     pendingCataFormatted
+   };
 };
 
+
 /**
- * Helper function to get user's staked balance from RewardsChef using Cirrus events
+ * Get user's staked balance from RewardsChef for a specific pool
  *
- * This function queries the latest CurrentUserAmount event for the given user and pool,
- * which contains the current staked balance. This approach avoids on-chain calls while
- * working around the limitation that nested mappings cannot be queried from Cirrus.
+ * This function queries the userInfo mapping from Cirrus to get the current staked balance
+ * and returns a rich data object with both raw and formatted values.
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
  * @param poolId - Pool ID to query
  * @param userAddress - User address to fetch balance for
- * @returns Promise resolving to staked balance as string (in wei)
+ * @returns Promise resolving to staked balance data with formatted values
  */
-export const getStakedBalance = async (
+export const getStakedBalanceForPool = async (
   accessToken: string,
   rewardsChefAddress: string,
   poolId: number,
   userAddress: string
-): Promise<string> => {
-  try {
-    // Query the latest CurrentUserAmount event for this user and pool
-    const response = await cirrus.get(accessToken, `/${RewardsChef}-CurrentUserAmount`, {
-      params: {
-        address: `eq.${rewardsChefAddress}`,
-        user: `eq.${userAddress}`,
-        pid: `eq.${poolId}`,
-        select: "currentAmount::text,block_timestamp",
-        order: "block_timestamp.desc",
-        limit: "1"
-      }
-    });
+): Promise<StakedBalanceData> => {
+  const stakedBalance = await Helpers.getStakedBalance(accessToken, rewardsChefAddress, poolId, userAddress);
 
-    // Extract the current amount from the latest event
-    const latestEvent = response.data?.[0];
-    return latestEvent?.currentAmount || "0";
-  } catch (error) {
-    console.error("Failed to fetch staked balance from RewardsChef events:", error);
-    return "0";
-  }
-};
+  // Format with proper decimals (wei to tokens with 18 decimals)
+  const stakedBalanceFormatted = (Number(stakedBalance) / 1e18).toFixed(2);
 
-/**
- * Low-level function to fetch pools from RewardsChef contract using Cirrus
- * with optional additional query parameters
- *
- * @param accessToken - User access token for authentication
- * @param rewardsChefAddress - Address of the RewardsChef contract
- * @param additionalParams - Optional additional Cirrus query parameters for filtering
- * @returns Promise resolving to array of pool information
- */
-const getPoolsCirrus = async (
-  accessToken: string,
-  rewardsChefAddress: string,
-  additionalParams?: Record<string, string>
-): Promise<Array<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-}>> => {
-  try {
-    const response = await cirrus.get(accessToken, `/${RewardsChef}-pools`, {
-      params: {
-        address: `eq.${rewardsChefAddress}`,
-        ...additionalParams
-      }
-    });
-
-    // Filter out entries with empty values and map to desired format
-    const pools = response.data
-      ?.filter((entry: any) => entry.value && entry.value !== "")
-      .map((entry: any) => ({
-        poolIdx: entry.key,
-        lpToken: entry.value.lpToken,
-        allocPoint: entry.value.allocPoint,
-        accPerToken: entry.value.accPerToken,
-        lastRewardTimestamp: entry.value.lastRewardTimestamp
-      })) || [];
-
-    return pools;
-  } catch (error) {
-    console.error("Failed to fetch pools from RewardsChef:", error);
-    return [];
-  }
+  return {
+    poolId,
+    stakedBalance,
+    stakedBalanceFormatted
+  };
 };
 
 /**
@@ -144,19 +77,12 @@ const getPoolsCirrus = async (
 export const getPools = async (
   accessToken: string,
   rewardsChefAddress: string
-): Promise<Array<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-}>> => {
-  return getPoolsCirrus(accessToken, rewardsChefAddress);
+): Promise<RewardsPool[]> => {
+  return Helpers.getPoolsCirrus(accessToken, rewardsChefAddress);
 };
 
 /**
  * Finds the RewardsChef pool for a given LP token address
- * Uses Cirrus filtering for efficient database-level query
  *
  * @param accessToken - User access token for authentication
  * @param rewardsChefAddress - Address of the RewardsChef contract
@@ -167,15 +93,43 @@ export const findPoolByLpToken = async (
   accessToken: string,
   rewardsChefAddress: string,
   lpTokenAddress: string
-): Promise<{
-  poolIdx: number;
-  lpToken: string;
-  allocPoint: string;
-  accPerToken: string;
-  lastRewardTimestamp: string;
-} | undefined> => {
-  const pools = await getPoolsCirrus(accessToken, rewardsChefAddress, {
-    "value->>lpToken": `eq.${lpTokenAddress}`
-  });
-  return pools[0]; // Should return at most one pool
+): Promise<RewardsPool | undefined> => {
+  return Helpers.findPoolByLpToken(accessToken, rewardsChefAddress, lpTokenAddress);
+};
+
+/**
+ * Fetches RewardsChef global state (cataPerSecond and totalAllocPoint)
+ *
+ * @param accessToken - User access token for authentication
+ * @param rewardsChefAddress - Address of the RewardsChef contract
+ * @returns Promise resolving to global state
+ */
+export const getRewardsChefState = async (
+  accessToken: string,
+  rewardsChefAddress: string
+): Promise<RewardsChefState | null> => {
+  return Helpers.getRewardsChefState(accessToken, rewardsChefAddress);
+};
+
+/**
+ * Calls claimAll on RewardsChef contract to claim all pending rewards from all pools
+ *
+ * @param accessToken - User access token for authentication
+ * @param userAddress - Address of the user claiming rewards
+ * @returns Promise resolving to transaction result
+ */
+export const claimAll = async (
+  accessToken: string,
+  userAddress: string
+): Promise<{ status: string; hash: string }> => {
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(RewardsChef),
+    contractAddress: config.rewardsChef,
+    method: "claimAll",
+    args: {}
+  }, userAddress, accessToken);
+
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
 };

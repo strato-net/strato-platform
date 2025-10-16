@@ -3,7 +3,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { executeTransaction } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { constants } from "../../config/constants";
-import { poolFactory } from "../../config/config";
+import * as config from "../../config/config";
 import {
   calculateImpliedPrice,
   buildPoolParams,
@@ -20,9 +20,9 @@ import {
   stakeNewLPTokens
 } from "../helpers/swapping.helper";
 import { getOraclePrices } from "./oracle.service";
-import { getPools as getRewardsChefPools, getStakedBalance, findPoolByLpToken } from "./rewardsChef.service";
+import { getPools as getRewardsChefPools } from "./rewardsChef.service";
+import { getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { rewardsChef } from "../../config/constants";
 import {
   SwapHistoryEntry,
   PoolList,
@@ -62,7 +62,7 @@ export const getPools = async (
   const [{data: poolData}, { data: factoryData }] = await Promise.all([
     cirrus.get(accessToken, `/${Pool}`, { params }),
     cirrus.get(accessToken, `/${PoolFactory}`, {
-      params: { address: "eq." + poolFactory, select: "swapFeeRate,lpSharePercent" }
+      params: { address: "eq." + config.poolFactory, select: "swapFeeRate,lpSharePercent" }
     })
   ]);
 
@@ -79,7 +79,7 @@ export const getPools = async (
   let stakedBalanceMap: Map<string, string> | undefined;
   if (userAddress) {
     // Get all RewardsChef pools
-    const rewardsChefPools = await getRewardsChefPools(accessToken, rewardsChef);
+    const rewardsChefPools = await getRewardsChefPools(accessToken, config.rewardsChef);
 
     // Build a map of lpToken address -> rewards pool index
     const lpTokenToPoolIdx = new Map<string, number>();
@@ -95,7 +95,7 @@ export const getPools = async (
         if (poolIdx !== undefined) {
           const stakedBalance = await getStakedBalance(
             accessToken,
-            rewardsChef,
+            config.rewardsChef,
             poolIdx,
             userAddress
           );
@@ -288,7 +288,7 @@ export const addLiquidityDualToken = async (
 
   if (stakeLPToken) {
     lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, lpTokenAddress);
+    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
 
     if (rewardsPool) {
       lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
@@ -334,7 +334,7 @@ export const addLiquiditySingleToken = async (
 
   if (stakeLPToken) {
     lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, lpTokenAddress);
+    rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
 
     if (rewardsPool) {
       lpTokenBalanceBefore = await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress);
@@ -389,14 +389,15 @@ export const removeLiquidity = async (
   // If includeStakedLPToken is true, check if we need to unstake from RewardsChef first
   if (includeStakedLPToken) {
     const lpTokenAddress = await fetchLPTokenAddress(accessToken, poolAddress);
-    const rewardsPool = await findPoolByLpToken(accessToken, rewardsChef, lpTokenAddress);
+    const rewardsPool = await findPoolByLpToken(accessToken, config.rewardsChef, lpTokenAddress);
 
     if (rewardsPool) {
       // Get user's wallet LP token balance
       const walletLPBalance = BigInt(await getTokenBalanceForUser(accessToken, lpTokenAddress, userAddress));
 
       // Get staked LP token balance
-      const stakedLPBalance = BigInt(await getStakedBalance(accessToken, rewardsChef, rewardsPool.poolIdx, userAddress));
+      const stakedBalance = await getStakedBalance(accessToken, config.rewardsChef, rewardsPool.poolIdx, userAddress);
+      const stakedLPBalance = BigInt(stakedBalance);
 
       // Calculate required LP tokens and how much needs to be unstaked
       const requiredLPTokens = lpTokenAmountBigInt;
@@ -412,7 +413,7 @@ export const removeLiquidity = async (
         // Add unstake transaction
         txArray.push({
           contractName: "RewardsChef",
-          contractAddress: rewardsChef,
+          contractAddress: config.rewardsChef,
           method: "withdraw",
           args: {
             _pid: rewardsPool.poolIdx,
@@ -483,7 +484,7 @@ export const setPoolRates = async (
   // Call setPoolFeeParameters on PoolFactory instead of calling Pool directly
   const tx = await buildFunctionTx({
     contractName: extractContractName(PoolFactory),
-    contractAddress: poolFactory,
+    contractAddress: config.poolFactory,
     method: "setPoolFeeParameters",
     args: {
       poolAddress: poolAddress,
