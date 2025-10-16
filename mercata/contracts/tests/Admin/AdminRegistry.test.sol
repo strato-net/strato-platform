@@ -88,9 +88,9 @@ contract Describe_AdminRegistry is Authorizable {
 
     function it_admin_registry_can_cast_vote_on_issue() {
         string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
-        
+
         (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        
+
         // With 2 admins, need 2 votes to execute (2/3 majority)
         require(!executed, "Should not execute with only one vote");
         require(keccak256(result) == keccak256(issueId), "Should return issue ID");
@@ -98,7 +98,7 @@ contract Describe_AdminRegistry is Authorizable {
 
     function it_admin_registry_reverts_multiple_votes_from_same_admin() {
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        
+
         bool reverted = false;
         try {
             adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
@@ -113,28 +113,28 @@ contract Describe_AdminRegistry is Authorizable {
     function it_admin_registry_generates_consistent_issue_ids() {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
-        
+
         require(keccak256(issueId1) == keccak256(issueId2), "Issue IDs should be consistent");
     }
 
     function it_admin_registry_generates_different_issue_ids_for_different_parameters() {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
-        
+
         require(keccak256(issueId1) != keccak256(issueId2), "Issue IDs should be different for different parameters");
     }
 
     function it_admin_registry_generates_different_issue_ids_for_different_targets() {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(0x5), "mint", admin3, 1000e18);
-        
+
         require(keccak256(issueId1) != keccak256(issueId2), "Issue IDs should be different for different targets");
     }
 
     function it_admin_registry_generates_different_issue_ids_for_different_functions() {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "burn", admin3, 1000e18);
-        
+
         require(keccak256(issueId1) != keccak256(issueId2), "Issue IDs should be different for different functions");
     }
 
@@ -249,7 +249,7 @@ contract Describe_AdminRegistry is Authorizable {
         uint256 adminIndex1 = adminRegistry.adminMap(admin1);
         uint256 adminIndex2 = adminRegistry.adminMap(address(user1));
         uint256 adminIndex3 = adminRegistry.adminMap(admin3);
-        
+
         require(adminIndex1 > 0, "Admin1 should have index > 0");
         require(adminIndex2 > 0, "User1 should have index > 0");
         require(adminIndex3 == 0, "Admin3 should have index 0");
@@ -291,7 +291,7 @@ contract Describe_AdminRegistry is Authorizable {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
         string memory issueId3 = adminRegistry.getIssueId(address(token), "burn", admin3, 1000e18);
-        
+
         // All should be different
         require(keccak256(issueId1) != keccak256(issueId2), "Issue IDs should be different");
         require(keccak256(issueId1) != keccak256(issueId3), "Issue IDs should be different");
@@ -308,11 +308,11 @@ contract Describe_AdminRegistry is Authorizable {
     function it_admin_registry_executes_issue_with_two_votes() {
         string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         require(keccak256(issueId) != keccak256(""), "Issue ID should be generated");
-        
+
         // First vote - should not execute
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         require(!executed1, "Should not execute with only one vote");
-        
+
         // Second vote - should execute (using user1 as second admin)
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
         require(executed2, "Should execute with two votes");
@@ -321,16 +321,16 @@ contract Describe_AdminRegistry is Authorizable {
 
     function it_admin_registry_handles_contract_creation() {
         string memory src = "contract TestContract { string public val; constructor(string _val) { val = _val; }}";
-        
+
         // First vote - should not execute
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "createContract", "TestContract", src, "hello");
         require(!executed1, "Should not execute contract creation with one vote");
-        
+
         // Second vote - should execute
         (bool executed2, address newContract) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createContract", "TestContract", src, "hello");
         require(executed2, "Should execute contract creation with two votes");
         require(newContract != address(0), "New contract should be created");
-        
+
         string memory val = newContract.call("val");
         require(keccak256(val) == keccak256("hello"), "Contract constructor should set val correctly");
     }
@@ -338,16 +338,16 @@ contract Describe_AdminRegistry is Authorizable {
     function it_admin_registry_handles_salted_contract_creation() {
         string memory src = "contract TestContract { string public val; constructor(string _val) { val = _val; }}";
         string memory salt = "testSalt123";
-        
+
         // First vote - should not execute
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
         require(!executed1, "Should not execute salted contract creation with one vote");
-        
+
         // Second vote - should execute
         (bool executed2, address newContract) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "createSaltedContract", salt, "TestContract", src, "hello");
         require(executed2, "Should execute salted contract creation with two votes");
         require(newContract != address(0), "New contract should be created");
-        
+
         string memory val = newContract.call("val");
         require(keccak256(val) == keccak256("hello"), "Salted contract constructor should set val correctly");
     }
@@ -374,7 +374,7 @@ contract Describe_AdminRegistry is Authorizable {
         // First vote - should not execute
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
         require(!executed1, "Should not execute threshold update with one vote");
-        
+
         // Second vote - should execute
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
         require(executed2, "Should execute threshold update with two votes");
@@ -384,14 +384,14 @@ contract Describe_AdminRegistry is Authorizable {
         // Add to whitelist
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(token), "mint", admin3);
         require(!executed1, "Should not execute whitelist add with one vote");
-        
+
         (bool executed2, variadic result2) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(token), "mint", admin3);
         require(executed2, "Should execute whitelist add with two votes");
-        
+
         // Remove from whitelist
         (bool executed3, variadic result3) = adminRegistry.castVoteOnIssue(address(adminRegistry), "removeWhitelist", address(token), "mint", admin3);
         require(!executed3, "Should not execute whitelist remove with one vote");
-        
+
         (bool executed4, variadic result4) = user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "removeWhitelist", address(token), "mint", admin3);
         require(executed4, "Should execute whitelist remove with two votes");
     }
@@ -400,19 +400,19 @@ contract Describe_AdminRegistry is Authorizable {
         // Add admin using the proper addAdmin function
         adminRegistry.addAdmin(admin3);
         require(adminRegistry.admins(2) == address(0), "Admin was added before enough votes were cast");
-        
+
         user1.do(address(adminRegistry), "addAdmin", admin3);
         require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "New admin was not added correctly");
         require(adminRegistry.isAdminAddress(admin3), "Admin3 should be admin after voting");
-        
+
         // Remove admin using the proper removeAdmin function
         adminRegistry.removeAdmin(admin3);
         require(adminRegistry.admins(2) != address(0) && adminRegistry.admins(3) == address(0), "Admin was removed before enough votes were cast");
-        
+
         user1.do(address(adminRegistry), "removeAdmin", admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was not removed correctly");
         require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin after removal");
-        
+
         // Swap admin using the proper swapAdmin function
         adminRegistry.swapAdmin(admin3);
         require(adminRegistry.admins(1) != address(0) && adminRegistry.admins(2) == address(0), "Admin was swapped before enough votes were cast");
@@ -425,19 +425,19 @@ contract Describe_AdminRegistry is Authorizable {
         // Test that issues are properly tracked and executed
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
-        
+
         require(keccak256(issueId1) != keccak256(issueId2), "Different issues should have different IDs");
-        
+
         // Vote on first issue
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
-        
+
         require(ERC20(token).balanceOf(admin3) == 1000e18, "First issue should be executed");
-        
+
         // Vote on second issue
         adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 2000e18);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 2000e18);
-        
+
         require(ERC20(token).balanceOf(admin3) == 3000e18, "Second issue should be executed");
     }
 
@@ -445,7 +445,7 @@ contract Describe_AdminRegistry is Authorizable {
         // First vote
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         require(!executed1, "Should not execute with one vote");
-        
+
         // Second vote from same admin - should fail with error
         bool duplicateVoteFailed = false;
         try {
@@ -454,7 +454,7 @@ contract Describe_AdminRegistry is Authorizable {
             duplicateVoteFailed = true;
         }
         require(duplicateVoteFailed, "Should fail when same admin tries to vote twice");
-        
+
         // Second vote from different admin - should execute
         (bool executed3, variadic result3) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
         require(executed3, "Should execute with two different admin votes");
@@ -465,11 +465,11 @@ contract Describe_AdminRegistry is Authorizable {
         string memory issueId1 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         string memory issueId2 = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
         require(keccak256(issueId1) == keccak256(issueId2), "Same issue should generate same ID");
-        
+
         // Test that different issues generate different IDs
         string memory issueId3 = adminRegistry.getIssueId(address(token), "mint", admin3, 2000e18);
         require(keccak256(issueId1) != keccak256(issueId3), "Different issues should generate different IDs");
-        
+
         string memory issueId4 = adminRegistry.getIssueId(address(token), "burn", admin3, 1000e18);
         require(keccak256(issueId1) != keccak256(issueId4), "Different functions should generate different IDs");
     }
@@ -478,7 +478,7 @@ contract Describe_AdminRegistry is Authorizable {
         // First add user2 to whitelist for token mint function
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(token), "mint", address(user2));
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "addWhitelist", address(token), "mint", address(user2));
-        
+
         // Now user2 should be able to vote on token mint issues
         (bool executed, variadic result) = user2.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
         require(executed, "Should execute with whitelisted user vote (whitelist allows immediate execution)");
@@ -489,7 +489,7 @@ contract Describe_AdminRegistry is Authorizable {
         // Set custom threshold to 50% (5000 basis points)
         adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
         user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(token), "mint", 5000);
-        
+
         // With 2 admins, 50% threshold should require 1 vote
         (bool executed, variadic result) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         require(executed, "Should execute with 50% threshold and 1 vote");
