@@ -70,7 +70,7 @@ export const addAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "addAdmin",
+      method: "addAdmin", // change this to castVoteOnIssue
       args: {
         _admin: adminAddress,
       },
@@ -96,7 +96,7 @@ export const removeAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "removeAdmin",
+      method: "removeAdmin", //change this to castVoteOnIssue
       args: {
         _admin: adminAddress,
       },
