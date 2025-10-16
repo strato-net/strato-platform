@@ -11,11 +11,12 @@ import {
   fetchChains,
   fetchChainIds
 } from '../Chains/chains.actions';
+import { secureFetch } from '../../lib/csrf';
 
 const url = env.BLOC_URL + "/chain"
 
 export function deployDappApiCall(label, members, balances, integrations, src, contract, args, vm) {
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',

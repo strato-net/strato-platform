@@ -14,7 +14,7 @@ HEALTHCHECK --interval=5s --timeout=1s --start-period=180s \
 
 COPY nginx.tpl.conf openid.tpl.lua csrf.lua /tmp/
 
-COPY swagger.yaml /usr/local/openresty/nginx/html/
+COPY swagger/ /usr/local/openresty/nginx/html/swagger/
 
 COPY docker-run.sh /
 

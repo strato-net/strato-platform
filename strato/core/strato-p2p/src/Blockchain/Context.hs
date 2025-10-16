@@ -79,7 +79,6 @@ import           BlockApps.X509.Certificate
 
 import           Blockchain.BlockDB
 import           Blockchain.Blockstanbul                 (WireMessage)
-import           Blockchain.CertificateDB
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
 import           Blockchain.Data.PubKey
@@ -98,7 +97,6 @@ import qualified Blockchain.Sequencer.Kafka              as SK
 import           Blockchain.Strato.Discovery.ContextLite ()
 import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
 import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
@@ -156,9 +154,9 @@ emptyActionTimestamp = ActionTimestamp Nothing
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
-newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe ChainMemberParsedSet}
+newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe Address}
 
-withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) -> PeerAddress -> PeerAddress
+withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddress
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
@@ -267,9 +265,6 @@ instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (Reader
 
 instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
   select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
-
-instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . getCertificate
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
   lookup _ = RBDB.withRedisBlockDB . getBlock
@@ -475,7 +470,6 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
          '(Host, PPeer)
        ]
@@ -582,14 +576,14 @@ getMyX509 ::
   m (Maybe X509CertInfoState)
 getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
 
-setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => ChainMemberParsedSet -> m ()
+setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
 
-shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => ChainMemberParsedSet -> m Bool
+shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
 shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Proxy @PeerAddress)
   where
     -- 0x0 is for a broadcast sync message.
-    zeroOrArg addr' = addr' == emptyChainMember || addr' == addr
+    zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
 withActivePeer ::
   ( MonadUnliftIO m,

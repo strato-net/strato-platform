@@ -103,10 +103,8 @@ statementHelper (Throw e _) =
   expressionHelper e
 statementHelper (EmitStatement _ vals _) =
   concat <$> traverse (expressionHelper . snd) vals
-statementHelper (RevertStatement _ (OrderedArgs vals) _) =
+statementHelper (RevertStatement _ vals _) =
   concat <$> traverse expressionHelper vals
-statementHelper (RevertStatement _ (NamedArgs vals) _) =
-  concat <$> traverse (expressionHelper . snd) vals
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []
@@ -182,9 +180,7 @@ expressionHelper (IndexAccess _ a b) = do
 expressionHelper (MemberAccess _ e _) = expressionHelper e
 expressionHelper (FunctionCall _ e args) = do
   as <- expressionHelper e
-  bs <- case args of
-    OrderedArgs es -> concat <$> traverse expressionHelper es
-    NamedArgs nes -> concat <$> traverse expressionHelper (snd <$> nes)
+  bs <- concat <$> traverse expressionHelper args
   put M.empty
   pure $ concat [as, bs]
 expressionHelper (Unitary _ _ a) = expressionHelper a
@@ -195,6 +191,7 @@ expressionHelper (DecimalLiteral _ _) = pure []
 expressionHelper (StringLiteral _ _) = pure []
 expressionHelper (AccountLiteral _ _) = pure []
 expressionHelper (HexaLiteral _ _) = pure []
+expressionHelper (InlineBoundsCheck _ _ _ _) = pure []
 expressionHelper (TupleExpression _ es) =
   concat <$> traverse (maybe (pure []) expressionHelper) es
 expressionHelper (ArrayExpression _ es) = concat <$> traverse expressionHelper es

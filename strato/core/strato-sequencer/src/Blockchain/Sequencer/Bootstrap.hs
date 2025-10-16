@@ -4,7 +4,6 @@
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
@@ -15,24 +14,20 @@ import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import ClassyPrelude (atomically, fromMaybe, newTMChan)
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
 import qualified Data.ByteString.Char8 as C8
-import Data.Foldable (for_)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
 --
-bootstrapSequencer :: [(Address, X509CertInfoState)] -> Block -> IO OutputBlock
+bootstrapSequencer :: Block -> IO OutputBlock
 bootstrapSequencer
-  extraCerts
   Block
     { blockBlockData = bd,
       blockReceiptTransactions = txs,
@@ -89,7 +84,6 @@ bootstrapSequencer
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash
-          for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
       initKafka :: CablePackage -> IO ()
       initKafka _ = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do

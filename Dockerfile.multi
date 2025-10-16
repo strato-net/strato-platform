@@ -48,9 +48,7 @@ COPY \
   ./usr/local/bin/strato-sequencer \
   ./usr/local/bin/strato-setup \
   ./usr/local/bin/vm-runner \
-  ./usr/local/bin/x509-generator \
-  ./usr/local/bin/x509-keygen \
-    /usr/local/bin/
+  /usr/local/bin/
 COPY ./strato /
 RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052

@@ -11,13 +11,14 @@ import {
 
 import { env } from '../../env';
 import { handleErrors } from '../../lib/handleErrors';
+import { secureFetch } from '../../lib/csrf';
 
 const compileUrl = env.BLOC_URL + "/contracts/xabi";
 const blocCompileUrl = env.BLOC_URL + "/contracts/compile";
 
 export function tokenizeSource(source) {
   let body = JSON.stringify({src : source});
-  return fetch(
+  return secureFetch(
     compileUrl,
     {
       method: 'POST',
@@ -43,7 +44,7 @@ export function tokenizeSource(source) {
 
 export function compileSource(contractName, source, codeType) {
   const searchable = [];
-  return fetch(blocCompileUrl, {
+  return secureFetch(blocCompileUrl, {
     method: 'POST',
     credentials: "include",
     headers: {

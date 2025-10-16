@@ -1,5 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -9,7 +10,7 @@ contract User {
     }
 }
 
-contract Describe_BadDebt_Basic {
+contract Describe_BadDebt_Basic is Authorizable {
 
     // CDP struct definitions for accessing record types (must match CDPEngine exactly)
     struct Vault {
@@ -53,6 +54,7 @@ contract Describe_BadDebt_Basic {
     address ETHST;
 
     function beforeAll() public {
+        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }

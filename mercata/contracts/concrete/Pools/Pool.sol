@@ -2,7 +2,6 @@
 import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
-import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 

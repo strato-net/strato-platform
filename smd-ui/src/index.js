@@ -76,6 +76,7 @@ import watchAppMetadata from './App/app.saga'
 import watchGetPeerIdentity from './components/PeersCard/peers.saga';
 
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
+import { initializeCsrfToken } from './lib/csrf';
 
 const rootReducer = combineReducers({
   form: formReducer.plugin({
@@ -172,6 +173,9 @@ const store = createStore(rootReducer, process.env.NODE_ENV !== 'production'
 
 // then run the saga
 sagaMiddleware.run(rootSaga);
+
+// Initialize CSRF token on app startup
+initializeCsrfToken();
 
 ReactDOM.render(
   <Provider store={store}>

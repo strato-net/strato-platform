@@ -15,6 +15,7 @@ module SolidVM.Model.CodeCollection (
   contracts,
   getParents,
   getParentsAndUsings,
+  getInheritedContracts,
   getTopLevelAbstracts,
   getTopLevelAbstractsForContract,
   flConstants,
@@ -165,6 +166,12 @@ getParentsAndUsings cc c = do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParentsAndUsings cc p'
   pure . concat $ ps : us
+
+getInheritedContracts :: CodeCollection -> SolidString -> SolidEither [Contract]
+getInheritedContracts cc cName = map fst . filter snd <$> traverse go (M.elems $ cc ^. contracts)
+  where go c = do
+          parents' <- map _contractName <$> getParents cc c
+          pure (c, cName `elem` parents')
 
 getTopLevelAbstracts :: CodeCollection -> Map SolidString Contract
 getTopLevelAbstracts cc = M.unions . map (getTopLevelAbstractsForContract cc) . M.elems $ _contracts cc

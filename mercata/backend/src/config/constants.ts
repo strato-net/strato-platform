@@ -54,9 +54,9 @@ export const constants = (() => {
 
   const tokenBalanceSelectFields = [
     "address",
-    "user:key",
+    "user:key", 
     "balance:value::text",
-    `token:${Token}(${tokenSelectFields.join(',')})`,
+    `token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
   ];
 
   const registrySelectFields = [

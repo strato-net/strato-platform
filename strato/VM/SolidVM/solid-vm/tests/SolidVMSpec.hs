@@ -42,11 +42,11 @@ import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
@@ -269,7 +269,7 @@ generateGBlock gi = do
         BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
-            beneficiary = genesisInfoCoinbase gi,
+            beneficiary = 0x0,
             stateRoot = sr,
             transactionsRoot = genesisInfoTransactionRoot gi,
             receiptsRoot = genesisInfoReceiptsRoot gi,
@@ -311,9 +311,9 @@ runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $
     runLoggingT . runTestContextM $ do
-      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [ChainMemberParsedSet]
+      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [Address]
           !admins = either error id eAdmins
-          eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [ChainMemberParsedSet]
+          eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [Validator]
           !vals = either error id eVals
           gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
@@ -347,7 +347,6 @@ runTestWithTimeout timeout f = do
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
         f
   case result of
     Left {} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
@@ -383,7 +382,7 @@ runArgsWithSenderBeef acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -424,7 +423,7 @@ runArgsWithSender acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -466,7 +465,7 @@ runArgsWithOrigin orig acc args bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -573,7 +572,7 @@ runCall funcName callArgs bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -633,7 +632,7 @@ runCall' funcName callArgs bs = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -695,7 +694,7 @@ call2 funcName callArgs contractAddress = do
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -6411,8 +6410,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"]
-      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]"),
-                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SString \"xNum\"]"),
+                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SInteger 100]")
                      ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -6438,7 +6437,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "[SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields ["x"]
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
@@ -8126,7 +8125,7 @@ contract qq {
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
@@ -8888,7 +8887,7 @@ contract qq {
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3

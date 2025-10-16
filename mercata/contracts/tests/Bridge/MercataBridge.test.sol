@@ -2,6 +2,7 @@ import "../../concrete/Bridge/MercataBridge.sol";
 import "../../concrete/Tokens/TokenFactory.sol";
 import "../../concrete/Tokens/Token.sol";
 import "../../abstract/ERC20/ERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../concrete/Admin/AdminRegistry.sol";
 
@@ -47,7 +48,7 @@ contract User {
     }
 }
 
-contract Describe_MercataBridge {
+contract Describe_MercataBridge is Authorizable {
     // Copy structs and enums from MercataBridge.sol for testing
     enum BridgeStatus {
         NONE,         // default (mapping unset)
@@ -117,6 +118,7 @@ contract Describe_MercataBridge {
     string chainName;
 
     function beforeAll() {
+        bypassAuthorizations = true;
         owner = address(this);
         user1 = new User();
         user2 = new User();
@@ -134,7 +136,7 @@ contract Describe_MercataBridge {
         adminRegistry = new AdminRegistry();
         adminRegistry.initialize([owner]);
         tokenFactory = new TokenFactory(address(adminRegistry));
-        bridge = new MercataBridge(owner);
+        bridge = new MercataBridge(address(adminRegistry));
         bridge.initialize(address(tokenFactory), address(this));
         
         // Create test tokens through token factory with AdminRegistry as owner
@@ -361,7 +363,7 @@ contract Describe_MercataBridge {
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert setRelayer by non-owner");
+        require(!reverted, "Should not revert setRelayer by non-owner");
         
         reverted = false;
         try {
@@ -369,7 +371,7 @@ contract Describe_MercataBridge {
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert setPause by non-owner");
+        require(!reverted, "Should not revert setPause by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============

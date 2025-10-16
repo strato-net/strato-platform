@@ -13,6 +13,7 @@
 module Blockchain.Slipstream.Data.Action where
 
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
@@ -49,7 +50,7 @@ data AggregateAction = AggregateAction
     actionStorage :: Action.DataDiff,
     actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     actionType :: Action.CallType,
-    actionSrc :: Maybe Text
+    actionSrc :: Maybe Code
   }
   deriving (Show, Generic, NFData)
 

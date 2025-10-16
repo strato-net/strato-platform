@@ -5,21 +5,11 @@ import { StratoPaths, constants, rewardsChef } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
 import { FunctionInput } from "../../types/types";
 import { getTokenBalanceForUser } from "./tokens.service";
-import { getStakedBalance, getPools, waitForBalanceUpdate } from "./rewardsChef.service";
+import { getPools } from "./rewardsChef.service";
+import { waitForBalanceUpdate, getStakedBalance, findPoolByLpToken } from "../helpers/rewards/rewardsChef.helpers";
 
 const SafetyModule = "mercata/backend/src/api/contracts/concrete/Lending/SafetyModule.sol";
 const { Token } = constants;
-
-/**
- * Helper function to find the RewardsChef pool for a given sToken
- */
-const findPoolForSToken = async (
-  accessToken: string,
-  sToken: string
-) => {
-  const pools = await getPools(accessToken, rewardsChef);
-  return pools.find(pool => pool.lpToken === sToken);
-};
 
 interface SafetyModuleInfo {
   totalAssets: string;
@@ -201,7 +191,7 @@ export const getSafetyModuleInfo = async (
 
     // Get user's staked sUSDST balance from RewardsChef
     // Find the pool for this sToken
-    const poolForSToken = await findPoolForSToken(accessToken, sTokenAddress);
+    const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
 
     // If no pool found, staked balance is 0
     const stakedSTokenBalance = poolForSToken
@@ -348,7 +338,7 @@ export const stakeSafetyModule = async (
 
     if (BigInt(newlyMintedAmount) > 0n) {
       // Find the pool for this sToken
-      const poolForSToken = await findPoolForSToken(accessToken, sTokenAddress);
+      const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
 
       if (!poolForSToken) {
         throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot stake after deposit.`);
@@ -431,7 +421,7 @@ export const redeemSafetyModule = async (
       const amountToUnstake = requiredSTokenWei - unstakedSTokenWei;
 
       // Find the pool for this sToken
-      const poolForSToken = await findPoolForSToken(accessToken, sTokenAddress);
+      const poolForSToken = await findPoolByLpToken(accessToken, rewardsChef, sTokenAddress);
 
       if (!poolForSToken) {
         throw new Error(`No RewardsChef pool found for sToken ${sTokenAddress}. Cannot unstake before redemption.`);

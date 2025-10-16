@@ -16,7 +16,7 @@ import Text.Tools
 
 showVariables :: MonadSM m => CallInfo -> m [String]
 showVariables ci = do
-  forM (M.toList . NE.head $ localVariables ci) $ \(name, (_, var)) -> do
+  forM (M.toList . NE.head $ localVariables ci) $ \(name, var) -> do
     val <- getVar var
     valueString <- showSM val
     return $ "    \"" ++ labelToString name ++ "\": " ++ valueString

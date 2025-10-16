@@ -1,93 +1,258 @@
--- API routes with CSRF protection
--- Safe methods (GET, HEAD, OPTIONS): Generate/refresh CSRF token and set as HttpOnly cookie
--- State-changing methods (POST, PUT, DELETE, PATCH): Require X-CSRF-Token header matching session token
+-- CSRF Protection: Double-Submit Cookie + Server-Side Storage
+-- Browser requests only; API clients (curl/Postman) exempt via User-Agent + Sec-Fetch validation
+-- GET: Generate token | POST/PUT/PATCH/DELETE: Validate token | HEAD/OPTIONS: Skip
 
 local _M = {}
 
--- Initialize CSRF module with shared dictionary reference
 function _M.init(csrf_tokens_dict)
     _M.csrf_tokens = csrf_tokens_dict
 end
 
--- Generate a secure CSRF token
 function _M.generate_csrf_token()
     local resty_random = require "resty.random"
     local str = require "resty.string"
     local random_bytes = resty_random.bytes(32)
     if not random_bytes then
-        ngx.log(ngx.ERR, "Failed to generate random bytes for CSRF token")
+        ngx.log(ngx.ERR, "CSRF: Failed to generate random bytes")
         return nil
     end
     return str.to_hex(random_bytes)
 end
 
--- Validate CSRF token against stored session token
-function _M.validate_csrf_token(token, session_id)
-    if not token or not session_id then
+function _M.build_csrf_cookie(token)
+    local cookie = "CSRF-TOKEN=" .. token .. "; Path=/; SameSite=Strict"
+    if ngx.var.https == "on" then
+        cookie = cookie .. "; Secure"
+    end
+    return cookie
+end
+
+function _M.validate_csrf_token(header_token, cookie_token, session_id)
+    if not header_token or not cookie_token or not session_id then
         return false
     end
-    local stored_token = _M.csrf_tokens:get(session_id)
-    return stored_token and stored_token == token
-end
-
--- Store CSRF token for session (30 minutes expiry)
-function _M.set_csrf_token(session_id, token)
-    if session_id and token then
-        _M.csrf_tokens:set(session_id, token, 1800)
-    end
-end
-
--- Main CSRF protection handler for API requests
-function _M.protect_api()
-    local method = ngx.var.request_method
-    local session_id = ngx.var.session_name and ngx.var.cookie_strato_session
     
-    -- Skip CSRF for safe methods (GET, HEAD, OPTIONS) but ensure token exists
-    if method == "GET" or method == "HEAD" or method == "OPTIONS" then
-        if session_id then
-            local existing_token = _M.csrf_tokens:get(session_id)
-            if not existing_token then
-                local new_token = _M.generate_csrf_token()
-                if new_token then
-                    _M.set_csrf_token(session_id, new_token)
-                    ngx.header["Set-Cookie"] = "CSRF-TOKEN=" .. new_token .. "; Path=/; HttpOnly; Secure; SameSite=Strict"
-                end
-            else
-                ngx.header["Set-Cookie"] = "CSRF-TOKEN=" .. existing_token .. "; Path=/; HttpOnly; Secure; SameSite=Strict"
+    if header_token ~= cookie_token then
+        return false
+    end
+    
+    local stored_token = _M.csrf_tokens:get(session_id)
+    if not stored_token or stored_token ~= cookie_token then
+        return false
+    end
+    
+    -- Refresh token TTL on successful validation
+    _M.csrf_tokens:set(session_id, stored_token, 1800)
+    
+    return true
+end
+
+-- Session ID = encrypted session cookie value (unique and stable per user)
+function _M.get_session_id()
+    return ngx.var.cookie_strato_session
+end
+
+-- Whitelist known API clients; validate Sec-Fetch headers for modern browsers
+-- Note: JS cannot modify User-Agent or Sec-Fetch-* headers
+function _M.is_browser_request()
+    local user_agent = ngx.var.http_user_agent or ""
+
+    local api_client_patterns = {
+        "curl/", "Wget/", "python%-requests/", "python%-urllib", "Go%-http%-client",
+        "PostmanRuntime/", "insomnia/", "HTTPie/", "node%-fetch", "axios/",
+        "okhttp/", "Java/", "Apache%-HttpClient", "Dart/", "Ruby", "PHP/", "RestSharp/"
+    }
+
+    for _, pattern in ipairs(api_client_patterns) do
+        if user_agent:find(pattern) then
+            return false  -- API client, skip CSRF
+        end
+    end
+
+    -- Validate Sec-Fetch headers (modern browsers only)
+    local sec_fetch_site = ngx.var.http_sec_fetch_site
+    local sec_fetch_mode = ngx.var.http_sec_fetch_mode
+
+    if sec_fetch_site == "cross-site" and sec_fetch_mode ~= "navigate" then
+        ngx.log(ngx.WARN, "CSRF: Suspicious Sec-Fetch headers (cross-site non-navigation)")
+    end
+
+    return true  -- Treat as browser, enforce CSRF
+end
+
+function _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    if not new_session_id then
+        return nil
+    end
+    
+    if old_session_id and old_session_id ~= new_session_id then
+        _M.csrf_tokens:delete(old_session_id)
+    end
+    
+    local new_token = _M.generate_csrf_token()
+    if not new_token then
+        return nil
+    end
+    
+    local success, err = _M.csrf_tokens:set(new_session_id, new_token, 1800)
+    if not success then
+        ngx.log(ngx.ERR, "CSRF: Failed to store token during rotation: ", err)
+        return nil
+    end
+    
+    return new_token
+end
+
+-- Ensure CSRF token exists and is sent to client
+function _M.ensure_csrf_token_for_session(session_id, context)
+    if not session_id then
+        return false
+    end
+    
+    local existing_token = _M.csrf_tokens:get(session_id)
+    local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
+    
+    if not existing_token then
+        local new_token = _M.generate_csrf_token()
+        if not new_token then
+            return false
+        end
+        
+        local success, err = _M.csrf_tokens:add(session_id, new_token, 1800)
+        if success then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(new_token)
+            return true
+        elseif err == "exists" then
+            existing_token = _M.csrf_tokens:get(session_id)
+            if existing_token and not cookie_token then
+                ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+                return true
             end
         end
+        return false
+    else
+        -- Token exists, refresh its TTL to extend session
+        _M.csrf_tokens:set(session_id, existing_token, 1800)
+        
+        if not cookie_token then
+            ngx.header["Set-Cookie"] = _M.build_csrf_cookie(existing_token)
+            return true
+        end
+    end
+    
+    return false
+end
+
+function _M.handle_session_rotation()
+    -- Prevent double-processing (header_filter can be called multiple times)
+    if ngx.ctx.csrf_rotation_handled then
         return
     end
     
-    -- For state-changing methods, validate CSRF token
+    if not _M.is_browser_request() then
+        return
+    end
+    
+    -- Check if openid.lua detected session rotation during access phase
+    if not ngx.ctx.session_rotated then
+        return
+    end
+    
+    local new_session_id = ngx.ctx.new_session_id
+    local old_session_id = ngx.ctx.old_session_id
+    
+    if not new_session_id then
+        ngx.log(ngx.WARN, "CSRF: Session rotation flagged but no new session ID")
+        return
+    end
+    
+    local new_csrf_token = _M.regenerate_token_for_new_session(new_session_id, old_session_id)
+    if not new_csrf_token then
+        ngx.log(ngx.ERR, "CSRF: Failed to regenerate token during session rotation")
+        return
+    end
+    
+    -- Add CSRF token cookie to response
+    local csrf_cookie = _M.build_csrf_cookie(new_csrf_token)
+    local existing_cookies = ngx.header["Set-Cookie"]
+    
+    if existing_cookies then
+        if type(existing_cookies) == "table" then
+            table.insert(existing_cookies, csrf_cookie)
+            -- CRITICAL: Must reassign the table back to ngx.header for changes to take effect
+            ngx.header["Set-Cookie"] = existing_cookies
+        else
+            ngx.header["Set-Cookie"] = {existing_cookies, csrf_cookie}
+        end
+    else
+        ngx.header["Set-Cookie"] = csrf_cookie
+    end
+    
+    -- Mark that we've handled this rotation to prevent double-processing
+    ngx.ctx.csrf_rotation_handled = true
+end
+
+function _M.initialize_token()
+    if not _M.is_browser_request() then
+        return
+    end
+
+    local session_id = _M.get_session_id()
+    if session_id then
+        _M.ensure_csrf_token_for_session(session_id, "/csrf-init")
+    end
+end
+
+function _M.protect_api()
+    local method = ngx.var.request_method
+    local session_id = _M.get_session_id()
+    local request_uri = ngx.var.request_uri or ""
+
+    if request_uri:find("^/auth/", 1, true) then
+        return
+    end
+    
+    if not _M.is_browser_request() then
+        return
+    end
+
+    if method == "OPTIONS" or method == "HEAD" then
+        return
+    end
+
+    if method == "GET" then
+        if session_id then
+            _M.ensure_csrf_token_for_session(session_id, "GET")
+        end
+        return
+    end
+
     if method == "POST" or method == "PUT" or method == "DELETE" or method == "PATCH" then
-        local csrf_token = ngx.var.http_x_csrf_token
-        
+        local header_token = ngx.var.http_x_csrf_token
+        local cookie_token = ngx.var.cookie_csrf_token or ngx.var["cookie_CSRF-TOKEN"]
+
         if not session_id then
-            ngx.log(ngx.WARN, "CSRF validation failed: No session ID for " .. method .. " request to " .. ngx.var.request_uri)
+            ngx.log(ngx.WARN, "CSRF: No session for ", method, " ", request_uri)
             ngx.status = 403
-            ngx.say('{"error": "CSRF protection: session required"}')
+            ngx.header.content_type = "application/json"
+            ngx.say('{"error": "Authentication required. Please log in and try again."}')
             ngx.exit(403)
             return
         end
-        
-        if not _M.validate_csrf_token(csrf_token, session_id) then
-            ngx.log(ngx.WARN, "CSRF validation failed for " .. method .. " request to " .. ngx.var.request_uri .. " from " .. (ngx.var.remote_addr or "unknown"))
+
+        if not _M.validate_csrf_token(header_token, cookie_token, session_id) then
+            ngx.log(ngx.WARN, "CSRF: Validation failed for ", method, " ", request_uri, " from ", ngx.var.remote_addr or "unknown")
             ngx.status = 403
-            ngx.say('{"error": "CSRF protection: invalid or missing token"}')
+            ngx.header.content_type = "application/json"
+            ngx.say('{"error": "Security validation failed. Please refresh the page and try again."}')
             ngx.exit(403)
             return
         end
     end
 end
 
--- Check if this file is being executed directly (via rewrite_by_lua_file)
--- or being required as a module (via require)
 if csrf and csrf.protect_api then
-    -- File is being executed directly via rewrite_by_lua_file
-    -- The 'csrf' global variable exists from init_by_lua
     csrf.protect_api()
 else
-    -- File is being required as a module, return the module table
     return _M
-end 
+end

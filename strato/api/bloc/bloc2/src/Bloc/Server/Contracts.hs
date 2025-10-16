@@ -80,8 +80,7 @@ getContracts mName mOffset mLimit chainId = do
   allAddrStateRefs <-
     getAccount'
       accountsFilterParams
-        { _qaChainId = maybeToList chainId,
-          _qaExternal = Just False,
+        { _qaExternal = Just False,
           _qaSearch = mName,
           _qaOffset = Nothing,  -- No offset - get all records
           _qaLimit = Nothing    -- No limit - get all records
@@ -140,8 +139,7 @@ getContractsContract name addr chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
       aParams = accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just addr,
+          { _qaAddress = Just addr,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
@@ -258,8 +256,7 @@ getContractsDetails' contractAddress chainId = do
               maybe "Main" (Text.pack . show) chainId
             ]
       aParams = accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just contractAddress,
+          { _qaAddress = Just contractAddress,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
@@ -408,21 +405,3 @@ completeXabi :: Text -> Xabi -> Either String Xabi
 completeXabi name xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi name c
-
-getSourceMapFromAddress :: 
-  ( MonadIO m,
-    (Keccak256 `A.Selectable` SourceMap) m, 
-    (Address `A.Selectable` AddressState) m
-  ) => Address -> m SourceMap
-getSourceMapFromAddress cptr = do
-  addressState <- A.select (A.Proxy @AddressState) cptr
-  mCodeHash <- case addressState of
-    Nothing -> throwIO $ UserError "Could not find code hash for contract"
-    Just as -> return $ addressStateCodeHash as
-  keccak <- case mCodeHash of
-    SolidVMCode _ k -> pure k
-    _ -> throwIO $ UserError "Could not find code hash for contract"
-  sourcy <- A.select (A.Proxy @SourceMap) keccak
-  case sourcy of
-    Nothing -> throwIO $ UserError "Could not find source map for contract"
-    Just sm -> pure sm

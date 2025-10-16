@@ -29,20 +29,20 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
     healthImpact: 0,
     isHealthy: true,
   });
-  const maxAmount = useMemo(
-    () =>
-      computeMaxTransferable(
-        BigInt(loans?.totalAmountOwed || 0) < (BigInt(usdstBalance) - 1n)
-          ? loans?.totalAmountOwed
-          : (BigInt(usdstBalance) - 1n).toString(),
-        true,
-        voucherBalance,
-        (BigInt(usdstBalance) - 1n).toString(),
-        safeParseUnits(REPAY_FEE).toString(),
-        setFeeError
-      ),
-    [voucherBalance, usdstBalance, loans?.totalAmountOwed]
-  );
+  const maxAmount = useMemo(() => {
+    const availableBalance = (BigInt(usdstBalance) - 1n).toString();
+    const maxTransferable = computeMaxTransferable(
+      availableBalance,
+      true,
+      voucherBalance,
+      availableBalance,
+      safeParseUnits(REPAY_FEE).toString(),
+      setFeeError
+    );
+    
+    const totalOwed = BigInt(loans?.totalAmountOwed || 0);
+    return BigInt(maxTransferable) < totalOwed ? maxTransferable : totalOwed.toString();
+  }, [voucherBalance, usdstBalance, loans?.totalAmountOwed]);
 
   // Calculate risk level when repay amount changes
   useEffect(() => {
@@ -194,6 +194,7 @@ const RepayForm = ({ loans, repayLoading, onRepay, usdstBalance, voucherBalance 
             setRepayAmount(val);
           }}
           className="pt-2"
+          disabled={BigInt(maxAmount) < 1e15} // Disable if less than 0.001 USDST (1e15 wei)
         />
       </div>
 

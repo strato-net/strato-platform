@@ -23,12 +23,11 @@ module Blockchain.SolidVM.SM
     action,
     runSM,
     getCurrentAddress,
+    getCurrentCodeAddress,
     withCallInfo,
-    withTempCallInfo,
+    withStaticCallInfo,
     withUncheckedCallInfo,
     withLocalVars,
-    getLocal,
-    setLocal,
     getCurrentCallInfo,
     getCurrentCallInfoIfExists,
     getCurrentContract,
@@ -132,10 +131,11 @@ import qualified Prelude as Ordering (Ordering (..))
 data CallInfo = CallInfo
   { currentFunctionName :: SolidString,
     currentAddress :: Address,
+    currentCodeAddress :: Address,
     currentContract :: CC.Contract,
     codeCollection :: CC.CodeCollection,
     collectionHash :: Keccak256,
-    localVariables :: NE.NonEmpty (Map SolidString (SVMType.Type, Variable)),
+    localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
     storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
     readOnly :: Bool,
@@ -478,22 +478,23 @@ runSM ::
   Env.Environment ->
   GasInfo ->
   SM m a ->
-  m (Either SolidException a)
-runSM maybeCode env gi f = do
+  m (Env.Environment, Either SolidException a)
+runSM maybeCode envBefore gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
-          { env = env,
+          { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode env,
+            _action = startingAction maybeCode envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
   eVal <- try $ runReaderT f startingStateRef
   sstateAfter <- readIORef startingStateRef
+  let envAfter = env sstateAfter
   case eVal of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
@@ -506,10 +507,10 @@ runSM maybeCode env gi f = do
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
-        else return $ Left se
+        else return (envAfter, Left se)
     Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
-      return $ Right value
+      return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
@@ -532,9 +533,8 @@ startingAction maybeCode env' =
       _actionData = OMap.empty,
       _src =
         case maybeCode of
-          Just (Code theCode) ->
+          Just theCode ->
             Just theCode
-          Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',
       _events = Q.empty,
@@ -588,7 +588,7 @@ getVariableOfName name = do
 
   -- when (name == "theSixthSense") (internalError "M. Night Shyamalan presents" currentCallInfo)
 
-  let maybeLocalValue = fmap snd $ M.lookup name vars
+  let maybeLocalValue = M.lookup name vars
 
   let maybeContractFunction :: Maybe Variable
       maybeContractFunction = fmap (t "constant function" . Constant . SFunction name . Just) $ M.lookup name $ currentContract currentCallInfo ^. CC.functions
@@ -623,6 +623,7 @@ getVariableOfName name = do
                        "sha3",
                        "delegatecall",
                        "call",
+                       "staticcall",
                        "derive",
                        "sha256",
                        "ecrecover",
@@ -739,17 +740,18 @@ getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 withCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m a ->
   m a
-withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
-  addCallInfo a c fn hsh cc initialLocalVariables ro ff
+withCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff f = do
+  addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff
   eRes <- try f
   popCallInfo $ isLeft eRes
   case eRes of
@@ -759,19 +761,21 @@ withCallInfo a c fn hsh cc initialLocalVariables ro ff f = do
 addCallInfo ::
   MonadSM m =>
   Address ->
+  Address ->
   CC.Contract ->
   SolidString ->
   Keccak256 ->
   CC.CodeCollection ->
-  Map SolidString (SVMType.Type, Variable) ->
+  Map SolidString Variable ->
   Bool ->
   Bool ->
   m ()
-addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
+addCallInfo a codeAddr c fn hsh cc initialLocalVariables ro ff = do
   let newCallInfo =
         CallInfo
           { currentFunctionName = fn,
             currentAddress = a,
+            currentCodeAddress = codeAddr,
             currentContract = c,
             codeCollection = cc,
             collectionHash = hsh,
@@ -785,11 +789,6 @@ addCallInfo a c fn hsh cc initialLocalVariables ro ff = do
           }
 
   Mod.modify_ (Mod.Proxy @[CallInfo]) $ pure . (newCallInfo :)
-
-dupCallInfo :: MonadSM m => Bool -> m ()
-dupCallInfo ro = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
-  [] -> internalError "dupCallInfo was called on an already empty stack" ()
-  (ci : rest) -> pure $ ci {readOnly = ro} : ci : rest
 
 uncheckedCallInfo :: MonadSM m => m ()
 uncheckedCallInfo = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
@@ -830,14 +829,18 @@ popLocalVars = Mod.modify_ (Mod.Proxy @[CallInfo]) $ \case
     _ NE.:| v:vs -> pure $ curFrame{localVariables = v NE.:| vs} : rest
     _ -> internalError "popLocalVars was called with an empty stack" ()
 
-withTempCallInfo :: MonadSM m => Bool -> m a -> m a
-withTempCallInfo ro f = do
-  dupCallInfo ro
-  eResult <- try f
-  popCallInfo $ isLeft eResult
-  case eResult of
-    Left (e :: SomeException) -> throwIO e
-    Right result -> pure result
+withStaticCallInfo :: MonadSM m => m a -> m a
+withStaticCallInfo f = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    [] -> internalError "withStaticCallInfo was called with an empty stack" ()
+    (curFrame : rest) -> do
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame{readOnly = True} : rest
+      eResult <- try f
+      Mod.put (Mod.Proxy @[CallInfo]) $ curFrame : rest
+      case eResult of
+        Left (e :: SomeException) -> throwIO e
+        Right result -> pure result
 
 withUncheckedCallInfo :: MonadSM m => m a -> m a
 withUncheckedCallInfo f = do
@@ -878,6 +881,13 @@ getCurrentAddress = do
   case cs of
     (currentCallInfo : _) -> return $ currentAddress currentCallInfo
     _ -> internalError "getCurrentAccount called with an empty stack" ()
+
+getCurrentCodeAddress :: MonadSM m => m Address
+getCurrentCodeAddress = do
+  cs <- Mod.get (Mod.Proxy @[CallInfo])
+  case cs of
+    (currentCallInfo : _) -> return $ currentCodeAddress currentCallInfo
+    _ -> internalError "getCurrentCodeAddress called with an empty stack" ()
 {-
 getCurrentChainId :: MonadSM m => m (Maybe Word256)
 getCurrentChainId = do
@@ -892,24 +902,6 @@ getCurrentFunctionName = do
   case cs of
     (currentCallInfo : _) -> return $ currentFunctionName currentCallInfo
     _ -> internalError "getCurrentFunctionName called with an empty stack" ()
-
-getLocal :: MonadSM m => SolidString -> m (Maybe (SVMType.Type, Variable))
-getLocal name = do
-  currentCallInfo <- getCurrentCallInfo
-  return . M.lookup name . NE.head $ localVariables currentCallInfo
-
-setLocal :: MonadSM m => SolidString -> Variable -> m ()
-setLocal name val = do
-  stack <- Mod.get (Mod.Proxy @[CallInfo])
-  let (info, rest) = case stack of
-        (ci : r) -> (ci, r)
-        [] -> internalError "setLocal stack underflow" ()
-      locals NE.:| locals' = localVariables info
-      (theType, _) =
-        fromMaybe (unknownVariable "setLocal called for variable that doesn't exist" name) $
-          M.lookup name locals
-      newVariables = M.insert name (theType, val) locals NE.:| locals'
-  Mod.put (Mod.Proxy @[CallInfo]) $ info {localVariables = newVariables} : rest
 
 addFunctionToCurrentContractInCurrentCallInfo :: MonadSM m => SolidString -> CC.Func -> m ()
 addFunctionToCurrentContractInCurrentCallInfo funcName funcObject = do
@@ -1097,29 +1089,34 @@ getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
 getContractNameAndHash address' = do
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-  resolvedCodeHash <- resolveCodePtr codeHash
-  case resolvedCodeHash of
-    Just (SolidVMCode cn ch') -> return (stringToLabel cn, ch')
-    Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
-    Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+  case codeHash of
+    SolidVMCode cn ch' -> return (stringToLabel cn, ch')
+    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = do
-  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeCI = find (\ci -> currentAddress ci == address') callStack'
+getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
+  Just ci | currentAddress ci == address' -> pure (currentContract ci, collectionHash ci, codeCollection ci)
+  _ -> do
+    callStack' <- Mod.get (Mod.Proxy @[CallInfo])
+    let maybeCI = find (\ci -> currentAddress ci == address') callStack'
 
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-  case maybeCI of
-    Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
-    Nothing -> do
-      (contractName', ch) <- getContractNameAndHash address'
-      isRunningTests <- Env.runningTests <$> getEnv
-      cc <- codeCollectionFromHash isRunningTests True ch
+    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
+    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
+    (contractName', ch) <- getContractNameAndHash address'
+    case maybeCI of
+      Just ci -> do
+        let contract = fromMaybe (currentContract ci)
+                     . M.lookup contractName'
+                     . CC._contracts
+                     $ codeCollection ci
+        return (contract, collectionHash ci, codeCollection ci)
+      Nothing -> do
+        isRunningTests <- Env.runningTests <$> getEnv
+        cc <- codeCollectionFromHash isRunningTests True ch
 
-      let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+        let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
 
-      return (contract', ch, cc)
+        return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
 getContractsForParents parents' cc =
@@ -1167,8 +1164,8 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for address " ++ show address
           pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
+          case addressStateCodeHash s of
+            SolidVMCode appName _ -> do
               appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
                 MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))

@@ -5,7 +5,6 @@ module JsonSpec where
 import Blockchain.Data.GenesisInfo
 import Blockchain.Database.MerklePatricia.StateRoot
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.CodePtr
 import qualified Data.Map.Strict as M
 import Blockchain.Strato.Model.Keccak256
@@ -91,7 +90,6 @@ spec = do
             \          \"number\":0,\
             \          \"difficulty\":8192,\
             \          \"timestamp\":\"1970-01-01T00:00:00.000Z\",\
-            \          \"coinbase\":{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true},\
             \          \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\
             \          \"nonce\":42\
             \       }"
@@ -100,7 +98,6 @@ spec = do
               GenesisInfo
                 { genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
                   genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
-                  genesisInfoCoinbase = CommonName "BlockApps" "Engineering" "Admin" True,
                   genesisInfoAccountInfo =
                     [ NonContract
                         (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)
@@ -151,7 +148,6 @@ spec = do
             \          \"number\":0,\
             \          \"difficulty\":8192,\
             \          \"timestamp\":\"1970-01-01T00:00:00.000Z\",\
-            \          \"coinbase\":{\"orgName\": \"BlockApps\", \"orgUnit\": \"Engineering\", \"commonName\": \"Admin\", \"access\": true},\
             \          \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\",\
             \          \"nonce\":42\
             \       }"
@@ -159,7 +155,6 @@ spec = do
             [ GenesisInfo
                 { genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
                   genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347,
-                  genesisInfoCoinbase = CommonName "BlockApps" "Engineering" "Admin" True,
                   genesisInfoAccountInfo =
                     [ NonContract
                         (Address 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859)

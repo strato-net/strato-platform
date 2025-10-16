@@ -18,7 +18,6 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Database.MerklePatricia.NodeData (NodeData)
 import Blockchain.Model.WrappedBlock (OutputBlock(..), OutputTx(..), IngestBlock(..), IngestTx(..))
 import qualified Blockchain.Strato.Model.Address as A
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Blockchain.Strato.Model.MicroTime
 import Blockchain.Strato.Model.StateRoot
@@ -84,8 +83,8 @@ data P2pEvent
   | P2pBlock OutputBlock
   | P2pBlockstanbul PBFT.WireMessage
   | -- Ask and push for inclusive ranges of blocks
-    P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: ChainMemberParsedSet}
-  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: ChainMemberParsedSet}
+    P2pAskForBlocks {askStart :: Integer, askEnd :: Integer, askPeer :: Address}
+  | P2pPushBlocks {pushStart :: Integer, pushEnd :: Integer, pushPeer :: Address}
   | P2pGetMPNodes [StateRoot]
   | P2pMPNodesResponse TO.TXOrigin [NodeData]
   deriving (Eq, Show, GHCG.Generic)
