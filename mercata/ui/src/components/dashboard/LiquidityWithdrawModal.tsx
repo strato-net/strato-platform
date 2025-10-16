@@ -13,7 +13,7 @@ import {
 import { useForm } from "react-hook-form";
 import { useToast } from '@/hooks/use-toast';
 import { useSwapContext } from '@/context/SwapContext';
-import { WITHDRAW_FEE } from "@/lib/constants";
+import { WITHDRAW_FEE, rewardsEnabled } from "@/lib/constants";
 import { Pool } from '@/interface';
 import { safeParseUnits } from '@/utils/numberUtils';
 import { handleAmountInputChange, computeMaxTransferable } from '@/utils/transferValidation';
@@ -266,8 +266,8 @@ const LiquidityWithdrawModal = ({
             )}
           </div>
 
-          {/* Include Staked LP Token Checkbox - only show if pool has rewards program */}
-          {selectedPool?.lpToken?.stakedBalance !== undefined && (
+          {/* Include Staked LP Token Checkbox - only show if pool has rewards program AND rewards are enabled */}
+          {rewardsEnabled && selectedPool?.lpToken?.stakedBalance !== undefined && (
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="include-staked-lp-token"

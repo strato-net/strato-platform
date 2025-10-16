@@ -9,6 +9,16 @@ export const rewardsChefAddress = "000000000000000000000000000000000000101f"
 export const DECIMAL = 18
 
 // ============================================
+// Feature Flags
+// ============================================
+
+/**
+ * Enable/disable rewards functionality in the UI
+ * When false, all rewards-related UI elements will be hidden
+ */
+export const rewardsEnabled = false;
+
+// ============================================
 // Input Validation Patterns
 // ============================================
 
