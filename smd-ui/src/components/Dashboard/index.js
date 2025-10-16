@@ -413,11 +413,11 @@ class Dashboard extends Component {
               </div>
             </div>
           </div>
-        </div>
-        <div className="row">
           <div className="col-sm-6">
             <NodeCard />
           </div>
+        </div>
+        <div className="row">
           <div className="col-sm-12">
             <br />
           </div>
