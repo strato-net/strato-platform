@@ -72,7 +72,7 @@ export const addAdmin = async (
       contractAddress: adminRegistry,
       method: "addAdmin",
       args: {
-        admin: adminAddress,
+        _admin: adminAddress,
       },
     }, userAddress, accessToken);
 
@@ -98,7 +98,7 @@ export const removeAdmin = async (
       contractAddress: adminRegistry,
       method: "removeAdmin",
       args: {
-        admin: adminAddress,
+        _admin: adminAddress,
       },
     }, userAddress, accessToken);
 
