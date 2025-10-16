@@ -6,6 +6,6 @@ import { ConfigData } from "@mercata/shared-types";
  */
 export const getConfig = (): ConfigData => {
   return {
-    projectId: config.wagmiProjectId,
+    wagmiProjectId: config.wagmiProjectId,
   };
 };

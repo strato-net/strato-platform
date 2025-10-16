@@ -59,7 +59,7 @@ const App = () => {
     const fetchConfig = async () => {
       try {
         const configData = await getConfig();
-        setProjectId(configData.projectId);
+        setProjectId(configData.wagmiProjectId);
       } catch (error) {
         console.error('Failed to fetch config:', error);
       } finally {
