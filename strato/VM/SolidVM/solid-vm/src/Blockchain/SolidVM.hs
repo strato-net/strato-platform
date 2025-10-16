@@ -1330,14 +1330,6 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (a@(SArray _), "push") -> return $ Constant $ SPush a (Just var)
     (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
     (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
-    (SReference apt, "length") -> do
-      ty <- getValueType apt
-      case ty of
-        TString -> do
-          let getInnerString (SString s) = s
-              getInnerString _ = error "impossible match in CC.hs"
-          return . Constant . SInteger . fromIntegral $ length $ getInnerString val
-        _ -> return . Constant . SReference . apSnoc apt $ MS.Field "length"
     (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
     m -> typeError ("illegal member access: " ++ (unparseExpression x)) ("parsed as " ++ show m ++ "with full exp" ++ show x)
@@ -2555,7 +2547,7 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
               let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
               case mReturnVar of
                 Nothing -> unknownVariable "findNamedReturns" name
-                Just returnVar -> fmap Just . forceLoadVar =<< getVar returnVar
+                Just returnVar -> Just <$> getVar returnVar
             xs ->
               Just . STuple . V.fromList <$> do
                 currentCallInfo <- getCurrentCallInfo
@@ -2563,11 +2555,11 @@ runTheCall address' codeAddr contract' funcName hsh cc theFunction argVals' ro f
                   let mReturnVar = M.lookup name . NE.head $ localVariables currentCallInfo
                   case mReturnVar of
                     Nothing -> unknownVariable "findNamedReturns" name
-                    Just returnVar -> fmap Constant . forceLoadVar =<< getVar returnVar
+                    Just returnVar -> Constant <$> getVar returnVar
     val' <- case val of
       Nothing -> findNamedReturns
       Just SNULL -> findNamedReturns
-      Just {} -> traverse forceLoadVar val
+      Just {} -> pure val
     pure val'
 
   return val'
@@ -2637,7 +2629,7 @@ encodeForReturn' (STuple items) = do
 encodeForReturn' (SDecimal d) = return $ show d 
 encodeForReturn' (SStruct _ vs) = do
   let encodePair k v = fmap (\v' -> show (labelToString k) ++ ": " ++ v')
-                     . encodeForReturn' =<< forceLoadVar =<< getVar v
+                     . encodeForReturn' =<< getVar v
   encodedItems <- mapM (uncurry encodePair) $ M.toList vs
   pure $ "{" ++ intercalate "," encodedItems ++ "}"
 encodeForReturn' SNULL = pure "[]"
@@ -3199,14 +3191,7 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
           if (Just $ length vs) `SVMType.maybeEq` (fromIntegral <$> ml)
             then fmap (SArray . V.fromList . map Constant) . sequence <$> traverse (marshalValue . (y,)) vs
             else pure Nothing
-        (r@(SReference addressedPath), _) -> do
-          refType <- getXabiValueType addressedPath
-          if (refType == t)
-            then pure $ Just r
-            else case (refType, t) of
-              (SVMType.UnknownLabel x _, SVMType.UnknownLabel y _) -> pure . bool Nothing (Just r) $ x == y
-              (SVMType.Array x _, SVMType.Array y _) -> pure . bool Nothing (Just r) $ x == y
-              _ -> pure Nothing
+        (r@(SReference _), _) -> pure $ Just r
         _ -> pure Nothing
     mapArgs :: MonadSM m => CC.FuncF a -> m (Maybe [(String, (SVMType.Type, Value))])
     mapArgs theFunc =

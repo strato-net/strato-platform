@@ -4,9 +4,7 @@
 module SolidVM.Model.Value
   ( Variable (..),
     Value (..),
-    BasicType (..),
     AccountPath (..),
-    Typo (..),
     ValList,
     rlpEncodeVariable,
     rlpEncodeValue,
@@ -29,7 +27,6 @@ import Control.Lens ((.~), (^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.Decimal
 import Data.Foldable (asum)
 import Data.IORef
@@ -306,32 +303,6 @@ castToInt :: Value -> Integer
 castToInt (SInteger i) = i
 castToInt s = typeError "castToInt" s
 -}
-
--- Typos are the possible values that a CC.UnknownLabel
--- is able to resolve to
-data Typo
-  = StructTypo [(SolidString, CC.FieldType)]
-  | EnumTypo [SolidString]
-  | ContractTypo SolidString
-  deriving (Show)
-
--- BasicTypes are approximately what can be stored, but more exactly
--- they are types which have an `operator=` in the parlance of C++.
--- Even though structs cannot be stored directly, the operator=
--- simulates their appearance by retrieving theh individual fields.
-data BasicType
-  = TInteger
-  | TString
-  | TDecimal
-  | TBool
-  | TAccount
-  | TEnumVal SolidString
-  | TContract SolidString
-  | TStruct SolidString [(B.ByteString, BasicType)]
-  | TArray BasicType (Maybe Word)
-  | TMapping
-  | Todo String
-  deriving (Show, Eq)
 
 -- Evaluated ArgLists
 type ValList = [Value]
