@@ -70,15 +70,16 @@ contract record AdminRegistry {
 
             _createIssue(sender, issueId, _target, _func, _args);
 
+            if (!hasVoted) {
+                votes[issueId].push(sender);
+                votesMap[issueId][sender] = votes[issueId].length;
+                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+            }
+
             if (_shouldExecute(issueId, _target, _func, _args)) {
                 variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
             } else {
-                if (!hasVoted) {
-                    votes[issueId].push(sender);
-                    votesMap[issueId][sender] = votes[issueId].length;
-                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
-                }
                 return (false, issueId);
             }
         } else {
@@ -112,9 +113,9 @@ contract record AdminRegistry {
         uint issueVotes = votes[_issueId].length;
         uint votingThresholdBps = votingThresholds[_target][_func];
         if (votingThresholdBps > 0) {
-            return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
+            return 10000 * issueVotes >= votingThresholdBps * admins.length;
         } else {
-            return 3 * (issueVotes + 1) >= 2 * admins.length;
+            return 3 * issueVotes >= 2 * admins.length;
         }
     }
 

@@ -96,16 +96,29 @@ contract Describe_AdminRegistry is Authorizable {
         require(keccak256(result) == keccak256(issueId), "Should return issue ID");
     }
 
-    function it_admin_registry_reverts_multiple_votes_from_same_admin() {
-        adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+    function it_admin_registry_handles_idempotent_voting() {
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
 
-        bool reverted = false;
-        try {
-            adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Should revert when same admin votes twice");
+        // First vote - should not execute with only 1 vote out of 2 admins
+        (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        require(!executed1, "Should not execute with only one vote");
+
+        // Verify the vote was counted (votesMap should be non-zero)
+        uint voteIndex1 = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndex1 > 0, "First vote should be recorded");
+
+        // Second vote from same admin - should be idempotent (not fail, but not add another vote)
+        (bool executed2, variadic result2) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        require(!executed2, "Should still not execute with only one unique vote");
+
+        // Verify the vote count hasn't increased (still just 1 vote)
+        uint voteIndex2 = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndex2 == voteIndex1, "Vote count should not increase when same admin votes twice");
+
+        // Now add a second DIFFERENT admin's vote - should execute
+        (bool executed3, variadic result3) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        require(executed3, "Should execute with two different admin votes");
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted after two votes");
     }
 
     // ============ ISSUE ID TESTS ============
@@ -398,22 +411,28 @@ contract Describe_AdminRegistry is Authorizable {
     }
 
     function it_admin_registry_handles_multiple_votes_on_same_issue() {
+        string memory issueId = adminRegistry.getIssueId(address(token), "mint", admin3, 1000e18);
+
         // First vote
         (bool executed1, variadic result1) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
         require(!executed1, "Should not execute with one vote");
 
-        // Second vote from same admin - should fail with error
-        bool duplicateVoteFailed = false;
-        try {
-            adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
-        } catch {
-            duplicateVoteFailed = true;
-        }
-        require(duplicateVoteFailed, "Should fail when same admin tries to vote twice");
+        // Verify vote was recorded
+        uint voteIndex1 = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndex1 > 0, "First vote should be recorded");
 
-        // Second vote from different admin - should execute
+        // Second vote from same admin - should be idempotent (no error, but no new vote)
+        (bool executed2, variadic result2) = adminRegistry.castVoteOnIssue(address(token), "mint", admin3, 1000e18);
+        require(!executed2, "Should not execute with same admin voting twice");
+
+        // Verify vote count is still the same
+        uint voteIndex2 = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndex2 == voteIndex1, "Same admin voting twice should be idempotent");
+
+        // Third vote from different admin - should execute
         (bool executed3, variadic result3) = user1.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
         require(executed3, "Should execute with two different admin votes");
+        require(ERC20(token).balanceOf(admin3) == 1000e18, "Token should be minted");
     }
 
     function it_admin_registry_handles_issue_id_generation() {
