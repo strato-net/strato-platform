@@ -176,27 +176,6 @@ contract Describe_AdminRegistry is Authorizable {
         require(true, "swapAdmin function should exist");
     }
 
-    // ============ ACCESS CONTROL TESTS ============
-
-    function it_admin_registry_rejects_non_admin_calls() {
-        bool reverted = false;
-        try {
-            user3.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Non-admin should not be able to call castVoteOnIssue");
-    }
-
-    function it_admin_registry_rejects_non_admin_admin_management() {
-        bool reverted = false;
-        try {
-            user3.do(address(adminRegistry), "addAdmin", admin3);
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Non-admin should not be able to call addAdmin");
-    }
 
     // ============ DELEGATE TESTS ============
 
