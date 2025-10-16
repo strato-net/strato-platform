@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
 import {
   getTokens,
-  getTokensPaginated,
   getBalance,
   createToken,
   transferToken,
@@ -49,10 +48,17 @@ class TokensController {
       const { accessToken, query } = req;
       validateQueryParams(query);
 
-        const result = await getTokensPaginated(
-          accessToken,
-          query as Record<string, string | undefined>
-        );
+      // Add default pagination parameters if not provided
+      const paramsWithDefaults = {
+        ...query,
+        limit: query.limit || "20",
+        offset: query.offset || "0"
+      };
+
+      const result = await getTokens(
+        accessToken,
+        paramsWithDefaults as Record<string, string | undefined>
+      );
       res.status(RestStatus.OK).json(result);
     } catch (error) {
       next(error);

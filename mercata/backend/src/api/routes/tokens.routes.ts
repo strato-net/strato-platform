@@ -64,7 +64,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  * @openapi
  * /tokens:
  *   get:
- *     summary: List tokens registered on Mercata (paginated)
+ *     summary: List tokens registered on Mercata (paginated by default)
  *     tags: [Tokens]
  *     parameters:
  *       - name: select
@@ -203,7 +203,7 @@ router.post("/", authHandler.authorizeRequest(), TokensController.create);
  *                 description: Recipient address
  *               value:
  *                 type: string
- *                 description: "Transfer amount (decimal string)"
+ *                 description: Transfer amount (decimal string)
  *     responses:
  *       200:
  *         description: Transfer transaction payload
@@ -240,7 +240,7 @@ router.post("/transfer", authHandler.authorizeRequest(), TokensController.transf
  *                 description: Spender address
  *               value:
  *                 type: string
- *                 description: "Allowance amount (decimal string)"
+ *                 description: Allowance amount (decimal string)
  *     responses:
  *       200:
  *         description: Approval transaction payload
@@ -281,7 +281,7 @@ router.post("/approve", authHandler.authorizeRequest(), TokensController.approve
  *                 description: Recipient address
  *               value:
  *                 type: string
- *                 description: "Transfer amount (decimal string)"
+ *                 description: Transfer amount (decimal string)
  *     responses:
  *       200:
  *         description: Transfer transaction payload
