@@ -9,6 +9,7 @@ module Blockchain.SolidVM.Builtins where
 import Blockchain.SolidVM.SM
 import Blockchain.SolidVM.SetGet
 import Blockchain.VM.SolidException
+import qualified Data.ByteString.Char8 as BC
 import Data.Curve                   (Form(Weierstrass), Coordinates(Affine))
 import Data.Curve.Weierstrass.BN254 (BN254, Fq, Fr, Point(..), add, mul)
 import Data.Pairing                 (pairing)
@@ -25,7 +26,7 @@ push (SReference apt) _ [av] = do
   len' <- getInt $ Constant $ SReference lenPath
   let len :: Int = fromIntegral len'
       newLen = SInteger $ fromIntegral $ len + 1
-      idxPath = apt `apSnoc` MS.ArrayIndex len
+      idxPath = apt `apSnoc` MS.Index (BC.pack $ show len)
   setVar (Constant (SReference lenPath)) newLen
   setVar (Constant (SReference idxPath)) av
   return $ Constant newLen

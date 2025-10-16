@@ -10,8 +10,6 @@ module SolidVM.Model.Storable where
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Exception
@@ -22,9 +20,7 @@ import Data.Binary
 import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Internal as BI
 import qualified Data.ByteString.UTF8 as UTF8
-import qualified Data.ByteString.Unsafe as BU
 import Data.Char
 import Data.Hashable
 import Data.Maybe
@@ -33,10 +29,7 @@ import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
-import Foreign.Ptr
-import Foreign.Storable
 import GHC.Generics
-import qualified LabeledError
 import SolidVM.Model.SolidString
 import System.IO.Unsafe
 import Text.Format
@@ -134,24 +127,14 @@ formatBasicValueForSQL (BEnumVal n1 n2 w) = labelToText n1 <> "." <> labelToText
 formatBasicValueForSQL (BContract _ a) = T.pack $ show a
 formatBasicValueForSQL BDefault = ""
 
---function that gives index type, wrap in map index 
-data IndexType
-  = INum Integer
-  | IText B.ByteString
-  | IBool Bool
-  | IAccount NamedAccount
-  deriving (Eq, Show, Ord, Generic, Hashable, NFData)
-
 data StoragePathPiece
   = Field B.ByteString
-  | MapIndex IndexType
-  | ArrayIndex Int
+  | Index B.ByteString
   deriving (Eq, Show, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
   format (Field n) = C8.unpack n
-  format (MapIndex i) = "[" ++ show i ++ "]"
-  format (ArrayIndex i) = "[" ++ show i ++ "]"
+  format (Index i) = "[" ++ C8.unpack i ++ "]"
 
 newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic, NFData, Hashable)
 
@@ -214,8 +197,7 @@ pathParser = do
   case ch of
     Nothing -> return []
     Just '.' -> parseField
-    Just '[' -> parseArrayIndex
-    Just '<' -> parseMapIndex
+    Just '[' -> parseIndex
     _ -> fail "unexpected character for next field"
 
 c2w8 :: Char -> Word8
@@ -224,41 +206,12 @@ c2w8 = fromIntegral . ord
 w82c :: Word8 -> Char
 w82c = chr . fromIntegral
 
-parseArrayIndex :: Parser [StoragePathPiece]
-parseArrayIndex = do
+parseIndex :: Parser [StoragePathPiece]
+parseIndex = do
   skip (== c2w8 '[')
-  idx <- parseInt
+  idx <- Atto.takeWhile (/= c2w8 ']')
   skip (== c2w8 ']')
-  (ArrayIndex idx :) <$> pathParser
-
-parseMapIndex :: Parser [StoragePathPiece]
-parseMapIndex = do
-  skip (== c2w8 '<')
-  nextChar <- peekWord8'
-  idx <- case w82c nextChar of
-    't' -> string "true" >> return (IBool True)
-    'f' -> string "false" >> return (IBool False)
-    'a' -> do
-      _ <- string "a:"
-      eAddress <- addressFromHex <$> Atto.take 40
-      mColon <- peekWord8
-      mChain <- case w82c <$> mColon of
-        Just ':' -> do
-          _ <- string ":"
-          (MainChain <$ string "main") <|> (ExplicitChain . bytesToWord256 . LabeledError.b16Decode "parseMapIndex" <$> Atto.take 64) <?> "parseMapIndex"
-        _ -> pure UnspecifiedChain
-      IAccount <$> either fail (return . flip NamedAccount mChain) eAddress
-    '"' -> do
-      skip (== c2w8 '"')
-      let ignoreEscapedQuotes False 0x22 = Nothing -- Unescaped quote
-          ignoreEscapedQuotes False 0x5c = Just True -- Begin of escape sequence
-          ignoreEscapedQuotes _ _ = Just False
-      strContents <- scan False ignoreEscapedQuotes
-      skip (== c2w8 '"')
-      return . IText . unescapeKey $ strContents
-    _ -> INum <$> parseInteger
-  skip (== c2w8 '>')
-  (MapIndex idx :) <$> pathParser
+  (Index idx :) <$> pathParser
 
 parseField :: Parser [StoragePathPiece]
 parseField = do
@@ -274,67 +227,12 @@ parseField = do
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
 
-escapeKey :: B.ByteString -> B.ByteString
-escapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim (2 * len) $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
-      let src = castPtr src'
-          copyAndEscape :: Int -> Int -> IO Int
-          copyAndEscape !dstOff !srcOff =
-            if srcOff >= len
-              then return dstOff
-              else do
-                ch <- peekByteOff src srcOff :: IO Word8
-                if ch /= 0x22 && ch /= 0x5c
-                  then do
-                    pokeByteOff dst dstOff ch
-                    copyAndEscape (dstOff + 1) (srcOff + 1)
-                  else do
-                    pokeByteOff dst dstOff (0x5c :: Word8)
-                    pokeByteOff dst (dstOff + 1) ch
-                    copyAndEscape (dstOff + 2) (srcOff + 1)
-      copyAndEscape 0 0
-
-unescapeKey :: B.ByteString -> B.ByteString
-unescapeKey srcBS = unsafePerformIO $ do
-  let len = B.length srcBS
-  BI.createAndTrim len $ \dst ->
-    BU.unsafeUseAsCString srcBS $ \src' -> do
-      let src = castPtr src'
-          copyAndUnescape :: Int -> Int -> IO Int
-          copyAndUnescape !dstOff !srcOff =
-            if len - srcOff > 1
-              then do
-                ch <- peekByteOff src srcOff :: IO Word8
-                if ch == 0x5c
-                  then do
-                    ch' <- peekByteOff src (srcOff + 1) :: IO Word8
-                    pokeByteOff dst dstOff ch'
-                    copyAndUnescape (dstOff + 1) (srcOff + 2)
-                  else do
-                    pokeByteOff dst dstOff ch
-                    copyAndUnescape (dstOff + 1) (srcOff + 1)
-              else
-                if len - srcOff == 1
-                  then do
-                    ch <- peekByteOff src srcOff :: IO Word8
-                    pokeByteOff dst dstOff ch
-                    copyAndUnescape (dstOff + 1) (srcOff + 1)
-                  else return dstOff
-      copyAndUnescape 0 0
-
 unparsePath :: StoragePath -> B.ByteString
 unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
   where
     go :: StoragePathPiece -> [B.ByteString]
     go (Field p) = [".", p]
-    go (ArrayIndex n) = ["[", C8.pack $ show n, "]"]
-    go (MapIndex (INum n)) = ["<", C8.pack $ show n, ">"]
-    go (MapIndex (IText t)) = ["<\"", escapeKey t, "\">"]
-    go (MapIndex (IBool True)) = ["<true>"]
-    go (MapIndex (IBool False)) = ["<false>"]
-    go (MapIndex (IAccount a)) = ["<a:", C8.pack $ show a, ">"]
+    go (Index i) = ["[", i, "]"]
 
 instance RLPSerializable BasicValue where
   rlpEncode = \case

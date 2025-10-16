@@ -147,17 +147,11 @@ applyDelta' (Field n : sp) bv (ValueStruct ss) = do
   case M.lookup n' ss of
     Just v -> ValueStruct . (\x -> M.insert n' x ss) <$> applyDelta' sp bv v
     Nothing -> Right . ValueStruct $ M.insert n' (constructFromNothing' sp bv) ss
-applyDelta' (MapIndex n : sp) bv (ValueMapping ms) =
+applyDelta' (Index n : sp) bv (ValueMapping ms) =
   let n' = fromIndex n
    in case M.lookup n' ms of
         Just v -> ValueMapping . (\x -> M.insert n' x ms) <$> applyDelta' sp bv v
         Nothing -> Right . ValueMapping $ M.insert n' (constructFromNothing' sp bv) ms
-applyDelta' (ArrayIndex n : sp) bv (ValueArrayDynamic vs) =
-  case I.lookup n vs of
-    Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
-    Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
-applyDelta' (ArrayIndex n : sp) bv sent@(ValueArraySentinel len) =
-  Right . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
 applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
@@ -177,10 +171,8 @@ constructFromNothing' [Field "length"] = \case
   BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
-constructFromNothing' (MapIndex n : sp) =
+constructFromNothing' (Index n : sp) =
   ValueMapping . M.singleton (fromIndex n) . constructFromNothing' sp
-constructFromNothing' (ArrayIndex n : sp) =
-  ValueArrayDynamic . I.singleton n . constructFromNothing' sp
 
 synthesize :: [(StoragePath, BasicValue)] -> Either ReplayFailure TotalStorage
 synthesize spbvs = do
@@ -215,9 +207,7 @@ fromBasic = \case
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
   BDefault -> SimpleValue $ ValueAddress 0x0
 
-fromIndex :: IndexType -> V.SimpleValue
-fromIndex = \case
-  IBool b -> ValueBool b
-  INum n -> valueInt n
-  IText bs -> valueBytes bs
-  IAccount a -> ValueAccount a
+fromIndex :: B.ByteString -> V.SimpleValue
+fromIndex b = case decodeUtf8' b of
+  Right t -> V.ValueString t
+  _       -> V.ValueBytes Nothing b

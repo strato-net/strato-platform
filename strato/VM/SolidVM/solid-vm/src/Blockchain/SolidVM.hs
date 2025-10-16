@@ -81,7 +81,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.UTF8 as UTF8
 import Data.Char as CHAR
 import Data.Decimal
 import Data.Foldable (for_)
@@ -547,7 +546,7 @@ call' from to' fnCalltype functionName valList = do
         Just CC.VariableDecl {..} -> do
           let args' = fromMaybe [] $ case (_varType, valList) of
                 ((SVMType.Array _ _), oa) -> for oa $ \case
-                  SInteger n -> Just . MS.ArrayIndex $ fromIntegral n
+                  SInteger n -> Just . MS.Index . BC.pack $ show n
                   _ -> Nothing
                 ((SVMType.Mapping _ _ _), oa) ->
                   traverse convertValueToStoragePathPiece oa
@@ -620,10 +619,10 @@ call' from to' fnCalltype functionName valList = do
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v = 
       case v of
-        SInteger i -> Just $ MS.MapIndex $ MS.INum i
-        SString s -> Just $ MS.MapIndex $ MS.IText $ UTF8.fromString s
-        SAccount a _ -> Just $ MS.MapIndex $ MS.IAccount a
-        SBool b -> Just $ MS.MapIndex $ MS.IBool b
+        SInteger i -> Just $ MS.Index $ BC.pack $ show i
+        SString s -> Just $ MS.Index $ DT.encodeUtf8 $ T.pack s
+        SAccount a _ -> Just $ MS.Index $ BC.pack $ show a
+        SBool b -> Just $ MS.Index $ bool "false" "true" b
         _ -> Nothing
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
@@ -1104,39 +1103,6 @@ doWhile condition code = do
     Just SContinue -> doWhile condition code
     _ -> return result
 
-getIndexType :: MonadSM m => AccountPath -> m IndexType
-getIndexType (AccountPath addr (MS.StoragePath path)) = case path of
-  (MS.Field field : path') -> do
-    mType <- getXabiType addr field
-    let loop :: MonadSM m => [MS.StoragePathPiece] -> SVMType.Type -> m IndexType
-        loop [] t = case t of
-          SVMType.Mapping {SVMType.key = SVMType.Int {}} -> return MapIntIndex
-          SVMType.Mapping {SVMType.key = SVMType.String {}} -> return MapStringIndex
-          SVMType.Mapping {SVMType.key = SVMType.Bytes {}} -> return MapStringIndex
-          SVMType.Mapping {SVMType.key = SVMType.Address {}} -> return MapAccountIndex
-          SVMType.Mapping {SVMType.key = SVMType.Account {}} -> return MapAccountIndex
-          SVMType.Mapping {SVMType.key = SVMType.Bool {}} -> return MapBoolIndex
-          SVMType.Array {} -> return ArrayIndex
-          _ -> typeError "unanticipated index type" t
-        loop (p:ps) t = case t of
-          SVMType.Mapping {SVMType.value = t'} -> loop ps t'
-          SVMType.Array {SVMType.entry = t'} -> loop ps t'
-          -- TODO lookup struct typos, this seems to be the case when there is a global struct reference
-          SVMType.UnknownLabel def' _ -> do
-            t' <- getTypeOfName def'
-            case t' of
-              StructTypo fs -> case p of
-                MS.Field f -> case UTF8.toString f `M.lookup` M.fromList fs of
-                  Nothing -> typeError "unknownField from StructTypo" field
-                  Just tt -> loop ps $ CC.fieldTypeType tt
-                _ -> typeError "non-field path piece found after struct type" ps
-              _ -> todo "hintFromType" t'
-          _ -> typeError "indexing type in var dec" t
-    case mType of
-      Nothing -> todo "getIndexType/unknown storage reference" field
-      Just v -> loop path' v
-  _ -> typeError "getIndexType called with non-field path" path
-
 expToPath :: MonadSM m => CC.Expression -> m AccountPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
@@ -1155,29 +1121,13 @@ expToPath x@(CC.IndexAccess _ parent mIndex) = do
       Constant (SReference apt) -> return apt
       _ -> expToPath parent
 
-  idxType <- getIndexType parPath
-  idxVar <- maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
-  apSnoc parPath <$> case idxType of
-    MapAccountIndex -> do
-      idx <- getVar idxVar
-      return $ case idx of
-        SAccount a _ -> MS.MapIndex $ MS.IAccount a
-        SInteger i -> MS.MapIndex $ MS.IAccount . unspecifiedChain $ fromIntegral i
-        _ -> typeError "invalid map of addresses index" idx
-    MapBoolIndex -> do
-      b <- getBool idxVar
-      return $ MS.MapIndex $ MS.IBool b
-    MapIntIndex -> do
-      n <- getInt idxVar
-      return . MS.MapIndex $ MS.INum n
-    MapStringIndex -> do
-      idx <- getVar idxVar
-      return $ case idx of
-        SString s -> MS.MapIndex $ MS.IText $ UTF8.fromString s
-        _ -> typeError "invalid map of strings index" idx
-    ArrayIndex -> do
-      n <- getInt idxVar
-      return . MS.ArrayIndex $ fromIntegral n
+  idx <- getVar =<< maybe (typeError "empty index is only valid at type level" x) expToVar mIndex
+  pure . apSnoc parPath $ case idx of
+    SAccount a _ -> MS.Index . BC.pack $ show a
+    SInteger i -> MS.Index . BC.pack $ show i
+    SBool b -> MS.Index $ bool "false" "true" b
+    SString s -> MS.Index . DT.encodeUtf8 $ T.pack s
+    _ -> typeError "invalid index" idx
 expToPath (CC.MemberAccess _ parent field) = do
   apt <- do
     parvar <- expToVar parent

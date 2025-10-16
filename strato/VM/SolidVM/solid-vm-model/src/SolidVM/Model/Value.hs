@@ -8,7 +8,6 @@ module SolidVM.Model.Value
     AccountPath (..),
     Typo (..),
     ValList,
-    IndexType (..),
     rlpEncodeVariable,
     rlpEncodeValue,
     rlpEncodeValues,
@@ -46,8 +45,6 @@ import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import Text.Printf
-
-data IndexType = ArrayIndex | MapBoolIndex | MapAccountIndex | MapIntIndex | MapStringIndex deriving (Show, Eq)
 
 data AccountPath = AccountPath
   { apAccount :: Address,

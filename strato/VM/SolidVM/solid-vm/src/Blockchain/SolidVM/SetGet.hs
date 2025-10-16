@@ -103,9 +103,9 @@ setVal (SReference dst) (SReference src) = do
       len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
       setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
       forM_ [0 .. len - 1] $ \i -> do
-        let i' = fromIntegral i
-        setVal (SReference $ dst `apSnoc` MS.ArrayIndex i')
-          =<< getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
+        let i' = BC.pack $ show i
+        setVal (SReference $ dst `apSnoc` MS.Index i')
+          =<< getVar (Constant $ SReference $ src `apSnoc` MS.Index i')
     _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
@@ -114,9 +114,9 @@ setVal (SReference dst) (SArray fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
-    let i' = fromIntegral i
+    let i' = BC.pack $ show i
     elementVal <- getVar $ fs V.! i
-    setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') elementVal
+    setVal (SReference $ dst `apSnoc` MS.Index i') elementVal
 setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
     then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
@@ -223,9 +223,9 @@ forceLoadVar (SReference a) = do
       return . SStruct n $ M.fromList vs
     TArray _ ml -> do
       arrLen <- case ml of
-        Just l -> pure $ fromIntegral l
+        Just l -> pure l
         Nothing -> fmap fromIntegral . getInt . Constant . SReference . apSnoc a $ MS.Field "length"
-      vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.ArrayIndex i))) [0..arrLen-1]
+      vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.Index (BC.pack $ show i)))) [0..arrLen-1]
       pure . SArray $ V.fromList vs
     TMapping -> typeError "forceLoadVar/mapping" (SReference a)
     _ -> pure $ findDefault typeHint
@@ -268,10 +268,10 @@ deleteVar (Constant (SReference a@(AccountPath addr path))) = do
   case xType of
     SVMType.Array {} -> do
       let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
-      len <- fromInteger <$> getInt lengthVar
+      len <- getInt lengthVar
       deleteVar lengthVar
       unless (len <= 0) . for_ [0 .. (len - 1)] $ \i -> do
-        let elemPath = a `apSnoc` MS.ArrayIndex i
+        let elemPath = a `apSnoc` MS.Index (BC.pack $ show i)
         deleteVar . Constant $ SReference elemPath
     SVMType.Struct _ structName -> do
       (ctract, _, cc) <- getCodeAndCollection addr

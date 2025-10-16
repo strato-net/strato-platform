@@ -995,12 +995,11 @@ getXabiValueType' (AccountPath loc path) = do
     loop _ [] = id
     loop ccs [x] = \case
       SVMType.Mapping {SVMType.value = v} -> case x of
-        MS.MapIndex {} -> v
+        MS.Index {} -> v
         _ -> typeError "non map index attribute of mapping" x
       SVMType.Array {SVMType.entry = v} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        MS.ArrayIndex {} -> v
-        MS.MapIndex MS.INum{} -> v
+        MS.Index {} -> v
         _ -> typeError "non-length or array index attribute of array" x
       SVMType.String {} -> case x of
         MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
