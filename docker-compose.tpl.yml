@@ -56,7 +56,6 @@ services:
     - prometheus
     environment:
     - NODE_HOST=${NODE_HOST}
-    - NODE_NAME=${NODE_NAME}
     - ssl=${ssl:-false}
     build: .
     image: ${SMD_IMAGE:-<REPO_URL>smd:<VERSION>}
@@ -153,7 +152,6 @@ services:
     - mercata-ui
     environment:
     - APEX_HOST=${APEX_HOST}
-    - blockstanbul=${blockstanbul}
     - blockTime=${blockTime}
     - debugPort=${debugPort}
     - debugWSPort=${debugWSPort}

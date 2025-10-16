@@ -469,7 +469,7 @@ const SafetyModuleSection = () => {
                             value={redeemAmount}
                             onChange={(e) => setRedeemAmount(e.target.value)}
                             className={`pl-16 ${!isRedeemAmountValid() ? 'text-red-600' : ''}`}
-                            disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
+                            disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
                           />
                           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">sUSDST</span>
                         </div>
@@ -505,10 +505,10 @@ const SafetyModuleSection = () => {
 
                           setRedeemAmount(clampedClean);
                         }}
-                        className={`mr-2 ${safetyInfo?.canRedeem && BigInt(safetyInfo?.userShares || "0") > 0n
+                        className={`mr-2 ${safetyInfo?.canRedeem && (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") > 0n : BigInt(safetyInfo?.userShares || "0") > 0n)
                           ? "text-blue-600 hover:underline cursor-pointer"
                           : "text-gray-400 cursor-not-allowed"}`}
-                        disabled={!safetyInfo?.canRedeem || BigInt(safetyInfo?.userShares || "0") === 0n}
+                        disabled={!safetyInfo?.canRedeem || (includeStakedSUSDST ? BigInt(safetyInfo?.userSharesTotal || "0") === 0n : BigInt(safetyInfo?.userShares || "0") === 0n)}
                       >
                         Max
                       </button>
