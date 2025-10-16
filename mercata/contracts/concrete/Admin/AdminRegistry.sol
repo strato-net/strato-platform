@@ -6,6 +6,7 @@ contract record AdminRegistry {
 
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) public record votesMap;
+    mapping (string => bool) public record currentIssues;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
 
@@ -121,6 +122,7 @@ contract record AdminRegistry {
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
         if(votes[_issueId].length == 0) {
+            currentIssues[_issueId] = true;
             emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
         }
     }
@@ -139,6 +141,7 @@ contract record AdminRegistry {
             votesMap[_issueId][votes[_issueId][i]] = 0;
         }
         delete votes[_issueId];
+        delete currentIssues[_issueId];
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
