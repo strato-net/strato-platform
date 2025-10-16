@@ -64,7 +64,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  * @openapi
  * /tokens:
  *   get:
- *     summary: List tokens registered on Mercata (paginated by default)
+ *     summary: List tokens registered on Mercata
  *     tags: [Tokens]
  *     parameters:
  *       - name: select
@@ -98,7 +98,7 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *           default: 0
  *     responses:
  *       200:
- *         description: Paginated token list
+ *         description: Token list
  *         content:
  *           application/json:
  *             schema:
