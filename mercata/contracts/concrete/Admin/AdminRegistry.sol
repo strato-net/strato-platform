@@ -65,6 +65,8 @@ contract record AdminRegistry {
                 }
                 sender = _target;
                 _target = msg.sender;
+            } else if (_target == msg.sender) { // the admin has called a local function guarded with onlyOwner
+                _target = this;
             }
             string issueId = _getIssueId(_target, _func, _args);
             bool hasVoted = votesMap[issueId][sender] != 0;
