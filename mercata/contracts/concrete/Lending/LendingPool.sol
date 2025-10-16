@@ -331,17 +331,18 @@ contract record LendingPool is Ownable {
         // Clamp to what's owed
         uint repayAmount = amount > owed ? owed : amount;
 
+        // Convert repayAmount to scaled units
+        uint scaledDelta = (repayAmount * RAY) / borrowIndex;
+
         // If partial, prove this will burn at least 1 scaled unit (avoid donation)
         if (repayAmount < owed) {
-            uint preScaledDelta = (repayAmount * RAY) / borrowIndex; // floor
-            require(preScaledDelta > 0, "Insufficient repayment amount");
+            require(scaledDelta > 0, "Insufficient repayment amount");
         }
 
         // Move funds into the pool
         LiquidityPool(_liquidityPool()).repay(repayAmount, msg.sender);
 
-        // Convert repayAmount to scaled units and reduce debt
-        uint scaledDelta = (repayAmount * RAY) / borrowIndex;
+        // Reduce debt
         if (scaledDelta > loan.scaledDebt) scaledDelta = loan.scaledDebt; // clamp dust
 
         loan.scaledDebt -= scaledDelta;
