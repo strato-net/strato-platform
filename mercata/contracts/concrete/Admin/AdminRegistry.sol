@@ -136,8 +136,9 @@ contract record AdminRegistry {
         variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
+            votes[_issueId][i] = address(0);
         }
-        delete votes[_issueId];
+        votes[_issueId].length = 0;
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
