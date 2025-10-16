@@ -25,6 +25,7 @@ interface UserContextType {
   getContractDetails: (address: string) => Promise<void>;
   castVoteOnIssue: (target: string, func: string, args: string[]) => Promise<void>;
   castVoteOnIssueById: (issueId: string) => Promise<void>;
+  addAdmin: (userAddress: string) => Promise<void>;
 }
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -155,6 +156,11 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const addAdmin = async (userAddress: string) => {
+    await api.post('/user/admin', { userAddress });
+    await getOpenIssues();
+  };
+
   const refreshAuth = () => {
     checkAuthenticationStatus();
   };
@@ -185,6 +191,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     getOpenIssues,
     castVoteOnIssue,
     castVoteOnIssueById,
+    addAdmin,
     contractSearch,
     contractSearchResults,
     contractSearchResultsLoading,
@@ -192,7 +199,7 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
     contractDetailsResults,
     contractDetailsResultsLoading,
   }), [userAddress, isLoggedIn, isAdmin, loading, userName,
-    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue, castVoteOnIssueById,
+    openIssues, openIssuesLoading, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin,
     contractSearch, contractSearchResults, contractSearchResultsLoading,
     getContractDetails, contractDetailsResults, contractDetailsResultsLoading,
   ]);

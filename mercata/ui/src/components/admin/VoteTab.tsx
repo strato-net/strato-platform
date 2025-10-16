@@ -15,13 +15,15 @@ import { Loader2, MoreVertical } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
+import AddAdminModal from './AddAdminModal';
 import JSONBig from 'json-bigint';
 
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
   const [voteModalOpen, setVoteModalOpen] = useState(false);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
   const [selectedIssue, setSelectedIssue] = useState<{
     issueId: string;
     target: string;
@@ -59,6 +61,10 @@ const VoteTab = () => {
     getOpenIssues();
   };
 
+  const handleAddAdmin = async (userAddress: string) => {
+    await addAdmin(userAddress);
+  };
+
   if (openIssuesLoading) {
     return (
       <Card>
@@ -89,9 +95,19 @@ const VoteTab = () => {
     <div className="space-y-6">
       {/* List of Admins */}
       <Card>
-        <CardHeader>
-          <CardTitle>Admins</CardTitle>
-          <CardDescription>Current administrators with voting rights</CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Admins</CardTitle>
+            <CardDescription>Current administrators with voting rights</CardDescription>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={() => setAddAdminOpen(true)}
+            className="bg-strato-blue hover:bg-strato-blue/90 shrink-0"
+          >
+            Add Admin
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -354,6 +370,11 @@ const VoteTab = () => {
         onOpenChange={setVoteModalOpen}
         issue={selectedIssue}
         onCastVote={handleCastVoteOnIssueById}
+      />
+      <AddAdminModal
+        open={addAdminOpen}
+        onOpenChange={setAddAdminOpen}
+        onAddAdmin={handleAddAdmin}
       />
     </div>
   );
