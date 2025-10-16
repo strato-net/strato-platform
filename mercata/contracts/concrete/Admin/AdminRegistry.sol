@@ -11,6 +11,8 @@ contract record AdminRegistry {
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
+    uint public defaultVotingThresholdBps = 6666;
+
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
@@ -26,6 +28,7 @@ contract record AdminRegistry {
     constructor() { }
 
     function initialize(address[] _initialAdmins) external onlyOnce {
+        defaultVotingThresholdBps = 6666;
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
             admins.push(_initialAdmins[i]);
@@ -111,12 +114,11 @@ contract record AdminRegistry {
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
         uint issueVotes = votes[_issueId].length;
+
         uint votingThresholdBps = votingThresholds[_target][_func];
-        if (votingThresholdBps > 0) {
-            return 10000 * issueVotes >= votingThresholdBps * admins.length;
-        } else {
-            return 3 * issueVotes >= 2 * admins.length;
-        }
+        if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
+
+        return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
@@ -198,6 +200,11 @@ contract record AdminRegistry {
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) internal {
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+    }
+
+    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) internal {
+        require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
+        defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) internal returns (address) {
