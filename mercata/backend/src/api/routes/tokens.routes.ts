@@ -82,12 +82,12 @@ router.get("/:address", authHandler.authorizeRequest(true), TokensController.get
  *       - name: limit
  *         in: query
  *         required: false
- *         description: "Number of tokens per page (default: 20, max: 100)"
+ *         description: "Number of tokens per page (default: 10, max: 100)"
  *         schema:
  *           type: integer
  *           minimum: 1
  *           maximum: 100
- *           default: 20
+ *           default: 10
  *       - name: offset
  *         in: query
  *         required: false

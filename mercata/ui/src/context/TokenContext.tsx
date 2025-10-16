@@ -51,7 +51,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
-    limit: 20,
+    limit: 10,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
@@ -59,13 +59,13 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
   const [activePagination, setActivePagination] = useState({
     total: 0,
     page: 1,
-    limit: 20,
+    limit: 10,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
   });
 
-  const getAllTokens = useCallback(async (page = 1, limit = 20, query: Record<string, string> = {}) => {
+  const getAllTokens = useCallback(async (page = 1, limit = 10, query: Record<string, string> = {}) => {
     setLoading(true);
     setError(null);
     try {
@@ -80,7 +80,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       setPagination(res.data.pagination || {
         total: 0,
         page: 1,
-        limit: 20,
+        limit: 10,
         totalPages: 0,
         hasNext: false,
         hasPrevious: false,
@@ -92,7 +92,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const getActiveTokens = useCallback(async (page = 1, limit = 20) => {
+  const getActiveTokens = useCallback(async (page = 1, limit = 10) => {
     setLoading(true);
     setError(null);
     try {
@@ -107,7 +107,7 @@ export const TokenProvider = ({ children }: { children: ReactNode }) => {
       setActivePagination(res.data.pagination || {
         total: 0,
         page: 1,
-        limit: 20,
+        limit: 10,
         totalPages: 0,
         hasNext: false,
         hasPrevious: false,

@@ -51,7 +51,7 @@ class TokensController {
       // Add default pagination parameters if not provided
       const paramsWithDefaults = {
         ...query,
-        limit: query.limit || "20",
+        limit: query.limit || "10",
         offset: query.offset || "0"
       };
 

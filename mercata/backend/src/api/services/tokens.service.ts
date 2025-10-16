@@ -26,7 +26,7 @@ export const getTokens = async (
     
     if (hasPagination) {
       // Pagination mode - return paginated response
-      const limit = parseInt(params.limit || "20");
+      const limit = parseInt(params.limit || "10");
       const offset = parseInt(params.offset || "0");
       
       // Validate pagination parameters
