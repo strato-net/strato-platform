@@ -555,7 +555,7 @@ assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Blo
 
 -- To be deleted
 rateStrategy :: AccountInfo
-rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 proxy $ createdByBlockApps mercataAddress
+rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [(".logicContract", BAccount $ unspecifiedChain rateStrategyImplAddress)]
 
 priceOracle :: AccountInfo
@@ -763,7 +763,7 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ ownedByB
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(9 :: Integer)..] GA.assets)
 
 adminRegistry :: AccountInfo
-adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ createdByBlockApps mercataAddress
+adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [ (".adminMap<a:" <> addrBS blockappsAddress <> ">", BInteger 1)
      , (".logicContract", BAccount $ unspecifiedChain adminRegistryImplAddress)
      , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
