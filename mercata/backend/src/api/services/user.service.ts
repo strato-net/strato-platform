@@ -283,7 +283,19 @@ export const getOpenIssues = async (
       },
     });
 
-    return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
+    // Deduplicate issues by issueId, keeping the most recent one based on block_timestamp
+    const issuesMap = new Map();
+    (issuesResponse?.data || []).forEach((issue: any) => {
+      const existingIssue = issuesMap.get(issue.issueId);
+      if (!existingIssue || 
+          (issue.block_timestamp && existingIssue.block_timestamp && 
+           issue.block_timestamp > existingIssue.block_timestamp)) {
+        issuesMap.set(issue.issueId, issue);
+      }
+    });
+    const uniqueIssues = Array.from(issuesMap.values());
+
+    return { admins, votes, thresholds, executed, issues: uniqueIssues };
   } catch (error) {
     console.log(error);
     return [];
