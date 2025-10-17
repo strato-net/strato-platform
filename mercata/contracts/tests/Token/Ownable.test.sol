@@ -215,7 +215,7 @@ contract Describe_Ownable {
         } catch {
             reverted = true;
         }
-        require(!reverted, "Should not revert when non-admin user creates issues");
+        require(reverted, "Should revert when non-admin user creates issues");
     }
 
     function it_ownable_allows_admin_execution_with_sufficient_votes() {
