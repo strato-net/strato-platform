@@ -19,7 +19,7 @@ import { fetchHealth, fetchMetadata } from './app.actions';
 
 // ReactGA.initialize("G-PWGS3Z6YNQ");
 // mixpanelWrapper.init('62f1bec01cdb0096be8e8bdd693e0081');
-// mixpanelWrapper.identify(env.NODE_NAME);
+// mixpanelWrapper.identify(env.NODE_HOST);
 
 class App extends Component {
 

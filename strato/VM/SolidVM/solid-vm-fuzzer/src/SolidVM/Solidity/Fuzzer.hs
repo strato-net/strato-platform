@@ -67,7 +67,7 @@ formatTestName :: T.Text -> T.Text
 formatTestName fName = case T.splitOn "_" fName of
   ("it" : rest) -> "Unit test '" <> T.intercalate " " rest <> "'"
   ("property" : rest) -> "Property test '" <> T.intercalate " " rest <> "'"
-  _ -> "Custom test '" <> fName <> "'"
+  _ -> fName
 
 withTestName :: (Functor f, Functor g) => T.Text -> f (g a) -> f (g (T.Text, a))
 withTestName = fmap . fmap . (,) . formatTestName
@@ -92,7 +92,10 @@ runFuzzerWithHook :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Eith
   (Int -> FuzzerTestAndResult -> m FuzzerTestAndResult) ->
   m [FuzzerTestAndResult]
 runFuzzerWithHook dSettings compile src hook = compile src >>= \case
-  Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
+  Left errs -> do
+    let ffs = FuzzerFailure Nothing . fmap ("compilation",) <$> errs
+    _ <- traverse (hook 0) ffs
+    pure ffs
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
     ctx <- FuzzerContext args <$> newIORef (error "_fuzzerContextBlockHeader not initialized")

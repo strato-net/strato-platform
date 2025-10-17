@@ -14,11 +14,27 @@ import { useUser } from '@/context/UserContext';
 import { Loader2, MoreVertical } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
+import CastVoteModal from './CastVoteModal';
+import AddAdminModal from './AddAdminModal';
+import RemoveAdminModal from './RemoveAdminModal';
+import JSONBig from 'json-bigint';
 
 
 const VoteTab = () => {
-  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue } = useUser();
+  const { userAddress, openIssuesLoading, openIssues, getOpenIssues, castVoteOnIssue, castVoteOnIssueById, addAdmin, removeAdmin } = useUser();
   const [createOpen, setCreateOpen] = useState(false);
+  const [voteModalOpen, setVoteModalOpen] = useState(false);
+  const [addAdminOpen, setAddAdminOpen] = useState(false);
+  const [removeAdminOpen, setRemoveAdminOpen] = useState(false);
+  const [selectedIssue, setSelectedIssue] = useState<{
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  } | null>(null);
 
   useEffect(() => {
     getOpenIssues();
@@ -26,6 +42,33 @@ const VoteTab = () => {
 
   const handleCastVoteOnIssue = (target: string, func: string, args: string[]) => {
     castVoteOnIssue(target, func, args);
+  };
+
+  const handleOpenVoteModal = (issueData: {
+    issueId: string;
+    target: string;
+    func: string;
+    args: any[];
+    votesCast: number;
+    votesNeeded: number;
+    threshold: number;
+  }) => {
+    setSelectedIssue(issueData);
+    setVoteModalOpen(true);
+  };
+
+  const handleCastVoteOnIssueById = async (issueId: string) => {
+    await castVoteOnIssueById(issueId);
+    // Refresh the issues after voting
+    getOpenIssues();
+  };
+
+  const handleAddAdmin = async (userAddress: string) => {
+    await addAdmin(userAddress);
+  };
+
+  const handleRemoveAdmin = async (userAddress: string) => {
+    await removeAdmin(userAddress);
   };
 
   if (openIssuesLoading) {
@@ -52,14 +95,34 @@ const VoteTab = () => {
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
   const executed: object[] = (openIssues && openIssues['executed']) || [];
+  const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
   return (
     <div className="space-y-6">
       {/* List of Admins */}
       <Card>
-        <CardHeader>
-          <CardTitle>Admins</CardTitle>
-          <CardDescription>Current administrators with voting rights</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
+          <div className="space-y-1">
+            <CardTitle>Admins</CardTitle>
+            <CardDescription>Current administrators with voting rights</CardDescription>
+          </div>
+
+          <div className="flex flex-row gap-2 shrink-0">
+            <Button
+              size="sm"
+              onClick={() => setAddAdminOpen(true)}
+              className="bg-strato-blue hover:bg-strato-blue/90"
+            >
+              Add Admin
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setRemoveAdminOpen(true)}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Remove Admin
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
@@ -137,7 +200,6 @@ const VoteTab = () => {
                     <TableHead className="w-[120px]">Issue ID</TableHead>
                     <TableHead className="w-[120px]">Contract</TableHead>
                     <TableHead className="w-[80px]">Function</TableHead>
-                    <TableHead className="w-[180px]">Arguments</TableHead>
                     <TableHead className="w-[60px]">Votes Cast</TableHead>
                     <TableHead className="w-[60px]">Votes Needed</TableHead>
                     <TableHead className="w-[60px]">Voting Threshold</TableHead>
@@ -148,10 +210,9 @@ const VoteTab = () => {
                   {issues.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
+                    const issueArgs = JSONBigNative.parse(issue.args);
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
-                    const alreadyVoted = votes.find((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
                       <TableRow key={`${issueId}-${index}`}>
@@ -184,9 +245,6 @@ const VoteTab = () => {
                         <TableCell className="text-sm max-w-[90px]">
                           {issue.func}
                         </TableCell>
-                        <TableCell className="font-mono text-xs max-w-[180px] truncate">
-                          {issueArgs.join(', ')}
-                        </TableCell>
                         <TableCell className="text-sm max-w-[90px]">
                           {votes.filter((v) => v.issueId === issueId).length}
                         </TableCell>
@@ -199,11 +257,18 @@ const VoteTab = () => {
                         <TableCell className="max-w-[60px]">
                           <Button 
                             size="sm" 
-                            onClick={() => handleCastVoteOnIssue(address, issue.func, issueArgs)}
-                            disabled={alreadyVoted}
+                            onClick={() => handleOpenVoteModal({
+                              issueId,
+                              target: address,
+                              func: issue.func,
+                              args: issueArgs,
+                              votesCast: votes.filter((v) => v.issueId === issueId).length,
+                              votesNeeded,
+                              threshold
+                            })}
                             className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
                           >
-                            Cast Vote
+                            View Vote
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -251,8 +316,7 @@ const VoteTab = () => {
                   {executed.map((issue: any, index) => {
                     const issueId = issue.issueId;
                     const address = issue.target;
-                    const issueArgs = JSON.parse(issue.args) || [];
-
+                    const issueArgs = JSONBigNative.parse(issue.args);
                     return (
                       <TableRow key={`${issueId}-${index}`}>
                         <TableCell className="font-mono text-xs max-w-[80px] truncate">
@@ -313,6 +377,24 @@ const VoteTab = () => {
         open={createOpen}
         onOpenChange={setCreateOpen}
         handleCastVoteOnIssue={handleCastVoteOnIssue}
+      />
+      <CastVoteModal
+        open={voteModalOpen}
+        onOpenChange={setVoteModalOpen}
+        issue={selectedIssue}
+        onCastVote={handleCastVoteOnIssueById}
+      />
+      <AddAdminModal
+        open={addAdminOpen}
+        onOpenChange={setAddAdminOpen}
+        onAddAdmin={handleAddAdmin}
+        admins={admins}
+      />
+      <RemoveAdminModal
+        open={removeAdminOpen}
+        onOpenChange={setRemoveAdminOpen}
+        onRemoveAdmin={handleRemoveAdmin}
+        admins={admins}
       />
     </div>
   );

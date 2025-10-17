@@ -14,7 +14,6 @@ const node_host = window.NODE_HOST && window.NODE_HOST !== '__NODE_HOST__' ? win
 const oauth_enabled = window.OAUTH_ENABLED && window.OAUTH_ENABLED !== '__OAUTH_ENABLED__' ? window.OAUTH_ENABLED==='true' : process.env.REACT_APP_OAUTH_ENABLED==='true';
 
 export const env = {
-  NODE_NAME: window.NODE_NAME && window.NODE_NAME !== '__NODE_NAME__' ? window.NODE_NAME : 'LOCALHOST',
   APEX_URL: `${http_protocol}://${node_host}${apex_uri}`,
   BLOC_URL: `${http_protocol}://${node_host}${bloc_uri}`,
   BLOC_DOC_URL: `${http_protocol}://${node_host}${bloc_doc_uri}`,

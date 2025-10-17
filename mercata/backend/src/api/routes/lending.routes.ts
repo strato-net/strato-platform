@@ -420,6 +420,11 @@ router.get("/liquidate/near-unhealthy", authHandler.authorizeRequest(), LendingC
  *                   - type: string
  *                   - type: number
  *                 description: Amount of debt to repay ("ALL" to cover full debt)
+ *               minCollateralOut:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: number
+ *                 description: Minimum collateral amount to receive (slippage protection, defaults to 0)
  *     responses:
  *       200:
  *         description: Liquidation transaction payload
@@ -460,6 +465,11 @@ router.post("/liquidate/:id", authHandler.authorizeRequest(), LendingController.
  *                   - type: string
  *                   - type: number
  *                 description: Amount of debt to repay ("ALL" to cover full debt)
+ *               minCollateralOut:
+ *                 oneOf:
+ *                   - type: string
+ *                   - type: number
+ *                 description: Minimum collateral amount to receive (slippage protection, defaults to 0)
  *     responses:
  *       200:
  *         description: Liquidation transaction payload

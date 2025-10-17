@@ -7,9 +7,10 @@ interface AssetSummaryProps {
   icon: React.ReactNode;
   color: string;
   tooltip?: string;
+  onClick?: () => void;
 }
 
-const AssetSummary = ({ title, value, icon, color, tooltip }: AssetSummaryProps) => {
+const AssetSummary = ({ title, value, icon, color, tooltip, onClick }: AssetSummaryProps) => {
   return (
     <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex justify-between items-start">
@@ -31,7 +32,8 @@ const AssetSummary = ({ title, value, icon, color, tooltip }: AssetSummaryProps)
         </div>
 
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${color}`}
+          className={`w-10 h-10 rounded-full flex items-center justify-center ${color} ${onClick ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+          onClick={onClick}
         >
           {icon}
         </div>

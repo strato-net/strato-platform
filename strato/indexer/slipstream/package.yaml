@@ -46,6 +46,7 @@ library:
     - prometheus-client
     - solid-vm-model
     - scientific
+    - source-tools
     - sql-monad
     - strato-conf
     - strato-model

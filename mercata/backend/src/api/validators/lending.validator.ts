@@ -159,6 +159,14 @@ export function validateLiquidationArgs(args: any) {
       .messages({
         "alternatives.match": "Repay amount must be a non-negative integer string, 'ALL', or number.",
       }),
+    minCollateralOut: Joi.string()
+      .trim()
+      .pattern(/^\d+$/)
+      .allow('')
+      .optional()
+      .messages({
+        "string.pattern.base": "minCollateralOut must be a valid numeric string (integer wei format).",
+      }),
   });
 
   const { error } = schema.validate(args);

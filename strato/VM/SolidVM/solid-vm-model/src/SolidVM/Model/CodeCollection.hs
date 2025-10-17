@@ -15,6 +15,7 @@ module SolidVM.Model.CodeCollection (
   contracts,
   getParents,
   getParentsAndUsings,
+  getInheritedContracts,
   getTopLevelAbstracts,
   getTopLevelAbstractsForContract,
   flConstants,
@@ -43,7 +44,8 @@ module SolidVM.Model.CodeCollection (
   --module SolidVM.Model.CodeCollection.Type,
   module SolidVM.Model.CodeCollection.VariableDecl,
   module SolidVM.Model.CodeCollection.Event,
-  module SolidVM.Model.CodeCollection.VarDef
+  module SolidVM.Model.CodeCollection.VarDef,
+  module SolidVM.Model.CodeCollection.Visibility
   ) where
 
 import Blockchain.SolidVM.Exception
@@ -69,6 +71,7 @@ import SolidVM.Model.CodeCollection.Statement
 --import           SolidVM.Model.CodeCollection.Type
 import SolidVM.Model.CodeCollection.VarDef
 import SolidVM.Model.CodeCollection.VariableDecl
+import SolidVM.Model.CodeCollection.Visibility
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -165,6 +168,12 @@ getParentsAndUsings cc c = do
         p' <- toErr (c ^. contractContext) p . M.lookup p $ cc ^. contracts
         (p' :) <$> getParentsAndUsings cc p'
   pure . concat $ ps : us
+
+getInheritedContracts :: CodeCollection -> SolidString -> SolidEither [Contract]
+getInheritedContracts cc cName = map fst . filter snd <$> traverse go (M.elems $ cc ^. contracts)
+  where go c = do
+          parents' <- map _contractName <$> getParents cc c
+          pure (c, cName `elem` parents')
 
 getTopLevelAbstracts :: CodeCollection -> Map SolidString Contract
 getTopLevelAbstracts cc = M.unions . map (getTopLevelAbstractsForContract cc) . M.elems $ _contracts cc

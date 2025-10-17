@@ -563,4 +563,39 @@ contract Describe_TokenPausable is Authorizable {
         require(accPerToken1 == newAccPerToken1, "Pool 1 should have correct accPerToken at new rate");
     }
 
+    function it_should_allow_user_to_claim_rewards() {
+        // given - add pool with 100 allocation points
+        uint256 poolId = 0;
+        uint256 depositAmount = 1000 * 1e18;
+        chef.addPool(100, address(lpToken1), 1);
+
+        // given - user1 deposits LP tokens
+        TestUtils.callAs(user1, address(lpToken1), "approve(address, uint256)", address(chef), depositAmount);
+        TestUtils.callAs(user1, address(chef), "deposit(uint256, uint256)", poolId, depositAmount);
+
+        // given - time passes (100 seconds)
+        fastForward(100);
+
+        // then - user has zero CATA balance initially
+        uint256 userCataBalanceBefore = ERC20(rewardsToken).balanceOf(address(user1));
+        require(userCataBalanceBefore == 0, "User should have zero CATA before claiming");
+
+        // then - pending CATA should be some value X
+        // Expected: 100 seconds * 1000 CATA/second * (100 allocPoint / 100 totalAllocPoint) = 100000 CATA
+        uint256 expectedPendingCata = 100000;
+        uint256 pendingCataBefore = chef.pendingCata(poolId, address(user1));
+        require(pendingCataBefore == expectedPendingCata, "Pending CATA should match expected value");
+
+        // when - user calls claim
+        TestUtils.callAs(user1, address(chef), "claim(uint256)", poolId);
+
+        // then - user now has X CATA
+        uint256 userCataBalanceAfter = ERC20(rewardsToken).balanceOf(address(user1));
+        require(userCataBalanceAfter == expectedPendingCata, "User should receive claimed CATA rewards");
+
+        // then - pending CATA is zero (which also proves rewardDebt was updated correctly)
+        uint256 pendingCataAfter = chef.pendingCata(poolId, address(user1));
+        require(pendingCataAfter == 0, "Pending CATA should be zero after claim");
+    }
+
 }

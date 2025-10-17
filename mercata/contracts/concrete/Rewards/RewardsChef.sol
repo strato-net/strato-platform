@@ -160,6 +160,7 @@ contract record RewardsChef is Ownable {
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event Claim(address indexed user, uint256 indexed pid, uint256 amount);
     event CurrentUserAmount(address indexed user, uint256 indexed pid, uint256 currentAmount);
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -464,6 +465,39 @@ contract record RewardsChef is Ownable {
         }
 
         emit EmergencyWithdraw(msg.sender, _pid, amount);
+    }
+
+    function claim(uint256 _pid) public {
+        require(_pid < pools.length, "Pool does not exist");
+
+        PoolInfo storage pool = pools[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        updatePool(_pid);
+
+        uint256 pending = ((user.amount * pool.accPerToken) / PRECISION_MULTIPLIER) - user.rewardDebt;
+        if (pending > 0) {
+            rewardToken.transfer(msg.sender, pending);
+        }
+
+        // ═════════════════════════════════════════════════════════════════════
+        // WARNING!!
+        // ═════════════════════════════════════════════════════════════════════
+        // This has to be set in variable and only then applied to
+        // user.rewardDebt, otherwise the solidvm throws!
+        uint256 rewardDebt = (user.amount * pool.accPerToken) / PRECISION_MULTIPLIER;
+        user.rewardDebt = rewardDebt;
+
+        emit Claim(msg.sender, _pid, pending);
+    }
+
+    function claimAll() public {
+        for (uint256 pid = 0; pid < pools.length; pid++) {
+            UserInfo storage user = userInfo[pid][msg.sender];
+            if (user.amount > 0) {
+                claim(pid);
+            }
+        }
     }
 
     function pendingCata(uint256 _pid, address _user) external view returns (uint256) {

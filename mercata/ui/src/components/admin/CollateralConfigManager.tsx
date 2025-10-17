@@ -75,10 +75,11 @@ const CollateralConfigManager = () => {
       
       // Convert unit scale from decimal count to 1eX format
       const unitScaleContract = BigInt(10) ** BigInt(values.unitScale);
-      
+
       // Convert debt floor/ceiling from USD to wei (18 decimals)
-      const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor) * 1e18));
-      const debtCeilingContract = BigInt(Math.floor(Number(values.debtCeiling) * 1e18));
+      // Convert to BigInt first, then multiply to avoid precision loss
+      const debtFloorContract = BigInt(Math.floor(Number(values.debtFloor))) * (BigInt(10) ** BigInt(18));
+      const debtCeilingContract = BigInt(Math.floor(Number(values.debtCeiling))) * (BigInt(10) ** BigInt(18));
       
       const configData = {
         asset: values.asset,
@@ -106,8 +107,8 @@ const CollateralConfigManager = () => {
     setEditingAsset(asset.asset);
     
     // Convert debt floor/ceiling from wei back to USD
-    const debtFloorUI = Number(asset.debtFloor) / 1e18;
-    const debtCeilingUI = Number(asset.debtCeiling) / 1e18;
+    const debtFloorUI = (BigInt(asset.debtFloor) / (BigInt(10) ** BigInt(18)));
+    const debtCeilingUI = (BigInt(asset.debtCeiling) / (BigInt(10) ** BigInt(18)));
     
     // Convert unit scale from 1eX back to decimal count
     const unitScaleUI = Math.log10(Number(asset.unitScale));

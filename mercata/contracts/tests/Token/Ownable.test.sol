@@ -208,14 +208,14 @@ contract Describe_Ownable {
         admin.initialize([address(this)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
         
-        // Single admin should not be able to execute without votes
+        // Non-admin should be able to create issues
         bool reverted = false;
         try {
             user1.do(address(ownableWithAdmin), "ownerOnlyFunction");
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert when admin doesn't have enough votes");
+        require(!reverted, "Should not revert when non-admin user creates issues");
     }
 
     function it_ownable_allows_admin_execution_with_sufficient_votes() {
