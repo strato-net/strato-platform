@@ -120,7 +120,7 @@ fi
 if [ "$FRESH_MODE" = true ]; then
     echo "Applying Generator.hs changes for fresh mode..."
     cd strato/core/strato-init/src/Blockchain/Init/
-    sed -i '' 's/--network=helium/--network=helium_aa/g' Generator.hs
+    sed -i '' 's/--network=helium/--network=helium_app/g' Generator.hs
     sed -i '' 's/--test_mode_bypass_blockstanbul=false/--test_mode_bypass_blockstanbul=true/g' Generator.hs
     cd /Users/ariya/Documents/BlockApps/strato-platform
 fi
@@ -149,7 +149,7 @@ make
 if [ "$FRESH_MODE" = true ]; then
     echo "Restoring Generator.hs to original state..."
     cd strato/core/strato-init/src/Blockchain/Init/
-    sed -i '' 's/--network=helium_aa/--network=helium/g' Generator.hs
+    sed -i '' 's/--network=helium_app/--network=helium/g' Generator.hs
     sed -i '' 's/--test_mode_bypass_blockstanbul=true/--test_mode_bypass_blockstanbul=false/g' Generator.hs
 fi
 
