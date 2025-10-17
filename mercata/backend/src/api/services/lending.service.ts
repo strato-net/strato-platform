@@ -559,8 +559,9 @@ export const liquidityAndBalance = async (
   });
 
   // Extract token data and user balances
-  const borrowableToken = tokenData.find(token => token.address === borrowableAsset);
-  const mTokenInfo = tokenData.find(token => token.address === mToken);
+  const tokenArray = Array.isArray(tokenData) ? tokenData : tokenData.data;
+  const borrowableToken = tokenArray.find((token: any) => token.address === borrowableAsset);
+  const mTokenInfo = tokenArray.find((token: any) => token.address === mToken);
 
   const borrowableBalance = borrowableToken?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
   const mTokenBalance = mTokenInfo?.balances?.find((b: any) => b.user === userAddress)?.balance || "0";
@@ -1175,7 +1176,8 @@ export const listLoansForLiquidation = async (
       address: `in.(${Array.from(tokenSet).join(',')})`,
       select: "address,_symbol,_name"
     });
-    tokenInfoMap = new Map<string, any>(tokenRows.map((t: any) => [t.address, t]));
+    const tokenArray = Array.isArray(tokenRows) ? tokenRows : tokenRows.data;
+    tokenInfoMap = new Map<string, any>(tokenArray.map((t: any) => [t.address, t]));
   } catch {}
 
   const results: LiquidationEntry[] = [];
