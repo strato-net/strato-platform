@@ -96,7 +96,6 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
-import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -964,29 +963,12 @@ getContractNameAndHash address' = do
     ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
-getCodeAndCollection address' = getCurrentCallInfoIfExists >>= \case
-  Just ci | currentAddress ci == address' -> pure (currentContract ci, collectionHash ci, codeCollection ci)
-  _ -> do
-    callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-    let maybeCI = find (\ci -> currentAddress ci == address') callStack'
-
-    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-    -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-    (contractName', ch) <- getContractNameAndHash address'
-    case maybeCI of
-      Just ci -> do
-        let contract = fromMaybe (currentContract ci)
-                     . M.lookup contractName'
-                     . CC._contracts
-                     $ codeCollection ci
-        return (contract, collectionHash ci, codeCollection ci)
-      Nothing -> do
-        isRunningTests <- Env.runningTests <$> getEnv
-        cc <- codeCollectionFromHash isRunningTests True ch
-
-        let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
-
-        return (contract', ch, cc)
+getCodeAndCollection address' = do
+  (contractName', ch) <- getContractNameAndHash address'
+  isRunningTests <- Env.runningTests <$> getEnv
+  cc <- codeCollectionFromHash isRunningTests True ch
+  let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+  return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
 getContractsForParents parents' cc =

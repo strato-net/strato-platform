@@ -441,9 +441,10 @@ call' ::
   ValList ->
   m ((SolidString, SolidString), Maybe Value)
 call' from to' fnCalltype functionName valList = do
-  (storageAddress, codeAddress) <- case fnCalltype of
-    CC.DelegateCall -> return (from, to')
-    _ -> (to',) <$> do
+  (isExternal, storageAddress, codeAddress) <- case fnCalltype of
+    CC.DelegateCall -> return (False, from, to')
+    CC.RawCall -> return (True, to', to')
+    _ -> (from /= to', to',) <$> do
       if from == to'
         then do
           mCallInfo <- getCurrentCallInfoIfExists
@@ -512,17 +513,17 @@ call' from to' fnCalltype functionName valList = do
       (Just theFunction, CC.DefaultCall) -> do
         mCallInfo <- getCurrentCallInfoIfExists
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
-        when ((from /= storageAddress) && isForbidden) $
+        when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf2" :: String) -- contract) -- ^. CC.contractName)
         let ro = case mCallInfo of
               Nothing -> False
               Just ci -> readOnly ci
-        pure . bool (pushSender from) id (from == storageAddress) $
+        pure . bool id (pushSender from) isExternal $
           runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
         let isForbidden = theFunction ^. CC.funcVisibility == Just CC.Private || theFunction ^. CC.funcVisibility == Just CC.Internal
-        when ((from /= storageAddress) && isForbidden) $
+        when (isExternal && isForbidden) $
           unknownFunction "logFunctionCall" (functionName, "asdf" :: String) -- contract ^. CC.contractName)
         validateFunctionArguments theFunction valList >>= \case
           Just (theFunction', valList') -> do
@@ -530,7 +531,7 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
-            pure . bool (pushSender from) id (from == storageAddress) $
+            pure . bool id (pushSender from) isExternal $
               runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
@@ -538,7 +539,7 @@ call' from to' fnCalltype functionName valList = do
               let ro = case mCallInfo of
                     Nothing -> False
                     Just ci -> readOnly ci
-              pure . bool (pushSender from) id (from == storageAddress) $
+              pure . bool id (pushSender from) isExternal $
                 runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
@@ -578,7 +579,7 @@ call' from to' fnCalltype functionName valList = do
               handleSimple path = do
                 v <- getVar $ Constant $ SReference path
                 pure $ Just v
-          when ((from /= storageAddress) && isForbidden) $
+          when (isExternal && isForbidden) $
             unknownFunction "logFunctionCall" (functionName, "asdf4" :: String) -- contract ^. CC.contractName)
           -- TODO: this should only exist if the storage variable is declared "public",
           -- right now I just ignore this and allow anything to be called as a getter
@@ -601,7 +602,7 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
-            pure . bool (pushSender from) id (from == storageAddress) $
+            pure . bool id (pushSender from) isExternal $
               runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 
