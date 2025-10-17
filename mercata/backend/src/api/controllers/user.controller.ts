@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import RestStatus from "http-status-codes";
-import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, getOpenIssues,
+import { getAdmin, isUserAdmin, addAdmin, removeAdmin, castVoteOnIssue, castVoteOnIssueById, getOpenIssues,
          contractSearch, getContractDetails,
  } from "../services/user.service";
 import { validateUserAddress, validateAddressField } from "../validators/common.validators";
@@ -93,15 +93,36 @@ class UserController {
     try {
       const { accessToken, address: actorAddress } = req;
       const { target, func, args } = req.body;
-
       validateAddressField(target);
-
+      
       const result = await castVoteOnIssue(accessToken, actorAddress as string, target, func, args);
       res.status(RestStatus.OK).json({ 
         message: "Vote cast successfully", 
         target,
         func,
         args,
+        status: result.status,
+        hash: result.hash,
+      });
+      next();
+    } catch (e) {
+      next(e);
+    }
+  }
+
+  static async castVoteOnIssueById(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const { accessToken, address: actorAddress } = req;
+      const { issueId } = req.body;
+      
+      const result = await castVoteOnIssueById(accessToken, actorAddress as string, issueId);
+      res.status(RestStatus.OK).json({ 
+        message: "Vote cast successfully", 
+        issueId,
         status: result.status,
         hash: result.hash,
       });

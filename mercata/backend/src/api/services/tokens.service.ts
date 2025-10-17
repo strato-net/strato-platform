@@ -147,6 +147,22 @@ export const getBalance = async (
     .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
 };
 
+/**
+ * Get transferable tokens for a user
+ * Returns tokens with positive balance that are not paused
+ */
+export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
+  // Get normal balance
+  const tokens = await getBalance(accessToken, userAddress);
+
+  // Filter out paused tokens and ensure nonzero balance
+  return tokens.filter((tokenData: any) => {
+    const hasBalance = tokenData.balance !== "0";
+    const isNotPaused = tokenData.token?._paused !== true;
+    return hasBalance && isNotPaused;
+  });
+}
+
 export const createToken = async (
   accessToken: string,
   userAddress: string,

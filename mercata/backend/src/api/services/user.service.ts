@@ -4,7 +4,7 @@ import { buildFunctionTx } from "../../utils/txBuilder";
 import { postAndWaitForTx } from "../../utils/txHelper";
 import { StratoPaths } from "../../config/constants";
 import { extractContractName } from "../../utils/utils";
-
+import JSONBig from "json-bigint";
 const { AdminRegistry, adminRegistry } = constants;
 
 export const isUserAdmin = async (
@@ -72,7 +72,7 @@ export const addAdmin = async (
       contractAddress: adminRegistry,
       method: "addAdmin",
       args: {
-        admin: adminAddress,
+        _admin: adminAddress,
       },
     }, userAddress, accessToken);
 
@@ -96,9 +96,9 @@ export const removeAdmin = async (
     const tx = await buildFunctionTx({
       contractName: extractContractName(AdminRegistry),
       contractAddress: adminRegistry,
-      method: "removeAdmin",
+      method: "removeAdmin", 
       args: {
-        admin: adminAddress,
+        _admin: adminAddress,
       },
     }, userAddress, accessToken);
 
@@ -118,7 +118,7 @@ export const castVoteOnIssue = async (
   userAddress: string,
   target: string,
   func: string, 
-  args: string[],
+  args: any[],
 ): Promise<{ status: string; hash: string }> => {
   try {
     const txArgs: Record<string, any> = {
@@ -132,6 +132,112 @@ export const castVoteOnIssue = async (
       contractAddress: adminRegistry,
       method: "castVoteOnIssue",
       args: txArgs,
+    }, userAddress, accessToken);
+
+    const { status, hash } = await postAndWaitForTx(accessToken, () =>
+      strato.post(accessToken, StratoPaths.transactionParallel, tx)
+    );
+
+    return { status, hash };
+  } catch (error) {
+    throw error;
+  }
+};
+
+// Cast a vote on an issue by issueId
+export const castVoteOnIssueById = async (
+  accessToken: string,
+  userAddress: string,
+  issueId: string,
+): Promise<{ status: string; hash: string }> => {
+  try {
+    // Find the issue by issueId
+    const issueResponse = await cirrus.get(accessToken, "/" + AdminRegistry + "-IssueCreated", {
+      params: {
+        issueId: `eq.${issueId}`
+      },
+    });
+
+    if (issueResponse.status !== 200) {
+      throw new Error('Failed to fetch issue');
+    }
+
+    if (!issueResponse.data || !Array.isArray(issueResponse.data) || issueResponse.data.length === 0) {
+      throw new Error('Issue not found');
+    }
+
+    const issue = issueResponse.data[0];
+    let { target, func, args: argsRaw } = issue;
+
+    // Parse args keeping large numbers as strings (JSONBig with storeAsString)
+    const JSONBigString = JSONBig({ storeAsString: true });
+    const args = typeof argsRaw === 'string' ? JSONBigString.parse(argsRaw) : argsRaw;
+    // console.log("args in castVoteOnIssueById", args);
+
+    // If func is _addAdmin, call the addAdmin endpoint directly
+    if (func === '_addAdmin') {
+      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
+      if (!adminAddress) {
+        throw new Error('Admin address not found in args');
+      }
+      return await addAdmin(accessToken, userAddress, adminAddress);
+    }
+
+    // If func is _removeAdmin, call the removeAdmin endpoint directly
+    if (func === '_removeAdmin') {
+      const adminAddress = Array.isArray(args) ? args[0] : args._admin;
+      if (!adminAddress) {
+        throw new Error('Admin address not found in args');
+      }
+      return await removeAdmin(accessToken, userAddress, adminAddress);
+    }
+
+    // Get contract name from Cirrus
+    const contractResponse = await cirrus.get(accessToken, "contract", {
+      params: {
+        address: `eq.${target}`
+      },
+    });
+
+    
+
+    if (contractResponse.status !== 200 || !contractResponse.data || !Array.isArray(contractResponse.data) || contractResponse.data.length === 0) {
+      throw new Error('Failed to fetch contract details for target address');
+    }
+    const contractName = contractResponse.data[0].contract_name;
+  
+
+    // Get contract details to retrieve function parameter names
+    const contractDetails = await getContractDetails(accessToken, target);
+    const allFunctions = (contractDetails as any)?._functions || {};
+    const functionInfo = allFunctions[func];
+    
+    if (!functionInfo || !functionInfo._funcArgs) {
+      throw new Error(`Function ${func} not found in contract ${contractName}`);
+    }
+
+    // Convert array args to object with parameter names
+    const funcArgs = functionInfo._funcArgs as Array<[string, any]>;
+    const argsObject: Record<string, any> = {};
+    
+    if (Array.isArray(args)) {
+      funcArgs.forEach(([paramName], index) => {
+        if (index < args.length) {
+          argsObject[paramName] = args[index];
+        }
+      });
+    } else {
+      // If args is already an object, use it directly
+      Object.assign(argsObject, args);
+    }
+
+
+    // Build transaction directly to the target contract
+    const tx = await buildFunctionTx({
+      contractName,
+      contractAddress: target,
+      method: func,
+      args: argsObject,
     }, userAddress, accessToken);
 
     const { status, hash } = await postAndWaitForTx(accessToken, () =>
@@ -177,7 +283,19 @@ export const getOpenIssues = async (
       },
     });
 
-    return { admins, votes, thresholds, executed, issues: issuesResponse?.data };
+    // Deduplicate issues by issueId, keeping the most recent one based on block_timestamp
+    const issuesMap = new Map();
+    (issuesResponse?.data || []).forEach((issue: any) => {
+      const existingIssue = issuesMap.get(issue.issueId);
+      if (!existingIssue || 
+          (issue.block_timestamp && existingIssue.block_timestamp && 
+           issue.block_timestamp > existingIssue.block_timestamp)) {
+        issuesMap.set(issue.issueId, issue);
+      }
+    });
+    const uniqueIssues = Array.from(issuesMap.values());
+
+    return { admins, votes, thresholds, executed, issues: uniqueIssues };
   } catch (error) {
     console.log(error);
     return [];

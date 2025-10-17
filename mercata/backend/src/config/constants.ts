@@ -44,6 +44,7 @@ export const constants = (() => {
     "customDecimals",
     "description",
     "status",
+    "_paused",
     `images:${Token}-images(value)`,
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,
