@@ -509,4 +509,25 @@ contract Describe_AdminRegistry is Authorizable {
         require(voteIndexAfter == 0, "Vote should be cleaned up after execution");
     }
 
+    function it_admin_registry_rejects_non_admin_non_whitelisted_issue_creation() {
+        // Scenario: A non-admin, non-whitelisted user tries to create an issue
+        // Should revert with "Only an admin or a whitelisted account can call castVoteOnIssue"
+        
+        // Verify user3 is not an admin
+        require(!adminRegistry.isAdminAddress(address(user3)), "User3 should not be an admin");
+        
+        // Verify user3 is not whitelisted for token mint
+        require(!adminRegistry.whitelist(address(token), "mint", address(user3)), "User3 should not be whitelisted");
+        
+        // Try to cast vote as non-admin, non-whitelisted user - should revert
+        bool reverted = false;
+        try {
+            user3.do(address(adminRegistry), "castVoteOnIssue", address(token), "mint", admin3, 1000e18);
+        } catch {
+            reverted = true;
+        }
+        
+        require(reverted, "Should revert when non-admin non-whitelisted user tries to create issue");
+    }
+
 }
