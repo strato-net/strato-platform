@@ -470,4 +470,43 @@ contract Describe_AdminRegistry is Authorizable {
         require(executed, "Should execute with 50% threshold and 1 vote");
     }
 
+    function it_admin_registry_executes_old_issue_when_admin_count_decreases() {
+        // Scenario: Issue created with 2 admins fails to reach quorum (1 vote out of 2 = 50% < 67%)
+        // Then an admin is removed, leaving 1 admin
+        // The same issue called again should now execute (1 vote out of 1 = 100%)
+        
+        // Step 1: Admin1 votes to add admin3 (1 out of 2 admins = 50%, needs 67%)
+        string memory issueId = adminRegistry.getIssueId(address(adminRegistry), "_addAdmin", admin3);
+        adminRegistry.addAdmin(admin3);
+        // Verify it did not execute yet (would need to check the return value if we used castVoteOnIssue)
+        // Instead we just verify admin3 is not added yet
+        
+        // Verify admin3 is not yet an admin
+        require(!adminRegistry.isAdminAddress(admin3), "Admin3 should not be admin yet");
+        
+        // Verify the vote was recorded
+        uint voteIndex1 = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndex1 > 0, "Admin1's vote should be recorded");
+        
+        // Step 2: Vote to remove user1 (the second admin) - this requires both admins to vote
+        adminRegistry.removeAdmin(address(user1));
+        user1.do(address(adminRegistry), "removeAdmin", address(user1));
+        
+        // Verify user1 is no longer an admin
+        require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
+        
+        // Step 3: Admin1 calls the same issue again (adding admin3)
+        // Now with only 1 admin, 1 vote = 100% (exceeds 67% threshold)
+        adminRegistry.addAdmin(admin3);
+        // Should execute this time
+        
+        // Verify admin3 was added
+        require(adminRegistry.isAdminAddress(admin3), "Admin3 should now be an admin");
+        
+        // Verify the vote data was cleaned up after execution
+        uint voteIndexAfter = adminRegistry.votesMap(issueId, admin1);
+        require(voteIndexAfter == 0, "Vote should be cleaned up after execution");
+    }
+
 }
