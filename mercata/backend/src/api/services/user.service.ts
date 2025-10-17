@@ -283,17 +283,23 @@ export const getOpenIssues = async (
       },
     });
 
-    // Deduplicate issues by issueId, keeping the most recent one based on block_timestamp
+    // Deduplicate issues by issueId, keeping the most recent one based on block_number
     const issuesMap = new Map();
     (issuesResponse?.data || []).forEach((issue: any) => {
       const existingIssue = issuesMap.get(issue.issueId);
       if (!existingIssue || 
-          (issue.block_timestamp && existingIssue.block_timestamp && 
-           issue.block_timestamp > existingIssue.block_timestamp)) {
+          (issue.block_number && existingIssue.block_number && 
+           Number(issue.block_number) > Number(existingIssue.block_number))) {
         issuesMap.set(issue.issueId, issue);
       }
     });
-    const uniqueIssues = Array.from(issuesMap.values());
+    const uniqueIssues = Array.from(issuesMap.values()).sort((a, b) => {
+      // Sort by block_number descending (newest first)
+      if (a.block_number && b.block_number) {
+        return Number(b.block_number) - Number(a.block_number);
+      }
+      return 0;
+    });
 
     return { admins, votes, thresholds, executed, issues: uniqueIssues };
   } catch (error) {
