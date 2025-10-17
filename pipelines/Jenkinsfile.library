@@ -1114,8 +1114,6 @@ def generateGenesisBlock() {
     sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     # Inject the nodeAddress into the validators.json file:
     sudo docker exec -e addr="${nodeAddress}" strato-strato-1 bash -c 'echo "[\"$addr\"]" > /genesis-builder/validators.json'
-#    sudo docker cp $(<_platform_path_tmp)/.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
-#    sudo docker cp $(<_platform_path_tmp)/strato/tools/genesis-builder strato-strato-1:/
     sudo docker cp ./.docker-work/usr/local/bin/genesis-builder strato-strato-1:/usr/local/bin/
     sudo docker cp ./strato/tools/genesis-builder strato-strato-1:/
     sudo docker exec strato-strato-1 genesis-builder \\
