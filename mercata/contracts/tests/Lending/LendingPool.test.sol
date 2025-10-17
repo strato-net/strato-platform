@@ -502,7 +502,7 @@ contract Describe_LendingPool_Basic is Authorizable {
         IERC20(USDST).approve(address(m.liquidityPool()), amount_needed);
 
         // Perform Liquidation
-        pool.liquidationCallAll(GOLDST, address(user1));
+        pool.liquidationCallAll(GOLDST, address(user1), 1);
         require(
             pool.getHealthFactor(address(user1)) == 2**256-1,
             "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
@@ -802,7 +802,7 @@ contract Describe_LendingPool_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), pool.getUserDebt(address(user))); // more than enough to liquidate
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCallAll(address(SILVST), address(user));
+        pool.liquidationCallAll(address(SILVST), address(user), 1);
 
         require(cv.userCollaterals(address(user), address(SILVST)) < a_collatAmount, "Collateral " + string(cv.userCollaterals(address(user), address(SILVST))) + " should be less than the original amount " + string(a_collatAmount) + " after liquidation");
 
@@ -836,7 +836,7 @@ contract Describe_LendingPool_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), pool.getUserDebt(address(user)));
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCallAll(address(SILVST), address(user));
+        pool.liquidationCallAll(address(SILVST), address(user), 1);
 
         require(cv.userCollaterals(address(user), address(SILVST)) < a_collatAmount, "Collateral " + string(cv.userCollaterals(address(user), address(SILVST))) + " should be less than the original amount " + string(a_collatAmount) + " after liquidation");
 
@@ -901,7 +901,7 @@ contract Describe_LendingPool_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), pool.getUserDebt(address(user))); // more than enough to liquidate
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        try pool.liquidationCallAll(address(SILVST), address(user)) {revert("Liquidation should fail");}
+        try pool.liquidationCallAll(address(SILVST), address(user), 1) {revert("Liquidation should fail");}
         catch {/* expected */}
     }
     
@@ -937,7 +937,7 @@ contract Describe_LendingPool_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), pool.getUserDebt(address(user)));
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCall(address(SILVST), address(user), 300e18); // not the asset who fell in price
+        pool.liquidationCall(address(SILVST), address(user), 300e18, 1); // not the asset who fell in price
 
         require(cv.userCollaterals(address(user), address(SILVST)) < silverAmount, "Silver collateral should be decreased");
         require(cv.userCollaterals(address(user), address(GOLDST)) == goldAmount, "Gold collateral should be unaffected");
