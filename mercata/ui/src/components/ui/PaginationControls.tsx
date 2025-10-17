@@ -25,7 +25,7 @@ export const PaginationControls: React.FC<PaginationControlsProps> = ({
   loading = false,
   showInfo = true,
   totalItems = 0,
-  itemsPerPage = 20,
+  itemsPerPage =10,
 }) => {
   if (totalPages <= 1) return null;
 

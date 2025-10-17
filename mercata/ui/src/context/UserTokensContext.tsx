@@ -46,7 +46,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   const [allActivePagination, setAllActivePagination] = useState({
     total: 0,
     page: 1,
-    limit: 20,
+    limit: 10,
     totalPages: 0,
     hasNext: false,
     hasPrevious: false,
@@ -135,7 +135,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Modified to work like fetchTokens - storing in state
-  const fetchAllActiveTokens = useCallback(async (page = 1, limit = 20, signal?: AbortSignal): Promise<void> => {
+  const fetchAllActiveTokens = useCallback(async (page = 1, limit = 10, signal?: AbortSignal): Promise<void> => {
     setAllActiveLoading(true);
     setError(null);
     try {
@@ -153,7 +153,7 @@ export const UserTokensProvider: React.FC<{ children: React.ReactNode }> = ({
       setAllActivePagination(response.data.pagination || {
         total: 0,
         page: 1,
-        limit: 20,
+        limit: 10,
         totalPages: 0,
         hasNext: false,
         hasPrevious: false,
