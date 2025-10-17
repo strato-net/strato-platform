@@ -371,6 +371,7 @@ class Dashboard extends Component {
               number={env.NODE_HOST || "N/A"}
               description={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."}
               iconClass="fa-server"
+              textSize="h4"
             />
           </div>
           <div className="col-sm-6">
