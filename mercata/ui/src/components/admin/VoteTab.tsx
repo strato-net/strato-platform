@@ -388,11 +388,13 @@ const VoteTab = () => {
         open={addAdminOpen}
         onOpenChange={setAddAdminOpen}
         onAddAdmin={handleAddAdmin}
+        admins={admins}
       />
       <RemoveAdminModal
         open={removeAdminOpen}
         onOpenChange={setRemoveAdminOpen}
         onRemoveAdmin={handleRemoveAdmin}
+        admins={admins}
       />
     </div>
   );

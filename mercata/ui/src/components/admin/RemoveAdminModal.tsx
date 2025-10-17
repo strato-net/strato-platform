@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -15,12 +15,14 @@ interface RemoveAdminModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onRemoveAdmin: (userAddress: string) => Promise<void>;
+  admins: Array<{ address: string }>;
 }
 
 const RemoveAdminModal: React.FC<RemoveAdminModalProps> = ({
   open,
   onOpenChange,
   onRemoveAdmin,
+  admins,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,15 +35,13 @@ const RemoveAdminModal: React.FC<RemoveAdminModalProps> = ({
   });
 
   const onSubmit = async (values: RemoveAdminFormValues) => {
-    const trimmedAddress = values.userAddress.trim();
-
     setIsSubmitting(true);
     try {
-      await onRemoveAdmin(trimmedAddress);
+      await onRemoveAdmin(values.userAddress);
 
       toast({
-        title: 'Admin Removed Successfully',
-        description: 'The admin has been removed from the registry.',
+        title: 'Issue to Remove Admin Created',
+        description: 'Your admin issue has been submitted for voting.',
       });
 
       form.reset({ userAddress: '' });
@@ -64,7 +64,7 @@ const RemoveAdminModal: React.FC<RemoveAdminModalProps> = ({
         <DialogHeader>
           <DialogTitle>Remove Admin</DialogTitle>
           <DialogDescription>
-            Enter the address of the admin you want to revoke administrator rights from.
+            Select the admin you want to revoke administrator rights from.
           </DialogDescription>
         </DialogHeader>
 
@@ -75,26 +75,35 @@ const RemoveAdminModal: React.FC<RemoveAdminModalProps> = ({
               control={form.control}
               name="userAddress"
               rules={{
-                required: 'User address is required',
-                validate: (v) => {
-                  const trimmed = v.trim();
-                  if (trimmed.length === 0) return 'User address cannot be empty';
-                  if (!/^[a-fA-F0-9]{40}$/.test(trimmed)) {
-                    return 'Please enter a valid 40-character hexadecimal address';
-                  }
-                  return true;
-                },
+                required: 'Please select an admin to remove',
               }}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>User Address</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      className="font-mono"
-                    />
-                  </FormControl>
-                  
+                  <FormLabel>Select Admin to Remove</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger className="font-mono">
+                        <SelectValue placeholder="Select an admin..." />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {admins.length === 0 ? (
+                        <SelectItem value="no-admins" disabled>
+                          No admins available
+                        </SelectItem>
+                      ) : (
+                        admins.map((admin) => (
+                          <SelectItem 
+                            key={admin.address} 
+                            value={admin.address}
+                            className="font-mono"
+                          >
+                            {admin.address}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                   <FormMessage />
                 </FormItem>
               )}

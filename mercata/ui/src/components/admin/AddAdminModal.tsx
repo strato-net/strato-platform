@@ -15,12 +15,14 @@ interface AddAdminModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAddAdmin: (userAddress: string) => Promise<void>;
+  admins: Array<{ address: string }>;
 }
 
 const AddAdminModal: React.FC<AddAdminModalProps> = ({
   open,
   onOpenChange,
   onAddAdmin,
+  admins,
 }) => {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,8 +42,8 @@ const AddAdminModal: React.FC<AddAdminModalProps> = ({
       await onAddAdmin(trimmedAddress);
 
       toast({
-        title: 'Admin Added Successfully',
-        description: 'The new admin has been added to the registry.',
+        title: 'Issue to Add Admin Created',
+        description: 'Your admin issue has been submitted for voting.',
       });
 
       form.reset({ userAddress: '' });
@@ -81,6 +83,13 @@ const AddAdminModal: React.FC<AddAdminModalProps> = ({
                   if (trimmed.length === 0) return 'User address cannot be empty';
                   if (!/^[a-fA-F0-9]{40}$/.test(trimmed)) {
                     return 'Please enter a valid 40-character hexadecimal address';
+                  }
+                  // Check if address is already an admin
+                  const isAlreadyAdmin = admins.some(
+                    (admin) => admin.address.toLowerCase() === trimmed.toLowerCase()
+                  );
+                  if (isAlreadyAdmin) {
+                    return 'This address is already an admin';
                   }
                   return true;
                 },
