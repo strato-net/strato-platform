@@ -6,6 +6,7 @@ contract record AdminRegistry {
 
     mapping (string => address[]) public record votes;
     mapping (string => mapping (address => uint)) public record votesMap;
+    mapping (string => bool) public record currentIssues;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
 
@@ -70,15 +71,16 @@ contract record AdminRegistry {
 
             _createIssue(sender, issueId, _target, _func, _args);
 
+            if (!hasVoted) {
+                votes[issueId].push(sender);
+                votesMap[issueId][sender] = votes[issueId].length;
+                emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
+            }
+
             if (_shouldExecute(issueId, _target, _func, _args)) {
                 variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
             } else {
-                if (!hasVoted) {
-                    votes[issueId].push(sender);
-                    votesMap[issueId][sender] = votes[issueId].length;
-                    emit IssueVoted(msg.sender, sender, issueId, _target, _func, _args);
-                }
                 return (false, issueId);
             }
         } else {
@@ -112,14 +114,15 @@ contract record AdminRegistry {
         uint issueVotes = votes[_issueId].length;
         uint votingThresholdBps = votingThresholds[_target][_func];
         if (votingThresholdBps > 0) {
-            return 10000 * (issueVotes + 1) >= votingThresholdBps * admins.length;
+            return 10000 * issueVotes >= votingThresholdBps * admins.length;
         } else {
-            return 3 * (issueVotes + 1) >= 2 * admins.length;
+            return 3 * issueVotes >= 2 * admins.length;
         }
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
         if(votes[_issueId].length == 0) {
+            currentIssues[_issueId] = true;
             emit IssueCreated(msg.sender, _sender, _issueId, _target, _func, _args);
         }
     }
@@ -138,6 +141,7 @@ contract record AdminRegistry {
             votesMap[_issueId][votes[_issueId][i]] = 0;
         }
         delete votes[_issueId];
+        delete currentIssues[_issueId];
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
