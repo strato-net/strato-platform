@@ -555,7 +555,9 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.Array t _ -> returnType t
                 SVMType.Mapping _ _ t -> returnType t
                 t -> t
-              isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
+              isForbidden = case _varVisibility of
+                Just CC.Public -> False
+                _ -> True
               handleStruct s path = do
                 mFields <- case M.lookup s $ contract ^. CC.structs of
                   Just vals -> pure . Just $ (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals
