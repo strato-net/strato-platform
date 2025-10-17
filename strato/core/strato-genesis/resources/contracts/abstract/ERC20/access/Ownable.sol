@@ -46,8 +46,12 @@ abstract contract Ownable is Context {
             _checkOwner();
             _;
         } catch {
-            AdminRegistry admin = AdminRegistry(owner());
+            address myOwner = owner();
+            AdminRegistry admin = AdminRegistry(myOwner);
             address sender = _msgSender();
+            if (myOwner == this) {
+                sender = this;
+            }
             (bool didExecute, variadic ret) = admin.castVoteOnIssue(sender, msg.sig, msg.data);
             return ret;
         }
