@@ -367,51 +367,11 @@ class Dashboard extends Component {
         </div>
         <div className="row">
           <div className="col-sm-6">
-            <div className="pt-card pt-elevation-1 node-info-card">
-              <div className="node-info-section">
-                <div className="node-info-header">
-                  <span className="node-info-label">Node Host:</span>
-                  <button 
-                    className="pt-button pt-minimal pt-small node-info-copy-btn"
-                    onClick={() => {
-                      navigator.clipboard.writeText(env.NODE_HOST || "N/A");
-                      toasts.show({ 
-                        message: "Node Host copied!", 
-                        intent: "success",
-                        timeout: 2000
-                      });
-                    }}
-                  >
-                    <i className="fa fa-copy"></i>
-                  </button>
-                </div>
-                <div className="node-info-value">
-                  {env.NODE_HOST || "N/A"}
-                </div>
-              </div>
-              
-              <div>
-                <div className="node-info-header">
-                  <span className="node-info-label">Node Address:</span>
-                  <button 
-                    className="pt-button pt-minimal pt-small node-info-copy-btn"
-                    onClick={() => {
-                      navigator.clipboard.writeText(metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading...");
-                      toasts.show({ 
-                        message: "Node Address copied!", 
-                        intent: "success",
-                        timeout: 2000
-                      });
-                    }}
-                  >
-                    <i className="fa fa-copy"></i>
-                  </button>
-                </div>
-                <div className="node-info-value">
-                  {metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."}
-                </div>
-              </div>
-            </div>
+            <NumberCard
+              number={env.NODE_HOST || "N/A"}
+              description={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."}
+              iconClass="fa-server"
+            />
           </div>
           <div className="col-sm-6">
             <NodeCard />

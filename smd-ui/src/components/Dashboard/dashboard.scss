@@ -38,32 +38,3 @@
   display: flex;
   flex-direction: column;
 }
-
-.node-info-card {
-  padding: 20px;
-}
-
-.node-info-section {
-  margin-bottom: 15px;
-}
-
-.node-info-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 5px;
-}
-
-.node-info-label {
-  font-weight: bold;
-}
-
-.node-info-copy-btn {
-  padding: 2px 8px;
-}
-
-.node-info-value {
-  font-size: 14px;
-  color: white;
-  word-break: break-all;
-}
