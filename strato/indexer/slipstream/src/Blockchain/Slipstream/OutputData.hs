@@ -134,7 +134,7 @@ data SlipstreamQuery = CreateTable
                         , viewColumns :: TableColumns
                         , dataColumn :: Text
                         , primaryKeyColumns :: [Text]
-                        , extraJoinColumns :: [(Text, Text)]
+                        , extraJoinColumns :: [([Either Text Text], Maybe Text, Text)]
                         }
                      | InsertTable
                         { tableName :: TableName
@@ -288,12 +288,16 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameContractName viewName
         , T.concat $ ("' OR c.contract_name = '" <>) <$> inheritedContractNames
         , "')"
-        , T.concat $ (\(col, val) -> T.concat
-            [ " AND s."
-            , wrapEscapeDouble col
-            , " = '"
+        , T.concat $ (\(cols, mOp, val) -> T.concat
+            [ " AND "
+            , T.concat $ (\case
+                Right col -> "s." <> wrapEscapeDouble col
+                Left raw -> raw
+              ) <$> cols
+            , " "
+            , fromMaybe "=" mOp
+            , " "
             , val
-            , "'"
             ]
           ) <$> extraJoinColumns
         , ";\n"
@@ -622,7 +626,11 @@ createCollectionTable (creator, a, n) c cc inherited (collectionName, keyTypes, 
     keyNames
     "key"
     (["address", "collection_name"] ++ (fst <$> keyNames))
-    [("collection_name", tableNameCollectionName tableName)]
+    [ ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
+    , ([Right "value"], Just "IS", "NOT NULL")
+    , ([Right "value", Left "::text"], Just "NOT IN", "('\"\"', '0', 'false')")
+    , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
+    ]
   pure $ case getTableColumnAndType False cc [("value", valueType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator a f) x SqlJsonb
     _ -> Nothing
@@ -656,8 +664,8 @@ createEventArrayTable (creator, a, n, e) cc inherited (arr, arrType) = do
     keyNames
     "key"
     (["address", "transaction_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
-    [ ("event_name", tableNameEventName tableName)
-    , ("collection_name", tableNameCollectionName tableName)
+    [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
+    , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
     [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator a f) x SqlJsonb
@@ -949,7 +957,7 @@ createEventTable (creator, a, n) evName ev cc inherited = do
             cols'
             "attributes"
             ["transaction_hash", "event_index"]
-            [("event_name", tableNameEventName tableName')]
+            [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
     createEventArrayTable (crtr, app, cname, escapeQuotes $ labelToText evName) cc inherited
@@ -1119,23 +1127,21 @@ valueToSQLText' :: Bool -> Value -> Maybe Text
 valueToSQLText' _ (SimpleValue (ValueBool x)) = Just $ if x then "true" else "false"
 valueToSQLText' _ (SimpleValue (ValueInt _ _ v)) = Just $ tshow v
 valueToSQLText' _ (SimpleValue (ValueString s)) = Just s
-valueToSQLText' z (SimpleValue (ValueAddress (Address 0))) = if z then Nothing else Just "0000000000000000000000000000000000000000"
-valueToSQLText' z (SimpleValue (ValueAddress (Address addr))) =
-  if z && fromIntegral addr == (0 :: Integer)
-    then Nothing
-    else Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' z (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) =
-  if z && fromIntegral addr == (0 :: Integer)
-    then Nothing
+valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
+valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
+  Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
+valueToSQLText' _ (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) =
+  if fromIntegral addr == (0 :: Integer)
+    then Just ""
     else Just . T.pack $ show acct
 valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
   case decodeUtf8' bytes of
     Left _ -> decodeUtf8 $ Base16.encode bytes
     Right x -> x
 valueToSQLText' _ (ValueEnum _ _ index) = Just . T.pack $ show index
-valueToSQLText' z (ValueContract acct@(NamedAccount (Address addr) _)) =
-  if z && fromIntegral addr == (0 :: Integer)
-    then Nothing
+valueToSQLText' _ (ValueContract acct@(NamedAccount (Address addr) _)) =
+  if fromIntegral addr == (0 :: Integer)
+    then Just ""
     else Just . T.pack $ show acct
 valueToSQLText' _ ValueFunction{} = Nothing
 valueToSQLText' z (ValueMapping m) = Just
