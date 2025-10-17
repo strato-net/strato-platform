@@ -33,13 +33,26 @@ api.interceptors.request.use(
 
 // Helper: Extract error message from backend response
 function extractApiErrorMessage(error: any): string {
-  console.log(" catching error in extractApiErrorMessage",error.response.data.error);
-  return (
-    error?.response?.data?.error?.message ||
-    error?.response?.data?.message ||
-    error?.message ||
-    "An unexpected error occurred."
-  );
+  // Handle different error response structures
+  const errorData = error?.response?.data;
+  
+  // If error is an object with message property
+  if (errorData?.error && typeof errorData.error === 'object' && errorData.error.message) {
+    return errorData.error.message;
+  }
+  
+  // If error is a direct string
+  if (typeof errorData?.error === 'string') {
+    return errorData.error;
+  }
+  
+  // If message is at top level
+  if (typeof errorData?.message === 'string') {
+    return errorData.message;
+  }
+  
+  // Fallback to generic error message
+  return error?.message || "An unexpected error occurred.";
 }
 
 // Response interceptor to catch 401, 403 (CSRF), and show global toast for all APIs
