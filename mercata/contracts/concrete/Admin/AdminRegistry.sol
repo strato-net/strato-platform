@@ -1,5 +1,3 @@
-import "../../abstract/ERC20/access/Authorizable.sol";
-
 contract record AdminRegistry {
     address[] public record admins;
     mapping (address => uint) public record adminMap;
@@ -15,6 +13,7 @@ contract record AdminRegistry {
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
+    event IssueRechecked(address sender, string issueId, address target, string func, variadic args, bool executed);
 
     bool public initialized = false;
 
@@ -51,21 +50,9 @@ contract record AdminRegistry {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
+        // Admin path: create issues and vote
+        if (adminMap[msg.sender] != 0) {
             address sender = msg.sender;
-            if (adminMap[msg.sender] == 0) {
-                if (_target != tx.origin) {
-                    bool authorizationGranted = false;
-                    try {
-                        authorizationGranted = Authorizable(_target).isAuthorized(msg.sender);
-                    } catch {
-
-                    }
-                    require(authorizationGranted, "Cannot forge a vote on behalf of an admin without their consent");
-                }
-                sender = _target;
-                _target = msg.sender;
-            }
             string issueId = _getIssueId(_target, _func, _args);
             bool hasVoted = votesMap[issueId][sender] != 0;
 
@@ -80,34 +67,42 @@ contract record AdminRegistry {
             if (_shouldExecute(issueId, _target, _func, _args)) {
                 variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
-            } else {
-                return (false, issueId);
-            }
-        } else {
-            try {
-                if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
-                    string issueId = _getIssueId(_target, _func, _args);
-                    variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-                    return (true, ret);
-                }
-            } catch {
-
-            }
-            address sender = msg.sender;
-            address target = _target;
-            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
-                sender = _target;
-                target = msg.sender;
-            }
-            string issueId = _getIssueId(target, _func, _args);
-            if (whitelist[target][_func][sender]) {
-                variadic ret = _executeIssue(sender, issueId, target, _func, _args);
-                return (true, ret);
-            } else {
-                _createIssue(sender, issueId, target, _func, _args);
             }
             return (false, issueId);
         }
+        
+        // Non-admin path: only allow whitelisted direct execution (no issue creation)
+        // Check if whitelisted
+        require(whitelist[_target][_func][msg.sender], "Only admins can create issues");
+        
+        string issueId = _getIssueId(_target, _func, _args);
+        variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
+        return (true, ret);
+    }
+
+    /**
+     * @notice Re-trigger execution check for an existing issue without re-voting
+     * @dev Useful when admin count changes and existing votes now meet threshold
+     * @param _target Target contract address
+     * @param _func Function name to call
+     * @param _args Function arguments
+     * @return executed Whether the issue was executed
+     * @return result Return value from execution (if executed) or issueId (if not)
+     */
+    function recheckIssue(address _target, string _func, variadic _args) external returns (bool executed, variadic result) {
+        require(adminMap[msg.sender] != 0, "Only admins can recheck issues");
+        
+        string issueId = _getIssueId(_target, _func, _args);
+        require(currentIssues[issueId], "Issue does not exist");
+        
+        if (_shouldExecute(issueId, _target, _func, _args)) {
+            variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
+            emit IssueRechecked(msg.sender, issueId, _target, _func, _args, true);
+            return (true, ret);
+        }
+        
+        emit IssueRechecked(msg.sender, issueId, _target, _func, _args, false);
+        return (false, issueId);
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
