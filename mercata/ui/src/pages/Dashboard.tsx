@@ -21,7 +21,7 @@ import { useLendingContext } from "@/context/LendingContext";
 import { useSwapContext } from "@/context/SwapContext";
 import { useCDP } from "@/context/CDPContext";
 import { useSafetyContext } from "@/context/SafetyContext";
-import { cataAddress } from "@/lib/constants";
+import { cataAddress, rewardsEnabled } from "@/lib/constants";
 import { api } from "@/lib/axios";
 
 const Dashboard = () => {
@@ -42,7 +42,7 @@ const Dashboard = () => {
   const { totalCDPDebt } = useCDP();
   const { poolsLoading: loadingUserPools, userPools, fetchUserPositions } = useSwapContext();
   const { safetyInfo } = useSafetyContext();
-  const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(true, 30000);
+  const { pendingRewards, refetch: refetchPendingRewards } = usePendingRewards(rewardsEnabled, 30000);
   const [isClaiming, setIsClaiming] = useState(false);
 
   // Extract CATA token from inactive tokens by address
@@ -145,7 +145,7 @@ const Dashboard = () => {
         />
 
         <main className="p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+          <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
             <AssetSummary
               title="Net Balance"
               value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
@@ -161,14 +161,16 @@ const Dashboard = () => {
               color="bg-purple-500"
             />
 
-            <AssetSummary
-              title="Pending CATA"
-              value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
-              icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
-              color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-gray-500"}
-              onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
-              tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
-            />
+            {rewardsEnabled && (
+              <AssetSummary
+                title="Pending CATA"
+                value={`${parseFloat(pendingRewards).toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
+                icon={isClaiming ? <Loader2 className="text-white animate-spin" size={18} /> : <Banknote className="text-white" size={18} />}
+                color={parseFloat(pendingRewards) > 0 ? "bg-green-500" : "bg-gray-500"}
+                onClick={parseFloat(pendingRewards) > 0 && !isClaiming ? handleClaimRewards : undefined}
+                tooltip={isClaiming ? "Processing claim..." : (parseFloat(pendingRewards) > 0 ? "Click to claim your rewards" : undefined)}
+              />
+            )}
 
             <AssetSummary
               title="Total Borrowed"

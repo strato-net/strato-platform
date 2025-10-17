@@ -21,11 +21,12 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 import { handleRecipientAddress, handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
+import { sortTokensCompareFn } from "@/lib/tokenPriority";
 
 const Transfer = () => {
   const { userAddress } = useUser();
   const { usdstBalance, voucherBalance, fetchUsdstBalance, loadingUsdstBalance } = useUserTokens();
-  const { getUserTokensWithBalance, transferToken } = useTokenContext();
+  const { getTransferableTokens, transferToken } = useTokenContext();
   const { toast } = useToast();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   
@@ -43,6 +44,7 @@ const Transfer = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [recipientError, setRecipientError] = useState("");
   const [feeError, setFeeError] = useState("");
+  const [showInactiveTokens, setShowInactiveTokens] = useState(false);
 
   const maxAmount = useMemo(() => {
     if (!fromAsset) return "0";
@@ -58,14 +60,25 @@ const Transfer = () => {
 
   const fetchUserTokens = useCallback(async () => {
     try {
-      const tokens = await getUserTokensWithBalance();
+      const tokens = await getTransferableTokens();
       setTokens(tokens);
       return tokens;
     } catch (err) {
       console.error("Failed to fetch tokens:", err);
       return [];
     }
-  }, [getUserTokensWithBalance]);
+  }, [getTransferableTokens]);
+
+  // Sort and separate tokens with configurable priority order
+  const { activeTokens, inactiveTokens } = useMemo(() => {
+    const active = tokens.filter(token => token.token?.status === '2');
+    const inactive = tokens.filter(token => token.token?.status !== '2');
+
+    active.sort(sortTokensCompareFn);
+    inactive.sort(sortTokensCompareFn);
+
+    return { activeTokens: active, inactiveTokens: inactive };
+  }, [tokens]);
 
   // Fetch USDST balance when user changes
   useEffect(() => {
@@ -131,7 +144,10 @@ const Transfer = () => {
               <label className="text-sm text-gray-600">Token</label>
               <Popover
                 open={tokenPopoverOpen}
-                onOpenChange={setTokenPopoverOpen}
+                onOpenChange={(open) => {
+                  setTokenPopoverOpen(open);
+                  if (!open) setShowInactiveTokens(false); // Reset when closing
+                }}
               >
                 <PopoverTrigger asChild>
                   <Button
@@ -150,21 +166,63 @@ const Transfer = () => {
                 <PopoverContent className="w-full p-0">
                   <div className="flex flex-col max-h-72 overflow-y-auto">
                     {tokens.length > 0 ? (
-                      tokens.map((token) => (
-                        <Button
-                          key={token.address}
-                          variant="ghost"
-                          className="justify-start"
-                          onClick={() => {
-                            setFromAsset(token);
-                            setFromAmount("");
-                            setTokenPopoverOpen(false);
-                          }}
-                        >
-                          {token?.token?._symbol ||
-                            fromAsset?.token?._name}
-                        </Button>
-                      ))
+                      <>
+                        {/* Active tokens */}
+                        {activeTokens.map((token) => (
+                          <Button
+                            key={token.address}
+                            variant="ghost"
+                            className="justify-start"
+                            onClick={() => {
+                              setFromAsset(token);
+                              setFromAmount("");
+                              setTokenPopoverOpen(false);
+                            }}
+                          >
+                            {token?.token?._symbol ||
+                              token?.token?._name}
+                          </Button>
+                        ))}
+                        
+                        {/* Show More button if there are inactive tokens */}
+                        {inactiveTokens.length > 0 && !showInactiveTokens && (
+                          <Button
+                            variant="ghost"
+                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            onClick={() => setShowInactiveTokens(true)}
+                          >
+                            Show More ({inactiveTokens.length})
+                          </Button>
+                        )}
+                        
+                        {/* Inactive tokens (shown when expanded) */}
+                        {showInactiveTokens && inactiveTokens.map((token) => (
+                          <Button
+                            key={token.address}
+                            variant="ghost"
+                            className="justify-start text-gray-400"
+                            onClick={() => {
+                              setFromAsset(token);
+                              setFromAmount("");
+                              setTokenPopoverOpen(false);
+                            }}
+                          >
+                            {token?.token?._symbol ||
+                              token?.token?._name}
+                          </Button>
+                        ))}
+                        
+                        {/* Show Less button */}
+                        {showInactiveTokens && inactiveTokens.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            className="justify-center text-gray-500 hover:text-gray-700 border-t"
+                            onClick={() => setShowInactiveTokens(false)}
+                          >
+                            Show Less
+                          </Button>
+                        )}
+                      </>
                     ) : (
                       <span className="p-2 text-sm text-gray-500">
                         No tokens available

@@ -284,13 +284,15 @@ stateVariableKeyword =
     <|> (try (reserved "internal") >> return KInternal)
     <|> (try (reserved "record") >> return KRecord)
 
-public :: [StateVariableKeyword] -> SolidityParser Bool
-public keywords =
+varVisibility :: [StateVariableKeyword] -> SolidityParser (Maybe SolidVM.Visibility)
+varVisibility keywords =
   let visibilities = nub . filter (`elem` [KPublic, KPrivate, KInternal]) $ keywords
    in case visibilities of
         (v1 : v2 : _) -> fail $ printf "multiple visibilities declared: %s vs %s" (show v1) (show v2)
-        [KPublic] -> return True
-        _ -> return False
+        [KPublic] -> return $ Just SolidVM.Public
+        [KInternal] -> return $ Just SolidVM.Internal
+        [KPrivate] -> return $ Just SolidVM.Private
+        _ -> return Nothing
 
 solidityFLConstant :: SolidityParser SourceUnit
 solidityFLConstant = do
@@ -300,7 +302,7 @@ solidityFLConstant = do
   -- generate accessor functions
   keywords <- many stateVariableKeyword
   let isConstant = KConstant `elem` keywords
-  isPublic <- public keywords
+  visibility <- varVisibility keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
   value <- optionMaybe $ do
@@ -310,7 +312,7 @@ solidityFLConstant = do
   semi
   let ctx = SourceAnnotation start end ()
   if isConstant
-    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    then return $ FLConstant (labelToText variableName) (SolidVM.ConstantDecl variableType visibility (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
     else fail "only constants can be declared in the top level"
 
 -- | Parses the declaration part of a variable definition, which is
@@ -324,7 +326,7 @@ simpleVariableDeclaration = do
   -- We have to remember which variables are "public", because they
   -- generate accessor functions
   keywords <- many stateVariableKeyword
-  isPublic <- public keywords
+  visibility <- varVisibility keywords
   let isRecord = KRecord `elem` keywords
   -- check to see if the "account" variable is being used
   variableName <- identifier
@@ -337,8 +339,8 @@ simpleVariableDeclaration = do
   let isImmutable = KImmutable `elem` keywords
   let isConstant = KConstant `elem` keywords
   if isConstant
-    then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType isPublic (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
-    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType isPublic value ctx isImmutable isRecord)
+    then return (variableName, ConstantDeclaration $ SolidVM.ConstantDecl variableType visibility (fromMaybe (parseError "constants must be initialized" variableName) value) ctx)
+    else return (variableName, VariableDeclaration $ SolidVM.VariableDecl variableType visibility value ctx isImmutable isRecord)
 
 errorDeclaration :: SolidityParser (String, Declaration)
 errorDeclaration = do

@@ -166,6 +166,7 @@ showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
   T.empty
 
 mutable :: Type' -> Type'
+mutable b@Bottom{} = b
 mutable m@Mutable{} = m
 mutable m@(Product ts _) =
   let isMutable Mutable{} = True
@@ -291,11 +292,9 @@ lookupContractFunction x cName fName = do
                 let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
                     fRets = Static (SVMType.Struct Nothing fName) x
                  in pure $ Function fArgs fRets x [] [] False
-            Just VariableDecl {..} ->
-              if _varIsPublic
-                then constructGetterType x _varType
-                else
-                  pure . bottom $
+            Just VariableDecl {..} -> case _varVisibility of
+              Just Public -> constructGetterType x _varType
+              _ -> pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
                           labelToText cName,

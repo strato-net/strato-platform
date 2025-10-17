@@ -41,7 +41,7 @@ contract record SafetyModule is Ownable {
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
 
-    constructor(address _owner) Ownable(_owner) { }
+    constructor(address initialOwner) Ownable(initialOwner) { }
 
     function initialize(address _lendingRegistry, address _tokenFactory) external onlyOwner {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
@@ -200,9 +200,8 @@ contract record SafetyModule is Ownable {
     }
 
     /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
-    /// @dev Overwrites previous starts. Requires wallet-held shares (not Chef).
+    /// @dev Overwrites previous starts.
     function startCooldown() external {
-        require(IERC20(sToken).balanceOf(msg.sender) > 0, "SM:no shares");
         uint start = block.timestamp;
         cooldownStart[msg.sender] = start;
         emit UnstakeCooldown(msg.sender, start, start + COOLDOWN_SECONDS);

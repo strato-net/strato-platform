@@ -67,7 +67,7 @@ createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         _varType=t,
-        _varIsPublic=True,
+        _varVisibility= Just Public,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
         _isImmutable = False,

@@ -37,20 +37,11 @@ pipeline {
     stage('Deploy') {
 
       steps {
-        sh '''#!/bin/bash -le
-          set -x
-          rm -rf strato-getting-started
-          git clone https://github.com/blockapps/strato-getting-started -b strato-erc20-revamp
-          cp docker-compose.allDocker.yml strato-getting-started/docker-compose.yml
-          cp docker-compose.vault.yml strato-getting-started/
-          cp docker-compose.highway.yml strato-getting-started/
-        '''
-
-        dir("strato-getting-started") {
-          // Copy .pem and .key for SSL
-          sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
-          sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
-
+        // Copy .pem and .key for SSL
+        sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
+        sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
+        
+        dir ('bootstrap-docker') {
           script {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
@@ -105,12 +96,11 @@ pipeline {
           sh 'chmod +x check_availability.sh'
           sh './check_availability.sh'
         }
-
         script {
-          lib.generateGenesisBlock('.', 'strato-getting-started')  // overwrites the strato-getting-started/genesis-block.json
+          lib.generateGenesisBlock()
         }
 
-        dir("strato-getting-started") {
+        dir("bootstrap-docker") {
           sh './strato --wipe'
           
           sh 'sed -i "s|useCustomGenesis=false|useCustomGenesis=true|" run.sh'
@@ -180,8 +170,9 @@ pipeline {
                     docker push $(<bridge_image_tag_ecr)
                   '''
                   archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
-                  stash includes: 'strato-getting-started/**', name: 'stratoGettingStarted'
-                  stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
+                  stash includes: 'bootstrap-docker/**', name: 'bootstrapDocker'
+                  stash includes: 'docker-compose.allDocker.yml', name: 'dc-alldocker-yaml'
+                  //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
                 // Push docker-compose files to Jenkins artifacts and AWS S3
@@ -296,8 +287,9 @@ pipeline {
                 ]) {
                   sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
                 }
-                unstash 'stratoGettingStarted'
                 dir("strato-getting-started"){
+                  unstash 'dc-alldocker-yaml'
+                  sh 'cp docker-compose.allDocker.yml docker-compose.yml'
                   withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
                         NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
@@ -322,7 +314,7 @@ pipeline {
                   script {
                     def VERSION = sh(
                         returnStdout: true,
-                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" strato-getting-started/docker-compose.yml"
+                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" docker-compose.allDocker.yml"
                     ).trim()
                     slackSend(
                         channel: '#engineering',
@@ -418,7 +410,7 @@ pipeline {
   post {
     always {
       sh 'rm -rf .docker-work'
-      dir ('strato-getting-started') {
+      dir ('bootstrap-docker') {
         sh 'rm -rf strato_logs*'
         sh './fetchlogs'
         sh 'sudo chmod 777 strato_logs.zip'

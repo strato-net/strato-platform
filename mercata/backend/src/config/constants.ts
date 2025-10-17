@@ -1,9 +1,9 @@
 import { lendingRegistry, poolFactory, tokenFactory, adminRegistry, mercataBridge, cdpRegistry, voucher } from "./config";
-import { 
-  SWAP_CONTRACTS, 
-  SWAP_TOKEN_SELECT_FIELDS, 
-  SWAP_POOL_SELECT_FIELDS, 
-  SWAP_HISTORY_SELECT_FIELDS 
+import {
+  SWAP_CONTRACTS,
+  SWAP_TOKEN_SELECT_FIELDS,
+  SWAP_POOL_SELECT_FIELDS,
+  SWAP_HISTORY_SELECT_FIELDS
 } from "./swapConstants";
 
 export enum StratoPaths {
@@ -13,9 +13,6 @@ export enum StratoPaths {
   identity = "/identity",
   result = "/transactions/results",
 }
-
-// Genesis contracts (known at genesis time)
-export const rewardsChef = "000000000000000000000000000000000000101f";
 
 export const constants = (() => {
   const CONTRACT_PREFIX = "BlockApps-";
@@ -47,6 +44,7 @@ export const constants = (() => {
     "customDecimals",
     "description",
     "status",
+    "_paused",
     `images:${Token}-images(value)`,
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,

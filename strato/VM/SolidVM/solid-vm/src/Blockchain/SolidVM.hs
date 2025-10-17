@@ -556,7 +556,9 @@ call' from to' fnCalltype functionName valList = do
                 SVMType.Array t _ -> returnType t
                 SVMType.Mapping _ _ t -> returnType t
                 t -> t
-              isForbidden = not _varIsPublic -- TODO: Stop being lazy and give VariableDecls the full visibility treatment!
+              isForbidden = case _varVisibility of
+                Just CC.Public -> False
+                _ -> True
               handleStruct s path = do
                 mFields <- case M.lookup s $ contract ^. CC.structs of
                   Just vals -> pure . Just $ (\(a, t, _) -> (a, CC.fieldTypeType t)) <$> vals
@@ -1191,7 +1193,7 @@ expToPath x = todo "expToPath/unhandled" x
 
 expToVar :: MonadSM m => CC.Expression -> Maybe SVMType.Type -> m Variable
 expToVar x t = do
-  liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
+  -- liftIO $ putStrLn $ C.cyan $ "expToVar: " ++ show x
   v <- expToVar' x t
   decrementGas 1
   return v
@@ -1377,8 +1379,7 @@ expToVar' x@(CC.MemberAccess _ expr name) _ = do
       let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
       return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
-    (SBuiltinVariable "block", "coinbase") ->
-      pure . Constant $ SAccount (NamedAccount (Address 0) UnspecifiedChain) True -- TODO: fix?
+    (SBuiltinVariable "block", "coinbase") -> Constant . flip SAccount False . unspecifiedChain . Env.proposer <$> getEnv
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
