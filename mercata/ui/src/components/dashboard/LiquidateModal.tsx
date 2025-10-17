@@ -185,24 +185,9 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
         });
       }
     } catch (error: any) {
-      // Extract error message from various possible error structures
-      let errorMessage = "Unable to submit liquidation. Please try again.";
-      
-      if (typeof error?.response?.data?.message === 'string') {
-        errorMessage = error.response.data.message;
-      } else if (typeof error?.response?.data?.error === 'string') {
-        errorMessage = error.response.data.error;
-      } else if (typeof error?.data?.message === 'string') {
-        errorMessage = error.data.message;
-      } else if (typeof error?.message === 'string') {
-        errorMessage = error.message;
-      }
-      
-      toast({ 
-        title: "Liquidation Failed", 
-        description: errorMessage,
-        variant: "destructive" 
-      });
+      // Axios interceptor already shows the error toast, so we don't need to show another one
+      // Just log for debugging
+      console.error('Liquidation error:', error?.response?.data || error);
     }
   };
 

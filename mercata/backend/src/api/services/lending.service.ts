@@ -938,7 +938,9 @@ export const executeLiquidation = async (
   const approveValue = treatAsAll ? MAX_UINT256 : repayAmount.toString();
 
   const repayAmountAtomic = repayAmount.toString();
-  const minCollateralOutAtomic = options.minCollateralOut ? toBig(options.minCollateralOut).toString() : "0";
+  const minCollateralOutAtomic = options.minCollateralOut 
+    ? toBig(options.minCollateralOut).toString() 
+    : "0";
 
   const tx = await buildFunctionTx([
     {
