@@ -200,6 +200,7 @@ main = do
             case (flags_fileServerUrl, flags_network) of
               ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
               ("", 'h':'e':'l':'i':'u':'m':_) -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
@@ -209,6 +210,8 @@ main = do
             case flags_network of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
+              "helium" -> "https://monitor.testnet.stratomercata.com"
+              "upquark" -> "https://monitor.stratomercata.com"
               _ -> ""
           )
         ]

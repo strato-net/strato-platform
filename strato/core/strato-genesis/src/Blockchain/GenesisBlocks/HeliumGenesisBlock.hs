@@ -5,8 +5,11 @@
 {-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Blockchain.GenesisBlocks.HeliumGenesisBlock (
-  genesisBlock
+module Blockchain.GenesisBlocks.HeliumGenesisBlock
+  ( genesisBlock
+  , genesisBlockTemplate
+  , validators
+  , admins
   ) where
 
 import           Blockchain.Data.GenesisInfo
@@ -298,8 +301,11 @@ implContract implAddress contractName =
   SolidVMContractWithStorage implAddress 0 (mercataContract contractName) $ ownedByBlockApps implAddress
 
 genesisBlock :: GenesisInfo
-genesisBlock  =
-  insertMercataGovernanceContract validators admins
+genesisBlock = genesisBlockTemplate validators admins
+
+genesisBlockTemplate :: [Validator] -> [Address] -> GenesisInfo
+genesisBlockTemplate validators' admins' =
+  insertMercataGovernanceContract validators' admins'
   . insertUserRegistryContract []
   . insertDecideContract
   $ defaultGenesisInfo{

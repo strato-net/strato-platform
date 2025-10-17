@@ -38,6 +38,25 @@ router.get("/balance", authHandler.authorizeRequest(), TokensController.getBalan
 
 /**
  * @openapi
+ * /tokens/transferable:
+ *   get:
+ *     summary: List transferable tokens
+ *     tags: [Tokens]
+ *     responses:
+ *       200:
+ *         description: Transferable token list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 additionalProperties: true
+ */
+router.get("/transferable", authHandler.authorizeRequest(true), TokensController.getTransferable);
+
+/**
+ * @openapi
  * /tokens/{address}:
  *   get:
  *     summary: Fetch token metadata by address
