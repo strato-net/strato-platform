@@ -184,11 +184,18 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           variant: "destructive" 
         });
       }
-    } catch (error) {
-      console.error('Liquidation failed:', error);
+    } catch (error: any) {
+      // Extract error message from various possible error structures
+      const errorMessage = 
+        error?.response?.data?.message || 
+        error?.response?.data?.error || 
+        error?.data?.message ||
+        error?.message || 
+        "Unable to submit liquidation. Please try again.";
+      
       toast({ 
         title: "Liquidation Failed", 
-        description: "Unable to submit liquidation. Please try again.",
+        description: errorMessage,
         variant: "destructive" 
       });
     }
