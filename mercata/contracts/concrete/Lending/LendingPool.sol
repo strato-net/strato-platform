@@ -531,6 +531,7 @@ contract record LendingPool is Ownable {
     * @param collateralAsset The collateral asset to seize
     * @param borrower The address of the borrower being liquidated
     * @param debtToCover Amount of debt (in borrowableAsset units) the liquidator is repaying
+    * @param minCollateralOut Minimum collateral amount to receive (slippage protection). Transaction reverts if actual collateral is less.
     * Requirements:
     *  - Borrower health factor must be < 1e18 (unsafe)
     *  - If health factor >= 0.95e18, liquidator may repay at most 50% of outstanding debt
@@ -641,6 +642,7 @@ contract record LendingPool is Ownable {
      *         to avoid overpaying when collateral cannot cover more.
      * @param collateralAsset The collateral asset to seize
      * @param borrower The address of the borrower being liquidated
+     * @param minCollateralOut Minimum collateral amount to receive (slippage protection). Transaction reverts if actual collateral is less.
      */
     function liquidationCallAll(
         address collateralAsset,
