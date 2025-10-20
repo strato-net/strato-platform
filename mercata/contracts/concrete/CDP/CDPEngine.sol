@@ -528,7 +528,7 @@ contract record CDPEngine is Ownable {
         emit LiquidationExecuted(
             borrower,
             collateralAsset,
-            owedForDelta,          // was coverageCap
+            owedForDelta,          
             penaltyWei,
             collateralToSeize,
             msg.sender,
