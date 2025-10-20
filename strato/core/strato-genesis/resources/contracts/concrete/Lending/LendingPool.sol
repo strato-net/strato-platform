@@ -355,7 +355,8 @@ contract record LendingPool is Ownable {
                 totalScaledDebt -= loan.scaledDebt;
                 loan.scaledDebt = 0;
             }
-            delete userLoan[msg.sender];
+            delete userLoan[msg.sender].scaledDebt;
+            delete userLoan[msg.sender].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
         }
@@ -429,7 +430,8 @@ contract record LendingPool is Ownable {
         totalScaledDebt -= scaledDelta;
 
         if (loan.scaledDebt == 0) {
-            delete userLoan[msg.sender];
+            delete userLoan[msg.sender].scaledDebt;
+            delete userLoan[msg.sender].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
         }
@@ -601,7 +603,8 @@ contract record LendingPool is Ownable {
                 totalScaledDebt -= loan.scaledDebt;
                 loan.scaledDebt = 0;
             }
-            delete userLoan[borrower];
+            delete userLoan[borrower].scaledDebt;
+            delete userLoan[borrower].lastUpdated;
         } else {
             loan.lastUpdated = block.timestamp;
         }
@@ -621,7 +624,8 @@ contract record LendingPool is Ownable {
 
                 // Zero the user loan
                 ln.scaledDebt = 0;
-                delete userLoan[borrower];
+                delete userLoan[borrower].scaledDebt;
+                delete userLoan[borrower].lastUpdated;
 
                 // Bump global bad debt
                 badDebt += baseBad;
@@ -1136,7 +1140,8 @@ contract record LendingPool is Ownable {
         // stop interest accrual on this borrower
         totalScaledDebt -= scaled;
         ln.scaledDebt = 0;
-        delete userLoan[borrower];
+        delete userLoan[borrower].scaledDebt;
+        delete userLoan[borrower].lastUpdated;
 
         // track non-accruing receivable
         badDebt += baseBad;

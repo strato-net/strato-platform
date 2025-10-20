@@ -364,15 +364,15 @@ contract Describe_MercataBridge is Authorizable {
         } catch {
             reverted = true;
         }
-        require(!reverted, "Should not revert setRelayer by non-owner");
-
+        require(reverted, "Should revert setRelayer by non-owner");
+        
         reverted = false;
         try {
             user1.do(address(bridge), "setPause", true, true);
         } catch {
             reverted = true;
         }
-        require(!reverted, "Should not revert setPause by non-owner");
+        require(reverted, "Should revert setPause by non-owner");
     }
 
     // ============ DEPOSIT FLOW TESTS ============
