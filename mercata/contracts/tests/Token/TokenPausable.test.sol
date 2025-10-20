@@ -25,7 +25,8 @@ contract Describe_TokenPausable {
 
     function beforeEach() {
         // Create a fresh test token directly with initial balance
-        token = new Token(
+        token = new Token(address(this));
+        token.initialize(
             "Test Token",
             "Test token for pausable operations",
             [],
