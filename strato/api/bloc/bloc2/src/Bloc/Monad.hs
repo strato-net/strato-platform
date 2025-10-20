@@ -39,6 +39,7 @@ import Data.Text (Text)
 import GHC.Stack
 import SQLM
 import Servant.Client
+import qualified Strato.Strato23.API.Types         as V
 import UnliftIO hiding (Handler (..))
 
 data Should a = Don't a | Do a
@@ -56,7 +57,8 @@ data BlocEnv = BlocEnv
     globalNonceCounter :: Cache Address Nonce,
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
-    useWalletsByDefault :: Bool
+    useWalletsByDefault :: Bool,
+    nodePubKey :: V.PublicKey
   }
 
 --------------------------------------------------------------------------------

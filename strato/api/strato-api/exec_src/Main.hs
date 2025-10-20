@@ -125,6 +125,12 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (
 instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where
+  access _ = asks nodePubKey
+
+instance {-# OVERLAPPING #-} (Monad m, Accessible V.PublicKey m) => Accessible V.PublicKey (ReaderT a m) where
+  access = lift . access
+
 instance {-# OVERLAPPING #-} Accessible (Maybe SyncStatus) IO where
   access _ = fmap SyncStatus <$> runStratoRedisIO getSyncStatus
 
@@ -200,6 +206,7 @@ main = do
             case (flags_fileServerUrl, flags_network) of
               ("", "mercata-hydrogen") -> "https://fileserver.mercata-testnet2.blockapps.net/highway"
               ("", 'h':'e':'l':'i':'u':'m':_) -> "https://fileserver.mercata.blockapps.net/highway"
+              ("", "upquark") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "mercata") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", "uranium") -> "https://fileserver.mercata.blockapps.net/highway"
               ("", _) -> error "File server url was not provided and cannot be derived"
@@ -209,6 +216,8 @@ main = do
             case flags_network of
               "mercata-hydrogen" -> "https://monitor.mercata-testnet2.blockapps.net:18080"
               "mercata" -> "https://monitor.mercata.blockapps.net:18080"
+              "helium" -> "https://monitor.testnet.stratomercata.com"
+              "upquark" -> "https://monitor.stratomercata.com"
               _ -> ""
           )
         ]
@@ -231,6 +240,12 @@ main = do
 
   nonceCache <- Cache.newCache . Just $ TimeSpec nonceCounterTimeout 0
 
+  pubKey <- runLoggingT
+          . runVaultM ("http://localhost:8013/strato/v2.3")
+          . fmap V.unPubKey
+          . blocVaultWrapper
+          $ getKey Nothing Nothing
+
   let env =
         BlocEnv
           { txSizeLimit = flags_txSizeLimit,
@@ -239,7 +254,8 @@ main = do
             globalNonceCounter = nonceCache,
             userRegistryAddress = fromJust $ stringAddress flags_userRegistryAddress,
             userRegistryCodeHash = if flags_useBuiltinUserRegistry then Nothing else stringKeccak256 flags_userRegistryCodeHash,
-            useWalletsByDefault = flags_useWalletsByDefault
+            useWalletsByDefault = flags_useWalletsByDefault,
+            nodePubKey = pubKey
           }
   runSettings (setPort 3000 $ setHost (fromString $ ipAddress $ apiConfig ethConf) defaultSettings) $ app env theDoc urlMap
 

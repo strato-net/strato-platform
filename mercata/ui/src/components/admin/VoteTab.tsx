@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useUser } from '@/context/UserContext';
-import { Loader2, MoreVertical } from 'lucide-react';
+import { Loader2, MoreVertical, CheckCircle2 } from 'lucide-react';
 import CopyButton from '../ui/copy';
 import CreateAdminIssueModal from './CreateAdminIssueModal';
 import CastVoteModal from './CastVoteModal';
@@ -213,11 +213,15 @@ const VoteTab = () => {
                     const issueArgs = JSONBigNative.parse(issue.args);
                     const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
+                    const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
 
                     return (
-                      <TableRow key={`${issueId}-${index}`}>
+                      <TableRow key={`${issueId}-${index}`} className={hasUserVoted ? 'bg-green-50' : ''}>
                         <TableCell className="font-medium text-sm max-w-[120px] truncate">
                           <div className="flex items-center space-x-2">
+                            {hasUserVoted && (
+                              <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            )}
                             <span>
                               {issueId && issueId !== 'Unknown' 
                                 ? `${issueId.slice(0, 6)}...${issueId.slice(-4)}`
@@ -255,21 +259,26 @@ const VoteTab = () => {
                           {`${threshold}%`}
                         </TableCell>
                         <TableCell className="max-w-[60px]">
-                          <Button 
-                            size="sm" 
-                            onClick={() => handleOpenVoteModal({
-                              issueId,
-                              target: address,
-                              func: issue.func,
-                              args: issueArgs,
-                              votesCast: votes.filter((v) => v.issueId === issueId).length,
-                              votesNeeded,
-                              threshold
-                            })}
-                            className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
-                          >
-                            View Vote
-                          </Button>
+                          <div className="flex flex-col items-start gap-1">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleOpenVoteModal({
+                                issueId,
+                                target: address,
+                                func: issue.func,
+                                args: issueArgs,
+                                votesCast: votes.filter((v) => v.issueId === issueId).length,
+                                votesNeeded,
+                                threshold
+                              })}
+                              className="bg-strato-blue hover:bg-strato-blue/90 text-xs"
+                            >
+                              View Vote
+                            </Button>
+                            {hasUserVoted && (
+                              <span className="text-xs text-green-600 font-medium">You voted</span>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     );

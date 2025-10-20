@@ -1,6 +1,7 @@
 import "../../abstract/ERC20/access/Authorizable.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
-contract record AdminRegistry {
+contract record AdminRegistry is Ownable {
     address[] public record admins;
     mapping (address => uint) public record adminMap;
 
@@ -24,7 +25,7 @@ contract record AdminRegistry {
         _;
     }
 
-    constructor() { }
+    constructor() Ownable(this) { }
 
     function initialize(address[] _initialAdmins) external onlyOnce {
         require(admins.length == 0, "AdminRegistry is already initialized");
@@ -95,6 +96,7 @@ contract record AdminRegistry {
             }
             address sender = msg.sender;
             address target = _target;
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
             if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
                 sender = _target;
                 target = msg.sender;
@@ -116,7 +118,7 @@ contract record AdminRegistry {
         if (votingThresholdBps > 0) {
             return 10000 * issueVotes >= votingThresholdBps * admins.length;
         } else {
-            return 3 * issueVotes >= 2 * admins.length;
+            return 5 * issueVotes >= 3 * admins.length;
         }
     }
 
@@ -139,20 +141,21 @@ contract record AdminRegistry {
         variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
+            votes[_issueId][i] = address(0);
         }
-        delete votes[_issueId];
+        votes[_issueId].length = 0;
         delete currentIssues[_issueId];
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
 
-    function _addAdmin(address _admin) internal {
+    function _addAdmin(address _admin) external onlyOwner {
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
     }
 
-    function _removeAdmin(address _admin) internal {
+    function _removeAdmin(address _admin) external onlyOwner {
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -163,7 +166,7 @@ contract record AdminRegistry {
         admins.length -= 1;
     }
 
-    function _swapAdmin(address _adminToReplace, address _admin) internal {
+    function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
@@ -174,7 +177,7 @@ contract record AdminRegistry {
         adminMap[_adminToReplace] = 0;
     }
 
-    function addWhitelist(address _target, string _func, address _user) internal {
+    function addWhitelist(address _target, string _func, address _user) external onlyOwner {
         if (_target == address(this)) {
             require(
                 _func != "addWhitelist" &&
@@ -194,20 +197,20 @@ contract record AdminRegistry {
         whitelist[_target][_func][_user] = true;
     }
 
-    function removeWhitelist(address _target, string _func, address _user) internal {
+    function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
         whitelist[_target][_func][_user] = false;
     }
 
-    function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) internal {
+    function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
-    function createContract(string _contractName, string _contractSrc, variadic _args) internal returns (address) {
+    function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
         return create(_contractName, _contractSrc, _args);
     }
 
-    function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) internal returns (address) {
+    function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
         return create2(_salt, _contractName, _contractSrc, _args);
     }
 }
