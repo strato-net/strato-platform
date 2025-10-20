@@ -118,7 +118,7 @@ contract record AdminRegistry is Ownable {
         if (votingThresholdBps > 0) {
             return 10000 * issueVotes >= votingThresholdBps * admins.length;
         } else {
-            return 3 * issueVotes >= 2 * admins.length;
+            return 5 * issueVotes >= 3 * admins.length;
         }
     }
 
