@@ -24,7 +24,6 @@ import Data.Aeson
 import qualified Data.Aeson as JSON
 import Data.Binary
 import Data.Binary.Get
-import Data.Map.Strict (Map)
 import qualified Data.Map.Strict as M
 import qualified Data.Map.Ordered as OMap
 import Data.Maybe (fromMaybe, listToMaybe)
@@ -48,7 +47,6 @@ data AggregateAction = AggregateAction
     actionCodeHash :: CodePtr,
     actionCodeCollection :: CodeCollection,
     actionStorage :: Action.DataDiff,
-    actionAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     actionType :: Action.CallType,
     actionSrc :: Maybe Code
   }
@@ -61,7 +59,6 @@ data AggregateEvent = AggregateEvent
     eventTxHash :: Keccak256,
     eventTxSender :: Address,
     eventIndex :: Int,
-    eventAbstracts :: Map (Address, Text) (Text, Text, [Text]),
     eventEvent :: Event
   }
   deriving (Show, Generic, NFData, ToJSON, FromJSON)
@@ -96,7 +93,6 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionCodeHash = _actionDataCodeHash,
             actionCodeCollection = _actionDataCodeCollection,
             actionStorage = _actionDataStorageDiffs,
-            actionAbstracts = _actionDataAbstracts,
             actionType = t,
             actionSrc = _src
           }

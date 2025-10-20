@@ -45,8 +45,6 @@ module Blockchain.Slipstream.OutputData (
   aggEventToCollectionRows,
   removeArrayEvArgs,
   getArraysFromEvents,
-  getAllEvents,
-  processParents,
   dbQueryCatchError,
   valueToSQLText',
   storageTableName,
@@ -1058,27 +1056,6 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , attributesMap
         ]
   in InsertTable globalEventTableName columns [values] Nothing
-
-getAllEvents ::
-  AggregateEvent ->
-  [AggregateEvent]
-getAllEvents aggEvent = do
-  let newEvents = processParents aggEvent
-    in aggEvent : newEvents
-
-processParents ::
-  AggregateEvent -> [AggregateEvent]
-processParents ae = createNewEvent <$> Map.toList (eventAbstracts ae)
-  where
-    createNewEvent ::
-      ((Address, Text), (Text, Text, [Text])) -> AggregateEvent
-    createNewEvent ((_, n'), (c, a, _)) =
-      ae { eventEvent = (eventEvent ae) {
-        Action.evContractCreator = T.unpack c,
-        Action.evContractApplication = T.unpack a,
-        Action.evContractName = T.unpack n'
-          }
-      }
 
 ------------------
 
