@@ -34,7 +34,6 @@ import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.Metrics (recordAction)
 import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
@@ -61,10 +60,6 @@ import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
-diffNull :: Action.DataDiff -> Bool
-diffNull (Action.EVMDiff m) = Map.null m
-diffNull (Action.SolidVMDiff m) = Map.null m
-
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
   , collectionInserts :: [ProcessedCollectionRow]
@@ -72,9 +67,7 @@ data BatchedInserts = BatchedInserts
   deriving (Show)
 
 matters :: AggregateAction -> Bool
-matters AggregateAction {..} =
-  (actionType == Action.Create || (not $ diffNull actionStorage))
-    && (codePtrToSHA actionCodeHash /= emptyHash)
+matters AggregateAction {..} = codePtrToSHA actionCodeHash /= emptyHash
 
 
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
@@ -277,7 +270,6 @@ processTheMessages messages = do
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
                 pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
-            recordAction row
             pure . Right $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
