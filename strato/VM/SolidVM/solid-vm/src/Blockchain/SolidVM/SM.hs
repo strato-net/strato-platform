@@ -1058,9 +1058,7 @@ markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
       val = rlpSerialize $ rlpEncode val'
-      ins = \case
-        Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
-        e -> internalError "SolidVM Diff executing in EVM" $ show e
+      ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key val m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 

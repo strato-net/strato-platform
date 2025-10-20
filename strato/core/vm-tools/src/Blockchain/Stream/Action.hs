@@ -50,7 +50,6 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.ExtendedWord (Word256)
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
@@ -127,19 +126,16 @@ omapMap :: Ord k => (a -> b) -> OMap.OMap k a -> OMap.OMap k b
 omapMap f omap = OMap.fromList $ map (\(k, a) -> (k, f a)) $ OMap.assocs omap
 
 data DataDiff
-  = EVMDiff (Map Word256 Word256)
-  | SolidVMDiff (Map B.ByteString B.ByteString)
+  = SolidVMDiff (Map B.ByteString B.ByteString)
   deriving (Eq, Show, Generic, NFData)
 
 instance Format DataDiff where
-  format x@(EVMDiff _) = show x
   format (SolidVMDiff vals) =
     "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (format . rlpDecode @BasicValue . rlpDeserialize) vals)) ++ "]"
 
 instance Binary DataDiff
 
 instance ToJSON DataDiff where
-  toJSON (EVMDiff m) = toJSON m
   toJSON (SolidVMDiff m) = toJSON m
 
 sequenceTuple :: Monad m => (m a, m b) -> m (a, b)
@@ -190,19 +186,22 @@ instance Binary ActionData
 
 mergeActionData :: ActionData -> ActionData -> ActionData
 mergeActionData newData oldData =
-  let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
-        (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
-        (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
-        _ -> error "mismatched action kinds at the same address"
-      cc = _actionDataCodeCollection oldData <> _actionDataCodeCollection newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs
+  let SolidVMDiff n = _actionDataStorageDiffs newData
+      SolidVMDiff o = _actionDataStorageDiffs oldData
+   in ActionData
+          (_actionDataCodeHash oldData)
+          (_actionDataCodeCollection oldData <> _actionDataCodeCollection newData)
+          (_actionDataCreator newData)
+          (_actionDataCCCreator newData)
+          (_actionDataRoot newData)
+          (_actionDataApplication newData)
+          (SolidVMDiff $ n <> o)
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
 mergeActionDataStorageDiffs newData oldData =
-  let diffs = case (_actionDataStorageDiffs newData, _actionDataStorageDiffs oldData) of
-        (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
-        (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
-        _ -> error "mismatched action kinds at the same address"
+  let SolidVMDiff n = _actionDataStorageDiffs newData
+      SolidVMDiff o = _actionDataStorageDiffs oldData
+      diffs = SolidVMDiff $ n <> o
    in newData & actionDataStorageDiffs .~ diffs
 
 instance Semigroup ActionData where

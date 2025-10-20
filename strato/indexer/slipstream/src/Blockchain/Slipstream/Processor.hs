@@ -26,9 +26,7 @@ where
 import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
-import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Value
-import qualified BlockApps.SolidityVarReader as SVR
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
@@ -105,11 +103,9 @@ processedContract ABIID {..} state AggregateAction {..} =
 rowToInsert ::
   ABIID ->
   AggregateAction ->
-  OLD.Contract ->
   E.ProcessedContract
-rowToInsert abiid row cont =
+rowToInsert abiid row =
   let newState = case actionStorage row of
-        Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
    in processedContract abiid (Map.fromList $ newState) row
 
@@ -118,7 +114,6 @@ rowToCollections :: AggregateAction -> Map.Map Text Value
 rowToCollections row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-        _ -> [] 
    in Map.fromList newState
 
 processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
@@ -253,7 +248,6 @@ processTheMessages messages = do
     forM changes $ \(_, actions) -> do
       forM actions $ \(row) -> do
         case actionStorage row of
-          Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
             let name = case actionCodeHash row of
                   SolidVMCode name' _ -> name'
@@ -263,9 +257,8 @@ processTheMessages messages = do
                     { aiName = T.pack name,
                       aiChain = ""
                     }
-                cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name
-            let indexContract = rowToInsert abiid row cont
+            let indexContract = rowToInsert abiid row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row

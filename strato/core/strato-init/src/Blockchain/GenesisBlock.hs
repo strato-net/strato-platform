@@ -356,13 +356,12 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
         storageDiff = case storage d of
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
-          EVMDiff m -> A.EVMDiff $ Map.map fromDiff m
+          EVMDiff _ -> error "evm state in genesis block isn't supported"
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'
         genesisBlockCodePtr (SolidVMCode _ ch') = ch'
 
         lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
-        lookupSolidDiff _ _                 = Nothing
 
 
 bootstrapIndexer :: OutputBlock -> IO ()

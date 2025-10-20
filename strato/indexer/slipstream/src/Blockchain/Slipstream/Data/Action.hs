@@ -108,11 +108,7 @@ formatAction AggregateAction {..} =
       " with account: ",
       tshow actionAddress,
       " with ",
-      tshow
-        ( case actionStorage of
-            Action.EVMDiff m -> M.size m
-            Action.SolidVMDiff m -> M.size m
-        ),
+      tshow (numberOfDiffs actionStorage),
       " items\n",
       "    codeHash = ",
       tshow actionCodeHash
@@ -120,3 +116,6 @@ formatAction AggregateAction {..} =
   where
     tshow :: Show a => a -> Text
     tshow = T.pack . show
+
+numberOfDiffs :: Action.DataDiff -> Int
+numberOfDiffs (Action.SolidVMDiff m) = M.size m
