@@ -475,81 +475,46 @@ contract record CDPEngine is Ownable {
         uint repay = debtToCoverWei;
         if (repay > totalDebtWei)   repay = totalDebtWei;
         if (repay > closeFactorCap) repay = closeFactorCap;
-        if (repay > coverageCap){
-            repay = coverageCap;
-            capBinds = true;  // Full collateral seizure expected
-        }    
+        if (repay > coverageCap) { repay = coverageCap; capBinds = true; }
         require(repay > 0, "CDPEngine: nothing to liquidate");
 
-        // If cap binds, switch to tokens-first to avoid leftover
         uint collateralToSeize = 0;
-        uint owedForDelta;
-
         uint penaltyWei = 0;
+
+        // Convert to scaled and clamp to vault's scaledDebt
+        uint scaledDebtToLiquidate = (repay * RAY) / assetState.rateAccumulator;
+        if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
+            scaledDebtToLiquidate = borrowerVault.scaledDebt;
+        }
+        uint owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
+
+        // burn exact, route only interest
+        Token(_usdst()).burn(msg.sender, owedForDelta);
+
+        uint feeWei = owedForDelta > scaledDebtToLiquidate ? (owedForDelta - scaledDebtToLiquidate) : 0;
+        if (feeWei > 0) _routeFees(collateralAsset, feeWei);
+
+        borrowerVault.scaledDebt   -= scaledDebtToLiquidate;
+        assetState.totalScaledDebt -= scaledDebtToLiquidate;
+
         if (capBinds) {
-            // 1) Seize ALL collateral → zero leftover
             collateralToSeize = borrowerVault.collateral;
-
-            // 2) Back-solve the USDST to burn from seized tokens
-            uint debtWithPenaltyWei = (collateralToSeize * priceCollWei) / config.unitScale; // floor
-            uint repayWei = (debtWithPenaltyWei * 10000) / (10000 + config.liquidationPenaltyBps); // == coverageCap
-
-            // 3) Push through the index to get exact amount to burn
-            uint scaledDebtToLiquidate = (repayWei * RAY) / assetState.rateAccumulator;
-            if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
-                scaledDebtToLiquidate = borrowerVault.scaledDebt;
-            }
-            owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
-            penaltyWei = (owedForDelta * config.liquidationPenaltyBps) / 10000;
-
-            // burn + fee routing + books
-            Token(_usdst()).burn(msg.sender, owedForDelta);
-
-            uint baseWei = scaledDebtToLiquidate;
-            uint feeWei  = owedForDelta > baseWei ? (owedForDelta - baseWei) : 0;
-            _routeFees(collateralAsset, feeWei);
-
-            borrowerVault.scaledDebt -= scaledDebtToLiquidate;
-            assetState.totalScaledDebt -= scaledDebtToLiquidate;
-
+            uint collateralUSD = (collateralToSeize * priceCollWei) / config.unitScale;
+            penaltyWei = collateralUSD > owedForDelta ? (collateralUSD - owedForDelta) : 0;
         } else {
-            // Convert to scaled and clamp (rounding may reduce extinguished USDST below `repay`)
-            uint scaledDebtToLiquidate = (repay * RAY) / assetState.rateAccumulator;
-            if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
-                scaledDebtToLiquidate = borrowerVault.scaledDebt;
-            }
-
-            // Debt actually extinguished at current index (EXACT amount to burn)
-            uint owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
-            uint baseWei = scaledDebtToLiquidate; // normalized principal extinguished
-            uint feeWei  = owedForDelta > baseWei ? (owedForDelta - baseWei) : 0;
-
-            // Burn exact, route fee, update books
-            Token(_usdst()).burn(msg.sender, owedForDelta);
-
-            // Route fees between Reserve and FeeCollector
-            _routeFees(collateralAsset, feeWei);
-
-            borrowerVault.scaledDebt -= scaledDebtToLiquidate;
-            assetState.totalScaledDebt -= scaledDebtToLiquidate;
-
-            // Seize collateral for (repay + penalty) based on actual burned amount
             penaltyWei = (owedForDelta * config.liquidationPenaltyBps) / 10000;
             uint debtWithPenaltyWei = owedForDelta + penaltyWei;
-
             collateralToSeize = (debtWithPenaltyWei * config.unitScale) / priceCollWei;
             if (collateralToSeize > borrowerVault.collateral) {
                 collateralToSeize = borrowerVault.collateral;
             }
         }
 
-        // Apply the seizure to books
         borrowerVault.collateral -= collateralToSeize;
         _cdpVault().seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
         uint finalDebtWei = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
 
-        // Realize bad debt if no collateral remains and debt still > 1 wei
         if (borrowerVault.collateral == 0) {
             uint rem = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
             if (rem > 1) {
@@ -559,15 +524,15 @@ contract record CDPEngine is Ownable {
                 emit BadDebtRealized(collateralAsset, borrower, rem);
             }
         }
-        
+
         emit LiquidationExecuted(
             borrower,
             collateralAsset,
-            owedForDelta,            
+            owedForDelta,          // was coverageCap
             penaltyWei,
-            collateralToSeize,   
+            collateralToSeize,
             msg.sender,
-            finalDebtWei,           
+            finalDebtWei,
             assetState.rateAccumulator
         );
 
