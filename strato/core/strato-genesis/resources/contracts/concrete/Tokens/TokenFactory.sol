@@ -12,6 +12,7 @@
 // SPDX-License-Identifier: MIT
 import "./Token.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
+import "../Proxy/Proxy.sol";
 
 /// @notice Token factory contract
 contract record TokenFactory is Ownable {
@@ -89,7 +90,8 @@ contract record TokenFactory is Ownable {
         address _initialOwner
     ) public onlyOwner returns (address) {
         // Create new token with msg.sender as the token creator
-        Token newToken = new Token(
+        Token newToken = Token(address(new Proxy(address(new Token(_initialOwner)), address(this))));
+        newToken.initialize(
             _name,
             _description,
             _images,
@@ -100,6 +102,7 @@ contract record TokenFactory is Ownable {
             _customDecimals,
             _initialOwner
         );
+        newToken.transferOwnership(_initialOwner);
         
         // Register the token
         address tokenAddress = address(newToken);

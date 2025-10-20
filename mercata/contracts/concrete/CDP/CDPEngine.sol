@@ -930,7 +930,9 @@ contract record CDPEngine is Ownable {
         if (newCap == 0) {
             totalJuniorOutstandingUSDST -= payAmount;
             prevReserveBalance -= payAmount;
-            delete juniorNotes[msg.sender];
+            delete juniorNotes[msg.sender].owner;
+            delete juniorNotes[msg.sender].capUSDST;
+            delete juniorNotes[msg.sender].entryIndex;
             emit JuniorNoteClaimed(msg.sender, payAmount, 0);
             emit JuniorNoteClosed(msg.sender);
         } else {

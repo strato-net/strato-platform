@@ -53,15 +53,15 @@ insertMercataGovernanceContract validators admins gi =
             (".adminCount", BInteger . toInteger $ length admins)
           ]
           -- ++ map (\(i, CommonName o u c True) ->
-          --          ( encodeUtf8 $ ".validatorMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+          --          ( encodeUtf8 $ ".validatorMap[" <> o <> "][" <> u <> "][" <> c <> "]"
           --          , addrToCertIdx . show $ validatorAddr i)) valIx
           -- ++ map (\(i, CommonName o u c True) ->
-          --          ( encodeUtf8 $ ".adminMap<\"" <> o <> "\"><\"" <> u <> "\"><\"" <> c <> "\">"
+          --          ( encodeUtf8 $ ".adminMap[" <> o <> "][" <> u <> "][" <> c <> "]"
           --          , addrToCertIdx . show $ adminAddr i)) adminIx
           ++ map
             ( \case
                 (i, Validator c) ->
-                  ( encodeUtf8 $ ".validatorMap<a:" <> Text.pack (printf "%040x" c) <> ">",
+                  ( encodeUtf8 $ ".validatorMap[" <> Text.pack (printf "%040x" c) <> "]",
                     addrToCertIdx $ validatorAddr i
                   )
             )
@@ -69,7 +69,7 @@ insertMercataGovernanceContract validators admins gi =
           ++ map
             ( \case
                 (i, c) ->
-                  ( encodeUtf8 $ ".adminMap<a:" <> Text.pack (printf "%040x" c) <> ">",
+                  ( encodeUtf8 $ ".adminMap[" <> Text.pack (printf "%040x" c) <> "]",
                     addrToCertIdx $ adminAddr i
                   )
             )
