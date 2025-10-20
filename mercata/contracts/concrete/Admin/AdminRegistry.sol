@@ -101,13 +101,8 @@ contract record AdminRegistry {
                 target = msg.sender;
             }
             string issueId = _getIssueId(target, _func, _args);
-            if (whitelist[target][_func][sender]) {
-                variadic ret = _executeIssue(sender, issueId, target, _func, _args);
-                return (true, ret);
-            } else {
-                _createIssue(sender, issueId, target, _func, _args);
-            }
-            return (false, issueId);
+            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
+            return (true, ret);
         }
     }
 
