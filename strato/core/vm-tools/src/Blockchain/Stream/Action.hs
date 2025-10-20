@@ -30,7 +30,6 @@ module Blockchain.Stream.Action (
   actionDataRoot,
   actionDataApplication,
   actionDataStorageDiffs,
-  actionDataAbstracts,
   actionDataCallTypes,
   
   CallType(..),
@@ -248,7 +247,6 @@ data ActionData = ActionData
     _actionDataRoot :: Text,
     _actionDataApplication :: Text,
     _actionDataStorageDiffs :: DataDiff,
-    _actionDataAbstracts :: Map (Address, Text) (Text, Text, [Text]), -- (import address, contract name) -> (cn, app)
     _actionDataCallTypes :: [CallType]
   }
   deriving (Eq, Show, Generic, NFData)
@@ -286,8 +284,7 @@ mergeActionData newData oldData =
         _ -> error "mismatched action kinds at the same address"
       calls = ((++) `on` _actionDataCallTypes) oldData newData
       cc = _actionDataCodeCollection oldData <> _actionDataCodeCollection newData
-      abstracts = _actionDataAbstracts oldData <> _actionDataAbstracts newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs abstracts calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs calls
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
 mergeActionDataStorageDiffs newData oldData =
@@ -310,7 +307,6 @@ instance ToJSON ActionData where
         "root" .= _actionDataRoot,
         "application" .= _actionDataApplication,
         "diff" .= _actionDataStorageDiffs,
-        "abstracts" .= _actionDataAbstracts,
         "types" .= _actionDataCallTypes
       ]
 
@@ -323,9 +319,8 @@ instance FromJSON ActionData where
     rt <- o .: "root"
     ap <- o .: "application"
     df <- explicitParseField parseDiffSolidVM o "diff"
-    da <- o .: "abstracts"
     dt <- o .: "types"
-    return $ ActionData ch cc cr ccr rt ap df da dt
+    return $ ActionData ch cc cr ccr rt ap df dt
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall

@@ -248,7 +248,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
     let srcHash = hash $ T.encodeUtf8 src
         codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash
-    pure $ CodeCollectionAdded (() <$ cc) codePtr' "BlockApps" name Map.empty
+    pure $ CodeCollectionAdded (() <$ cc) codePtr' "BlockApps" name
 
   pub Nothing ccas
 
@@ -334,7 +334,6 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     originAddress'
                     appName'
                     storageDiff
-                    Map.empty
                     [A.Create]),
               A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,

@@ -221,7 +221,7 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ <- messages]
+        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
