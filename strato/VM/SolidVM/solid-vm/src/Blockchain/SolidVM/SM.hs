@@ -1050,7 +1050,7 @@ initializeAction :: MonadSM m
                  -> CC.CodeCollection
                  -> m ()
 initializeAction acct name crtr cc_crtr root appName hsh cc = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) []
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 

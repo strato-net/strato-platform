@@ -30,9 +30,7 @@ module Blockchain.Stream.Action (
   actionDataRoot,
   actionDataApplication,
   actionDataStorageDiffs,
-  actionDataCallTypes,
   
-  CallType(..),
   DataDiff(..),
   Delegatecall(..),
 
@@ -40,7 +38,7 @@ module Blockchain.Stream.Action (
   omapInsertWith,
   omapLens,
   omapMap,
-  omapUnionWith,
+--  omapUnionWith,
   mergeActionData,
   mergeActionDataStorageDiffs
 
@@ -65,9 +63,7 @@ import Data.Binary
 import qualified Data.Bifunctor as BF
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Short as BSS
 import Data.Foldable
-import Data.Function (on)
 import Data.List
 import Data.Map.Strict (Map)
 import qualified Data.Map.Ordered as OMap
@@ -88,86 +84,6 @@ import Text.Tools
 
 import Data.Binary.Instances.Time ()
 
-data CallType = Create | Delete | Update deriving (Eq, Show, Generic, NFData)
-
-instance Binary CallType
-
-instance ToJSON CallType
-
-instance FromJSON CallType
-
-data CallData = CallData
-  { _callDataType :: CallType,
-    _callDataSender :: Address,
-    _callDataOwner :: Address,
-    _callDataGasPrice :: Integer,
-    _callDataValue :: Integer,
-    _callDataInput :: BSS.ShortByteString,
-    _callDataOutput :: Maybe BSS.ShortByteString
-  }
-  deriving (Eq, Show, Generic, NFData)
-
---makeLenses ''CallData
-{-
-instance Format CallData where
-  format CallData {..} =
-    "callDataType: " ++ show _callDataType ++ "\n"
-      ++ "callDataSender: "
-      ++ format _callDataSender
-      ++ "\n"
-      ++ "callDataOwner: "
-      ++ format _callDataOwner
-      ++ "\n"
-      ++ "callDataGasPrice: "
-      ++ show _callDataGasPrice
-      ++ "\n"
-      ++ "callDataValue: "
-      ++ show _callDataValue
-      ++ "\n"
-      ++ "callDataInput: "
-      ++ show _callDataInput
-      ++ "\n"
-      ++ "callDataOutput: "
-      ++ show _callDataOutput
-      ++ "\n"
-
-instance ToJSON CallData where
-  toJSON CallData {..} =
-    object
-      [ "type" .= _callDataType,
-        "sender" .= _callDataSender,
-        "owner" .= _callDataOwner,
-        "gasPrice" .= _callDataGasPrice,
-        "value" .= _callDataValue,
-        "input" .= _callDataInput,
-        "output" .= _callDataOutput
-      ]
-
-instance FromJSON CallData where
-  parseJSON (Object o) =
-    CallData
-      <$> (o .: "type")
-      <*> (o .: "sender")
-      <*> (o .: "owner")
-      <*> (o .: "gasPrice")
-      <*> (o .: "value")
-      <*> (o .: "input")
-      <*> (o .:? "output")
-  parseJSON o = fail $ "parseJSON CallData: Expected object, got: " ++ show o
--}
-{-
-emptyCallData :: CallData
-emptyCallData =
-  CallData
-    { _callDataType = Create,
-      _callDataSender = Address 0,
-      _callDataOwner = Address 0,
-      _callDataGasPrice = 0,
-      _callDataValue = 0,
-      _callDataInput = BSS.empty,
-      _callDataOutput = Nothing
-    }
--}
 omapLens :: (Ord k) => k -> Lens' (OMap.OMap k v) (Maybe v)
 omapLens k = lens getter setter
   where
@@ -195,7 +111,7 @@ omapAdjust f k omap = omapAdjustWithKey (const f) k omap
 -- If the key is not present, return the original OMap.
 omapAdjustWithKey :: Ord k => (k -> a -> a) -> k -> OMap.OMap k a -> OMap.OMap k a
 omapAdjustWithKey f k omap = OMap.alter (fmap (f k)) k omap
-
+{-
 -- | Take the union of two ordered maps. If a key appears in both maps,
 -- the first argument's index takes precedence, and the supplied function
 -- is used to combine the values.
@@ -206,7 +122,7 @@ omapUnionWith f = omapUnionWithKey (\_ x y -> f x y)
 -- If a key appears in both maps, the first argument's index takes precedence.
 omapUnionWithKey :: Ord k => (k -> v -> v -> v) -> OMap.OMap k v -> OMap.OMap k v -> OMap.OMap k v
 omapUnionWithKey f t1 t2 = OMap.unionWithL f t1 t2
-
+-}
 omapMap :: Ord k => (a -> b) -> OMap.OMap k a -> OMap.OMap k b
 omapMap f omap = OMap.fromList $ map (\(k, a) -> (k, f a)) $ OMap.assocs omap
 
@@ -246,8 +162,7 @@ data ActionData = ActionData
     _actionDataCCCreator :: Maybe Text,
     _actionDataRoot :: Text,
     _actionDataApplication :: Text,
-    _actionDataStorageDiffs :: DataDiff,
-    _actionDataCallTypes :: [CallType]
+    _actionDataStorageDiffs :: DataDiff
   }
   deriving (Eq, Show, Generic, NFData)
 
@@ -270,9 +185,6 @@ instance Format ActionData where
       ++ "\n"
       ++ "actionDataStorageDiffs: "
       ++ format _actionDataStorageDiffs
-      ++ "\n"
-      ++ "actionDataCallTypes:\n"
-      ++ tab (show _actionDataCallTypes)
 
 instance Binary ActionData
 
@@ -282,9 +194,8 @@ mergeActionData newData oldData =
         (EVMDiff n, EVMDiff o) -> EVMDiff $ n <> o
         (SolidVMDiff n, SolidVMDiff o) -> SolidVMDiff $ n <> o
         _ -> error "mismatched action kinds at the same address"
-      calls = ((++) `on` _actionDataCallTypes) oldData newData
       cc = _actionDataCodeCollection oldData <> _actionDataCodeCollection newData
-   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs calls
+   in ActionData (_actionDataCodeHash oldData) cc (_actionDataCreator newData) (_actionDataCCCreator newData) (_actionDataRoot newData) (_actionDataApplication newData) diffs
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
 mergeActionDataStorageDiffs newData oldData =
@@ -306,8 +217,7 @@ instance ToJSON ActionData where
         "cc_creator" .= _actionDataCCCreator,
         "root" .= _actionDataRoot,
         "application" .= _actionDataApplication,
-        "diff" .= _actionDataStorageDiffs,
-        "types" .= _actionDataCallTypes
+        "diff" .= _actionDataStorageDiffs
       ]
 
 instance FromJSON ActionData where
@@ -319,8 +229,7 @@ instance FromJSON ActionData where
     rt <- o .: "root"
     ap <- o .: "application"
     df <- explicitParseField parseDiffSolidVM o "diff"
-    dt <- o .: "types"
-    return $ ActionData ch cc cr ccr rt ap df dt
+    return $ ActionData ch cc cr ccr rt ap df
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
@@ -468,8 +377,6 @@ instance FromJSON Action where
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))
   parseJSON o = fail $ "parseJSON Action: Expected object, got: " ++ show o
 
-instance Arbitrary CallType where
-  arbitrary = genericArbitrary
 {-
 instance Arbitrary CallData where
   arbitrary = genericArbitrary

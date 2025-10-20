@@ -333,8 +333,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     mkCreator
                     originAddress'
                     appName'
-                    storageDiff
-                    [A.Create]),
+                    storageDiff),
               A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
               A._events = addressEvents,
