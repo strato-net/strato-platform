@@ -95,6 +95,7 @@ contract record AdminRegistry {
             }
             address sender = msg.sender;
             address target = _target;
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
             if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
                 sender = _target;
                 target = msg.sender;

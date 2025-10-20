@@ -420,7 +420,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
 
         // Perform Liquidation
-        pool.liquidationCallAll(GOLDST, address(user1));
+        pool.liquidationCallAll(GOLDST, address(user1), 0);
         require(
             pool.getHealthFactor(address(user1)) == INFINITY,
             "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
@@ -485,7 +485,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), amountBorrowed); // enough to cover the debt
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCallAll(GOLDST, address(user));
+        pool.liquidationCallAll(GOLDST, address(user), 0);
 
         require(pool.badDebt() > 0, "Bad debt should be > 0 after liquidation");
 
