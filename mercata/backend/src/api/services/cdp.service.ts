@@ -918,7 +918,7 @@ export const liquidate = async (
       args: {
         collateralAsset: body.collateralAsset,
         borrower: body.borrower,
-        debtToCover: debtToCoverWei,
+        debtToCoverWei: debtToCoverWei,
       },
     },
   ];
