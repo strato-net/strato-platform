@@ -3,10 +3,11 @@ import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record Voucher is ERC20, Ownable {
     
-    constructor(
-        string _name,
-        string _symbol
-    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+    constructor() Ownable(msg.sender) {}
+
+    /// @dev initializable only once
+    function initialize(string name_, string symbol_) external onlyOwner {
+        __ERC20_init(name_, symbol_);
     }
 
     function transfer(address to, uint256 value) public override returns (bool) {

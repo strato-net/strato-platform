@@ -184,13 +184,10 @@ const LiquidateModal: React.FC<LiquidateModalProps> = ({
           variant: "destructive" 
         });
       }
-    } catch (error) {
-      console.error('Liquidation failed:', error);
-      toast({ 
-        title: "Liquidation Failed", 
-        description: "Unable to submit liquidation. Please try again.",
-        variant: "destructive" 
-      });
+    } catch (error: any) {
+      // Axios interceptor already shows the error toast, so we don't need to show another one
+      // Just log for debugging
+      console.error('Liquidation error:', error?.response?.data || error);
     }
   };
 

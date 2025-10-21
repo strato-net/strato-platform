@@ -1,6 +1,6 @@
 import "../abstract/ERC20/access/Authorizable.sol";
 import "../concrete/BaseCodeCollection.sol";
-import "main.groth16.sol";
+import "General/main.groth16.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
