@@ -34,7 +34,7 @@ export const getTokenDetails = async (
     {
       params: {
         select:
-          `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,images:${Token}-images(value),attributes:${Token}-attributes(key,value)`,
+          `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,_paused,images:${Token}-images(value),attributes:${Token}-attributes(key,value)`,
         address: `in.(${tokenAddresses.join(",")})`,
       },
     }
