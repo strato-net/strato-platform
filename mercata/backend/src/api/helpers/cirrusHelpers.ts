@@ -1,6 +1,8 @@
 import { cirrus } from "../../utils/mercataApiHelper";
 import { constants } from "../../config/constants";
 
+const { Token } = constants;
+
 export const fetchTokenBalances = (accessToken: string, userAddress: string, tokenAddrs: string[]) =>
   cirrus.get(accessToken, `/${constants.Token}-_balances`, {
     params: { 
@@ -13,9 +15,31 @@ export const fetchTokenBalances = (accessToken: string, userAddress: string, tok
 export const getTokenMetadata = async (accessToken: string, tokenAddresses: string[]) => {
   if (!tokenAddresses.length) return new Map();
   
-  const { data: tokenData } = await cirrus.get(accessToken, `/${constants.Token}`, {
+  const { data: tokenData } = await cirrus.get(accessToken, `/${Token}`, {
     params: { select: "address,_name,_symbol", address: `in.(${tokenAddresses.join(",")})` }
   });
   
   return new Map(tokenData.map((token: any) => [token.address, { name: token._name, symbol: token._symbol }]));
 };
+
+export const getTokenDetails = async (
+  accessToken: string,
+  tokenAddresses: string[]
+) => {
+  if (!tokenAddresses.length) return new Map();
+
+  const { data: tokenData } = await cirrus.get(
+    accessToken,
+    `/${Token}`,
+    {
+      params: {
+        select:
+          `address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,images:${Token}-images(value),attributes:${Token}-attributes(key,value)`,
+        address: `in.(${tokenAddresses.join(",")})`,
+      },
+    }
+  );
+
+  return new Map(tokenData.map((token: any) => [token.address, token]));
+};
+
