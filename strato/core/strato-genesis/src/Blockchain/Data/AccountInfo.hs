@@ -29,7 +29,17 @@ data AccountInfo
   = NonContract Address Integer
   | ContractNoStorage Address Integer CodePtr
   | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
-  | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, BasicValue)]
+  | SolidVMContractWithStorage
+      Address
+      -- ^ Contract address on the blockchain
+      Integer
+      -- ^ Balance in wei
+      CodePtr
+      -- ^ Hash pointer to the compiled SolidVM bytecode
+      [(B.ByteString, BasicValue)]
+      -- ^ Storage key-value pairs where keys are raw ByteStrings and values are
+      -- BasicValue types from SolidVM.Model.Storable This differs from
+      -- ContractWithStorage which uses (Word256, Word256) pairs for EVM storage
   deriving (Show, Eq, Read)
 
 acctInfoAddress :: AccountInfo ->  Address
