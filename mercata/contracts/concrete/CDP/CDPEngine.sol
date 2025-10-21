@@ -475,7 +475,7 @@ contract record CDPEngine is Ownable {
         uint repay = debtToCoverWei;
         if (repay > totalDebtWei)   repay = totalDebtWei;
         if (repay > closeFactorCap) repay = closeFactorCap;
-        if (repay > coverageCap) { repay = coverageCap; capBinds = true; }
+        if (repay >= coverageCap) { repay = coverageCap; capBinds = true; }
         require(repay > 0, "CDPEngine: nothing to liquidate");
 
         uint collateralToSeize = 0;
