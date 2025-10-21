@@ -33,6 +33,9 @@ contract record SafetyModule is Ownable {
     address public  asset;   // USDST
     address public  sToken;  // sUSDST (ERC-20)
 
+    // Managed assets: internal tracking to prevent donation attacks
+    uint256 private managedAssets;
+
     // Cooldown mechanics
     uint public COOLDOWN_SECONDS = 259200;
     uint public UNSTAKE_WINDOW  = 172800;
@@ -108,10 +111,12 @@ contract record SafetyModule is Ownable {
     // ─────────────────────────────────────────
     // Views / math
     // Vault TVL in underlying (pulls live ERC20 balance)
+    /// @notice Returns managed assets - immune to donation attacks
+    /// @dev Uses internal accounting instead of live balance to prevent share price manipulation
     function totalAssets() public view returns (uint) 
     { 
         require(asset != address(0), "SM:asset not set");
-        return IERC20(asset).balanceOf(address(this)); 
+        return managedAssets;
     }
 
     // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
@@ -170,24 +175,31 @@ contract record SafetyModule is Ownable {
     /// @notice Stake `assetsIn` USDST; mints shares using balance-delta to account for fee-on-transfer tokens.
     /// @dev Guards:
     ///  - Active underlying (prevents deposits into offboarded market)
-    ///  - Donation guard on first mint (no pre-loaded funds)
+    ///  - Donation guard on first mint (no pre-loaded funds via managedAssets tracking)
     ///  - Slippage (minSharesOut)
+    ///  - Uses managedAssets for accounting to prevent donation attacks
     function stake(uint assetsIn, uint minSharesOut) external onlyActiveToken(asset) onlyActiveToken(sToken) returns (uint sharesOut) {
         require(assetsIn > 0, "SM:zero");
         uint s = totalShares();
-        uint beforeBal = totalAssets();
+        uint beforeAssets = totalAssets();
 
         if (s == 0) {
-            require(beforeBal == 0, "SM:init stray funds"); // donation guard
+            require(beforeAssets == 0, "SM:init stray funds"); // donation guard
         } else {
-            require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
+            require(beforeAssets > 0, "SM:price=0");  // prevent (s>0, a==0) 
         }
 
+        // Use balance delta to handle fee-on-transfer tokens
+        uint beforeBal = IERC20(asset).balanceOf(address(this));
         IERC20(asset).transferFrom(msg.sender, address(this), assetsIn);
-        uint delta = totalAssets() - beforeBal;
+        uint afterBal = IERC20(asset).balanceOf(address(this));
+        uint delta = afterBal - beforeBal;
         require(delta > 0, "SM:no delta");
 
-        sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
+        // Update managed assets with actual received amount
+        managedAssets += delta;
+
+        sharesOut = (s == 0) ? delta : (delta * s) / beforeAssets;
         require(sharesOut > 0, "SM:dust");
         require(sharesOut >= minSharesOut, "SM:slippage");
 
@@ -209,6 +221,7 @@ contract record SafetyModule is Ownable {
 
     /// @notice Redeem shares for USDST to `to` after cooldown and within unstake window.
     /// @dev Caller must hold the shares in wallet (withdraw from Chef first).
+    ///      Updates managedAssets to maintain accurate internal accounting.
     function redeem(uint sharesIn, uint minAssetsOut) external returns (uint assetsOut) {
         require(sharesIn > 0, "SM:zero");
         require(IERC20(sToken).balanceOf(msg.sender) >= sharesIn, "SM:not holder");
@@ -224,6 +237,9 @@ contract record SafetyModule is Ownable {
         require(assetsOut > 0, "SM:dust");
         require(assetsOut >= minAssetsOut, "SM:slippage");
 
+        // Update managed assets before transfer
+        managedAssets -= assetsOut;
+
         // burn then transfer
         Token(sToken).burn(msg.sender, sharesIn);
         IERC20(asset).transfer(msg.sender, assetsOut);
@@ -237,21 +253,31 @@ contract record SafetyModule is Ownable {
     // Rewards / Shortfall
     // ─────────────────────────────────────────
     /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
+    /// @dev Updates managedAssets with actual received amount (handles fee-on-transfer tokens).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
+        
+        // Use balance delta to handle fee-on-transfer tokens
+        uint beforeBal = IERC20(asset).balanceOf(address(this));
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
-        emit RewardNotified(amount);
+        uint afterBal = IERC20(asset).balanceOf(address(this));
+        uint actualReceived = afterBal - beforeBal;
+        
+        // Increment managed assets with actual amount received
+        managedAssets += actualReceived;
+        
+        emit RewardNotified(actualReceived);
     }
 
     /// @notice Slash vault to cover protocol shortfall.
     /// @dev Data plane: send USDST to LiquidityPool.
     /// Control plane: tell LendingPool to consume badDebt (accounting).
- 
+    ///      Updates managedAssets to maintain accurate internal accounting.
     function coverShortfall(uint256 amount) external onlyOwner returns (uint256 covered) {
         require(amount > 0, "SM:zero");
 
         // Live caps
-        uint256 ta        = totalAssets();                         // SM TVL
+        uint256 ta        = totalAssets();                         // SM TVL (managed)
         uint256 bd        = lendingPool.badDebt();                 // live bad debt in base units
         require(bd > 0, "SM:no bad debt");
 
@@ -264,6 +290,9 @@ contract record SafetyModule is Ownable {
         if (covered > bd)        covered = bd;        // don't overfund beyond bad debt
 
         require(covered > 0, "SM:nothing to cover");
+
+        // Decrement managed assets before transfer
+        managedAssets -= covered;
 
         // Push exactly what will be consumed, then notify LendingPool
         IERC20(asset).transfer(address(liquidityPool), covered);
