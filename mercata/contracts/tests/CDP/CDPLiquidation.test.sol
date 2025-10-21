@@ -977,6 +977,47 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         require(sumRepay > 0, "Final: expected some repay across rounds");
     }
 
+    // ───────────────────── Proof-of-bug: cap-bound must NOT mint fees ─────────────────────
+    /// With no interest accrual (rate == RAY), a cap-bound liquidation should:
+    ///   - burn exactly `coverageCap` USDST from the liquidator
+    ///   - mint ZERO fees (interest portion is zero)
+    /// Therefore, USDST total supply MUST drop by exactly `coverageCap`,
+    /// and the Reserve balance MUST remain unchanged.
+    function it_cap_bound_must_not_mint_fees_and_total_supply_must_drop_by_repay() public {
+        // Setup: CF=50% (default), PEN=10%, no interest (SFR == RAY), cap-bound at $1
+        _open(2000e18, 6000e18, OPEN_P);
+
+        // Force cap-bound path: set price to $1 so coverageCap < totalDebt and engine seizes ALL collateral.
+        oracle.setAssetPrice(ASSET, LOW_P);
+
+        // Compute the exact coverageCap the engine will use (same formula as in the engine)
+        (uint colBefore, ) = _state(address(borrower));
+        uint colUSD = (colBefore * LOW_P) / UNIT;
+        uint coverageCap = (colUSD * 10000) / (10000 + PEN); // floor
+
+        // Snapshot USDST total supply and Reserve balance BEFORE
+        uint ts0 = usdstT.totalSupply();
+        uint reserve0 = usdstT.balanceOf(address(reg.cdpReserve()));
+
+        fastForward(3600); // 1 hour
+
+        // Liquidate with a huge allowance so internal caps determine the repay
+        liq.callFunction(USDST, "approve", address(cdp), 1e36);
+        liq.callFunction(address(cdp), "liquidate", ASSET, address(borrower), 1e36);
+
+        // AFTER:
+        // With rate == RAY (no interest), the EXACT burn equals coverageCap and fee==0,
+        // so total supply must drop by exactly coverageCap. If your cap branch wrongly
+        // calls _routeFees with `coverageCap`, net supply drop will be ~0, and this fails.
+        uint ts1 = usdstT.totalSupply();
+        log("ts0 - ts1", ts0 - ts1);
+        log("coverageCap", coverageCap);
+        require(ts0 - ts1 == coverageCap, "CAP FEE BUG: totalSupply should drop by exactly coverageCap");
+
+        // Also ensure no fees were minted to the Reserve (fee portion must be zero here)
+        uint reserve1 = usdstT.balanceOf(address(reg.cdpReserve()));
+        require(reserve1 == reserve0, "CAP FEE BUG: Reserve should not receive USDST when no interest accrued");
+    }
 
 
 }
