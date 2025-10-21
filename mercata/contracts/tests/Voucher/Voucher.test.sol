@@ -29,7 +29,8 @@ contract Describe_Voucher {
     }
 
     function beforeEach() {
-        voucher = new Voucher("Test Voucher", "VCH");
+        voucher = new Voucher();
+        voucher.initialize("Test Voucher", "VCH");
     }
 
     // ============ CONSTRUCTOR TESTS ============
