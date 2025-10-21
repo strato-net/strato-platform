@@ -62,6 +62,7 @@ import qualified Handlers.TransactionResult        as TransactionResult
 import           Handlers.TxLast                   hiding (API, server)
 import qualified Handlers.TxLast                   as TxLast
 import           Servant
+import qualified Strato.Strato23.API.Types         as V
 import           UnliftIO
 
 type CoreAPI =
@@ -89,6 +90,7 @@ type MonadCoreAPI m =
     Accessible IdentityData m,
     Accessible [RawTransaction] m,
     Accessible Stats.TransactionCount m,
+    Accessible V.PublicKey m,
     BlkLast.GetLastBlocks m,
     TxLast.GetLastTransactions m,
     HasVault m,

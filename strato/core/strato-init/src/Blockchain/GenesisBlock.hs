@@ -15,9 +15,7 @@ module Blockchain.GenesisBlock
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.BlockDB
-import Blockchain.CertificateDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
@@ -35,10 +33,7 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
-import Blockchain.Generation
-  ( readCertsFromGenesisInfo,
-    readValidatorsFromGenesisInfo,
-  )
+import Blockchain.Generation (readValidatorsFromGenesisInfo)
 import Blockchain.Model.WrappedBlock (OutputBlock(..))
 import Blockchain.Model.SyncState
 import Blockchain.Sequencer.Bootstrap (bootstrapSequencer)
@@ -46,6 +41,7 @@ import Blockchain.SolidVM.CodeCollectionDB
 import qualified Blockchain.Strato.Indexer.ApiIndexer as ApiIndexer
 import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
@@ -89,33 +85,14 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasStateDB m,
     HasStorageDB m,
     HasMemStorageDB m,
-    (Ad.Address `Alters` AddressState) m,
-    HasRedis m
+    (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([(Ad.Address, X509CertInfoState)], [Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- getGenesisInfo
-  let certs' = readCertsFromGenesisInfo genesisInfo
-      validators = readValidatorsFromGenesisInfo genesisInfo
+  let validators = readValidatorsFromGenesisInfo genesisInfo
 
-  -- Need to insert the X509 certificates INTO Redis
-  void . execRedis $ insertRootCertificate
-  $logInfoS "Redis/certInsertion" $ T.pack . format $ x509CertToCertInfoState rootCert
-
-  extraCertInfoStates <-
-    mapM
-      ( \c -> do
-          let c' = x509CertToCertInfoState c
-              ua' = userAddress c'
-          insertCert <- execRedis $ registerCertificate ua' c'
-          case insertCert of
-            Right _ -> $logInfoS "Redis/certInsertion" $ T.pack "Certificate insertion was successful"
-            Left e -> $logInfoS "Redis/certInsertion" $ T.pack $ "Certificate insertion failed: " ++ show e
-          pure (ua', c')
-      )
-      certs'
-
-  (extraCertInfoStates, validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
+  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -133,8 +110,8 @@ initializeGenesisBlock ::
   m ()
 initializeGenesisBlock = do
   $logInfoS "initgen" "Begin of initgen"
-  (extraCertInfoStates, validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
-  obGB <- liftIO $ bootstrapSequencer extraCertInfoStates genesisBlock
+  (validators, genesisInfo, (srcInfo, genesisBlock)) <- getGenesisBlockAndPopulateInitialMPs
+  obGB <- liftIO $ bootstrapSequencer genesisBlock
   putGenesisHash $ blockHash genesisBlock
   $logInfoS "initgen" "Initial merkle patricia tries successfully created"
   void $ putBlocks [genesisBlock] False
@@ -322,23 +299,23 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         }
 
     toAction ::
-      ( MonadLogger m
-      , Selectable Ad.Address AddressState m
-      )
+      MonadLogger m
       => S.Seq Event
       -> S.Seq A.Delegatecall
       -> Ad.Address
       -> AccountDiff 'Eventual
       -> m VMEvent
     toAction addressEvents delegatecalls a d = do
-      let ch = codeHash d
-      cPtr <- fromMaybe ch <$> resolveCodePtr ch
+      let cPtr = codeHash d
       let
           theMetadata = getMetadata $ genesisBlockCodePtr cPtr
           creator' = fromMaybe "" mkCreator
           originAddress' = mkOriginAddress
 
-      appName' <- (\case Just (SolidVMCode n _) -> T.pack n; _ -> "") <$> resolveCodePtrParent ch
+      let appName' =
+            case cPtr of
+              SolidVMCode n _ -> T.pack n
+              _ -> ""
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
@@ -359,7 +336,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     storageDiff
                     Map.empty
                     [A.Create]),
-              A._src = join $ fmap (Map.lookup "src") theMetadata,
+              A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
@@ -385,8 +362,6 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'
         genesisBlockCodePtr (SolidVMCode _ ch') = ch'
-        genesisBlockCodePtr cp =
-          error $ "Could not resolve code ptr in genesis block" ++ show cp
 
         lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
         lookupSolidDiff _ _                 = Nothing

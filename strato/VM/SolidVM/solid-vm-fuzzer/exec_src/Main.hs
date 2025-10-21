@@ -38,6 +38,7 @@ import Debugger.Options ()
 import HFlags
 import SolidVM.Solidity.Fuzzer
 import SolidVM.Solidity.StaticAnalysis
+import System.Exit (exitFailure)
 import System.IO (hSetEncoding, utf8)
 import UnliftIO
 
@@ -89,20 +90,26 @@ main = do
           "test" -> do
             let printResult i r = liftIO $ r <$ case r of
                   FuzzerSuccess (SourceAnnotation _ _ (testName, _)) -> do
-                    putStrLn $ "✅ " <> show i <> ". " <> T.unpack testName <> " succeeded"
+                    putStrLn $ "✅ " <> showNum i <> T.unpack testName <> " succeeded"
                   FuzzerFailure _ (SourceAnnotation _ _ (testName, msg)) -> do
-                    putStrLn $ "❌ " <> show i <> ". " <> T.unpack testName <> " failed: " <> T.unpack msg
+                    putStrLn $ "❌ " <> showNum i <> T.unpack testName <> " failed: " <> T.unpack msg
+                showNum 0 = ""
+                showNum i = show i ++ ". "
             xs <- runCli $ fuzz Nothing srcMap $ if j then defaultHook else printResult
+            let isFuzzerSuccess (FuzzerSuccess _) = True
+                isFuzzerSuccess _ = False
+                totalTests = length xs
+                passedTests = length $ filter isFuzzerSuccess xs
+                anyFailed = passedTests < totalTests
             if j
-              then printJSON xs
+              then do
+                printJSON xs
+                when anyFailed exitFailure
               else do
-                let totalTests = length xs
-                    passedTests = length $ filter isFuzzerSuccess xs
-                    isFuzzerSuccess (FuzzerSuccess _) = True
-                    isFuzzerSuccess _ = False
                 when (totalTests > 0) $ do
                   putStrLn ""
                   putStrLn $ "(" ++ show passedTests ++ " / " ++ show totalTests ++ " tests passed)"
+                when anyFailed exitFailure
           "compile" -> runCli (compile srcMap) >>= \case
             Right cc -> if j
                           then printJSON cc

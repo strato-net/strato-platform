@@ -49,13 +49,10 @@ unparseSourceUnit (FLContract contract) = unparseContract contract
 unparseSourceUnit (FLFunc n a) = unparseFunc (n, a)
 
 unparseVar :: (SolidString, VariableDecl) -> String
-unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _ _)) =
+unparseVar (name, (VariableDecl theType vis maybeExpression _ _ _)) =
   unparseVarType (theType)
     <> " "
-    <> ( if isPublic --TODO- I need to expand this to public, private or nothing
-           then "public "
-           else ""
-       )
+    <> maybe "" ((<> " ") . Text.unpack . tShowVisibility) vis
     <> labelToString name
     <> ( case maybeExpression of
            Nothing -> ""
@@ -64,13 +61,10 @@ unparseVar (name, (VariableDecl theType isPublic maybeExpression _ _ _)) =
     <> ";"
 
 unparseConstant :: (SolidString, ConstantDecl) -> String
-unparseConstant (name, (ConstantDecl theType isPublic expression _)) =
+unparseConstant (name, (ConstantDecl theType vis expression _)) =
   unparseVarType (theType)
     <> " "
-    <> ( if isPublic --TODO- I need to expand this to public, private or nothing
-           then "public "
-           else ""
-       )
+    <> maybe "" ((<> " ") . Text.unpack . tShowVisibility) vis
     {-  <> (case varTypePublic theType of
             Nothing -> ""
             Just True -> "public "

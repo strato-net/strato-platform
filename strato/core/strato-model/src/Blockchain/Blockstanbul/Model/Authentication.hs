@@ -6,7 +6,6 @@ module Blockchain.Blockstanbul.Model.Authentication where
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
 
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
@@ -27,7 +26,7 @@ import Test.QuickCheck.Instances.ByteString ()
 type RawExtraData = B.ByteString
 
 data IstanbulExtra = IstanbulExtra
-  { _validatorList :: ChainMembers,
+  { _validatorList :: [Validator],
     _proposedSig :: Maybe Signature,
     _commitment :: [Signature]
   }
@@ -101,9 +100,9 @@ scrubCommitmentSeals :: HasIstanbulExtra h => h -> h
 scrubCommitmentSeals = execIstanbulExtra (set (_Just . commitment) [])
 
 getValidatorSet :: HasIstanbulExtra h => h -> Set Validator
-getValidatorSet =  evalIstanbulExtra (maybe S.empty $ S.map chainMemberParsedSetToValidator . unChainMembers . _validatorList)
+getValidatorSet =  evalIstanbulExtra (maybe S.empty (S.fromList . _validatorList))
 
-addValidators :: HasIstanbulExtra h => ChainMembers -> h -> h
+addValidators :: HasIstanbulExtra h => [Validator] -> h -> h
 addValidators vs = execIstanbulExtra (const . Just $ IstanbulExtra vs Nothing [])
 
 getProposerSeal :: HasIstanbulExtra h => h -> Maybe Signature

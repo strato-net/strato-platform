@@ -52,19 +52,22 @@ applyInheritanceFunctions cc = do
       { _contracts = ccs
       }
 
+matchType :: Contract -> M.WhenMatched SolidEither SolidString VariableDecl VariableDecl VariableDecl
+matchType c = M.WhenMatched $ \k t u ->
+  if typesMatch t u
+    then Right $ Just t
+    else Left (TypeError ("Overlapping definitions for " ++ labelToString k ++ " in contract " ++ labelToString (_contractName c))
+                         ("at " ++ show (_varContext t) ++ " and " ++ show (_varContext u)), _varContext t)
+  where typesMatch t u = and $ (\f -> f t u) <$> [(==) `on` _varType, (==) `on` _varVisibility, (==) `on` (fmap (() <$) . _varInitialVal), (==) `on` _isImmutable, (==) `on` _isRecord]
+
 addInheritedObjects :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedObjects cc c = do
-  let typesMatch t u = and $ (\f -> f t u) <$> [(==) `on` _varType, (==) `on` _varIsPublic, (==) `on` (fmap (() <$) . _varInitialVal), (==) `on` _isImmutable, (==) `on` _isRecord]
-      matchType k t u = if typesMatch t u
-                          then Right $ Just t
-                          else Left (TypeError ("Overlapping definitions for " ++ labelToString k ++ " in contract " ++ labelToString (_contractName c))
-                                               ("at " ++ show (_varContext t) ++ " and " ++ show (_varContext u)), _varContext t)
-  sd <- toUnionMaker' _storageDefs _storageDefs (M.WhenMatched matchType) cc c
+  sd <- toUnionMaker' _storageDefs (M.filter ((/= Just Private) . _varVisibility) . _storageDefs) (matchType c) cc c
   ud <- toUnionMaker _userDefined cc c
   en <- toUnionMaker _enums cc c
   st <- toUnionMaker _structs cc c
   ev <- toUnionMaker _events cc c
-  co <- toUnionMaker _constants cc c
+  co <- toUnionMaker' _constants (M.filter ((/= Just Private) . _constVisibility) . _constants) match cc c
   mo <- toUnionMaker _modifiers cc c
   pure $
     c
@@ -85,10 +88,14 @@ match = M.WhenMatched $ \_ x _ -> Right $ Just x
 
 addInheritedFunctions :: CodeCollection -> Contract -> SolidEither Contract
 addInheritedFunctions cc c = do
+  sd <- toUnionMaker' _storageDefs _storageDefs (matchType c) cc c
   fu <- toUnionMaker' _functions (M.filter ((/= Just Private) . _funcVisibility) . _functions) match cc c
+  co <- toUnionMaker _constants cc c
   pure $
     c
       { _functions = fu
+      , _storageDefs = sd
+      , _constants = co
       }
 
 checkForNamingCollisions :: Contract -> SolidEither Contract

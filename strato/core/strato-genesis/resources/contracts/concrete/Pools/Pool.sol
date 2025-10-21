@@ -2,7 +2,6 @@
 import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
-import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -153,21 +152,26 @@ contract record Pool is Ownable {
 
     // ============ CONSTRUCTOR ============
     
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
     /// @notice Initialize a new liquidity pool
     /// @param tokenAAddr The address of the first token in the pair
     /// @param tokenBAddr The address of the second token in the pair
     /// @param lpTokenAddr The address of the LP token contract
     /// @param _owner The address of the owner of the pool
     /// @dev Should be called by the PoolFactory contract
-    constructor(
+    function initialize(
         address tokenAAddr, 
         address tokenBAddr,
-        address lpTokenAddr,
-        address _owner
-    ) Ownable(_owner) {
+        address lpTokenAddr
+    ) external onlyOwner {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(lpTokenAddr != address(0), "Zero lpToken address");
+
+        // @dev important: must be set here for proxied instances;
+        // ensure consistency with desired initial values
+        zapSwapFeesEnabled = true;
         
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);
@@ -180,8 +184,8 @@ contract record Pool is Ownable {
     /// @notice Sync the pool's reserves with current balances (external version)
     /// @dev Updates reserves to match current token balances
     function sync() external onlyPoolFactory {
-        tokenABalance = ERC20(tokenA).balanceOf(address(this));
-        tokenBBalance = ERC20(tokenB).balanceOf(address(this));
+        tokenABalance = tokenA.balanceOf(address(this));
+        tokenBBalance = tokenB.balanceOf(address(this));
         _updateRatios();
         emit Sync(tokenABalance, tokenBBalance);
     }
@@ -190,14 +194,14 @@ contract record Pool is Ownable {
     /// @param to Address to send the excess tokens to
     function skim(address to) external onlyPoolFactory {
         require(to != address(0), "Invalid recipient");
-        uint256 excessA = ERC20(tokenA).balanceOf(address(this)) - tokenABalance;
-        uint256 excessB = ERC20(tokenB).balanceOf(address(this)) - tokenBBalance;
+        uint256 excessA = tokenA.balanceOf(address(this)) - tokenABalance;
+        uint256 excessB = tokenB.balanceOf(address(this)) - tokenBBalance;
 
         if (excessA > 0) {
-            require(ERC20(tokenA).transfer(to, excessA), "TokenA skim failed");
+            require(tokenA.transfer(to, excessA), "TokenA skim failed");
         }
         if (excessB > 0) {
-            require(ERC20(tokenB).transfer(to, excessB), "TokenB skim failed");
+            require(tokenB.transfer(to, excessB), "TokenB skim failed");
         }
 
         emit Skim(to, excessA, excessB);
@@ -255,7 +259,7 @@ contract record Pool is Ownable {
         require(tokenBAmount > 0 && maxTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
         
-        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        uint256 totalLiquidity = lpToken.totalSupply();
         uint256 tokenAAmount;
         uint256 mintAmount;
         
@@ -269,8 +273,8 @@ contract record Pool is Ownable {
         }
 
         lpToken.mint(msg.sender, mintAmount);
-        require(ERC20(tokenB).transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
-        require(ERC20(tokenA).transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
+        require(tokenB.transferFrom(msg.sender, address(this), tokenBAmount), "TokenB transfer failed");
+        require(tokenA.transferFrom(msg.sender, address(this), tokenAAmount), "TokenA transfer failed");
 
         _updateStateVars(tokenABalance + tokenAAmount, tokenBBalance + tokenBAmount);
         emit AddLiquidity(msg.sender, tokenBAmount, tokenAAmount);
@@ -293,7 +297,7 @@ contract record Pool is Ownable {
     ) external returns (uint256, uint256) {
         require(lpTokenAmount > 0 && minTokenBAmount > 0 && minTokenAAmount > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
-        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        uint256 totalLiquidity = lpToken.totalSupply();
         require(totalLiquidity > 0, "No liquidity");
         uint256 tokenAReserve = tokenABalance;
         uint256 tokenBReserve = tokenBBalance;
@@ -302,8 +306,8 @@ contract record Pool is Ownable {
         
         require(tokenBAmount >= minTokenBAmount && tokenAAmount >= minTokenAAmount, "Insufficient amounts");
 
-        require(ERC20(tokenB).transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
-        require(ERC20(tokenA).transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
+        require(tokenB.transfer(msg.sender, tokenBAmount), "TokenB transfer failed");
+        require(tokenA.transfer(msg.sender, tokenAAmount), "TokenA transfer failed");
 
         lpToken.burn(msg.sender, lpTokenAmount);
         _updateStateVars(tokenABalance - tokenAAmount, tokenBBalance - tokenBAmount);
@@ -361,15 +365,15 @@ contract record Pool is Ownable {
         uint256 netInput = amountIn - fee;
 
         // Transfer full amount to pool
-        require(ERC20(inputToken).transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
+        require(inputToken.transferFrom(msg.sender, address(this), amountIn), "Input transfer failed");
         
         // Send protocol fee to fee collector
-        require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
+        require(inputToken.transfer(_feeCollector(), protocolFee), "Protocol fee transfer failed");
 
         amountOut = getInputPrice(netInput, inputReserve, outputReserve);
         require(amountOut >= minAmountOut, "Slippage check failed");
 
-        require(ERC20(outputToken).transfer(msg.sender, amountOut), "Output xfer failed");
+        require(outputToken.transfer(msg.sender, amountOut), "Output xfer failed");
 
         // Update balances: net input stays in pool, output is sent out
         if (isAToB) {
@@ -401,9 +405,8 @@ contract record Pool is Ownable {
         uint256 newSwapFeeRate,
         uint256 newLpSharePercent
     ) external onlyPoolFactory {
-        require(newSwapFeeRate <= 1000, "Swap fee rate too high"); // Max 10%
-        require(newLpSharePercent <= 10000, "LP share percent too high"); // Max 100%
-        require(newLpSharePercent > 0, "LP share must be greater than 0");
+        require(newSwapFeeRate > 0 && newSwapFeeRate <= 1000, "Invalid swap fee rate"); // Max 10%
+        require(newLpSharePercent > 0 && newLpSharePercent <= 10000, "Invalid LP share percent"); // Max 100%
         
         swapFeeRate = newSwapFeeRate;
         lpSharePercent = newLpSharePercent;
@@ -466,7 +469,7 @@ contract record Pool is Ownable {
 
             // protocol fee sent to collector
             Token inputToken = isAToB ? tokenA : tokenB;
-            require(ERC20(inputToken).transfer(_feeCollector(), protocolFee), "Fee transfer failed");
+            require(inputToken.transfer(_feeCollector(), protocolFee), "Fee transfer failed");
         } else {
             netInput = amountIn; // no fees charged
         }
@@ -481,7 +484,7 @@ contract record Pool is Ownable {
         uint256 tokenBContribution,
         uint256 tokenAContribution
     ) internal returns (uint256 liquidityMinted) {
-        uint256 totalLiquidity = ERC20(lpToken).totalSupply();
+        uint256 totalLiquidity = lpToken.totalSupply();
         uint256 tokenBReserve = tokenBBalance;
         liquidityMinted = tokenBContribution * totalLiquidity / tokenBReserve;
         
@@ -501,12 +504,12 @@ contract record Pool is Ownable {
     ) external returns (uint256 liquidityMinted) {
         require(amountIn > 0, "Invalid inputs");
         require(block.timestamp <= deadline, "EXPIRED");
-        require(ERC20(lpToken).totalSupply() > 0, "POOL_EMPTY");
+        require(lpToken.totalSupply() > 0, "POOL_EMPTY");
 
         // Transfer full amount from user to pool
         Token depositToken = isAToB ? tokenA : tokenB;
         uint256 reserveIn = isAToB ? tokenABalance : tokenBBalance; // reserve before deposit
-        require(ERC20(depositToken).transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
+        require(depositToken.transferFrom(msg.sender, address(this), amountIn), "Deposit transfer failed");
         
         uint256 feeBps = zapSwapFeesEnabled ? _swapFeeRate() : 0;
         uint256 swapAmt = _getOptimalSwapAmount(reserveIn, amountIn, feeBps);

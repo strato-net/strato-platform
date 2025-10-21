@@ -64,7 +64,13 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadUnliftIO m, MonadLogger m, Accessible UrlMap m) => ServerT API m
+server
+  :: ( MonadUnliftIO m
+     , MonadLogger m
+     , Accessible UrlMap m
+     , Accessible V.PublicKey m
+     )
+  => ServerT API m
 server = getMetaData
 
 instance ToSchema MetadataResponse where
@@ -79,7 +85,7 @@ exMetadataRespone =
    in MetadataResponse
         pubKey
         (fromPublicKey pubKey)
-        ["admin.blockapps.net"]
+        [Validator 0xdeadbeef]
         True
         True
         "0"
@@ -99,7 +105,7 @@ metadataSchemaOptions =
 getMetaData ::
   ( MonadLogger m,
     MonadUnliftIO m,
-    HasVault m,
+    Accessible V.PublicKey m,
     Accessible UrlMap m
   ) =>
   m MetadataResponse
@@ -111,9 +117,9 @@ getMetaData =
     urlMap <- access (Proxy @UrlMap)
     pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
 
-getPubKeyAndAddress :: (MonadLogger m, HasVault m) => m V.AddressAndKey
+getPubKeyAndAddress :: (MonadLogger m, Accessible V.PublicKey m) => m V.AddressAndKey
 getPubKeyAndAddress = do
-  pub <- getPub
+  pub <- access (Proxy @V.PublicKey)
   pure $ V.AddressAndKey (fromPublicKey pub) pub
 
 checkIsSynced :: MonadIO m => m Bool

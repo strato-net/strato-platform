@@ -2,7 +2,6 @@
 import "PoolFactory.sol";
 import "../Tokens/Token.sol";
 import "../Tokens/TokenFactory.sol";
-import "../Admin/AdminRegistry.sol";
 import "../Admin/FeeCollector.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
@@ -153,21 +152,26 @@ contract record Pool is Ownable {
 
     // ============ CONSTRUCTOR ============
     
+    constructor(address initialOwner) Ownable(initialOwner) {}
+
     /// @notice Initialize a new liquidity pool
     /// @param tokenAAddr The address of the first token in the pair
     /// @param tokenBAddr The address of the second token in the pair
     /// @param lpTokenAddr The address of the LP token contract
     /// @param _owner The address of the owner of the pool
     /// @dev Should be called by the PoolFactory contract
-    constructor(
+    function initialize(
         address tokenAAddr, 
         address tokenBAddr,
-        address lpTokenAddr,
-        address _owner
-    ) Ownable(_owner) {
+        address lpTokenAddr
+    ) external onlyOwner {
         require(tokenAAddr != address(0), "Zero tokenA address");
         require(tokenBAddr != address(0), "Zero tokenB address");
         require(lpTokenAddr != address(0), "Zero lpToken address");
+
+        // @dev important: must be set here for proxied instances;
+        // ensure consistency with desired initial values
+        zapSwapFeesEnabled = true;
         
         tokenA = Token(tokenAAddr);
         tokenB = Token(tokenBAddr);

@@ -12,7 +12,6 @@ module Blockchain.Data.GenesisInfo
     defaultGenesisInfo,
     genesisParser,
     getGenesisInfo,
-    convertFromOld,
     module Blockchain.Data.AccountInfo,
     module Blockchain.Data.CodeInfo
   )
@@ -22,12 +21,7 @@ import Blockchain.Data.AccountInfo
 import Blockchain.Data.CodeInfo
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Address
-import qualified Blockchain.Data.AccountInfoOld as OLD
-import qualified Blockchain.Data.CodeInfoOld as OLD
-import qualified Blockchain.Data.GenesisInfoOld as OLD
-import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Delegatecall)
 import Control.Lens
@@ -49,7 +43,6 @@ import qualified Data.Sequence as S
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
     genesisInfoUnclesHash :: Keccak256,
-    genesisInfoCoinbase :: ChainMemberParsedSet,
     genesisInfoAccountInfo :: [AccountInfo],
     genesisInfoCodeInfo :: [CodeInfo],
     genesisInfoTransactionRoot :: StateRoot, -- Misspelled to match the existing parser
@@ -75,7 +68,6 @@ instance Format GenesisInfo where
     "GenesisInfo\n" ++ tab (
     "genesisInfoParentHash: " ++ format genesisInfoParentHash ++ "\n"
     ++ "genesisInfoUnclesHash: " ++ format genesisInfoUnclesHash ++ "\n"
-    ++ "genesisInfoCoinbase: " ++ format genesisInfoCoinbase ++ "\n"
     ++ "genesisInfoAccountInfo:\n"
     ++  tab (unlines $ map format genesisInfoAccountInfo) ++ "\n"
     ++ "genesisInfoCodeInfo:\n"
@@ -105,7 +97,6 @@ defaultGenesisInfo =
   GenesisInfo
     { genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
       genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
-      genesisInfoCoinbase = emptyChainMember,
       genesisInfoAccountInfo = [],
       genesisInfoCodeInfo = [],
       genesisInfoTransactionRoot = nullStateRoot,
@@ -128,7 +119,6 @@ instance FromJSON GenesisInfo where
     GenesisInfo
       <$> o .: "parentHash"
       <*> o .: "unclesHash"
-      <*> o .: "coinbase"
       <*> o .: "accountInfo"
       <*> o .:? "codeInfo" .!= []
       <*> o .: "transactionRoot" -- This is manual to account for GenesisInfos missing codeInfo
@@ -155,7 +145,6 @@ genesisParser =
   GenesisInfo
     <$> "parentHash" JS..: JS.value
     <*> "unclesHash" JS..: JS.value
-    <*> "coinbase" JS..: JS.value
     <*> accountExtractor
     <*> ("codeInfo" JS..: JS.value JS..| [])
     <*> "transactionRoot" JS..: JS.value
@@ -179,39 +168,3 @@ getGenesisInfo = do
   case genesis of
     [x] -> pure x
     _ -> error $ "invalid genesis: " ++ show genesis
-
-convertFromOld :: OLD.GenesisInfo -> GenesisInfo
-convertFromOld OLD.GenesisInfo{..} =
-  GenesisInfo
-    genesisInfoParentHash
-    genesisInfoUnclesHash
-    genesisInfoCoinbase
-    (map convertFromOldAccountInfo genesisInfoAccountInfo)
-    (map convertFromOldCodeInfo genesisInfoCodeInfo)
-    genesisInfoTransactionRoot
-    genesisInfoReceiptsRoot
-    genesisInfoLogBloom
-    genesisInfoDifficulty
-    genesisInfoNumber
-    genesisInfoGasLimit
-    genesisInfoGasUsed
-    genesisInfoTimestamp
-    genesisInfoExtraData
-    genesisInfoMixHash
-    genesisInfoNonce
-    M.empty
-    M.empty
-  where
-    convertFromOldAccountInfo :: OLD.AccountInfo -> AccountInfo
-    convertFromOldAccountInfo (OLD.NonContract address nonce) = NonContract address nonce
-    convertFromOldAccountInfo (OLD.ContractNoStorage address nonce codeHash) =
-      ContractNoStorage address nonce codeHash
-    convertFromOldAccountInfo (OLD.ContractWithStorage address nonce codeHash storage) =
-      ContractWithStorage address nonce codeHash storage
-    convertFromOldAccountInfo (OLD.SolidVMContractWithStorage address nonce codeHash storage) =
-      SolidVMContractWithStorage address nonce codeHash $
-                            map (\(k, v) ->  (k, rlpDecode $ rlpDeserialize v)) $ storage
-
-
-    convertFromOldCodeInfo :: OLD.CodeInfo -> CodeInfo
-    convertFromOldCodeInfo OLD.CodeInfo{..} = CodeInfo codeInfoSource codeInfoName

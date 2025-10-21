@@ -50,6 +50,7 @@ module Blockchain.Stream.Action (
 import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord (Word256)
@@ -382,7 +383,7 @@ data Action = Action
     _transactionHash :: Keccak256,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
-    _src :: Maybe Text,
+    _src :: Maybe Code,
     _name :: Maybe Text,
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall

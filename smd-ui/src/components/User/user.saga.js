@@ -13,12 +13,13 @@ import {
 } from './user.actions';
 import { handleErrors } from '../../lib/handleErrors'; 
 import { env } from '../../env';
+import { secureFetch } from '../../lib/csrf';
 
 const oauthUserUrl = env.APEX_URL + "/user";
 
 function getOrCreateOauthUserApi() {
 
-  return fetch(
+  return secureFetch(
     oauthUserUrl,
     {
       method: 'POST',
@@ -41,7 +42,7 @@ function getOrCreateOauthUserApi() {
 
 function fetchUserPubKeyRequest() {
   const pubkeyURL = `${env.STRATO_URL_V23}/key`
-  return fetch(
+  return secureFetch(
     pubkeyURL,
     {
       method: 'GET',

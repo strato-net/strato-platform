@@ -25,7 +25,6 @@ import Bloc.API.Users
 import Bloc.API.Utils
 import Bloc.Database.Queries (getContractByAddress, getContractDetailsForContract)
 import Bloc.Monad
-import Bloc.Server.Contracts (getSourceMapFromAddress)
 import Bloc.Server.TransactionResult
 import Bloc.Server.Utils
 import BlockApps.Logging
@@ -76,7 +75,7 @@ import Data.Semigroup (Max (..))
 import Data.Set (isSubsetOf)
 import qualified Data.Set as S
 import Data.Source.Map
-import Data.Text (Text, unpack)
+import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time.Clock
 import qualified Data.Vector as V
@@ -157,19 +156,18 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           mapUploadList =
             map
-              ( \p@(ContractPayload _ c a x _ _) -> do
+              ( \p@(ContractPayload _ c a x _) -> do
                   UploadListContract
                     (fromJust c)
                     (getSrc p)
                     (fromMaybe Map.empty a)
                     (mergeTxParams x txParams)
                     Nothing
-                    (getMaybeCodeFromContractPayload p)
               )
               ps
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractTxParams mapUploadList
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params _ cPtr) -> do
+        \(UploadListContract name srcs args params _) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -191,10 +189,7 @@ postBlocTransactionBody (PostBlocTransactionRequest mAddr txList txParams msrcs)
                 argsAsSource
                 "mercata"
                 (fromMaybe emptyTxParams params)
-                (case cPtr of
-                  Just cp -> Just cp
-                  Nothing -> (Just $ Code $ serializeSourceMap src)
-                )
+                (Just $ Code $ serializeSourceMap src)
           return $ BlocTransactionBodyResult (hash' tx) (Just tx)
     FUNCTION -> do
       p <- mapM fromFunction txs
@@ -294,19 +289,18 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
               else Just $ contractpayloadSrc p
           getSrc p = fromMaybe mempty $ src' p <|> srcMap p
           upload =
-            ( \p@(ContractPayload _ c a x _ _) -> do
+            ( \p@(ContractPayload _ c a x _) -> do
                 UploadListContract
                   (fromJust c)
                   (getSrc p)
                   (fromMaybe Map.empty a)
                   (mergeTxParams x txParams)
                   Nothing
-                  (getMaybeCodeFromContractPayload p)
             )
               ps
       txsWithParams <- genNonces (Don't CacheNonce) addr uploadlistcontractTxParams [upload]
       forStateT Map.empty txsWithParams $
-        \(UploadListContract name srcs args params _ cPtr) -> do
+        \(UploadListContract name srcs args params _) -> do
           (src, contract) <- do
             cd <-
               fmap snd . lift $
@@ -328,10 +322,7 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
                 argsAsSource
                 "network"
                 (fromMaybe emptyTxParams params)
-                (case cPtr of
-                  Just cp -> Just cp
-                  Nothing -> (Just $ Code $ serializeSourceMap src)
-                )
+                (Just $ Code $ serializeSourceMap src)
     FUNCTION -> do
       p <- fromFunction tx
       let mapMethodCalls = (\(FunctionPayload a m r x md) -> MethodCall a m r (mergeTxParams x txParams) md) p
@@ -376,20 +367,6 @@ postBlocTransactionUnsigned (PostBlocTransactionRequest mAddr txList txParams ms
           _ -> throwIO $ UserError "Could not decode function arguments from body"
 
 ---------------------------------- REGULAR TRANSACTIONS ---------------------------------------
-
-getMaybeCodeFromContractPayload :: ContractPayload -> Maybe Code --TODO: Add logic for returning serialized source map
-getMaybeCodeFromContractPayload p = 
-  case contractpayloadCodePtr p of
-    Just p' -> 
-      case contractpayloadContract p of
-        Just contract -> 
-          Just $ PtrToCode (
-            CodeAtAccount
-              p'
-              (unpack contract)
-          )
-        Nothing -> Nothing
-    Nothing -> Nothing
 
 postBlocTransactionParallel ::
   ( MonadUnliftIO m,
@@ -545,14 +522,10 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                     resolve
             fmap (:[]) $ postUsersContractMethod' cacheNonce bcp
           False -> do
-            src'' <- case contractpayloadCodePtr p of 
-              Nothing -> return $ getSrc p
-              Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
-              Just p' -> getSourceMapFromAddress p'
             let bcp =
                   ContractParameters
                     addr
-                    src''
+                    (getSrc p)
                     (contractpayloadContract p)
                     (contractpayloadArgs p)
                     (mergeTxParams (contractpayloadTxParams p) txParams)
@@ -564,13 +537,12 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                         Just m -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn m)
                     )
                     resolve
-                    (getMaybeCodeFromContractPayload p)
             fmap (:[]) $ postUsersContractSolidVM' cacheNonce bcp
       xs -> do
         ps <- mapM fromContract xs
         case useWallet of
           True -> do
-            methodList <- mapM (\p@(ContractPayload _ c a x _ m) -> do
+            methodList <- mapM (\p@(ContractPayload _ c a x m) -> do
                               let contractSrc = getSrc p
                                   contractSrcText = sourceBlob $ contractSrc
                                   srcLength = Text.length contractSrcText
@@ -600,23 +572,18 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
           False -> do
             payloadList <-
               mapM
-                  ( \p@(ContractPayload _ c a x _ m) -> do
+                  ( \p@(ContractPayload _ c a x m) -> do
                       let cn = fromMaybe "unnamed_contract" c
-                      src'' <- case contractpayloadCodePtr p of 
-                        Nothing -> return $ getSrc p
-                        Just _ | getSrc p /= mempty -> throwIO $ UserError "Can only provide one of either `src` or `codePtr`."
-                        Just p' -> getSourceMapFromAddress p'
                       return $
                         UploadListContract
                           (fromJust c)
-                          src''
+                          (getSrc p)
                           (fromMaybe Map.empty a)
                           (mergeTxParams x txParams)
                           ( case m of
                               Nothing -> Just $ Map.insert "VM" "SolidVM" (Map.singleton "history" cn)
                               Just h -> Just $ Map.insert "VM" "SolidVM" (Map.insert "history" cn h)
                           )
-                          (getMaybeCodeFromContractPayload p)
                   )
                   ps
             let bclp = 
@@ -792,10 +759,7 @@ postUsersContractSolidVM' cacheNonce ContractParameters {..} = do
         argsAsSource
         "mercata"
         params
-        (case ptr2Code of
-          Just ptr -> Just ptr
-          Nothing -> (Just $ Code $ serializeSourceMap src)
-        )
+        (Just $ Code $ serializeSourceMap src)
         -- (Code $ Text.encodeUtf8 $ serializeSourceMap src)
   $logDebugLS "postUsersContractSolidVM'/tx" tx
 
@@ -822,7 +786,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
   txSizeLimit <- fmap txSizeLimit getBlocEnv
   txsWithParams <- genNonces cacheNonce fromAddr uploadlistcontractTxParams contracts
   namesTxs <- forStateT Map.empty txsWithParams $
-    \(UploadListContract name srcs args params _ cPtr) -> do
+    \(UploadListContract name srcs args params _) -> do
       (src, contract) <- do
         cd <-
           fmap snd . lift $
@@ -845,10 +809,7 @@ postUsersUploadListSolidVM' cacheNonce ContractListParameters {..} = do
             argsAsSource
             "mercata"
             (fromMaybe emptyTxParams params)
-            (case cPtr of
-              Just cp -> Just cp
-              Nothing -> (Just $ Code $ serializeSourceMap src)
-            )
+            (Just $ Code $ serializeSourceMap src)
       return (name, tx)
   let txs = map snd namesTxs
   hashes <- postTransactionList (Just txSizeLimit) txs

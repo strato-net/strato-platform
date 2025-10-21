@@ -28,7 +28,10 @@ module Blockchain.SolidVM.Simple
     _SolidVMCreate,
     _SolidVMCall,
     create,
+    createReturnEnv,
     call,
+    callReturnEnv,
+    Env.Environment(..),
     module Blockchain.Strato.Model.Code,
     module Blockchain.Data.DataDefs,
     module Blockchain.Data.ExecResults,
@@ -46,9 +49,9 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM as SolidVM
+import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
@@ -66,7 +69,7 @@ defaultBlockData =
   BlockHeader
     emptyHash
     emptyHash
-    emptyChainMember
+    0x0
     MP.emptyTriePtr
     MP.emptyTriePtr
     MP.emptyTriePtr
@@ -164,13 +167,46 @@ create s =
     (s ^. createContractName)
     (s ^. createArgs . argsArgs)
 
+createReturnEnv ::
+  (SolidVM.SolidVMBase m) =>
+  SolidVMCreateArgs ->
+  m (Env.Environment, ExecResults)
+createReturnEnv s =
+  SolidVM.createReturnEnv
+    (s ^. createArgs . argsBlockData)
+    (s ^. createArgs . argsSender)
+    (s ^. createArgs . argsOrigin)
+    (s ^. createArgs . argsProposer)
+    (Gas 100000000)
+    (s ^. createNewAddress)
+    (s ^. createCode)
+    (s ^. createArgs . argsTxHash)
+    (s ^. createContractName)
+    (s ^. createArgs . argsArgs)
+
 call ::
   (SolidVM.SolidVMBase m) =>
   SolidVMCallArgs ->
   m ExecResults
 call s =
   SolidVM.call
-    False
+    (s ^. callArgs . argsBlockData)
+    (s ^. callCodeAddress)
+    (s ^. callArgs . argsSender)
+    (s ^. callArgs . argsProposer)
+    (Gas 100000000)
+    (s ^. callArgs . argsOrigin)
+    (s ^. callArgs . argsTxHash)
+    (s ^. callFuncName)
+    (s ^. callArgs . argsArgs)
+    Nothing
+
+callReturnEnv ::
+  (SolidVM.SolidVMBase m) =>
+  SolidVMCallArgs ->
+  m (Env.Environment, ExecResults)
+callReturnEnv s =
+  SolidVM.callReturnEnv
     (s ^. callArgs . argsBlockData)
     (s ^. callCodeAddress)
     (s ^. callArgs . argsSender)

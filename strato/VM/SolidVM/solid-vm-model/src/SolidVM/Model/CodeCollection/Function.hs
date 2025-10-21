@@ -13,14 +13,12 @@ module SolidVM.Model.CodeCollection.Function
   ( FuncF (..),
     Func,
     StateMutability (..),
-    Visibility (..),
     ModifierF (..),
     Modifier,
     UsingF (..),
     Using,
     FunctionCallType (..),
     tShow,
-    tShowVisibility,
     tRead,
     funcArgs,
     funcVals,
@@ -41,6 +39,7 @@ module SolidVM.Model.CodeCollection.Function
     usingContract,
     usingType,
     usingContext,
+    module SolidVM.Model.CodeCollection.Visibility
   )
 where
 
@@ -58,6 +57,7 @@ import GHC.Generics
 import qualified Generic.Random as GR
 import SolidVM.Model.CodeCollection.Statement
 import qualified SolidVM.Model.CodeCollection.VarDef as SolidVM
+import SolidVM.Model.CodeCollection.Visibility
 import SolidVM.Model.SolidString
 import Test.QuickCheck
 import Test.QuickCheck.Instances ()
@@ -111,38 +111,6 @@ instance ToSchema StateMutability where
       & mapped . name ?~ "State Mutability"
       & mapped . schema . description ?~ "Reserved keywords for function state mutability"
       & mapped . schema . example ?~ toJSON View
-
-data Visibility
-  = Private
-  | Public
-  | Internal
-  | External
-  deriving (Eq, Show, Generic, NFData)
-
-tShowVisibility :: Visibility -> Text
-tShowVisibility Private = "private"
-tShowVisibility Public = "public"
-tShowVisibility Internal = "internal"
-tShowVisibility External = "external"
-
-instance Binary Visibility
-
-instance ToJSON Visibility where
-  toJSON = String . tShowVisibility
-
-instance FromJSON Visibility
-
-instance Arbitrary Visibility where arbitrary = GR.genericArbitrary GR.uniform
-
-instance ToSchema Visibility where
-  declareNamedSchema proxy =
-    genericDeclareNamedSchema soliditySchemaOptions proxy
-      & mapped . name ?~ "Visibility of a Function"
-      & mapped . schema . description ?~ "SolidVM Function Visibility"
-      & mapped . schema . example ?~ toJSON ex
-    where
-      ex :: Visibility
-      ex = Public
 
 -- Changes to this structure should also have changes in the Unparser :)
 data FuncF a = Func

@@ -67,7 +67,7 @@ createDummyContract :: [(T.Text, SVMType.Type)] -> ContractF()
 createDummyContract v = 
   let createVariableDecl t = VariableDecl{
         _varType=t,
-        _varIsPublic=True,
+        _varVisibility= Just Public,
         _varInitialVal=Nothing,
         _varContext=error "varContext undefined",
         _isImmutable = False,
@@ -594,7 +594,8 @@ FOR EACH ROW EXECUTE PROCEDURE "insert_or_update_Vehicle2_history_table"();|]
         input =
            ( SE.ProcessedContract
                 { SE.address = testAdd,
-                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
+                  SE.codehash = SolidVMCode "SwissArmy" (hash ""), -- hash "<CODEHASH>",
+--                  SE.codehash = CodeAtAccount (Address 0x1234567890) "SwissArmy", -- hash "<CODEHASH>",
                   SE.creator = "",
                   SE.cc_creator = Nothing,
                   SE.root = "",

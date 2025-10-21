@@ -38,12 +38,6 @@ module Blockchain.SolidVM.SM
     getEnv,
     getGasInfo,
     getVariableOfName,
-    getTypeOfName,
-    getXabiType,
-    getXabiValueType,
-    getXabiValueType',
-    getValueType,
-    getValueType',
     pushSender,
     initializeAction,
     -- lookupX509AddrFromCBHash,
@@ -91,7 +85,6 @@ import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative ((<|>))
-import Control.DeepSeq (force, ($!!))
 import Control.Lens hiding (Context)
 import Control.Monad
 import Control.Monad.Catch (MonadCatch)
@@ -99,12 +92,10 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
-import Data.List (find)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
 import qualified Data.Map.Ordered as OMap
@@ -115,7 +106,6 @@ import qualified Data.Sequence as Q
 import qualified Data.Set as S
 import Data.Source
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Debugger
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
@@ -478,22 +468,23 @@ runSM ::
   Env.Environment ->
   GasInfo ->
   SM m a ->
-  m (Either SolidException a)
-runSM maybeCode env gi f = do
+  m (Env.Environment, Either SolidException a)
+runSM maybeCode envBefore gi f = do
   csMemDBs <- _memDBs <$> Mod.get (Mod.Proxy @ContextState)
   GasCap gasCap <- Mod.get (Mod.Proxy @GasCap)
   $logInfoS "runSM/GasCap/status" . T.pack $ "Current gas cap: " ++ CL.green (show gasCap)
   let !startingState =
         SState
-          { env = env,
+          { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode env,
+            _action = startingAction maybeCode envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
   eVal <- try $ runReaderT f startingStateRef
   sstateAfter <- readIORef startingStateRef
+  let envAfter = env sstateAfter
   case eVal of
     -- NO errors will crash the VM.
     -- InternalError should *never* happen.
@@ -506,10 +497,10 @@ runSM maybeCode env gi f = do
         then do
           $logErrorLS "runSM/error_code" maybeCode
           throwIO se
-        else return $ Left se
+        else return (envAfter, Left se)
     Right value -> do
       Mod.modifyStatefully_ (Mod.Proxy @ContextState) $ memDBs .= _ssMemDBs sstateAfter
-      return $ Right value
+      return (envAfter, Right value)
 
 -- When calling a remote contract, the new `msg.sender` is the contract
 -- that the call is initiated from.
@@ -532,9 +523,8 @@ startingAction maybeCode env' =
       _actionData = OMap.empty,
       _src =
         case maybeCode of
-          Just (Code theCode) ->
+          Just theCode ->
             Just theCode
-          Just (PtrToCode _) -> Env.src env'
           Nothing -> Env.src env',
       _name = Env.name env',
       _events = Q.empty,
@@ -718,24 +708,6 @@ getVariableOfName name = do
       --, maybeUserDefined
       unknownVariable ("getVariableOfName " ++ (show (currentContract currentCallInfo ^. CC.storageDefs))) name
     ]
-
-getTypeOfName' :: SolidString -> CC.CodeCollection -> Typo
-getTypeOfName' s (CC.CodeCollection ccs _ _ enms strcts _ _ _) =
-  let lookInContract :: CC.Contract -> [Typo]
-      lookInContract (CC.Contract {..}) =
-        catMaybes
-          [ fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s _structs),
-            fmap EnumTypo (fst <$> M.lookup s _enums),
-            fmap StructTypo (fmap (\(a, b, _) -> (a, b)) <$> M.lookup s strcts),
-            fmap EnumTypo (fst <$> M.lookup s enms)
-          ]
-      ctrs = map ContractTypo $ M.keys ccs
-   in case concatMap lookInContract ccs ++ ctrs of
-        [] -> internalError "getTypeOfName' " s
-        (typo : _) -> typo
-
-getTypeOfName :: MonadSM m => SolidString -> m Typo
-getTypeOfName s = getTypeOfName' s . codeCollection <$> getCurrentCallInfo
 
 withCallInfo ::
   MonadSM m =>
@@ -936,109 +908,6 @@ getCurrentCodeCollection = do
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
 
-hintFromType :: MonadSM m => SVMType.Type -> m BasicType
-hintFromType = \case
-  SVMType.Address _ -> return TAccount
-  SVMType.Account _ -> return TAccount
-  SVMType.Bool {} -> return TBool
-  SVMType.Bytes {} -> return TString
-  SVMType.Int {} -> return TInteger
-  SVMType.String {} -> return TString
-  SVMType.Decimal {} -> return TDecimal
-  (SVMType.UserDefined _ SVMType.Bool {}) -> return TBool
-  (SVMType.UserDefined _ SVMType.Int {}) -> return TString
-  SVMType.UnknownLabel s _ -> do
-    t' <- getTypeOfName s
-    case t' of
-      ContractTypo {} -> return $ TContract s
-      EnumTypo {} -> return $ TEnumVal s
-      StructTypo fs -> do
-        let upgrade :: MonadSM m => (SolidString, CC.FieldType) -> m (B.ByteString, BasicType)
-            upgrade = mapM (hintFromType . CC.fieldTypeType) . first (encodeUtf8 . labelToText)
-        TStruct s <$> mapM upgrade fs
-  SVMType.Array t ml -> do
-    t' <- hintFromType t
-    pure $ TArray t' ml
-  SVMType.Mapping{} -> pure TMapping
-  tt'' -> todo "hintFromType" tt''
-
-getXabiTypeFromContract :: B.ByteString -> CC.Contract -> Maybe SVMType.Type
-getXabiTypeFromContract field ctract =
-  M.lookup (stringToLabel $ BC.unpack field)
-    . fmap CC._varType
-    . CC._storageDefs
-    $ ctract
-
-getXabiType :: MonadSM m => Address -> B.ByteString -> m (Maybe SVMType.Type)
-getXabiType acct field = do
-  (ctract, _, _) <- getCodeAndCollection acct
-  pure $ getXabiTypeFromContract field ctract
-
-getXabiValueType :: MonadSM m => AccountPath -> m SVMType.Type
-getXabiValueType a = getXabiValueType' a >>= \case
-  Left (Left e) -> typeError "getXabiValueType/invalid storage path" e
-  Left (Right field) -> todo "getXabiValueType/unknown storage reference" field
-  Right t -> pure t
-
-getXabiValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) SVMType.Type)
-getXabiValueType' (AccountPath loc path) = do
-  ccs' <- codeCollection <$> getCurrentCallInfo
-  case MS.getField path of
-    Left e -> pure . Left $ Left e
-    Right field -> getXabiType loc field >>= \case
-      Nothing -> pure . Left $ Right field
-      Just v -> pure . Right $!!  case MS.toList path of
-                  [] -> v
-                  (_:xs) -> loop ccs' xs v
-  where
-    loop :: CC.CodeCollection -> [MS.StoragePathPiece] -> SVMType.Type -> SVMType.Type
-    loop _ [] = id
-    loop ccs [x] = \case
-      SVMType.Mapping {SVMType.value = v} -> case x of
-        MS.MapIndex {} -> v
-        _ -> typeError "non map index attribute of mapping" x
-      SVMType.Array {SVMType.entry = v} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        MS.ArrayIndex {} -> v
-        MS.MapIndex MS.INum{} -> v
-        _ -> typeError "non-length or array index attribute of array" x
-      SVMType.String {} -> case x of
-        MS.Field "length" -> SVMType.Int {signed = Just True, bytes = Nothing}
-        _ -> force (typeError "non-length attribute of string" x)
-      SVMType.UnknownLabel s _ ->
-        let t' = getTypeOfName' s ccs
-         in case (x, t') of
-              (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
-                 in case mt'' of
-                      Just t'' -> CC.fieldTypeType t''
-                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
-              (_, StructTypo {}) -> typeError "non field access to struct" x
-              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t'' -> t''
-    loop ccs (x : rs) = \case
-      SVMType.Mapping {SVMType.value = t'} -> loop ccs rs t'
-      SVMType.Array {SVMType.entry = t'} -> loop ccs rs t'
-      SVMType.UnknownLabel s _ ->
-        let t' = getTypeOfName' s ccs
-         in case (x, t') of
-              (MS.Field n, StructTypo fs) ->
-                let mt'' = lookup (textToLabel $ decodeUtf8 n) fs
-                 in case mt'' of
-                      Just t'' -> loop ccs rs $ CC.fieldTypeType t''
-                      Nothing -> missingField "field not present in struct definition" $ show (n, fs)
-              (_, StructTypo {}) -> typeError "non field access to struct" x
-              (_, ContractTypo {}) -> todo "getValueType/contract access" t'
-              (_, EnumTypo {}) -> todo "getValueType/enum acess" t'
-      t -> todo "getXabiValueType/loopnext unsupported type" t
-
-getValueType :: MonadSM m => AccountPath -> m BasicType
-getValueType p = hintFromType =<< getXabiValueType p
-
-getValueType' :: MonadSM m => AccountPath -> m (Either (Either String B.ByteString) BasicType)
-getValueType' p = traverse hintFromType =<< getXabiValueType' p
-
 initializeAction :: MonadSM m
                  => Address
                  -> String
@@ -1089,29 +958,17 @@ getContractNameAndHash :: MonadSM m => Address -> m (SolidString, Keccak256)
 getContractNameAndHash address' = do
   codeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) address'
 
-  resolvedCodeHash <- resolveCodePtr codeHash
-  case resolvedCodeHash of
-    Just (SolidVMCode cn ch') -> return (stringToLabel cn, ch')
-    Just ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
-    Nothing -> missingCodeCollection ("SolidVM for non-existent code at address " ++ formatAddressWithoutColor address') (format codeHash)
+  case codeHash of
+    SolidVMCode cn ch' -> return (stringToLabel cn, ch')
+    ch -> internalError ("SolidVM for non-solidvm code at address " ++ formatAddressWithoutColor address') (format ch)
 
 getCodeAndCollection :: MonadSM m => Address -> m (CC.Contract, Keccak256, CC.CodeCollection)
 getCodeAndCollection address' = do
-  callStack' <- Mod.get (Mod.Proxy @[CallInfo])
-  let maybeCI = find (\ci -> currentAddress ci == address') callStack'
-
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- caller address: " ++ fromMaybe "Nothing" (fmap format maybeAddress)
-  -- $logDebugS "getCodeAndCollection" . T.pack $ "----------------- callee address: " ++ format address'
-  case maybeCI of
-    Just ci -> return (currentContract ci, collectionHash ci, codeCollection ci)
-    Nothing -> do
-      (contractName', ch) <- getContractNameAndHash address'
-      isRunningTests <- Env.runningTests <$> getEnv
-      cc <- codeCollectionFromHash isRunningTests True ch
-
-      let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
-
-      return (contract', ch, cc)
+  (contractName', ch) <- getContractNameAndHash address'
+  isRunningTests <- Env.runningTests <$> getEnv
+  cc <- codeCollectionFromHash isRunningTests True ch
+  let !contract' = fromMaybe (missingType "getCodeAndCollection" contractName') $ M.lookup contractName' $ cc ^. CC.contracts
+  return (contract', ch, cc)
 
 getContractsForParents :: [SolidString] -> M.Map SolidString (CC.ContractF a) -> [CC.ContractF a]
 getContractsForParents parents' cc =
@@ -1159,8 +1016,8 @@ resolveNameParts to' crtr app c = do
             "Could not find address state for address " ++ show address
           pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
         Just s ->
-          resolveCodePtr (addressStateCodeHash s) >>= \case
-            Just (SolidVMCode appName _) -> do
+          case addressStateCodeHash s of
+            SolidVMCode appName _ -> do
               appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
               case appCreator of
                 MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))

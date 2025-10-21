@@ -213,11 +213,10 @@ instance Format TransactionFailureCause where
   format (TFKnownFailedTX t) = "Known failed tx: " ++ format (otHash t)
   format (TFTransactionGasExceeded limit actual _) = "Transaction gas limit exceeded: limit of " ++ show limit ++ ", actual " ++ show actual
 
-getDeltasFromResults :: [TxRunResult] -> (ValidatorDelta, CertDelta)
-getDeltasFromResults = foldr go (mempty,mempty)
-  where go trr (v,c) = case trrResult trr of
-          Left _ -> (v,c)
+getDeltasFromResults :: [TxRunResult] -> ValidatorDelta
+getDeltasFromResults = foldr go mempty
+  where go trr v = case trrResult trr of
+          Left _ -> (v)
           Right ExecResults{..} ->
             let vd' = toDelta erNewValidators erRemovedValidators
-                cd' = toDelta erNewCerts      erRevokedCerts
-             in (vd' <> v, cd' <> c)
+             in (vd' <> v)

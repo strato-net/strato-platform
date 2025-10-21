@@ -17,9 +17,8 @@ module SolidVM.Solidity.Fuzzer
 where
 
 import BlockApps.Logging
-import Blockchain.Data.BlockHeader
 import Blockchain.MemVMContext
-import Blockchain.SolidVM.Simple
+import Blockchain.SolidVM.Simple hiding (runningTests)
 import Blockchain.Strato.Model.Address
 import Blockchain.VMContext (VMBase, runningTests)
 import Control.Lens
@@ -68,7 +67,7 @@ formatTestName :: T.Text -> T.Text
 formatTestName fName = case T.splitOn "_" fName of
   ("it" : rest) -> "Unit test '" <> T.intercalate " " rest <> "'"
   ("property" : rest) -> "Property test '" <> T.intercalate " " rest <> "'"
-  _ -> "Custom test '" <> fName <> "'"
+  _ -> fName
 
 withTestName :: (Functor f, Functor g) => T.Text -> f (g a) -> f (g (T.Text, a))
 withTestName = fmap . fmap . (,) . formatTestName
@@ -93,10 +92,14 @@ runFuzzerWithHook :: (MonadUnliftIO m, MonadCatch m, A.Selectable FilePath (Eith
   (Int -> FuzzerTestAndResult -> m FuzzerTestAndResult) ->
   m [FuzzerTestAndResult]
 runFuzzerWithHook dSettings compile src hook = compile src >>= \case
-  Left errs -> pure $ FuzzerFailure Nothing . fmap ("Compilation error: ",) <$> errs
+  Left errs -> do
+    let ffs = FuzzerFailure Nothing . fmap ("compilation",) <$> errs
+    _ <- traverse (hook 0) ffs
+    pure ffs
   Right cc -> do
     let args = FuzzerArgs src "" [] "" [] Nothing
-    runNoLoggingT . evalMemContextM dSettings . flip runReaderT args $ do
+    ctx <- FuzzerContext args <$> newIORef (error "_fuzzerContextBlockHeader not initialized")
+    runNoLoggingT . evalMemContextM dSettings . flip runReaderT ctx $ do
       lift . modify' $ runningTests .~ True
       let contractsInSourceOrder =
             sortBy (comparing (\(_, c') -> c' ^. contractContext . sourceAnnotationStart)) (M.toList $ _contracts cc)
@@ -105,27 +108,33 @@ runFuzzerWithHook dSettings compile src hook = compile src >>= \case
           then pure []
           else case _funcArgs <$> _constructor c of
             Just (_ : _) -> pure . fmap (\f -> FuzzerFailure Nothing $ ("Contract constructor", "Expected constructor to have zero arguments") <$ _funcContext f) . maybeToList $ _constructor c
-            _ -> fuzzContract cName (_contractContext c) $ \bh addr -> do
-              _ <- for (M.lookup "beforeAll" $ _functions c) $ test bh addr "beforeAll"
-              let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
-              testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
-                mResult <- fmap (fmap (withTestName $ T.pack fName)) $
-                  if
-                    | testPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        result <- Just <$> test bh addr fName f
-                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
-                        pure result
-                    | propertyPrefix `T.isPrefixOf` labelToText fName -> do
-                        _ <- for (M.lookup "beforeEach" $ _functions c) $ test bh addr "beforeEach"
-                        result <- Just <$> prop bh addr fName f
-                        _ <- for (M.lookup "afterEach" $ _functions c) $ test bh addr "afterEach"
-                        pure result
-                    | otherwise -> pure Nothing
-                maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
-                ) (1, []) functionsInSourceOrder
-              _ <- for (M.lookup "afterAll" $ _functions c) $ test bh addr "afterAll"
-              pure testResults
+            _ -> fuzzContract cName (_contractContext c) $ \addr -> do
+              beforeAllRes <- for (M.lookup "beforeAll" $ _functions c) $ test addr "beforeAll"
+              case beforeAllRes of
+                Just ff@FuzzerFailure{} -> do
+                  let res = withTestName "beforeAll" ff
+                  _ <- lift . lift . lift $ hook 0 res
+                  pure []
+                _ -> do
+                  let functionsInSourceOrder = sortBy (comparing (\(_, f') -> f' ^. funcContext . sourceAnnotationStart)) (M.toList $ _functions c)
+                  testResults <- fmap (reverse . snd) $ foldlM (\(i, ran) (fName, f) -> do
+                    mResult <- fmap (fmap (withTestName $ T.pack fName)) $
+                      if
+                        | testPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test addr "beforeEach"
+                            result <- Just <$> test addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test addr "afterEach"
+                            pure result
+                        | propertyPrefix `T.isPrefixOf` labelToText fName -> do
+                            _ <- for (M.lookup "beforeEach" $ _functions c) $ test addr "beforeEach"
+                            result <- Just <$> prop addr fName f
+                            _ <- for (M.lookup "afterEach" $ _functions c) $ test addr "afterEach"
+                            pure result
+                        | otherwise -> pure Nothing
+                    maybe (i, ran) (\r -> (i+1, r:ran)) <$> traverse (lift . lift . lift . hook i) mResult
+                    ) (1, []) functionsInSourceOrder
+                  _ <- for (M.lookup "afterAll" $ _functions c) $ test addr "afterAll"
+                  pure testResults
 
 accessible :: Maybe Visibility -> Bool
 accessible (Just External) = True
@@ -138,12 +147,12 @@ emptyOrBool []                                = True
 emptyOrBool [(_, IndexedType _ SVMType.Bool)] = True
 emptyOrBool _                                 = False
 
-test :: VMBase m => BlockHeader -> Address -> SolidString -> Func -> FuzzerM m FuzzerResult
-test bh addr fName f =
+test :: VMBase m => Address -> SolidString -> Func -> FuzzerM m FuzzerResult
+test addr fName f =
   if accessible $ _funcVisibility f
     then if null $ _funcArgs f
            then if emptyOrBool $ _funcVals f
-                  then fuzzFunction bh addr (_funcContext f) fName []
+                  then fuzzFunction addr (_funcContext f) fName []
                   else pure . FuzzerFailure Nothing $ ("Test must return () or (bool).") <$ _funcContext f
            else pure . FuzzerFailure Nothing $ ("Expected unit test to have zero arguments. To write a property test, prefix the function name with " <> propertyPrefix <> ".") <$ _funcContext f
     else pure . FuzzerFailure Nothing $ "Test must be a public or external function" <$ _funcContext f
@@ -178,8 +187,8 @@ generateArgs = traverse generateArg
     generateArg (SVMType.Error _ _) = pure "<error>" -- haha xd
     generateArg (SVMType.Variadic) = pure "<variadic>"
 
-prop :: VMBase m => BlockHeader -> Address -> SolidString -> Func -> FuzzerM m FuzzerResult
-prop bh addr fName f =
+prop :: VMBase m => Address -> SolidString -> Func -> FuzzerM m FuzzerResult
+prop addr fName f =
   if accessible $ _funcVisibility f
     then if null $ _funcArgs f
            then pure . FuzzerFailure Nothing $ ("Expected property test to have at least one argument. To write a unit test, prefix the function name with " <> testPrefix <> ".") <$ _funcContext f
@@ -190,21 +199,21 @@ prop bh addr fName f =
   where
     runProp :: VMBase m => FuzzerM m FuzzerResult
     runProp = do
-      n <- asks $ fromMaybe defaultFuzzerRuns . view fuzzerArgsMaxRuns
+      n <- asks $ fromMaybe defaultFuzzerRuns . view (fuzzerContextArgs . fuzzerArgsMaxRuns)
       runPropNTimes n
     runPropNTimes :: VMBase m => Integer -> FuzzerM m FuzzerResult
     runPropNTimes n | n <= 0 = success $ _funcContext f
     runPropNTimes n = do
       args <- liftIO . generateArgs $ indexedTypeType . snd <$> _funcArgs f
       $logInfoS "runPropNTimes/generateArgs" $ "(" <> T.intercalate ", " args <> ")"
-      r <- fuzzFunction bh addr (_funcContext f) fName args
+      r <- fuzzFunction addr (_funcContext f) fName args
       case r of
         FuzzerSuccess _ -> runPropNTimes $ n - 1
         _ -> pure r
 
-fuzzContract :: VMBase m => SolidString -> SourceAnnotation a -> (BlockHeader -> Address -> FuzzerM m [FuzzerTestAndResult]) -> FuzzerM m [FuzzerTestAndResult]
-fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArgsCreateArgs .~ [])) $ do
-  ~FuzzerArgs {..} <- ask
+fuzzContract :: VMBase m => SolidString -> SourceAnnotation a -> (Address -> FuzzerM m [FuzzerTestAndResult]) -> FuzzerM m [FuzzerTestAndResult]
+fuzzContract cName ctx f = local ((fuzzerContextArgs . fuzzerArgsContractName .~ cName) . (fuzzerContextArgs . fuzzerArgsCreateArgs .~ [])) $ do
+  FuzzerContext FuzzerArgs{..} bhRef <- ask
   contractAddress <- liftIO $ generate arbitrary
   let svmErr (Left e) = e
       svmErr (Right e) = InternalError "SolidVM for non-solidvm code" (show e)
@@ -216,21 +225,25 @@ fuzzContract cName ctx f = local ((fuzzerArgsContractName .~ cName) . (fuzzerArg
           & createArgs . argsMetadata ?~ M.empty
       failure txs e = pure [FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ (labelToText cName <> " constructor", e) <$ ctx]
       exception txs = failure txs . T.pack . show
-  createResults <- lift $ create txArgs
+  (env, createResults) <- lift $ createReturnEnv txArgs
   case erException createResults of
     Just e -> exception [] $ svmErr e
-    Nothing -> f (txArgs ^. createArgs . argsBlockData) contractAddress
+    Nothing -> do
+      writeIORef bhRef $ blockHeader env
+      f contractAddress
 
-fuzzFunction :: VMBase m => BlockHeader -> Address -> SourceAnnotation a -> SolidString -> [T.Text] -> FuzzerM m FuzzerResult
-fuzzFunction bh contractAddress ctx fName args = local ((fuzzerArgsFuncName .~ fName) . (fuzzerArgsCallArgs .~ args)) $ do
-  ~FuzzerArgs {..} <- ask
+fuzzFunction :: VMBase m => Address -> SourceAnnotation a -> SolidString -> [T.Text] -> FuzzerM m FuzzerResult
+fuzzFunction contractAddress ctx fName args = local ((fuzzerContextArgs . fuzzerArgsFuncName .~ fName) . (fuzzerContextArgs . fuzzerArgsCallArgs .~ args)) $ do
+  FuzzerContext FuzzerArgs{..} bhRef <- ask
+  bh <- liftIO $ readIORef bhRef
   let txArgs' =
         def & callArgs . argsBlockData .~ bh
           & callCodeAddress .~ contractAddress
           & callFuncName .~ labelToText _fuzzerArgsFuncName
           & callArgs . argsArgs .~ _fuzzerArgsCallArgs
           & callArgs . argsMetadata ?~ M.empty
-  callResults <- lift $ call txArgs'
+  (env, callResults) <- lift $ callReturnEnv txArgs'
+  liftIO . writeIORef bhRef $ blockHeader env
   let failure txs e = pure . FuzzerFailure (Just $ FuzzerFailureDetails contractAddress _fuzzerArgsContractName _fuzzerArgsCreateArgs txs) $ e <$ ctx
       exception txs = failure txs . T.pack . show
       failure' = failure [FuzzerTx _fuzzerArgsFuncName _fuzzerArgsCallArgs]

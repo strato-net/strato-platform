@@ -5,47 +5,10 @@ import { usc } from "../../utils/importer";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
-import { getCDPRegistry } from "./cdp.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
+import { getOraclePrices } from "./oracle.service";
 
-const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher } = constants;
-
-// Helper function to get CDP collateral for a user
-const getCDPCollateralForUser = async (accessToken: string, userAddress: string): Promise<Map<string, string>> => {
-  try {
-    // Get the CDPEngine address from registry to ensure we only query the correct instance
-    const registry = await getCDPRegistry(accessToken, userAddress, {}, "getCDPCollateralForUser");
-    
-    if (!registry?.cdpEngine) {
-      return new Map();
-    }
-
-    const cdpEngineAddress = registry.cdpEngine.address || registry.cdpEngine;
-
-    // Use direct vault query with specific CDPEngine address
-    const { data: userVaults } = await cirrus.get(
-      accessToken,
-      `/${CDPEngine}-vaults`,
-      {
-        params: {
-          select: "user:key,asset:key2,Vault:value",
-          key: `eq.${userAddress.toLowerCase()}`,
-          address: `eq.${cdpEngineAddress}`
-        }
-      }
-    );
-      
-    const cdpCollateralMap = new Map<string, string>(
-      (userVaults || []).map((v: any) => [v.asset, v.Vault.collateral || "0"])
-    );
-    
-    return cdpCollateralMap;
-  } catch (error) {
-    // Graceful fallback - return empty map if CDP data unavailable
-    console.warn(`❌ [CDP] Failed to fetch CDP collateral data:`, error);
-    return new Map();
-  }
-};
+const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
 
 // Get all tokens
 export const getTokens = async (
@@ -66,7 +29,7 @@ export const getTokens = async (
     // Fetch tokens and lending data in parallel
     const [response, lendingResponse] = await Promise.all([
       cirrus.get(accessToken, "/" + Token, { params }),
-      getLendingRegistry(accessToken, undefined, {
+      getLendingRegistry(accessToken, {
         select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)),oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`
       })
     ]);
@@ -141,86 +104,64 @@ export const getBalance = async (
   address: string,
   rawParams: Record<string, string | undefined> = {}
 ) => {
-  try {
+  const params = {
+    ...Object.fromEntries(Object.entries(rawParams).filter(([_, v]) => v !== undefined)),
+    key: `eq.${address}`,
+    select: rawParams.select || tokenBalanceSelectFields.join(","),
+  };
 
-    // Filter out undefined
-    let params = {
-      ...Object.fromEntries(
-        Object.entries(rawParams).filter(([_, v]) => v !== undefined)
-      ),
-      key: `eq.${address}`,
-      select: rawParams.select || tokenBalanceSelectFields.join(","),
-      ...(rawParams.select
-        ? {}
-        : {
-            "token.balances.key": `eq.${address}`
-          }),
-    };
+  const [balanceResponse, collateralResponse, cdpResponse, priceMap] = await Promise.all([
+    cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
+    cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
+      params: {
+        select: "user:key,asset:key2,amount:value::text",
+        key: `eq.${address}`,
+        value: `gt.0`
+      }
+    }),
+    cirrus.get(accessToken, `/${CDPEngine}-vaults`, {
+      params: {
+        select: "user:key,asset:key2,amount:value->>collateral::text",
+        key: `eq.${address}`,
+        "value->>collateral": `gt.0`
+      }
+    }),
+    // Get all oracle prices (could be optimized to filter by token addresses if needed)
+    getOraclePrices(accessToken)
+  ]);
 
-    const response = await cirrus.get(accessToken, "/" + Token + "-_balances", {
-      params,
-    });
+  const collateralMap = new Map<string, string>();
+  (collateralResponse.data || []).forEach((c: any) => collateralMap.set(c.asset, c.amount));
+  (cdpResponse.data || []).forEach((v: any) => {
+    const existing = collateralMap.get(v.asset) || "0";
+    const cdpAmount = v.amount || "0";
+    collateralMap.set(v.asset, (BigInt(existing) + BigInt(cdpAmount)).toString());
+  });
 
-    if (response.status !== 200) {
-      throw new Error(`Error fetching balance: ${response.statusText}`);
-    }
-
-    if (!response.data) {
-      throw new Error("Balance data is empty");
-    }
-
-    // Fetch collateral vault balances for the user
-    
-    const collateralData = await getLendingRegistry(accessToken, undefined, {
-      select: `collateralVault:collateralVault_fkey(userCollaterals:${constants.CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text))`,
-      "collateralVault.userCollaterals.key": `eq.${address}`
-    });
-
-    const userCollaterals = collateralData.collateralVault?.userCollaterals || [];
-    const lendingCollateralMap = new Map(userCollaterals.map((c: any) => [c.asset, c.amount]));
-
-    // Fetch CDP collateral for the user
-    const cdpCollateralMap = await getCDPCollateralForUser(accessToken, address);
-
-    // Combine both collateral types
-    
-    const combinedCollateralMap = new Map();
-    // Add lending collateral
-    lendingCollateralMap.forEach((amount, asset) => {
-      combinedCollateralMap.set(asset, amount);
-    });
-    // Add CDP collateral (sum if exists)
-    cdpCollateralMap.forEach((amount, asset) => {
-      const existing = combinedCollateralMap.get(asset) || "0";
-      const sum = (BigInt(existing) + BigInt(amount)).toString();
-      combinedCollateralMap.set(asset, sum);
-    });
-    const lendingInfo = await getLendingRegistry(accessToken, undefined, {
-      select: `oracle:priceOracle_fkey(address,prices:${PriceOracle}-prices(key,value::text))`,
-    });
-  
-    const rawPrices = lendingInfo.oracle?.prices || [];
-    
-    const priceMap = await createCompletePriceMap(accessToken, rawPrices);
-
-    
-    const finalTokens = response.data
-      .map((token: any) => {
-        const collateralBalance = combinedCollateralMap.get(token.address) || "0";
-        
-        return {
-          ...token,
-          price: priceMap.get(token.address) || "0",
-          collateralBalance: collateralBalance,
-        };
-      })
-      .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
-    return finalTokens;
-  } catch (error) {
-    console.error(`❌ [BALANCE] Error in getBalance for user ${address}:`, error);
-    throw error;
-  }
+  return balanceResponse.data
+    .map((token: any) => ({
+      ...token,
+      price: priceMap.get(token.address) || "0",
+      collateralBalance: collateralMap.get(token.address) || "0",
+    }))
+    .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
 };
+
+/**
+ * Get transferable tokens for a user
+ * Returns tokens with positive balance that are not paused
+ */
+export const getTransferableTokens = async (accessToken: string, userAddress: string) => {
+  // Get normal balance
+  const tokens = await getBalance(accessToken, userAddress);
+
+  // Filter out paused tokens and ensure nonzero balance
+  return tokens.filter((tokenData: any) => {
+    const hasBalance = tokenData.balance !== "0";
+    const isNotPaused = tokenData.token?._paused !== true;
+    return hasBalance && isNotPaused;
+  });
+}
 
 export const createToken = async (
   accessToken: string,

@@ -13,7 +13,6 @@ module Blockchain.SolidVM.SetGet
   ( setVar,
     weakGetVar,
     getVar,
-    forceLoadVar,
     getInt,
     getRealNum,
     getBool,
@@ -28,22 +27,20 @@ where
 import Blockchain.DB.SolidStorageDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.SM
-import Blockchain.Strato.Model.Account
-import Control.Arrow ((***))
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Bool (bool)
 import Data.Decimal
-import Data.Foldable (for_)
 import Data.List
 import qualified Data.Map as M
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import qualified Data.Vector as V
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
-import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Model.Value
 import Text.Format
 import Text.Printf
@@ -52,32 +49,20 @@ import UnliftIO
 fromBasic :: MS.BasicValue -> Value
 fromBasic = \case
   MS.BInteger i -> SInteger i
-  MS.BString s -> SString . BC.unpack $ s
+  MS.BString s -> case decodeUtf8' s of
+    Right t -> SString $ T.unpack t
+    Left _ -> SString $ BC.unpack s
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
   MS.BAccount a -> SAccount a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
-  MS.BDefault -> internalError "fromBasic: should never decode" MS.BDefault
-
-findDefault :: BasicType -> Value
-findDefault = \case
-  TInteger -> SInteger 0
-  TString -> SString ""
-  TDecimal -> SDecimal 0
-  TBool -> SBool False
-  TAccount -> (SAccount $ unspecifiedChain 0x0) False
-  TContract n -> SContract n $ unspecifiedChain 0x0
-  TEnumVal n -> SEnumVal n "" 0x0
-  TStruct n fs -> SStruct n . M.fromList $ (BC.unpack *** Constant . findDefault) <$> fs
-  TArray t ml -> SArray $ maybe V.empty (\l -> V.fromList $ Constant (findDefault t) <$ [0..l-1]) ml
-  TMapping -> SMap M.empty
-  Todo msg -> todo "findDefault/todo" msg
+  MS.BDefault -> SNULL
 
 toBasic :: Value -> Maybe MS.BasicValue
 toBasic = \case
   SInteger i -> Just $ MS.BInteger i
-  SString s -> Just $ MS.BString (BC.pack s)
+  SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
   SAccount a _ -> Just $ MS.BAccount a
@@ -97,16 +82,12 @@ setVal :: MonadSM m => Value -> Value -> m ()
 setVal (SUserDefined a _ _) (SUserDefined _ _ _) =
   when (True) (internalError "Unimplemented feature user defined types" (a))
 setVal (SReference dst) (SReference src) = do
-  t <- getXabiValueType src
-  case t of
-    SVMType.Array {} -> do
-      len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
-      setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
-      forM_ [0 .. len - 1] $ \i -> do
-        let i' = fromIntegral i
-        setVal (SReference $ dst `apSnoc` MS.ArrayIndex i')
-          =<< getVar (Constant $ SReference $ src `apSnoc` MS.ArrayIndex i')
-    _ -> internalError "unimplemented wide copy to storage" (dst, src, t)
+  len <- getInt (Constant $ SReference $ src `apSnoc` MS.Field "length")
+  setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger len
+  forM_ [0 .. len - 1] $ \i -> do
+    let i' = BC.pack $ show i
+    setVal (SReference $ dst `apSnoc` MS.Index i')
+      =<< getVar (Constant $ SReference $ src `apSnoc` MS.Index i')
 setVal (SReference dst) (SStruct _ fs) = do
   forM_ (M.toList fs) $ \(f, var) -> do
     setVal (SReference $ dst `apSnoc` MS.Field (BC.pack $ labelToString f)) =<< weakGetVar var
@@ -114,9 +95,9 @@ setVal (SReference dst) (SArray fs) = do
   let len = length fs
   setVal (SReference $ dst `apSnoc` MS.Field "length") $ SInteger $ fromIntegral len
   forM_ [0 .. len - 1] $ \i -> do
-    let i' = fromIntegral i
+    let i' = BC.pack $ show i
     elementVal <- getVar $ fs V.! i
-    setVal (SReference $ dst `apSnoc` MS.ArrayIndex i') elementVal
+    setVal (SReference $ dst `apSnoc` MS.Index i') elementVal
 setVal (STuple dstVector) (STuple srcVector) =
   if V.length dstVector /= V.length srcVector
     then typeError "you are trying to set the value of a tuple to another tuple of the wrong length:\n" (show dstVector ++ "\n" ++ show srcVector)
@@ -128,17 +109,11 @@ setVal (STuple dstVector) (STuple srcVector) =
         return (dstItem, srcItemVal)
       forM_ zipped' $ \(dstItem, srcItemVal) -> do
         setVar dstItem srcItemVal
-setVal dst@(SReference addressedPath@(AccountPath addr path)) src = do
+setVal dst@(SReference (AccountPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
-  !t <- getXabiValueType addressedPath -- IMPORTANT: t is not evaulated until it is used, so we use bang pattern to force it to WHNF
   let basicSrc = case src of
-        SString s ->
-          case t of -- t is evaluated here because Haskell is lazy
-          -- We ONLY want to evaluate it if we know src is a SString because
-          -- in some non-SString cases getXabiValueType will throw an exception
-            SVMType.String {} -> Just . MS.BString . UTF8.fromString $ s
-            _ -> toBasic src
+        SString s -> Just . MS.BString . UTF8.fromString $ s
         _ -> toBasic src
   case basicSrc of
     Nothing -> typeError "non basic solidity type cannot be stored atomically" src
@@ -157,21 +132,8 @@ getVar :: MonadSM m => Variable -> m Value
 getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
-    MS.BDefault -> do
-      eTypeHint <- getValueType' addressedPath
-      case eTypeHint of
-        Right typeHint -> case typeHint of
-          TStruct{} -> return $ SReference addressedPath
-          TArray{} -> return $ SReference addressedPath
-          TMapping -> return $ SReference addressedPath
-          _ -> return $ findDefault typeHint
-        _ -> return $ SInteger 0
-    MS.BString bs -> do
-      t <- getXabiValueType addressedPath
-      case t of
-        SVMType.String {} -> return . SString $ UTF8.toString bs
-        _ -> return $ fromBasic theValue
-    _ -> return $ fromBasic theValue
+    MS.BDefault -> pure $ SReference addressedPath
+    _ -> pure $ fromBasic theValue
 getVar (Constant (SStruct s ma)) = do
   resolved <-
     mapM
@@ -214,29 +176,13 @@ getVar (Constant (SPush v (Just var))) = do
 getVar (Constant v) = return v
 getVar (Variable v) = liftIO $ readIORef v
 
-forceLoadVar :: MonadSM m => Value -> m Value
-forceLoadVar (SReference a) = do
-  typeHint <- getValueType a
-  case typeHint of
-    TStruct n ts -> do
-      vs <- traverse (\(t,_) -> (BC.unpack t,) . Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.Field t))) ts
-      return . SStruct n $ M.fromList vs
-    TArray _ ml -> do
-      arrLen <- case ml of
-        Just l -> pure $ fromIntegral l
-        Nothing -> fmap fromIntegral . getInt . Constant . SReference . apSnoc a $ MS.Field "length"
-      vs <- traverse (\i -> Constant <$> (forceLoadVar =<< (getVar . Constant . SReference . apSnoc a $ MS.ArrayIndex i))) [0..arrLen-1]
-      pure . SArray $ V.fromList vs
-    TMapping -> typeError "forceLoadVar/mapping" (SReference a)
-    _ -> pure $ findDefault typeHint
-forceLoadVar v = pure v
-
 getInt :: MonadSM m => Variable -> m Integer
 getInt p = do
   v <- getVar p
   case v of
     SInteger s -> return s
     SNULL -> return 0
+    SReference{} -> pure 0
     _ -> typeError "getInt" (p, v)
 
 getRealNum :: MonadSM m => Variable -> m (Either Integer Decimal)
@@ -246,6 +192,7 @@ getRealNum p = do
     SInteger s -> return $ Left s
     SDecimal s -> return $ Right s
     SNULL -> return $ Left 0
+    SReference{} -> pure $ Left 0
     _ -> typeError "getRealNum" (p, v)
 
 getBool :: MonadSM m => Variable -> m Bool
@@ -255,37 +202,15 @@ getBool p = do
     SBool b -> return b
     SInteger i -> return $ i /= 0
     SNULL -> return False
+    SReference{} -> pure False
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference a@(AccountPath addr path))) = do
-  xType <- getXabiValueType a >>= \case
-    SVMType.UnknownLabel s _ -> getTypeOfName s >>= \case
-      StructTypo {} -> pure $ SVMType.Struct Nothing s
-      ContractTypo {} -> pure $ SVMType.Contract s
-      EnumTypo ns -> pure $ SVMType.Enum Nothing s $ Just ns
-    t'' -> pure t''
-  case xType of
-    SVMType.Array {} -> do
-      let lengthVar = Constant . SReference $ a `apSnoc` MS.Field "length"
-      len <- fromInteger <$> getInt lengthVar
-      deleteVar lengthVar
-      unless (len <= 0) . for_ [0 .. (len - 1)] $ \i -> do
-        let elemPath = a `apSnoc` MS.ArrayIndex i
-        deleteVar . Constant $ SReference elemPath
-    SVMType.Struct _ structName -> do
-      (ctract, _, cc) <- getCodeAndCollection addr
-      case M.lookup structName $ CC._structs ctract of
-        Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
-        Nothing -> case M.lookup structName $ CC._flStructs cc of
-          Just fields -> for_ fields $ \(fieldName, _, _) -> deleteVar (Constant . SReference $ a `apSnoc` MS.Field (UTF8.fromString fieldName))
-          Nothing -> pure ()
-    _ -> do
-      -- TODO: handle other types
-      ro <- readOnly <$> getCurrentCallInfo
-      when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
-      markDiffForAction addr path $ MS.BDefault
-      putSolidStorageKeyVal' addr path $ MS.BDefault
+deleteVar (Constant (SReference (AccountPath addr path))) = do
+  ro <- readOnly <$> getCurrentCallInfo
+  when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
+  markDiffForAction addr path $ MS.BDefault
+  putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 
 showSM :: MonadSM m => Value -> m String
@@ -331,12 +256,8 @@ showSM (SContract name address) = do
   return $ "Contract: " ++ labelToString name ++ "/" ++ format address
 showSM (SReference apt) = return $ "<reference to " ++ show apt ++ ">"
 showSM (SBuiltinVariable x) = return $ "<built-in " ++ show x ++ ">"
-showSM (SContractFunction maybeContractName address functionName) = do
-  contractName <- case maybeContractName of
-    Just name -> return name
-    Nothing -> do
-      contract <- getCurrentContract
-      return $ CC._contractName contract
+showSM (SContractFunction address functionName) = do
+  contractName <- CC._contractName <$> getCurrentContract
   return $ "Contract function: " ++ labelToString contractName ++ "/" ++ format address ++ "." ++ labelToString functionName
 showSM (SVariadic xs) = ('[' :) . (++ "]") . intercalate ", " <$> traverse showSM xs
 showSM x = todo "showSM called for unsupported value: " x

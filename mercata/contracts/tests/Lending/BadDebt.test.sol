@@ -1,5 +1,6 @@
 import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
 
 contract User {
@@ -9,7 +10,7 @@ contract User {
     }
 }
 
-contract Describe_BadDebt_Basic {
+contract Describe_BadDebt_Basic is Authorizable {
 
     struct LoanInfo {
         uint scaledDebt;     // user debt in index-scaled units
@@ -35,6 +36,7 @@ contract Describe_BadDebt_Basic {
     address SILVST;
 
     function beforeAll() public {
+        bypassAuthorizations = true;
         m = new Mercata();
         require(address(m) != address(0), "Mercata address is 0");
     }
@@ -418,7 +420,7 @@ contract Describe_BadDebt_Basic {
         IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
 
         // Perform Liquidation
-        pool.liquidationCallAll(GOLDST, address(user1));
+        pool.liquidationCallAll(GOLDST, address(user1), 1);
         require(
             pool.getHealthFactor(address(user1)) == INFINITY,
             "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
@@ -483,7 +485,7 @@ contract Describe_BadDebt_Basic {
         // Liquidate
         Token(USDST).mint(address(this), amountBorrowed); // enough to cover the debt
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCallAll(GOLDST, address(user));
+        pool.liquidationCallAll(GOLDST, address(user), 1);
 
         require(pool.badDebt() > 0, "Bad debt should be > 0 after liquidation");
 

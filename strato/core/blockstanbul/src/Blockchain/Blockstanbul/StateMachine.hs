@@ -13,7 +13,6 @@ import Blockchain.Blockstanbul.Messages
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
@@ -66,7 +65,6 @@ data BlockstanbulContext = BlockstanbulContext
     _roundChanged :: M.Map RoundNumber (S.Set Validator),
     -- The identity of this node
     _selfAddr :: Maybe Address,
-    _selfCert :: Maybe ChainMemberParsedSet,
     -- Block locking: a safety mechanism to prevent partial commits
     _blockLock :: Maybe Block,
     _lockSender :: Maybe Validator,
@@ -98,8 +96,8 @@ debugShowCtx = do
   debugLog "showctx/hasPrepared" hasPrepared show
   debugLog "showctx/roundChanged" roundChanged show
 
-newContext :: String -> Checkpoint -> Maybe Address -> Bool -> Maybe ChainMemberParsedSet -> BlockstanbulContext
-newContext network' (Checkpoint v as) addr valB chainm =
+newContext :: String -> Checkpoint -> Maybe Address -> Bool -> BlockstanbulContext
+newContext network' (Checkpoint v as) addr valB =
   let valSet = S.fromList as
       prop = fromMaybe (error "you need at least one validator in the network") $ S.lookupMin valSet
    in BlockstanbulContext
@@ -116,7 +114,6 @@ newContext network' (Checkpoint v as) addr valB chainm =
           _pendingRound = Nothing,
           _roundChanged = M.empty,
           _selfAddr = addr,
-          _selfCert = chainm,
           _blockLock = Nothing,
           _lockSender = Nothing,
           _lastParent = Nothing,

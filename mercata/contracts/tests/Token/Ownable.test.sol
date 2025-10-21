@@ -6,7 +6,7 @@ import "../../concrete/Admin/AdminRegistry.sol";
 
 contract TestOwnable is Ownable {
     bool public ownerOnlyFunctionCalled = false;
-    
+
     constructor(address _owner) Ownable(_owner) {
     }
 
@@ -102,10 +102,10 @@ contract Describe_Ownable {
     function it_ownable_can_transfer_ownership_multiple_times() {
         address newOwner1 = address(user1);
         address newOwner2 = address(user2);
-        
+
         Ownable(ownable).transferOwnership(newOwner1);
         require(Ownable(ownable).owner() == newOwner1, "First ownership transfer failed");
-        
+
         // Transfer from new owner
         user1.do(address(ownable), "transferOwnership", newOwner2);
         require(Ownable(ownable).owner() == newOwner2, "Second ownership transfer failed");
@@ -186,10 +186,10 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Initially, the function should not have been called
         require(!ownableWithAdmin.ownerOnlyFunctionCalled(), "Function should not be called initially");
-        
+
         // The AdminRegistry fallback mechanism has compatibility issues with the test framework
         // This test demonstrates the intended behavior but may not work due to msg.sig/msg.data incompatibility
         bool reverted = false;
@@ -207,26 +207,26 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
-        // Single admin should not be able to execute without votes
+
+        // Non-admin should be able to create issues
         bool reverted = false;
         try {
             user1.do(address(ownableWithAdmin), "ownerOnlyFunction");
         } catch {
             reverted = true;
         }
-        require(reverted, "Should revert when admin doesn't have enough votes");
+        require(reverted, "Should revert when non-admin user creates issues");
     }
 
     function it_ownable_allows_admin_execution_with_sufficient_votes() {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // First vote - should not execute yet
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         // Second vote should execute
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(secondVoteExecuted, "Admin execution should succeed with sufficient votes");
@@ -236,10 +236,10 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Initially, the function should not have been called
         require(!ownableWithAdmin.ownerOnlyFunctionCalled(), "Function should not be called initially");
-        
+
         // Admin as owner should work directly - no voting needed
         // But the AdminRegistry's ownership mechanism may not work in test environment
         bool reverted = false;
@@ -264,13 +264,13 @@ contract Describe_Ownable {
         address owner1 = address(user1);
         address owner2 = address(user2);
         address owner3 = address(user3);
-        
+
         Ownable(ownable).transferOwnership(owner1);
         require(Ownable(ownable).owner() == owner1, "First transfer failed");
-        
+
         user1.do(address(ownable), "transferOwnership", owner2);
         require(Ownable(ownable).owner() == owner2, "Second transfer failed");
-        
+
         user2.do(address(ownable), "transferOwnership", owner3);
         require(Ownable(ownable).owner() == owner3, "Third transfer failed");
     }
@@ -298,15 +298,15 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1), address(user2)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // First vote using correct parameter format
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         // Second vote
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(secondVoteExecuted, "Second vote should execute function call");
-        
+
         // Check that the function was called by checking state
         require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Should execute after sufficient admin votes");
     }
@@ -315,7 +315,7 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Only one vote - should not execute
         (bool voteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!voteExecuted, "Should not execute with insufficient votes");
@@ -325,14 +325,14 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Vote for ownerOnlyFunction using correct parameter format
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(secondVoteExecuted, "Second vote should execute function call");
-        
+
         // Check that the function was called by checking state
         require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Voted function should have been executed");
     }
@@ -341,10 +341,10 @@ contract Describe_Ownable {
 
     function it_ownable_correctly_identifies_owner() {
         require(Ownable(ownable).owner() == initialOwner, "Should identify correct owner");
-        
+
         Ownable(ownable).transferOwnership(address(user1));
         require(Ownable(ownable).owner() == address(user1), "Should identify new owner");
-        
+
         user1.do(address(ownable), "renounceOwnership");
         require(Ownable(ownable).owner() == zeroAddress, "Should identify zero address after renunciation");
     }
@@ -353,7 +353,7 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         require(Ownable(ownableWithAdmin).owner() == address(admin), "Should identify admin registry as owner");
     }
 
@@ -363,7 +363,7 @@ contract Describe_Ownable {
         // Owner should pass
         bool success = ownable.ownerOnlyFunction();
         require(success, "Owner should pass onlyOwner modifier");
-        
+
         // Non-owner should fail
         bool reverted = false;
         try {
@@ -378,14 +378,14 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Admin fallback should work with votes using correct parameter format
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(secondVoteExecuted, "Second vote should execute function call");
-        
+
         // Check that the function was called by checking state
         require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Admin fallback should work with votes");
     }
@@ -410,7 +410,7 @@ contract Describe_Ownable {
             reverted1 = true;
         }
         require(reverted1, "Should revert with OwnableInvalidOwner error on construction");
-        
+
         bool reverted2 = false;
         try {
             Ownable(ownable).transferOwnership(zeroAddress);
@@ -428,14 +428,14 @@ contract Describe_Ownable {
         AdminRegistry admin2 = new AdminRegistry();
         admin2.initialize([address(this), address(user2)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin1));
-        
+
         // Transfer ownership to new admin using correct parameter format
         (bool firstVoteExecuted, ) = admin1.castVoteOnIssue(address(ownableWithAdmin), "transferOwnership", address(admin2));
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         (bool secondVoteExecuted, ) = user1.do(address(admin1), "castVoteOnIssue", address(ownableWithAdmin), "transferOwnership", address(admin2));
         require(secondVoteExecuted, "Second vote should execute ownership transfer");
-        
+
         require(Ownable(ownableWithAdmin).owner() == address(admin2), "Ownership should be transferred to new admin");
     }
 
@@ -443,14 +443,14 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // Renounce ownership using correct parameter format
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "renounceOwnership");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "renounceOwnership");
         require(secondVoteExecuted, "Second vote should execute renunciation");
-        
+
         require(Ownable(ownableWithAdmin).owner() == zeroAddress, "Ownership should be renounced");
     }
 
@@ -460,14 +460,14 @@ contract Describe_Ownable {
         address owner1 = address(user1);
         address owner2 = address(user2);
         address owner3 = address(user3);
-        
+
         // Rapid ownership transfers
         Ownable(ownable).transferOwnership(owner1);
         user1.do(address(ownable), "transferOwnership", owner2);
         user2.do(address(ownable), "transferOwnership", owner3);
-        
+
         require(Ownable(ownable).owner() == owner3, "Final ownership should be correct after rapid changes");
-        
+
         // Final owner should be able to call functions
         bool success = user3.do(address(ownable), "ownerOnlyFunction");
         require(success, "Final owner should be able to call owner functions");
@@ -477,17 +477,17 @@ contract Describe_Ownable {
         AdminRegistry admin = new AdminRegistry();
         admin.initialize([address(this), address(user1), address(user2), address(user3)]);
         TestOwnable ownableWithAdmin = new TestOwnable(address(admin));
-        
+
         // With 4 admins, we need 3 votes to execute (threshold: 3 * (votes + 1) >= 2 * 4 = 8)
         (bool firstVoteExecuted, ) = admin.castVoteOnIssue(address(ownableWithAdmin), "ownerOnlyFunction");
         require(!firstVoteExecuted, "First vote should not execute immediately");
-        
+
         (bool secondVoteExecuted, ) = user1.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(!secondVoteExecuted, "Second vote should not execute with 4 admins");
-        
+
         (bool thirdVoteExecuted, ) = user2.do(address(admin), "castVoteOnIssue", address(ownableWithAdmin), "ownerOnlyFunction");
         require(thirdVoteExecuted, "Third vote should execute function call with 4 admins");
-        
+
         // Check that the function was called by checking state
         require(ownableWithAdmin.ownerOnlyFunctionCalled(), "Should work with large admin registry");
     }

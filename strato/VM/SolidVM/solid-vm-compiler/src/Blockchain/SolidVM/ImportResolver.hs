@@ -178,12 +178,11 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
         lift (A.select (A.Proxy @AddressState) (acct^.namedAccountAddress)) >>= \case
           Nothing -> pure (seen, resolved)
           Just AddressState {..} ->
-            lift (runMainChainT $ resolveCodePtr addressStateCodeHash) >>= \case
-              Just (SolidVMCode _ ch) -> do
+            case addressStateCodeHash of
+              SolidVMCode _ ch -> do
                 rfu <- lift $ codeCollectionToFileUnits (Just $ acct^.namedAccountAddress) <$> getCCFromHash ch
                 pure (seen, M.insert (tShowExpr expr) (Right rfu) resolved)
-              Just (ExternallyOwned _) -> throwE (x, T.pack $ "Account referenced in import contains EVM code: " ++ show acct)
-              _ -> throwE (x, T.pack $ "Account referenced in import could not be resolved: " ++ show acct)
+              _ -> throwE (x, T.pack $ "Account referenced in import contains EVM code: " ++ show acct)
       StringLiteral x fileName' ->
         let fileName = T.pack fileName'
          in case M.lookup fileName resolved of

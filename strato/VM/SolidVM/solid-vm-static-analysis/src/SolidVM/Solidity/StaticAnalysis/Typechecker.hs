@@ -27,6 +27,7 @@ import qualified Data.Set as S
 import Data.Source
 import Data.String (IsString, fromString)
 import Data.Text (Text)
+import Data.Traversable (for)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection hiding (modifierContext)
 import qualified SolidVM.Model.CodeCollection.Contract as Con
@@ -90,6 +91,10 @@ data TypeF' a
   deriving (Eq, Show, Functor)
 
 type Type' = Annotated TypeF'
+
+withAnn :: Text -> Type' -> Type'
+withAnn msg (Bottom x) = Bottom $ (msg <$) <$> x
+withAnn _   t          = t
 
 showType :: Type -> Text
 showType (SVMType.Int s b) =
@@ -161,6 +166,7 @@ showType' (SolidVM.Solidity.StaticAnalysis.Typechecker.Modifier _ _ _ _) =
   T.empty
 
 mutable :: Type' -> Type'
+mutable b@Bottom{} = b
 mutable m@Mutable{} = m
 mutable m@(Product ts _) =
   let isMutable Mutable{} = True
@@ -286,11 +292,9 @@ lookupContractFunction x cName fName = do
                 let fArgs = Product ((\(_,t,y) -> Static (fieldTypeType t) y) <$> fields) x
                     fRets = Static (SVMType.Struct Nothing fName) x
                  in pure $ Function fArgs fRets x [] [] False
-            Just VariableDecl {..} ->
-              if _varIsPublic
-                then constructGetterType x _varType
-                else
-                  pure . bottom $
+            Just VariableDecl {..} -> case _varVisibility of
+              Just Public -> constructGetterType x _varType
+              _ -> pure . bottom $
                     ( T.concat
                         [ "Unknown contract function: ",
                           labelToText cName,
@@ -440,15 +444,14 @@ simpleType' x =
       :| [ addressType' x,
            accountType' x,
            intType' x,
-           contractType' x,
            boolType' x,
            bytesType' x,
            decimalType' x,
            enumType' x
          ]
 
-arrayType' :: SourceAnnotation Text -> Type'
-arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
+-- arrayType' :: SourceAnnotation Text -> Type'
+-- arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
@@ -786,7 +789,7 @@ typecheckMember (Mutable t) member = do
     Top{} -> Mutable t'
     _ -> t'
 typecheckMember (Product [t] _) member = typecheckMember t member
-typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -1191,7 +1194,17 @@ functionHelper test cc c funcName f@Func {..} =
                       )
                         <$> (catMaybes $ sequence . swap <$> _funcVals)
                     argVals = M.fromList $ args ++ vals
-                 in runReader (statementsHelper argVals stmts) r
+                 in flip runReader r $ do
+                      argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                        fmap catMaybes . for (M.elems argVals) $ \case
+                          VarDefEntry mType _ _ x -> for mType $ \case
+                            SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                            t -> pure $ Static t x
+                          _ -> pure Nothing
+                      mods <- flip evalStateT ((Nothing, argVals) :| []) $
+                        reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
+                      ret <- statementsHelper argVals stmts
+                      pure . reduceType' (f ^. funcContext) $ ret : mods : argTypes
               ([fArg], _, _, _) ->
                 bottom $
                   ( T.concat
@@ -1231,7 +1244,17 @@ functionHelper test cc c funcName f@Func {..} =
                           )
                             <$> (catMaybes $ sequence . swap <$> _funcVals)
                         argVals = M.fromList $ args ++ vals
-                     in runReader (statementsHelper argVals stmts) r
+                     in flip runReader r $ do
+                          argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                            fmap catMaybes . for (M.elems argVals) $ \case
+                              VarDefEntry mType _ _ x -> for mType $ \case
+                                SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                                t -> pure $ Static t x
+                              _ -> pure Nothing
+                          mods <- flip evalStateT ((Nothing, argVals) :| []) $
+                            reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
+                          ret <- statementsHelper argVals stmts
+                          pure . reduceType' (f ^. funcContext) $ ret : mods : argTypes
                   _ -> bottom $ "Function `fallback` must be External, but has not been declared so " <$ _funcContext
             else
               let r =
@@ -1253,10 +1276,16 @@ functionHelper test cc c funcName f@Func {..} =
                       <$> (catMaybes $ sequence . swap <$> _funcVals)
                   argVals = M.fromList $ args ++ vals
                in flip runReader r $ do
+                    argTypes <- flip evalStateT ((Nothing, argVals) :| []) $
+                      fmap catMaybes . for (M.elems argVals) $ \case
+                        VarDefEntry mType _ _ x -> for mType $ \case
+                          SVMType.UnknownLabel l _ -> withAnn ("Unknown type: " <> T.pack l) <$> getVarTypeByName' l x
+                          t -> pure $ Static t x
+                        _ -> pure Nothing
                     mods <- flip evalStateT ((Nothing, argVals) :| []) $
                       reduceType' _funcContext <$> traverse (uncurry checkModifier) _funcModifiers
                     ret <- statementsHelper argVals stmts
-                    pure $ reduceType' _funcContext [ret, mods]
+                    pure . reduceType' _funcContext $ ret : mods : argTypes
                   where checkModifier modName modArgs = do
                           e <- getModifierByNameRecursively funcName modName _funcContext
                           a <- productType' _funcContext <$> traverse tcExpr modArgs
@@ -1404,7 +1433,7 @@ accountArgs x =
          ]
 
 deleteArgs :: SourceAnnotation Text -> Type'
-deleteArgs x = sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
+deleteArgs x = simpleType' x -- sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
 
 boolArgs :: SourceAnnotation Text -> Type'
 boolArgs x =

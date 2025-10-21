@@ -97,5 +97,24 @@ end
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 end
+
+-- Check if session was rotated during authentication and mark for CSRF token regeneration
+local old_session_id = ngx.var.cookie_strato_session
+local set_cookie_header = ngx.header["Set-Cookie"]
+
+if set_cookie_header then
+  local cookies = type(set_cookie_header) == "table" and set_cookie_header or {set_cookie_header}
+  for _, cookie in ipairs(cookies) do
+    local new_session_id = cookie:match("^strato_session=([^;]+)")
+    if new_session_id and new_session_id ~= old_session_id then
+      -- Session rotated, store info for CSRF handler in header_filter phase
+      ngx.ctx.session_rotated = true
+      ngx.ctx.new_session_id = new_session_id
+      ngx.ctx.old_session_id = old_session_id
+      break
+    end
+  end
+end
+
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT-based access)
 ngx.req.clear_header("Authorization")
