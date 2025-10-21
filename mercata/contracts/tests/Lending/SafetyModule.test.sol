@@ -52,7 +52,7 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(freshSM));
     }
 
-    function it_allows_share_dilution_via_donation() public {
+    function it_prevents_share_dilution_via_donation() public {
         SafetyModule sm = freshSM;
         address asset = address(sm.asset());
         address sToken = address(sm.sToken());
@@ -68,51 +68,53 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         uint attackerShares = IERC20(sToken).balanceOf(address(attacker));
         require(attackerShares == 1, "Attacker should have 1 share");
         
-        // Attacker donates 10,000 USDST directly to contract
+        // Attacker attempts to donate 10,000 USDST directly to contract
         uint donationAmount = 10000e18;
         Token(asset).mint(address(attacker), donationAmount);
         attacker.do(asset, "transfer", address(sm), donationAmount);
         
-        require(sm.totalAssets() == 10000e18 + 1, "Total assets inflated");
+        // Internal tracking prevents donation from affecting totalAssets
+        require(sm.totalAssets() == 1, "Total assets NOT inflated by donation");
         require(sm.totalShares() == 1, "Only 1 share exists");
         
-        // Victim attempts to stake 9,999 USDST - rounds down to 0 shares
+        // Victim can now stake 9,999 USDST successfully (no dilution)
         Token(asset).mint(address(victim), 9999e18);
         victim.do(asset, "approve", address(sm), INFINITY);
+        victim.do(address(sm), "stake(uint256,uint256)", 9999e18, 9999e18);
         
-        try victim.do(address(sm), "stake(uint256,uint256)", 9999e18, 1) {
-            revert("Stake should fail with SM:dust");
-        } catch {}
+        uint victimShares = IERC20(sToken).balanceOf(address(victim));
+        require(victimShares == 9999e18, "Victim gets fair shares for deposit");
+        require(sm.totalShares() == 1 + 9999e18, "Total shares = 1 + 9999e18");
+        require(sm.totalAssets() == 1 + 9999e18, "Total assets = 1 + 9999e18");
         
-        require(IERC20(sToken).balanceOf(address(victim)) == 0, "Victim blocked from depositing");
-        
-        // Victim deposits 19,000 USDST to get 1 share
-        // sharesOut = (19000e18 * 1) / 10000.000000000000000001 ≈ 1 (rounds down)
-        Token(asset).mint(address(victim), 10001e18);
-        victim.do(address(sm), "stake(uint256,uint256)", 19000e18, 1);
-        
-        require(IERC20(sToken).balanceOf(address(victim)) == 1, "Victim got 1 share for 19,000 USDST");
-        require(sm.totalShares() == 2, "Total 2 shares for 29,000 USDST");
-        
-        // Attacker's 1 share is now worth ~14,500 USDST (stole ~4,500 from victim)
+        // Both users get fair share values
         uint attackerShareValue = (attackerShares * sm.totalAssets()) / sm.totalShares();
-        require(attackerShareValue >= 14500e18, "Attacker's 1 share worth >=14,500 USDST");
-        require(attackerShareValue > 10000e18 + 4000e18, "Profit >4,000 USDST from 1 wei investment");
+        uint victimShareValue = (victimShares * sm.totalAssets()) / sm.totalShares();
+        
+        require(attackerShareValue == 1, "Attacker's share worth exactly 1 wei");
+        require(victimShareValue == 9999e18, "Victim's shares worth exactly 9999e18");
+        
+        // No profit for attacker from donation
+        require(attackerShareValue == 1, "Attacker gets no profit from donation");
     }
 
-    function it_blocks_small_deposits_causing_dos() public {
+    function it_allows_small_deposits_after_donation() public {
         SafetyModule sm = freshSM;
         address asset = address(sm.asset());
         
         User attacker = new User();
         
-        // Attacker stakes 1 wei and donates 10,000 USDST
+        // Attacker stakes 1 wei and attempts to donate 10,000 USDST
         Token(asset).mint(address(attacker), 10000e18 + 1);
         attacker.do(asset, "approve", address(sm), INFINITY);
         attacker.do(address(sm), "stake(uint256,uint256)", 1, 1);
         attacker.do(asset, "transfer", address(sm), 10000e18);
         
-        // Test various deposit amounts below 10,000 USDST
+        // Internal tracking prevents donation from affecting exchange rate
+        require(sm.totalAssets() == 1, "Total assets NOT affected by donation");
+        require(sm.totalShares() == 1, "Only 1 share exists");
+        
+        // Test various deposit amounts - all should work normally
         uint[] memory amounts = [1e18, 10e18, 100e18, 1000e18, 5000e18, 9999e18];
         
         for (uint i = 0; i < amounts.length; i++) {
@@ -120,21 +122,54 @@ contract Describe_SafetyModule_Attacks is Authorizable {
             Token(asset).mint(address(victim), amounts[i]);
             victim.do(asset, "approve", address(sm), INFINITY);
             
-            // All deposits below ~10,000 USDST will revert with SM:dust
-            try victim.do(address(sm), "stake(uint256,uint256)", amounts[i], 1) {
-                revert("Deposit should fail");
-            } catch {}
+            // All deposits should succeed with fair share calculation
+            victim.do(address(sm), "stake(uint256,uint256)", amounts[i], amounts[i]);
             
-            require(IERC20(address(sm.sToken())).balanceOf(address(victim)) == 0, "Victim blocked");
+            uint victimShares = IERC20(address(sm.sToken())).balanceOf(address(victim));
+            require(victimShares == amounts[i], "Victim gets fair shares for deposit");
         }
         
-        // Only deposits > 10,000 USDST can succeed
-        User richUser = new User();
-        Token(asset).mint(address(richUser), 10001e18);
-        richUser.do(asset, "approve", address(sm), INFINITY);
-        richUser.do(address(sm), "stake(uint256,uint256)", 10001e18, 1);
+        // Verify final state is correct
+        require(sm.totalAssets() == 1 + 1e18 + 10e18 + 100e18 + 1000e18 + 5000e18 + 9999e18, "Total assets correct");
+        require(sm.totalShares() == 1 + 1e18 + 10e18 + 100e18 + 1000e18 + 5000e18 + 9999e18, "Total shares correct");
+    }
+
+    function it_allows_recovery_of_stray_assets() public {
+        SafetyModule sm = freshSM;
+        address asset = address(sm.asset());
         
-        require(IERC20(address(sm.sToken())).balanceOf(address(richUser)) == 1, "Only deposits >10K succeed");
+        User attacker = new User();
+        User victim = new User();
+        
+        // Attacker stakes 1 wei
+        Token(asset).mint(address(attacker), 1);
+        attacker.do(asset, "approve", address(sm), INFINITY);
+        attacker.do(address(sm), "stake(uint256,uint256)", 1, 1);
+        
+        // Attacker donates 10,000 USDST directly to contract
+        uint donationAmount = 10000e18;
+        Token(asset).mint(address(attacker), donationAmount);
+        attacker.do(asset, "transfer", address(sm), donationAmount);
+        
+        // Internal tracking is unaffected
+        require(sm.totalAssets() == 1, "Internal tracking unaffected by donation");
+        
+        // Admin can recover stray assets
+        uint balanceBefore = IERC20(asset).balanceOf(address(this));
+        sm.recoverStrayAssets(address(this));
+        uint balanceAfter = IERC20(asset).balanceOf(address(this));
+        
+        require(balanceAfter == balanceBefore + donationAmount, "Stray assets recovered");
+        require(sm.totalAssets() == 1, "Internal tracking still unaffected");
+        
+        // Victim can still stake normally
+        Token(asset).mint(address(victim), 1000e18);
+        victim.do(asset, "approve", address(sm), INFINITY);
+        victim.do(address(sm), "stake(uint256,uint256)", 1000e18, 1000e18);
+        
+        uint victimShares = IERC20(address(sm.sToken())).balanceOf(address(victim));
+        require(victimShares == 1000e18, "Victim gets fair shares");
+        require(sm.totalAssets() == 1 + 1000e18, "Total assets updated correctly");
     }
 
 }

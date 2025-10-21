@@ -40,6 +40,9 @@ contract record SafetyModule is Ownable {
 
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
+    
+    // Internal asset tracking to prevent donation attacks
+    uint256 private _managedAssets;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -107,11 +110,11 @@ contract record SafetyModule is Ownable {
 
     // ─────────────────────────────────────────
     // Views / math
-    // Vault TVL in underlying (pulls live ERC20 balance)
+    // Vault TVL in underlying (uses internal tracking to prevent donation attacks)
     function totalAssets() public view returns (uint) 
     { 
         require(asset != address(0), "SM:asset not set");
-        return IERC20(asset).balanceOf(address(this)); 
+        return _managedAssets; 
     }
 
     // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
@@ -183,11 +186,10 @@ contract record SafetyModule is Ownable {
             require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
         }
 
-        IERC20(asset).transferFrom(msg.sender, address(this), assetsIn);
-        uint delta = totalAssets() - beforeBal;
-        require(delta > 0, "SM:no delta");
+        require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
+        _managedAssets += assetsIn;
 
-        sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
+        sharesOut = (s == 0) ? assetsIn : (assetsIn * s) / beforeBal;
         require(sharesOut > 0, "SM:dust");
         require(sharesOut >= minSharesOut, "SM:slippage");
 
@@ -196,7 +198,7 @@ contract record SafetyModule is Ownable {
         // Reset cooldown on new stake
         cooldownStart[msg.sender] = 0;
 
-        emit Staked(msg.sender, delta, sharesOut);
+        emit Staked(msg.sender, assetsIn, sharesOut);
     }
 
     /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
@@ -226,7 +228,8 @@ contract record SafetyModule is Ownable {
 
         // burn then transfer
         Token(sToken).burn(msg.sender, sharesIn);
-        IERC20(asset).transfer(msg.sender, assetsOut);
+        require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
+        _managedAssets -= assetsOut;
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
@@ -239,7 +242,8 @@ contract record SafetyModule is Ownable {
     /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
+        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
+        _managedAssets += amount;
         emit RewardNotified(amount);
     }
 
@@ -266,7 +270,8 @@ contract record SafetyModule is Ownable {
         require(covered > 0, "SM:nothing to cover");
 
         // Push exactly what will be consumed, then notify LendingPool
-        IERC20(asset).transfer(address(liquidityPool), covered);
+        require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
+        _managedAssets -= covered;
         lendingPool.coverShortfall(covered);
 
         emit ShortfallCovered(covered);
@@ -298,6 +303,17 @@ contract record SafetyModule is Ownable {
         sToken = _sToken;
         asset = _asset;
         emit TokensUpdated(_asset, _sToken);
+    }
+
+    /// @notice Recover stray assets that were donated to the contract without affecting internal tracking.
+    /// @dev This prevents donation attacks by removing surplus tokens without updating totalAssets().
+    /// @param to Address to send the stray assets to (should be a safe recipient like liquidityPool).
+    function recoverStrayAssets(address to) external onlyOwner {
+        require(to != address(0), "SM:bad recipient");
+        uint256 actual = IERC20(asset).balanceOf(address(this));
+        require(actual > totalAssets(), "SM:no stray");
+        uint256 stray = actual - totalAssets();
+        require(IERC20(asset).transfer(to, stray), "SM:transfer failed");
     }
 
     /// @notice Rescue stray tokens (not the vault asset).
