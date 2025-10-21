@@ -1,5 +1,4 @@
-pragma solidity >=0.8.0;
-
+import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../abstract/ERC20/access/Ownable.sol";
 
 contract record AdminRegistry is Ownable {
@@ -11,13 +10,14 @@ contract record AdminRegistry is Ownable {
     mapping (string => bool) public record currentIssues;
 
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
+
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
-    // Events
+    uint public defaultVotingThresholdBps = 6000; // 3/5
+
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
-    event IssueRechecked(address sender, string issueId, address target, string func, variadic args, bool executed);
 
     bool public initialized = false;
 
@@ -30,13 +30,9 @@ contract record AdminRegistry is Ownable {
     constructor() Ownable(this) { }
 
     function initialize(address[] _initialAdmins) external onlyOnce {
+        defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
-        require(_initialAdmins.length > 0, "Must have at least one admin");
-        
-        // Check for duplicates
         for (uint i = 0; i < _initialAdmins.length; i++) {
-            require(_initialAdmins[i] != address(0), "Admin cannot be zero address");
-            require(adminMap[_initialAdmins[i]] == 0, "Duplicate admin in initial list");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
         }
@@ -58,19 +54,22 @@ contract record AdminRegistry is Ownable {
         return adminMap[_admin] > 0;
     }
 
-    /**
-     * @notice Cast a vote on an issue or execute whitelisted function
-     * @dev Admins can create issues and vote. Non-admins can only execute whitelisted functions.
-     * @param _target Target contract address
-     * @param _func Function name to call
-     * @param _args Function arguments
-     * @return executed Whether the function was executed
-     * @return result Return value (issueId if not executed, function result if executed)
-     */
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
-        // Admin path: create issues and vote
-        if (adminMap[msg.sender] != 0) {
+        if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
+            if (adminMap[msg.sender] == 0) {
+                if (_target != tx.origin) {
+                    bool authorizationGranted = false;
+                    try {
+                        authorizationGranted = Authorizable(_target).isAuthorized(msg.sender);
+                    } catch {
+
+                    }
+                    require(authorizationGranted, "Cannot forge a vote on behalf of an admin without their consent");
+                }
+                sender = _target;
+                _target = msg.sender;
+            }
             string issueId = _getIssueId(_target, _func, _args);
             bool hasVoted = votesMap[issueId][sender] != 0;
 
@@ -85,51 +84,31 @@ contract record AdminRegistry is Ownable {
             if (_shouldExecute(issueId, _target, _func, _args)) {
                 variadic ret = _executeIssue(sender, issueId, _target, _func, _args);
                 return (true, ret);
+            } else {
+                return (false, issueId);
             }
-            return (false, issueId);
-        }
-        
-        // Non-admin path: only allow whitelisted direct execution (no issue creation)
-        require(whitelist[_target][_func][msg.sender], "Only admins can create issues");
-        
-        string issueId = _getIssueId(_target, _func, _args);
-        variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-        return (true, ret);
-    }
-
-    /**
-     * @notice Re-trigger execution check for an existing issue without re-voting
-     * @dev Useful when admin count changes and existing votes now meet threshold
-     * @param _target Target contract address
-     * @param _func Function name to call
-     * @param _args Function arguments
-     * @return executed Whether the issue was executed
-     * @return result Return value from execution (if executed) or issueId (if not)
-     */
-    function recheckIssue(address _target, string _func, variadic _args) external returns (bool executed, variadic result) {
-        require(adminMap[msg.sender] != 0, "Only admins can recheck issues");
-        
-        string issueId = _getIssueId(_target, _func, _args);
-        require(currentIssues[issueId], "Issue does not exist");
-        
-        if (_shouldExecute(issueId, _target, _func, _args)) {
-            variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-            emit IssueRechecked(msg.sender, issueId, _target, _func, _args, true);
+        } else {
+            // Non-admin path: only execute if whitelisted
+            address sender = msg.sender;
+            address target = _target;
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
+            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
+                sender = _target;
+                target = msg.sender;
+            }
+            string issueId = _getIssueId(target, _func, _args);
+            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
             return (true, ret);
         }
-        
-        emit IssueRechecked(msg.sender, issueId, _target, _func, _args, false);
-        return (false, issueId);
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
         uint issueVotes = votes[_issueId].length;
+
         uint votingThresholdBps = votingThresholds[_target][_func];
-        if (votingThresholdBps > 0) {
-            return 10000 * issueVotes >= votingThresholdBps * admins.length;
-        } else {
-            return 5 * issueVotes >= 3 * admins.length;
-        }
+        if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
+
+        return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
@@ -149,15 +128,12 @@ contract record AdminRegistry is Ownable {
 
     function _executeIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal returns (variadic) {
         variadic ret = _target.call(_func, _args);
-        
-        // Clean up votes
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
             votes[_issueId][i] = address(0);
         }
         votes[_issueId].length = 0;
         delete currentIssues[_issueId];
-        
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
@@ -179,25 +155,18 @@ contract record AdminRegistry is Ownable {
         admins.length -= 1;
     }
 
-    function _swapAdmin(address _adminToReplace, address _newAdmin) external onlyOwner {
-        uint index = adminMap[_newAdmin];
-        require(index == 0, "New admin is already an admin");
+    function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
+        uint index = adminMap[_admin];
+        require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
-        require(index > 0, "Admin to replace is not an admin");
-        admins[index - 1] = _newAdmin;
-        adminMap[_newAdmin] = index;
+        require(index > 0, "Caller is not an admin");
+        address swap = admins[admins.length - 1];
+        admins[index - 1] = _admin;
+        adminMap[_admin] = index;
         adminMap[_adminToReplace] = 0;
     }
 
-    /**
-     * @notice Add a whitelist entry allowing a user to call a function on a target contract
-     * @dev Only callable through admin voting (onlyOwner = AdminRegistry)
-     * @param _target Target contract address
-     * @param _func Function name
-     * @param _user User address to whitelist
-     */
     function addWhitelist(address _target, string _func, address _user) external onlyOwner {
-        // Prevent whitelisting critical internal governance functions on AdminRegistry itself
         if (_target == address(this)) {
             require(
                 _func != "addWhitelist" &&
@@ -209,6 +178,7 @@ contract record AdminRegistry is Ownable {
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
                 _func != "setVotingThreshold" &&
+                _func != "setDefaultVotingThresholdBps" &&
                 _func != "createContract" &&
                 _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
@@ -222,8 +192,15 @@ contract record AdminRegistry is Ownable {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
+        require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+    }
+
+    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
+        require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
+        require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
+        defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
