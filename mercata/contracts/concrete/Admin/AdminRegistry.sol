@@ -186,6 +186,7 @@ contract record AdminRegistry is Ownable {
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
                 _func != "setVotingThreshold" &&
+                _func != "setDefaultVotingThresholdBps" &&
                 _func != "createContract" &&
                 _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
@@ -199,11 +200,13 @@ contract record AdminRegistry is Ownable {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
+        require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
-    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) internal {
+    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
+        require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
         require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
         defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
