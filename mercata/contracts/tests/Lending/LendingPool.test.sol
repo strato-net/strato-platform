@@ -130,11 +130,11 @@ contract Describe_LendingPool_Basic is Authorizable {
     }
 
     function it_lending_ae_can_whitelist_tokens() public {
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.liquidityPool()));
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.liquidityPool()));
-
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.safetyModule()));
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.safetyModule()));
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.addWhitelist(address(mUSDST), "mint", address(m.liquidityPool()));
+        adminRegistry.addWhitelist(address(mUSDST), "burn", address(m.liquidityPool()));
+        adminRegistry.addWhitelist(address(sUSDST), "mint", address(m.safetyModule()));
+        adminRegistry.addWhitelist(address(sUSDST), "burn", address(m.safetyModule()));
     }
 
     // Test complete lending pool configuration with full setup

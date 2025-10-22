@@ -285,8 +285,8 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         USDST  = m.tokenFactory().createToken("USDST","USD Stable",[],[],[],"USDST",0,18);
         usdstT = Token(USDST);
         usdstT.setStatus(2);
-        usdstT.addWhitelist(address(m.adminRegistry()), "mint", address(cdp));
-        usdstT.addWhitelist(address(m.adminRegistry()), "burn", address(cdp));
+        m.adminRegistry().castVoteOnIssue(address(m.adminRegistry()), "addWhitelist", address(USDST), "mint", address(cdp));
+        m.adminRegistry().castVoteOnIssue(address(m.adminRegistry()), "addWhitelist", address(USDST), "burn", address(cdp));
         reg.setUSDST(USDST);
         oracle.setAssetPrice(USDST, 1e18);
 

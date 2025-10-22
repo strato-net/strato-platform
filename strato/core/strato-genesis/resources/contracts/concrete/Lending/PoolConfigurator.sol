@@ -223,6 +223,12 @@ contract record PoolConfigurator is Ownable {
         pool.setSafetyShareBps(bps);
     }
 
+    /// @notice Governance setter to update price max age
+    function setPriceMaxAge(uint newMaxAge) external onlyOwner {
+        LendingPool pool = LendingPool(registry.getLendingPool());
+        pool.setPriceMaxAge(newMaxAge);
+    }
+
     // Individual setters for the LendingRegistry
     function setLendingPool(address _lendingPool) external onlyOwner {
         require(_lendingPool != address(0), "Invalid lendingPool address");

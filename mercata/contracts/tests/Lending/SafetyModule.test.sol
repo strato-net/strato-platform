@@ -48,8 +48,8 @@ contract Describe_SafetyModule_Attacks is Authorizable {
         freshSM.setTokens(sUSDST, USDST);
         
         // Whitelist tokens for SafetyModule
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(freshSM));
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(freshSM));
+        m.adminRegistry().addWhitelist(address(sUSDST), "mint", address(freshSM));
+        m.adminRegistry().addWhitelist(address(sUSDST), "burn", address(freshSM));
     }
 
     function it_prevents_share_dilution_via_donation() public {
