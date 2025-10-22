@@ -186,8 +186,11 @@ contract record SafetyModule is Ownable {
             require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
         }
 
-        require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
         _managedAssets += assetsIn;
+        uint256 beforeTransfer = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
+        uint256 afterTransfer = IERC20(asset).balanceOf(address(this));
+        require(afterTransfer - beforeTransfer == assetsIn, "SM: stake transfer delta mismatch");
 
         sharesOut = (s == 0) ? assetsIn : (assetsIn * s) / beforeBal;
         require(sharesOut > 0, "SM:dust");
@@ -227,9 +230,12 @@ contract record SafetyModule is Ownable {
         require(assetsOut >= minAssetsOut, "SM:slippage");
 
         // burn then transfer
+        _managedAssets -= assetsOut;
+        uint256 beforeTransfer = IERC20(asset).balanceOf(address(this));
         Token(sToken).burn(msg.sender, sharesIn);
         require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
-        _managedAssets -= assetsOut;
+        uint256 afterTransfer = IERC20(asset).balanceOf(address(this));
+        require(afterTransfer - beforeTransfer == assetsOut, "SM: redeem transfer delta mismatch");
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
@@ -242,8 +248,13 @@ contract record SafetyModule is Ownable {
     /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
-        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
+
         _managedAssets += amount;
+        uint256 beforeTransfer = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
+        uint256 afterTransfer = IERC20(asset).balanceOf(address(this));
+        require(afterTransfer - beforeTransfer == amount, "SM: notifyReward transfer delta mismatch");
+
         emit RewardNotified(amount);
     }
 
@@ -270,8 +281,12 @@ contract record SafetyModule is Ownable {
         require(covered > 0, "SM:nothing to cover");
 
         // Push exactly what will be consumed, then notify LendingPool
-        require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
         _managedAssets -= covered;
+        uint256 beforeTransfer = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
+        uint256 afterTransfer = IERC20(asset).balanceOf(address(this));
+        require(afterTransfer - beforeTransfer == covered, "SM: coverShortfall transfer delta mismatch");
+
         lendingPool.coverShortfall(covered);
 
         emit ShortfallCovered(covered);
@@ -314,6 +329,8 @@ contract record SafetyModule is Ownable {
         require(actual > totalAssets(), "SM:no stray");
         uint256 stray = actual - totalAssets();
         require(IERC20(asset).transfer(to, stray), "SM:transfer failed");
+        uint256 afterTransfer = IERC20(asset).balanceOf(address(this));
+        require(actual - afterTransfer == stray, "SM: recoverStrayAssets transfer delta mismatch");
     }
 
     /// @notice Rescue stray tokens (not the vault asset).
