@@ -234,11 +234,13 @@ contract record SafetyModule is Ownable {
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
-        _managedAssets -= IERC20(asset).balanceOf(address(this)) - bal;
+        uint256 delta = bal - IERC20(asset).balanceOf(address(this));
+        require(delta > 0, "SM:no delta");
+        _managedAssets -= delta;
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
-        emit Redeemed(msg.sender, sharesIn, assetsOut);
+        emit Redeemed(msg.sender, sharesIn, delta);
     }
 
     // ─────────────────────────────────────────
@@ -250,9 +252,11 @@ contract record SafetyModule is Ownable {
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
-        _managedAssets += IERC20(asset).balanceOf(address(this)) - bal;
+        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        require(delta > 0, "SM:no delta");
+        _managedAssets += delta;
 
-        emit RewardNotified(amount);
+        emit RewardNotified(delta);
     }
 
     /// @notice Slash vault to cover protocol shortfall.
@@ -280,7 +284,7 @@ contract record SafetyModule is Ownable {
         // Push exactly what will be consumed, then notify LendingPool
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
-        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        uint256 delta = bal - IERC20(asset).balanceOf(address(this));
         require(delta > 0, "SM:no delta");
         _managedAssets -= delta;
 
