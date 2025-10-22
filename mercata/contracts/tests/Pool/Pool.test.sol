@@ -38,6 +38,12 @@ contract Describe_Pool is Authorizable {
         // Create pool
         poolAddress = m.poolFactory().createPool(tokenAAddress, tokenBAddress);
         pool = Pool(poolAddress);
+
+        // Give Pool mint/burn rights over its LP token
+        Token lpToken = pool.lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(pool));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(pool));
     }
 
     function it_pool_creates_successfully() {

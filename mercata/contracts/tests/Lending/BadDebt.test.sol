@@ -104,11 +104,16 @@ contract Describe_BadDebt_Basic is Authorizable {
     }
 
     function it_ae_can_whitelist_tokens() public {
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.liquidityPool()));
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.liquidityPool()));
+        AdminRegistry adminRegistry = m.adminRegistry();
 
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.safetyModule()));
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.safetyModule()));
+        // Option A: Use castVoteOnIssue
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "mint", address(m.liquidityPool()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "burn", address(m.liquidityPool()));
+
+        // Option B: Use addWhitelist directly, since it's external;
+        // this results in a castVoteOnIssue call via the onlyOwner modifier
+        adminRegistry.addWhitelist(address(sUSDST), "mint", address(m.safetyModule()));
+        adminRegistry.addWhitelist(address(sUSDST), "burn", address(m.safetyModule()));
     }
 
     // Test complete lending pool configuration with full setup

@@ -205,6 +205,7 @@ contract record PoolFactory is Ownable {
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
     function createPool(address tokenA, address tokenB) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");
@@ -231,8 +232,6 @@ contract record PoolFactory is Ownable {
         pool = address(new Proxy(address(new Pool(address(thisOwner))), address(this)));
         Pool(pool).initialize(tokenA, tokenB, lpTokenAddress);
         Pool(pool).transferOwnership(thisOwner);
-        Token(lpTokenAddress).addWhitelist(thisOwner, "mint", pool);
-        Token(lpTokenAddress).addWhitelist(thisOwner, "burn", pool);
         Ownable(lpTokenAddress).transferOwnership(thisOwner);
 
         // update pool registry
