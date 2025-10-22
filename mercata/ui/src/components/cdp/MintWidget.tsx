@@ -902,12 +902,12 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
 
       {/* Warning for dangerous positions */}
       {isPositionDangerous && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
+            <div className="w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
               <span className="text-white text-xs font-bold">!</span>
             </div>
-            <span className="text-sm text-red-700 font-medium">
+            <span className="text-sm text-yellow-700 font-medium">
               Warning: Position is at liquidation threshold ({formatPercentage(liquidationRatio, 0)}). 
               Consider increasing collateral or reducing borrow amount.
             </span>
