@@ -162,6 +162,14 @@ contract Describe_CDPEngine is Authorizable {
     function it_cdp_engine_has_correct_constants() {
         require(cdpEngine.WAD() == WAD, "WAD should be 1e18");
         require(cdpEngine.RAY() == RAY, "RAY should be 1e27");
+        
+        // Test price max age configuration
+        uint initialPriceMaxAge = cdpEngine.priceMaxAge();
+        uint newPriceMaxAge = 1800; // 30 minutes in seconds
+        
+        // Test setter function
+        cdpEngine.setPriceMaxAge(newPriceMaxAge);
+        require(cdpEngine.priceMaxAge() == newPriceMaxAge, "Price max age not updated");
     }
 
     function it_cdp_engine_can_configure_collateral_asset() {
