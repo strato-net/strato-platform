@@ -205,7 +205,6 @@ contract record AdminRegistry is Ownable {
                 _func != "removeWhitelist" &&
                 _func != "_addAdmin" &&
                 _func != "_createIssue" &&
-                //TODO
                 _func != "_executeIssue" &&
                 _func != "_removeAdmin" &&
                 _func != "_shouldExecute" &&
