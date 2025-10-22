@@ -188,16 +188,14 @@ contract record SafetyModule is Ownable {
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
-        require(IERC20(asset).balanceOf(address(this)) - bal == assetsIn, "SM: transfer mismatch");
-        _managedAssets += assetsIn;
+        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        _managedAssets += delta;
 
-        sharesOut = (s == 0) ? assetsIn : (assetsIn * s) / beforeBal;
+        sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
         require(sharesOut > 0, "SM:dust");
         require(sharesOut >= minSharesOut, "SM:slippage");
 
-        bal = IERC20(sToken).balanceOf(msg.sender);
         Token(sToken).mint(msg.sender, sharesOut);
-        require(IERC20(sToken).balanceOf(msg.sender) - bal == sharesOut, "SM: mint mismatch");
 
         // Reset cooldown on new stake
         cooldownStart[msg.sender] = 0;
@@ -231,14 +229,11 @@ contract record SafetyModule is Ownable {
         require(assetsOut >= minAssetsOut, "SM:slippage");
 
         // burn then transfer
-        uint256 bal = IERC20(sToken).balanceOf(msg.sender);
         Token(sToken).burn(msg.sender, sharesIn);
-        require(bal - IERC20(sToken).balanceOf(msg.sender) == sharesIn, "SM: burn mismatch");
 
-        bal = IERC20(asset).balanceOf(address(this));
+        uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
-        require(bal - IERC20(asset).balanceOf(address(this)) == assetsOut, "SM: transfer mismatch");
-        _managedAssets -= assetsOut;
+        _managedAssets -= IERC20(asset).balanceOf(address(this)) - bal;
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
@@ -254,8 +249,7 @@ contract record SafetyModule is Ownable {
 
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
-        require(IERC20(asset).balanceOf(address(this)) - bal == amount, "SM: transfer mismatch");
-        _managedAssets += amount;
+        _managedAssets += IERC20(asset).balanceOf(address(this)) - bal;
 
         emit RewardNotified(amount);
     }
@@ -285,8 +279,7 @@ contract record SafetyModule is Ownable {
         // Push exactly what will be consumed, then notify LendingPool
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
-        require(bal - IERC20(asset).balanceOf(address(this)) == covered, "SM: transfer mismatch");
-        _managedAssets -= covered;
+        _managedAssets -= IERC20(asset).balanceOf(address(this)) - bal;
 
         lendingPool.coverShortfall(covered);
 
@@ -326,19 +319,13 @@ contract record SafetyModule is Ownable {
     /// @param to Address to send the stray assets to (should be a safe recipient like liquidityPool).
     function recoverStrayAssets(address to) external onlyOwner {
         require(to != address(0), "SM:bad recipient");
-        uint256 actual = IERC20(asset).balanceOf(address(this));
-        require(actual > totalAssets(), "SM:no stray");
-        uint256 stray = actual - totalAssets();
-        uint256 bal = IERC20(asset).balanceOf(address(this));
+        uint256 stray = IERC20(asset).balanceOf(address(this)) - totalAssets();
         require(IERC20(asset).transfer(to, stray), "SM:transfer failed");
-        require(bal - IERC20(asset).balanceOf(address(this)) == stray, "SM: transfer mismatch");
     }
 
     /// @notice Rescue stray tokens (not the vault asset).
     function rescueToken(address token, address to, uint amount) external onlyOwner {
         require(token != address(asset), "SM:no USDST rescue");
-        uint256 bal = IERC20(token).balanceOf(address(this));
         require(IERC20(token).transfer(to, amount), "SM: rescue transfer failed");
-        require(bal - IERC20(token).balanceOf(address(this)) == amount, "SM: rescue transfer mismatch");
     }
 }
