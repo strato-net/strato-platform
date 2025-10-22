@@ -166,6 +166,7 @@ contract record AdminRegistry is Ownable {
     function dismissOwnIssue(address _target, string _func, variadic _args) external {
         string issueId = _getIssueId(_target, _func, _args);
         require(votesMap[issueId][msg.sender] == 1, "Only the proposer may dismiss their own issue");
+        require(votes[issueId].length == 1, "Issue with additional votes cannot be dismissed");
         _dismissIssue(_target, _func, _args);
     }
 
