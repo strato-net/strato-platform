@@ -598,27 +598,15 @@ assetBalances GA.Asset{..} =
          in case mEscrowBalance of
               Nothing -> [(o, q)]
               Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
-    . (++) (case () of
-              _ | root == ethstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (ethstPoolAddress, 11_129_288_949_700_000_000)]
-                | root == wbtcstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (wbtcstPoolAddress, (425 * oneE18) `div` 1000)]
-                | root == goldstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (goldstPoolAddress, (151 * oneE18) `div` 10)]
-                | root == silvstRoot -> [(blockappsAddress, 1_000_000 * oneE18), (silvstPoolAddress, (13_125 * oneE18) `div` 10)]
-                -- | root == paxgstRoot -> [(paxgstPoolAddress, (598 * oneE18) `div` 10)]
-                | otherwise -> []
-           )
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
-            [ (blockappsAddress, 1_000_000 * oneE18) -- correctQuantity decimals name q)
-            , (bridgeRelayerAddress, 1_000 * oneE18)
-            , (oracleAddress1, 1_000 * oneE18)
-            , (oracleAddress2, 1_000 * oneE18)
+            [ (blockappsAddress, correctQuantity decimals name q)
             , (ethstPoolAddress, 50_000 * oneE18)
             , (wbtcstPoolAddress, 50_000 * oneE18)
             , (goldstPoolAddress, 50_000 * oneE18)
             , (silvstPoolAddress, 50_000 * oneE18)
             -- , (paxgstPoolAddress, 200_000 * oneE18)
-            , (liquidityPoolAddress, 250_000 * oneE18)
             ]
         | root == goldstRoot ->
             let goldstBalance = correctQuantity decimals name q
@@ -909,8 +897,11 @@ voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ ownedByBlockApps m
      , (".logicContract", BAccount $ unspecifiedChain voucherImplAddress)
      , ("._symbol", BString "VOUCHER")
      , ("._erc20Initialized", BBool True)
-     , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
+     , ("._totalSupply", BInteger $ 1_300_000 * oneE18)
      , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 1_000_000 * oneE18)
+     , ("._balances[" <> addrBS bridgeRelayerAddress <> "]", BInteger $ 100_000 * oneE18) -- $1,000 worth of txs
+     , ("._balances[" <> addrBS oracleAddress1 <> "]", BInteger $ 100_000 * oneE18)
+     , ("._balances[" <> addrBS oracleAddress2 <> "]", BInteger $ 100_000 * oneE18)
      ]
 
 mToken :: AccountInfo
@@ -921,10 +912,9 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ ownedByBlockApps mer
      , ("._erc20Initialized", BBool True)
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 250_000 * oneE18)
+     , ("._totalSupply", BInteger 0)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 250_000 * oneE18)
      ]
 
 rewardsChef :: AccountInfo
