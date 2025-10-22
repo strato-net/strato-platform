@@ -55,6 +55,14 @@ contract record AdminRegistry is Ownable {
     }
 
     function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+        // Allow whitelisted calls
+        if (whitelist[_target][_func][msg.sender]) {
+            string issueId = _getIssueId(_target, _func, _args);
+            variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
+            return (true, ret);
+        }
+
+        // Handle admin calls
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
@@ -87,19 +95,11 @@ contract record AdminRegistry is Ownable {
             } else {
                 return (false, issueId);
             }
-        } else {
-            // Non-admin path: only execute if whitelisted
-            address sender = msg.sender;
-            address target = _target;
-            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
-            if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
-                sender = _target;
-                target = msg.sender;
-            }
-            string issueId = _getIssueId(target, _func, _args);
-            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
-            return (true, ret);
         }
+
+        // Otherwise, revert
+        revert("Only an admin or a whitelisted account can call castVoteOnIssue");
+        return false;
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
