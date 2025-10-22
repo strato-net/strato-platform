@@ -38,23 +38,11 @@ contract record AdminRegistry is Ownable {
         }
     }
 
-    function addAdmin(address _admin) external {
-        castVoteOnIssue(this, "_addAdmin", _admin);
-    }
-
-    function removeAdmin(address _admin) external {
-        castVoteOnIssue(this, "_removeAdmin", _admin);
-    }
-
-    function swapAdmin(address _adminToReplace, address _newAdmin) external {
-        castVoteOnIssue(this, "_swapAdmin", _adminToReplace, _newAdmin);
-    }
-
     function isAdminAddress(address _admin) external returns (bool) {
         return adminMap[_admin] > 0;
     }
 
-    function castVoteOnIssue(address _target, string _func, variadic _args) public returns (bool, variadic) {
+    function castVoteOnIssue(address _target, string _func, variadic _args) external returns (bool, variadic) {
         if (adminMap[msg.sender] != 0 || adminMap[_target] != 0) {
             address sender = msg.sender;
             if (adminMap[msg.sender] == 0) {
@@ -134,13 +122,13 @@ contract record AdminRegistry is Ownable {
         return ret;
     }
 
-    function _addAdmin(address _admin) external onlyOwner {
+    function addAdmin(address _admin) external onlyOwner {
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
     }
 
-    function _removeAdmin(address _admin) external onlyOwner {
+    function removeAdmin(address _admin) external onlyOwner {
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -151,7 +139,7 @@ contract record AdminRegistry is Ownable {
         admins.length -= 1;
     }
 
-    function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
+    function swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
@@ -163,23 +151,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function addWhitelist(address _target, string _func, address _user) external onlyOwner {
-        if (_target == address(this)) {
-            require(
-                _func != "addWhitelist" &&
-                _func != "removeWhitelist" &&
-                _func != "_addAdmin" &&
-                _func != "_createIssue" &&
-                _func != "_executeIssue" &&
-                _func != "_removeAdmin" &&
-                _func != "_shouldExecute" &&
-                _func != "_swapAdmin" &&
-                _func != "setVotingThreshold" &&
-                _func != "setDefaultVotingThresholdBps" &&
-                _func != "createContract" &&
-                _func != "createSaltedContract",
-                "Cannot whitelist internal governance functions"
-            );
-        }
+        require(_target != address(this), "Cannot whitelist admin registry functions");
         whitelist[_target][_func][_user] = true;
     }
 
