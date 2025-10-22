@@ -416,8 +416,12 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     function it_rejects_zero_price() public {
         _open(1000e18, 100e18, OPEN_P);
         // set price to 0 → oracle will cause a revert the engine catches as require
-        oracle.setAssetPrice(ASSET, 0);
         bool reverted = false;
+        try oracle.setAssetPrice(ASSET, 0) { 
+            revert("expected revert on set zero price"); 
+        } catch { reverted = true; }
+        require(reverted, "should revert");
+        
         try cdp.liquidate(ASSET, address(borrower), 1e18) {
             revert("expected revert on zero price");
         } catch { reverted = true; }
@@ -908,6 +912,9 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         uint reserve0 = usdstT.balanceOf(address(reg.cdpReserve()));
 
         fastForward(3600); // 1 hour
+        
+        // Update price to make it fresh again
+        oracle.setAssetPrice(ASSET, LOW_P);
 
         // Liquidate with a huge allowance so internal caps determine the repay
         liq.callFunction(USDST, "approve", address(cdp), 1e36);

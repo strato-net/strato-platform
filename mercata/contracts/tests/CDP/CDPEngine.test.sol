@@ -162,6 +162,18 @@ contract Describe_CDPEngine is Authorizable {
     function it_cdp_engine_has_correct_constants() {
         require(cdpEngine.WAD() == WAD, "WAD should be 1e18");
         require(cdpEngine.RAY() == RAY, "RAY should be 1e27");
+        
+        // Test price max age configuration
+        uint initialPriceMaxAge = cdpEngine.priceMaxAge();
+        uint newPriceMaxAge = 1800; // 30 minutes in seconds
+        
+        // Test setter function
+        cdpEngine.setPriceMaxAge(newPriceMaxAge);
+        require(cdpEngine.priceMaxAge() == newPriceMaxAge, "Price max age not updated");
+
+        // Test that price max age is updated
+        cdpEngine.setPriceMaxAge(1200);
+        require(cdpEngine.priceMaxAge() == 1200, "Price max age not updated");
     }
 
     function it_cdp_engine_can_configure_collateral_asset() {
@@ -1469,6 +1481,10 @@ contract Describe_CDPEngine is Authorizable {
         // // Fast forward a bit to avoid timestamp 0 issues
         fastForward(1);
         
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        
         // Set up collateral and mint debt
         uint256 collateralAmount = 1000e18;
         uint256 debtAmount = 100e18; // 100 USDST
@@ -1495,6 +1511,10 @@ contract Describe_CDPEngine is Authorizable {
         uint256 timestampBefore = block.timestamp;
         fastForward(secondsInYear);
         uint256 timestampAfter = block.timestamp;
+        
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
         
         // log("Time before fastForward", timestampBefore);
         // log("Time after fastForward", timestampAfter);
@@ -1533,6 +1553,10 @@ contract Describe_CDPEngine is Authorizable {
         // Fast forward to avoid timestamp 0
         fastForward(1);
         
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        
         // Set up initial position
         uint256 collateralAmount = 1000e18;
         uint256 debtAmount = 100e18;
@@ -1554,6 +1578,10 @@ contract Describe_CDPEngine is Authorizable {
         uint256 sixMonths = 182 * 24 * 60 * 60; // ~6 months
         fastForward(sixMonths);
         
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        
         // Trigger accrual
         cdpEngine.mint(collateralTokenAddress, 1);
         
@@ -1564,6 +1592,10 @@ contract Describe_CDPEngine is Authorizable {
         
         // Fast forward another 6 months
         fastForward(sixMonths);
+        
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
         
         // Trigger accrual again
         cdpEngine.mint(collateralTokenAddress, 1);
@@ -1586,6 +1618,10 @@ contract Describe_CDPEngine is Authorizable {
         // Fast forward to avoid timestamp 0
         fastForward(1);
         
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
+        
         // Set up position
         uint256 collateralAmount = 1000e18;
         uint256 debtAmount = 100e18;
@@ -1601,6 +1637,10 @@ contract Describe_CDPEngine is Authorizable {
         // Fast forward 30 days to accrue some interest
         uint256 thirtyDays = 30 * 24 * 60 * 60;
         fastForward(thirtyDays);
+        
+        // Update oracle prices after time advancement to prevent staleness
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        priceOracle.setAssetPrice(usdstAddress, 1e18);
         
         // Trigger accrual with a small mint
         cdpEngine.mint(collateralTokenAddress, 1);
@@ -1639,5 +1679,30 @@ contract Describe_CDPEngine is Authorizable {
         uint256 totalRepaid = debtBefore;
         // log("Total amount repaid", totalRepaid);
         require(totalRepaid > debtAmount, "Should have paid interest on top of principal");
+    }
+
+    function it_cdp_engine_reverts_mint_with_stale_prices() {
+        // Set up collateral
+        uint256 collateralAmount = 1000e18;
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        
+        // Set initial price
+        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+        
+        // Advance time beyond the staleness threshold (25 minutes > 20 minutes)
+        fastForward(1500); // 25 minutes
+        
+        // Try to mint without updating prices - should fail due to stale price
+        bool reverted = false;
+        try cdpEngine.mint(collateralTokenAddress, 100e18) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Mint should revert with stale prices");
     }
 }

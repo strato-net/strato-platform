@@ -141,14 +141,17 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint debtCeilingAssetUnits = 10000000e18; // 10M USDST
         uint debtCeilingUSD = 10000000e18;        // 10M USD value 
         uint safetyShareBps = 1000;              // 10% to safety module
+        uint priceMaxAge = 1800;                 // 30 minutes in seconds
         
         configurator.setDebtCeilings(debtCeilingAssetUnits, debtCeilingUSD);
         configurator.setSafetyShareBps(safetyShareBps);
+        configurator.setPriceMaxAge(priceMaxAge);
         
         // Verify debt ceiling configuration
         require(pool.debtCeilingAsset() == debtCeilingAssetUnits, "Asset debt ceiling not set");
         require(pool.debtCeilingUSD() == debtCeilingUSD, "USD debt ceiling not set");
         require(pool.safetyShareBps() == safetyShareBps, "Safety share not set");
+        require(pool.priceMaxAge() == priceMaxAge, "Price max age not set");
         
         // === STEP 3: Configure USD borrowable asset parameters ===
         
