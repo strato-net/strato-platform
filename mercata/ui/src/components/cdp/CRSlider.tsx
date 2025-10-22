@@ -98,7 +98,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
                 projectedCR >= 999999 
                   ? 'text-green-600' 
                   : isPositionDangerous 
-                    ? 'text-red-500 font-bold' 
+                    ? 'text-yellow-600 font-bold' 
                     : ''
               }>
                 {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
@@ -138,7 +138,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       
       {/* Slider Labels */}
       <div className="flex justify-between text-xs text-gray-500">
-        <span className="text-red-500">LT: {formatPercentage(liquidationThreshold)}</span>
+        <span className="text-yellow-600">LT: {formatPercentage(liquidationThreshold)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
