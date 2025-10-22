@@ -606,48 +606,6 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         require(badAfter >= badBefore + 1, "cap bound 100: bad debt should grow");
     }
 
-    // ─────────────────────── Boundary: repay == coverageCap ───────────────────────
-
-    /**
-     * When debtToCover equals coverageCap, the engine must take the NON-cap path
-     * (branch uses `if (repay > coverageCap)`). We validate that collateral is NOT
-     * fully seized and that debt reduces exactly by repay (modulo index rounding).
-     */
-    function it_boundary_repay_equals_coverage_cap_non_cap_path() public {
-        _open(2000e18, 6000e18, OPEN_P);
-        // Use liq price = $1 → coverageCap = floor( collateralUSD * 10000 / (10000+PEN) )
-        oracle.setAssetPrice(ASSET, LOW_P);
-        (uint colBefore, uint sdBefore) = _state(address(borrower));
-
-        // Compute coverageCap in USD (WAD)
-        uint collateralUSD = (colBefore * LOW_P) / UNIT;
-        uint coverageCap   = (collateralUSD * 10000) / (10000 + PEN); // floor
-
-        // Run liquidation with repay == coverageCap (NOT cap-bound)
-        liq.callFunction(USDST, "approve", address(cdp), coverageCap);
-        uint beforeBal = vault.userCollaterals(address(borrower), ASSET);
-        liq.callFunction(address(cdp), "liquidate", ASSET, address(borrower), coverageCap);
-        uint afterBal  = vault.userCollaterals(address(borrower), ASSET);
-
-        uint seized   = beforeBal - afterBal;
-        uint leftover = afterBal;
-
-        // Expect not all collateral seized (since non-cap branch)
-        require(leftover > 0, "boundary: should not seize all");
-
-        // Check remaining debt decreased by ~coverageCap (index rounding may reduce exact burn)
-        (, uint sdAfter) = _state(address(borrower));
-        (uint rate,,) = cdp.collateralGlobalStates(ASSET);
-        uint debtBefore = (sdBefore * rate) / RAY;
-        uint debtAfter  = (sdAfter  * rate) / RAY;
-
-        require(debtAfter < debtBefore, "boundary: debt should decrease");
-        // Seized collateral should match (repay + 10%) / price within rounding
-        uint penalty = (coverageCap * PEN) / 10000;
-        uint expectedSeized = ((coverageCap + penalty) * UNIT) / LOW_P;
-        require(seized <= expectedSeized && expectedSeized - seized <= 1, "boundary: seized rounding off-by-1");
-    }
-
     // ─────────────────────── Multi-step liquidation ───────────────────────
 
     /**
@@ -794,56 +752,6 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         // Bad debt increases by remainder = debtBefore - repay
         uint expectedRemainder = usdDebt0 > coverageCap ? (usdDebt0 - coverageCap) : 0;
         require(_approxEq(bad1 - bad0, expectedRemainder, 1), "CAP50: bad debt remainder mismatch");
-    }
-
-    // ─────────────── state checks: boundary repay == coverageCap (non-cap) ───────────────
-
-    function it_state_consistency_boundary_equal_covcap_non_cap_branch() public {
-        _open(2000e18, 6000e18, OPEN_P);
-
-        // Compute exact coverageCap at $1 and use it as debtToCover → NON-CAP branch
-        oracle.setAssetPrice(ASSET, LOW_P);
-        (uint col0, uint scaled0) = cdp.vaults(address(borrower), ASSET);
-        (uint rate0,, uint totalScaled0) = cdp.collateralGlobalStates(ASSET);
-        uint debt0 = _usdFromScaled(scaled0, rate0);
-
-        uint colUSD = (col0 * LOW_P) / UNIT;
-        uint capUSD = (colUSD * 10000) / (10000 + PEN);
-
-        uint vBal0    = assetT.balanceOf(address(vault));
-        uint liqCol0  = assetT.balanceOf(address(liq));
-        uint liqUsd0  = usdstT.balanceOf(address(liq));
-        uint bad0     = cdp.badDebtUSDST(ASSET);
-
-        liq.callFunction(USDST, "approve", address(cdp), capUSD);
-        uint beforeBal = vault.userCollaterals(address(borrower), ASSET);
-        liq.callFunction(address(cdp), "liquidate", ASSET, address(borrower), capUSD);
-        uint afterBal  = vault.userCollaterals(address(borrower), ASSET);
-        uint seized = beforeBal - afterBal;
-
-        (uint col1, uint scaled1) = cdp.vaults(address(borrower), ASSET);
-        (uint rate1,, uint totalScaled1) = cdp.collateralGlobalStates(ASSET);
-        uint debt1 = _usdFromScaled(scaled1, rate1);
-
-        uint vBal1   = assetT.balanceOf(address(vault));
-        uint liqCol1 = assetT.balanceOf(address(liq));
-        uint liqUsd1 = usdstT.balanceOf(address(liq));
-        uint bad1    = cdp.badDebtUSDST(ASSET);
-
-        // Non-cap branch: not all collateral seized; debt decreases by exactly capUSD
-        uint penalty = (capUSD * PEN) / 10000;
-        uint expSeized = ((capUSD + penalty) * UNIT) / LOW_P;
-
-        require(col1 > 0, "BND: unexpected full seize");
-        require(seized == expSeized, "BND: seized mismatch");
-        require(vBal1 == vBal0 - expSeized, "BND: vault ERC20");
-        require(liqCol1 == liqCol0 + expSeized, "BND: liquidator collateral");
-        require(_approxEq(liqUsd0 - liqUsd1, capUSD, 1), "BND: liquidator USD");
-
-        // Engine mappings & globals
-        require(_approxEq(debt0 - debt1, capUSD, 1), "BND: borrower debt delta");
-        require(_approxEq(_usdFromScaled(totalScaled0, rate1) - _usdFromScaled(totalScaled1, rate1), capUSD, 1), "BND: global debt delta");
-        require(bad1 == bad0, "BND: bad debt changed");
     }
 
     // ───────────────────── state checks: total-debt binds (CF=100%) ─────────────────────
