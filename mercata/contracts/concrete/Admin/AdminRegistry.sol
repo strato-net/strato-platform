@@ -70,7 +70,7 @@ contract record AdminRegistry is Ownable {
                 sender = _target;
                 _target = msg.sender;
             }
-            string issueId = _getIssueId(_target, _func, _args);
+            string issueId = getIssueId(_target, _func, _args);
             bool hasVoted = votesMap[issueId][sender] != 0;
 
             _createIssue(sender, issueId, _target, _func, _args);
@@ -96,7 +96,7 @@ contract record AdminRegistry is Ownable {
                 sender = _target;
                 target = msg.sender;
             }
-            string issueId = _getIssueId(target, _func, _args);
+            string issueId = getIssueId(target, _func, _args);
             variadic ret = _executeIssue(sender, issueId, target, _func, _args);
             return (true, ret);
         }
@@ -118,11 +118,7 @@ contract record AdminRegistry is Ownable {
         }
     }
 
-    function getIssueId(address _target, string _func, variadic _args) external returns (string) {
-        return _getIssueId(_target, _func, _args);
-    }
-
-    function _getIssueId(address _target, string _func, variadic _args) internal returns (string) {
+    function getIssueId(address _target, string _func, variadic _args) public returns (string) {
         return keccak256(_target, _func, _args);
     }
 
