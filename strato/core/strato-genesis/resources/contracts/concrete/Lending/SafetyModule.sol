@@ -40,6 +40,9 @@ contract record SafetyModule is Ownable {
 
     // Policy
     uint public MAX_SLASH_BPS = 3000; // 30% per event
+    
+    // Internal asset tracking to prevent donation attacks
+    uint256 private _managedAssets;
 
     constructor(address initialOwner) Ownable(initialOwner) { }
 
@@ -107,11 +110,11 @@ contract record SafetyModule is Ownable {
 
     // ─────────────────────────────────────────
     // Views / math
-    // Vault TVL in underlying (pulls live ERC20 balance)
+    // Vault TVL in underlying (uses internal tracking to prevent donation attacks)
     function totalAssets() public view returns (uint) 
     { 
         require(asset != address(0), "SM:asset not set");
-        return IERC20(asset).balanceOf(address(this)); 
+        return _managedAssets; 
     }
 
     // Total shares outstanding (assumes sToken implements ERC20 totalSupply)
@@ -183,9 +186,11 @@ contract record SafetyModule is Ownable {
             require(beforeBal > 0, "SM:price=0");  // prevent (s>0, a==0) 
         }
 
-        IERC20(asset).transferFrom(msg.sender, address(this), assetsIn);
-        uint delta = totalAssets() - beforeBal;
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
+        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
         require(delta > 0, "SM:no delta");
+        _managedAssets += delta;
 
         sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
         require(sharesOut > 0, "SM:dust");
@@ -226,11 +231,16 @@ contract record SafetyModule is Ownable {
 
         // burn then transfer
         Token(sToken).burn(msg.sender, sharesIn);
-        IERC20(asset).transfer(msg.sender, assetsOut);
+
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transfer(msg.sender, assetsOut), "SM: redeem transfer failed");
+        uint256 delta = bal - IERC20(asset).balanceOf(address(this));
+        require(delta > 0, "SM:no delta");
+        _managedAssets -= delta;
 
         if (IERC20(sToken).balanceOf(msg.sender) == 0) cooldownStart[msg.sender] = 0;
 
-        emit Redeemed(msg.sender, sharesIn, assetsOut);
+        emit Redeemed(msg.sender, sharesIn, delta);
     }
 
     // ─────────────────────────────────────────
@@ -239,8 +249,14 @@ contract record SafetyModule is Ownable {
     /// @notice Pull USDST from owner and treat as rewards (price ↑ for all holders).
     function notifyReward(uint amount) external onlyOwner {
         require(amount > 0, "SM:zero");
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
-        emit RewardNotified(amount);
+
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transferFrom(msg.sender, address(this), amount), "SM: notifyReward transfer failed");
+        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        require(delta > 0, "SM:no delta");
+        _managedAssets += delta;
+
+        emit RewardNotified(delta);
     }
 
     /// @notice Slash vault to cover protocol shortfall.
@@ -258,7 +274,7 @@ contract record SafetyModule is Ownable {
         uint256 maxSlash  = (ta * MAX_SLASH_BPS) / 10000;
 
         // Compute the actual amount we are willing & able to cover
-        covered = amount;
+        uint256 covered = amount;
         if (covered > ta)        covered = ta;        // cannot send more than vault assets
         if (covered > maxSlash)  covered = maxSlash;  // per-event slash cap
         if (covered > bd)        covered = bd;        // don't overfund beyond bad debt
@@ -266,10 +282,15 @@ contract record SafetyModule is Ownable {
         require(covered > 0, "SM:nothing to cover");
 
         // Push exactly what will be consumed, then notify LendingPool
-        IERC20(asset).transfer(address(liquidityPool), covered);
-        lendingPool.coverShortfall(covered);
+        uint256 bal = IERC20(asset).balanceOf(address(this));
+        require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
+        uint256 delta = bal - IERC20(asset).balanceOf(address(this));
+        require(delta > 0, "SM:no delta");
+        _managedAssets -= delta;
 
-        emit ShortfallCovered(covered);
+        lendingPool.coverShortfall(delta);
+
+        emit ShortfallCovered(delta);
     }
     
     // ─────────────────────────────────────────
@@ -300,9 +321,19 @@ contract record SafetyModule is Ownable {
         emit TokensUpdated(_asset, _sToken);
     }
 
+    /// @notice Recover stray assets that were donated to the contract without affecting internal tracking.
+    /// @dev This prevents donation attacks by removing surplus tokens without updating totalAssets().
+    /// @param to Address to send the stray assets to (should be a safe recipient like liquidityPool).
+    function recoverStrayAssets(address to) external onlyOwner {
+        require(to != address(0), "SM:bad recipient");
+        uint256 stray = IERC20(asset).balanceOf(address(this)) - totalAssets();
+        require(stray > 0, "SM:no stray");
+        require(IERC20(asset).transfer(to, stray), "SM:transfer failed");
+    }
+
     /// @notice Rescue stray tokens (not the vault asset).
     function rescueToken(address token, address to, uint amount) external onlyOwner {
         require(token != address(asset), "SM:no USDST rescue");
-        IERC20(token).transfer(to, amount);
+        require(IERC20(token).transfer(to, amount), "SM: rescue transfer failed");
     }
 }

@@ -562,6 +562,7 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 proxy $ ownedByBlo
   , (".debtCeilingUSD", BInteger 0)
   , (".badDebt", BInteger 0)
   , (".safetyShareBps", BInteger 1000)
+  , (".priceMaxAge", BInteger 1200)
   ] ++
   [ (".assetConfigs[" <> addrBS usdstAddress <> "].ltv", BInteger 7500)
   , (".assetConfigs[" <> addrBS usdstAddress <> "].interestRate", BInteger 500)
@@ -840,6 +841,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ ownedByBlockAp
      , (".juniorIndex", BInteger ray)
      , (".totalJuniorOutstandingUSDST", BInteger 0)
      , (".prevReserveBalance", BInteger 0)
+     , (".priceMaxAge", BInteger 1200)
      ]
   ++ concatMap (\a ->
     [ (".collateralConfigs[" <> addrBS a <> "].debtFloor", BInteger oneE18)
@@ -945,6 +947,7 @@ safetyModule = SolidVMContractWithStorage safetyModuleAddress 0 proxy $ ownedByB
      , (".COOLDOWN_SECONDS", BInteger 1)
      , (".UNSTAKE_WINDOW", BInteger 432000)
      , (".MAX_SLASH_BPS", BInteger 3000)
+     , ("._managedAssets", BInteger 0)
      ]
 
 safetyModuleEvents :: (Address, S.Seq Event)

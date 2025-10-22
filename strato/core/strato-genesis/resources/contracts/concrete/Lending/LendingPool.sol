@@ -37,6 +37,7 @@ contract record LendingPool is Ownable {
     event BadDebtCovered(uint cover, uint remainingBadDebt);
     event BadDebtWrittenOffFromReserves(uint writeOff, uint badDebt, uint reservesAccrued);
     event DepositorHaircutApplied(uint writeOff, uint badDebt, string calldata reason);
+    event PriceMaxAgeSet(uint oldMaxAge, uint newMaxAge);
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // DATA STRUCTURES
@@ -77,6 +78,7 @@ contract record LendingPool is Ownable {
     uint public debtCeilingUSD;   // cap in USD 1e18; 0 disables
 
     uint  public safetyShareBps;      // % of reserves to SM on sweep, e.g. 2000 = 20%
+    uint public priceMaxAge = 1200;
 
    // Loan Management - One loan per user
     mapping(address => LoanInfo) public record userLoan; // user => single loan
@@ -108,6 +110,7 @@ contract record LendingPool is Ownable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         SECONDS_PER_YEAR = 31536000;
+        priceMaxAge = 1200;
         
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
@@ -489,10 +492,11 @@ contract record LendingPool is Ownable {
          require(maxBorrowAmount > currentOwed, "No room");
 
          // Prices and LTV
-         uint priceAsset = PriceOracle(_priceOracle()).getAssetPrice(asset); // 1e18
-         uint priceBorrow = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18
+         (uint priceAsset, uint timestampAsset) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(asset); // 1e18
+         (uint priceBorrow, uint timestampBorrow) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18
          uint ltv = assetConfigs[asset].ltv; // bps
          require(priceAsset > 0 && priceBorrow > 0 && ltv > 0, "Config");
+         require(block.timestamp - timestampAsset <= priceMaxAge && block.timestamp - timestampBorrow <= priceMaxAge, "Invalid or stale price");
 
          // roomBorrow = maxBorrowAmount - currentOwed (in borrowable units)
          uint roomBorrow = maxBorrowAmount - currentOwed;
@@ -567,9 +571,10 @@ contract record LendingPool is Ownable {
         require(debtToCover <= maxRepay, "Repay amount exceeds allowed limit");
 
          // Calculate collateral to seize
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 18 decimals USD
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        (uint priceDebt, uint timestampDebt) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 18 decimals USD
+        (uint priceColl, uint timestampColl) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(collateralAsset);
         require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+        require(block.timestamp - timestampDebt <= priceMaxAge && block.timestamp - timestampColl <= priceMaxAge, "Invalid or stale price");
 
         uint collateralToSeize = (debtToCover * priceDebt * cConfig.liquidationBonus) / (priceColl * 10000);
         // debtToCover and prices are 1e18, so collateralToSeize is in collateral decimals (assume 18)
@@ -671,9 +676,10 @@ contract record LendingPool is Ownable {
         uint maxRepay = (health < 95e16) ? totalOwed : (totalOwed / 2);
 
         // Coverage cap = borrowerCollateral * priceColl / (priceDebt * bonus)
-        uint priceDebt = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
-        uint priceColl = PriceOracle(_priceOracle()).getAssetPrice(collateralAsset);
+        (uint priceDebt, uint timestampDebt) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset);
+        (uint priceColl, uint timestampColl) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(collateralAsset);
         require(priceDebt > 0 && priceColl > 0, "Invalid oracle price");
+        require(block.timestamp - timestampDebt <= priceMaxAge && block.timestamp - timestampColl <= priceMaxAge, "Invalid or stale price");
         uint borrowerCollateral = CollateralVault(_collateralVault()).userCollaterals(borrower, collateralAsset);
         uint num = borrowerCollateral * priceColl * 10000;
         uint den = priceDebt * cConfig.liquidationBonus;
@@ -882,7 +888,8 @@ contract record LendingPool is Ownable {
             require(newDebt <= debtCeilingAsset, "Debt ceiling (asset) exceeded");
         }
         if (debtCeilingUSD > 0) {
-            uint p = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
+            (uint p, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18 USD
+            require(block.timestamp - timestamp <= priceMaxAge, "Invalid or stale price");
             require(p > 0, "No oracle price");
             uint newUsd = (newDebt * p) / 1e18;
             require(newUsd <= debtCeilingUSD, "Debt ceiling (USD) exceeded");
@@ -943,6 +950,12 @@ contract record LendingPool is Ownable {
         safetyShareBps = bps;
     }
 
+    function setPriceMaxAge(uint newMaxAge) external onlyPoolConfigurator {
+        uint old = priceMaxAge;
+        priceMaxAge = newMaxAge;
+        emit PriceMaxAgeSet(old, newMaxAge);
+    }
+
     /// @notice Sweep protocol reserves to FeeCollector (bounded by cash & reserves)
     function sweepReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0 || reservesAccrued == 0) return;
@@ -989,9 +1002,9 @@ contract record LendingPool is Ownable {
             uint collateralAmount = vault.userCollaterals(user, asset);
             if (collateralAmount == 0) continue;
 
-            uint price = oracle.getAssetPrice(asset);
+            (uint price, uint timestamp) = oracle.getAssetPriceWithTimestamp(asset);
             uint liqThreshold = assetConfigs[asset].liquidationThreshold;
-            if (price == 0 || liqThreshold == 0) continue;
+            if (price == 0 || liqThreshold == 0 || block.timestamp - timestamp > priceMaxAge) continue;
 
             totalValue += (collateralAmount * price * liqThreshold) / (1e18 * 10000);
         }
@@ -1007,8 +1020,8 @@ contract record LendingPool is Ownable {
         uint debt = getUserDebt(user); // scaledDebt * borrowIndex / RAY
         if (debt == 0) return 0;
 
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // USD 1e18
-        if (price == 0) return 0;
+        (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // USD 1e18
+        if (price == 0 || block.timestamp - timestamp > priceMaxAge) return 0;
 
         // USD value (18 decimals)
         return (debt * price) / 1e18;
@@ -1043,9 +1056,9 @@ contract record LendingPool is Ownable {
                 }
 
                 if (collateralAmount > 0) {
-                    uint price = PriceOracle(_priceOracle()).getAssetPrice(asset);
+                    (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(asset);
 
-                    if (price > 0) {
+                    if (price > 0 && block.timestamp - timestamp <= priceMaxAge) {
                         // Calculate borrowable value using LTV (max borrowing power)
                         uint assetBorrowableValue = (collateralAmount * price * ltv) / (1e18 * 10000);
                         totalCollateralValue += assetBorrowableValue;
@@ -1055,8 +1068,8 @@ contract record LendingPool is Ownable {
         }
 
         // Convert total borrowable value back to borrowableAsset units
-        uint borrowableAssetPrice = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset);
-        if (borrowableAssetPrice == 0) {
+        (uint borrowableAssetPrice, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset);
+        if (borrowableAssetPrice == 0 || block.timestamp - timestamp > priceMaxAge) {
             return 0;
         }
 
@@ -1113,8 +1126,8 @@ contract record LendingPool is Ownable {
     function getTotalBorrowValuePreview(address user) public view returns (uint usdValuePreview) {
         uint debt = getUserDebtPreview(user);
         if (debt == 0) return 0;
-        uint price = PriceOracle(_priceOracle()).getAssetPrice(borrowableAsset); // 1e18 USD
-        if (price == 0) return 0;
+        (uint price, uint timestamp) = PriceOracle(_priceOracle()).getAssetPriceWithTimestamp(borrowableAsset); // 1e18 USD
+        if (price == 0 || block.timestamp - timestamp > priceMaxAge) return 0;
         return (debt * price) / 1e18;
     }
 
