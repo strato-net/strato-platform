@@ -189,6 +189,7 @@ contract record SafetyModule is Ownable {
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transferFrom(msg.sender, address(this), assetsIn), "SM: stake transfer failed");
         uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        require(delta > 0, "SM:no delta");
         _managedAssets += delta;
 
         sharesOut = (s == 0) ? delta : (delta * s) / beforeBal;
@@ -200,7 +201,7 @@ contract record SafetyModule is Ownable {
         // Reset cooldown on new stake
         cooldownStart[msg.sender] = 0;
 
-        emit Staked(msg.sender, assetsIn, sharesOut);
+        emit Staked(msg.sender, delta, sharesOut);
     }
 
     /// @notice Start cooldown. After COOLDOWN_SECONDS elapse, you have UNSTAKE_WINDOW to redeem.
