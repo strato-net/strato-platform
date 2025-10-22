@@ -88,15 +88,7 @@ contract record AdminRegistry is Ownable {
                 return (false, issueId);
             }
         } else {
-            try {
-                if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
-                    string issueId = _getIssueId(_target, _func, _args);
-                    variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-                    return (true, ret);
-                }
-            } catch {
-
-            }
+            // Non-admin path: only execute if whitelisted
             address sender = msg.sender;
             address target = _target;
             require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
