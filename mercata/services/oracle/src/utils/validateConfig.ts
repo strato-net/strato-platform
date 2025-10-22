@@ -62,6 +62,9 @@ export async function validateConfig(): Promise<boolean> {
                         
                         if (!sourceName) {
                             errors.push(`${sourcePrefix} Missing source name`);
+                        } else if (sourceName === 'constant') {
+                            // Skip validation for constant source - it's handled specially
+                            usedSources.add(sourceName);
                         } else if (!(sourcesConfig as any)[sourceName]) {
                             errors.push(`${sourcePrefix} Unknown source: ${sourceName}`);
                         } else {
@@ -93,6 +96,13 @@ export async function validateConfig(): Promise<boolean> {
                             // Validate tokenAddress format for crypto assets
                             if (asset.tokenAddress && !/^0x[a-fA-F0-9]{40}$/.test(asset.tokenAddress)) {
                                 errors.push(`${assetPrefix} Invalid tokenAddress format: ${asset.tokenAddress}`);
+                            }
+                            
+                            // Validate constantPrice for assets in constant-price feeds
+                            if (feed.sources && feed.sources.includes('constant')) {
+                                if (!asset.constantPrice || typeof asset.constantPrice !== 'number') {
+                                    errors.push(`${assetPrefix} Must have constantPrice field (number) when using constant source`);
+                                }
                             }
                         }
                     });
@@ -149,7 +159,8 @@ export async function validateConfig(): Promise<boolean> {
         const source = sourcesConfig[sourceName];
         const sourcePrefix = `   Source ${sourceName}:`;
         
-        if (!source.url) {
+        // Skip URL validation for constant price sources
+        if (sourceName !== 'ConstantPrice' && !source.url) {
             errors.push(`${sourcePrefix} Missing url`);
         }
 
