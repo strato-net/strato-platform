@@ -151,7 +151,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function addWhitelist(address _target, string _func, address _user) external onlyOwner {
-        require(_target != address(this), "Cannot whitelist admin registry functions");
+        require(_target != this && _user != this, "Cannot whitelist admin registry functions");
         whitelist[_target][_func][_user] = true;
     }
 
