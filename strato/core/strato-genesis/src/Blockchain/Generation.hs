@@ -197,13 +197,12 @@ insertContracts slotss name src code start gi =
         }
 
 readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
-readValidatorsFromGenesisInfo gi = catMaybes . flip map (genesisInfoAccountInfo gi) $ \case
-  SolidVMContractWithStorage _ _ (SolidVMCode "MercataValidator" _) storage -> do
+readValidatorsFromGenesisInfo gi = concat . flip map (genesisInfoAccountInfo gi) $ \case
+  SolidVMContractWithStorage _ _ (SolidVMCode "MercataGovernance" _) storage ->
     let storageMap = M.fromList storage
-    c <- M.lookup ".commonName" storageMap
-    case c of
-      BAccount c' -> do
-        pure $ (Validator $ _namedAccountAddress c')
-      _ -> Nothing
-  _ -> Nothing
-
+     in case M.lookup ".validators.length" storageMap of
+          Just (BInteger l) -> mapMaybe (\i -> case M.lookup (".validators[" <> BC.pack (show i) <> "]") storageMap of
+            Just (BAccount a) -> Just . Validator . _namedAccountAddress $ a
+            _ -> Nothing) [0..l-1]
+          _ -> []
+  _ -> []
