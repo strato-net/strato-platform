@@ -270,7 +270,7 @@ contract record SafetyModule is Ownable {
         uint256 maxSlash  = (ta * MAX_SLASH_BPS) / 10000;
 
         // Compute the actual amount we are willing & able to cover
-        covered = amount;
+        uint256 covered = amount;
         if (covered > ta)        covered = ta;        // cannot send more than vault assets
         if (covered > maxSlash)  covered = maxSlash;  // per-event slash cap
         if (covered > bd)        covered = bd;        // don't overfund beyond bad debt
@@ -280,11 +280,13 @@ contract record SafetyModule is Ownable {
         // Push exactly what will be consumed, then notify LendingPool
         uint256 bal = IERC20(asset).balanceOf(address(this));
         require(IERC20(asset).transfer(address(liquidityPool), covered), "SM: coverShortfall transfer failed");
-        _managedAssets -= IERC20(asset).balanceOf(address(this)) - bal;
+        uint256 delta = IERC20(asset).balanceOf(address(this)) - bal;
+        require(delta > 0, "SM:no delta");
+        _managedAssets -= delta;
 
-        lendingPool.coverShortfall(covered);
+        lendingPool.coverShortfall(delta);
 
-        emit ShortfallCovered(covered);
+        emit ShortfallCovered(delta);
     }
     
     // ─────────────────────────────────────────
@@ -321,6 +323,7 @@ contract record SafetyModule is Ownable {
     function recoverStrayAssets(address to) external onlyOwner {
         require(to != address(0), "SM:bad recipient");
         uint256 stray = IERC20(asset).balanceOf(address(this)) - totalAssets();
+        require(stray > 0, "SM:no stray");
         require(IERC20(asset).transfer(to, stray), "SM:transfer failed");
     }
 
