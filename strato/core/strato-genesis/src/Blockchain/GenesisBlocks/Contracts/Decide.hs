@@ -1,20 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.GenesisBlocks.Contracts.Decide
   ( insertDecideContract,
   )
 where
 
-import Blockchain.Data.GenesisInfo
-import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.CodePtr
+import           Blockchain.Data.GenesisInfo
+import           Blockchain.GenesisBlocks.Contracts.TH
+import           Blockchain.Strato.Model.Account
+import           Blockchain.Strato.Model.Address
+import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
-import Data.Text (Text)
-import Data.Text.Encoding
-import SolidVM.Model.Storable
-import Text.RawString.QQ
+import           Data.ByteString                   (ByteString)
+import           Data.Map                          (Map)
+import qualified Data.Map                          as Map
+import           Data.Maybe
+import           Data.Text.Encoding
+import           SolidVM.Model.Storable
 
 blockappsAddress :: Address
 blockappsAddress = 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce -- 0x0dbb9131d99c8317aa69a70909e124f2e02446e8
@@ -27,20 +31,23 @@ insertDecideContract :: GenesisInfo -> GenesisInfo
 insertDecideContract gi =
   gi
     { genesisInfoAccountInfo = genesisInfoAccountInfo gi ++ [decideAcct] ++ [decideStateAcct],
-      genesisInfoCodeInfo = genesisInfoCodeInfo gi ++ [CodeInfo dec1deContract (Just "Decider")] ++ [CodeInfo dec1deStateContract (Just "DeciderState")]
+      genesisInfoCodeInfo = genesisInfoCodeInfo gi
+                         ++ [ CodeInfo (decodeUtf8 dec1deContract) (Just "Decider")
+                            , CodeInfo (decodeUtf8 dec1deStateContract) (Just "DeciderState")
+                            ]
     }
   where
     decideAcct =
       SolidVMContractWithStorage
         0xDEC1DE
         0
-        (SolidVMCode "Decider" (KECCAK256.hash $ encodeUtf8 dec1deContract))
+        (SolidVMCode "Decider" $ KECCAK256.hash dec1deContract)
         []
     decideStateAcct =
       SolidVMContractWithStorage
         0xDEC1DE02
         0
-        (SolidVMCode "DeciderState" (KECCAK256.hash $ encodeUtf8 dec1deStateContract))
+        (SolidVMCode "DeciderState" $ KECCAK256.hash dec1deStateContract)
         [ (".:creator", BString $ encodeUtf8 "BlockApps"),
           (".:creatorAddress", BAccount $ unspecifiedChain blockappsAddress),
           (".:originAddress", BAccount $ unspecifiedChain mercataAddress),
@@ -48,73 +55,23 @@ insertDecideContract gi =
           (".currentFeeContract", BAccount $ unspecifiedChain 0xDEC1DE02)
         ]
 
-dec1deContract :: Text
-dec1deContract =
-  [r|
-interface GetImplContract {
-    function getImplContract() public view returns (address);
-}
+dec1deFilePath :: FilePath
+dec1deFilePath = "Decide.sol"
 
-contract record Decider {
-    constructor() {
-    }
+dec1deStateFilePath :: FilePath
+dec1deStateFilePath = "DeciderState.sol"
 
-    function decide() returns (bool) {
-      GetImplContract deciderStateContract = GetImplContract(address(0xDEC1DE02));
-      address payFeesImplContract = deciderStateContract.getImplContract();
-      payFeesImplContract.delegatecall("payFees");
-      return true;
-    }
-}|]
+embeddedFiles :: [(FilePath, ByteString)]
+embeddedFiles = $(typecheckAndEmbedDir "resources/strato/decider" Nothing)
 
-dec1deStateContract :: Text
-dec1deStateContract =
-  [r|
-abstract contract ERC20_Template {
-  function transfer(address _to, uint _amount) public;
-}
+fileMap :: Map FilePath ByteString
+fileMap = Map.fromList embeddedFiles
 
-interface GetImplContract {
-    function getImplContract() public view returns (address);
-}
+fileContents :: FilePath -> ByteString
+fileContents = fromJust . flip Map.lookup fileMap
 
-contract record DeciderState is GetImplContract {
-    address public owner;
-    address public currentFeeContract = address(this);
+dec1deContract :: ByteString
+dec1deContract = fileContents dec1deFilePath
 
-    constructor(address _owner) {
-        owner = _owner;
-    }
-
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Only owner can call this function");
-        _;
-    }
-
-    function upateOwner(address _newOwner) external onlyOwner {
-        require(_newOwner != address(0), "Cannot set owner to zero address");
-        require(_newOwner != owner, "Should set new owner as different from current owner");
-        owner = _newOwner;
-    }
-
-    function getImplContract() public view override returns (address) {
-        return currentFeeContract;
-    }
-
-    function updatePayFeeContract(address _newFeeContract) external onlyOwner {
-        require(_newFeeContract != address(0), "Cannot set contract address to zero address");
-        currentFeeContract = _newFeeContract;
-    }
-
-    function payFees() external {
-        uint oneDollar = 1e18;
-        address voucher = address(0x000000000000000000000000000000000000100e);
-        address USDST = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
-        address validatorPool = address(0x100d); // FeeCollector address
-        try { // try to use a voucher
-            voucher.call("burn", address(this), 1000000000000000000);
-        } catch { // if no voucher, pay in USDST
-            ERC20_Template(USDST).transfer(validatorPool, oneDollar / 100);
-        }
-    }
-}|]
+dec1deStateContract :: ByteString
+dec1deStateContract = fileContents dec1deStateFilePath

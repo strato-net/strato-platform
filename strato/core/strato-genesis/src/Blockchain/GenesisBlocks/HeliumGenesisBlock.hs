@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
 module Blockchain.GenesisBlocks.HeliumGenesisBlock where
@@ -11,6 +12,7 @@ import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.Decide
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
+import           Blockchain.GenesisBlocks.Contracts.TH
 import           Blockchain.GenesisBlocks.Contracts.UserRegistry
 import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
 import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
@@ -35,6 +37,16 @@ import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
+import           System.FilePath                                 (takeFileName)
+
+embeddedFiles :: [(FilePath, B.ByteString)]
+embeddedFiles = $(typecheckAndEmbedDir "resources" $ Just mercataContractFiles)
+
+fileMap :: M.Map FilePath B.ByteString
+fileMap = M.fromList embeddedFiles
+
+mercataContracts :: [[String]]
+mercataContracts=map (\filename -> [takeFileName filename, BC.unpack $ fromMaybe (error $ "internal error finding source code in genesis resources: " ++ show filename) $ M.lookup filename fileMap]) mercataContractFiles
 
 data BridgeChainInfo = BridgeChainInfo
   { bci_chainId :: Integer
