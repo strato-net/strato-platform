@@ -896,6 +896,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18)) > 0 || 
               parseFloat(depositAmount || "0") > 0
             }
+            collateralValueUSD={getTotalCollateralValue()}
+            totalDebtUSD={parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18)) + parseFloat(borrowAmount || "0")}
           />
         </div>
 
