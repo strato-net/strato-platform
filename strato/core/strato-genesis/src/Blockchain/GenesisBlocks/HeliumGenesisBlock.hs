@@ -3,19 +3,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TupleSections     #-}
 
-module Blockchain.GenesisBlocks.HeliumGenesisBlock
-  ( genesisBlock
-  , genesisBlockTemplate
-  , validators
-  , admins
-  ) where
+module Blockchain.GenesisBlocks.HeliumGenesisBlock where
 
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.Decide
 import           Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import           Blockchain.GenesisBlocks.Contracts.Mercata
+import           Blockchain.GenesisBlocks.Contracts.TH
 import           Blockchain.GenesisBlocks.Contracts.UserRegistry
 import qualified Blockchain.GenesisBlocks.Instances.GenesisAssets as GA
 import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
@@ -40,6 +37,43 @@ import           Data.Text                                       (Text)
 import qualified Data.Text                                       as T
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
+import           System.FilePath                                 (takeFileName)
+
+embeddedFiles :: [(FilePath, B.ByteString)]
+embeddedFiles = $(typecheckAndEmbedDir "resources" $ Just mercataContractFiles)
+
+fileMap :: M.Map FilePath B.ByteString
+fileMap = M.fromList embeddedFiles
+
+mercataContracts :: [[String]]
+mercataContracts=map (\filename -> [takeFileName filename, BC.unpack $ fromMaybe (error $ "internal error finding source code in genesis resources: " ++ show filename) $ M.lookup filename fileMap]) mercataContractFiles
+
+data BridgeChainInfo = BridgeChainInfo
+  { bci_chainId :: Integer
+  , bci_custody :: Address
+  , bci_depositRouter :: Address
+  , bci_lastProcessedBlock :: Integer
+  , bci_enabled :: Bool
+  , bci_chainName :: Text
+  }
+
+data BridgeAssetInfo = BridgeAssetInfo
+  { bai_asset :: Address
+  , bai_externalToken :: Address
+  , bai_externalDecimals :: Integer
+  , bai_externalChainId :: Integer
+  , bai_externalName :: Text
+  , bai_externalSymbol :: Text
+  , bai_maxPerTx :: Integer
+  , bai_permissions :: Integer
+  }
+
+data HeliumGenesisBlockConfig = HeliumGenesisBlockConfig
+  { hgbc_validators :: [Validator]
+  , hgbc_admins :: [Address]
+  , hgbc_chainInfos :: [BridgeChainInfo]
+  , hgbc_assetInfos :: [BridgeAssetInfo]
+  }
 
 list :: b -> (a -> [a] -> b) -> [a] -> b
 list onEmpty onCons as = case as of
@@ -276,12 +310,106 @@ implContract :: Address -> String -> AccountInfo
 implContract implAddress contractName =
   SolidVMContractWithStorage implAddress 0 (mercataContract contractName) $ ownedByBlockApps implAddress
 
-genesisBlock :: GenesisInfo
-genesisBlock = genesisBlockTemplate validators admins
+sepoliaChainId :: Integer
+sepoliaChainId = 11155111
 
-genesisBlockTemplate :: [Validator] -> [Address] -> GenesisInfo
-genesisBlockTemplate validators' admins' =
-  insertMercataGovernanceContract validators' admins'
+ethChainId :: Integer
+ethChainId = 0
+
+sepolia :: BridgeChainInfo
+sepolia = BridgeChainInfo sepoliaChainId
+  0x8713850e9ff0fd0200ce87c32e3cdb24ed021631
+  0x8223f1a6a4710c110a3c4333b7682de23cd072a5
+  9217425
+  True
+  "Ethereum Sepolia"
+
+meth :: BridgeAssetInfo
+meth = BridgeAssetInfo
+  0x93fb7295859b2d70199e0a4883b7c320cf874e6c
+  0xe46550c8d3c4e5a04da14a948543d918d69f3df1
+  18
+  sepoliaChainId
+  "METH"
+  "METH"
+  0
+  1
+
+musdc :: BridgeAssetInfo
+musdc = BridgeAssetInfo
+  0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
+  0x46e96acf148b019da71e41f36239833f550dfeb9
+  6
+  sepoliaChainId
+  "MUSDC"
+  "MUSDC"
+  0
+  2
+
+eth :: BridgeAssetInfo
+eth = BridgeAssetInfo
+  0x93fb7295859b2d70199e0a4883b7c320cf874e6c
+  0x0000000000000000000000000000000000000000
+  18
+  ethChainId
+  "Ether"
+  "ETH"
+  0
+  1
+
+wbtc :: BridgeAssetInfo
+wbtc = BridgeAssetInfo
+  0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
+  0x29f2d40b0605204364af54ec677bd022da425d03
+  8
+  ethChainId
+  "WBTC"
+  "WBTC"
+  0
+  1
+
+paxg :: BridgeAssetInfo
+paxg = BridgeAssetInfo
+  0x491cdfe98470bfe69b662ab368826dca0fc2f24d
+  0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3
+  18
+  ethChainId
+  "PAXG"
+  "PAXG"
+  0
+  1
+
+usdc :: BridgeAssetInfo
+usdc = BridgeAssetInfo
+  0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
+  0x1c7d4b196cb0c7b01d743fbc6116a902379c7238
+  6
+  ethChainId
+  "USDC"
+  "USDC"
+  0
+  2
+
+usdt :: BridgeAssetInfo
+usdt = BridgeAssetInfo
+  0x86a5ae535ded415203c3e27d654f9a1d454c553b
+  0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0
+  6
+  ethChainId
+  "USDT"
+  "USDT"
+  0
+  2
+
+heliumConfig :: HeliumGenesisBlockConfig
+heliumConfig = HeliumGenesisBlockConfig validators admins [sepolia] [meth, musdc]
+
+genesisBlock :: GenesisInfo
+genesisBlock = genesisBlockTemplate heliumConfig
+
+genesisBlockTemplate :: HeliumGenesisBlockConfig -> GenesisInfo
+genesisBlockTemplate HeliumGenesisBlockConfig{..} =
+  insertMercataGovernanceContract hgbc_validators hgbc_admins
   . insertUserRegistryContract []
   . insertDecideContract
   $ defaultGenesisInfo{
@@ -345,7 +473,7 @@ genesisBlockTemplate validators' admins' =
             , lendingPool
             , poolConfigurator
             , lendingRegistry
-            , mercataBridge
+            , mercataBridge hgbc_chainInfos hgbc_assetInfos
             , poolFactory
             , tokenFactory
             , adminRegistry
@@ -442,21 +570,10 @@ assetBalances GA.Asset{..} =
          in case mEscrowBalance of
               Nothing -> [(o, q)]
               Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
-    . (++) (case () of
-              _ | root == ethstRoot -> [(blockappsAddress, 1_000_000 * oneE18)]
-                | root == wbtcstRoot -> [(blockappsAddress, 1_000_000 * oneE18)]
-                | root == goldstRoot -> [(blockappsAddress, 1_000_000 * oneE18)]
-                | root == silvstRoot -> [(blockappsAddress, 1_000_000 * oneE18)]
-                | otherwise -> []
-           )
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
-            [ (blockappsAddress, 1_000_000 * oneE18) -- correctQuantity decimals name q)
-            , (bridgeRelayerAddress, 1_000 * oneE18)
-            , (oracleAddress1, 1_000 * oneE18)
-            , (oracleAddress2, 1_000 * oneE18)
-            , (liquidityPoolAddress, 250_000 * oneE18)
+            [ (blockappsAddress, correctQuantity decimals name q)
             ]
         | root == goldstRoot ->
             let goldstBalance = correctQuantity decimals name q
@@ -624,8 +741,8 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 proxy $ ow
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
-mercataBridge :: AccountInfo
-mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ ownedByBlockApps mercataAddress ++
+mercataBridge :: [BridgeChainInfo] -> [BridgeAssetInfo] -> AccountInfo
+mercataBridge bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ ownedByBlockApps mercataAddress ++
   [ (".relayer", BAccount $ unspecifiedChain bridgeRelayerAddress)
   , (".logicContract", BAccount $ unspecifiedChain mercataBridgeImplAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
@@ -637,61 +754,21 @@ mercataBridge = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ ownedB
   , (".PERMISSION_MINT", BInteger 2)
   , (".PERMISSION_MASK", BInteger 3)
   , (".USDST_ADDRESS", BAccount $ unspecifiedChain usdstAddress)
-  , (".chains[11155111].custody", BAccount $ unspecifiedChain 0x8713850e9ff0fd0200ce87c32e3cdb24ed021631)
-  , (".chains[11155111].depositRouter", BAccount $ unspecifiedChain 0x8223f1a6a4710c110a3c4333b7682de23cd072a5)
-  , (".chains[11155111].lastProcessedBlock", BInteger 9217425)
-  , (".chains[11155111].enabled", BBool True)
-  , (".chains[11155111].chainName", BString "Ethereum Sepolia")
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalToken", BAccount $ unspecifiedChain 0x0000000000000000000000000000000000000000)
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalDecimals", BInteger 18)
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalChainId", BInteger 11155111)
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalName", BString "Ether")
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalSymbol", BString "ETH")
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].maxPerTx", BInteger 0)
-  -- , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].permissions", BInteger 1)
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalToken", BAccount $ unspecifiedChain 0xe46550c8d3c4e5a04da14a948543d918d69f3df1)
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalDecimals", BInteger 18)
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalChainId", BInteger 11155111)
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalName", BString "METH")
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].externalSymbol", BString "METH")
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].maxPerTx", BInteger 0)
-  , (".assets[93fb7295859b2d70199e0a4883b7c320cf874e6c][11155111].permissions", BInteger 1)
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].externalToken", BAccount $ unspecifiedChain 0x29f2d40b0605204364af54ec677bd022da425d03)
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].externalDecimals", BInteger 8)
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].externalChainId", BInteger 11155111)
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].externalName", BString "WBTC")
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].externalSymbol", BString "WBTC")
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].maxPerTx", BInteger 0)
-  -- , (".assets[7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9][11155111].permissions", BInteger 1)
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].externalToken", BAccount $ unspecifiedChain 0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3)
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].externalDecimals", BInteger 18)
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].externalChainId", BInteger 11155111)
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].externalName", BString "PAXG")
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].externalSymbol", BString "PAXG")
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].maxPerTx", BInteger 0)
-  -- , (".assets[491cdfe98470bfe69b662ab368826dca0fc2f24d][11155111].permissions", BInteger 1)
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalToken", BAccount $ unspecifiedChain 0x1c7d4b196cb0c7b01d743fbc6116a902379c7238)
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalDecimals", BInteger 6)
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalChainId", BInteger 11155111)
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalName", BString "USDC")
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalSymbol", BString "USDC")
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].maxPerTx", BInteger 0)
-  -- , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].permissions", BInteger 2)
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalToken", BAccount $ unspecifiedChain 0x46e96acf148b019da71e41f36239833f550dfeb9)
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalDecimals", BInteger 6)
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalChainId", BInteger 11155111)
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalName", BString "MUSDC")
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].externalSymbol", BString "MUSDC")
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].maxPerTx", BInteger 0)
-  , (".assets[3d351a4a339f6eef7371b0b1b025b3a434ad0399][11155111].permissions", BInteger 2)
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].externalToken", BAccount $ unspecifiedChain 0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0)
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].externalDecimals", BInteger 6)
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].externalChainId", BInteger 11155111)
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].externalName", BString "USDT")
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].externalSymbol", BString "USDT")
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].maxPerTx", BInteger 0)
-  -- , (".assets[86a5ae535ded415203c3e27d654f9a1d454c553b][11155111].permissions", BInteger 2)
-  ]
+  ] ++ concatMap (\BridgeChainInfo{..} ->
+  [ (".chains[" <> BC.pack (show bci_chainId) <> "].custody", BAccount $ unspecifiedChain bci_custody)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].depositRouter", BAccount $ unspecifiedChain bci_depositRouter)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].lastProcessedBlock", BInteger bci_lastProcessedBlock)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].enabled", BBool bci_enabled)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].chainName", BString $ encodeUtf8 bci_chainName)
+  ]) bcis ++ concatMap (\BridgeAssetInfo{..} ->
+  [ (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalToken", BAccount $ unspecifiedChain bai_externalToken)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalDecimals", BInteger bai_externalDecimals)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalChainId", BInteger bai_externalChainId)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalName", BString $ encodeUtf8 bai_externalName)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalSymbol", BString $ encodeUtf8 bai_externalSymbol)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].maxPerTx", BInteger bai_maxPerTx)
+  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].permissions", BInteger bai_permissions)
+  ]) bais
 
 poolFactory :: AccountInfo
 poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 proxy $ ownedByBlockApps mercataAddress ++
@@ -769,8 +846,11 @@ voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ ownedByBlockApps m
      , (".logicContract", BAccount $ unspecifiedChain voucherImplAddress)
      , ("._symbol", BString "VOUCHER")
      , ("._erc20Initialized", BBool True)
-     , ("._totalSupply", BInteger $ 1_000_000 * oneE18)
+     , ("._totalSupply", BInteger $ 1_300_000 * oneE18)
      , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 1_000_000 * oneE18)
+     , ("._balances[" <> addrBS bridgeRelayerAddress <> "]", BInteger $ 100_000 * oneE18) -- $1,000 worth of txs
+     , ("._balances[" <> addrBS oracleAddress1 <> "]", BInteger $ 100_000 * oneE18)
+     , ("._balances[" <> addrBS oracleAddress2 <> "]", BInteger $ 100_000 * oneE18)
      ]
 
 mToken :: AccountInfo
@@ -781,10 +861,9 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ ownedByBlockApps mer
      , ("._erc20Initialized", BBool True)
      , (".description", BString "MUSDST")
      , (".customDecimals", BInteger 18)
-     , ("._totalSupply", BInteger $ 250_000 * oneE18)
+     , ("._totalSupply", BInteger 0)
      , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
-     , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 250_000 * oneE18)
      ]
 
 rewardsChef :: AccountInfo
