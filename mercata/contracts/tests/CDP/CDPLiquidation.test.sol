@@ -912,6 +912,9 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         uint reserve0 = usdstT.balanceOf(address(reg.cdpReserve()));
 
         fastForward(3600); // 1 hour
+        
+        // Update price to make it fresh again
+        oracle.setAssetPrice(ASSET, LOW_P);
 
         // Liquidate with a huge allowance so internal caps determine the repay
         liq.callFunction(USDST, "approve", address(cdp), 1e36);

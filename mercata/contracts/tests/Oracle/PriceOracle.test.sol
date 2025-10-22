@@ -313,6 +313,137 @@ contract Describe_PriceOracle {
         require(isFresh, "Price should be fresh with very large max age");
     }
 
+    function it_price_oracle_validates_staleness_with_time_advancement() {
+        uint256 price = 100e8;
+        oracle.setAssetPrice(tokenA, price);
+        
+        // Price should be fresh immediately after setting
+        bool isFresh = oracle.isPriceFresh(tokenA, 1200); // 20 minutes
+        require(isFresh, "Price should be fresh immediately after setting");
+        
+        // Advance time by 10 minutes (600 seconds)
+        fastForward(600);
+        
+        // Price should still be fresh (within 20 minute window)
+        isFresh = oracle.isPriceFresh(tokenA, 1200);
+        require(isFresh, "Price should be fresh after 10 minutes");
+        
+        // Advance time by another 15 minutes (900 seconds total)
+        fastForward(900);
+        
+        // Price should now be stale (25 minutes total > 20 minute window)
+        isFresh = oracle.isPriceFresh(tokenA, 1200);
+        require(!isFresh, "Price should be stale after 25 minutes");
+        
+        // Update the price - should be fresh again
+        oracle.setAssetPrice(tokenA, 150e8);
+        isFresh = oracle.isPriceFresh(tokenA, 1200);
+        require(isFresh, "Updated price should be fresh");
+    }
+
+    function it_price_oracle_staleness_validation_with_different_thresholds() {
+        uint256 price = 200e8;
+        oracle.setAssetPrice(tokenA, price);
+        
+        // Test with 1 minute threshold
+        fastForward(30); // 30 seconds
+        bool isFresh = oracle.isPriceFresh(tokenA, 60); // 1 minute
+        require(isFresh, "Price should be fresh after 30 seconds with 1 minute threshold");
+        
+        fastForward(60); // 90 seconds total
+        isFresh = oracle.isPriceFresh(tokenA, 60);
+        require(!isFresh, "Price should be stale after 90 seconds with 1 minute threshold");
+        
+        // Test with 1 hour threshold
+        oracle.setAssetPrice(tokenA, 250e8); // Reset timestamp
+        fastForward(1800); // 30 minutes
+        isFresh = oracle.isPriceFresh(tokenA, 3600); // 1 hour
+        require(isFresh, "Price should be fresh after 30 minutes with 1 hour threshold");
+        
+        fastForward(3600); // 1.5 hours total
+        isFresh = oracle.isPriceFresh(tokenA, 3600);
+        require(!isFresh, "Price should be stale after 1.5 hours with 1 hour threshold");
+    }
+
+    function it_price_oracle_get_asset_price_with_timestamp_returns_correct_values() {
+        uint256 price = 150e8;
+        oracle.setAssetPrice(tokenA, price);
+        
+        (uint256 retrievedPrice, uint256 timestamp) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(retrievedPrice == price, "Retrieved price should match set price");
+        require(timestamp > 0, "Timestamp should be set");
+        require(timestamp <= block.timestamp, "Timestamp should not be in the future");
+    }
+
+    function it_price_oracle_get_asset_price_with_timestamp_updates_timestamp_on_price_change() {
+        uint256 initialPrice = 100e8;
+        oracle.setAssetPrice(tokenA, initialPrice);
+        
+        (uint256 price1, uint256 timestamp1) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(price1 == initialPrice, "Initial price should match");
+        
+        // Advance time and update price
+        fastForward(60); // 1 minute
+        uint256 newPrice = 200e8;
+        oracle.setAssetPrice(tokenA, newPrice);
+        
+        (uint256 price2, uint256 timestamp2) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(price2 == newPrice, "Updated price should match");
+        require(timestamp2 > timestamp1, "Timestamp should be updated on price change");
+        require(timestamp2 >= block.timestamp - 60, "Timestamp should reflect recent update");
+    }
+
+    function it_price_oracle_get_asset_price_with_timestamp_handles_stale_prices() {
+        uint256 price = 300e8;
+        oracle.setAssetPrice(tokenA, price);
+        
+        // Get initial timestamp
+        (uint256 initialPrice, uint256 initialTimestamp) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(initialPrice == price, "Initial price should match");
+        
+        // Advance time significantly (2 hours)
+        fastForward(7200);
+        
+        // Price should still be retrievable but timestamp should be old
+        (uint256 stalePrice, uint256 staleTimestamp) = oracle.getAssetPriceWithTimestamp(tokenA);
+        require(stalePrice == price, "Stale price should still be retrievable");
+        require(staleTimestamp == initialTimestamp, "Timestamp should not change without price update");
+        require(block.timestamp - staleTimestamp > 3600, "Price should be considered stale");
+        
+        // Verify staleness check
+        bool isFresh = oracle.isPriceFresh(tokenA, 3600); // 1 hour threshold
+        require(!isFresh, "Price should be stale after 2 hours with 1 hour threshold");
+    }
+
+    function it_price_oracle_get_asset_price_with_timestamp_works_with_multiple_assets() {
+        uint256 priceA = 100e8;
+        uint256 priceB = 200e8;
+        
+        oracle.setAssetPrice(tokenA, priceA);
+        oracle.setAssetPrice(tokenB, priceB);
+        
+        // Get prices and timestamps for both assets
+        (uint256 retrievedPriceA, uint256 timestampA) = oracle.getAssetPriceWithTimestamp(tokenA);
+        (uint256 retrievedPriceB, uint256 timestampB) = oracle.getAssetPriceWithTimestamp(tokenB);
+        
+        require(retrievedPriceA == priceA, "Price A should match");
+        require(retrievedPriceB == priceB, "Price B should match");
+        require(timestampA > 0 && timestampB > 0, "Both timestamps should be set");
+        require(timestampA <= block.timestamp && timestampB <= block.timestamp, "Timestamps should not be in future");
+        
+        // Update only one asset
+        fastForward(120); // 2 minutes
+        oracle.setAssetPrice(tokenA, 150e8);
+        
+        (uint256 newPriceA, uint256 newTimestampA) = oracle.getAssetPriceWithTimestamp(tokenA);
+        (uint256 unchangedPriceB, uint256 unchangedTimestampB) = oracle.getAssetPriceWithTimestamp(tokenB);
+        
+        require(newPriceA == 150e8, "Price A should be updated");
+        require(unchangedPriceB == priceB, "Price B should be unchanged");
+        require(newTimestampA > timestampA, "Timestamp A should be updated");
+        require(unchangedTimestampB == timestampB, "Timestamp B should be unchanged");
+    }
+
     // ============ EDGE CASES AND STRESS TESTS ============
 
     function it_price_oracle_handles_multiple_price_updates() {
