@@ -81,6 +81,7 @@ contract Describe_CDPGeneral is Authorizable {
     function it_ac_can_setup_test_environment() public {
         CDPEngine engine = m.cdpEngine();
         CDPRegistry registry = m.cdpRegistry();
+        AdminRegistry adminRegistry = m.adminRegistry();
         
         // Create users for testing
         user1 = new User();
@@ -103,8 +104,8 @@ contract Describe_CDPGeneral is Authorizable {
         require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
         
         // Grant CDPEngine mint/burn rights on USDST
-        Token(USDST).addWhitelist(address(m.adminRegistry()), "mint", address(engine));
-        Token(USDST).addWhitelist(address(m.adminRegistry()), "burn", address(engine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "mint", address(engine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "burn", address(engine));
         
         // Set TokenFactory in CDPRegistry
         registry.setTokenFactory(address(m.tokenFactory()));

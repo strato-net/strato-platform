@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import "../concrete/BaseCodeCollection.sol";
+import "../../concrete/BaseCodeCollection.sol";
 
 /// @title Test to verify fastForward behavior in beforeEach
 /// @notice This test demonstrates a bug where fastForward in beforeEach doesn't persist to test execution

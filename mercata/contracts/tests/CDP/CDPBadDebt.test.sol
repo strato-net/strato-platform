@@ -85,6 +85,7 @@ contract Describe_BadDebt_Basic is Authorizable {
     function it_af_can_configure_cdp_system() public {
         CDPEngine engine = m.cdpEngine();
         CDPRegistry registry = m.cdpRegistry();
+        AdminRegistry adminRegistry = m.adminRegistry();
         
         // Create users for testing
         user1 = new User();
@@ -108,8 +109,8 @@ contract Describe_BadDebt_Basic is Authorizable {
         log("✅ Using custom tokens - USDST: " + string(address(USDST)) + ", ETHST: " + string(address(ETHST)));
         
         // Grant CDPEngine mint/burn rights on USDST
-        Token(USDST).addWhitelist(address(m.adminRegistry()), "mint", address(engine));
-        Token(USDST).addWhitelist(address(m.adminRegistry()), "burn", address(engine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "mint", address(engine));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "burn", address(engine));
         Token(USDST).mint(address(user2), 100000000000000000000000000000000);
         
         // Set TokenFactory in CDPRegistry

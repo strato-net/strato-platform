@@ -7,6 +7,7 @@ import { StratoPaths, constants } from "../../config/constants";
 import { getPool as getLendingRegistry } from "./lending.service";
 import { createCompletePriceMap } from "../helpers/oracle.helper";
 import { getOraclePrices } from "./oracle.service";
+import { getTokenDetails } from "../helpers/cirrusHelpers";
 
 const { tokenSelectFields, tokenBalanceSelectFields, Token, PriceOracle, tokenFactory, TokenFactory, CDPEngine, Voucher, CollateralVault } = constants;
 
@@ -110,7 +111,7 @@ export const getBalance = async (
     select: rawParams.select || tokenBalanceSelectFields.join(","),
   };
 
-  const [balanceResponse, collateralResponse, cdpResponse, priceMap] = await Promise.all([
+  const [balances, collaterals, cdps, prices] = await Promise.all([
     cirrus.get(accessToken, "/" + Token + "-_balances", { params }),
     cirrus.get(accessToken, "/" + CollateralVault + "-userCollaterals", {
       params: {
@@ -130,21 +131,43 @@ export const getBalance = async (
     getOraclePrices(accessToken)
   ]);
 
-  const collateralMap = new Map<string, string>();
-  (collateralResponse.data || []).forEach((c: any) => collateralMap.set(c.asset, c.amount));
-  (cdpResponse.data || []).forEach((v: any) => {
-    const existing = collateralMap.get(v.asset) || "0";
-    const cdpAmount = v.amount || "0";
-    collateralMap.set(v.asset, (BigInt(existing) + BigInt(cdpAmount)).toString());
-  });
+  const collateralMap = new Map<string, bigint>();
+  for (const c of collaterals.data || [])
+    collateralMap.set(c.asset, BigInt(c.amount));
+  for (const v of cdps.data || [])
+    collateralMap.set(
+      v.asset,
+      (collateralMap.get(v.asset) || 0n) + BigInt(v.amount || "0")
+    );
 
-  return balanceResponse.data
-    .map((token: any) => ({
-      ...token,
-      price: priceMap.get(token.address) || "0",
-      collateralBalance: collateralMap.get(token.address) || "0",
-    }))
-    .filter((token: any) => token.balance !== "0" || token.collateralBalance !== "0");
+  const balanceData = balances.data || [];
+  const balanceAddresses = new Set(balanceData.map((b: any) => b.address));
+  const tokensWithCollateralOnly = [...collateralMap.keys()].filter(a => !balanceAddresses.has(a));
+
+  const tokenDetails =
+    tokensWithCollateralOnly.length > 0
+      ? await getTokenDetails(accessToken, tokensWithCollateralOnly)
+      : new Map();
+
+  const allTokens = [
+    ...balanceData.map((t: any) => ({
+      ...t,
+      price: prices.get(t.address) || "0",
+      collateralBalance: (collateralMap.get(t.address) || 0n).toString(),
+    })),
+    ...tokensWithCollateralOnly.map((a) => ({
+      address: a,
+      user: address,
+      balance: "0",
+      price: prices.get(a) || "0",
+      collateralBalance: (collateralMap.get(a) || 0n).toString(),
+      token: tokenDetails.get(a),
+    })),
+  ];
+
+  return allTokens.filter(
+    (t) => t.balance !== "0" || t.collateralBalance !== "0"
+  );
 };
 
 /**
