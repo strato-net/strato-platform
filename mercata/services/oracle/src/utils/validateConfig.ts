@@ -150,6 +150,11 @@ export async function validateConfig(): Promise<boolean> {
                 errors.push(`${feedPrefix} minPrice must be less than maxPrice`);
             }
             
+            // Validate that constant pricing is not mixed with external sources
+            if (feed.sources?.includes('constant') && feed.sources.length > 1) {
+                errors.push(`${feedPrefix} Cannot mix constant pricing with external sources`);
+            }
+            
         });
     }
 
@@ -160,7 +165,7 @@ export async function validateConfig(): Promise<boolean> {
         const sourcePrefix = `   Source ${sourceName}:`;
         
         // Skip URL validation for constant price sources
-        if (sourceName !== 'ConstantPrice' && !source.url) {
+        if (sourceName !== 'constant' && !source.url) {
             errors.push(`${sourcePrefix} Missing url`);
         }
 
