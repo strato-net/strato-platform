@@ -44,6 +44,7 @@ export const constants = (() => {
     "customDecimals",
     "description",
     "status",
+    "_paused",
     `images:${Token}-images(value)`,
     `attributes:${Token}-attributes(key,value)`,
     `balances:${Token}-_balances(user:key,balance:value::text)`,
@@ -53,7 +54,7 @@ export const constants = (() => {
     "address",
     "user:key", 
     "balance:value::text",
-    `token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
+    `token:${Token}(address,_name,_symbol,_owner,_totalSupply::text,customDecimals,description,status,_paused,images:${Token}-images(value),attributes:${Token}-attributes(key,value))`
   ];
 
   const registrySelectFields = [

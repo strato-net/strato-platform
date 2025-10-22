@@ -444,15 +444,14 @@ simpleType' x =
       :| [ addressType' x,
            accountType' x,
            intType' x,
-           contractType' x,
            boolType' x,
            bytesType' x,
            decimalType' x,
            enumType' x
          ]
 
-arrayType' :: SourceAnnotation Text -> Type'
-arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
+-- arrayType' :: SourceAnnotation Text -> Type'
+-- arrayType' x = Static (SVMType.Array (SVMType.UnknownLabel "*" Nothing) Nothing) x
 
 sumType' :: Type' -> Type' -> Type'
 sumType' (Sum t1) (Sum t2) = Sum (t1 <> t2)
@@ -790,7 +789,7 @@ typecheckMember (Mutable t) member = do
     Top{} -> Mutable t'
     _ -> t'
 typecheckMember (Product [t] _) member = typecheckMember t member
-typecheckMember (Static (SVMType.Array _ _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
+typecheckMember (Static (SVMType.Array _ _) x) "length" = pure . Mutable $ Static (SVMType.Int Nothing Nothing) x
 typecheckMember (Static (SVMType.Array t _) x) "push" = pure $ Function (Static t x) (Product [] x) x [] [] False
 typecheckMember (Static (SVMType.Array _ _) x) n = pure . bottom $ ("Unknown member of SVMType.Array: " <> labelToText n) <$ x
 typecheckMember (Static (SVMType.String _) x) "length" = pure $ Static (SVMType.Int Nothing Nothing) x
@@ -1434,7 +1433,7 @@ accountArgs x =
          ]
 
 deleteArgs :: SourceAnnotation Text -> Type'
-deleteArgs x = sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
+deleteArgs x = simpleType' x -- sumType' (simpleType' x) . Sum $ Static (SVMType.Struct Nothing "") x :| [arrayType' x]
 
 boolArgs :: SourceAnnotation Text -> Type'
 boolArgs x =

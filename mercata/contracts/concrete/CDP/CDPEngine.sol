@@ -100,17 +100,6 @@ contract record CDPEngine is Ownable {
         uint rateAccumulator
     );
 
-    /**
-     * @notice Emitted after a successful liquidation (direct seize, no auction)
-     * @param borrower Vault owner being liquidated
-     * @param asset Collateral asset
-     * @param debtBurnedUSD Debt repaid by liquidator (USD 1e18)
-     * @param penaltyUSD Penalty applied to the liquidation (USD 1e18), realized via extra collateral seized (not minted)
-     * @param collateralOut Collateral amount sent to liquidator
-     * @param liquidator Caller who executed liquidation
-     * @param remainingDebtUSD Borrower debt after update
-     * @param rateAccumulator Current per‑asset rate accumulator (RAY)
-     */
     event LiquidationExecuted(
         address indexed borrower,
         address indexed asset,
@@ -450,21 +439,18 @@ contract record CDPEngine is Ownable {
     *      - Emit events and dust-clean if remainder <= 1 wei
     * @param collateralAsset Address of the collateral token
     * @param borrower Address of the vault owner being liquidated
-    * @param debtToCover Desired repay amount in USD (WAD, 18 decimals)
+    * @param debtToCover Desired repay amount in wei (18 decimals)
     */
     function liquidate(
         address collateralAsset,
         address borrower,
         uint debtToCover
     ) external onlyKnownAsset(collateralAsset) {
-        // Basic checks
         require(borrower != address(0) && borrower != msg.sender, "CDPEngine: invalid borrower");
         require(debtToCover > 0, "CDPEngine: zero debt amount");
 
-        // Accrue for this asset
         _accrue(collateralAsset);
 
-        // Load config/state and assert unhealthy
         CollateralConfig memory config = collateralConfigs[collateralAsset];
         CollateralGlobalState storage assetState = collateralGlobalStates[collateralAsset];
         Vault storage borrowerVault = vaults[borrower][collateralAsset];
@@ -473,149 +459,84 @@ contract record CDPEngine is Ownable {
         uint borrowerCR = collateralizationRatio(borrower, collateralAsset);
         require(borrowerCR < config.liquidationRatio, "CDPEngine: position healthy");
 
-        // Prices & caps
-        uint priceColl = _cdpPriceOracle().getAssetPrice(collateralAsset);
-        require(priceColl > 0, "CDPEngine: invalid collateral price");
+        uint priceCollWei = _cdpPriceOracle().getAssetPrice(collateralAsset);
+        require(priceCollWei > 0, "CDPEngine: invalid collateral price");
 
-        uint totalDebtUSD   = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        uint closeFactorCap = (totalDebtUSD * config.closeFactorBps) / 10000;
+        uint totalDebtWei   = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint closeFactorCap = (totalDebtWei * config.closeFactorBps) / 10000;
 
-        // Collateral USD value and coverage cap INCLUDING penalty
-        uint collateralUSD = (borrowerVault.collateral * priceColl) / config.unitScale;
+        uint collateralWei = (borrowerVault.collateral * priceCollWei) / config.unitScale;
         // Ensure repay + penalty can be paid fully in collateral:
-        // repay <= collateralUSD * 10000 / (10000 + penaltyBps)
-        uint coverageCap = (collateralUSD * 10000) / (10000 + config.liquidationPenaltyBps);
-
+        // repay <= collateralWei * 10000 / (10000 + penaltyBps)
+        uint coverageCap = (collateralWei * 10000) / (10000 + config.liquidationPenaltyBps);
+        
         // Repay amount capped by all constraints
+        bool capBinds = false;
         uint repay = debtToCover;
-        if (repay > totalDebtUSD)   repay = totalDebtUSD;
+        if (repay > totalDebtWei)   repay = totalDebtWei;
         if (repay > closeFactorCap) repay = closeFactorCap;
-        if (repay > coverageCap)    repay = coverageCap;
+        if (repay >= coverageCap) { repay = coverageCap; capBinds = true; }
         require(repay > 0, "CDPEngine: nothing to liquidate");
 
-        // Convert to scaled and clamp (rounding may reduce extinguished USD below `repay`)
+        uint collateralToSeize = 0;
+        uint penaltyWei = 0;
+
+        // Convert to scaled and clamp to vault's scaledDebt
         uint scaledDebtToLiquidate = (repay * RAY) / assetState.rateAccumulator;
         if (scaledDebtToLiquidate > borrowerVault.scaledDebt) {
             scaledDebtToLiquidate = borrowerVault.scaledDebt;
         }
-
-        // Debt actually extinguished at current index (EXACT amount to burn)
         uint owedForDelta = (scaledDebtToLiquidate * assetState.rateAccumulator) / RAY;
-        uint baseUSD = scaledDebtToLiquidate; // normalized principal extinguished
-        uint feeUSD  = owedForDelta > baseUSD ? (owedForDelta - baseUSD) : 0;
 
-        // Burn exact, route fee, update books
+        // burn exact, route only interest
         Token(_usdst()).burn(msg.sender, owedForDelta);
 
-        // Route fees between Reserve and FeeCollector
-        _routeFees(collateralAsset, feeUSD);
+        uint feeWei = owedForDelta > scaledDebtToLiquidate ? (owedForDelta - scaledDebtToLiquidate) : 0;
+        if (feeWei > 0) _routeFees(collateralAsset, feeWei);
 
-        borrowerVault.scaledDebt -= scaledDebtToLiquidate;
+        borrowerVault.scaledDebt   -= scaledDebtToLiquidate;
         assetState.totalScaledDebt -= scaledDebtToLiquidate;
 
-        // Seize collateral for (repay + penalty) based on actual burned amount
-        uint penaltyUSD = (owedForDelta * config.liquidationPenaltyBps) / 10000;
-        uint debtWithPenaltyUSD = owedForDelta + penaltyUSD;
-
-        uint collateralToSeize = (debtWithPenaltyUSD * config.unitScale) / priceColl;
-        if (collateralToSeize > borrowerVault.collateral) {
+        if (capBinds) {
             collateralToSeize = borrowerVault.collateral;
+            uint collateralUSD = (collateralToSeize * priceCollWei) / config.unitScale;
+            penaltyWei = collateralUSD > owedForDelta ? (collateralUSD - owedForDelta) : 0;
+        } else {
+            penaltyWei = (owedForDelta * config.liquidationPenaltyBps) / 10000;
+            uint debtWithPenaltyWei = owedForDelta + penaltyWei;
+            collateralToSeize = (debtWithPenaltyWei * config.unitScale) / priceCollWei;
+            if (collateralToSeize > borrowerVault.collateral) {
+                collateralToSeize = borrowerVault.collateral;
+            }
         }
 
         borrowerVault.collateral -= collateralToSeize;
         _cdpVault().seize(borrower, collateralAsset, msg.sender, collateralToSeize);
 
-        // Dust cleanup first, then emit events with final state
-        uint remainingDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
+        uint finalDebtWei = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
 
-        // Collateral dust cleanup and bad debt realization
-        uint collateralDustThreshold = 1; 
-        uint dustCollateralSeized = 0;
-        
-        // First handle dust collateral cleanup
-        if (borrowerVault.collateral > 0 && borrowerVault.collateral <= collateralDustThreshold) {
-            // Transfer dust collateral to liquidator and zero it out
-            dustCollateralSeized = borrowerVault.collateral;
-            _cdpVault().seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
-            borrowerVault.collateral = 0;
-        }
-        
-        // Realize bad debt if no collateral remains and debt still > 1 wei
         if (borrowerVault.collateral == 0) {
             uint rem = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
             if (rem > 1) {
-                // remove from books
                 assetState.totalScaledDebt -= borrowerVault.scaledDebt;
                 borrowerVault.scaledDebt = 0;
-                // make explicit, non-accruing
                 badDebtUSDST[collateralAsset] += rem;
-                
                 emit BadDebtRealized(collateralAsset, borrower, rem);
             }
         }
-        
-        // If ≤ 1 wei debt remains, zero it out in normalized units
-        if (remainingDebtUSD <= 1) {
-            if (borrowerVault.scaledDebt > 0) {
-                assetState.totalScaledDebt -= borrowerVault.scaledDebt;
-                borrowerVault.scaledDebt = 0;
-            }
-        }
 
-        // Calculate final state after dust cleanup and emit events
-        uint finalDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        uint totalCollateralSeized = collateralToSeize + dustCollateralSeized;
-        
         emit LiquidationExecuted(
             borrower,
             collateralAsset,
-            owedForDelta,            // actual debt burned
-            penaltyUSD,
-            totalCollateralSeized,   // includes dust cleanup
+            owedForDelta,          
+            penaltyWei,
+            collateralToSeize,
             msg.sender,
-            finalDebtUSD,           // debt after dust cleanup
+            finalDebtWei,
             assetState.rateAccumulator
         );
 
         emit VaultUpdated(borrower, collateralAsset, borrowerVault.collateral, borrowerVault.scaledDebt);
-    }
-
-    /**
-     * @notice Manually clean up dust positions that can't be liquidated economically
-     * @dev Can be called by anyone to clean up positions with dust collateral and significant debt
-     * @param borrower Address of the vault owner with dust position
-     * @param collateralAsset Address of the collateral token
-     */
-    function cleanupDustPosition(address borrower, address collateralAsset) external onlyKnownAsset(collateralAsset) {
-        require(borrower != address(0), "CDPEngine: invalid borrower");
-        
-        // Accrue for this asset
-        _accrue(collateralAsset);
-        
-        CollateralGlobalState storage assetState = collateralGlobalStates[collateralAsset];
-        Vault storage borrowerVault = vaults[borrower][collateralAsset];
-        
-        require(borrowerVault.scaledDebt > 0, "CDPEngine: no debt to clean up");
-        
-        uint collateralDustThreshold = 1000; // Same threshold as liquidation
-        require(borrowerVault.collateral < collateralDustThreshold, "CDPEngine: position not dust");
-        
-        uint remainingDebtUSD = (borrowerVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        require(remainingDebtUSD > 1, "CDPEngine: debt too small");
-        
-        // Remove from books and realize as bad debt
-        assetState.totalScaledDebt -= borrowerVault.scaledDebt;
-        borrowerVault.scaledDebt = 0;
-        badDebtUSDST[collateralAsset] += remainingDebtUSD;
-        
-        // Seize any remaining dust collateral to caller as reward
-        if (borrowerVault.collateral > 0) {
-            _cdpVault().seize(borrower, collateralAsset, msg.sender, borrowerVault.collateral);
-            borrowerVault.collateral = 0;
-        }
-        
-        emit BadDebtRealized(collateralAsset, borrower, remainingDebtUSD);
-        emit VaultUpdated(borrower, collateralAsset, 0, 0);
     }
 
     // ───────────────────────── Accrual & Views ──────────────────────────────
@@ -1009,7 +930,9 @@ contract record CDPEngine is Ownable {
         if (newCap == 0) {
             totalJuniorOutstandingUSDST -= payAmount;
             prevReserveBalance -= payAmount;
-            delete juniorNotes[msg.sender];
+            delete juniorNotes[msg.sender].owner;
+            delete juniorNotes[msg.sender].capUSDST;
+            delete juniorNotes[msg.sender].entryIndex;
             emit JuniorNoteClaimed(msg.sender, payAmount, 0);
             emit JuniorNoteClosed(msg.sender);
         } else {
