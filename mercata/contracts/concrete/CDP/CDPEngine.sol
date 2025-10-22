@@ -439,15 +439,15 @@ contract record CDPEngine is Ownable {
     *      - Emit events and dust-clean if remainder <= 1 wei
     * @param collateralAsset Address of the collateral token
     * @param borrower Address of the vault owner being liquidated
-    * @param debtToCoverWei Desired repay amount in wei (18 decimals)
+    * @param debtToCover Desired repay amount in wei (18 decimals)
     */
     function liquidate(
         address collateralAsset,
         address borrower,
-        uint debtToCoverWei
+        uint debtToCover
     ) external onlyKnownAsset(collateralAsset) {
         require(borrower != address(0) && borrower != msg.sender, "CDPEngine: invalid borrower");
-        require(debtToCoverWei > 0, "CDPEngine: zero debt amount");
+        require(debtToCover > 0, "CDPEngine: zero debt amount");
 
         _accrue(collateralAsset);
 
@@ -472,7 +472,7 @@ contract record CDPEngine is Ownable {
         
         // Repay amount capped by all constraints
         bool capBinds = false;
-        uint repay = debtToCoverWei;
+        uint repay = debtToCover;
         if (repay > totalDebtWei)   repay = totalDebtWei;
         if (repay > closeFactorCap) repay = closeFactorCap;
         if (repay >= coverageCap) { repay = coverageCap; capBinds = true; }
