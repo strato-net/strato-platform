@@ -546,25 +546,18 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const RAY = BigInt("1000000000000000000000000000"); // 1e27
         const existingScaledDebtWei = BigInt(vaultData.scaledDebt || "0");
         const rateAccumulatorWei = BigInt(vaultData.rateAccumulator || "1000000000000000000000000000");
-        
+
         // Step 1: Convert borrow amount to scaled debt (same as contract)
-        const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
-        
+        const scaledAddWei = (borrowAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
+
         // Step 2: Add to existing scaled debt (same as contract)
         const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
-        
+
         // Step 3: Convert back to debt for floor check (same as contract)
         const totalDebtAfterWei = (newScaledDebtWei * rateAccumulatorWei) / RAY;
         
 
         if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
-          // Calculate how much more is needed to reach debt floor
-          const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
-          const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
-          const minRequired = parseFloat(formatWeiToDecimalHP(minRequiredWei.toString(), 18));
-          const debtFloorDecimal = parseFloat(formatWeiToDecimalHP(debtFloorWei.toString(), 18));
-          const currentDebt = parseFloat(formatWeiToDecimalHP(currentDebtWei.toString(), 18));
-          
           toast({
             title: "Below Debt Floor",
             description: `Borrow more USDST to reach the minimum debt floor`,
