@@ -31,7 +31,6 @@ import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Control.Arrow ((***))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
@@ -87,15 +86,6 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-  ContractWithStorage address balance' codeHash' slots -> do
-    A.insert
-      A.Proxy
-      address
-      blankAddressState
-        { addressStateBalance = balance',
-          addressStateCodeHash = codeHash'
-        }
-    putStorageTrie address $ map (word256ToBytes *** (rlpSerialize . rlpEncode)) slots
   SolidVMContractWithStorage address balance' codeHash' slots -> do
     A.insert
       A.Proxy
@@ -143,8 +133,6 @@ zipSourceInfo accounts codes =
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
    in catMaybes $ map findCodeFor accounts
