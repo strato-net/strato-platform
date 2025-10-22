@@ -530,4 +530,17 @@ contract Describe_AdminRegistry is Authorizable {
         require(reverted, "Should revert when non-admin non-whitelisted user tries to create issue");
     }
 
+    function it_cannot_execute_internal_functions() {
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
+        user1.do(address(adminRegistry), "castVoteOnIssue", address(adminRegistry), "setVotingThreshold", address(adminRegistry), "_getIssueId", 5000);
+
+        bool reverted = false;
+        try {
+            adminRegistry.castVoteOnIssue(address(adminRegistry), "_getIssueId", address(0xdeadbeef), "parmesan", 7);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when delegatecalling into an internal function");
+    }
+
 }
