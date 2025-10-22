@@ -55,7 +55,7 @@ contract record CDPEngine is Ownable {
     mapping(address => bool) public record isSupportedAsset;
 
     uint256 public feeToReserveBps; // portion of feeUSD sent to CDPReserve (0..10000)
-    uint public priceMaxAge = 1200; // 20 minutes in seconds
+    uint public priceMaxAge = 1200;
 
     event FeeToReserveBpsSet(uint256 oldBps, uint256 newBps);
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
@@ -168,6 +168,7 @@ contract record CDPEngine is Ownable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         WAD = 1e18;
+        priceMaxAge = 1200;
 
         require(_registry != address(0), "CDPEngine: invalid registry");
         registry = CDPRegistry(_registry);

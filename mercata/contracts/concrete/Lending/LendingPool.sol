@@ -78,7 +78,7 @@ contract record LendingPool is Ownable {
     uint public debtCeilingUSD;   // cap in USD 1e18; 0 disables
 
     uint  public safetyShareBps;      // % of reserves to SM on sweep, e.g. 2000 = 20%
-    uint public priceMaxAge = 1200; // 20 minutes in seconds
+    uint public priceMaxAge = 1200;
 
    // Loan Management - One loan per user
     mapping(address => LoanInfo) public record userLoan; // user => single loan
@@ -110,6 +110,7 @@ contract record LendingPool is Ownable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         SECONDS_PER_YEAR = 31536000;
+        priceMaxAge = 1200;
         
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
