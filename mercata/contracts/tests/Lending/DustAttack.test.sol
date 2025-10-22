@@ -35,6 +35,7 @@ contract Describe_DustAttack is Authorizable {
     LiquidityPool liquidity;
     PoolConfigurator configurator;
     PriceOracle oracle;
+    AdminRegistry adminRegistry;
 
     // Tokens (created fresh in beforeEach)
     address usdst;
@@ -74,6 +75,7 @@ contract Describe_DustAttack is Authorizable {
         liquidity = m.liquidityPool();
         configurator = m.poolConfigurator();
         oracle = m.priceOracle();
+        adminRegistry = m.adminRegistry();
 
         // Create tokens
         usdst = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
@@ -86,8 +88,8 @@ contract Describe_DustAttack is Authorizable {
         Token(goldst).setStatus(2);
 
         // Whitelist mToken
-        Token(musdst).addWhitelist(address(m.adminRegistry()), "mint", address(liquidity));
-        Token(musdst).addWhitelist(address(m.adminRegistry()), "burn", address(liquidity));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "mint", address(liquidity));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "burn", address(liquidity));
 
         // Configure pool
         configurator.setBorrowableAsset(usdst);
