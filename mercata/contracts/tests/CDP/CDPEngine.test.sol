@@ -170,6 +170,10 @@ contract Describe_CDPEngine is Authorizable {
         // Test setter function
         cdpEngine.setPriceMaxAge(newPriceMaxAge);
         require(cdpEngine.priceMaxAge() == newPriceMaxAge, "Price max age not updated");
+
+        // Test that price max age is updated
+        cdpEngine.setPriceMaxAge(1200);
+        require(cdpEngine.priceMaxAge() == 1200, "Price max age not updated");
     }
 
     function it_cdp_engine_can_configure_collateral_asset() {
