@@ -17,6 +17,24 @@ export function extractNestedProperty(obj: any, path: string): any {
     }, obj);
 }
 
+export function generateConstantPrices(assets: Asset[]): BatchPriceResult {
+    const result: BatchPriceResult = {};
+    const timestamp = new Date().toISOString();
+    
+    assets.forEach(asset => {
+        if (!asset.constantPrice) {
+            throw new Error(`Asset ${asset.name} is configured for constant price but has no constantPrice field`);
+        }
+        
+        result[asset.name] = {
+            price: asset.constantPrice,
+            feedTimestamp: timestamp
+        };
+    });
+    
+    return result;
+} 
+
 export async function fetchBatchPrices(assets: Asset[], sourceConfig: SourceConfig): Promise<BatchPriceResult> {
     const apiKey = getApiKey(sourceConfig);
     const url = buildBatchUrl(sourceConfig, assets, apiKey);
