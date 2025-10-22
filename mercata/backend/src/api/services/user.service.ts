@@ -272,7 +272,7 @@ export const getOpenIssues = async (
       return {};
     }
 
-    const { admins: adminsRaw, votes, thresholds, executed } = response.data[0];
+    const { admins: adminsRaw, votes, defaultVotingThresholdBps, thresholds, executed } = response.data[0];
     const admins = adminsRaw.filter((admin: any) => admin.address && admin.address !== 'Unknown'); // remove blank admins
 
     const issueIds = new Set(votes.map((v: any) => v.issueId));
@@ -301,7 +301,7 @@ export const getOpenIssues = async (
       return 0;
     });
 
-    return { admins, votes, thresholds, executed, issues: uniqueIssues };
+    return { admins, votes, globalThreshold: defaultVotingThresholdBps, thresholds, executed, issues: uniqueIssues };
   } catch (error) {
     console.log(error);
     return [];

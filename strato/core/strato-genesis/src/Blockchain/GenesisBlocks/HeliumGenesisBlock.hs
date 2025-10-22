@@ -717,6 +717,7 @@ adminRegistry :: AccountInfo
 adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ ownedByBlockApps mercataAddress
   ++ [ (".adminMap[" <> addrBS blockappsAddress <> "]", BInteger 1)
      , (".logicContract", BAccount $ unspecifiedChain adminRegistryImplAddress)
+     , (".defaultVotingThresholdBps", BInteger 6000)
      , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
      , (".admins.length", BInteger 1)
      , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
