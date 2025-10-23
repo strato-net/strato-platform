@@ -10,9 +10,6 @@ import Blockchain.GenesisBlocks.Contracts.TH
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Data.ByteString (ByteString)
-import Data.Map.Strict (Map)
-import qualified Data.Map.Strict as Map
-import Data.Maybe
 import Data.String
 import Data.Text.Encoding
 
@@ -44,17 +41,5 @@ insertUserRegistryContract gi =
         (SolidVMCode "UserRegistry" (KECCAK256.hash userRegistryContract))
         $ []
 
-userRegistryFilePath :: FilePath
-userRegistryFilePath = "UserRegistry.sol"
-
-embeddedFiles :: [(FilePath, ByteString)]
-embeddedFiles = $(typecheckAndEmbedDir "resources/strato/user" Nothing)
-
-fileMap :: Map FilePath ByteString
-fileMap = Map.fromList embeddedFiles
-
-fileContents :: FilePath -> ByteString
-fileContents = fromJust . flip Map.lookup fileMap
-
 userRegistryContract :: ByteString
-userRegistryContract = fileContents userRegistryFilePath
+userRegistryContract = $(typecheckAndEmbedFile "resources/strato/UserRegistry.sol")

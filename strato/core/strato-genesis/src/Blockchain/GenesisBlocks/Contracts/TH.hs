@@ -4,38 +4,46 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
-module Blockchain.GenesisBlocks.Contracts.TH where
+module Blockchain.GenesisBlocks.Contracts.TH
+  ( typecheckAndEmbedFile
+  , typecheckAndEmbedFiles
+  ) where
 
-import Blockchain.SolidVM.CodeCollectionDB
-import           Data.FileEmbed                    (embedDir)
-import           Data.List                         (isSuffixOf)
-import qualified Data.Map                          as Map
-import           Data.Maybe
-import qualified Data.Text as Text
-import Language.Haskell.TH.Syntax
+import           Blockchain.SolidVM.CodeCollectionDB
+import           Data.ByteString                     (ByteString)
+import           Data.FileEmbed                      (embedFile)
+import qualified Data.Map                            as Map
+import qualified Data.Text                           as Text
+import           Language.Haskell.TH.Syntax
+import           System.FilePath                     ((</>))
 
-typecheckAndEmbedDir :: String -> Maybe [FilePath] -> Q Exp
-typecheckAndEmbedDir dir mFilesToTypecheck = do
-  qexp <- embedDir dir
-  let unravel (AppE _ r) = unravel r
-      unravel (LitE (BytesPrimL s)) = pure $ show s
-      unravel e = fail $ "typecheckAndEmbedDir/unravel: " ++ show e
-  fpsAndBss <- case qexp of
-    SigE (ListE exps) _ -> catMaybes <$> traverse (\case
-        TupE [Just (LitE (StringL p)), Just b] | ".sol" `isSuffixOf` p
-                              && maybe True (elem p) mFilesToTypecheck -> Just . (p,) <$> unravel b
-        TupE [Just (LitE (StringL _)), Just _]                         -> pure Nothing
-        ex -> fail $ "typecheckAndEmbedDir: Expression is not a tuple: " ++ show ex
-      ) exps
-    _ -> fail $ "typecheckAndEmbedDir: embedDir did not return a list of files: " ++ show qexp
+unravel :: Exp -> Q String
+unravel (AppE _ r)            = unravel r
+unravel (LitE (BytesPrimL s)) = pure $ show s
+unravel e                     = fail $ "unravel: " ++ show e
+
+runTypechecker :: Exp -> Map.Map Text.Text Text.Text -> Q Exp
+runTypechecker qexp =
   either (fail . show) (pure . const qexp)
-    . compileSourceWithAnnotationsWithoutImports False True
+  . compileSourceWithAnnotationsWithoutImports False True
+
+typecheckAndEmbedFile :: FilePath -> Q Exp
+typecheckAndEmbedFile fp = do
+  qexp <- embedFile fp
+  bs <- unravel qexp
+  runTypechecker qexp $ Map.singleton (Text.pack fp) (Text.pack bs)
+
+typecheckAndEmbedFiles :: String -> [FilePath] -> Q Exp
+typecheckAndEmbedFiles dir files = do
+  let fps = (dir </>) <$> files
+  qexps <- traverse embedFile fps
+  bss <- traverse unravel qexps
+  let fpsAndExps = zip fps qexps
+  qexp <- do
+    typ <- [t| [(FilePath, ByteString)] |]
+    let e = ListE $ (\(fp,ex) -> TupE [Just . LitE $ StringL fp, Just ex]) <$> fpsAndExps
+    pure $ SigE e typ
+  runTypechecker qexp
     . Map.fromList
     . map (\(fp, bs) -> (Text.pack fp, Text.pack bs))
-    $ fpsAndBss
-
-fileList :: [FilePath] -> Q Exp
-fileList files = do
-  typ <- [t| [FilePath] |]
-  let e = ListE $ LitE . StringL <$> files
-  pure $ SigE e typ
+    $ zip fps bss

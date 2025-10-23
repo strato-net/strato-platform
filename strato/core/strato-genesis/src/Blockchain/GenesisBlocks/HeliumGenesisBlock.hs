@@ -40,13 +40,10 @@ import           SolidVM.Model.Storable
 import           System.FilePath                                 (takeFileName)
 
 embeddedFiles :: [(FilePath, B.ByteString)]
-embeddedFiles = $(typecheckAndEmbedDir "resources" $ Just mercataContractFiles)
-
-fileMap :: M.Map FilePath B.ByteString
-fileMap = M.fromList embeddedFiles
+embeddedFiles = $(typecheckAndEmbedFiles "resources" mercataContractFiles)
 
 mercataContracts :: [[String]]
-mercataContracts=map (\filename -> [takeFileName filename, BC.unpack $ fromMaybe (error $ "internal error finding source code in genesis resources: " ++ show filename) $ M.lookup filename fileMap]) mercataContractFiles
+mercataContracts = map (\(fp, bs) -> [takeFileName fp, T.unpack $ decodeUtf8 bs]) embeddedFiles
 
 data BridgeChainInfo = BridgeChainInfo
   { bci_chainId :: Integer

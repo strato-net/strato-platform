@@ -11,8 +11,6 @@ contract record MercataGovernance {
     mapping (address => mapping (address => uint)) public record adminVoteMap;
     mapping (address => address[]) public record adminVotes;
 
-    address public owner;
-
     event ValidatorVoteMade(address voter, address recipient, bool voteDirection);
     event ValidatorAdded(address validator);
     event ValidatorRemoved(address validator);
