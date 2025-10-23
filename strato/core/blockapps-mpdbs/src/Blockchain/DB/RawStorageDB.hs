@@ -219,7 +219,7 @@ flushMemDBs = do
 -- the word256 based storage.
 {-# NOINLINE blankVal #-}
 blankVal :: RawStorageValue
-blankVal = BString ""
+blankVal = BDefault
 
 putAllRawStorageKeyValForAddress ::
   (MonadLogger m, FullRawStorage m) =>
