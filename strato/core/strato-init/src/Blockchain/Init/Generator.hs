@@ -55,8 +55,6 @@ createGenesisInfo network = do
                     , Validator 0x4d8cb07af178cb10db093abea710b73179a5dd16
                     , Validator 0x4dd4bb6125cefd36d5adfbb303d8f00787b7ea0c
                     ]
-          "helium" -> HELIUM.genesisBlockTemplate config
-            where config = HELIUM.HeliumGenesisBlockConfig HELIUM.validators HELIUM.admins [HELIUM.sepolia] [HELIUM.meth, HELIUM.musdc]
           _ -> HELIUM.genesisBlock
 
   liftIO $ B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo
