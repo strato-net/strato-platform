@@ -112,6 +112,8 @@ contract DepositRouter is
             ++depositId;
         }
 
+        uint256 balanceBefore = IERC20(token).balanceOf(safe);
+
         IPermit2.PermitTransferFrom memory permit = IPermit2
             .PermitTransferFrom({
                 permitted: IPermit2.TokenPermissions({
@@ -130,9 +132,11 @@ contract DepositRouter is
             signature
         );
 
+        uint256 depositedAmount = IERC20(token).balanceOf(safe) - balanceBefore;
+
         emit DepositRouted(
             token,
-            amount,
+            depositedAmount,
             msg.sender,
             stratoAddress,
             depositId,
