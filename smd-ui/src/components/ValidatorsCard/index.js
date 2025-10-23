@@ -23,9 +23,7 @@ class ValidatorsCard extends Component {
                   <div className='row'>
                     <div className="col-xs-12">
                       <Text ellipsize={true}>
-                        <small>
-                          {validator.commonName}
-                        </small>
+                        <small>{validator}</small>
                       </Text>
                     </div>
                   </div>
