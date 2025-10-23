@@ -337,21 +337,28 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-4"
+            className="col-sm-6"
           >
             <withRouter(Connect(NumberCard))
-              className="smd-pointer"
-              description="Node ID"
-              iconClass="fa-exclamation-circle"
-              mode="pt-intent-warning"
-              number="No Identity"
+              description="Loading..."
+              iconClass="fa-server"
+              number="localhost"
               textSize="h4"
             />
           </div>
           <div
-            className="col-sm-8"
+            className="col-sm-6"
           >
             <withRouter(Connect(NodeCard)) />
+          </div>
+        </div>,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-12"
+          >
+            <br />
           </div>
         </div>,
         <div
@@ -1079,19 +1086,17 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>,
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -1106,14 +1111,12 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />,
-              "className": "col-sm-4",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -1121,11 +1124,9 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "className": "smd-pointer",
-                "description": "Node ID",
-                "iconClass": "fa-exclamation-circle",
-                "mode": "pt-intent-warning",
-                "number": "No Identity",
+                "description": "Loading...",
+                "iconClass": "fa-server",
+                "number": "localhost",
                 "textSize": "h4",
               },
               "ref": null,
@@ -1140,7 +1141,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-8",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -1155,6 +1156,41 @@ ShallowWrapper {
             "type": "div",
           },
         ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-12"
+          >
+            <br />
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <br />,
+            "className": "col-sm-12",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {},
+            "ref": null,
+            "rendered": null,
+            "type": "br",
+          },
+          "type": "div",
+        },
         "type": "div",
       },
       Object {
@@ -2145,21 +2181,28 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
+            </div>
+          </div>,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-12"
+            >
+              <br />
             </div>
           </div>,
           <div
@@ -2887,19 +2930,17 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-4"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />
               </div>,
               <div
-                className="col-sm-8"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -2914,14 +2955,12 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />,
-                "className": "col-sm-4",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -2929,11 +2968,9 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Node ID",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "pt-intent-warning",
-                  "number": "No Identity",
+                  "description": "Loading...",
+                  "iconClass": "fa-server",
+                  "number": "localhost",
                   "textSize": "h4",
                 },
                 "ref": null,
@@ -2948,7 +2985,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-8",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -2963,6 +3000,41 @@ ShallowWrapper {
               "type": "div",
             },
           ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-12"
+            >
+              <br />
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <br />,
+              "className": "col-sm-12",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {},
+              "ref": null,
+              "rendered": null,
+              "type": "br",
+            },
+            "type": "div",
+          },
           "type": "div",
         },
         Object {
@@ -4307,21 +4379,28 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-4"
+            className="col-sm-6"
           >
             <withRouter(Connect(NumberCard))
-              className="smd-pointer"
-              description="Node ID"
-              iconClass="fa-exclamation-circle"
-              mode="pt-intent-warning"
-              number="No Identity"
+              description="Loading..."
+              iconClass="fa-server"
+              number="localhost"
               textSize="h4"
             />
           </div>
           <div
-            className="col-sm-8"
+            className="col-sm-6"
           >
             <withRouter(Connect(NodeCard)) />
+          </div>
+        </div>,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-12"
+          >
+            <br />
           </div>
         </div>,
         <div
@@ -5049,19 +5128,17 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>,
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -5076,14 +5153,12 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />,
-              "className": "col-sm-4",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -5091,11 +5166,9 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "className": "smd-pointer",
-                "description": "Node ID",
-                "iconClass": "fa-exclamation-circle",
-                "mode": "pt-intent-warning",
-                "number": "No Identity",
+                "description": "Loading...",
+                "iconClass": "fa-server",
+                "number": "localhost",
                 "textSize": "h4",
               },
               "ref": null,
@@ -5110,7 +5183,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-8",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -5125,6 +5198,41 @@ ShallowWrapper {
             "type": "div",
           },
         ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-12"
+          >
+            <br />
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <br />,
+            "className": "col-sm-12",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {},
+            "ref": null,
+            "rendered": null,
+            "type": "br",
+          },
+          "type": "div",
+        },
         "type": "div",
       },
       Object {
@@ -6115,21 +6223,28 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
+            </div>
+          </div>,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-12"
+            >
+              <br />
             </div>
           </div>,
           <div
@@ -6857,19 +6972,17 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-4"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />
               </div>,
               <div
-                className="col-sm-8"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -6884,14 +6997,12 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />,
-                "className": "col-sm-4",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -6899,11 +7010,9 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Node ID",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "pt-intent-warning",
-                  "number": "No Identity",
+                  "description": "Loading...",
+                  "iconClass": "fa-server",
+                  "number": "localhost",
                   "textSize": "h4",
                 },
                 "ref": null,
@@ -6918,7 +7027,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-8",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -6933,6 +7042,41 @@ ShallowWrapper {
               "type": "div",
             },
           ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-12"
+            >
+              <br />
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <br />,
+              "className": "col-sm-12",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {},
+              "ref": null,
+              "rendered": null,
+              "type": "br",
+            },
+            "type": "div",
+          },
           "type": "div",
         },
         Object {
@@ -7972,21 +8116,28 @@ ShallowWrapper {
           className="row"
         >
           <div
-            className="col-sm-4"
+            className="col-sm-6"
           >
             <withRouter(Connect(NumberCard))
-              className="smd-pointer"
-              description="Node ID"
-              iconClass="fa-exclamation-circle"
-              mode="pt-intent-warning"
-              number="No Identity"
+              description="Loading..."
+              iconClass="fa-server"
+              number="localhost"
               textSize="h4"
             />
           </div>
           <div
-            className="col-sm-8"
+            className="col-sm-6"
           >
             <withRouter(Connect(NodeCard)) />
+          </div>
+        </div>,
+        <div
+          className="row"
+        >
+          <div
+            className="col-sm-12"
+          >
+            <br />
           </div>
         </div>,
         <div
@@ -8608,19 +8759,17 @@ ShallowWrapper {
         "props": Object {
           "children": Array [
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>,
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
             </div>,
@@ -8635,14 +8784,12 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />,
-              "className": "col-sm-4",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -8650,11 +8797,9 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "function",
               "props": Object {
-                "className": "smd-pointer",
-                "description": "Node ID",
-                "iconClass": "fa-exclamation-circle",
-                "mode": "pt-intent-warning",
-                "number": "No Identity",
+                "description": "Loading...",
+                "iconClass": "fa-server",
+                "number": "localhost",
                 "textSize": "h4",
               },
               "ref": null,
@@ -8669,7 +8814,7 @@ ShallowWrapper {
             "nodeType": "host",
             "props": Object {
               "children": <withRouter(Connect(NodeCard)) />,
-              "className": "col-sm-8",
+              "className": "col-sm-6",
             },
             "ref": null,
             "rendered": Object {
@@ -8684,6 +8829,41 @@ ShallowWrapper {
             "type": "div",
           },
         ],
+        "type": "div",
+      },
+      Object {
+        "instance": null,
+        "key": undefined,
+        "nodeType": "host",
+        "props": Object {
+          "children": <div
+            className="col-sm-12"
+          >
+            <br />
+          </div>,
+          "className": "row",
+        },
+        "ref": null,
+        "rendered": Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <br />,
+            "className": "col-sm-12",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {},
+            "ref": null,
+            "rendered": null,
+            "type": "br",
+          },
+          "type": "div",
+        },
         "type": "div",
       },
       Object {
@@ -9364,21 +9544,28 @@ ShallowWrapper {
             className="row"
           >
             <div
-              className="col-sm-4"
+              className="col-sm-6"
             >
               <withRouter(Connect(NumberCard))
-                className="smd-pointer"
-                description="Node ID"
-                iconClass="fa-exclamation-circle"
-                mode="pt-intent-warning"
-                number="No Identity"
+                description="Loading..."
+                iconClass="fa-server"
+                number="localhost"
                 textSize="h4"
               />
             </div>
             <div
-              className="col-sm-8"
+              className="col-sm-6"
             >
               <withRouter(Connect(NodeCard)) />
+            </div>
+          </div>,
+          <div
+            className="row"
+          >
+            <div
+              className="col-sm-12"
+            >
+              <br />
             </div>
           </div>,
           <div
@@ -10000,19 +10187,17 @@ ShallowWrapper {
           "props": Object {
             "children": Array [
               <div
-                className="col-sm-4"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />
               </div>,
               <div
-                className="col-sm-8"
+                className="col-sm-6"
               >
                 <withRouter(Connect(NodeCard)) />
               </div>,
@@ -10027,14 +10212,12 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NumberCard))
-                  className="smd-pointer"
-                  description="Node ID"
-                  iconClass="fa-exclamation-circle"
-                  mode="pt-intent-warning"
-                  number="No Identity"
+                  description="Loading..."
+                  iconClass="fa-server"
+                  number="localhost"
                   textSize="h4"
                 />,
-                "className": "col-sm-4",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -10042,11 +10225,9 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "function",
                 "props": Object {
-                  "className": "smd-pointer",
-                  "description": "Node ID",
-                  "iconClass": "fa-exclamation-circle",
-                  "mode": "pt-intent-warning",
-                  "number": "No Identity",
+                  "description": "Loading...",
+                  "iconClass": "fa-server",
+                  "number": "localhost",
                   "textSize": "h4",
                 },
                 "ref": null,
@@ -10061,7 +10242,7 @@ ShallowWrapper {
               "nodeType": "host",
               "props": Object {
                 "children": <withRouter(Connect(NodeCard)) />,
-                "className": "col-sm-8",
+                "className": "col-sm-6",
               },
               "ref": null,
               "rendered": Object {
@@ -10076,6 +10257,41 @@ ShallowWrapper {
               "type": "div",
             },
           ],
+          "type": "div",
+        },
+        Object {
+          "instance": null,
+          "key": undefined,
+          "nodeType": "host",
+          "props": Object {
+            "children": <div
+              className="col-sm-12"
+            >
+              <br />
+            </div>,
+            "className": "row",
+          },
+          "ref": null,
+          "rendered": Object {
+            "instance": null,
+            "key": undefined,
+            "nodeType": "host",
+            "props": Object {
+              "children": <br />,
+              "className": "col-sm-12",
+            },
+            "ref": null,
+            "rendered": Object {
+              "instance": null,
+              "key": undefined,
+              "nodeType": "host",
+              "props": Object {},
+              "ref": null,
+              "rendered": null,
+              "type": "br",
+            },
+            "type": "div",
+          },
           "type": "div",
         },
         Object {

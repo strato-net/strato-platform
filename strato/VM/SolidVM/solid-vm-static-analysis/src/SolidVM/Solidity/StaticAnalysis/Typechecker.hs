@@ -1403,7 +1403,8 @@ stringArgs x =
       :| [ addressType' x,
            accountType' x,
            intType' x,
-           boolType' x
+           boolType' x,
+           Product [intType' x, intType' x] x
          ]
 
 addressArgs :: SourceAnnotation Text -> Type'

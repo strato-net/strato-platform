@@ -39,7 +39,6 @@ library:
       - merkle-patricia-db
       - strato-model
       - text
-      - raw-strings-qq
       - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
