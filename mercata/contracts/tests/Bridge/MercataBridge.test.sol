@@ -1092,4 +1092,32 @@ contract Describe_MercataBridge is Authorizable {
         }
         require(reverted, "Should revert emergency override by non-owner");
     }
+
+    // ============ ZERO ADDRESS VALIDATION TESTS ============
+
+    function it_bridge_reverts_deposit_with_zero_recipient() {
+        uint256 amount = 1000e18;
+        string memory txHash = "0xzerorecipient";
+
+        bool reverted = false;
+        try {
+            bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, address(0), amount);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert with zero recipient");
+    }
+
+    function it_bridge_allows_deposit_with_valid_recipient() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+        string memory txHash = "0xvalidrecipient";
+
+        // Should succeed with valid recipient
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, recipient, amount);
+        
+        // Verify deposit was created
+        (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.INITIATED, "Deposit should be initiated");
+    }
 }
