@@ -96,7 +96,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 externalDecimals; // decimals of externalToken
         string  externalName;     // external token name
         string  externalSymbol;   // external token symbol
-        uint256 maxPerTx;         // hard ceiling; 0 means "unlimited"
+        uint256 maxPerWithdrawal; // hard ceiling for withdrawals; 0 means "unlimited"
         address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
     }
 
@@ -259,21 +259,21 @@ contract Describe_MercataBridge is Authorizable {
         uint256 decimals = 6;
         string memory name = "BSC Test Token";
         string memory symbol = "BTEST";
-        uint256 maxPerTx = 500000e6;
+        uint256 maxPerWithdrawal = 500000e6;
         uint8 permissions = 1; // WRAP only
 
         // First set up the chain
         bridge.setChain("BSC", address(0x6666), true, newChainId, 2000, address(0x7777));
 
-        bridge.setAsset(newChainId, decimals, name, symbol, externalToken, maxPerTx, newToken);
+        bridge.setAsset(newChainId, decimals, name, symbol, externalToken, maxPerWithdrawal, newToken);
 
-        (address _externalToken, uint externalChainId, uint externalDecimals, string externalName, string externalSymbol, uint _maxPerTx, address _stratoToken) = bridge.assets(externalToken, newChainId);
+        (address _externalToken, uint externalChainId, uint externalDecimals, string externalName, string externalSymbol, uint _maxPerWithdrawal, address _stratoToken) = bridge.assets(externalToken, newChainId);
         require(_externalToken == externalToken, "External token not set correctly");
         require(externalDecimals == decimals, "Decimals not set correctly");
         require(externalChainId == newChainId, "Chain ID not set correctly");
         require(keccak256(externalName) == keccak256(name), "Name not set correctly");
         require(keccak256(externalSymbol) == keccak256(symbol), "Symbol not set correctly");
-        require(_maxPerTx == maxPerTx, "Max per tx not set correctly");
+        require(_maxPerWithdrawal == maxPerWithdrawal, "Max per withdrawal not set correctly");
         require(_stratoToken == newToken, "Strato token not set correctly");
     }
 
@@ -292,8 +292,8 @@ contract Describe_MercataBridge is Authorizable {
         uint256 newLimit = 2000000e18;
         bridge.setTokenLimits(address(0x5555), externalChainId, newLimit);
 
-        (,,,,, uint maxPerTx,) = bridge.assets(address(0x5555), externalChainId);
-        require(maxPerTx == newLimit, "Token limit not updated correctly");
+        (,,,,, uint maxPerWithdrawal,) = bridge.assets(address(0x5555), externalChainId);
+        require(maxPerWithdrawal == newLimit, "Token limit not updated correctly");
     }
 
     function it_bridge_reverts_set_asset_for_missing_chain() {
@@ -780,7 +780,7 @@ contract Describe_MercataBridge is Authorizable {
     }
 
     function it_bridge_reverts_withdrawal_exceeding_cap() {
-        uint256 amount = 2000000e18; // Exceeds maxPerTx of 1000000e18
+        uint256 amount = 2000000e18; // Exceeds maxPerWithdrawal of 1000000e18
 
         testToken.mint(address(user1), amount);
         user1.do(address(testToken), "approve", address(bridge), amount);

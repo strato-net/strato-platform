@@ -91,7 +91,7 @@ contract record MercataBridge is Ownable {
         uint256 externalDecimals; // decimals of externalToken
         string  externalName;     // external token name
         string  externalSymbol;   // external token symbol
-        uint256 maxPerTx;         // hard ceiling; 0 means "unlimited"
+        uint256 maxPerWithdrawal; // hard ceiling for withdrawals; 0 means "unlimited"
         address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
     }
     // key = externalChainId
@@ -146,7 +146,7 @@ contract record MercataBridge is Ownable {
     event TokenFactoryUpdated(address oldFactory, address newFactory);
     event PauseToggled     (bool depositsPaused, bool withdrawalsPaused);
     event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router);
-    event AssetUpdated(uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerTx, address stratoToken);
+    event AssetUpdated(uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken);
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
     event EmergencyBlockRollback(uint256 externalChainId, uint256 lastProcessedBlock);
     event USDSTAddressUpdated(address oldAddress, address newAddress);
@@ -216,14 +216,14 @@ contract record MercataBridge is Ownable {
     }
 
     /* hard per-tx cap */
-    function setTokenLimits(address externalToken, uint256 externalChainId, uint256 maxPerTx)
+    function setTokenLimits(address externalToken, uint256 externalChainId, uint256 maxPerWithdrawal)
         external
         onlyOwner
     {
         require(assets[externalToken][externalChainId].externalToken != address(0), "MB: asset missing");
         AssetInfo a = assets[externalToken][externalChainId];
-        a.maxPerTx = maxPerTx;
-        emit AssetUpdated(a.externalChainId, a.externalDecimals, a.externalName, a.externalSymbol, externalToken, maxPerTx, a.stratoToken);
+        a.maxPerWithdrawal = maxPerWithdrawal;
+        emit AssetUpdated(a.externalChainId, a.externalDecimals, a.externalName, a.externalSymbol, externalToken, maxPerWithdrawal, a.stratoToken);
     }
 
     function setChain(
@@ -272,7 +272,7 @@ contract record MercataBridge is Ownable {
         string externalName,
         string externalSymbol,
         address externalToken,
-        uint256 maxPerTx,
+        uint256 maxPerWithdrawal,
         address stratoToken
     ) external onlyOwner {
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
@@ -284,9 +284,9 @@ contract record MercataBridge is Ownable {
         a.externalChainId  = externalChainId;
         a.externalName     = externalName;
         a.externalSymbol   = externalSymbol;
-        a.maxPerTx         = maxPerTx;
+        a.maxPerWithdrawal = maxPerWithdrawal;
 
-        emit AssetUpdated(externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerTx, stratoToken);
+        emit AssetUpdated(externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
     }
 
     function setAssetMetadata(
@@ -299,7 +299,7 @@ contract record MercataBridge is Ownable {
         AssetInfo a = assets[externalToken][externalChainId];
         a.externalName   = externalName;
         a.externalSymbol = externalSymbol;
-        emit AssetUpdated(a.externalChainId, a.externalDecimals, externalName, externalSymbol, externalToken, a.maxPerTx, a.stratoToken);
+        emit AssetUpdated(a.externalChainId, a.externalDecimals, externalName, externalSymbol, externalToken, a.maxPerWithdrawal, a.stratoToken);
     }
 
 /* ===================================================================== */
@@ -481,7 +481,7 @@ contract record MercataBridge is Ownable {
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
-        require(a.maxPerTx == 0 || stratoTokenAmount <= a.maxPerTx, "MB: per-tx cap");
+        require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
         require(tokenFactory.isTokenActive(a.stratoToken), "MB: inactive token");
 
         /* pull user funds; bridge holds until approval */
