@@ -127,7 +127,7 @@ data CallInfo = CallInfo
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
-    storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    storageMap :: !(M.Map (Address, B.ByteString) MS.BasicValue),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -174,8 +174,6 @@ type MonadSM m =
     HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
-    HasSelectX509FieldDB m,
-    A.Selectable (Address, T.Text) X509CertificateField m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
@@ -384,9 +382,6 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   delete p = lift . A.delete p
 
 instance (Address `A.Selectable` X509Certificate) m => (Address `A.Selectable` X509Certificate) (SM m) where
-  select p k = lift $ A.select p k
-
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) m => ((Address, T.Text) `A.Selectable` X509CertificateField) (SM m) where
   select p k = lift $ A.select p k
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where

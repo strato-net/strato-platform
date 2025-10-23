@@ -336,5 +336,5 @@ storageValueByteStringToBasic bs =
     handler :: SomeException -> IO (Either String BasicValue)
     handler = return . Left . show
 
-storageValueByteStringToText :: B.ByteString -> Text
-storageValueByteStringToText = either T.pack formatBasicValueForSQL . storageValueByteStringToBasic
+storageValueToText :: BasicValue -> Text
+storageValueToText = formatBasicValueForSQL

@@ -254,33 +254,21 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
   for_ addresses $ \address -> do
     -- Fetch full address state from the state database
-    fullAddressState <- A.selectWithDefault (A.Proxy @AddressState) address
+    addressState <- A.selectWithDefault (A.Proxy @AddressState) address
 
     $logInfoS "initgen" $ T.pack $
       "##################### writing to DBs: " ++ format address
 
-    -- Apply special filtering for Vitu vehicle manager contract (0x7000...0000)
-    -- to prevent performance issues with large arrays
-    -- For now, we are just clumsily filtering out any state changes for the
-    -- Vitu vehicle manager, since this contract has giant arrays that would
-    -- choke strato (yes, this temprary feature is hardcoded into the whole
-    -- platform for one client)
-    let acct = address
-        filteredAddressState =
-          if address /= Ad.Address 0x7000000000000000000000000000000000000000
-            then fullAddressState
-            else fullAddressState {addressStateContractRoot = MP.blankStateRoot}
-        fullAddrStates = [(acct, fullAddressState)]
-        filteredAddrStates = [(acct, filteredAddressState)]
+    let addrStateMap = Map.fromList [(address, addressState)]
         squashMap f = mapM (uncurry f) . Map.toList
 
     -- Step 4: State Diff Generation - Create SQL database diffs for account creation
-    fullAccountDiffs <- mapM eventualAccountState . Map.fromList $ fullAddrStates
+    accountDiffs <- mapM eventualAccountState addrStateMap
     -- Step 5: VM Event Production - Generate and publish VM events to Kafka
     let addressEvents = Map.findWithDefault S.empty address  events
     let addressDelegatecalls = Map.findWithDefault S.empty address delegatecalls
-    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) =<< mapM eventualAccountState (Map.fromList filteredAddrStates)
-    pub (Just $ mkStateDiff fullAccountDiffs) vmEvents
+    vmEvents <- squashMap (toAction addressEvents addressDelegatecalls) accountDiffs
+    pub (Just $ mkStateDiff accountDiffs) vmEvents
 
   for_ mSR $ A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
 
@@ -355,7 +343,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           $ lookupSolidDiff ".:originAddress" storageDiff
 
         storageDiff = case storage d of
-          SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
+          SolidVMDiff m -> A.SolidVMDiff $ Map.map (rlpSerialize . rlpEncode . fromDiff) m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'

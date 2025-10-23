@@ -45,6 +45,7 @@ import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
+import SolidVM.Model.Storable
 import qualified Strato.Strato23.API as VC
 import qualified Strato.Strato23.Client as VC
 
@@ -54,8 +55,8 @@ data SetupDBs = SetupDBs
     hashDB :: HashDB,
     codeDB :: CodeDB,
     vaultDB :: ClientEnv,
-    localStorageTx :: IORef (M.Map (Address, B.ByteString) B.ByteString),
-    localStorageBlock :: IORef (M.Map (Address, B.ByteString) B.ByteString),
+    localStorageTx :: IORef (M.Map (Address, B.ByteString) BasicValue),
+    localStorageBlock :: IORef (M.Map (Address, B.ByteString) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
   }

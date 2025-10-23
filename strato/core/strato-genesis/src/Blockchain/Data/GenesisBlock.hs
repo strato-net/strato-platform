@@ -26,7 +26,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
@@ -39,6 +38,7 @@ import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import qualified Data.Text.Encoding as T
 import Numeric
+import SolidVM.Model.Storable
 
 initializeBlankStateDB ::
   ( (Maybe Word256 `A.Alters` StateRoot) m,
@@ -57,7 +57,7 @@ putStorageTrie ::
     (Address `A.Alters` AddressState) m
   ) =>
   Address ->
-  [(BS.ByteString, BS.ByteString)] ->
+  [(BS.ByteString, BasicValue)] ->
   m ()
 putStorageTrie account slots = do
   mapM_ (\slot -> putRawStorageKeyVal' (account, fst slot) (snd slot)) slots
@@ -94,7 +94,7 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-    putStorageTrie address $ map (\(k, v) -> (k, rlpSerialize $ rlpEncode v)) $ slots
+    putStorageTrie address slots
 
 initializeStateDB ::
   ( MonadLogger m,
