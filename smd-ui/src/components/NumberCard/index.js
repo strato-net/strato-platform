@@ -2,6 +2,8 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import './NumberCard.css'
+import { Text } from '@blueprintjs/core';
+
 
 class NumberCard extends Component {
   render() {
@@ -28,10 +30,14 @@ class NumberCard extends Component {
           </div>
           <div className="col-xs-8">
             <div className={`${textSize} ${numberAlignment}`}>
-              <strong>{this.props.number}</strong>
+              <Text ellipsize={true}>
+                <strong>{this.props.number}</strong>
+              </Text>
             </div>
             <div className={`h4 text-right desc`}>
-              {this.props.description}
+              <Text ellipsize={true}>
+                {this.props.description}
+              </Text>
             </div>
           </div>
         </div>
