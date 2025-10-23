@@ -32,7 +32,6 @@ import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
 import qualified Blockchain.Strato.Model.Keccak256 as SHA (Keccak256, hash, keccak256ToByteString, keccak256ToWord256)
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.UserRegistry
 import Blockchain.Strato.Model.Util
 import Control.DeepSeq
 import Control.Lens.Operators
@@ -53,7 +52,6 @@ import qualified Data.NibbleString as N
 import Data.Swagger hiding (Format, format, get, put)
 import qualified Data.Swagger as Sw
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Sql hiding (get)
 -- import Debug.Trace
 import GHC.Generics
@@ -269,7 +267,7 @@ deriveAddressWithSalt sender salt srcHash args = do
               [ rlpEncode (0xFF :: Integer),
                 rlpEncode theAddress,
                 rlpEncode salt,
-                rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
+                rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash "") srcHash,
                 rlpEncode $ fromMaybe "[]" args
               ]
   -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show srcHash) ++ " " ++ show args) $

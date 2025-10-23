@@ -1,14 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 
-module Blockchain.Strato.Model.UserRegistry (userRegistryContract) where
-
-import Data.Text
-import Text.RawString.QQ
-
-userRegistryContract :: Text
-userRegistryContract =
-  [r|
 
 enum IssuerStatus {
     NULL,
@@ -117,4 +107,4 @@ contract record User {
     function setIsAdmin(bool b) onlyOwner {
         isAdmin = b;
     }
-}|]
+}
