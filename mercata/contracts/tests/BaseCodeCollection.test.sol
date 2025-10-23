@@ -123,6 +123,13 @@ contract Describe_Mercata is Authorizable {
         require(from == address(0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce), "Signed tx hash: " + h + ", unsigned tx hash: " + u + ", Signer: 0x" + string(from) + " didn't match 0x1b7dc206ef2fe3aab27404b88c36470ccf16c0ce");
     }
 
+    function property_hex_encoding_roundtrips(uint w) {
+        string x = string(w, 16);
+        uint y = uint(x);
+        string z = string(y, 16);
+        require(w == y && x == z, "Hex encoding failed: " + intercalate(", ", [string(w), x, string(y), z]));
+    }
+
     struct Transaction {
         uint aversion;
         uint bnonce;
