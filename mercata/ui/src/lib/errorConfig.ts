@@ -25,11 +25,11 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/oracle/price": "Price Error",
   
   // Swap operations
-  "/swap-pools": "Swap Error",
   "/swap-pools/tokens": "Token Pair Error",
   "/swap-pools/positions": "LP Positions Error",
-  "/swap": "Swap Transaction Error",
   "/swap-pools/liquidity": "Liquidity Operation Error",
+  "/swap-pools": "Swap Error",
+  "/swap": "Swap Transaction Error",
   
   // Bridge operations 
   "/bridge/config": "Bridge Configuration Error",
@@ -42,8 +42,11 @@ export const API_ERROR_TITLES: Record<string, string> = {
   "/bridge/withdrawalStatus": "Withdrawal Status Error",
   
   // User operations
-  "/user": "User Error",
   "/user/me": "User Profile Error",
+  "/user/admin/vote": "Failed to cast vote",
+  "/user/admin/issues": "Admin vote issueserror",
+  "/user/admin": "Admin Operation Error",
+  "/user": "User Error",
   
   // Default
   "default": "API Error"

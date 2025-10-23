@@ -50,13 +50,14 @@ import Data.Map (Map)
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import Data.Traversable (for)
+import SolidVM.Model.Storable
 
-instance Default ByteString where
+instance Default BasicValue where
   def = blankVal
 
 type RawStorageKey = (Address, ByteString)
 
-type RawStorageValue = ByteString
+type RawStorageValue = BasicValue
 
 type HasRawStorageDB m = (RawStorageKey `A.Alters` RawStorageValue) m
 
@@ -218,7 +219,7 @@ flushMemDBs = do
 -- the word256 based storage.
 {-# NOINLINE blankVal #-}
 blankVal :: RawStorageValue
-blankVal = rlpSerialize $ RLPString ""
+blankVal = BDefault
 
 putAllRawStorageKeyValForAddress ::
   (MonadLogger m, FullRawStorage m) =>

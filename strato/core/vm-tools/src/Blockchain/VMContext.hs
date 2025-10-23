@@ -86,7 +86,6 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Model.SyncState
@@ -239,8 +238,8 @@ makeLenses ''ContextDBs
 data MemDBs = MemDBs
   { _stateTxMap :: !(M.Map Address AddressStateModification),
     _stateBlockMap :: !(M.Map Address AddressStateModification),
-    _storageTxMap :: !(M.Map (Address, B.ByteString) B.ByteString),
-    _storageBlockMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    _storageTxMap :: !(M.Map (Address, B.ByteString) BasicValue),
+    _storageBlockMap :: !(M.Map (Address, B.ByteString) BasicValue),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
     _currentBlock :: !(Maybe CurrentBlockHash)
   }
@@ -333,7 +332,6 @@ type VMBase m =
     (RawStorageKey `A.Alters` RawStorageValue) m,
     (Keccak256 `A.Alters` BlockSummary) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
-    (A.Selectable (Address, T.Text) X509CertificateField) m,
     (A.Selectable Address X509Certificate) m
   )
 
@@ -368,14 +366,14 @@ instance Show Context where
 
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
-    (A.Alters (Address, B.ByteString) B.ByteString) m
+    (A.Alters (Address, B.ByteString) BasicValue) m
   ) =>
   Address ->
   m (Maybe Address)
 lookupX509AddrFromCBHash k = do
   let certKey addr = (addr,) . Text.encodeUtf8
       certRegistryKey = certKey (Address 0x509)
-  mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+  mAccount <- A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
   $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
   case mAccount of
     Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress

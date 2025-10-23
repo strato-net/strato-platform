@@ -18,6 +18,7 @@ import           Blockchain.Strato.Model.Validator
 import qualified Data.Aeson                        as JSON
 import           Data.ByteString                   (ByteString)
 import qualified Data.ByteString.Lazy              as BL
+import           Data.String
 import qualified Data.Text as Text
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable            hiding (size)
@@ -59,10 +60,10 @@ insertMercataGovernanceContract owner validators admins gi =
           ++ concatMap
             ( \case
                 (i, Validator c) ->
-                  [ ( encodeUtf8 $ ".validatorMap[" <> Text.pack (printf "%040x" c) <> "]"
+                  [ ( fromString $ ".validatorMap[" ++ printf "%040x" c ++ "]"
                     , BInteger $ i + 1
                     )
-                  , ( encodeUtf8 $ ".validators[" <> Text.pack (show i) <> "]"
+                  , ( fromString $ ".validators[" ++ show i ++ "]"
                     , BAccount (NamedAccount c UnspecifiedChain)
                     )
                   ]
@@ -71,10 +72,10 @@ insertMercataGovernanceContract owner validators admins gi =
           ++ concatMap
             ( \case
                 (i, c) ->
-                  [ ( encodeUtf8 $ ".adminMap[" <> Text.pack (printf "%040x" c) <> "]"
+                  [ ( fromString $ ".adminMap[" ++ printf "%040x" c ++ "]"
                     , BInteger $ i + 1
                     )
-                  , ( encodeUtf8 $ ".admins[" <> Text.pack (show i) <> "]"
+                  , ( fromString $ ".admins[" ++ show i ++ "]"
                     , BAccount (NamedAccount c UnspecifiedChain)
                     )
                   ]
