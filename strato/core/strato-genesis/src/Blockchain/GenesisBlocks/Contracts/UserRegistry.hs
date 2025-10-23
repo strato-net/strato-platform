@@ -1,64 +1,60 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.GenesisBlocks.Contracts.UserRegistry (
   insertUserRegistryContract
   ) where
 
-import BlockApps.X509.Certificate
 import Blockchain.Data.GenesisInfo
-import Blockchain.Strato.Model.Address
+import Blockchain.GenesisBlocks.Contracts.TH
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
-import Blockchain.Strato.Model.UserRegistry
+import Data.ByteString (ByteString)
+import Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
 import Data.Maybe
 import Data.String
 import Data.Text.Encoding
-import SolidVM.Model.Value
 
 
 
 -- | Inserts a User Registry contract into the genesis block with the BlockApps root cert as owner
-insertUserRegistryContract :: [X509Certificate] -> GenesisInfo -> GenesisInfo
-insertUserRegistryContract certs gi =
+insertUserRegistryContract :: GenesisInfo -> GenesisInfo
+insertUserRegistryContract gi =
   gi
-    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct] ++ userAccts,
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo userRegistryContract (Just "UserRegistry")]
+    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
+      genesisInfoCodeInfo = initialCode ++ [CodeInfo (decodeUtf8 userRegistryContract) (Just "UserRegistry")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
 
-    encodedRegistry = encodeUtf8 userRegistryContract
-
-    rootSub = fromJust $ getCertSubject rootCert
     rootAcct =
       SolidVMContractWithStorage
-        (deriveAddressWithSalt Nothing (subCommonName rootSub) Nothing (Just $ show [SString $ subCommonName rootSub]))
+        0x840a84f572cff5b12c8ed176565e86f10d3b820e -- TODO: Remove. This is just for current genesis block compatibility
         123
-        (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-        [ (".commonName", fromString $ subCommonName rootSub)
+        (SolidVMCode "User" (KECCAK256.hash userRegistryContract))
+        [ (".commonName", fromString "Admin")
         ]
-
-    userAccts =
-      map
-        ( \cert -> do
-            let certSub' crt =
-                  case getCertSubject crt of
-                    Just s -> s
-                    Nothing -> error "Certificate requires a subject"
-                certSub = certSub' cert
-            SolidVMContractWithStorage
-              (deriveAddressWithSalt Nothing (subCommonName certSub) Nothing (Just $ show [SString $ subCommonName certSub]))
-              0
-              (SolidVMCode "User" (KECCAK256.hash encodedRegistry))
-              [ (".commonName", fromString $ subCommonName certSub)
-              ]
-        )
-        certs
 
     registryAcct =
       SolidVMContractWithStorage
         0x720
         720
-        (SolidVMCode "UserRegistry" (KECCAK256.hash encodedRegistry))
+        (SolidVMCode "UserRegistry" (KECCAK256.hash userRegistryContract))
         $ []
+
+userRegistryFilePath :: FilePath
+userRegistryFilePath = "UserRegistry.sol"
+
+embeddedFiles :: [(FilePath, ByteString)]
+embeddedFiles = $(typecheckAndEmbedDir "resources/strato/user" Nothing)
+
+fileMap :: Map FilePath ByteString
+fileMap = Map.fromList embeddedFiles
+
+fileContents :: FilePath -> ByteString
+fileContents = fromJust . flip Map.lookup fileMap
+
+userRegistryContract :: ByteString
+userRegistryContract = fileContents userRegistryFilePath
