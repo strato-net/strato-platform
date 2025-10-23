@@ -128,6 +128,7 @@ contract record MercataBridge is Ownable {
     );
     event DepositCompleted(uint256 srcChainId, string srcTxHash);   // wrapped tokens minted
     event DepositPendingReview(uint256 srcChainId, string srcTxHash);   // verification failed, needs review
+    event DepositAborted(uint256 srcChainId, string srcTxHash);
 
     /*  WITHDRAWAL FLOW  */
     event WithdrawalRequested(  // user locked tokens in bridge
@@ -402,7 +403,11 @@ contract record MercataBridge is Ownable {
         string normalizedTxHash = string(uint(externalTxHash, 16), 16);
         
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+        require(
+            d.bridgeStatus == BridgeStatus.INITIATED || 
+            d.bridgeStatus == BridgeStatus.PENDING_REVIEW, 
+            "MB: bad state"
+        );
 
         Token(d.stratoToken).mint(d.stratoRecipient, d.stratoTokenAmount);
 
@@ -462,6 +467,43 @@ contract record MercataBridge is Ownable {
 
         for (uint256 i = 0; i < n; i++) {
             reviewDeposit(
+                externalChainIds[i],
+                externalTxHashes[i]
+            );
+        }
+    }
+
+    /**
+     * Step-2.3 (owner) – Cancel a deposit that was marked for review
+     */
+    function abortDeposit(uint256 externalChainId, string externalTxHash)
+        public
+        onlyOwner
+        whenDepositsOpen
+    {
+        string normalizedTxHash = string(uint(externalTxHash, 16), 16);
+        
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+
+        d.bridgeStatus = BridgeStatus.ABORTED;
+        emit DepositAborted(externalChainId, normalizedTxHash);
+    }
+
+    // ──────────────────────── BATCH: abortDeposit ────────────────────────
+    function abortDepositBatch(
+        uint256[] externalChainIds,
+        string[]  externalTxHashes
+    )
+        external
+        onlyOwner
+        whenDepositsOpen
+    {
+        uint256 n = externalChainIds.length;
+        require(n == externalTxHashes.length, "MB: len");
+
+        for (uint256 i = 0; i < n; i++) {
+            abortDeposit(
                 externalChainIds[i],
                 externalTxHashes[i]
             );

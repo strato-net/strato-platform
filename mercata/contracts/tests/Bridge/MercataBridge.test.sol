@@ -1279,4 +1279,117 @@ contract Describe_MercataBridge is Authorizable {
         (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, hashWith0x);
         require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
     }
+
+    function it_bridge_can_confirm_deposit_in_pending_review() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+        string memory txHash = "0x1234567890abcdef";
+
+        // First initiate deposit
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, recipient, amount);
+
+        // Mark for review
+        bridge.reviewDeposit(externalChainId, txHash);
+
+        // Confirm the reviewed deposit
+        bridge.confirmDeposit(externalChainId, txHash);
+
+        // Verify deposit was completed
+        (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.COMPLETED, "Deposit should be completed");
+        require(IERC20(address(testToken)).balanceOf(recipient) == amount, "Tokens should be minted");
+    }
+
+    function it_bridge_can_abort_deposit_in_pending_review() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+        string memory txHash = "0xabcdef1234567890";
+
+        // First initiate deposit
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, recipient, amount);
+
+        // Mark for review
+        bridge.reviewDeposit(externalChainId, txHash);
+
+        // Abort the reviewed deposit
+        bridge.abortDeposit(externalChainId, txHash);
+
+        // Verify deposit was aborted
+        (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, txHash);
+        require(status == BridgeStatus.ABORTED, "Deposit should be aborted");
+        require(IERC20(address(testToken)).balanceOf(recipient) == 0, "No tokens should be minted");
+    }
+
+    function it_bridge_abort_requires_owner() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+        string memory txHash = "0xfedcba0987654321";
+
+        // First initiate deposit
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, recipient, amount);
+
+        // Mark for review
+        bridge.reviewDeposit(externalChainId, txHash);
+
+        // Try to abort as non-owner (should fail)
+        bool reverted = false;
+        try {
+            user1.do(address(bridge), "abortDeposit", externalChainId, txHash);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when non-owner tries to abort");
+    }
+
+    function it_bridge_abort_only_works_on_pending_review() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+        string memory txHash = "0x9876543210fedcba";
+
+        // First initiate deposit
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash, recipient, amount);
+
+        // Try to abort deposit in INITIATED state (should fail)
+        bool reverted = false;
+        try {
+            bridge.abortDeposit(externalChainId, txHash);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when trying to abort deposit in INITIATED state");
+    }
+
+    function it_bridge_can_handle_batch_abort_deposits() {
+        uint256 amount = 1000e18;
+        address recipient1 = address(0xAAAA);
+        address recipient2 = address(0xBBBB);
+        string memory txHash1 = "0x1111111111111111";
+        string memory txHash2 = "0x2222222222222222";
+
+        // First initiate deposits
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash1, recipient1, amount);
+        bridge.deposit(externalChainId, externalSender, address(0x5555), txHash2, recipient2, amount);
+
+        // Mark both for review
+        bridge.reviewDeposit(externalChainId, txHash1);
+        bridge.reviewDeposit(externalChainId, txHash2);
+
+        // Batch abort both deposits
+        uint256[] memory chainIds = new uint256[](2);
+        string[] memory txHashes = new string[](2);
+        chainIds[0] = externalChainId;
+        chainIds[1] = externalChainId;
+        txHashes[0] = txHash1;
+        txHashes[1] = txHash2;
+
+        bridge.abortDepositBatch(chainIds, txHashes);
+
+        // Verify both deposits were aborted
+        (BridgeStatus status1,,,,,,) = bridge.deposits(externalChainId, txHash1);
+        (BridgeStatus status2,,,,,,) = bridge.deposits(externalChainId, txHash2);
+        require(status1 == BridgeStatus.ABORTED, "First deposit should be aborted");
+        require(status2 == BridgeStatus.ABORTED, "Second deposit should be aborted");
+        require(IERC20(address(testToken)).balanceOf(recipient1) == 0, "No tokens should be minted for first deposit");
+        require(IERC20(address(testToken)).balanceOf(recipient2) == 0, "No tokens should be minted for second deposit");
+    }
 }
