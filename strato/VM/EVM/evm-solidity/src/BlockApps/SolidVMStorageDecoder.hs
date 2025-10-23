@@ -152,11 +152,12 @@ applyDelta' (Index n : sp) bv (ValueMapping ms) =
    in case M.lookup n' ms of
         Just v -> ValueMapping . (\x -> M.insert n' x ms) <$> applyDelta' sp bv v
         Nothing -> Right . ValueMapping $ M.insert n' (constructFromNothing' sp bv) ms
-applyDelta' (Index n' : sp) bv (ValueArrayDynamic vs) =
-  let n = fromInteger $ byteString2Integer n'
-   in case I.lookup n vs of
-        Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
-        Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
+applyDelta' (Index n' : sp) bv s@(ValueArrayDynamic vs) = do
+  let err = Left $ TypeMismatch (StoragePath sp) bv s
+  n <- maybe err Right . readMaybe . T.unpack $ decodeUtf8 n'
+  case I.lookup n vs of
+    Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
+    Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
 applyDelta' (Index n' : sp) bv sent@(ValueArraySentinel len) =
   let n = fromInteger $ byteString2Integer n'
    in Right . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
