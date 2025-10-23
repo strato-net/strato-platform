@@ -11,7 +11,6 @@ where
 
 import Blockchain.Data.GenesisInfo
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Data.Map.Strict as M
 import Data.Maybe
