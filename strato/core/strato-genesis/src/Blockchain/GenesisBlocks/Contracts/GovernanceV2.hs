@@ -24,12 +24,9 @@ import           SolidVM.Model.Storable            hiding (size)
 import           System.FilePath                   (takeFileName)
 import           Text.Printf
 
-adminRegistryAddress :: Address
-adminRegistryAddress = 0x100c
-
 -- | Inserts a Governance contract into the genesis block with the BlockApps root cert as owner
-insertMercataGovernanceContract :: [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
-insertMercataGovernanceContract validators admins gi =
+insertMercataGovernanceContract :: Address -> [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
+insertMercataGovernanceContract owner validators admins gi =
   gi
     { genesisInfoAccountInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
       genesisInfoCodeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")]
@@ -54,7 +51,7 @@ insertMercataGovernanceContract validators admins gi =
         0x100
         0x426c6f636b61707073205374617274696e6672042616c616e6365
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
-        $ [ ("._owner", BAccount $ NamedAccount adminRegistryAddress UnspecifiedChain)
+        $ [ ("._owner", BAccount $ NamedAccount owner UnspecifiedChain)
           , (".validators.length", BInteger . toInteger $ length validators)
           , (".admins.length", BInteger . toInteger $ length admins)
           , (".logicContract", BAccount $ NamedAccount govLogicAddr UnspecifiedChain)
