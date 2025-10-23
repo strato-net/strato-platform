@@ -1031,4 +1031,65 @@ contract Describe_MercataBridge is Authorizable {
         }
         require(reverted, "Should revert aborting withdrawal by different user");
     }
+
+    // ============ BLOCK ROLLBACK SECURITY TESTS ============
+
+    function it_bridge_reverts_set_last_processed_block_rollback() {
+        uint256 initialBlock = 1000;
+        bridge.setLastProcessedBlock(externalChainId, initialBlock);
+        
+        bool reverted = false;
+        try {
+            bridge.setLastProcessedBlock(externalChainId, 500); // Rollback attempt
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert rollback attempt");
+    }
+
+    function it_bridge_allows_monotonic_block_updates() {
+        uint256 initialBlock = 1000;
+        bridge.setLastProcessedBlock(externalChainId, initialBlock);
+        
+        // Should succeed - monotonic increase
+        bridge.setLastProcessedBlock(externalChainId, 1500);
+        
+        (,, uint256 currentBlock,,) = bridge.chains(externalChainId);
+        require(currentBlock == 1500, "Block should be updated");
+    }
+
+    function it_bridge_allows_same_block_update() {
+        uint256 initialBlock = 1000;
+        bridge.setLastProcessedBlock(externalChainId, initialBlock);
+        
+        // Should succeed - same block (no-op)
+        bridge.setLastProcessedBlock(externalChainId, 1000);
+        
+        (,, uint256 currentBlock,,) = bridge.chains(externalChainId);
+        require(currentBlock == 1000, "Block should remain the same");
+    }
+
+    function it_bridge_emergency_override_allows_rollback() {
+        uint256 initialBlock = 1000;
+        bridge.setLastProcessedBlock(externalChainId, initialBlock);
+        
+        // Emergency override should allow rollback
+        bridge.emergencySetLastProcessedBlock(externalChainId, 500);
+        
+        (,, uint256 currentBlock,,) = bridge.chains(externalChainId);
+        require(currentBlock == 500, "Emergency rollback should succeed");
+    }
+
+    function it_bridge_emergency_override_requires_owner() {
+        uint256 initialBlock = 1000;
+        bridge.setLastProcessedBlock(externalChainId, initialBlock);
+        
+        bool reverted = false;
+        try {
+            user1.do(address(bridge), "emergencySetLastProcessedBlock", externalChainId, 500);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert emergency override by non-owner");
+    }
 }

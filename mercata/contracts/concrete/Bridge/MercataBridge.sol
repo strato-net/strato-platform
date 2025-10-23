@@ -148,6 +148,7 @@ contract record MercataBridge is Ownable {
     event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router);
     event AssetUpdated(uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerTx, address stratoToken);
     event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
+    event EmergencyBlockRollback(uint256 externalChainId, uint256 lastProcessedBlock);
     event USDSTAddressUpdated(address oldAddress, address newAddress);
 
 /* --------------------------------------------------------------------- */
@@ -246,8 +247,23 @@ contract record MercataBridge is Ownable {
     function setLastProcessedBlock(uint256 externalChainId, uint256 lastProcessedBlock) external onlyRelayer
     {
         require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        
+        uint256 currentBlock = chains[externalChainId].lastProcessedBlock;
+        require(lastProcessedBlock >= currentBlock, "MB: cannot rollback block");
+        
         chains[externalChainId].lastProcessedBlock = lastProcessedBlock;
         emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+    }
+
+    function emergencySetLastProcessedBlock(
+        uint256 externalChainId, 
+        uint256 lastProcessedBlock
+    ) external onlyOwner {
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        
+        chains[externalChainId].lastProcessedBlock = lastProcessedBlock;
+        emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+        emit EmergencyBlockRollback(externalChainId, lastProcessedBlock);
     }
 
     function setAsset(
