@@ -49,7 +49,8 @@ createAccount ::
   [(Address, AccountDiff 'Eventual)] ->
   SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
-  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
+  tryCreates
+--  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
     tryCreates = do
       let newAccounts = map (uncurry addrRef) accountDiffs
