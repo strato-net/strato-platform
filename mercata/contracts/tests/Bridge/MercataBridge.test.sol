@@ -1151,4 +1151,86 @@ contract Describe_MercataBridge is Authorizable {
         (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, "abcdef1234");
         require(status == BridgeStatus.INITIATED, "Should normalize to lowercase");
     }
+
+    function it_prevents_multiple_case_variations() {
+        uint256 depositAmount = 500000e6;
+        address recipient = address(0xCCCC);
+        string memory variant1 = "abc123";
+        string memory variant2 = "ABC123";
+        string memory variant3 = "AbC123";
+        string memory variant4 = "aBc123";
+        
+        // First deposit should succeed
+        bridge.deposit(externalChainId, externalSender, address(0x5555), variant1, recipient, depositAmount);
+        bridge.confirmDeposit(externalChainId, variant1);
+        
+        // Subsequent deposits with case variations should fail due to normalization
+        bool reverted2 = false;
+        try {
+            bridge.deposit(externalChainId, externalSender, address(0x5555), variant2, recipient, depositAmount);
+        } catch {
+            reverted2 = true;
+        }
+        require(reverted2, "Should prevent case variation replay");
+        
+        bool reverted3 = false;
+        try {
+            bridge.deposit(externalChainId, externalSender, address(0x5555), variant3, recipient, depositAmount);
+        } catch {
+            reverted3 = true;
+        }
+        require(reverted3, "Should prevent case variation replay");
+        
+        bool reverted4 = false;
+        try {
+            bridge.deposit(externalChainId, externalSender, address(0x5555), variant4, recipient, depositAmount);
+        } catch {
+            reverted4 = true;
+        }
+        require(reverted4, "Should prevent case variation replay");
+        
+        // Only one deposit should have succeeded
+        require(IERC20(address(testToken)).balanceOf(recipient) == depositAmount, "Only one mint should succeed");
+    }
+
+    function it_prevents_case_variation_replay_attack() {
+        uint256 depositAmount = 500000e6;
+        address victim = address(0xCCCC);
+        string memory txHashLower = "abc123";
+        string memory txHashUpper = "ABC123";
+        
+        require(IERC20(address(testToken)).balanceOf(victim) == 0, "Victim starts with 0 balance");
+        
+        // First deposit with lowercase hash
+        bridge.deposit(
+            externalChainId,
+            externalSender,
+            address(0x5555),
+            txHashLower,
+            victim,
+            depositAmount
+        );
+        bridge.confirmDeposit(externalChainId, txHashLower);
+        
+        require(IERC20(address(testToken)).balanceOf(victim) == depositAmount, "First mint successful");
+        
+        // Second deposit with uppercase hash should fail due to normalization
+        bool reverted = false;
+        try {
+            bridge.deposit(
+                externalChainId,
+                externalSender,
+                address(0x5555),
+                txHashUpper,
+                victim,
+                depositAmount
+            );
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should prevent case variation replay attack");
+        
+        // Balance should remain the same (no duplicate mint)
+        require(IERC20(address(testToken)).balanceOf(victim) == depositAmount, "No duplicate mint should occur");
+    }
 }
