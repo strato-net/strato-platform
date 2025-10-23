@@ -127,6 +127,7 @@ contract Describe_CDPEngine is Authorizable {
         cdpEngine.setCollateralAssetParams(
             collateralTokenAddress,
             LIQUIDATION_RATIO,
+            160e16, // minCR = 1.6 WAD (160%) - must be >= liquidationRatio
             LIQUIDATION_PENALTY_BPS,
             CLOSE_FACTOR_BPS,
             STABILITY_FEE_RATE,
@@ -347,14 +348,15 @@ contract Describe_CDPEngine is Authorizable {
             "USDST balance should increase by minted amount"
         );
 
-        // Verify we're at the liquidation ratio
+        // Verify we're at the min collateral ratio
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
             collateralTokenAddress
         );
+        (uint256 _lr1, uint256 _minCR1, uint256 _pen1, uint256 _cf1, uint256 _sfr1, uint256 _floor1, uint256 _ceil1, uint256 _unit1, bool _pause1) = cdpEngine.collateralConfigs(collateralTokenAddress);
         require(
-            cr == LIQUIDATION_RATIO,
-            "CR should be equal to liquidation ratio"
+            cr == _minCR1,
+            "CR should be equal to min collateral ratio"
         );
     }
 
@@ -655,14 +657,15 @@ contract Describe_CDPEngine is Authorizable {
             "Should not withdraw all collateral when debt exists"
         );
 
-        // Verify position is exactly at liquidation threshold (withdrew maximum possible)
+        // Verify position is exactly at min collateral ratio (withdrew maximum possible)
         uint256 cr = cdpEngine.collateralizationRatio(
             address(this),
             collateralTokenAddress
         );
+        (uint256 _lr2, uint256 _minCR2, uint256 _pen2, uint256 _cf2, uint256 _sfr2, uint256 _floor2, uint256 _ceil2, uint256 _unit2, bool _pause2) = cdpEngine.collateralConfigs(collateralTokenAddress);
         require(
-            cr == LIQUIDATION_RATIO,
-            "CR should equal liquidation ratio after withdrawMax (withdrew maximum safe amount)"
+            cr == _minCR2,
+            "CR should equal min collateral ratio after withdrawMax (withdrew maximum safe amount)"
         );
     }
 
@@ -945,7 +948,7 @@ contract Describe_CDPEngine is Authorizable {
         uint256 initialDepositAmount = 2000e18;  // 2000 tokens × $5 = $10,000 collateral
         uint256 firstMintAmount = 5000e18;        // $5000 USDST (200% CR)
         uint256 secondDepositAmount = 200e18;    // Additional deposit → 200 tokens = $1000 total
-        uint256 secondMintAmount = 2000e18;        // Additional USDST mint → $1,000 total debt (5000% CR)
+        uint256 secondMintAmount = 1000e18;        // Additional USDST mint → $1000 total debt (10000% CR)
         uint256 partialRepayAmount = 1000e18;      // Partial repayment
         uint256 partialWithdrawAmount = 100e18;  // Partial withdrawal
         uint256 princeIncreaseMultiplier = 2;       // Price doubles ($5 → $10)
@@ -1048,7 +1051,7 @@ contract Describe_CDPEngine is Authorizable {
         uint256 totalMinted = firstMintAmount + secondMintAmount;
         uint256 crAfterSecondMint = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
         
-        require(crAfterSecondMint == (totalCollateralAfterSecondDeposit * currentPrice) / totalMinted, "Step 4: CR should be approximately 5000% after second mint");
+        require(crAfterSecondMint == (totalCollateralAfterSecondDeposit * currentPrice) / totalMinted, "Step 4: CR should be approximately 10000% after second mint");
 
         // log(" ═══════════════════════════════════════════════════════════════════
         //                 STEP 4: SECOND USDST MINT (LEVERAGING ADDITIONAL COLLATERAL)
@@ -1157,12 +1160,13 @@ contract Describe_CDPEngine is Authorizable {
 
    
 
-        // Verify we're at liquidation threshold
+        // Verify we're at min collateral ratio threshold
+        (uint256 _lr1, uint256 _minCR1, uint256 _pen1, uint256 _cf1, uint256 _sfr1, uint256 _floor1, uint256 _ceil1, uint256 _unit1, bool _pause1) = cdpEngine.collateralConfigs(collateralTokenAddress);
         uint256 crAfterMaxWithdraw = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
         require(
-            crAfterMaxWithdraw >= LIQUIDATION_RATIO && 
-            crAfterMaxWithdraw <= LIQUIDATION_RATIO + 1e15,
-            "Step 8b: Should be at liquidation threshold"
+            crAfterMaxWithdraw >= _minCR1 && 
+            crAfterMaxWithdraw <= _minCR1 + 1e15,
+            "Step 8b: Should be at min collateral ratio threshold"
         );
 
         // // Verify no more withdrawals possible
@@ -1397,7 +1401,7 @@ contract Describe_CDPEngine is Authorizable {
             "Step 2: Engine and CDPVault should be in sync after mint"
         );
         
-        // STEP 3: Withdraw maximum safe amount to reach liquidation threshold
+        // STEP 3: Withdraw maximum safe amount to reach min collateral ratio threshold
         uint256 maxWithdrawable = cdpEngine.withdrawMax(collateralTokenAddress);
         // log("=== AFTER WITHDRAW MAX ===");
         // log("Max withdrawable", maxWithdrawable);
@@ -1422,7 +1426,7 @@ contract Describe_CDPEngine is Authorizable {
         // log("CDPVault collateral BEFORE", vaultCollateralBefore);
         // log("User balance BEFORE", userBalanceBefore);
         
-        // Attempt to withdraw when at liquidation threshold (should fail)
+        // Attempt to withdraw when at min collateral ratio threshold (should fail)
         bool withdrawFailed = false;
         try {
             cdpEngine.withdraw(collateralTokenAddress, 1000000000); // 1 billion wei - should definitely fail
@@ -1441,7 +1445,7 @@ contract Describe_CDPEngine is Authorizable {
         // log("User balance AFTER", userBalanceAfter);
         
         // CRITICAL CHECKS: State should be unchanged after failed withdrawal
-        require(withdrawFailed, "Withdrawal should have failed at liquidation threshold");
+        require(withdrawFailed, "Withdrawal should have failed at min collateral ratio threshold");
         require(
             engineCollateralBefore == engineCollateralAfter,
             "BUG: Engine vault collateral changed after failed withdrawal!"
@@ -1704,5 +1708,194 @@ contract Describe_CDPEngine is Authorizable {
             reverted = true;
         }
         require(reverted, "Mint should revert with stale prices");
+    }
+
+    // ============ MIN COLLATERAL RATIO TESTS ============
+
+    function it_cdp_engine_enforces_min_collateral_ratio_on_withdraw() {
+        // Set up position with debt
+        uint256 collateralAmount = 1000e18;
+        uint256 debtAmount = 200e18; // This will create a CR of 250% (1000*5/200 = 25), above minCR of 160%
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, debtAmount);
+        
+        // Try to withdraw too much collateral that would bring CR below minCR
+        // Current CR = 1000*5/200 = 2500% (25x)
+        // To get CR = 160%, we need: collateralValue/debt = 1.6
+        // So: (collateral * 5) / 200 = 1.6 => collateral = 64
+        // We can withdraw up to 1000 - 64 = 936 tokens safely
+        // Let's try to withdraw 940 tokens (should fail)
+        
+        bool reverted = false;
+        try cdpEngine.withdraw(collateralTokenAddress, 940e18) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Withdraw should revert when CR would fall below minCR");
+        
+        // Try to withdraw 935 tokens (should succeed)
+        cdpEngine.withdraw(collateralTokenAddress, 935e18);
+        
+        // Verify the withdrawal succeeded
+        (uint256 collateralAfter, ) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        require(collateralAfter == 65e18, "Should have withdrawn 935 tokens, leaving 65");
+    }
+
+    function it_cdp_engine_enforces_min_collateral_ratio_on_mint() {
+        // Set up position with some debt
+        uint256 collateralAmount = 1000e18;
+        uint256 initialDebt = 200e18;
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, initialDebt);
+        
+        // Try to mint more debt that would bring CR below minCR
+        // Current CR = 1000*5/200 = 2500% (25x)
+        // To get CR = 160%, we need: collateralValue/debt = 1.6
+        // So: 5000 / debt = 1.6 => debt = 3125
+        // We can mint up to 3125 - 200 = 2925 more tokens safely
+        // Let's try to mint 3000 tokens (should fail)
+        
+        bool reverted = false;
+        try cdpEngine.mint(collateralTokenAddress, 3000e18) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Mint should revert when CR would fall below minCR");
+        
+        // Try to mint 2900 tokens (should succeed)
+        cdpEngine.mint(collateralTokenAddress, 2900e18);
+        
+        // Verify the mint succeeded
+        (, uint256 scaledDebtAfter) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 rateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 totalDebt = (scaledDebtAfter * rateAccumulator) / RAY;
+        require(totalDebt == initialDebt + 2900e18, "Should have minted 2900 additional tokens");
+    }
+
+    function it_cdp_engine_withdraw_max_respects_min_collateral_ratio() {
+        // Set up position with debt
+        uint256 collateralAmount = 1000e18;
+        uint256 debtAmount = 200e18;
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, debtAmount);
+        
+        // Debug: Check actual debt and CR before withdrawMax
+        (, uint256 scaledDebt) = cdpEngine.vaults(address(this), collateralTokenAddress);
+        (uint256 rateAccumulator, , ) = cdpEngine.collateralGlobalStates(collateralTokenAddress);
+        uint256 actualDebt = (scaledDebt * rateAccumulator) / RAY;
+        uint256 actualCR = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        uint256 collateralInVault = cdpVault.userCollaterals(address(this), collateralTokenAddress);
+        uint256 price = priceOracle.getAssetPrice(collateralTokenAddress);
+        // log("Actual debt", actualDebt);
+        // log("Actual CR", actualCR);
+        // log("Collateral in vault", collateralInVault);
+        // log("Price", price);
+        
+        // Test withdrawMax - should only allow withdrawal that keeps CR >= minCR
+        uint256 maxWithdrawable = cdpEngine.withdrawMax(collateralTokenAddress);
+        
+        // Debug: Let's see what we actually get
+        // log("Actual maxWithdrawable", maxWithdrawable);
+        // log("Expected maxWithdrawable", 935e18);
+        
+        // Calculate expected max withdrawal
+        // To keep CR >= 160%, we need: collateralValue/debt >= 1.6
+        // So: (collateral * 5) / debt >= 1.6 => collateral >= debt * 1.6 / 5
+        // We can withdraw up to 1000 - requiredCollateral - 1 tokens (1-wei buffer)
+        // Due to potential interest accrual, allow some tolerance
+        require(maxWithdrawable >= 930e18 && maxWithdrawable <= 940e18, "Max withdrawal should respect minCR constraint");
+        
+        // Verify that after withdrawal, CR is still >= minCR
+        // Note: withdrawMax() already performs the withdrawal internally, so we just need to check the final state
+        (uint256 _lr2, uint256 _minCR2, uint256 _pen2, uint256 _cf2, uint256 _sfr2, uint256 _floor2, uint256 _ceil2, uint256 _unit2, bool _pause2) = cdpEngine.collateralConfigs(collateralTokenAddress);
+        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        require(cr >= _minCR2, "CR should be >= minCR after max withdrawal");
+    }
+
+    function it_cdp_engine_mint_max_respects_min_collateral_ratio() {
+        // Set up position with some debt
+        uint256 collateralAmount = 1000e18;
+        uint256 initialDebt = 200e18;
+        
+        require(
+            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+            "Collateral approval failed"
+        );
+        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+        cdpEngine.mint(collateralTokenAddress, initialDebt);
+        
+        // Test mintMax - should only allow minting that keeps CR >= minCR
+        uint256 maxMintable = cdpEngine.mintMax(collateralTokenAddress);
+        
+        // Calculate expected max mint
+        // To keep CR >= 160%, we need: collateralValue/debt >= 1.6
+        // So: 5000 / (currentDebt + mint) >= 1.6 => currentDebt + mint <= 3125 => mint <= 3125 - currentDebt
+        // With 1-wei buffer: mint <= (3125 - currentDebt) - 1
+        // Due to potential interest accrual, allow some tolerance
+        require(maxMintable >= 2900e18 && maxMintable <= 2930e18, "Max mint should respect minCR constraint");
+        
+        // Verify that after minting, CR is still >= minCR
+        // Note: mintMax() already performs the minting internally, so we just need to check the final state
+        (uint256 _lr3, uint256 _minCR3, uint256 _pen3, uint256 _cf3, uint256 _sfr3, uint256 _floor3, uint256 _ceil3, uint256 _unit3, bool _pause3) = cdpEngine.collateralConfigs(collateralTokenAddress);
+        uint256 cr = cdpEngine.collateralizationRatio(address(this), collateralTokenAddress);
+        require(cr >= _minCR3, "CR should be >= minCR after max mint");
+    }
+
+    function it_cdp_engine_validates_min_collateral_ratio_parameter() {
+        // Test that minCR must be >= liquidationRatio
+        bool reverted = false;
+        try cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            150e16, // 150% liquidation ratio
+            140e16, // 140% minCR (invalid - less than liquidation ratio)
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            STABILITY_FEE_RATE,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        ) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should reject minCR < liquidationRatio");
+        
+        // Test that minCR can equal liquidationRatio
+        cdpEngine.setCollateralAssetParams(
+            collateralTokenAddress,
+            150e16, // 150% liquidation ratio
+            150e16, // 150% minCR (valid - equal to liquidation ratio)
+            LIQUIDATION_PENALTY_BPS,
+            CLOSE_FACTOR_BPS,
+            STABILITY_FEE_RATE,
+            DEBT_FLOOR,
+            DEBT_CEILING,
+            UNIT_SCALE,
+            false
+        );
+        
+        // Verify the configuration was set correctly
+        (uint256 liquidationRatio, uint256 minCR, , , , , , , ) = cdpEngine.collateralConfigs(collateralTokenAddress);
+        require(minCR == 150e16, "minCR should be set to 150%");
+        require(liquidationRatio == 150e16, "liquidationRatio should be set to 150%");
     }
 }

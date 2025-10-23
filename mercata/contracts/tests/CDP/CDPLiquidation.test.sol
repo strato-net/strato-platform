@@ -302,7 +302,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
         // Default params (CF=50% here; tests may overwrite)
         cdp.setCollateralAssetParams(
-            ASSET, LR, PEN, CF, SFR, FLOOR_, CEIL_, UNIT, false
+            ASSET, LR, 160e16, PEN, CF, SFR, FLOOR_, CEIL_, UNIT, false
         );
 
         // Open price healthy
@@ -507,7 +507,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
     /// totalDebt binds (CF=100%, coverageCap >= totalDebt, unsafe CR)
     function it_liquidates_when_total_debt_binds_CF_100() public {
         // Make CF 100% for this test.
-        cdp.setCollateralAssetParams(ASSET, LR, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
+        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
 
         // Choose deposit & liq price so: unsafe, and coverageCap ≥ totalDebt.
         // deposit=3000, debt=6000, liq price=$2.5 → colUSD=7500, covCap=6818 ≥ 6000, CR=1.25 < LR
@@ -590,7 +590,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     /// CF=100%, same cap-bound behavior: seize all + bad debt
     function it_liquidates_cap_bound_CF_100() public {
-        cdp.setCollateralAssetParams(ASSET, LR, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
+        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
 
         _open(2000e18, 6000e18, OPEN_P);
         (uint colBefore, ) = _state(address(borrower));
@@ -762,7 +762,7 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
 
     function it_state_consistency_total_debt_binds_CF100_updates_all() public {
         // Set CF=100% and choose price so coverageCap ≥ totalDebt, CR < LR
-        cdp.setCollateralAssetParams(ASSET, LR, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
+        cdp.setCollateralAssetParams(ASSET, LR, 160e16, PEN, 10000, SFR, FLOOR_, CEIL_, UNIT, false);
         _open(3000e18, 6000e18, OPEN_P);
 
         (uint rate0,, uint totalScaled0) = cdp.collateralGlobalStates(ASSET);
@@ -925,8 +925,8 @@ contract Describe_CDPEngine_Liquidations is Authorizable {
         // so total supply must drop by exactly coverageCap. If your cap branch wrongly
         // calls _routeFees with `coverageCap`, net supply drop will be ~0, and this fails.
         uint ts1 = usdstT.totalSupply();
-        log("ts0 - ts1", ts0 - ts1);
-        log("coverageCap", coverageCap);
+        // log("ts0 - ts1", ts0 - ts1);
+        // log("coverageCap", coverageCap);
         require(ts0 - ts1 == coverageCap, "CAP FEE BUG: totalSupply should drop by exactly coverageCap");
 
         // Also ensure no fees were minted to the Reserve (fee portion must be zero here)

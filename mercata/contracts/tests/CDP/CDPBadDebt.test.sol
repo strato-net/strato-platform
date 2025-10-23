@@ -106,7 +106,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(address(ETHST) != address(0), "Failed to create ETHST token");
         Token(ETHST).setStatus(2); // Activate ETHST
         require(Token(ETHST).status() == TokenStatus.ACTIVE, "ETHST token not activated");
-        log("✅ Using custom tokens - USDST: " + string(address(USDST)) + ", ETHST: " + string(address(ETHST)));
+        // log("✅ Using custom tokens - USDST: " + string(address(USDST)) + ", ETHST: " + string(address(ETHST)));
         
         // Grant CDPEngine mint/burn rights on USDST
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(USDST), "mint", address(engine));
@@ -119,7 +119,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Set our newly created USDST token in the registry
         registry.setUSDST(address(USDST));
         require(address(registry.usdst()) == address(USDST), "USDST not set correctly in registry");
-        log("✅ USDST token set in registry: " + string(address(USDST)));
+        // log("✅ USDST token set in registry: " + string(address(USDST)));
         
         // Set initial ETHST price in oracle (needed for CDP operations)
         PriceOracle oracle = m.priceOracle();
@@ -128,10 +128,11 @@ contract Describe_BadDebt_Basic is Authorizable {
         require(oracle.getAssetPrice(ETHST) == ethstPrice, "ETHST price not set correctly");
         
         // Configure ETHST as collateral asset in CDPEngine
-        log("Setting collateral asset params for ETHST...");
+        // log("Setting collateral asset params for ETHST...");
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000, // 150% liquidation ratio (1.5e18)
+            1600000000000000000, // 160% minCollateralRatio - must be >= liquidationRatio
             500, // 5% liquidation penalty (500 bps)
             10000, // 100% close factor (10000 bps)
             1000000000315522921573372069, // ~1% APR stability fee rate
@@ -140,26 +141,26 @@ contract Describe_BadDebt_Basic is Authorizable {
             1e18, // 1e18 unit scale (18 decimals)
             false // not paused
         );
-        log("Collateral asset params set successfully");
+        // log("Collateral asset params set successfully");
         
-        log("✅ CDP system configured with ETHST collateral");
+        // log("✅ CDP system configured with ETHST collateral");
     }
 
     function it_ag_can_deposit_collateral() public {
         CDPVault vault = m.cdpVault();
         PriceOracle oracle = m.priceOracle();
         
-        log("ETHST token address: " + string(address(ETHST)));
+        // log("ETHST token address: " + string(address(ETHST)));
         
         // Set ETHST price to $3,000 (ensure it's set for this test)
         uint ethstPrice = 3000e18; // $3,000 with 18 decimals
-        log("Setting ETHST price to: " + string(ethstPrice / 1e18));
+        // log("Setting ETHST price to: " + string(ethstPrice / 1e18));
         oracle.setAssetPrice(ETHST, ethstPrice);
         
         // Verify price is set
         uint retrievedPrice = oracle.getAssetPrice(ETHST);
-        log("Price set, now checking...");
-        log("Retrieved ETHST price: " + string(retrievedPrice / 1e18));
+        // log("Price set, now checking...");
+        // log("Retrieved ETHST price: " + string(retrievedPrice / 1e18));
         require(retrievedPrice == ethstPrice, "ETHST price not set correctly");
         
         // Mint ETHST tokens to user1
@@ -168,7 +169,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         // User1 approves CDP Vault to spend ETHST
         uint approvalAmount = depositAmount;
-        log("ETHST approval amount: " + string(approvalAmount / 1e18));
+        // log("ETHST approval amount: " + string(approvalAmount / 1e18));
         user1.do(ETHST, "approve", address(vault), approvalAmount);
         
         // User1 deposits ETHST as collateral
@@ -176,22 +177,22 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         // Verify deposit worked
         uint vaultBalance = vault.userCollaterals(address(user1), ETHST);
-        log("Vault ETHST balance: " + string(vaultBalance / 1e18));
+        // log("Vault ETHST balance: " + string(vaultBalance / 1e18));
         require(vaultBalance == depositAmount, "ETHST not deposited correctly");
         
-        log("✅ User1 deposited " + string(depositAmount / 1e18) + " ETHST as collateral (~$30,000 value)");
+        // log("✅ User1 deposited " + string(depositAmount / 1e18) + " ETHST as collateral (~$30,000 value)");
     }
 
     function it_ah_can_borrow_against_collateral() public {
         CDPEngine engine = m.cdpEngine();
         
-        log("CDPEngine address: " + string(address(engine)));
-        log("About to mint USDST against ETHST collateral...");
-        log("ETHST address: " + string(address(ETHST)));
+        // log("CDPEngine address: " + string(address(engine)));
+        // log("About to mint USDST against ETHST collateral...");
+        // log("ETHST address: " + string(address(ETHST)));
         
         // Mint 15,000 USDST against ETHST collateral (safe under 150% liquidation ratio)
         uint mintAmount = 15000e18; // 15,000 USDST
-        log("Amount to mint: " + string(mintAmount / 1e18) + " USDST");
+        // log("Amount to mint: " + string(mintAmount / 1e18) + " USDST");
         
         user1.do(address(engine), "mint", ETHST, mintAmount);
         
@@ -201,16 +202,16 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         // Check collateralization ratio
         uint cr = engine.collateralizationRatio(address(user1), ETHST);
-        log("📊 Collateralization ratio: " + string(cr / 1e16) + "% (healthy)");
+        // log("📊 Collateralization ratio: " + string(cr / 1e16) + "% (healthy)");
         
-        log("✅ User1 minted " + string(mintAmount / 1e18) + " USDST against ETHST collateral");
+        // log("✅ User1 minted " + string(mintAmount / 1e18) + " USDST against ETHST collateral");
     }
 
     function it_ai_can_tank_ethst_price() public {
         PriceOracle oracle = m.priceOracle();
         
         require(address(ETHST) != address(0), "ETHST token not created");
-        log("Tanking ETHST price - ETHST address: " + string(address(ETHST)));
+        // log("Tanking ETHST price - ETHST address: " + string(address(ETHST)));
         
         // Set initial ETHST price to $3,000 (in case it wasn't set earlier)
         uint initialPrice = 3000e18; // $3,000 with 18 decimals
@@ -231,9 +232,9 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Collateral value: 10 ETHST * $100 = $1,000
         // Debt: 15,000 USDST
         // New ratio: $1,000 / $15,000 = 6.67% (severely undercollateralized)
-        log("📉 ETHST price crashed from $3,000 to $100");
-        log("⚠️  Position now severely undercollateralized: $1,000 collateral vs $15,000 debt");
-        log("📊 Collateralization ratio: 6.67% (below 150% liquidation threshold)");
+        // log("📉 ETHST price crashed from $3,000 to $100");
+        // log("⚠️  Position now severely undercollateralized: $1,000 collateral vs $15,000 debt");
+        // log("📊 Collateralization ratio: 6.67% (below 150% liquidation threshold)");
     }
 
     function it_aj_can_liquidate_cdp() public {
@@ -242,7 +243,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         // Check initial reserve balance
         uint initialReserveBalance = IERC20(USDST).balanceOf(address(reserve));
-        log("💰 Initial reserve balance: " + string(initialReserveBalance / 1e18) + " USDST");
+        // log("💰 Initial reserve balance: " + string(initialReserveBalance / 1e18) + " USDST");
         
         // Give user2 USDST for liquidation (mint directly to user2)
         // Use exact amount from setupCDPTest.js - 50,000 USDST (much larger than 15,000 debt)
@@ -258,21 +259,21 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         // Check user2 received ETHST collateral
         uint user2ETHSTBalance = IERC20(ETHST).balanceOf(address(user2));
-        log("⚡ User2 received " + string(user2ETHSTBalance / 1e18) + " ETHST from liquidation");
+        // log("⚡ User2 received " + string(user2ETHSTBalance / 1e18) + " ETHST from liquidation");
         
         // Clean up dust position to create bad debt
         try user2.do(address(engine), "cleanupDustPosition", address(user1), ETHST) {
-            log("✅ Dust position cleaned up - bad debt created");
+            // log("✅ Dust position cleaned up - bad debt created");
         } catch {
-            log("⚠️  Dust cleanup not needed or failed");
+            // log("⚠️  Dust cleanup not needed or failed");
         }
         
         // Check final reserve balance
         uint finalReserveBalance = IERC20(USDST).balanceOf(address(reserve));
-        log("💰 Final reserve balance: " + string(finalReserveBalance / 1e18) + " USDST");
+        // log("💰 Final reserve balance: " + string(finalReserveBalance / 1e18) + " USDST");
         
-        log("✅ Liquidation completed - bad debt should be created");
-        log("📊 Expected bad debt: ~14,000 USDST ($15,000 debt - $1,000 collateral)");
+        // log("✅ Liquidation completed - bad debt should be created");
+        // log("📊 Expected bad debt: ~14,000 USDST ($15,000 debt - $1,000 collateral)");
     }
 
     function it_ak_can_test_junior_notes_system() public {
@@ -280,11 +281,11 @@ contract Describe_BadDebt_Basic is Authorizable {
         CDPReserve reserve = m.cdpReserve();
         
         // Part 1: Configure junior premium (10% as in testJuniorNotes.js)
-        log("🔧 Setting junior premium to 10%...");
+        // log("🔧 Setting junior premium to 10%...");
         engine.setJuniorPremium(1000); // 10% in basis points
         
         // Part 2: Open junior notes from multiple users
-        log("📝 Opening junior notes...");
+        // log("📝 Opening junior notes...");
         
         // Give users USDST for burning in junior notes (mint directly)
         // Match exact amounts from testJuniorNotes.js constants
@@ -294,72 +295,72 @@ contract Describe_BadDebt_Basic is Authorizable {
         // User1 opens note: 2,000 USDST burn → ~2,200 USDST cap (with 10% premium)
         user1.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
         user1.do(address(engine), "openJuniorNote", ETHST, 2000e18); // ACC1_BURN
-        log("✅ User1 opened junior note: 2,000 USDST → ~2,200 USDST cap");
+        // log("✅ User1 opened junior note: 2,000 USDST → ~2,200 USDST cap");
         
         // User2 opens note: 1,500 USDST burn → ~1,650 USDST cap
         user2.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
         user2.do(address(engine), "openJuniorNote", ETHST, 1500e18); // ACC2_BURN
-        log("✅ User2 opened junior note: 1,500 USDST → ~1,650 USDST cap");
+        // log("✅ User2 opened junior note: 1,500 USDST → ~1,650 USDST cap");
         
         // User3 opens note: 500 USDST burn → ~550 USDST cap
         user3.do(USDST, "approve", address(engine), 10000e18); // 10,000 USDST approval (APPROVAL_AMOUNT)
         user3.do(address(engine), "openJuniorNote", ETHST, 500e18); // ACC3_BURN
-        log("✅ User3 opened junior note: 500 USDST → ~550 USDST cap");
+        // log("✅ User3 opened junior note: 500 USDST → ~550 USDST cap");
         
-        log("📊 Total notes outstanding: ~4,400 USDST cap from 4,000 USDST burned");
+        // log("📊 Total notes outstanding: ~4,400 USDST cap from 4,000 USDST burned");
         
         // Part 3: Simulate reserve inflows (as in testJuniorNotes.js)
-        log("💰 Testing reserve inflows & pro-rata recovery...");
+        // log("💰 Testing reserve inflows & pro-rata recovery...");
         
         // Inflow #1: 1,000 USDST to reserve
         Token(USDST).mint(address(this), 1000e18);
         IERC20(USDST).transfer(address(reserve), 1000e18);
-        log("🌊 Inflow #1: Sent 1,000 USDST to reserve");
+        // log("🌊 Inflow #1: Sent 1,000 USDST to reserve");
         
         // Claims after inflow #1
         user1.do(address(engine), "claimJunior");
         user2.do(address(engine), "claimJunior");
         user3.do(address(engine), "claimJunior");
-        log("💸 All users claimed after inflow #1");
+        // log("💸 All users claimed after inflow #1");
         
         // Inflow #2: 700 USDST to reserve
         Token(USDST).mint(address(this), 700e18);
         IERC20(USDST).transfer(address(reserve), 700e18);
-        log("🌊 Inflow #2: Sent 700 USDST to reserve");
+        // log("🌊 Inflow #2: Sent 700 USDST to reserve");
         
         // Only user3 claims (others accumulate)
         user3.do(address(engine), "claimJunior");
-        log("💸 Only User3 claimed after inflow #2");
+        // log("💸 Only User3 claimed after inflow #2");
         
         // Inflow #3: User2 top-up + 2,000 USDST to reserve
         user2.do(USDST, "approve", address(engine), 1000e18);
         user2.do(address(engine), "openJuniorNote", ETHST, 1000e18); // Top-up
-        log("📝 User2 topped up with 1,000 USDST");
+        // log("📝 User2 topped up with 1,000 USDST");
         
         Token(USDST).mint(address(this), 2000e18);
         IERC20(USDST).transfer(address(reserve), 2000e18);
-        log("🌊 Inflow #3: Sent 2,000 USDST to reserve");
+        // log("🌊 Inflow #3: Sent 2,000 USDST to reserve");
         
         // All users claim
         user1.do(address(engine), "claimJunior");
         user2.do(address(engine), "claimJunior");
         user3.do(address(engine), "claimJunior");
-        log("💸 All users claimed after inflow #3");
+        // log("💸 All users claimed after inflow #3");
         
         // Inflow #4: Final flush 300 USDST
         Token(USDST).mint(address(this), 300e18);
         IERC20(USDST).transfer(address(reserve), 300e18);
-        log("🌊 Inflow #4: Final flush 300 USDST");
+        // log("🌊 Inflow #4: Final flush 300 USDST");
         
         // Final claims
         user1.do(address(engine), "claimJunior");
         user2.do(address(engine), "claimJunior");
         user3.do(address(engine), "claimJunior");
-        log("💸 Final claims completed");
+        // log("💸 Final claims completed");
         
-        log("✅ Junior notes system tested successfully");
-        log("📊 Total inflows: 4,000 USDST (1,000 + 700 + 2,000 + 300)");
-        log("🎯 Pro-rata distribution and indexing tested across multiple users");
+        // log("✅ Junior notes system tested successfully");
+        // log("📊 Total inflows: 4,000 USDST (1,000 + 700 + 2,000 + 300)");
+        // log("🎯 Pro-rata distribution and indexing tested across multiple users");
     }
 
     // ========================================
@@ -389,7 +390,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user2.do(USDST, "approve", address(engine), 1000e18);
         user2.do(address(engine), "liquidate", ETHST, address(user4), 100e18);
         
-        log("✅ Bad debt edge case with minimal amounts handled correctly");
+        // log("✅ Bad debt edge case with minimal amounts handled correctly");
     }
 
     function it_bb_can_handle_bad_debt_recovery_edge_cases() public {
@@ -400,7 +401,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         user1.do(USDST, "approve", address(engine), 1e18);
         user1.do(address(engine), "openJuniorNote", ETHST, 1e18);
         
-        log("✅ Bad debt recovery edge case with minimal amounts handled correctly");
+        // log("✅ Bad debt recovery edge case with minimal amounts handled correctly");
     }
 
     function it_bc_can_handle_bad_debt_max_values() public {
@@ -412,9 +413,9 @@ contract Describe_BadDebt_Basic is Authorizable {
         user1.do(USDST, "approve", address(engine), maxAmount);
         
         try user1.do(address(engine), "openJuniorNote", ETHST, maxAmount) {
-            log("✅ Large junior note amount handled correctly");
+            // log("✅ Large junior note amount handled correctly");
         } catch {
-            log("⚠️  Large junior note amount rejected (may be intended)");
+            // log("⚠️  Large junior note amount rejected (may be intended)");
         }
     }
 
@@ -424,7 +425,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Test bad debt calculation precision
         uint badDebt = engine.badDebtUSDST(ETHST);
         require(badDebt >= 0, "Bad debt should be non-negative");
-        log("✅ Bad debt precision calculations handled correctly");
+        // log("✅ Bad debt precision calculations handled correctly");
     }
 
     function it_bf_can_handle_bad_debt_state_transitions() public {
@@ -437,6 +438,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             1000, // 10% penalty
             10000,
             1000000000315522921573372069,
@@ -448,7 +450,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         
         uint finalBadDebt = engine.badDebtUSDST(ETHST);
         require(finalBadDebt == initialBadDebt, "Bad debt should persist across configuration changes");
-        log("✅ Bad debt state transitions handled correctly");
+        // log("✅ Bad debt state transitions handled correctly");
     }
 
     function it_bg_can_handle_bad_debt_integration() public {
@@ -462,6 +464,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         engine.setCollateralAssetParams(
             GOLDST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -483,8 +486,8 @@ contract Describe_BadDebt_Basic is Authorizable {
         Token(GOLDST).mint(address(user5), 10e18);
         user5.do(GOLDST, "approve", address(m.cdpVault()), 10e18);
         user5.do(address(engine), "deposit", GOLDST, 10e18);
-        // Mint safe amount: 10 GOLDST * $2,000 / 1.5 = ~$13,333 USDST (safe under 150% ratio)
-        user5.do(address(engine), "mint", GOLDST, 13000e18);
+        // Mint safe amount: 10 GOLDST * $2,000 / 1.6 = $12,500 USDST (safe under 160% minCollateralRatio)
+        user5.do(address(engine), "mint", GOLDST, 12000e18);
         
         // Crash GOLDST price
         m.priceOracle().setAssetPrice(GOLDST, 100e18);
@@ -492,14 +495,14 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Liquidate GOLDST position
         Token(USDST).mint(address(user2), 20000e18);
         user2.do(USDST, "approve", address(engine), 20000e18);
-        user2.do(address(engine), "liquidate", GOLDST, address(user5), 13000e18);
+        user2.do(address(engine), "liquidate", GOLDST, address(user5), 12000e18);
         
         uint ethstBadDebt = engine.badDebtUSDST(ETHST);
         uint goldstBadDebt = engine.badDebtUSDST(GOLDST);
         
-        log("✅ Bad debt integration across multiple assets handled correctly");
-        log("   ETHST Bad Debt: " + string(ethstBadDebt / 1e18) + " USDST");
-        log("   GOLDST Bad Debt: " + string(goldstBadDebt / 1e18) + " USDST");
+        // log("✅ Bad debt integration across multiple assets handled correctly");
+        // log("   ETHST Bad Debt: " + string(ethstBadDebt / 1e18) + " USDST");
+        // log("   GOLDST Bad Debt: " + string(goldstBadDebt / 1e18) + " USDST");
     }
 
     function it_bh_can_handle_bad_debt_validation() public {
@@ -513,7 +516,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         (address a, uint capUSDST, uint b) = engine.juniorNotes(address(user1));
         require(capUSDST >= 0, "Junior note cap should be non-negative");
         
-        log("✅ Bad debt validation handled correctly");
+        // log("✅ Bad debt validation handled correctly");
     }
 
     function it_bi_can_handle_bad_debt_cleanup() public {
@@ -525,33 +528,33 @@ contract Describe_BadDebt_Basic is Authorizable {
         uint finalReserveBalance = IERC20(USDST).balanceOf(address(reserve));
         uint finalJuniorIndex = engine.juniorIndex();
         
-        log("📊 Final Bad Debt Test State:");
-        log("   Bad Debt: " + string(finalBadDebt / 1e18) + " USDST");
-        log("   Reserve Balance: " + string(finalReserveBalance / 1e18) + " USDST");
-        log("   Junior Index: " + string(finalJuniorIndex));
+        // log("📊 Final Bad Debt Test State:");
+        // log("   Bad Debt: " + string(finalBadDebt / 1e18) + " USDST");
+        // log("   Reserve Balance: " + string(finalReserveBalance / 1e18) + " USDST");
+        // log("   Junior Index: " + string(finalJuniorIndex));
         
         // Verify bad debt system is in consistent state
         require(finalBadDebt >= 0, "Final bad debt should be non-negative");
         require(finalReserveBalance >= 0, "Final reserve balance should be non-negative");
         require(finalJuniorIndex >= 0, "Final junior index should be non-negative");
         
-        log("✅ Bad debt test cleanup and verification completed");
+        // log("✅ Bad debt test cleanup and verification completed");
     }
 
     function it_bj_can_run_bad_debt_test_summary() public {
-        log("🎯 CDP BAD DEBT TEST SUITE COMPLETED");
-        log("📋 Bad Debt Specific Test Coverage:");
-        log("   ✅ Bad Debt Creation (undercollateralized liquidation)");
-        log("   ✅ Junior Notes System (bad debt recovery mechanism)");
-        log("   ✅ Pro-Rata Distribution (fair recovery allocation)");
-        log("   ✅ Bad Debt Edge Cases (minimal amounts, max values)");
-        log("   ✅ Bad Debt Security (malicious prevention)");
-        log("   ✅ Bad Debt Precision (calculation accuracy)");
-        log("   ✅ Bad Debt State Transitions (configuration persistence)");
-        log("   ✅ Bad Debt Integration (multi-asset scenarios)");
-        log("   ✅ Bad Debt Validation (input validation)");
-        log("   ✅ Bad Debt Cleanup (state verification)");
-        log("🚀 CDP Bad Debt Recovery System ready for production!");
+        // log("🎯 CDP BAD DEBT TEST SUITE COMPLETED");
+        // log("📋 Bad Debt Specific Test Coverage:");
+        // log("   ✅ Bad Debt Creation (undercollateralized liquidation)");
+        // log("   ✅ Junior Notes System (bad debt recovery mechanism)");
+        // log("   ✅ Pro-Rata Distribution (fair recovery allocation)");
+        // log("   ✅ Bad Debt Edge Cases (minimal amounts, max values)");
+        // log("   ✅ Bad Debt Security (malicious prevention)");
+        // log("   ✅ Bad Debt Precision (calculation accuracy)");
+        // log("   ✅ Bad Debt State Transitions (configuration persistence)");
+        // log("   ✅ Bad Debt Integration (multi-asset scenarios)");
+        // log("   ✅ Bad Debt Validation (input validation)");
+        // log("   ✅ Bad Debt Cleanup (state verification)");
+        // log("🚀 CDP Bad Debt Recovery System ready for production!");
     }
 
 } 
