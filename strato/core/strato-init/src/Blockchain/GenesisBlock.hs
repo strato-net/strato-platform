@@ -341,7 +341,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           $ lookupSolidDiff ".:originAddress" storageDiff
 
         storageDiff = case storage d of
-          SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
+          SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff $ Map.mapKeys (either (error . ("malformad StoragePath: " ++)) id . parsePath) m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'

@@ -48,21 +48,19 @@ bimapValue f (name', value') = do
   mValue <- valueToSolidityValue value'
   return $ fmap (name,) mValue
 
-decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map B.ByteString BasicValue -> [(T.Text, Value)]
+decodeCacheValuesWith :: (StoragePath -> BasicValue -> Bool) -> M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValuesWith f hxs = either (error . (++ ": " ++ show hxs) . printf "SVM.decodeCacheValuesWith: %s" . show) id $ do
-  let parseM = bimapM parsePath return
-  pathValues <- mapM parseM $ M.toList hxs
-  let pathValues' = filter (uncurry f) pathValues
+  let pathValues' = filter (uncurry f) $ M.toList hxs
   finalState <- bimap show HM.toList $ synthesize pathValues'
   mapM (bimapM bsToText return) finalState
 
-decodeCacheValues :: M.Map B.ByteString BasicValue -> [(T.Text, Value)]
+decodeCacheValues :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValues = decodeCacheValuesWith (const . isBasic)
   where isBasic (StoragePath ([Field _])) = True
         isBasic (StoragePath [Field _, Field fieldBS]) = C8.unpack fieldBS /= "length"
         isBasic _ = False
 
-decodeCacheValuesForCollections :: M.Map B.ByteString BasicValue -> [(T.Text, Value)]
+decodeCacheValuesForCollections :: M.Map StoragePath BasicValue -> [(T.Text, Value)]
 decodeCacheValuesForCollections = decodeCacheValuesWith (\_ _ -> True)
 
 bsToText :: B.ByteString -> Either String T.Text

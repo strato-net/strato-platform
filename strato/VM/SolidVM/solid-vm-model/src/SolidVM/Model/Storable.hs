@@ -134,13 +134,18 @@ formatBasicValueForSQL BDefault = ""
 data StoragePathPiece
   = Field B.ByteString
   | Index B.ByteString
-  deriving (Eq, Show, Generic, NFData, Hashable)
+  deriving (Eq, Ord, Show, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
   format (Field n) = C8.unpack n
   format (Index i) = "[" ++ C8.unpack i ++ "]"
 
-newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Show, Generic, NFData, Hashable)
+instance Binary StoragePathPiece
+
+newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Ord, Show, Generic, NFData, Hashable)
+
+instance IsString StoragePath where
+  fromString = either (error . ("error parsing String to StoragePath" ++)) id . parsePath . C8.pack
 
 instance Format StoragePath where
   format (StoragePath []) = "<empty path>"
@@ -150,6 +155,17 @@ instance Format StoragePath where
       addConditionalDot :: String -> String
       addConditionalDot w@(c1 : _) | isAlpha c1 = "." ++ w
       addConditionalDot w = w
+
+instance JSON.FromJSON StoragePath where
+  parseJSON (JSON.String v) = return $ either (error . ("malformed StoragePath: " ++)) id $ parsePath $ encodeUtf8 v
+  parseJSON v = error $ "wrong format in call to parseJSON for StoragePath: " ++ show v
+
+instance JSON.ToJSONKey StoragePath where
+
+instance JSON.ToJSON StoragePath where
+  toJSON v = JSON.String $ decodeUtf8 $ unparsePath v
+
+instance Binary StoragePath where
 
 empty :: StoragePath
 empty = StoragePath []

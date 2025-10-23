@@ -59,7 +59,6 @@ import qualified Data.Aeson.KeyMap as KM
 import Data.Aeson.Types
 import Data.Binary
 import qualified Data.Bifunctor as BF
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Foldable
 import Data.List
@@ -123,12 +122,12 @@ omapMap :: Ord k => (a -> b) -> OMap.OMap k a -> OMap.OMap k b
 omapMap f omap = OMap.fromList $ map (\(k, a) -> (k, f a)) $ OMap.assocs omap
 
 data DataDiff
-  = SolidVMDiff (Map B.ByteString BasicValue)
+  = SolidVMDiff (Map StoragePath BasicValue)
   deriving (Eq, Show, Generic, NFData)
 
 instance Format DataDiff where
   format (SolidVMDiff vals) =
-    "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap format vals)) ++ "]"
+    "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack (unparsePath k) ++ ", " ++ v ++ ")") (M.toList $ fmap format vals)) ++ "]"
 
 instance Binary DataDiff
 
@@ -144,7 +143,7 @@ parseDiffSolidVM (Object obs) =
     . mapM (sequenceTuple . bimap (f . String) parseJSON)
     $ BF.first DAK.toText <$> KM.toList obs
   where
-    f :: Value -> Parser B.ByteString
+    f :: Value -> Parser StoragePath
     f = parseJSON
 parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 

@@ -919,8 +919,7 @@ initializeAction acct name crtr cc_crtr root appName hsh cc = do
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
-  let key = MS.unparsePath key'
-      ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key val' m
+  let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
