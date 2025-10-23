@@ -415,7 +415,7 @@ genesisBlock = genesisBlockTemplate heliumConfig
 genesisBlockTemplate :: HeliumGenesisBlockConfig -> GenesisInfo
 genesisBlockTemplate HeliumGenesisBlockConfig{..} =
   insertMercataGovernanceContract hgbc_validators hgbc_admins
-  . insertUserRegistryContract []
+  . insertUserRegistryContract
   . insertDecideContract
   $ defaultGenesisInfo{
         genesisInfoDifficulty=8192,
