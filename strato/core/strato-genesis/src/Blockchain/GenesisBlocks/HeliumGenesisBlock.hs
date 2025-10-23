@@ -42,13 +42,10 @@ import           SolidVM.Model.Storable
 import           System.FilePath                                 (takeFileName)
 
 embeddedFiles :: [(FilePath, B.ByteString)]
-embeddedFiles = $(typecheckAndEmbedDir "resources" $ Just mercataContractFiles)
-
-fileMap :: M.Map FilePath B.ByteString
-fileMap = M.fromList embeddedFiles
+embeddedFiles = $(typecheckAndEmbedFiles "resources" mercataContractFiles)
 
 mercataContracts :: [[String]]
-mercataContracts=map (\filename -> [takeFileName filename, BC.unpack $ fromMaybe (error $ "internal error finding source code in genesis resources: " ++ show filename) $ M.lookup filename fileMap]) mercataContractFiles
+mercataContracts = map (\(fp, bs) -> [takeFileName fp, T.unpack $ decodeUtf8 bs]) embeddedFiles
 
 data BridgeChainInfo = BridgeChainInfo
   { bci_chainId :: Integer
@@ -414,7 +411,7 @@ genesisBlock = genesisBlockTemplate heliumConfig
 
 genesisBlockTemplate :: HeliumGenesisBlockConfig -> GenesisInfo
 genesisBlockTemplate HeliumGenesisBlockConfig{..} =
-  insertMercataGovernanceContract hgbc_validators hgbc_admins
+  insertMercataGovernanceContract adminRegistryAddress hgbc_validators [adminRegistryAddress]
   . insertUserRegistryContract
   . insertDecideContract
   $ defaultGenesisInfo{
@@ -481,7 +478,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             , mercataBridge hgbc_chainInfos hgbc_assetInfos
             , poolFactory
             , tokenFactory
-            , adminRegistry
+            , adminRegistry hgbc_admins
             , feeCollector
             , voucher
             , mToken
@@ -796,13 +793,11 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths 
   ++ ((\GA.Asset{..} -> (".isFactoryToken[" <> addrBS root <> "]", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(9 :: Integer)..] GA.assets)
 
-adminRegistry :: AccountInfo
-adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
-  ++ [ (".adminMap[" <> addrBS blockappsAddress <> "]", BInteger 1)
-     , (".logicContract", BAccount $ unspecifiedChain adminRegistryImplAddress)
+adminRegistry :: [Address] -> AccountInfo
+adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
+  ++ [ (".logicContract", BAccount $ unspecifiedChain adminRegistryImplAddress)
      , (".defaultVotingThresholdBps", BInteger 6000)
-     , (".admins[0]", BAccount $ unspecifiedChain blockappsAddress)
-     , (".admins.length", BInteger 1)
+     , (".admins.length", BInteger . fromIntegral $ length adminList)
      , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS bridgeRelayerAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS mTokenAddress <> "][mint][" <> addrBS liquidityPoolAddress <> "]", BBool True)
@@ -822,6 +817,10 @@ adminRegistry = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPath
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setAllComponents][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS cataAddress <> "][mint][" <> addrBS rewardsChefAddress <> "]", BBool True)
      ]
+  ++ concatMap (\(i, adminAddress) ->
+     [ (".admins[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain adminAddress)
+     , (".adminMap[" <> addrBS adminAddress <> "]", BInteger $ i + 1)
+     ]) (zip [0..] adminList)
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
          then [ (".whitelist[" <> addrBS root <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)

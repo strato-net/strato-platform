@@ -11,7 +11,6 @@ where
 
 import Blockchain.Data.GenesisInfo
 import Blockchain.Strato.Model.Account
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Validator (Validator(..))
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -20,7 +19,7 @@ import SolidVM.Model.Storable hiding (size)
 
 readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = concat . flip map (genesisInfoAccountInfo gi) $ \case
-  SolidVMContractWithStorage _ _ (SolidVMCode "MercataGovernance" _) storage ->
+  SolidVMContractWithStorage 0x100 _ _ storage ->
     let storageMap = M.fromList storage
      in case M.lookup ".validators.length" storageMap of
           Just (BInteger l) -> mapMaybe (\i -> case M.lookup (fromString $ ".validators[" ++ show i ++ "]") storageMap of
