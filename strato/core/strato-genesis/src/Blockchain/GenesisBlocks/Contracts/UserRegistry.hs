@@ -10,7 +10,6 @@ import Blockchain.GenesisBlocks.Contracts.TH
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Data.ByteString (ByteString)
-import Data.String
 import Data.Text.Encoding
 
 
@@ -19,20 +18,12 @@ import Data.Text.Encoding
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
   gi
-    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct, rootAcct],
+    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct],
       genesisInfoCodeInfo = initialCode ++ [CodeInfo (decodeUtf8 userRegistryContract) (Just "UserRegistry")]
     }
   where
     initialAccounts = genesisInfoAccountInfo gi
     initialCode = genesisInfoCodeInfo gi
-
-    rootAcct =
-      SolidVMContractWithStorage
-        0x840a84f572cff5b12c8ed176565e86f10d3b820e -- TODO: Remove. This is just for current genesis block compatibility
-        123
-        (SolidVMCode "User" (KECCAK256.hash userRegistryContract))
-        [ (".commonName", fromString "Admin")
-        ]
 
     registryAcct =
       SolidVMContractWithStorage
