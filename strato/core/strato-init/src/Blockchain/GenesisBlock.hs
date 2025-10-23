@@ -29,7 +29,6 @@ import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
 import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
@@ -334,16 +333,15 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
         mkCreator =
             (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
-          . rlpDecode
-          . rlpDeserialize =<< lookupSolidDiff ".:creator" storageDiff
+          =<< lookupSolidDiff ".:creator" storageDiff
 
         mkOriginAddress =
             (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "")
-          . maybe BDefault (rlpDecode . rlpDeserialize)
+          . maybe BDefault id
           $ lookupSolidDiff ".:originAddress" storageDiff
 
         storageDiff = case storage d of
-          SolidVMDiff m -> A.SolidVMDiff $ Map.map (rlpSerialize . rlpEncode . fromDiff) m
+          SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'

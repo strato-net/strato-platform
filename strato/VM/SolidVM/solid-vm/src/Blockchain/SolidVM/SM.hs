@@ -67,7 +67,6 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
@@ -921,8 +920,7 @@ initializeAction acct name crtr cc_crtr root appName hsh cc = do
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
   let key = MS.unparsePath key'
-      val = rlpSerialize $ rlpEncode val'
-      ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key val m
+      ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key val' m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 

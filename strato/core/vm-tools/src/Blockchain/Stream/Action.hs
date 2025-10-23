@@ -44,7 +44,6 @@ module Blockchain.Stream.Action (
 
   ) where
 
-import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
@@ -75,8 +74,6 @@ import Data.Time
 import GHC.Generics
 import SolidVM.Model.CodeCollection (CodeCollection)
 import SolidVM.Model.Storable hiding (toList)
-import Test.QuickCheck
-import Test.QuickCheck.Arbitrary.Generic
 import Test.QuickCheck.Instances ()
 import Text.Format
 import Text.Tools
@@ -126,12 +123,12 @@ omapMap :: Ord k => (a -> b) -> OMap.OMap k a -> OMap.OMap k b
 omapMap f omap = OMap.fromList $ map (\(k, a) -> (k, f a)) $ OMap.assocs omap
 
 data DataDiff
-  = SolidVMDiff (Map B.ByteString B.ByteString)
+  = SolidVMDiff (Map B.ByteString BasicValue)
   deriving (Eq, Show, Generic, NFData)
 
 instance Format DataDiff where
   format (SolidVMDiff vals) =
-    "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap (format . rlpDecode @BasicValue . rlpDeserialize) vals)) ++ "]"
+    "SolidVMDiff [" ++ intercalate ", " (map (\(k, v) -> "(" ++ BC.unpack k ++ ", " ++ v ++ ")") (M.toList $ fmap format vals)) ++ "]"
 
 instance Binary DataDiff
 
@@ -144,7 +141,7 @@ sequenceTuple = uncurry (liftM2 (,))
 parseDiffSolidVM :: Value -> Parser DataDiff
 parseDiffSolidVM (Object obs) =
   fmap (SolidVMDiff . M.fromList)
-    . mapM (sequenceTuple . bimap (f . String) f)
+    . mapM (sequenceTuple . bimap (f . String) parseJSON)
     $ BF.first DAK.toText <$> KM.toList obs
   where
     f :: Value -> Parser B.ByteString
@@ -379,7 +376,7 @@ instance FromJSON Action where
 {-
 instance Arbitrary CallData where
   arbitrary = genericArbitrary
--}
+
 instance Arbitrary DataDiff where
   arbitrary = genericArbitrary
 
@@ -396,4 +393,4 @@ instance (Ord k, Arbitrary k, Arbitrary v) => Arbitrary (OMap.OMap k v) where
     arbitrary = do
         kvPairs <- listOf arbitrary -- Generate a list of key-value pairs
         return $ OMap.fromList kvPairs -- Convert list to OMap
-
+-}
