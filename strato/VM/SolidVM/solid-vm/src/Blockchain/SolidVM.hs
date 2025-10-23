@@ -440,7 +440,7 @@ call' ::
   m ((SolidString, SolidString), Maybe Value)
 call' from to' fnCalltype functionName valList = do
   (isExternal, storageAddress, codeAddress) <- case fnCalltype of
-    CC.DelegateCall -> return (False, from, to')
+    CC.DelegateCall -> return (True, from, to')
     CC.RawCall -> return (True, to', to')
     _ -> (from /= to', to',) <$> do
       if from == to'
@@ -450,6 +450,7 @@ call' from to' fnCalltype functionName valList = do
             Just callInfo -> pure $ currentCodeAddress callInfo
             _ -> pure to'
         else pure to'
+  let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
   (toName, parentName) <- do
     ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) storageAddress
@@ -514,7 +515,7 @@ call' from to' fnCalltype functionName valList = do
         let ro = case mCallInfo of
               Nothing -> False
               Just ci -> readOnly ci
-        pure . bool id (pushSender from) isExternal $
+        pure . bool id (pushSender from) shouldPushSender $
           runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction valList ro False
       -- Handles .call() and .delegatecall() logic
       (Just theFunction, _) -> do
@@ -527,7 +528,7 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
-            pure . bool id (pushSender from) isExternal $
+            pure . bool id (pushSender from) shouldPushSender $
               runTheCall storageAddress codeAddress contract functionName' hsh cc theFunction' valList' ro False
           _ -> case M.lookup "fallback" functionsIncludingConstructor of
             Just fallbackFunc -> do
@@ -535,7 +536,7 @@ call' from to' fnCalltype functionName valList = do
               let ro = case mCallInfo of
                     Nothing -> False
                     Just ci -> readOnly ci
-              pure . bool id (pushSender from) isExternal $
+              pure . bool id (pushSender from) shouldPushSender $
                 runTheCall storageAddress codeAddress contract functionName' hsh cc fallbackFunc valList ro False
             _ -> unknownFunction "logFunctionCall" (functionName, valList) -- contract ^. CC.contractName)
       -- Maybe the function is actually a getter
@@ -598,7 +599,7 @@ call' from to' fnCalltype functionName valList = do
             let ro = case mCallInfo of
                   Nothing -> False
                   Just ci -> readOnly ci
-            pure . bool id (pushSender from) isExternal $
+            pure . bool id (pushSender from) shouldPushSender $
               runTheCall storageAddress codeAddress contract functionName hsh cc fallbackFunc valList ro False
           _ -> unknownFunction "logFunctionCall" (functionName, "asdf5" :: String) -- ^. CC.contractName)
 

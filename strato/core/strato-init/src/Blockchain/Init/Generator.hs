@@ -47,8 +47,9 @@ createGenesisInfo :: MonadIO m => String -> m ()
 createGenesisInfo network = do
   let genesisInfo = 
         case network of
-          "upquark" -> HELIUM.genesisBlockTemplate upquarkValidators HELIUM.admins
-            where upquarkValidators = -- TODO: move this to a more logical place
+          "upquark" -> HELIUM.genesisBlockTemplate config
+            where config = HELIUM.HeliumGenesisBlockConfig upquarkValidators HELIUM.admins [] []
+                  upquarkValidators = -- TODO: move this to a more logical place
                     [ Validator 0x2e8462e383a1d516cfbf13d7cf4826ce77b4b91e
                     , Validator 0x3e7b7d721cf9a4ec9f7c87a6c02572bb7ef1bbf4
                     , Validator 0x4d8cb07af178cb10db093abea710b73179a5dd16
