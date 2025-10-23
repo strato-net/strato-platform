@@ -44,11 +44,6 @@ const CastVoteModal: React.FC<CastVoteModalProps> = ({
       onOpenChange(false);
     } catch (err) {
       console.error('Cast vote failed:', err);
-      toast({
-        title: 'Failed to cast vote',
-        description: err instanceof Error ? err.message : 'Please try again.',
-        variant: 'destructive',
-      });
     } finally {
       setIsSubmitting(false);
     }
