@@ -533,6 +533,7 @@ contract record MercataBridge is Ownable {
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
+        require(externalRecipient != address(0), "MB: zero recipient");
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
         require(tokenFactory.isTokenActive(a.stratoToken), "MB: inactive token");
 
