@@ -666,7 +666,6 @@ extractCodeCollectionAddedMessages a =
               then Just _actionDataCreator
               else Nothing
           cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-          abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
           contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
                                             --  . (constructor .~ Nothing)
                                              . (modifiers .~ M.empty)
@@ -677,8 +676,7 @@ extractCodeCollectionAddedMessages a =
               { codeCollection = const () <$> cc',
                 codePtr = cp,
                 creator = cn,
-                application = n,
-                abstracts = abstracts'
+                application = n
               }
     _ -> Nothing
 

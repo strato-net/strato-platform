@@ -67,7 +67,6 @@ import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
@@ -127,7 +126,7 @@ data CallInfo = CallInfo
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
-    storageMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    storageMap :: !(M.Map (Address, B.ByteString) MS.BasicValue),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,
@@ -174,8 +173,6 @@ type MonadSM m =
     HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
     HasSelectX509CertDB m,
-    HasSelectX509FieldDB m,
-    A.Selectable (Address, T.Text) X509CertificateField m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
@@ -384,9 +381,6 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   delete p = lift . A.delete p
 
 instance (Address `A.Selectable` X509Certificate) m => (Address `A.Selectable` X509Certificate) (SM m) where
-  select p k = lift $ A.select p k
-
-instance ((Address, T.Text) `A.Selectable` X509CertificateField) m => ((Address, T.Text) `A.Selectable` X509CertificateField) (SM m) where
   select p k = lift $ A.select p k
 
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
@@ -917,20 +911,15 @@ initializeAction :: MonadSM m
                  -> String
                  -> Keccak256
                  -> CC.CodeCollection
-                 -> Map (Address, T.Text) (T.Text, T.Text, [T.Text])
                  -> m ()
-initializeAction acct name crtr cc_crtr root appName hsh cc ab = do
-  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty) ab []
+initializeAction acct name crtr cc_crtr root appName hsh cc = do
+  let newData = Action.ActionData (SolidVMCode name hsh) cc (T.pack crtr) (fmap T.pack cc_crtr) (T.pack root) (T.pack appName) (Action.SolidVMDiff M.empty)
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
 
 markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
 markDiffForAction owner key' val' = do
-  let key = MS.unparsePath key'
-      val = rlpSerialize $ rlpEncode val'
-      ins = \case
-        Action.SolidVMDiff m -> Action.SolidVMDiff $ M.insert key val m
-        e -> internalError "SolidVM Diff executing in EVM" $ show e
+  let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 

@@ -19,10 +19,10 @@ import           Data.ByteString                   (ByteString)
 import           Data.Map                          (Map)
 import qualified Data.Map                          as Map
 import           Data.Maybe
-import qualified Data.Text as Text
-import Data.Text.Encoding
-import SolidVM.Model.Storable hiding (size)
-import Text.Printf
+import           Data.String
+import           Data.Text.Encoding
+import           SolidVM.Model.Storable hiding (size)
+import           Text.Printf
 
 adminRegistryAddress :: Address
 adminRegistryAddress = 0x100c
@@ -60,10 +60,10 @@ insertMercataGovernanceContract validators admins gi =
           ++ concatMap
             ( \case
                 (i, Validator c) ->
-                  [ ( encodeUtf8 $ ".validatorMap[" <> Text.pack (printf "%040x" c) <> "]"
+                  [ ( fromString $ ".validatorMap[" ++ printf "%040x" c ++ "]"
                     , BInteger $ i + 1
                     )
-                  , ( encodeUtf8 $ ".validators[" <> Text.pack (show i) <> "]"
+                  , ( fromString $ ".validators[" ++ show i ++ "]"
                     , BAccount (NamedAccount c UnspecifiedChain)
                     )
                   ]
@@ -72,10 +72,10 @@ insertMercataGovernanceContract validators admins gi =
           ++ concatMap
             ( \case
                 (i, c) ->
-                  [ ( encodeUtf8 $ ".adminMap[" <> Text.pack (printf "%040x" c) <> "]"
+                  [ ( fromString $ ".adminMap[" ++ printf "%040x" c ++ "]"
                     , BInteger $ i + 1
                     )
-                  , ( encodeUtf8 $ ".admins[" <> Text.pack (show i) <> "]"
+                  , ( fromString $ ".admins[" ++ show i ++ "]"
                     , BAccount (NamedAccount c UnspecifiedChain)
                     )
                   ]
