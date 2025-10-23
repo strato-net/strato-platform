@@ -19,7 +19,6 @@ import qualified Blockchain.GenesisBlocks.Instances.GenesisEscrows as GE
 import qualified Blockchain.GenesisBlocks.Instances.GenesisReserves as GR
 import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.CodePtr
 import           Blockchain.Strato.Model.Event
 import qualified Blockchain.Strato.Model.Keccak256               as KECCAK256
 import           Blockchain.Strato.Model.Validator
