@@ -53,10 +53,7 @@ contract DepositRouter is
         address indexed stratoAddress,
         uint96 depositId
     );
-    event TokenConfigUpdated(
-        address indexed token,
-        uint256 minAmount
-    );
+    event TokenConfigUpdated(address indexed token, uint256 minAmount);
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -86,8 +83,7 @@ contract DepositRouter is
         address stratoAddress,
         uint256 nonce,
         uint256 deadline,
-        bytes calldata signature,
-        bool mint
+        bytes calldata signature
     ) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
         if (token == address(0)) revert UseDepositETH();
@@ -172,11 +168,10 @@ contract DepositRouter is
 
     function batchUpdateTokens(
         address[] calldata tokens,
-        uint96[] calldata minAmounts,
+        uint96[] calldata minAmounts
     ) external onlyOwner {
         uint256 len = tokens.length;
-        if (len != minAmounts.length)
-            revert ArrayLengthMismatch();
+        if (len != minAmounts.length) revert ArrayLengthMismatch();
 
         for (uint256 i; i < len; ) {
             address t = tokens[i];
