@@ -106,7 +106,7 @@ import qualified LabeledError
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
-import qualified Numeric (readHex)
+import qualified Numeric (readHex, showHex)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -2166,6 +2166,8 @@ callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "string" [SString s] = return $ SString s
 callBuiltin "string" [SAccount a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i
+callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ show i
+callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ Numeric.showHex i ""
 callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
