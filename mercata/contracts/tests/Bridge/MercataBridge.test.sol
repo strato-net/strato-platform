@@ -1120,4 +1120,35 @@ contract Describe_MercataBridge is Authorizable {
         (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, txHash);
         require(status == BridgeStatus.INITIATED, "Deposit should be initiated");
     }
+
+    // ============ HASH NORMALIZATION SECURITY TESTS ============
+
+    function it_bridge_prevents_case_variation_replay_attack() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+
+        // First deposit with lowercase hash
+        bridge.deposit(externalChainId, externalSender, address(0x5555), "0xabcdef1234", recipient, amount);
+        
+        // Attempt replay with uppercase hash (should fail)
+        bool reverted = false;
+        try {
+            bridge.deposit(externalChainId, externalSender, address(0x5555), "0xABCDEF1234", recipient, amount);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should prevent case variation replay");
+    }
+
+    function it_bridge_normalizes_transaction_hashes() {
+        uint256 amount = 1000e18;
+        address recipient = address(0xCCCC);
+
+        // Deposit with mixed case hash
+        bridge.deposit(externalChainId, externalSender, address(0x5555), "0xAbCdEf1234", recipient, amount);
+        
+        // Verify stored as lowercase
+        (BridgeStatus status,,,,,,) = bridge.deposits(externalChainId, "0xabcdef1234");
+        require(status == BridgeStatus.INITIATED, "Should normalize to lowercase");
+    }
 }

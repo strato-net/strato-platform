@@ -325,6 +325,9 @@ contract record MercataBridge is Ownable {
         onlyRelayer
         whenDepositsOpen
     {
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        string normalizedTxHash = string(uint(externalTxHash, 16), 16);
+        
         AssetInfo a = assets[externalToken][externalChainId];
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
@@ -333,9 +336,9 @@ contract record MercataBridge is Ownable {
         require(tokenFactory.isTokenActive(a.stratoToken), "MB: inactive token");
 
         // replay protection on composite key
-        require(deposits[externalChainId][externalTxHash].bridgeStatus == BridgeStatus.NONE,"MB: dup key");
+        require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE,"MB: dup key");
 
-        deposits[externalChainId][externalTxHash] = DepositInfo(
+        deposits[externalChainId][normalizedTxHash] = DepositInfo(
             BridgeStatus.INITIATED,
             externalSender,
             externalToken,
@@ -346,7 +349,7 @@ contract record MercataBridge is Ownable {
         );
 
         emit DepositInitiated(
-            externalChainId, externalSender, externalTxHash, stratoRecipient, a.stratoToken, stratoTokenAmount
+            externalChainId, externalSender, normalizedTxHash, stratoRecipient, a.stratoToken, stratoTokenAmount
         );
     }
     
@@ -394,13 +397,16 @@ contract record MercataBridge is Ownable {
         onlyRelayer
         whenDepositsOpen
     {
-        DepositInfo d = deposits[externalChainId][externalTxHash];
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        string normalizedTxHash = string(uint(externalTxHash, 16), 16);
+        
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         Token(d.stratoToken).mint(d.stratoRecipient, d.stratoTokenAmount);
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
-        emit DepositCompleted(externalChainId, externalTxHash);
+        emit DepositCompleted(externalChainId, normalizedTxHash);
     }
 
     // ──────────────────────── BATCH: confirmDeposit ────────────────────────
@@ -431,11 +437,14 @@ contract record MercataBridge is Ownable {
         onlyRelayer
         whenDepositsOpen
     {
-        DepositInfo d = deposits[externalChainId][externalTxHash];
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        string normalizedTxHash = string(uint(externalTxHash, 16), 16);
+        
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
-        emit DepositPendingReview(externalChainId, externalTxHash);
+        emit DepositPendingReview(externalChainId, normalizedTxHash);
     }
 
     // ──────────────────────── BATCH: reviewDeposit ────────────────────────
