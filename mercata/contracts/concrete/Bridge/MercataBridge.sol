@@ -56,6 +56,7 @@ contract record MercataBridge is Ownable {
 
     struct WithdrawalInfo {
         BridgeStatus bridgeStatus; // NONE / INITIATED / PENDING_REVIEW / ...
+        string custodyTxHash;     // Hash of the custody transaction (set when confirmed)
         uint256 externalChainId;   // Chain where Custody resides
         address externalRecipient; // External chain recipient
         address externalToken;     // External token to receive
@@ -500,6 +501,7 @@ contract record MercataBridge is Ownable {
 
         withdrawals[id] = WithdrawalInfo(
             BridgeStatus.INITIATED,
+            "",
             externalChainId,
             externalRecipient,
             externalToken,
@@ -529,6 +531,7 @@ contract record MercataBridge is Ownable {
 
         w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         w.timestamp = block.timestamp;
+        w.custodyTxHash = custodyTxHash;
         emit WithdrawalPending(id, custodyTxHash);
     }
 

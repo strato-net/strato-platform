@@ -72,6 +72,7 @@ contract Describe_MercataBridge is Authorizable {
 
     struct WithdrawalInfo {
         BridgeStatus bridgeStatus; // NONE / INITIATED / PENDING_REVIEW / ...
+        string custodyTxHash;     // Hash of the custody transaction (set when confirmed)
         uint256 externalChainId;   // Chain where Custody resides
         address externalRecipient; // External chain recipient
         address externalToken;     // External token to receive
@@ -578,7 +579,7 @@ contract Describe_MercataBridge is Authorizable {
         require(withdrawalId == 1, "Withdrawal ID should be 1");
         require(bridge.withdrawalCounter() == 1, "Withdrawal counter should be 1");
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(withdrawalToken), "Token should be set");
     }
 
@@ -594,7 +595,7 @@ contract Describe_MercataBridge is Authorizable {
         uint256 withdrawalId = user1.do(address(bridge), "requestWithdrawal", externalChainId, recipient, address(0x6666), amount);
         require(withdrawalId == 1, "Withdrawal ID should be 1");
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(usdstToken), "Token should be set");
     }
 
@@ -611,7 +612,7 @@ contract Describe_MercataBridge is Authorizable {
         // Confirm withdrawal
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -629,7 +630,7 @@ contract Describe_MercataBridge is Authorizable {
         bridge.confirmWithdrawal(withdrawalId, custodyTxHash);
         bridge.finaliseWithdrawal(withdrawalId, custodyTxHash);
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -651,7 +652,7 @@ contract Describe_MercataBridge is Authorizable {
         }
         require(reverted, "Should revert due to 48h wait period");
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -667,7 +668,7 @@ contract Describe_MercataBridge is Authorizable {
         // Abort by relayer (should succeed)
         bridge.abortWithdrawal(withdrawalId);
 
-        (,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
+        (,,,,,,, address stratoToken,,) = bridge.withdrawals(withdrawalId);
         require(stratoToken == address(testToken), "Token should be set");
     }
 
@@ -696,8 +697,8 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.confirmWithdrawalBatch(ids, txHashes);
 
-        (,,,,,, address stratoToken1,,) = bridge.withdrawals(withdrawalId1);
-        (,,,,,, address stratoToken2,,) = bridge.withdrawals(withdrawalId2); 
+        (,,,,,,, address stratoToken1,,) = bridge.withdrawals(withdrawalId1);
+        (,,,,,,, address stratoToken2,,) = bridge.withdrawals(withdrawalId2); 
         require(stratoToken1 == address(testToken), "First withdrawal token should be set");
         require(stratoToken2 == address(usdstToken), "Second withdrawal token should be set");
     }
@@ -723,7 +724,7 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.finaliseWithdrawalBatch(ids, txHashes);
 
-        (BridgeStatus bridgeStatus,,,,,,,,) = bridge.withdrawals(withdrawalId);
+        (BridgeStatus bridgeStatus,,,,,,,,,) = bridge.withdrawals(withdrawalId);
         require(bridgeStatus == BridgeStatus.COMPLETED, "Status should be COMPLETED");
     }
 
@@ -748,8 +749,8 @@ contract Describe_MercataBridge is Authorizable {
 
         bridge.abortWithdrawalBatch(ids);
 
-        (BridgeStatus bridgeStatus,,,,,,,,) = bridge.withdrawals(withdrawalId1);
-        (BridgeStatus bridgeStatus2,,,,,,,,) = bridge.withdrawals(withdrawalId2);
+        (BridgeStatus bridgeStatus,,,,,,,,,) = bridge.withdrawals(withdrawalId1);
+        (BridgeStatus bridgeStatus2,,,,,,,,,) = bridge.withdrawals(withdrawalId2);
         require(bridgeStatus == BridgeStatus.ABORTED, "First withdrawal should be ABORTED");
         require(bridgeStatus2 == BridgeStatus.ABORTED, "Second withdrawal should be ABORTED");
     }
