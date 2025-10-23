@@ -30,11 +30,6 @@ contract DepositRouter is
     error NotPermitted();
     error InvalidPermissions();
 
-    // ============ Constants ============
-    uint8 constant PERMISSION_WRAP = 1; // 0b01
-    uint8 constant PERMISSION_MINT = 2; // 0b10
-    uint8 constant PERMISSION_MASK = PERMISSION_WRAP | PERMISSION_MINT;
-
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
     // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
@@ -48,7 +43,6 @@ contract DepositRouter is
     // ============ Structs ============
     struct TokenConfig {
         uint96 min;
-        uint8 permissions; // bitmask: WRAP/MINT, 0 = disabled
     }
 
     // ============ Events ============
@@ -57,13 +51,11 @@ contract DepositRouter is
         uint256 amount,
         address indexed sender,
         address indexed stratoAddress,
-        uint96 depositId,
-        bool mint // true = Mint, false = Wrap
+        uint96 depositId
     );
     event TokenConfigUpdated(
         address indexed token,
-        uint256 minAmount,
-        uint8 permissions
+        uint256 minAmount
     );
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
@@ -104,8 +96,6 @@ contract DepositRouter is
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) revert BelowMinimum();
-        if ((c.permissions & (mint ? PERMISSION_MINT : PERMISSION_WRAP)) == 0)
-            revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -139,8 +129,7 @@ contract DepositRouter is
             depositedAmount,
             msg.sender,
             stratoAddress,
-            depositId,
-            mint
+            depositId
         );
     }
 
@@ -153,7 +142,6 @@ contract DepositRouter is
 
         TokenConfig storage c = tokenConfig[address(0)];
         if (msg.value < c.min) revert BelowMinimum();
-        if ((c.permissions & PERMISSION_WRAP) == 0) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -168,8 +156,7 @@ contract DepositRouter is
             msg.value,
             msg.sender,
             stratoAddress,
-            depositId,
-            false
+            depositId
         );
     }
 
@@ -180,47 +167,23 @@ contract DepositRouter is
         TokenConfig storage c = tokenConfig[token];
         if (c.min == minAmount) return;
         c.min = minAmount;
-        emit TokenConfigUpdated(token, minAmount, c.permissions);
-    }
-
-    function setTokenPermissions(
-        address token,
-        uint8 permissions
-    ) external onlyOwner {
-        if (
-            (permissions & ~PERMISSION_MASK) != 0 ||
-            (token == address(0) && (permissions & PERMISSION_MINT) != 0)
-        ) revert InvalidPermissions();
-        TokenConfig storage c = tokenConfig[token];
-        if (c.permissions == permissions) return;
-        c.permissions = permissions;
-        emit TokenConfigUpdated(token, c.min, permissions);
+        emit TokenConfigUpdated(token, minAmount);
     }
 
     function batchUpdateTokens(
         address[] calldata tokens,
         uint96[] calldata minAmounts,
-        uint8[] calldata permissions
     ) external onlyOwner {
         uint256 len = tokens.length;
-        if (len != minAmounts.length || len != permissions.length)
+        if (len != minAmounts.length)
             revert ArrayLengthMismatch();
 
         for (uint256 i; i < len; ) {
             address t = tokens[i];
             uint96 m = minAmounts[i];
-            uint8 p = permissions[i];
-
-            if (
-                (p & ~PERMISSION_MASK) != 0 ||
-                (t == address(0) && (p & PERMISSION_MINT) != 0)
-            ) revert InvalidPermissions();
-
             TokenConfig storage c = tokenConfig[t];
             c.min = m;
-            c.permissions = p;
-
-            emit TokenConfigUpdated(t, m, p);
+            emit TokenConfigUpdated(t, m);
             unchecked {
                 ++i;
             }
@@ -245,18 +208,13 @@ contract DepositRouter is
 
     function canDeposit(
         address token,
-        uint256 amount,
-        bool mint
+        uint256 amount
     ) external view returns (bool) {
         if (amount == 0 || paused()) return false;
-        if (token == address(0) && mint) return false; // ETH cannot mint
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) return false;
-
-        uint8 need = mint ? PERMISSION_MINT : PERMISSION_WRAP;
-        uint8 perms = c.permissions;
-        return (perms & need) != 0;
+        return true;
     }
 
     function version() external pure virtual returns (string memory) {
