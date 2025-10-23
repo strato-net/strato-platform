@@ -6,8 +6,6 @@ import {
 } from 'redux-saga/effects';
 import { expectSaga } from 'redux-saga-test-plan';
 import {
-  FETCH_CHAINS_REQUEST,
-  FETCH_CHAIN_IDS_REQUEST,
   FETCH_CHAIN_DETAIL_REQUEST,
   fetchChainsSuccess,
   fetchChainsFailure,
@@ -36,8 +34,6 @@ describe('Chains: saga', () => {
   test('watch chains', () => {
     const gen = watchFetchChains();
     const match = [
-      takeLatest(FETCH_CHAINS_REQUEST, getChains),
-      takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
       takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail),
       takeEvery(FETCH_SELECT_CHAIN_DETAIL_REQUEST, getChainDetailSelect)
     ]
