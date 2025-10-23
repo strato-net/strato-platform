@@ -150,10 +150,10 @@ contract Describe_MercataBridge is Authorizable {
         // AdminRegistry is already the owner of tokens, no need to transfer
 
         // Whitelist bridge for mint and burn functions
-        Token(address(testToken)).addWhitelist(address(adminRegistry), "mint", address(bridge));
-        Token(address(testToken)).addWhitelist(address(adminRegistry), "burn", address(bridge));
-        Token(address(usdstToken)).addWhitelist(address(adminRegistry), "mint", address(bridge));
-        Token(address(usdstToken)).addWhitelist(address(adminRegistry), "burn", address(bridge));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(testToken), "mint", address(bridge));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(testToken), "burn", address(bridge));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "mint", address(bridge));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(usdstToken), "burn", address(bridge));
 
         // Set up chain
         bridge.setChain(externalChainId, custody, depositRouter, 1000, true, chainName);

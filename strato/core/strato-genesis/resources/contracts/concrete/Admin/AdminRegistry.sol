@@ -13,6 +13,8 @@ contract record AdminRegistry is Ownable {
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
 
+    uint public defaultVotingThresholdBps = 6000; // 3/5
+
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
     event IssueExecuted(address sender, address executor, string issueId, address target, string func, variadic args);
@@ -28,6 +30,7 @@ contract record AdminRegistry is Ownable {
     constructor() Ownable(this) { }
 
     function initialize(address[] _initialAdmins) external onlyOnce {
+        defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
             admins.push(_initialAdmins[i]);
@@ -85,15 +88,7 @@ contract record AdminRegistry is Ownable {
                 return (false, issueId);
             }
         } else {
-            try {
-                if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
-                    string issueId = _getIssueId(_target, _func, _args);
-                    variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-                    return (true, ret);
-                }
-            } catch {
-
-            }
+            // Non-admin path: only execute if whitelisted
             address sender = msg.sender;
             address target = _target;
             require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
@@ -109,12 +104,11 @@ contract record AdminRegistry is Ownable {
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
         uint issueVotes = votes[_issueId].length;
+
         uint votingThresholdBps = votingThresholds[_target][_func];
-        if (votingThresholdBps > 0) {
-            return 10000 * issueVotes >= votingThresholdBps * admins.length;
-        } else {
-            return 5 * issueVotes >= 3 * admins.length;
-        }
+        if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
+
+        return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
@@ -184,6 +178,7 @@ contract record AdminRegistry is Ownable {
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
                 _func != "setVotingThreshold" &&
+                _func != "setDefaultVotingThresholdBps" &&
                 _func != "createContract" &&
                 _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
@@ -197,8 +192,15 @@ contract record AdminRegistry is Ownable {
     }
 
     function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
+        require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
+    }
+
+    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
+        require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
+        require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
+        defaultVotingThresholdBps = _defaultVotingThresholdBps;
     }
 
     function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {

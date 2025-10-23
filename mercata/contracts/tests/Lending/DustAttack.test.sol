@@ -35,6 +35,7 @@ contract Describe_DustAttack is Authorizable {
     LiquidityPool liquidity;
     PoolConfigurator configurator;
     PriceOracle oracle;
+    AdminRegistry adminRegistry;
 
     // Tokens (created fresh in beforeEach)
     address usdst;
@@ -74,6 +75,7 @@ contract Describe_DustAttack is Authorizable {
         liquidity = m.liquidityPool();
         configurator = m.poolConfigurator();
         oracle = m.priceOracle();
+        adminRegistry = m.adminRegistry();
 
         // Create tokens
         usdst = m.tokenFactory().createToken("USDST", "USDST Token", [], [], [], "USDST", 0, 18);
@@ -86,8 +88,8 @@ contract Describe_DustAttack is Authorizable {
         Token(goldst).setStatus(2);
 
         // Whitelist mToken
-        Token(musdst).addWhitelist(address(m.adminRegistry()), "mint", address(liquidity));
-        Token(musdst).addWhitelist(address(m.adminRegistry()), "burn", address(liquidity));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "mint", address(liquidity));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(musdst), "burn", address(liquidity));
 
         // Configure pool
         configurator.setBorrowableAsset(usdst);
@@ -169,6 +171,10 @@ contract Describe_DustAttack is Authorizable {
 
         // given time passes to accrue some interest (1 year at 5% APY)
         fastForward(365 * 24 * 60 * 60);
+        
+        // Update oracle prices after time advancement to prevent staleness
+        oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
+        oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)
 
         // given a user with collateral wants to borrow dust amount
         User dustBorrower = new User();
@@ -219,6 +225,10 @@ contract Describe_DustAttack is Authorizable {
         for (uint i = 0; i < 10; i++) {
             fastForward(365 * 24 * 60 * 60);
         }
+        
+        // Update oracle prices after time advancement to prevent staleness
+        oracle.setAssetPrice(goldst, 2000e18);   // $2000 Gold (preserve original price)
+        oracle.setAssetPrice(usdst, 1e18);       // $1 USD (preserve original price)
 
         // given a user with collateral wants to borrow dust amount
         User dustBorrower = new User();
@@ -241,5 +251,27 @@ contract Describe_DustAttack is Authorizable {
         // then scaled debt is 1 (proving ceiling division: ceiling(0.5) = 1)
         LoanInfo memory loan = pool.getUserLoan(address(dustBorrower));
         require(loan.scaledDebt == 1, "Scaled debt should be 1 (ceiling of 0.5)");
+    }
+
+    function it_lending_pool_reverts_borrow_with_stale_prices() {
+        // Set up a user with collateral
+        User borrower = new User();
+        setupUserWithCollateral(borrower, goldst, 1e18);
+        
+        // Set initial prices
+        oracle.setAssetPrice(goldst, 2000e18);
+        oracle.setAssetPrice(usdst, 1e18);
+        
+        // Advance time beyond the staleness threshold (25 minutes > 20 minutes)
+        fastForward(1500); // 25 minutes
+        
+        // Try to borrow without updating prices - should fail due to stale price
+        bool reverted = false;
+        try TestUtils.callAs(borrower, address(pool), "borrow(uint256)", 1000e18) {
+            // Should not reach here
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Borrow should revert with stale prices");
     }
 }

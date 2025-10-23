@@ -15,7 +15,6 @@ contract record CDPReserve is Ownable {
   function _usdst() internal view returns (Token) { return Token(address(registry.usdst())); }
 
   event Transferred(address indexed to, uint256 amount);
-  event Skimmed(address indexed token, uint256 amount, address indexed to);
 
   modifier onlyEngine() {
     require(msg.sender == address(registry.cdpEngine()), "Reserve: not engine");

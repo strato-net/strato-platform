@@ -1,6 +1,6 @@
 import "../abstract/ERC20/access/Authorizable.sol";
 import "../concrete/BaseCodeCollection.sol";
-import "main.groth16.sol";
+import "General/main.groth16.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -52,6 +52,13 @@ contract Describe_Mercata is Authorizable {
         Token(t2).mint(address(u2), 10000e18);
         address p1 = m.poolFactory().createPool(t1,t2);
         require(p1 != address(0), "Failed to create pool 1");
+
+        // Give Pool mint/burn rights over its LP token
+        Token lpToken = Pool(p1).lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
+
         // address p2 = m.poolFactory().createPool(t2,t1);
         // require(p2 != address(0), "Failed to create pool 2");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
@@ -81,6 +88,13 @@ contract Describe_Mercata is Authorizable {
         Token(t1).mint(address(u1), u1t1Amt);
         Token(t2).mint(address(u1), 20000000e18);
         address p1 = m.poolFactory().createPool(t1,t2);
+
+        // Give Pool mint/burn rights over its LP token
+        Token lpToken = Pool(p1).lpToken();
+        AdminRegistry adminRegistry = m.adminRegistry();
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "mint", address(p1));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(lpToken), "burn", address(p1));
+
         require(p1 != address(0), "Failed to create pool 1");
         require(ERC20(t1).approve(address(p1), 4000e18), "Approval failed for t1");
         require(ERC20(t2).approve(address(p1), 10000000e18), "Approval failed for t2");

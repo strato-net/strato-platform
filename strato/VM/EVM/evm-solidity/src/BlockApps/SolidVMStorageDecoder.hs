@@ -18,6 +18,7 @@ where
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
 import Blockchain.Strato.Model.Account (unspecifiedChain)
+import Blockchain.Strato.Model.Util (byteString2Integer)
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -35,6 +36,7 @@ import GHC.Generics
 import SolidVM.Model.SolidString
 import SolidVM.Model.Storable
 import Text.Printf
+import Text.Read
 
 decodeSolidVMValues :: [(T.Text, T.Text)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
@@ -152,9 +154,27 @@ applyDelta' (Index n : sp) bv (ValueMapping ms) =
    in case M.lookup n' ms of
         Just v -> ValueMapping . (\x -> M.insert n' x ms) <$> applyDelta' sp bv v
         Nothing -> Right . ValueMapping $ M.insert n' (constructFromNothing' sp bv) ms
+applyDelta' (Index n' : sp) bv (ValueArrayDynamic vs) =
+  let n = fromInteger $ byteString2Integer n'
+   in case I.lookup n vs of
+        Just v -> ValueArrayDynamic . (\x -> I.insert n x vs) <$> applyDelta' sp bv v
+        Nothing -> Right . ValueArrayDynamic $ I.insert n (constructFromNothing' sp bv) vs
+applyDelta' (Index n' : sp) bv sent@(ValueArraySentinel len) =
+  let n = fromInteger $ byteString2Integer n'
+   in Right . ValueArrayDynamic $ I.fromList [(n, constructFromNothing' sp bv), (len, sent)]
 applyDelta' [Field "length"] (BInteger n) (ValueArrayDynamic vs) =
   let n' = fromIntegral n
    in Right . ValueArrayDynamic $ I.insert n' (ValueArraySentinel n') vs
+applyDelta' sp@[Field "length"] b@(BInteger n) s@(ValueMapping vs) =
+  let err = Left $ TypeMismatch (StoragePath sp) b s
+      n' = fromIntegral n
+      toArrayElem (ValueInt _ _ k', v') = Right (fromInteger k', v')
+      toArrayElem (ValueString k', v') = maybe err (Right . (,v')) . readMaybe $ T.unpack k'
+      toArrayElem _ = err
+   in ValueArrayDynamic
+      . I.insert n' (ValueArraySentinel n')
+      . I.fromList
+      <$> traverse toArrayElem (M.toList vs)
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
 applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
