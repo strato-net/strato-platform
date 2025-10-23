@@ -49,7 +49,7 @@ insertMercataGovernanceContract owner validators admins gi =
     govStorageAcct =
       SolidVMContractWithStorage
         0x100
-        0x426c6f636b61707073205374617274696e6672042616c616e6365
+        0
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
         $ [ ("._owner", BAccount $ NamedAccount owner UnspecifiedChain)
           , (".validators.length", BInteger . toInteger $ length validators)
