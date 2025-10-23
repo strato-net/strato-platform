@@ -15,7 +15,9 @@ fi
 echo 
 
 
-read -p "Warning!  This script is about to delete everything in the \"$1\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).  Click "Y" to proceed. [y/N]: " choice
+echo -n -e "Warning!  This script is about to delete everything in the \"$1\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).\nClick "Y" to proceed. [y/N]: " | fold -s -w $(tput cols)
+
+read choice
 
 if [[ "$choice" == "Y" || "$choice" == "y" ]]; then
     echo "You chose Yes. Continuing..."

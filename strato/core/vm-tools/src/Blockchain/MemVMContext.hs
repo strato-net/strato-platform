@@ -44,7 +44,6 @@ import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
@@ -81,13 +80,11 @@ import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import Debugger
 import GHC.Generics
 import SolidVM.Model.Storable
-import Text.Read (readMaybe)
 import UnliftIO
 
 data MemContextDBs = MemContextDBs
@@ -301,19 +298,12 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM m) where
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k = dbsModify' $ codeDB . at k .~ Nothing
 
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => ((Address, T.Text) `A.Selectable` X509CertificateField) (MemContextM m) where
-  select _ (k, t) = do
-    let certKey addr = (addr,) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress ->
-      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
-
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509Certificate) (MemContextM m) where
   select _ k = do
     let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      mBString <- A.lookup (A.Proxy) (certKey certAddress ".certificateString")
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing

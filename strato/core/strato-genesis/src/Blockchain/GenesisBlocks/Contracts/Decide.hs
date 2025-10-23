@@ -14,9 +14,6 @@ import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import           Data.ByteString                   (ByteString)
-import           Data.Map                          (Map)
-import qualified Data.Map                          as Map
-import           Data.Maybe
 import           Data.Text.Encoding
 import           SolidVM.Model.Storable
 
@@ -55,23 +52,8 @@ insertDecideContract gi =
           (".currentFeeContract", BAccount $ unspecifiedChain 0xDEC1DE02)
         ]
 
-dec1deFilePath :: FilePath
-dec1deFilePath = "Decide.sol"
-
-dec1deStateFilePath :: FilePath
-dec1deStateFilePath = "DeciderState.sol"
-
-embeddedFiles :: [(FilePath, ByteString)]
-embeddedFiles = $(typecheckAndEmbedDir "resources/strato/decider" Nothing)
-
-fileMap :: Map FilePath ByteString
-fileMap = Map.fromList embeddedFiles
-
-fileContents :: FilePath -> ByteString
-fileContents = fromJust . flip Map.lookup fileMap
-
 dec1deContract :: ByteString
-dec1deContract = fileContents dec1deFilePath
+dec1deContract = $(typecheckAndEmbedFile "resources/strato/Decide.sol")
 
 dec1deStateContract :: ByteString
-dec1deStateContract = fileContents dec1deStateFilePath
+dec1deStateContract = $(typecheckAndEmbedFile "resources/strato/DeciderState.sol")

@@ -49,6 +49,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
 import Text.Format
+import SolidVM.Model.Storable
 
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.
@@ -67,7 +68,7 @@ data StateDiff = StateDiff
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map B.ByteString (Diff B.ByteString v))
+  | SolidVMDiff (Map B.ByteString (Diff BasicValue v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -84,7 +85,7 @@ instance StorableValue Word256 where
 instance StorableKey B.ByteString where
   lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
-instance StorableValue B.ByteString where
+instance StorableValue BasicValue where
   decodeMPDBValue = rlpDecode
 
 -- | Describes all the changes to a particular account.  The address is not
@@ -154,6 +155,10 @@ instance Detailed (Diff StateRoot) where
   incrementalToEventual x = Value $ newValue x
 
 instance Detailed (Diff ByteString) where
+  incrementalToEventual Delete {} = Value $ fromString ""
+  incrementalToEventual x = Value $ newValue x
+
+instance Detailed (Diff BasicValue) where
   incrementalToEventual Delete {} = Value $ fromString ""
   incrementalToEventual x = Value $ newValue x
 

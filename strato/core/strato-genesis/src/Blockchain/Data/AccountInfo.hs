@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Data.AccountInfo
   ( AccountInfo (..),
@@ -8,19 +7,13 @@ module Blockchain.Data.AccountInfo
   )
 where
 
-import Blockchain.Data.RLP
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Applicative (many)
 
 import Data.Aeson
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.JsonStream.Parser as JS
---import Data.Swagger hiding (Format, format, name)
-import qualified Data.Vector as V
 import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
@@ -28,7 +21,6 @@ import Text.Tools
 data AccountInfo
   = NonContract Address Integer
   | ContractNoStorage Address Integer CodePtr
-  | ContractWithStorage Address Integer CodePtr [(Word256, Word256)]
   | SolidVMContractWithStorage
       Address
       -- ^ Contract address on the blockchain
@@ -36,7 +28,7 @@ data AccountInfo
       -- ^ Balance in wei
       CodePtr
       -- ^ Hash pointer to the compiled SolidVM bytecode
-      [(B.ByteString, BasicValue)]
+      [(StoragePath, BasicValue)]
       -- ^ Storage key-value pairs where keys are raw ByteStrings and values are
       -- BasicValue types from SolidVM.Model.Storable This differs from
       -- ContractWithStorage which uses (Word256, Word256) pairs for EVM storage
@@ -45,7 +37,6 @@ data AccountInfo
 acctInfoAddress :: AccountInfo ->  Address
 acctInfoAddress (NonContract a _) = a
 acctInfoAddress (ContractNoStorage a _ _) = a
-acctInfoAddress (ContractWithStorage a _ _ _) = a
 acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
 
 instance Format AccountInfo where
@@ -64,15 +55,6 @@ instance Format AccountInfo where
         tab' $ "Nonce:     " ++ show nonce,
         tab' $ "Code hash: " ++ format ch
       ]
-  format (ContractWithStorage addr nonce ch s) =
-    unlines
-      [ "AccountInfo - ContractWithStorage",
-        "-------------------------",
-        tab' $ "Address:   " ++ format addr,
-        tab' $ "Nonce:     " ++ show nonce,
-        tab' $ "Code hash: " ++ format ch,
-        tab' $ "Storage:   " ++ show s
-      ]
   format (SolidVMContractWithStorage addr nonce ch s) =
     unlines
       [ "AccountInfo - SolidVMContractWithStorage",
@@ -84,23 +66,6 @@ instance Format AccountInfo where
       ]
 
 instance FromJSON AccountInfo where
-  parseJSON (Array v) = do
-    -- (a':i':xs)
-
-    let (a', i', xs) = case V.toList v of (a : i : xs') -> (a, i, xs'); _ -> error "parseJSON for AccountInfo as an Array failed"
-
-    a <- parseJSON a'
-    i <- parseJSON i'
-    case xs of
-      [] -> return $ NonContract a i
-      (c' : s') -> do
-        c <- parseJSON c'
-        case s' of
-          [] -> return $ ContractNoStorage a i c
-          [x] -> do
-            s <- parseJSON x
-            return $ ContractWithStorage a i c s
-          _ -> error "parseJSON for AccountInfo as an Array failed"
   parseJSON (Object o) = do
     a <- (o .: "address")
     b <- (o .: "balance")
@@ -112,7 +77,7 @@ instance FromJSON AccountInfo where
         case ms of
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
-            return $ SolidVMContractWithStorage a b c (map (\(k, v) -> (BC.pack k, v)) s)
+            return $ SolidVMContractWithStorage a b c s
   parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
 
 instance ToJSON AccountInfo where
@@ -127,48 +92,14 @@ instance ToJSON AccountInfo where
         "balance" .= b,
         "codeHash" .= c
       ]
-  toJSON (ContractWithStorage a b c s) =
+  toJSON (SolidVMContractWithStorage a b c s) =
     object
       [ "address" .= a,
         "balance" .= b,
         "codeHash" .= c,
         "storage" .= s
       ]
-  toJSON (SolidVMContractWithStorage a b c s) =
-    object
-      [ "address" .= a,
-        "balance" .= b,
-        "codeHash" .= c,
-        "storage" .= map (\(k, v) -> (BC.unpack k, v)) s
-      ]
 
-instance RLPSerializable AccountInfo where
-  rlpEncode (NonContract a b) = RLPArray [rlpEncode a, rlpEncode b]
-  rlpEncode (ContractNoStorage a b c) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c]
-  rlpEncode (ContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ map rlpEncode d]
-  rlpEncode (SolidVMContractWithStorage a b c d) = RLPArray [rlpEncode a, rlpEncode b, rlpEncode c, RLPArray $ map rlpEncode d]
-
-  rlpDecode (RLPArray [a, b, c, RLPArray d]) = ContractWithStorage (rlpDecode a) (rlpDecode b) (rlpDecode c) (map rlpDecode d)
-  rlpDecode (RLPArray [a, b, c]) = ContractNoStorage (rlpDecode a) (rlpDecode b) (rlpDecode c)
-  rlpDecode (RLPArray [a, b]) = NonContract (rlpDecode a) (rlpDecode b)
-  rlpDecode _ = error ("Error in rlpDecode for AccountInfo: bad RLPObject")
-{-
-instance Arbitrary AccountInfo where
-  arbitrary =
-    NonContract
-      <$> arbitrary
-      <*> arbitrary `suchThat` (>= 0)
-
-instance ToSchema CodeInfo where
-  declareNamedSchema _ =
-    return $
-      NamedSchema
-        (Just "CodeInfo")
-        (mempty)
-
-instance ToSchema AccountInfo where
-  declareNamedSchema _ = return $ NamedSchema (Just "AccountInfo") byteSchema
--}
 accountExtractor :: JS.Parser [AccountInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 

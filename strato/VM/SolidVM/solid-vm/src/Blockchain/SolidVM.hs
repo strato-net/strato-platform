@@ -260,12 +260,10 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
   parentName <-  getParentName creator
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
-      !abstracts' = getAbstractParentsFromContract contract' cc
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
-  !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
 
-  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc abstracts
+  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -464,12 +462,10 @@ call' from to' fnCalltype functionName valList = do
       _ -> pure (n, "")
 
   let parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      !abstracts' = getAbstractParentsFromContract contract cc
 
   (_, oAddr, ctrName) <- getCreator codeAddress
-  !abstracts <- M.fromList <$> traverse (resolveNameParts storageAddress (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction storageAddress (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts
+  initializeAction storageAddress (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) storageAddress
