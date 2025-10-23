@@ -13,8 +13,8 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
 import Blockchain.Strato.Model.Validator
+import Data.String
 import Data.Text (Text)
-import qualified Data.Text as Text
 import Data.Text.Encoding
 import SolidVM.Model.Storable hiding (size)
 import Text.Printf
@@ -61,7 +61,7 @@ insertMercataGovernanceContract validators admins gi =
           ++ map
             ( \case
                 (i, Validator c) ->
-                  ( encodeUtf8 $ ".validatorMap[" <> Text.pack (printf "%040x" c) <> "]",
+                  ( fromString $ ".validatorMap[" ++ printf "%040x" c ++ "]",
                     addrToCertIdx $ validatorAddr i
                   )
             )
@@ -69,7 +69,7 @@ insertMercataGovernanceContract validators admins gi =
           ++ map
             ( \case
                 (i, c) ->
-                  ( encodeUtf8 $ ".adminMap[" <> Text.pack (printf "%040x" c) <> "]",
+                  ( fromString $ ".adminMap[" ++ printf "%040x" c ++ "]",
                     addrToCertIdx $ adminAddr i
                   )
             )

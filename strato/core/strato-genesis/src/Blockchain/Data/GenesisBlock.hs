@@ -20,6 +20,7 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
@@ -33,7 +34,6 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
-import Data.ByteString as BS hiding (map, zip)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import qualified Data.Text.Encoding as T
@@ -57,10 +57,10 @@ putStorageTrie ::
     (Address `A.Alters` AddressState) m
   ) =>
   Address ->
-  [(BS.ByteString, BasicValue)] ->
+  [(StoragePath, BasicValue)] ->
   m ()
 putStorageTrie account slots = do
-  mapM_ (\slot -> putRawStorageKeyVal' (account, fst slot) (snd slot)) slots
+  mapM_ (\(theKey, theValue) -> putSolidStorageKeyVal' account theKey theValue) slots
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 

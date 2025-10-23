@@ -13,8 +13,6 @@ import Blockchain.Strato.Model.CodePtr
 import Control.Applicative (many)
 
 import Data.Aeson
-import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.JsonStream.Parser as JS
 import SolidVM.Model.Storable
 import Text.Format
@@ -23,7 +21,7 @@ import Text.Tools
 data AccountInfo
   = NonContract Address Integer
   | ContractNoStorage Address Integer CodePtr
-  | SolidVMContractWithStorage Address Integer CodePtr [(B.ByteString, BasicValue)]
+  | SolidVMContractWithStorage Address Integer CodePtr [(StoragePath, BasicValue)]
   deriving (Show, Eq, Read)
 
 acctInfoAddress :: AccountInfo ->  Address
@@ -69,7 +67,7 @@ instance FromJSON AccountInfo where
         case ms of
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
-            return $ SolidVMContractWithStorage a b c (map (\(k, v) -> (BC.pack k, v)) s)
+            return $ SolidVMContractWithStorage a b c s
   parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
 
 instance ToJSON AccountInfo where
@@ -89,7 +87,7 @@ instance ToJSON AccountInfo where
       [ "address" .= a,
         "balance" .= b,
         "codeHash" .= c,
-        "storage" .= map (\(k, v) -> (BC.unpack k, v)) s
+        "storage" .= s
       ]
 
 accountExtractor :: JS.Parser [AccountInfo]

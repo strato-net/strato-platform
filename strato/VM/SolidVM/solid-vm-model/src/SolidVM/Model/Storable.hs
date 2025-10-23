@@ -134,7 +134,7 @@ formatBasicValueForSQL BDefault = ""
 data StoragePathPiece
   = Field B.ByteString
   | Index B.ByteString
-  deriving (Eq, Ord, Show, Generic, NFData, Hashable)
+  deriving (Eq, Ord, Show, Read, Generic, NFData, Hashable)
 
 instance Format StoragePathPiece where
   format (Field n) = C8.unpack n
@@ -142,7 +142,7 @@ instance Format StoragePathPiece where
 
 instance Binary StoragePathPiece
 
-newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Ord, Show, Generic, NFData, Hashable)
+newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Ord, Show, Read, Generic, NFData, Hashable)
 
 instance IsString StoragePath where
   fromString = either (error . ("error parsing String to StoragePath" ++)) id . parsePath . C8.pack
