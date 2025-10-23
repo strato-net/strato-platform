@@ -25,7 +25,7 @@ contract record CDPEngine is Ownable {
     // Per‑asset configuration (see setCollateralAssetParams)
     struct CollateralConfig {
         uint liquidationRatio;          // WAD (e.g. 1.50e18)
-        uint minCR;        // WAD (e.g. 1.60e18) — action gate CR (must be ≥ liquidationRatio)
+        uint minCR;                     // WAD (e.g. 1.60e18) — action gate CR (must be ≥ liquidationRatio)
         uint liquidationPenaltyBps;     // 10000 = 100%
         uint closeFactorBps;            // 10000 = 100%
         uint stabilityFeeRate;          // per‑second factor (RAY)
