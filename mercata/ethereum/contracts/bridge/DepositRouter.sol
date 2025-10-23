@@ -36,9 +36,9 @@ contract DepositRouter is
     uint8 constant PERMISSION_MASK = PERMISSION_WRAP | PERMISSION_MINT;
 
     // ============ State Variables ============
+    //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
     // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
-    IPermit2 public constant PERMIT2 =
-        IPermit2(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+    IPermit2 public immutable PERMIT2;
 
     address public gnosisSafe;
     uint96 public depositId;
@@ -68,7 +68,9 @@ contract DepositRouter is
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
+    constructor(address permit2_) {
+        if (permit2_ == address(0)) revert InvalidAddress();
+        PERMIT2 = IPermit2(permit2_);
         _disableInitializers();
     }
 
