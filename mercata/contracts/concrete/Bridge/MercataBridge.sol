@@ -94,8 +94,9 @@ contract record MercataBridge is Ownable {
         uint256 maxPerTx;         // hard ceiling; 0 means "unlimited"
         address stratoToken;      // STRATO token to mint (ETHst, USDST, etc)
     }
-
-    mapping(uint256 => ChainInfo) public record chains;   
+    // key = externalChainId
+    mapping(uint256 => ChainInfo) public record chains;
+    // key = (externalToken, externalChainId)
     mapping(address => mapping(uint256 => AssetInfo)) public record assets;   
 
     /* ─────────────────────────────── */
