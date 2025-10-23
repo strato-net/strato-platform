@@ -101,20 +101,20 @@ export const UserProvider = ({ children }: { children: React.ReactNode }) => {
   const castVoteOnIssue = async (target: string, func: string, args: any[]) => {
     try {
       await api.post('/user/admin/vote', { target, func, args });
+      await getOpenIssues();
     } catch (error) {
-    } finally {
-      const response = await getOpenIssues();
-      return response;
+      await getOpenIssues();
+      throw error;
     }
   };
 
   const castVoteOnIssueById = async (issueId: string) => {
     try {
       await api.post('/user/admin/vote/by-id', { issueId });
+      await getOpenIssues();
     } catch (error) {
-    } finally {
-      const response = await getOpenIssues();
-      return response;
+      await getOpenIssues();
+      throw error;
     }
   };
 
