@@ -880,7 +880,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4">
           <CRSlider
             projectedCR={projectedCR}
-            liquidationThreshold={minCR}
+            minCR={minCR}
             onCRChange={handleCRChange}
             disabled={!depositAsset}
             hasCollateral={
