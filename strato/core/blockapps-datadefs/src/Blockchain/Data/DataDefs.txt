@@ -93,7 +93,7 @@ RawTransaction
 Storage json
     addressStateRefId AddressStateRefId
     key Text
-    value Text
+    value BasicValue
     deriving Eq Read Show
 
 TransactionResult json

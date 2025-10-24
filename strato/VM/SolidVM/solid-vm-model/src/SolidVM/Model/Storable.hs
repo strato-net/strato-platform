@@ -13,6 +13,7 @@ import Blockchain.Strato.Model.Account
 import Control.Applicative ((<|>))
 import Control.DeepSeq
 import Control.Exception
+import Control.Lens.Operators
 import qualified Data.Aeson as JSON
 import Data.Attoparsec.ByteString as Atto
 import Data.Attoparsec.ByteString.Char8 (scientific)
@@ -28,9 +29,11 @@ import Data.Hashable
 import Data.Maybe
 import Data.Scientific (isInteger, toBoundedInteger)
 import Data.String
+import qualified Data.Swagger as SWAGGER
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
+import qualified Database.Esqueleto.Internal.Internal as E
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -39,6 +42,8 @@ import System.IO.Unsafe
 import Text.Format
 import Text.Read
 import Text.Regex.TDFA
+import Database.Persist.Sql
+import Servant
 
 data BasicValue
   = BInteger !Integer
@@ -49,10 +54,47 @@ data BasicValue
   | BEnumVal !SolidString !SolidString !Word32
   | BContract !SolidString !NamedAccount
   | BDefault -- Indicates a not present value
-  deriving (Show, Read, Eq, Generic, NFData, Hashable, Binary)
+  deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Binary)
 
 instance IsString BasicValue where
   fromString s = BString $ C8.pack s
+
+instance PersistField BasicValue where
+  toPersistValue = toPersistValue . format
+  fromPersistValue v =
+    case fromPersistValue v of
+      Left e -> Left e
+      Right theString ->
+        case basicParse theString of
+          Nothing -> Left $ T.pack $ "malformed value string in call to fromPersistValue: " ++ show theString
+          Just theBasicValue -> Right theBasicValue
+
+instance PersistFieldSql BasicValue where
+  sqlType _ = SqlString
+
+instance E.SqlString BasicValue where
+
+instance ToHttpApiData BasicValue where
+  toUrlPiece = T.pack . format
+
+instance FromHttpApiData BasicValue where
+  parseUrlPiece v =
+    case basicParse $ T.unpack v of
+      Nothing -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v
+      Just theBasicValue -> Right theBasicValue
+
+instance SWAGGER.ToParamSchema BasicValue where
+  toParamSchema _ =
+      mempty
+        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
+        & SWAGGER.format  ?~ "simple SolidVM expression"
+
+instance SWAGGER.ToSchema BasicValue where
+  declareNamedSchema _ =
+    pure $ SWAGGER.NamedSchema (Just "BasicValue") $
+      mempty
+        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
+        & SWAGGER.format       ?~ "simple SolidVM expression"
 
 instance JSON.ToJSON BasicValue where
   toJSON v = JSON.toJSON $ format v

@@ -17,6 +17,7 @@ dependencies:
   - labeled-error
   - persistent
   - QuickCheck
+  - solid-vm-model
   - strato-model
   - swagger2
   - text
