@@ -4,6 +4,8 @@
 // - Liquidation with direct seize (no auctions)
 // - Fees: split between FeeCollector and CDPReserve (feeToReserveBps)
 // - Pro-rata juniors: splits USDST from reserve across all active notes proportionally to their remaining caps
+// - UPDATED: Per-asset minCR (minCR). User actions (borrow/withdraw) must keep CR ≥ minCR.
+//            minCR is stored per asset in CollateralConfig and must be ≥ liquidationRatio.
 
 import "./CDPVault.sol";
 import "../Tokens/Token.sol";
@@ -23,6 +25,7 @@ contract record CDPEngine is Ownable {
     // Per‑asset configuration (see setCollateralAssetParams)
     struct CollateralConfig {
         uint liquidationRatio;          // WAD (e.g. 1.50e18)
+        uint minCR;                     // WAD (e.g. 1.60e18) — action gate CR (must be ≥ liquidationRatio)
         uint liquidationPenaltyBps;     // 10000 = 100%
         uint closeFactorBps;            // 10000 = 100%
         uint stabilityFeeRate;          // per‑second factor (RAY)
@@ -61,11 +64,11 @@ contract record CDPEngine is Ownable {
     event FeesRouted(address indexed asset, uint256 toReserve, uint256 toCollector);
     event PriceMaxAgeSet(uint oldMaxAge, uint newMaxAge);
 
-
     // ─────────────── Events ───────────────
     event CollateralConfigured(
         address indexed asset,
         uint liquidationRatio,
+        uint minCR,
         uint liquidationPenaltyBps,
         uint closeFactorBps,
         uint stabilityFeeRate,
@@ -133,7 +136,7 @@ contract record CDPEngine is Ownable {
     function _feeCollector() internal view returns (FeeCollector) { return FeeCollector(address(registry.feeCollector())); }
     function _cdpReserve() internal view returns (CDPReserve) { return registry.cdpReserve(); }
 
-   // ─────────────────────────── Access Modifiers ───────────────────────────
+    // ─────────────────────────── Access Modifiers ───────────────────────────
     modifier whenNotPaused(address asset) {
         require(!globalPaused, "CDPEngine: global pause");
         require(!collateralConfigs[asset].isPaused, "CDPEngine: asset paused");
@@ -221,8 +224,8 @@ contract record CDPEngine is Ownable {
     }
 
     /**
-     * @notice Withdraw explicit amount of collateral; requires CR ≥ LR when debt > 0
-     * @dev Accrues first; reverts if resulting CR would fall below liquidationRatio
+     * @notice Withdraw explicit amount of collateral; requires CR ≥ minCR when debt > 0
+     * @dev Accrues first; reverts if resulting CR would fall below threshold
      */
     function withdraw(address asset, uint amount) external onlyKnownAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
@@ -234,7 +237,7 @@ contract record CDPEngine is Ownable {
         vault.collateral -= amount;
         if (vault.scaledDebt > 0) {
             uint crAfter = collateralizationRatio(msg.sender, asset);
-            require(crAfter >= collateralConfigs[asset].liquidationRatio, "CDPEngine: Undercollateralized");
+            require(crAfter >= collateralConfigs[asset].minCR, "CDPEngine: below min CR");
         }
         // Perform custody move after checks
         _cdpVault().withdraw(msg.sender, asset, amount);
@@ -243,7 +246,7 @@ contract record CDPEngine is Ownable {
     }
 
     /**
-     * @notice Withdraw maximum safe collateral while preserving CR ≥ LR
+     * @notice Withdraw maximum safe collateral while preserving CR ≥ minCR
      * @dev Applies a +1 wei buffer when there is outstanding debt to avoid edge rounding
      * @return maxAmount The amount withdrawn
      */
@@ -256,12 +259,12 @@ contract record CDPEngine is Ownable {
             // No debt: user can withdraw all collateral
             maxAmount = vault.collateral;
         } else {
-            // Compute collateral required to keep CR >= LR
+            // Compute collateral required to keep CR >= minCR
             (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
             require(price > 0, "invalid price");
             require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
             CollateralConfig memory config = collateralConfigs[asset];
-            uint requiredCollateralValue = (debt * config.liquidationRatio) / WAD;
+            uint requiredCollateralValue = (debt * config.minCR) / WAD;
             uint requiredCollateral = (requiredCollateralValue * config.unitScale) / price;
             // Enforce a 1 wei buffer when debt exists to protect against rounding
             if (vault.collateral <= requiredCollateral + 1) {
@@ -282,6 +285,7 @@ contract record CDPEngine is Ownable {
     /**
      * @notice Mint a specific amount of USDST against collateral
      * @dev Checks debtCeiling and debtFloor, accrues first, and updates scaled debt and books
+     *      Enforces CR ≥ minCR after mint
      */
     function mint(address asset, uint amountUSD) external whenNotPaused(asset) onlyActiveAsset(asset) {
         // Accrue fees so debt math uses the latest rateAccumulator
@@ -293,12 +297,12 @@ contract record CDPEngine is Ownable {
         Vault storage userVault = vaults[msg.sender][asset];
         // Compute current debt in USD using scaledDebt and rateAccumulator
         uint currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        // Value collateral in USD and compute borrow headroom from LR
+        // Value collateral in USD and compute borrow headroom from minCR
         (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
         require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
         uint collateralValueUSD_calc = (userVault.collateral * price) / assetConfig.unitScale;
-        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / assetConfig.liquidationRatio;
+        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / assetConfig.minCR;
         require(currentDebt + amountUSD < maxBorrowableUSD, "CDPEngine: insufficient collateral");
         // Enforce per-asset debt ceiling vs current outstanding debt (Maker-style)
         if (assetConfig.debtCeiling > 0) {
@@ -322,7 +326,7 @@ contract record CDPEngine is Ownable {
 
     /**
      * @notice Mint the maximum safe USDST amount (applies 1-wei buffer)
-     * @dev Computes headroom from CR and LR, enforces ceiling/floor, and mints to user
+     * @dev Computes headroom from CR and minCR, enforces ceiling/floor, and mints to user
      */
     function mintMax(address asset) external whenNotPaused(asset) onlyActiveAsset(asset) returns (uint amountMinted) {
         // Accrue to make the index current
@@ -332,12 +336,12 @@ contract record CDPEngine is Ownable {
         Vault storage userVault = vaults[msg.sender][asset];
         // Current owed in USD
         uint currentDebt = (userVault.scaledDebt * assetState.rateAccumulator) / RAY;
-        // Compute borrow headroom from collateral value and LR
+        // Compute borrow headroom from collateral value and minCR
         (uint price, uint timestamp) = _cdpPriceOracle().getAssetPriceWithTimestamp(asset);
         require(price > 0, "invalid price");
         require(block.timestamp - timestamp <= priceMaxAge, "CDPEngine: stale price");
         uint collateralValueUSD_calc = (userVault.collateral * price) / config.unitScale;
-        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.liquidationRatio;
+        uint maxBorrowableUSD = (collateralValueUSD_calc * WAD) / config.minCR;
         require(maxBorrowableUSD > currentDebt, "No borrowing power");
         uint available = maxBorrowableUSD - currentDebt;
         // Apply 1 wei buffer to avoid rounding into liquidation edge
@@ -580,11 +584,12 @@ contract record CDPEngine is Ownable {
 
     /**
      * @notice Configure per-asset risk parameters
-     * @dev Validates bounds for LR, penalty, close-factor, rate, floor/ceiling, and unitScale
+     * @dev Validates bounds for LR, minCR, penalty, close-factor, rate, floor/ceiling, and unitScale
      */
     function setCollateralAssetParams(
         address asset,
         uint liquidationRatio,
+        uint minCR,
         uint liquidationPenaltyBps,
         uint closeFactorBps,
         uint stabilityFeeRate,
@@ -594,14 +599,17 @@ contract record CDPEngine is Ownable {
         bool pause
     ) public onlyOwner {
         require(asset != address(0), "CDPEngine: invalid asset");
-        require(liquidationRatio >= WAD, "CDPEngine: liquidation ratio too low");
+        require(liquidationRatio >= WAD, "CDPEngine: LR too low");
+        require(minCR >= liquidationRatio, "CDPEngine: minCR < LR");
         require(liquidationPenaltyBps >= 500 && liquidationPenaltyBps <= 3000, "penalty out of range");
         require(closeFactorBps >= 5000 && closeFactorBps <= 10000, "CDPEngine: close factor out of range");
         require(stabilityFeeRate >= RAY, "CDPEngine: stability fee too low");
         require(unitScale > 0, "CDPEngine: invalid unit scale");
         if (debtCeiling > 0) { require(debtFloor <= debtCeiling, "CDPEngine: debt floor above ceiling"); }
+
         CollateralConfig storage config = collateralConfigs[asset];
-        config.liquidationRatio = liquidationRatio; 
+        config.liquidationRatio = liquidationRatio;
+        config.minCR = minCR;
         config.liquidationPenaltyBps = liquidationPenaltyBps; 
         config.closeFactorBps = closeFactorBps; 
         config.stabilityFeeRate = stabilityFeeRate; 
@@ -609,8 +617,21 @@ contract record CDPEngine is Ownable {
         config.debtCeiling = debtCeiling; 
         config.unitScale = unitScale;
         config.isPaused = pause;
+
         if (!isSupportedAsset[asset]) { isSupportedAsset[asset] = true; }
-        emit CollateralConfigured(asset, liquidationRatio, liquidationPenaltyBps, closeFactorBps, stabilityFeeRate, debtFloor, debtCeiling, unitScale, pause);
+
+        emit CollateralConfigured(
+            asset,
+            liquidationRatio,
+            minCR,
+            liquidationPenaltyBps,
+            closeFactorBps,
+            stabilityFeeRate,
+            debtFloor,
+            debtCeiling,
+            unitScale,
+            pause
+        );
     }
 
     /**
@@ -620,6 +641,7 @@ contract record CDPEngine is Ownable {
     function setCollateralAssetParamsBatch(
         address[] calldata assets,
         uint[] calldata liquidationRatios,
+        uint[] calldata minCRs,
         uint[] calldata liquidationPenaltyBpsArr,
         uint[] calldata closeFactorBpsArr,
         uint[] calldata stabilityFeeRates,
@@ -632,6 +654,7 @@ contract record CDPEngine is Ownable {
         require(len > 0, "CDPEngine: empty batch");
         require(
             liquidationRatios.length == len &&
+            minCRs.length == len &&
             liquidationPenaltyBpsArr.length == len &&
             closeFactorBpsArr.length == len &&
             stabilityFeeRates.length == len &&
@@ -642,10 +665,10 @@ contract record CDPEngine is Ownable {
             "CDPEngine: array length mismatch"
         );
         for (uint i = 0; i < len; i++) {
-            // Reuse existing validation/events via the single-asset setter
             setCollateralAssetParams(
                 assets[i],
                 liquidationRatios[i],
+                minCRs[i],
                 liquidationPenaltyBpsArr[i],
                 closeFactorBpsArr[i],
                 stabilityFeeRates[i],

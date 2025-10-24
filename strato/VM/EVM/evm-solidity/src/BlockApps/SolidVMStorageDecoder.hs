@@ -11,7 +11,7 @@ module BlockApps.SolidVMStorageDecoder
     replayDeltas, -- Testing only
     ReplayFailure (..),
     synthesize, -- Testing only
-    TotalStorage,
+    TotalStorage
   )
 where
 
@@ -37,9 +37,9 @@ import SolidVM.Model.Storable
 import Text.Printf
 import Text.Read
 
-decodeSolidVMValues :: [(T.Text, T.Text)] -> [(T.Text, SolidityValue)]
+decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM storageKeyToPath (Right . textToBasicValue)) hxs
+  pathValues <- mapM (bimapM return return) hxs
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MoreVertical } from "lucide-react";
 import { cdpService, VaultData, TransactionResponse } from "@/services/cdpService";
 import { useToast } from "@/hooks/use-toast";
@@ -394,7 +395,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           const rateAccumulatorWei = BigInt(position.rateAccumulator || "1000000000000000000000000000");
           
           // Step 1: Convert borrow amount to scaled debt (same as contract)
-          const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
+          const scaledAddWei = (borrowAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
           
           // Step 2: Add to existing scaled debt (same as contract)
           const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
@@ -404,13 +405,6 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
           
 
           if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
-            // Calculate how much more is needed to reach debt floor
-            const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
-            const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
-            const minRequired = parseFloat(formatWeiToDecimalHP(minRequiredWei.toString(), 18));
-            const debtFloorDecimal = parseFloat(formatWeiToDecimalHP(debtFloorWei.toString(), 18));
-            const currentDebt = parseFloat(formatWeiToDecimalHP(currentDebtWei.toString(), 18));
-            
             toast({
               title: "Below Debt Floor",
               description: `Borrow more USDST to reach the minimum debt floor`,
@@ -597,11 +591,12 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
   }
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Your Vaults</CardTitle>
-      </CardHeader>
-      <CardContent>
+    <TooltipProvider>
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle>Your Vaults</CardTitle>
+        </CardHeader>
+        <CardContent>
         <style>{`
           /* Hide number input arrows */
           input[type="number"]::-webkit-outer-spin-button,
@@ -676,9 +671,21 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Health Factor</p>
-                  <p className={`font-semibold ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600'}`}>
-                    {hasDebt ? formatNumber(healthFactor) : '∞'}
-                  </p>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className={`font-semibold cursor-help ${hasDebt ? getHealthFactorColor(healthFactor) : 'text-green-600'}`}>
+                        {hasDebt ? formatNumber(healthFactor) : '∞'}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="whitespace-pre-line text-center">
+                        {hasDebt 
+                          ? `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber(position.collateralizationRatio)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(healthFactor)}`
+                          : 'Health Factor = CR ÷ Liquidation Threshold'
+                        }
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Stability Fee</p>
@@ -703,9 +710,21 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 mb-1">Health Factor</p>
-                      <p className={`font-semibold ${previewValues.healthFactor === Infinity ? 'text-green-600' : getHealthFactorColor(previewValues.healthFactor)}`}>
-                        {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
-                      </p>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <p className={`font-semibold cursor-help ${previewValues.healthFactor === Infinity ? 'text-green-600' : getHealthFactorColor(previewValues.healthFactor)}`}>
+                            {previewValues.healthFactor === Infinity ? '∞' : formatNumber(previewValues.healthFactor)}
+                          </p>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="whitespace-pre-line text-center">
+                            {previewValues.healthFactor === Infinity 
+                              ? 'Health Factor = CR ÷ Liquidation Threshold'
+                              : `Health Factor = CR ÷ Liquidation Threshold\n${formatNumber((parseFloat(previewValues.collateralValueUSD) / parseFloat(previewValues.debtValueUSD)) * 100)}% ÷ ${formatNumber(position.liquidationRatio)}% = ${formatNumber(previewValues.healthFactor)}`
+                            }
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                     <div>
                       <p className="text-xs text-blue-600 mb-1">Stability Fee</p>
@@ -781,6 +800,7 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
         </div>
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 };
 

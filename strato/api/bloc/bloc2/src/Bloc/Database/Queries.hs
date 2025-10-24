@@ -31,6 +31,7 @@ import Blockchain.Data.DataDefs (AddressStateRef(..))
 import Blockchain.Model.JsonBlock
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -51,6 +52,7 @@ import Handlers.AccountInfo
 import Handlers.Storage
 import SQLM
 import SolidVM.Model.CodeCollection
+import SolidVM.Model.Storable
 import Text.Format
 import UnliftIO
 
@@ -103,7 +105,10 @@ getContractByAccountsFilterParams aParams = runMaybeT $ do
             { qsAddress = Just a
             , qsKey = Just ".logicContract"
             }
-      logicContract <- MaybeT . pure . stringAddress $ Text.unpack v
+      logicContract <- MaybeT $ pure $
+            case v of
+              BAccount (NamedAccount address' _) -> Just address'
+              _ -> Nothing
       (AddressStateRef' l _) <- MaybeT
         . fmap listToMaybe
         . getAccount'

@@ -40,15 +40,16 @@ import Numeric.Natural
 import Servant
 import Servant.Client
 import Settings
+import SolidVM.Model.Storable
 import UnliftIO
 
 type API =
-  "storage" :> QueryParam "key" Text
-    :> QueryParam "minkey" Text
-    :> QueryParam "maxkey" Text
-    :> QueryParam "value" Text
-    :> QueryParam "minvalue" Text
-    :> QueryParam "maxvalue" Text
+  "storage" :> QueryParam "key" StoragePath
+    :> QueryParam "minkey" StoragePath
+    :> QueryParam "maxkey" StoragePath
+    :> QueryParam "value" BasicValue
+    :> QueryParam "minvalue" BasicValue
+    :> QueryParam "maxvalue" BasicValue
     :> QueryParam "search" Text
     :> QueryParam "address" Address
     :> QueryParam "offset" Natural
@@ -56,12 +57,12 @@ type API =
     :> Get '[JSON] [StorageAddress]
 
 data StorageFilterParams = StorageFilterParams
-  { qsKey :: Maybe Text,
-    qsMinKey :: Maybe Text,
-    qsMaxKey :: Maybe Text,
-    qsValue :: Maybe Text,
-    qsMinValue :: Maybe Text,
-    qsMaxValue :: Maybe Text,
+  { qsKey :: Maybe StoragePath,
+    qsMinKey :: Maybe StoragePath,
+    qsMaxKey :: Maybe StoragePath,
+    qsValue :: Maybe BasicValue,
+    qsMinValue :: Maybe BasicValue,
+    qsMaxValue :: Maybe BasicValue,
     qsSearch :: Maybe Text,
     qsAddress :: Maybe Address,
     qsOffset :: Maybe Natural,
@@ -106,8 +107,8 @@ server = getStorage
 -----------------------
 
 data StorageAddress = StorageAddress
-  { key :: Text,
-    value :: Text,
+  { key :: StoragePath,
+    value :: BasicValue,
     address :: Address
   }
   deriving (Show, Read, Eq, Generic)
@@ -143,8 +144,9 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [
                             searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
                             queries = (\v -> (E.unsafeSqlCastAs "TEXT" (addrStRef E.^. AddressStateRefAddress) `E.like` E.val (T.unpack $ "%" <> v <> "%"))
                                        E.||. (addrStRef E.^. AddressStateRefContractName `E.like` E.val (Just . T.unpack $ "%" <> v <> "%"))
-                                       E.||. (storage E.^. StorageKey `E.like` E.val ("%" <> v <> "%"))
-                                       E.||. (storage E.^. StorageValue `E.like` E.val ("%" <> v <> "%"))) <$> searches
+                                       E.||. (E.castString (storage E.^. StorageKey) `E.like` E.val ("%" <> v <> "%"))
+                                       E.||. (E.castString (storage E.^. StorageValue) `E.like` E.val ("%" <> v <> "%"))
+                                      ) <$> searches
                          in foldr (E.||.) (E.val False) queries
                       ) qsSearch,
                     -- Note: a join is done in StorageInfo
@@ -167,12 +169,12 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable StorageFilterParams [
 
 getStorage ::
   Selectable StorageFilterParams [StorageAddress] m =>
-  Maybe Text ->
-  Maybe Text ->
-  Maybe Text ->
-  Maybe Text ->
-  Maybe Text ->
-  Maybe Text ->
+  Maybe StoragePath ->
+  Maybe StoragePath ->
+  Maybe StoragePath ->
+  Maybe BasicValue ->
+  Maybe BasicValue ->
+  Maybe BasicValue ->
   Maybe Text ->
   Maybe Address ->
   Maybe Natural ->

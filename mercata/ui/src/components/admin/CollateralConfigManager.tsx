@@ -57,6 +57,24 @@ const CollateralConfigManager = () => {
  
 
   const handleSubmit = useCallback(async (values: any) => {
+    // Validate minCR >= liquidationRatio BEFORE setting loading state
+    const liquidationRatioValue = Number(values.liquidationRatio);
+    const minCRValue = Number(values.minCR);
+    
+    if (minCRValue < liquidationRatioValue) {
+      setInputErrors(prev => ({
+        ...prev,
+        minCR: `Must be >= Liquidation Ratio (${liquidationRatioValue.toFixed(2)})`
+      }));
+      return;
+    }
+    
+    // Clear any previous errors
+    setInputErrors(prev => {
+      const { minCR, ...rest } = prev;
+      return rest;
+    });
+    
     try {
       setLoading(true);
       
@@ -67,6 +85,9 @@ const CollateralConfigManager = () => {
       
       // Convert liquidation ratio from percentage to WAD (e.g., 150% -> 1.5e18)
       const liquidationRatioContract = (BigInt(Math.floor(Number(values.liquidationRatio) * 100)) * WAD) / BigInt(100);
+      
+      // Convert min collateral ratio from percentage to WAD (e.g., 160% -> 1.6e18)
+      const minCRContract = (BigInt(Math.floor(Number(values.minCR) * 100)) * WAD) / BigInt(100);
       
       // Convert stability fee rate from annual percentage to per-second RAY
       const [intPart, decPart = ''] = values.stabilityFeeRate.toString().split('.');
@@ -84,6 +105,7 @@ const CollateralConfigManager = () => {
       const configData = {
         asset: values.asset,
         liquidationRatio: liquidationRatioContract.toString(),
+        minCR: minCRContract.toString(),
         liquidationPenaltyBps: values.liquidationPenaltyBps,
         closeFactorBps: values.closeFactorBps,
         stabilityFeeRate: stabilityFeeRateContract.toString(),
@@ -98,6 +120,9 @@ const CollateralConfigManager = () => {
       toast.success('Collateral configuration updated successfully');
       resetForm();
       await loadAssets();
+    } catch (error) {
+      console.error('Failed to set collateral config:', error);
+      toast.error('Failed to update collateral configuration. Please check the values and try again.');
     } finally {
       setLoading(false);
     }
@@ -107,7 +132,7 @@ const CollateralConfigManager = () => {
     setEditingAsset(asset.asset);
     
     // Convert debt floor/ceiling from wei back to USD
-    const debtFloorUI = (BigInt(asset.debtFloor) / (BigInt(10) ** BigInt(18)));
+    const debtFloorUI = (BigInt(asset.debtFloor || 0) / (BigInt(10) ** BigInt(18)));
     const debtCeilingUI = (BigInt(asset.debtCeiling) / (BigInt(10) ** BigInt(18)));
     
     // Convert unit scale from 1eX back to decimal count
@@ -116,6 +141,7 @@ const CollateralConfigManager = () => {
     form.setFieldsValue({
       asset: asset.asset.trim(),
       liquidationRatio: (asset.liquidationRatio / 100).toString(), // Convert percentage to decimal for form
+      minCR: ((asset.minCR || asset.liquidationRatio) / 100).toString(), // Convert percentage to decimal for form, fallback to liquidationRatio
       liquidationPenaltyBps: asset.liquidationPenaltyBps.toString(),
       closeFactorBps: asset.closeFactorBps.toString(),
       stabilityFeeRate: asset.stabilityFeeRate.toString(), // Backend already provides annual percentage
@@ -289,6 +315,21 @@ const CollateralConfigManager = () => {
                       className="w-full"
                       inputMode="decimal"
                       onChange={(e) => handleNumericInputChange('liquidationRatio', e.target.value, "5", 2, "1")}
+                    />
+                  </Form.Item>
+
+                  <Form.Item
+                    name="minCR"
+                    label="Min Collateral Ratio (e.g., 1.6 = 160%)"
+                    extra="Range: 1.0-5.0 (100%-500%), must be >= Liquidation Ratio"
+                    validateStatus={inputErrors.minCR ? 'error' : ''}
+                    help={inputErrors.minCR}
+                  >
+                    <Input 
+                      placeholder="1.6"
+                      className="w-full"
+                      inputMode="decimal"
+                      onChange={(e) => handleNumericInputChange('minCR', e.target.value, "5", 2, "1")}
                     />
                   </Form.Item>
 
@@ -507,6 +548,10 @@ const CollateralConfigManager = () => {
                           <div>
                             <p className="text-sm text-gray-500">Liquidation Ratio</p>
                             <p className="font-semibold">{formatValue(asset.liquidationRatio.toString(), 'percentage')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Min CR</p>
+                            <p className="font-semibold">{formatValue((asset.minCR || asset.liquidationRatio).toString(), 'percentage')}</p>
                           </div>
                           <div>
                             <p className="text-sm text-gray-500">Penalty</p>
