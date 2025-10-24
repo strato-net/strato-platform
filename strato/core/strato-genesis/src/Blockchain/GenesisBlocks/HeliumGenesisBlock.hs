@@ -72,6 +72,8 @@ data HeliumGenesisBlockConfig = HeliumGenesisBlockConfig
   , hgbc_admins :: [Address]
   , hgbc_chainInfos :: [BridgeChainInfo]
   , hgbc_assetInfos :: [BridgeAssetInfo]
+  , hgbc_bridgeRelayer :: (Address, Integer)
+  , hgbc_oracleRelayers :: [(Address, Integer)]
   }
 
 list :: b -> (a -> [a] -> b) -> [a] -> b
@@ -404,7 +406,13 @@ usdt = BridgeAssetInfo
   2
 
 heliumConfig :: HeliumGenesisBlockConfig
-heliumConfig = HeliumGenesisBlockConfig validators admins [sepolia] [meth, musdc]
+heliumConfig = HeliumGenesisBlockConfig
+  validators
+  admins
+  [sepolia]
+  [meth, musdc]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
 
 genesisBlock :: GenesisInfo
 genesisBlock = genesisBlockTemplate heliumConfig
@@ -475,12 +483,12 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             , lendingPool
             , poolConfigurator
             , lendingRegistry
-            , mercataBridge hgbc_chainInfos hgbc_assetInfos
+            , mercataBridge (fst hgbc_bridgeRelayer) hgbc_chainInfos hgbc_assetInfos
             , poolFactory
             , tokenFactory
-            , adminRegistry hgbc_admins
+            , adminRegistry hgbc_admins (fst hgbc_bridgeRelayer) (fst <$> hgbc_oracleRelayers)
             , feeCollector
-            , voucher
+            , voucher $ hgbc_bridgeRelayer : hgbc_oracleRelayers
             , mToken
             , rewardsChef
             , cdpEngine
@@ -743,9 +751,9 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 proxy $ to
   , (".priceOracle", BContract "PriceOracle" $ unspecifiedChain priceOracleAddress)
   ]
 
-mercataBridge :: [BridgeChainInfo] -> [BridgeAssetInfo] -> AccountInfo
-mercataBridge bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
-  [ (".relayer", BAccount $ unspecifiedChain bridgeRelayerAddress)
+mercataBridge :: Address -> [BridgeChainInfo] -> [BridgeAssetInfo] -> AccountInfo
+mercataBridge bridgeRelayer bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
+  [ (".relayer", BAccount $ unspecifiedChain bridgeRelayer)
   , (".logicContract", BAccount $ unspecifiedChain mercataBridgeImplAddress)
   , (".tokenFactory", BContract "TokenFactory" $ unspecifiedChain tokenFactoryAddress)
   , (".depositsPaused", BBool False)
@@ -793,22 +801,18 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths 
   ++ ((\GA.Asset{..} -> (".isFactoryToken[" <> addrBS root <> "]", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain root)) <$> zip [(9 :: Integer)..] GA.assets)
 
-adminRegistry :: [Address] -> AccountInfo
-adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
+adminRegistry :: [Address] -> Address -> [Address] -> AccountInfo
+adminRegistry adminList bridgeRelayer oracleRelayers = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".logicContract", BAccount $ unspecifiedChain adminRegistryImplAddress)
      , (".defaultVotingThresholdBps", BInteger 6000)
      , (".admins.length", BInteger . fromIntegral $ length adminList)
      , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
-     , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS bridgeRelayerAddress <> "]", BBool True)
+     , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS bridgeRelayer <> "]", BBool True)
      , (".whitelist[" <> addrBS mTokenAddress <> "][mint][" <> addrBS liquidityPoolAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS mTokenAddress <> "][burn][" <> addrBS liquidityPoolAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS sUsdstAddress <> "][mint][" <> addrBS safetyModuleAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS sUsdstAddress <> "][burn][" <> addrBS safetyModuleAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS tokenFactoryAddress <> "][createTokenWithInitialOwner][" <> addrBS poolFactoryAddress <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleAddress1 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleAddress1 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleAddress2 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleAddress2 <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setLendingPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setLiquidityPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setCollateralVault][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
@@ -821,6 +825,10 @@ adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 prox
      [ (".admins[" <> BC.pack (show i) <> "]", BAccount $ unspecifiedChain adminAddress)
      , (".adminMap[" <> addrBS adminAddress <> "]", BInteger $ i + 1)
      ]) (zip [0..] adminList)
+  ++ concatMap (\oracleRelayer ->
+     [ (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleRelayer <> "]", BBool True)
+     ]) oracleRelayers
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
          then [ (".whitelist[" <> addrBS root <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
@@ -844,18 +852,16 @@ feeCollector :: AccountInfo
 feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [(".logicContract", BAccount $ unspecifiedChain feeCollectorImplAddress)]
 
-voucher :: AccountInfo
-voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
+voucher :: [(Address, Integer)] -> AccountInfo
+voucher extraAccounts = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , (".logicContract", BAccount $ unspecifiedChain voucherImplAddress)
      , ("._symbol", BString "VOUCHER")
      , ("._erc20Initialized", BBool True)
      , ("._totalSupply", BInteger $ 1_300_000 * oneE18)
      , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 1_000_000 * oneE18)
-     , ("._balances[" <> addrBS bridgeRelayerAddress <> "]", BInteger $ 100_000 * oneE18) -- $1,000 worth of txs
-     , ("._balances[" <> addrBS oracleAddress1 <> "]", BInteger $ 100_000 * oneE18)
-     , ("._balances[" <> addrBS oracleAddress2 <> "]", BInteger $ 100_000 * oneE18)
      ]
+  ++ ((\(acct, bal) -> ("._balances[" <> addrBS acct <> "]", BInteger bal)) <$> extraAccounts)
 
 mToken :: AccountInfo
 mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
@@ -1089,11 +1095,7 @@ validators = [
   ]
 
 admins :: [Address]
-admins = [
-  0x7630b673862a2807583834908f10192e00c58b00, --Kieren
-  0x292dd9591f506845ef05a9f3b8116e641cbcb4bb, --Victor
-  0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
-  ]
+admins = [blockappsAddress]
 
 descriptions :: M.Map Text Text
 descriptions = M.fromList
