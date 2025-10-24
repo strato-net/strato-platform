@@ -33,6 +33,7 @@ contract record AdminRegistry is Ownable {
         defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
+            require(_initialAdmins[i] != address(0), "Invalid admin address");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
         }
