@@ -8,13 +8,14 @@ import "../Tokens/TokenFactory.sol";
 
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/utils/Pausable.sol";
 
 /**
  * @title LendingPool
  * @notice Core lending logic contract managing deposits, borrows, repayments, and liquidations.
  * @dev Risk parameters are configured by PoolConfigurator; operational functions may be owner-gated.
  */
-contract record LendingPool is Ownable {
+contract record LendingPool is Ownable, Pausable {
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // EVENTS
@@ -170,6 +171,18 @@ contract record LendingPool is Ownable {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
+    // PAUSE & UNPAUSE FUNCTIONS
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════════
     // LIQUIDITY OPERATIONS (DEPOSITS & WITHDRAWALS)
     // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -202,7 +215,7 @@ contract record LendingPool is Ownable {
      * @notice Withdraw liquidity by specifying underlying asset amount
      * @param amount The amount of underlying assets to withdraw
      */
-    function withdrawLiquidity(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function withdrawLiquidity(uint amount) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
         require(mToken != address(0), "mToken not set");
 
@@ -253,7 +266,7 @@ contract record LendingPool is Ownable {
      * @param asset The collateral asset address
      * @param amount The amount of collateral to withdraw
      */
-    function withdrawCollateral(address asset, uint amount) external onlyTokenFactory(asset) {
+    function withdrawCollateral(address asset, uint amount) external whenNotPaused onlyTokenFactory(asset) {
         require(amount > 0, "Invalid amount");
 
         uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
@@ -280,7 +293,7 @@ contract record LendingPool is Ownable {
     * @param amount The amount to borrow (underlying units, 18 decimals)
     * @dev Uses global borrow index; enforces system-wide debt ceilings.
     */
-    function borrow(uint amount) external onlyTokenFactory(borrowableAsset) {
+    function borrow(uint amount) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(amount > 0, "Invalid amount");
 
         // 1) bring index & reserves current, then enforce global caps
@@ -369,7 +382,7 @@ contract record LendingPool is Ownable {
      * @notice Borrow the maximum amount allowed by current collateral (minus 1 wei safety)
      * @return amountBorrowed The amount actually borrowed
      */
-    function borrowMax() external onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
+    function borrowMax() external whenNotPaused onlyTokenFactory(borrowableAsset) returns (uint amountBorrowed) {
         // Bring index & reserves current, then enforce system caps on the final amount
         _accrue();
 
@@ -445,7 +458,7 @@ contract record LendingPool is Ownable {
      * @notice Withdraw all supplied liquidity by burning the caller's entire mToken balance
      * @dev Burns 100% of caller's mTokens and transfers the corresponding underlying based on current exchange rate
      */
-    function withdrawLiquidityAll() external onlyTokenFactory(borrowableAsset) {
+    function withdrawLiquidityAll() external whenNotPaused onlyTokenFactory(borrowableAsset) {
         _accrue();
         require(mToken != address(0), "mToken not set");
         uint userShares = IERC20(mToken).balanceOf(msg.sender);
@@ -469,7 +482,7 @@ contract record LendingPool is Ownable {
      * @param asset The collateral asset to withdraw
      * @return amountWithdrawn The amount actually withdrawn
      */
-        function withdrawCollateralMax(address asset) external onlyTokenFactory(asset) returns (uint amountWithdrawn) {
+    function withdrawCollateralMax(address asset) external whenNotPaused onlyTokenFactory(asset) returns (uint amountWithdrawn) {
          // Current user collateral for asset
          uint totalCollateral = CollateralVault(_collateralVault()).userCollaterals(msg.sender, asset);
          require(totalCollateral > 0, "No collateral");
@@ -544,7 +557,7 @@ contract record LendingPool is Ownable {
         address borrower,
         uint debtToCover,
         uint minCollateralOut
-    ) public onlyTokenFactory(borrowableAsset) {
+    ) public whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
         require(debtToCover > 0, "Invalid debt amount");
@@ -652,7 +665,7 @@ contract record LendingPool is Ownable {
         address collateralAsset,
         address borrower,
         uint minCollateralOut
-    ) external onlyTokenFactory(borrowableAsset) {
+    ) external whenNotPaused onlyTokenFactory(borrowableAsset) {
         require(collateralAsset != address(0), "Invalid collateral asset");
         require(borrower != address(0) && borrower != msg.sender, "Invalid borrower");
 
@@ -1129,7 +1142,7 @@ contract record LendingPool is Ownable {
     *      - Iterates configured assets and seizes any leftover collateral balances (>0) to `feeCollector`.
     *      - No-op if borrower still has liquidation-weighted value or has no scaled debt.
     */
-    function recognizeBadDebt(address borrower) external onlyPoolConfigurator {
+    function recognizeBadDebt(address borrower) external whenNotPaused onlyPoolConfigurator {
         _accrue();
         if (_getTotalCollateralValueForHealth(borrower) > 0) return;
 
@@ -1164,7 +1177,7 @@ contract record LendingPool is Ownable {
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
-    function coverShortfall(uint amount) external {
+    function coverShortfall(uint amount) external whenNotPaused {
         require(msg.sender == address(safetyModule), "LP:not SM");
         require(amount > 0, "LP:zero");
 
@@ -1179,7 +1192,7 @@ contract record LendingPool is Ownable {
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
-    function writeOffBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
+    function writeOffBadDebtFromReserves(uint amount) external whenNotPaused onlyPoolConfigurator {
         if (amount == 0) return;
         _accrue();
 
@@ -1200,7 +1213,7 @@ contract record LendingPool is Ownable {
     /// @notice LAST-RESORT: write off bad debt without funding (haircut depositors).
     /// @dev Reduces `badDebt` directly, which lowers getExchangeRate() once, pro-rata for all mToken holders.
     ///      Use only after attempting SM coverage and reserves write-off.
-    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external onlyPoolConfigurator
+    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external whenNotPaused onlyPoolConfigurator
     {
         require(amount > 0, "LP:zero");
         _accrue();
