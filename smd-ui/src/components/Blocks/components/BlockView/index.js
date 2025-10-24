@@ -245,7 +245,7 @@ class BlockView extends Component {
               style={{ tableLayout: 'fixed', width: "100%" }}>
               <thead>
                 <tr>
-                  <th width="60%"><h5>Username</h5></th>
+                  <th width="60%"><h5>Address</h5></th>
                 </tr>
               </thead>
 
@@ -264,7 +264,7 @@ class BlockView extends Component {
               style={{ tableLayout: 'fixed', width: "100%" }}>
               <thead>
                 <tr>
-                  <th width="60%"><h5>Username</h5></th>
+                  <th width="60%"><h5>Address</h5></th>
                 </tr>
               </thead>
 
@@ -283,7 +283,7 @@ class BlockView extends Component {
               style={{ tableLayout: 'fixed', width: "100%" }}>
               <thead>
                 <tr>
-                  <th width="60%"><h5>Username</h5></th>
+                  <th width="60%"><h5>Address</h5></th>
                 </tr>
               </thead>
 
