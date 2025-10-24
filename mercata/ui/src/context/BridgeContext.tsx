@@ -100,30 +100,14 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
     [availableNetworks, fetchTokensForChain],
   );
 
-  const bridgeOut = useCallback(
+  const requestWithdrawal = useCallback(
     async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
       setLoading(true);
       try {
-        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/bridgeOut`, params);
+        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/requestWithdrawal`, params);
         return { success: true, data };
       } catch (e) {
-        setError("Bridge out failed");
-        throw e;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-
-  const redeemOut = useCallback(
-    async (params: WithdrawalRequestParams): Promise<BridgeResponse> => {
-      setLoading(true);
-      try {
-        const { data } = await api.post<WithdrawalRequestResponse>(`/bridge/redeemOut`, params);
-        return { success: true, data };
-      } catch (e) {
-        setError("Redeem out failed");
+        setError("Withdrawal request failed");
         throw e;
       } finally {
         setLoading(false);
@@ -313,8 +297,7 @@ export const BridgeProvider = ({ children }: { children: ReactNode }) => {
         selectedMintToken,
         targetTransactionTab,
         setTargetTransactionTab,
-        bridgeOut,
-        redeemOut,
+        requestWithdrawal,
         useBalance,
         setSelectedNetwork: handleSetSelectedNetwork,
         setSelectedToken,

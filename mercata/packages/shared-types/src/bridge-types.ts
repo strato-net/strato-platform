@@ -33,7 +33,7 @@ export interface BridgeToken {
   externalToken: string;         // Matches AssetInfo.externalToken
   externalSymbol: string;        // Matches AssetInfo.externalSymbol
   externalDecimals: string;      // Matches AssetInfo.externalDecimals
-  maxPerTx: string;              // Matches AssetInfo.maxPerTx
+  maxPerWithdrawal: string;      // Matches AssetInfo.maxPerWithdrawal
 }
 
 // ============================================================================
@@ -90,9 +90,10 @@ export type BridgeTransactionTab = 'DepositRecorded' | 'WithdrawalInitiated' | '
  */
 export interface WithdrawalRequestParams {
   externalChainId: string;
+  externalRecipient: string;
+  externalToken: string;
   stratoToken: string;
   stratoTokenAmount: string;
-  externalRecipient: string;
 }
 
 /**
@@ -101,5 +102,4 @@ export interface WithdrawalRequestParams {
 export interface WithdrawalRequestResponse {
   status: string;
   hash: string;
-  message: string;
 }

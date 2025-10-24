@@ -94,34 +94,53 @@ export interface PreparedWithdrawal {
   withdrawalId: string;
 }
 
-export interface Deposit {
+export interface DepositArgs {
   externalChainId: string | number;
-  externalTxHash: string;
-  stratoToken: string;
-  stratoRecipient: string;
-  stratoTokenAmount: string;
   externalSender: string;
   externalToken: string;
   externalTokenAmount: string;
+  externalTxHash: string;
+  stratoRecipient: string;
+}
+
+export interface ConfirmDepositArgs {
+  externalChainId: string | number;
+  externalTxHash: string;
+  stratoRecipient: string;
+  verified: boolean;
+}
+
+export interface DepositInfo {
+  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  externalSender: string;
+  externalToken: string;
+  requestedAt: string;
+  stratoRecipient: string;
+  stratoToken: string;
+  stratoTokenAmount: string;
+  timestamp: string;
+
+  externalChainId: string | number;
+  externalTxHash: string;
   externalDecimals: number;
-  depositId: string;
-  mintUSDST: boolean;
   depositRouter: string;
 }
 
-export interface Withdrawal {
 
-  withdrawalId?: string;
-  safeTxHash?: string;
+export interface WithdrawalInfo {
+  bridgeStatus: string; // NONE / INITIATED / COMPLETED / ABORTED
+  custodyTxHash: string;
   externalChainId: string | number;
   externalRecipient: string;
+  externalToken: string;
+  externalTokenAmount: string;
+  requestedAt: string;
+  stratoSender: string;
   stratoToken: string;
   stratoTokenAmount: string;
-  stratoSender: string;
-  bridgeStatus: string;
-  mintUSDST: boolean;
   timestamp: string;
-  requestedAt: string;
+
+  withdrawalId: string;
 }
 
 export interface ChainInfo {

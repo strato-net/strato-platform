@@ -4,7 +4,7 @@ import {
   getInternalTransactionsBatch 
 } from "./rpcService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
-import { Deposit } from "../types";
+import { DepositInfo } from "../types";
 
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
@@ -27,7 +27,7 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: Deposit, chainId: number, safe: string) => {
+const validateDeposit = (deposit: DepositInfo, chainId: number, safe: string) => {
   if (deposit.externalChainId !== chainId.toString()) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
@@ -38,7 +38,6 @@ const validateDeposit = (deposit: Deposit, chainId: number, safe: string) => {
   return {
     safe,
     isETH: externalToken === ZERO_ADDRESS,
-    expectedAmount: safeToBigInt(deposit.externalTokenAmount),
     externalToken,
     depositRouter,
     externalDecimals: deposit.externalDecimals
@@ -86,11 +85,11 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
 const fail = (txHash: string, msg: string): Error => new Error(`${msg} for ${txHash}`);
 
 // Batched verification for multiple deposits
-export const verifyDepositsBatch = async (deposits: Deposit[]): Promise<Map<string, Error | null>> => {
+export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<string, Error | null>> => {
   const results = new Map<string, Error | null>();
   
   // Group deposits by chain for batch processing
-  const depositsByChain = new Map<number, Deposit[]>();
+  const depositsByChain = new Map<number, DepositInfo[]>();
   deposits.forEach(deposit => {
     const externalChainId = typeof deposit.externalChainId === "number" 
       ? deposit.externalChainId 
