@@ -329,7 +329,6 @@ contract record MercataBridge is Ownable {
         require(a.externalChainId == externalChainId, "MB: wrong chain");
         require(chains[externalChainId].enabled, "MB: chain off");
         require(stratoTokenAmount > 0,"MB: zero");
-        require(stratoRecipient != address(0), "MB: zero recipient");
         uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
         require(_has(a.permissions, need), "MB: not permitted");
 
