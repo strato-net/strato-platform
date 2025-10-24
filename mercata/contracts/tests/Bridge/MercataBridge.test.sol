@@ -1408,4 +1408,156 @@ contract Describe_MercataBridge is Authorizable {
         require(IERC20(address(testToken)).balanceOf(recipient1) == 0, "No tokens should be minted for first deposit");
         require(IERC20(address(testToken)).balanceOf(recipient2) == 0, "No tokens should be minted for second deposit");
     }
+
+    function it_bridge_deposit_decimal_conversion_works_correctly() {
+        // Test decimal conversion from 6-decimal USDC to 18-decimal STRATO tokens
+        // 1e6 USDC (6 decimals) should convert to 1e18 STRATO tokens (18 decimals)
+        
+        // Set up asset with 6 decimals (like USDC)
+        uint256 usdcDecimals = 6;
+        string memory usdcName = "USD Coin";
+        string memory usdcSymbol = "USDC";
+        address usdcToken = address(0x1111);
+        uint256 maxPerWithdrawal = 0; // unlimited
+        address usdcStratoToken = address(testToken);
+        
+        bridge.setAsset(true, externalChainId, usdcDecimals, usdcName, usdcSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
+        
+        // Test conversion: 1e6 USDC should become 1e18 STRATO tokens
+        uint256 externalTokenAmount = 1e6; // 1 USDC in 6-decimal format
+        uint256 expectedStratoAmount = 1e18; // 1 STRATO token in 18-decimal format
+        
+        bridge.deposit(externalChainId, address(0x2222), usdcToken, externalTokenAmount, "0x123", address(0x3333));
+        
+        // Check the deposit was recorded with correct conversion
+        (,,,,,, uint256 recordedStratoAmount,) = bridge.deposits(externalChainId, "0x123");
+        require(recordedStratoAmount == expectedStratoAmount, "Decimal conversion failed");
+        
+        // Test another conversion: 2.5e6 USDC should become 2.5e18 STRATO tokens
+        uint256 externalTokenAmount2 = 25e5; // 2.5 USDC in 6-decimal format
+        uint256 expectedStratoAmount2 = 25e17; // 2.5 STRATO tokens in 18-decimal format
+        
+        bridge.deposit(externalChainId, address(0x4444), usdcToken, externalTokenAmount2, "0x456", address(0x5555));
+        
+        // Check the second deposit was recorded with correct conversion
+        (,,,,,, uint256 recordedStratoAmount2,) = bridge.deposits(externalChainId, "0x456");
+        require(recordedStratoAmount2 == expectedStratoAmount2, "Decimal conversion failed for 2.5 USDC");
+    }
+
+    function it_bridge_deposit_same_decimal_conversion_works_correctly() {
+        // Test decimal conversion when external token has same decimals as STRATO (18 decimals)
+        // 1e18 external tokens should convert to 1e18 STRATO tokens (no conversion needed)
+        
+        // Set up asset with 18 decimals (same as STRATO)
+        uint256 tokenDecimals = 18;
+        string memory tokenName = "Ethereum Token";
+        string memory tokenSymbol = "ETH";
+        address ethToken = address(0x2222);
+        uint256 maxPerWithdrawal = 0; // unlimited
+        address ethStratoToken = address(testToken);
+        
+        bridge.setAsset(true, externalChainId, tokenDecimals, tokenName, tokenSymbol, ethToken, maxPerWithdrawal, ethStratoToken);
+        
+        // Test conversion: 1e18 ETH should become 1e18 STRATO tokens (1:1 ratio)
+        uint256 externalTokenAmount = 1e18; // 1 ETH in 18-decimal format
+        uint256 expectedStratoAmount = 1e18; // 1 STRATO token in 18-decimal format
+        
+        bridge.deposit(externalChainId, address(0x3333), ethToken, externalTokenAmount, "0x789", address(0x4444));
+        
+        // Check the deposit was recorded with correct conversion (1:1 ratio)
+        (,,,,,, uint256 recordedStratoAmount,) = bridge.deposits(externalChainId, "0x789");
+        require(recordedStratoAmount == expectedStratoAmount, "Same decimal conversion failed");
+        
+        // Test another conversion: 2.5e18 ETH should become 2.5e18 STRATO tokens
+        uint256 externalTokenAmount2 = 25e17; // 2.5 ETH in 18-decimal format
+        uint256 expectedStratoAmount2 = 25e17; // 2.5 STRATO tokens in 18-decimal format
+        
+        bridge.deposit(externalChainId, address(0x5555), ethToken, externalTokenAmount2, "0xabc", address(0x6666));
+        
+        // Check the second deposit was recorded with correct conversion (1:1 ratio)
+        (,,,,,, uint256 recordedStratoAmount2,) = bridge.deposits(externalChainId, "0xabc");
+        require(recordedStratoAmount2 == expectedStratoAmount2, "Same decimal conversion failed for 2.5 ETH");
+        
+        // Test fractional conversion: 0.1e18 ETH should become 0.1e18 STRATO tokens
+        uint256 externalTokenAmount3 = 1e17; // 0.1 ETH in 18-decimal format
+        uint256 expectedStratoAmount3 = 1e17; // 0.1 STRATO tokens in 18-decimal format
+        
+        bridge.deposit(externalChainId, address(0x7777), ethToken, externalTokenAmount3, "0xdef", address(0x8888));
+        
+        // Check the third deposit was recorded with correct conversion (1:1 ratio)
+        (,,,,,, uint256 recordedStratoAmount3,) = bridge.deposits(externalChainId, "0xdef");
+        require(recordedStratoAmount3 == expectedStratoAmount3, "Same decimal conversion failed for 0.1 ETH");
+    }
+
+    function it_bridge_withdrawal_decimal_conversion_rounds_down() {
+        // Test that withdrawal conversion rounds down when precision is lost
+        // Set up asset with 6 decimals (like USDC)
+        uint256 tokenDecimals = 6;
+        string memory tokenName = "USD Coin";
+        string memory tokenSymbol = "USDC";
+        address usdcToken = address(0x6666);
+        uint256 maxPerWithdrawal = 0; // unlimited
+        address usdcStratoToken = address(testToken);
+        
+        bridge.setAsset(true, externalChainId, tokenDecimals, tokenName, tokenSymbol, usdcToken, maxPerWithdrawal, usdcStratoToken);
+        
+        // Test withdrawal conversion: 1.999999 STRATO tokens should become 1.999999 USDC (rounds down)
+        // 1.999999e18 STRATO tokens / 10^(18-6) = 1.999999e18 / 10^12 = 1999999 -> rounds down to 1999999
+        uint256 stratoTokenAmount = 1999999e12; // 1.999999 STRATO tokens in 18-decimal format
+        uint256 expectedExternalAmount = 1999999; // 1.999999 USDC in 6-decimal format (no rounding needed)
+        
+        // First mint some tokens to the user
+        testToken.mint(address(this), stratoTokenAmount);
+        testToken.approve(address(bridge), stratoTokenAmount);
+        
+        uint256 withdrawalId = bridge.requestWithdrawal(externalChainId, address(0x7777), usdcToken, stratoTokenAmount);
+        
+        // Check the withdrawal was recorded with correct conversion
+        (,,,,, uint256 recordedExternalAmount,,,,,) = bridge.withdrawals(withdrawalId);
+        require(recordedExternalAmount == expectedExternalAmount, "USDC withdrawal conversion failed");
+        
+        // Test rounding down scenario: 1.999999999 STRATO tokens should become 1.999999 USDC (rounds down)
+        uint256 stratoTokenAmount2 = 1999999999e9; // 1.999999999 STRATO tokens in 18-decimal format
+        uint256 expectedExternalAmount2 = 1999999; // 1.999999 USDC in 6-decimal format (rounded down)
+        
+        // Mint more tokens
+        testToken.mint(address(this), stratoTokenAmount2);
+        testToken.approve(address(bridge), stratoTokenAmount2);
+        
+        uint256 withdrawalId2 = bridge.requestWithdrawal(externalChainId, address(0x8888), usdcToken, stratoTokenAmount2);
+        
+        // Check the second withdrawal was recorded with correct conversion (should round down)
+        (,,,,, uint256 recordedExternalAmount2,,,,,) = bridge.withdrawals(withdrawalId2);
+        require(recordedExternalAmount2 == expectedExternalAmount2, "USDC rounding down failed");
+        
+        // Test edge case: very small STRATO amount that should round down to 0
+        uint256 tinyStratoAmount = 1e11; // 0.0000001 STRATO tokens in 18-decimal format
+        uint256 expectedTinyExternalAmount = 0; // 1.000000 USDC in 6-decimal format (rounded down to 0)
+        
+        // Mint tiny amount
+        testToken.mint(address(this), tinyStratoAmount);
+        testToken.approve(address(bridge), tinyStratoAmount);
+        
+        bool reverted = false;
+        try {
+            uint256 withdrawalId3 = bridge.requestWithdrawal(externalChainId, address(0x9999), usdcToken, tinyStratoAmount);
+        } catch {
+            reverted = true;
+        }
+        require(reverted, "Should revert when tiny withdrawal is recorded with correct conversion (should round down to 0)");
+
+        // Test another rounding down scenario: 2.000001 STRATO tokens should become 2.000000 USDC (rounds down)
+        uint256 stratoTokenAmount4 = 2000001e12; // 2.000001 STRATO tokens in 18-decimal format
+        uint256 expectedExternalAmount4 = 2000001; // 2.000000 USDC in 6-decimal format (rounded down)
+        
+        // Mint more tokens
+        testToken.mint(address(this), stratoTokenAmount4);
+        testToken.approve(address(bridge), stratoTokenAmount4);
+        
+        uint256 withdrawalId4 = bridge.requestWithdrawal(externalChainId, address(0xaaaa), usdcToken, stratoTokenAmount4);
+        
+        // Check the fourth withdrawal was recorded with correct conversion (should round down)
+        (,,,,, uint256 recordedExternalAmount4,,,,,) = bridge.withdrawals(withdrawalId4);
+        require(recordedExternalAmount4 == expectedExternalAmount4, "USDC precision loss rounding down failed");
+    }
 }
