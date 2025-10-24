@@ -169,21 +169,21 @@ contract record MercataBridge is Ownable {
     /// @notice Restricts access to the relayer address only
     /// @dev Ensures only the designated relayer can perform certain operations
     modifier onlyRelayer() {
-        require(msg.sender == relayer, "BA: relayer only");
+        require(msg.sender == relayer, "MB: relayer only");
         _;
     }
 
     /// @notice Ensures deposits are not paused
     /// @dev Prevents deposit operations when circuit breaker is active
     modifier whenDepositsOpen() {
-        require(!depositsPaused, "BA: deposits paused");
+        require(!depositsPaused, "MB: deposits paused");
         _;
     }
 
     /// @notice Ensures withdrawals are not paused
     /// @dev Prevents withdrawal operations when circuit breaker is active
     modifier whenWithdrawalsOpen() {
-        require(!withdrawalsPaused, "BA: withdrawals paused");
+        require(!withdrawalsPaused, "MB: withdrawals paused");
         _;
     }
 
@@ -216,7 +216,7 @@ contract record MercataBridge is Ownable {
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
         WITHDRAWAL_ABORT_DELAY = 172800;
 
-        require(_tokenFactory != address(0) && _relayer != address(0), "BC: zero");
+        require(_tokenFactory != address(0) && _relayer != address(0), "MB: zero");
         tokenFactory = _tokenFactory;
         relayer      = _relayer;
     }
@@ -231,9 +231,9 @@ contract record MercataBridge is Ownable {
     function emergencySetLastProcessedBlock(
         uint256 externalChainId, uint256 lastProcessedBlock
     ) external onlyOwner {
-        require(externalChainId > 0, "BR: invalid external chain id");
+        require(externalChainId > 0, "MB: invalid external chain id");
         ChainInfo chainInfo = chains[externalChainId];
-        require(chainInfo.custody != address(0), "BR: chain missing");
+        require(chainInfo.custody != address(0), "MB: chain missing");
         
         chainInfo.lastProcessedBlock = lastProcessedBlock;
         emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
@@ -256,10 +256,10 @@ contract record MercataBridge is Ownable {
     function setAsset(
         bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken
     ) external onlyOwner {
-        require(chains[externalChainId].custody != address(0), "BR: chain missing");
-        require(externalName.length > 0, "BR: invalid external name");
-        require(externalSymbol.length > 0, "BR: invalid external symbol");
-        require(stratoToken != address(0), "BR: invalid strato token");
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        require(externalName.length > 0, "MB: invalid external name");
+        require(externalSymbol.length > 0, "MB: invalid external symbol");
+        require(stratoToken != address(0), "MB: invalid strato token");
         assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
         emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
     }
@@ -277,12 +277,12 @@ contract record MercataBridge is Ownable {
     function setAssetMetadata(
         uint256 externalChainId, string externalName, string externalSymbol, address externalToken
     ) external onlyOwner {
-        require(externalChainId > 0, "BA: invalid chain id");
-        require(externalName.length > 0, "BA: invalid external name");
-        require(externalSymbol.length > 0, "BA: invalid external symbol");
-        require(chains[externalChainId].custody != address(0), "BA: chain missing");
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(externalName.length > 0, "MB: invalid external name");
+        require(externalSymbol.length > 0, "MB: invalid external symbol");
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
         AssetInfo assetInfo = assets[externalToken][externalChainId];
-        require(assetInfo.externalToken == externalToken, "BA: asset not found");
+        require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.externalName = externalName;
         assetInfo.externalSymbol = externalSymbol;
         emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken);
@@ -301,10 +301,10 @@ contract record MercataBridge is Ownable {
     function setWithdrawalLimits(
         uint256 externalChainId, address externalToken, uint256 maxPerWithdrawal
     ) external onlyOwner {
-        require(externalChainId > 0, "BA: invalid chain id");
-        require(chains[externalChainId].custody != address(0), "BA: chain missing");
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
         AssetInfo assetInfo = assets[externalToken][externalChainId];
-        require(assetInfo.externalToken == externalToken, "BA: asset not found");
+        require(assetInfo.externalToken == externalToken, "MB: asset not found");
         assetInfo.maxPerWithdrawal = maxPerWithdrawal;
         emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken);
     }
@@ -322,10 +322,10 @@ contract record MercataBridge is Ownable {
     function setChain(
         string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
     ) external onlyOwner {
-        require(chainName.length > 0, "BR: invalid chain name");
-        require(custody != address(0), "BR: zero custody address");
-        require(externalChainId > 0, "BR: invalid external chain id");
-        require(router != address(0), "BR: zero router address");
+        require(chainName.length > 0, "MB: invalid chain name");
+        require(custody != address(0), "MB: zero custody address");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(router != address(0), "MB: zero router address");
         chains[externalChainId] = ChainInfo(chainName, custody, router, enabled, lastProcessedBlock);
         emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router);
     }
@@ -339,11 +339,11 @@ contract record MercataBridge is Ownable {
     function setLastProcessedBlock(
         uint256 externalChainId, uint256 lastProcessedBlock
     ) external onlyRelayer {
-        require(externalChainId > 0, "BR: invalid external chain id");
+        require(externalChainId > 0, "MB: invalid external chain id");
         ChainInfo chainInfo = chains[externalChainId];
-        require(chainInfo.custody != address(0), "BR: chain missing");
+        require(chainInfo.custody != address(0), "MB: chain missing");
         
-        require(lastProcessedBlock >= chainInfo.lastProcessedBlock, "BR: cannot rollback block");
+        require(lastProcessedBlock >= chainInfo.lastProcessedBlock, "MB: cannot rollback block");
         
         chainInfo.lastProcessedBlock = lastProcessedBlock;
         emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
@@ -367,7 +367,7 @@ contract record MercataBridge is Ownable {
      * @param newRelayer The new relayer address (must not be zero address)
      */
     function setRelayer(address newRelayer) external onlyOwner {
-        require(newRelayer != address(0), "BA: zero");
+        require(newRelayer != address(0), "MB: zero");
         emit RelayerUpdated(newRelayer, relayer);
         relayer = newRelayer;
     }
@@ -378,7 +378,7 @@ contract record MercataBridge is Ownable {
      * @param newFactory The new token factory address (must not be zero address)
      */
     function setTokenFactory(address newFactory) external onlyOwner {
-        require(newFactory != address(0), "BA: zero");
+        require(newFactory != address(0), "MB: zero");
         emit TokenFactoryUpdated(newFactory, tokenFactory);
         tokenFactory = newFactory;
     }
@@ -389,7 +389,7 @@ contract record MercataBridge is Ownable {
      * @param newUSDSTAddress The new USDST token address (must not be zero address)
      */
     function setUSDSTAddress(address newUSDSTAddress) external onlyOwner {
-        require(newUSDSTAddress != address(0), "BA: zero USDST address");
+        require(newUSDSTAddress != address(0), "MB: zero USDST address");
         emit USDSTAddressUpdated(newUSDSTAddress, USDST_ADDRESS);
         USDST_ADDRESS = newUSDSTAddress;
     }
@@ -401,8 +401,8 @@ contract record MercataBridge is Ownable {
      * @param enabled Whether to enable or disable the chain
      */
     function toggleChain(uint256 externalChainId, bool enabled) external onlyOwner {
-        require(externalChainId > 0, "BA: invalid chain id");
-        require(chains[externalChainId].custody != address(0), "BA: chain not found");
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(chains[externalChainId].custody != address(0), "MB: chain not found");
         
         chains[externalChainId].enabled = enabled;
         emit ChainToggled(enabled, externalChainId);
@@ -416,8 +416,8 @@ contract record MercataBridge is Ownable {
      * @param enabled Whether to enable or disable the asset
      */
     function toggleAsset(address externalToken, uint256 externalChainId, bool enabled) external onlyOwner {
-        require(externalChainId > 0, "BA: invalid chain id");
-        require(assets[externalToken][externalChainId].externalChainId == externalChainId, "BA: asset not found");
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(assets[externalToken][externalChainId].externalChainId == externalChainId, "MB: asset not found");
         
         assets[externalToken][externalChainId].enabled = enabled;
         emit AssetToggled(enabled, externalChainId, externalToken);
@@ -434,7 +434,7 @@ contract record MercataBridge is Ownable {
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
         Token(token).burn(address(this), amount);
         actualAmount = balanceBefore - IERC20(token).balanceOf(address(this));
-        require(actualAmount > 0, "Escrow: no tokens burned");
+        require(actualAmount > 0, "MB: no tokens burned");
     }
 
     /**
@@ -446,9 +446,9 @@ contract record MercataBridge is Ownable {
      */
     function _escrowFunds(address token, address from, uint256 amount) internal returns (uint256 actualAmount) {
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
-        require(IERC20(token).transferFrom(from, address(this), amount), "Escrow: transfer failed");
+        require(IERC20(token).transferFrom(from, address(this), amount), "MB: transfer failed");
         actualAmount = IERC20(token).balanceOf(address(this)) - balanceBefore;
-        require(actualAmount > 0, "Escrow: no tokens received");
+        require(actualAmount > 0, "MB: no tokens received");
     }
 
     /**
@@ -462,7 +462,7 @@ contract record MercataBridge is Ownable {
         uint256 balanceBefore = IERC20(token).balanceOf(to);
         Token(token).mint(to, amount);
         actualAmount = IERC20(token).balanceOf(to) - balanceBefore;
-        require(actualAmount > 0, "Escrow: no tokens minted");
+        require(actualAmount > 0, "MB: no tokens minted");
     }
 
     /**
@@ -474,9 +474,9 @@ contract record MercataBridge is Ownable {
      */
     function _refundFunds(address token, address to, uint256 amount) internal returns (uint256 actualAmount) {
         uint256 balanceBefore = IERC20(token).balanceOf(address(this));
-        require(IERC20(token).transfer(to, amount), "Escrow: transfer failed");
+        require(IERC20(token).transfer(to, amount), "MB: transfer failed");
         actualAmount = balanceBefore - IERC20(token).balanceOf(address(this));
-        require(actualAmount > 0, "Escrow: no tokens sent");
+        require(actualAmount > 0, "MB: no tokens sent");
     }
 
     // ───────────── Deposit & withdrawal related functions ─────────────
@@ -497,25 +497,25 @@ contract record MercataBridge is Ownable {
     function deposit(
         uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient
     ) public onlyRelayer whenDepositsOpen {
-        require(externalChainId > 0, "BC: invalid external chain id");
-        require(externalSender != address(0), "BC: invalid external sender");
-        require(externalTokenAmount > 0, "BC: invalid external token amount");
-        require(externalTxHash.length > 0, "BC: invalid external tx hash");
-        require(stratoRecipient != address(0), "BC: invalid strato recipient");
-        require(chains[externalChainId].enabled, "BC: chain not enabled");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalSender != address(0), "MB: invalid external sender");
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        require(stratoRecipient != address(0), "MB: invalid strato recipient");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
         string normalizedTxHash = string(uint(externalTxHash, 16), 16);
-        require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "BC: duplicate deposit");
+        require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "BC: asset not enabled");
-        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "BC: inactive token");
+        require(a.enabled, "MB: asset not enabled");
+        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
 
         // Example: 1e6 USDC * 10^(18-6) = 1e6 * 10^12 = 1e18 USDCST tokens
         uint256 stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
-        require(stratoTokenAmount > 0, "BC: invalid strato token amount");
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
 
         deposits[externalChainId][normalizedTxHash] = DepositInfo(
             BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, a.stratoToken, stratoTokenAmount, block.timestamp
@@ -541,7 +541,7 @@ contract record MercataBridge is Ownable {
         uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients
     ) external onlyRelayer whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "BC: len");
+        require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
             deposit(externalChainIds[i], externalSenders[i], externalTokens[i], externalTokenAmounts[i], externalTxHashes[i], stratoRecipients[i]);
         }
@@ -558,18 +558,18 @@ contract record MercataBridge is Ownable {
     function confirmDeposit(
         uint256 externalChainId, string externalTxHash
     ) public onlyRelayer whenDepositsOpen {
-        require(externalChainId > 0, "BC: invalid external chain id");
-        require(chains[externalChainId].enabled, "BC: chain not enabled");
-        require(externalTxHash.length > 0, "BC: invalid external tx hash");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
         string normalizedTxHash = string(uint(externalTxHash, 16), 16);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "BC: bad state");
+        require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
-        require(actualMintedAmount > 0, "BC: no tokens minted");
+        require(actualMintedAmount > 0, "MB: no tokens minted");
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
         d.timestamp = block.timestamp;
@@ -589,7 +589,7 @@ contract record MercataBridge is Ownable {
         uint256[] externalChainIds, string[] externalTxHashes
     ) external onlyRelayer whenDepositsOpen {   
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "BC: len");
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
             confirmDeposit(externalChainIds[i], externalTxHashes[i]);
         }
@@ -606,15 +606,15 @@ contract record MercataBridge is Ownable {
     function reviewDeposit(
         uint256 externalChainId, string externalTxHash
     ) public onlyRelayer whenDepositsOpen {
-        require(externalChainId > 0, "BC: invalid external chain id");
-        require(chains[externalChainId].enabled, "BC: chain not enabled");
-        require(externalTxHash.length > 0, "BC: invalid external tx hash");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
         string normalizedTxHash = string(uint(externalTxHash, 16), 16);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.INITIATED, "BC: bad state");
+        require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         d.timestamp = block.timestamp;
@@ -634,7 +634,7 @@ contract record MercataBridge is Ownable {
         uint256[] externalChainIds, string[] externalTxHashes
     ) external onlyRelayer whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "BC: len");
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             reviewDeposit(externalChainIds[i], externalTxHashes[i]);
@@ -652,15 +652,15 @@ contract record MercataBridge is Ownable {
     function abortDeposit(
         uint256 externalChainId, string externalTxHash
     ) public onlyOwner whenDepositsOpen {
-        require(externalChainId > 0, "BC: invalid external chain id");
-        require(chains[externalChainId].enabled, "BC: chain not enabled");
-        require(externalTxHash.length > 0, "BC: invalid external tx hash");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
         string normalizedTxHash = string(uint(externalTxHash, 16), 16);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
-        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "BC: bad state");
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.ABORTED;
         d.timestamp = block.timestamp;
@@ -680,7 +680,7 @@ contract record MercataBridge is Ownable {
         uint256[] externalChainIds, string[] externalTxHashes
     ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(n > 0 && n == externalTxHashes.length, "BC: len");
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             abortDeposit(externalChainIds[i], externalTxHashes[i]);
@@ -703,26 +703,26 @@ contract record MercataBridge is Ownable {
     function requestWithdrawal(
         uint256 externalChainId, address externalRecipient, address externalToken, uint256 stratoTokenAmount
     ) external whenWithdrawalsOpen returns (uint256 id) {
-        require(externalChainId > 0, "BC: invalid external chain id");
-        require(externalRecipient != address(0), "BC: invalid external recipient");
-        require(stratoTokenAmount > 0, "BC: invalid strato token amount");
-        require(chains[externalChainId].enabled, "BC: chain not enabled");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalRecipient != address(0), "MB: invalid external recipient");
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
 
         AssetInfo a = assets[externalToken][externalChainId];
-        require(a.enabled, "BC: asset not enabled");
-        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "BC: inactive token");
+        require(a.enabled, "MB: asset not enabled");
+        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
 
-        require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "BC: per-withdrawal cap");
+        require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
 
         uint256 actualStratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
-        require(actualStratoTokenAmount > 0, "BC: no tokens escrowed");
+        require(actualStratoTokenAmount > 0, "MB: no tokens escrowed");
 
         id = ++withdrawalCounter;
 
         // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
         // Round down to the nearest integer
         uint256 externalTokenAmount = actualStratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
-        require(externalTokenAmount > 0, "BC: invalid external token amount");
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
 
         withdrawals[id] = WithdrawalInfo(
             BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, actualStratoTokenAmount, block.timestamp
@@ -742,11 +742,11 @@ contract record MercataBridge is Ownable {
     function confirmWithdrawal(
         uint256 id, string custodyTxHash
     ) public onlyRelayer whenWithdrawalsOpen {
-        require(id > 0, "BC: invalid withdrawal id");
-        require(custodyTxHash.length > 0, "BC: invalid custody tx hash");
+        require(id > 0, "MB: invalid withdrawal id");
+        require(custodyTxHash.length > 0, "MB: invalid custody tx hash");
 
         WithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.INITIATED, "BC: bad state");
+        require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         w.timestamp = block.timestamp;
@@ -771,7 +771,7 @@ contract record MercataBridge is Ownable {
         uint256[] ids, string[] custodyTxHashes
     ) external onlyRelayer whenWithdrawalsOpen {
         uint256 n = ids.length;
-        require(n > 0 && n == custodyTxHashes.length, "BC: len");
+        require(n > 0 && n == custodyTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             confirmWithdrawal(ids[i], custodyTxHashes[i]);
@@ -788,13 +788,13 @@ contract record MercataBridge is Ownable {
     function finaliseWithdrawal(
         uint256 id
     ) public onlyRelayer whenWithdrawalsOpen {
-        require(id > 0, "BC: invalid withdrawal id");
+        require(id > 0, "MB: invalid withdrawal id");
 
         WithdrawalInfo w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "BC: bad state");
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
         uint256 actualBurnedAmount = _burnFunds(w.stratoToken, w.stratoTokenAmount);
-        require(actualBurnedAmount > 0, "BC: no tokens burned");
+        require(actualBurnedAmount > 0, "MB: no tokens burned");
 
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
@@ -812,7 +812,7 @@ contract record MercataBridge is Ownable {
         uint256[] ids
     ) external onlyRelayer whenWithdrawalsOpen {
         uint256 n = ids.length;
-        require(n > 0, "BC: len");
+        require(n > 0, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             finaliseWithdrawal(ids[i]);
@@ -831,25 +831,25 @@ contract record MercataBridge is Ownable {
     function abortWithdrawal(
         uint256 id
     ) public whenWithdrawalsOpen {
-        require(id > 0, "BC: invalid withdrawal id");
+        require(id > 0, "MB: invalid withdrawal id");
 
         WithdrawalInfo w = withdrawals[id];
         uint256 currentTimestamp = block.timestamp;
 
         if (msg.sender == relayer) {
-            require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "BC: not abortable");
+            require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
         }
         else {
-            require(msg.sender == w.stratoSender, "BC: not sender");
-            require(w.bridgeStatus == BridgeStatus.INITIATED, "BC: not abortable");
-            require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "BC: wait 48h");
+            require(msg.sender == w.stratoSender, "MB: not sender");
+            require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
+            require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait 48h");
         }
 
         w.bridgeStatus = BridgeStatus.ABORTED;
         w.timestamp = currentTimestamp;
 
         uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
-        require(actualRefundedAmount > 0, "BC: no tokens refunded");
+        require(actualRefundedAmount > 0, "MB: no tokens refunded");
 
         emit WithdrawalAborted(id);
     }
@@ -864,7 +864,7 @@ contract record MercataBridge is Ownable {
         uint256[] ids
     ) external whenWithdrawalsOpen {
         uint256 n = ids.length;
-        require(n > 0, "BC: len");
+        require(n > 0, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             abortWithdrawal(ids[i]);
