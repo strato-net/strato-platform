@@ -132,11 +132,13 @@ while [ ${#} -gt 0 ]; do
     exit 0
     ;;
   --down)
+    checkDocker
     checkCompose
     down
     exit 0
     ;;
   --wipe)
+    checkDocker
     checkCompose
     wipe
     exit 0
@@ -145,23 +147,28 @@ while [ ${#} -gt 0 ]; do
     node_type=single
     ;;
   --pull)
+    checkDocker
     checkCompose
     pullImages
     exit 0
     ;;
   --get-address)
+    checkDocker
     getAddress
     exit 0
     ;;
   --get-pubkey)
+    checkDocker
     getPublicKey
     exit 0
     ;;
   --get-validators)
+    checkDocker
     getValidators
     exit 0
     ;;
   --get-metadata)
+    checkDocker
     getMetadata
     exit 0
     ;;
@@ -173,6 +180,7 @@ while [ ${#} -gt 0 ]; do
   shift 1
 done
 
+checkDocker
 checkCompose
 
 export NODE_HOST=${NODE_HOST:-localhost}
