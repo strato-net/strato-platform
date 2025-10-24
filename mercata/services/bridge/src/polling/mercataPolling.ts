@@ -6,7 +6,7 @@ import {
   finaliseWithdrawalBatch,
   handleRejectedWithdrawalBatch,
 } from "../services/bridgeService";
-import { NonEmptyArray, Withdrawal, Deposit } from "../types";
+import { NonEmptyArray, WithdrawalInfo, DepositInfo, ConfirmDepositArgs } from "../types";
 import {
   getWithdrawalsByStatus,
   getDepositsByStatus,
@@ -25,12 +25,10 @@ export const startWithdrawalRequestPolling = (): void => {
       // Check Voucher and USDST balances regularly
       await checkBalances();
       
-      const initiatedWithdrawals = await getWithdrawalsByStatus("1");
+      const initiatedWithdrawals: WithdrawalInfo[] = await getWithdrawalsByStatus("1");
 
       if (initiatedWithdrawals.length > 0) {
-        await confirmWithdrawalBatch(
-          initiatedWithdrawals as NonEmptyArray<Withdrawal>,
-        );
+        await confirmWithdrawalBatch(initiatedWithdrawals as NonEmptyArray<WithdrawalInfo>);
       }
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
@@ -49,40 +47,45 @@ export const startDepositInitiatedPolling = (): void => {
 
   const poll = async () => {
     try {
-      const deposits = await getDepositsByStatus("1");
+      const deposits: DepositInfo[] = await getDepositsByStatus("1");
       if (!Array.isArray(deposits) || deposits.length === 0) return;
 
       const verificationResults = await verifyDepositsBatch(deposits);
       
-      const results = deposits.map((deposit) => {
-        const error = verificationResults.get(deposit.srcTxHash);
+      const results: ConfirmDepositArgs[] = deposits.map((deposit) => {
+        const error = verificationResults.get(deposit.externalTxHash);
         if (error) {
           logError("MercataPolling", error, {
             operation: "verifyDepositTransferEvents",
-            depositId: (deposit as any)?.id,
+            externalChainId: deposit.externalChainId,
+            externalTxHash: deposit.externalTxHash,
           });
-          return { deposit, verified: false as const };
+          return { externalChainId: deposit.externalChainId, externalTxHash: deposit.externalTxHash, stratoRecipient: deposit.stratoRecipient, verified: false as const };
         }
-        return { deposit, verified: true as const };
+        return { externalChainId: deposit.externalChainId, externalTxHash: deposit.externalTxHash, stratoRecipient: deposit.stratoRecipient, verified: true as const };
       });
 
-      const verifiedDeposits = results
-        .filter(r => r.verified)
-        .map(r => r.deposit);
-
-      const failedDeposits = results
-        .filter(r => !r.verified)
-        .map(r => r.deposit);
+      const { verifiedDeposits, failedDeposits } = results.reduce(
+        (acc, r) => {
+          if (r.verified) {
+            acc.verifiedDeposits.push(r);
+          } else {
+            acc.failedDeposits.push(r);
+          }
+          return acc;
+        },
+        { verifiedDeposits: [] as ConfirmDepositArgs[], failedDeposits: [] as ConfirmDepositArgs[] }
+      );
 
       if (verifiedDeposits.length > 0) {
         await confirmDepositBatch(
-          verifiedDeposits as NonEmptyArray<Deposit>
+          verifiedDeposits as NonEmptyArray<ConfirmDepositArgs>
         );
       }
 
       if (failedDeposits.length > 0) {
         await reviewDepositBatch(
-          failedDeposits as NonEmptyArray<Deposit>
+          failedDeposits as NonEmptyArray<ConfirmDepositArgs>
         );
       }
     } catch (e: any) {
@@ -98,47 +101,46 @@ export const startDepositInitiatedPolling = (): void => {
 
 export const startWithdrawalTxPolling = (): void => {
   const pollingInterval = config.polling.bridgeOutInterval ?? 5 * 60 * 1000;
-
+  type Withdrawal = { id: Number, safeTxHash: string };
   const poll = async () => {
     try {
-      const pending = await getWithdrawalsByStatus("2");
+      const pending: WithdrawalInfo[] = await getWithdrawalsByStatus("2");
       if (!Array.isArray(pending) || pending.length === 0) return;
 
       // ids -> safeTxHash
       const ids = pending.map(w => String(w.withdrawalId));
       const hashMap = await getSafeTxHashFromEvents(ids);
 
-      const toFinalize: Array<Withdrawal & { safeTxHash: string }> = [];
-      const toReject: Withdrawal[] = [];
+      const toFinalize: Array<Number> = [];
+      const toReject: Array<Number> = [];
 
       // Group ONLY items with hashes; collect no-hash separately
-      const byChain = new Map<bigint, Array<Withdrawal & { safeTxHash: string }>>();
+      const byChain = new Map<bigint, Array<Withdrawal>>();
       for (const w of pending) {
-        const id = String(w.withdrawalId);
+        const id = Number(w.withdrawalId);
         const h = hashMap[id];
         if (!h) {
-          toReject.push(w); // or keep pending per your policy
+          toReject.push(id); // or keep pending per your policy
           continue;
         }
         const cid = safeToBigInt(w.externalChainId);
-        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({ ...w, safeTxHash: h });
+        (byChain.get(cid) ?? byChain.set(cid, []).get(cid)!).push({ id, safeTxHash: h });
       }
 
       // Monitor per chain only the with-hash subset
-      for (const [chainId, ws] of byChain) {
-        const statuses = await monitorSafeTransactionStatusBatch(ws as NonEmptyArray<Withdrawal & { safeTxHash: string }>, chainId);
-        for (const w of ws) {
-          const id = String(w.withdrawalId);
+      for (const [chainId, withdrawals] of byChain) {
+        const statuses = await monitorSafeTransactionStatusBatch(withdrawals as NonEmptyArray<Withdrawal>, safeToBigInt(chainId));
+        for (const { id } of withdrawals) {
           const st = statuses.get(id);
-          if (st === "executed") toFinalize.push(w);
-          else if (st === "rejected") toReject.push(w);
+          if (st === "executed") toFinalize.push(id);
+          else if (st === "rejected") toReject.push(id);
         }
       }
 
       if (toFinalize.length)
-        await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Withdrawal>);
+        await finaliseWithdrawalBatch(toFinalize as NonEmptyArray<Number>);
       if (toReject.length)
-        await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Withdrawal>);
+        await handleRejectedWithdrawalBatch(toReject as NonEmptyArray<Number>);
     } catch (e: any) {
       logError("MercataPolling", e as Error, {
         operation: "startWithdrawalTxPolling",

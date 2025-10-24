@@ -1,23 +1,22 @@
 import { config, STRATO_DECIMALS } from "../config";
 import { execute } from "../utils/stratoHelper";
 import { logInfo, logError } from "../utils/logger";
-import { Deposit } from "../types";
 
-export const mintVouchersForDeposits = async (deposits: Deposit[]) => {
+export const mintVouchersForDeposits = async (stratoRecipients: string[]) => {
   const voucherContractAddress = config.voucher.contractAddress;
   const voucherCount = config.voucher.mintCount;
   
   const voucherAmount = (voucherCount * Math.pow(10, STRATO_DECIMALS)).toString();
 
-  logInfo("VoucherService", `Minting vouchers for ${deposits.length} successful bridge-in deposits`);
+  logInfo("VoucherService", `Minting vouchers for ${stratoRecipients.length} successful bridge-in deposits`);
 
   try {
-    const mintTransactions = deposits.map((deposit) => ({
+    const mintTransactions = stratoRecipients.map((stratoRecipient) => ({
       contractName: "Voucher",
       contractAddress: voucherContractAddress,
       method: "mint",
       args: {
-        to: deposit.stratoRecipient,
+        to: stratoRecipient,
         amount: voucherAmount,
       }
     }));
@@ -25,13 +24,13 @@ export const mintVouchersForDeposits = async (deposits: Deposit[]) => {
     const result = await execute(mintTransactions);
 
     if (result.status === "Success") {
-      logInfo("VoucherService", `Successfully minted ${voucherCount} vouchers for ${deposits.length} users, tx: ${result.hash}`);
+      logInfo("VoucherService", `Successfully minted ${voucherCount} vouchers for ${stratoRecipients.length} users, tx: ${result.hash}`);
     } else {
       logError("VoucherService", new Error(`Voucher minting failed: ${result.status}`));
     }
   } catch (error) {
     logError("VoucherService", error as Error, { 
-      depositCount: deposits.length
+      stratoRecipientsCount: stratoRecipients.length
     });
   }
 };

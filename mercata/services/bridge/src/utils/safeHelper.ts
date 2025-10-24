@@ -17,7 +17,7 @@ import {
   safeToBigInt,
 } from "./utils";
 import { logError, logInfo } from "./logger";
-import { AssetInfo, PreparedWithdrawal, Withdrawal, TxType, SafeTransactionData } from "../types";
+import { AssetInfo, PreparedWithdrawal, WithdrawalInfo, TxType, SafeTransactionData, NonEmptyArray } from "../types";
 import { retry } from "./api";
 
 // Constants
@@ -141,55 +141,6 @@ export function groupByChain<T extends { externalChainId: number | string }>(
   }, new Map<number, T[]>());
 }
 
-export async function prepareWithdrawals(
-  externalChainId: number,
-  withdrawals: Withdrawal[],
-  callCache: CallCache,
-): Promise<PreparedWithdrawal[]> {
-  const preparationPromises = withdrawals.map(async (withdrawal) => {
-    const assetInfo = await getAssetInfoForChain(
-      withdrawal.stratoToken,
-      externalChainId,
-      callCache,
-    );
-
-    const isEth = assetInfo.externalToken.toLowerCase() === ZERO_ADDRESS;
-    const externalTokenAmount = convertDecimals(
-      withdrawal.stratoTokenAmount.toString(),
-      STRATO_DECIMALS,
-      assetInfo.externalDecimals,
-    ).toString();
-
-    return {
-      externalTokenAmount,
-      externalRecipient: withdrawal.externalRecipient,
-      type: (isEth ? "eth" : "erc20") as TxType,
-      externalToken: isEth ? ZERO_ADDRESS : assetInfo.externalToken,
-      externalChainId,
-      withdrawalId: withdrawal.withdrawalId!,
-    };
-  });
-
-  const results = await Promise.allSettled(preparationPromises);
-  const preparedWithdrawals: PreparedWithdrawal[] = [];
-
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled") {
-      preparedWithdrawals.push(result.value);
-    } else {
-      // Log the error but don't fail the entire batch
-      logError("SafeService", result.reason as Error, {
-        operation: "prepareWithdrawals",
-        withdrawalId: withdrawals[index].withdrawalId,
-        token: withdrawals[index].stratoToken,
-        externalChainId,
-      });
-    }
-  });
-
-  return preparedWithdrawals;
-}
-
 export function isNonceConflict(err: any): boolean {
   const msg = String(err?.message ?? "");
   const code = Number(err?.response?.status ?? 0);
@@ -242,15 +193,9 @@ export async function initializeSafeForChain(chainId: number) {
 
 export async function createWithdrawalProposals(
   externalChainId: number,
-  withdrawals: Withdrawal[],
-  callCache: CallCache,
+  withdrawals: NonEmptyArray<WithdrawalInfo>
 ): Promise<SafeTransactionData[]> {
   const { protocolKit, apiKit } = await initializeSafeForChain(externalChainId);
-  const preparedWithdrawals = await prepareWithdrawals(
-    externalChainId,
-    withdrawals,
-    callCache,
-  );
 
   const transactionProposals: SafeTransactionData[] = [];
   const safeAddress = config.safe.address || "";
@@ -260,13 +205,13 @@ export async function createWithdrawalProposals(
     { logPrefix: "SafeService" }
   ));
 
-  for (const prepared of preparedWithdrawals) {
+  for (const withdrawal of withdrawals) {
     const nonce = currentNonce++;
     const descriptor = buildTxDescriptor({
-      type: prepared.type,
-      externalRecipient: prepared.externalRecipient,
-      externalTokenAmount: prepared.externalTokenAmount,
-      externalToken: prepared.type === "erc20" ? prepared.externalToken : undefined,
+      type: withdrawal.externalToken.toLowerCase() === ZERO_ADDRESS ? "eth" : "erc20",
+      externalRecipient: withdrawal.externalRecipient,
+      externalTokenAmount: withdrawal.externalTokenAmount,
+      externalToken: withdrawal.externalToken.toLowerCase() === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
       nonce,
     });
 
@@ -274,7 +219,7 @@ export async function createWithdrawalProposals(
     const safeTxHash = await protocolKit.getTransactionHash(safeTransaction);
     const signature = await protocolKit.signHash(safeTxHash);
 
-    logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${prepared.withdrawalId}`);
+    logInfo("SafeService", `Created tx proposal: nonce ${nonce}, withdrawalId ${withdrawal.withdrawalId}`);
 
     transactionProposals.push({
       safeAddress,
@@ -283,7 +228,7 @@ export async function createWithdrawalProposals(
       senderAddress: relayer,
       senderSignature: signature.data,
       nonce,
-      externalChainId: prepared.externalChainId,
+      externalChainId: Number(withdrawal.externalChainId as string),
     });
   }
 
