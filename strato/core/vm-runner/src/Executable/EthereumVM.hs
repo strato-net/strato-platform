@@ -21,6 +21,8 @@ where
 
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
+import qualified Blockchain.Bagger.Transactions as Flush
+import qualified Blockchain.Bagger.Transactions (FlushScope)
 --import Blockchain.BlockChain
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
@@ -81,6 +83,12 @@ ethereumVM d = runResourceT $ do
         case maybeSelfAddress of
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()
+
+        -- Handle flush mempool events immediately
+        forM_ seqEvents $ \event -> case event of
+          VmFlushMempool req -> handleVmFlushMempool req
+          _ -> return ()
+
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
@@ -163,6 +171,7 @@ logEventSummaries evs = do
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
     getNames (VmRunPreprepare _) = "VmRunPreprepare"
     getNames (VmSelfAddress _) = "VmSelfAddress"
+    getNames (VmFlushMempool _) = "FlushMempool"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -199,3 +208,17 @@ sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepare
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
 
+-- | Handle flush mempool event by converting scope and calling Bagger.flush
+handleVmFlushMempool :: (MonadLogger m, MonadIO m) => FlushMempoolRequest -> m ()
+handleVmFlushMempool (FlushMempoolRequest scope reqId) = do
+  $logInfoS "EthereumVM.flush" $ T.pack $
+    "Processing flush request " ++ reqId ++ " with scope " ++ show scope
+  flushedTxs <- Bagger.flush (convertFlushScope scope)
+  $logInfoS "EthereumVM.flush" $ T.pack $
+    "Flushed " ++ show (length flushedTxs) ++ " transactions for request " ++ reqId
+  where
+    -- Convert event scope to Bagger scope
+    convertFlushScope :: FlushMempoolScope -> FlushScope
+    convertFlushScope FlushPending = Flush.FlushPending
+    convertFlushScope FlushQueued = Flush.FlushQueued
+    convertFlushScope FlushAll = Flush.FlushAll
