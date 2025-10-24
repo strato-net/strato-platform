@@ -30,7 +30,7 @@ const BridgeOut: React.FC = () => {
   const { usdstBalance, voucherBalance, fetchUsdstBalance } = useUserTokens();
 
   const {
-    bridgeOut: bridgeOutAPI,
+    requestWithdrawal: bridgeOutAPI,
     useBalance,
     bridgeableTokens,
     availableNetworks,
@@ -113,10 +113,11 @@ const BridgeOut: React.FC = () => {
       const externalChainId = selectedNetworkConfig?.chainId || "";
 
       const response = await bridgeOutAPI({
-        stratoTokenAmount: amountInSmallestUnit,
-        externalRecipient: address,
-        stratoToken: selectedToken.stratoToken,
         externalChainId: String(externalChainId),
+        externalRecipient: address,
+        externalToken: selectedToken.externalToken,
+        stratoToken: selectedToken.stratoToken,
+        stratoTokenAmount: amountInSmallestUnit,
       });
 
       if (response?.success) {
@@ -249,7 +250,7 @@ const BridgeOut: React.FC = () => {
                           <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
                         ) : (
                           <span className="text-xs text-gray-500">
-                            { `Max: ${selectedToken.maxPerTx} ${selectedToken.stratoTokenSymbol}`}
+                            { `Max: ${selectedToken.maxPerWithdrawal} ${selectedToken.stratoTokenSymbol}`}
                           </span>
                         )}
                       </div>
@@ -346,9 +347,9 @@ const BridgeOut: React.FC = () => {
                   {selectedNetwork || "selected"} network
                 </p>
               )}
-              {!selectedToken?.maxPerTx &&  (
+              {!selectedToken?.maxPerWithdrawal &&  (
                 <p className="text-orange-600 text-sm">
-                  Transfer limit: {selectedToken?.maxPerTx} {selectedToken?.externalSymbol}
+                  Transfer limit: {selectedToken?.maxPerWithdrawal} {selectedToken?.externalSymbol}
                 </p>
               )}
             </div>
