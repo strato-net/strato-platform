@@ -148,12 +148,11 @@ class BridgeContractService {
     depositRouterAddress: string; 
   }): Promise<{
     minAmount: string;
-    permissions: number;
   }> {
     const client = await this.getClient(chainId.toString());
     const normalizedAddress = this.formatAddress(tokenAddress);
     
-    const [minAmount, permissions] = await client.readContract({
+    const minAmount = await client.readContract({
       address: this.formatAddress(depositRouterAddress),
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "tokenConfig",
@@ -161,8 +160,7 @@ class BridgeContractService {
     });
     
     return {
-      minAmount: minAmount.toString(),
-      permissions: Number(permissions)
+      minAmount: minAmount.toString()
     };
   }
 
@@ -178,16 +176,15 @@ class BridgeContractService {
     amount, 
     decimals, 
     chainId,
-    tokenAddress,
-    mint = false
-  }: ValidationParams & { mint?: boolean }): Promise<ContractValidationResult> {
+    tokenAddress
+  }: ValidationParams): Promise<ContractValidationResult> {
     try {
       const client = await this.getClient(chainId);
       const normalizedTokenAddress = this.formatAddress(tokenAddress);
       const depositAmount = safeParseUnits(amount, parseInt(decimals) || 18);
       
       // Get token configuration from router
-      const [minAmount, permissions] = await client.readContract({
+      const minAmount = await client.readContract({
         address: this.formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "tokenConfig",
@@ -199,28 +196,14 @@ class BridgeContractService {
         address: this.formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "canDeposit",
-        args: [normalizedTokenAddress, depositAmount, mint]
+        args: [normalizedTokenAddress, depositAmount]
       });
 
       // Determine token type for error messages
       const tokenType = normalizedTokenAddress === NATIVE_TOKEN_ADDRESS ? "ETH" : "ERC20";
-      const operationType = mint ? "mint" : "wrap";
       
       // Check if operation is permitted
       if (!canDeposit) {
-        const permissionRequired = mint ? 2 : 1; // PERMISSION_MINT = 2, PERMISSION_WRAP = 1
-        const hasPermission = (permissions & permissionRequired) !== 0;
-        
-        if (!hasPermission) {
-          return {
-            isValid: false,
-            error: `${tokenType} ${operationType} operations are not currently allowed on this router contract`,
-            isAllowed: false,
-            minAmount: minAmount.toString(),
-            depositAmount: depositAmount.toString()
-          };
-        }
-        
         return {
           isValid: false,
           error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formatBalance(minAmount, undefined, parseInt(decimals) || 18)} ${tokenType}`,
@@ -238,10 +221,10 @@ class BridgeContractService {
         depositAmount: depositAmount.toString()
       };
       
-    } catch (error: any) {
+    } catch (error) {
       return {
         isValid: false,
-        error: `Router contract validation failed: ${error.message || 'Unknown error'}`
+        error: `Router contract validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       };
     }
   }

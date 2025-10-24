@@ -6,7 +6,7 @@ const router = Router();
 
 /**
  * @openapi
- * /bridge/bridgeOut:
+ * /bridge/requestWithdrawal:
  *   post:
  *     summary: Submit a withdrawal request
  *     tags: [Bridge]
@@ -57,62 +57,7 @@ const router = Router();
  *                     message:
  *                       type: string
  */
-router.post("/bridgeOut", authHandler.authorizeRequest(), BridgeController.bridgeOut);
-
-/**
- * @openapi
- * /bridge/redeemOut:
- *   post:
- *     summary: Request redemption on the external chain
- *     tags: [Bridge]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - externalChainId
- *               - stratoToken
- *               - stratoTokenAmount
- *               - externalRecipient
- *             properties:
- *               externalChainId:
- *                 type: string
- *                 description: Destination chain identifier (numeric string)
- *               stratoToken:
- *                 type: string
- *                 description: STRATO token contract address backing the redemption
- *               stratoTokenAmount:
- *                 type: string
- *                 description: Amount to redeem (decimal string)
- *               externalRecipient:
- *                 type: string
- *                 description: External-chain recipient address
- *               targetStratoToken:
- *                 type: string
- *                 description: Optional STRATO token to mint during redemption
- *     responses:
- *       200:
- *         description: Redemption transaction submitted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *                   properties:
- *                     status:
- *                       type: string
- *                     hash:
- *                       type: string
- *                     message:
- *                       type: string
- */
-router.post("/redeemOut", authHandler.authorizeRequest(), BridgeController.redeemOut);
+router.post("/requestWithdrawal", authHandler.authorizeRequest(), BridgeController.requestWithdrawal);
 
 /**
  * @openapi
