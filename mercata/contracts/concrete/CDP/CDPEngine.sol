@@ -609,7 +609,7 @@ contract record CDPEngine is Ownable {
 
         CollateralConfig storage config = collateralConfigs[asset];
         config.liquidationRatio = liquidationRatio;
-        config.minCR = minCR; // 0 means "use LR"
+        config.minCR = minCR;
         config.liquidationPenaltyBps = liquidationPenaltyBps; 
         config.closeFactorBps = closeFactorBps; 
         config.stabilityFeeRate = stabilityFeeRate; 
