@@ -214,7 +214,7 @@ contract record CDPEngine is Ownable {
      * @notice Deposit collateral from msg.sender into their vault
      * @dev Pulls tokens via transferFrom into CDPVault custody; emits Deposited and VaultUpdated
      */
-    function deposit(address asset, uint amount) external whenNotPaused(asset) onlyActiveAsset(asset) {
+    function deposit(address asset, uint amount) external onlyActiveAsset(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
         // Move collateral into vault custody and update in-memory vault balance
         _cdpVault().deposit(msg.sender, asset, amount);
@@ -227,7 +227,7 @@ contract record CDPEngine is Ownable {
      * @notice Withdraw explicit amount of collateral; requires CR ≥ minCR when debt > 0
      * @dev Accrues first; reverts if resulting CR would fall below threshold
      */
-    function withdraw(address asset, uint amount) external onlyKnownAsset(asset) {
+    function withdraw(address asset, uint amount) external onlyKnownAsset(asset) whenNotPaused(asset) {
         require(amount > 0, "CDPEngine: Invalid amount");
         Vault storage vault = vaults[msg.sender][asset];
         require(vault.collateral >= amount, "CDPEngine: Insufficient collateral");
@@ -250,7 +250,7 @@ contract record CDPEngine is Ownable {
      * @dev Applies a +1 wei buffer when there is outstanding debt to avoid edge rounding
      * @return maxAmount The amount withdrawn
      */
-    function withdrawMax(address asset) external onlyKnownAsset(asset) returns (uint maxAmount) {
+    function withdrawMax(address asset) external onlyKnownAsset(asset) whenNotPaused(asset) returns (uint maxAmount) {
         // Accrue to get an up-to-date rateAccumulator before computing debt
         _accrue(asset);
         Vault storage vault = vaults[msg.sender][asset];
@@ -862,6 +862,7 @@ contract record CDPEngine is Ownable {
     function openJuniorNote(address asset, uint256 amountUSDST)
         external
         onlyKnownAsset(asset)
+        whenNotPaused(asset)
         returns (uint256 burnedUSDST, uint256 capUSDST)
     {
         require(amountUSDST > 0, "junior: zero amount");
