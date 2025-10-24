@@ -2,6 +2,7 @@ import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
 import "../../libraries/Bridge/BridgeTypes.sol";
 
 /**
@@ -24,9 +25,6 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when pause states are toggled for deposits and withdrawals
     event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
     
-    /// @notice Emitted when the relayer address is updated
-    event RelayerUpdated(address newRelayer, address oldRelayer);
-    
     /// @notice Emitted when the token factory address is updated
     event TokenFactoryUpdated(address newFactory, address oldFactory);
     
@@ -46,7 +44,7 @@ contract record MercataBridge is Ownable {
     /// @notice Emitted when a deposit is completed and tokens are minted
     event DepositCompleted(uint256 srcChainId, string srcTxHash);
     
-    /// @notice Emitted when a deposit is initiated by the relayer
+    /// @notice Emitted when a deposit is initiated
     /// @param externalChainId The external chain identifier where the deposit occurred
     /// @param externalSender The address that sent the transaction on the external chain
     /// @param externalTxHash The transaction hash on the external chain
@@ -111,10 +109,6 @@ contract record MercataBridge is Ownable {
     /// @dev When true, all deposit operations are paused
     bool public depositsPaused;
     
-    /// @notice Off-chain orchestrator account responsible for bridge operations
-    /// @dev Only this address can update last processed blocks
-    address public relayer;
-    
     /// @notice Token factory contract for creating new STRATO tokens
     /// @dev Single source of truth for active token creation
     address public tokenFactory;
@@ -165,14 +159,6 @@ contract record MercataBridge is Ownable {
     /* ===================================================================== */
     /*                            MODIFIERS                                  */
     /* ===================================================================== */
-
-    /// @notice Restricts access to the relayer address only
-    /// @dev Ensures only the designated relayer can perform certain operations
-    modifier onlyRelayer() {
-        require(msg.sender == relayer, "MB: relayer only");
-        _;
-    }
-
     /// @notice Ensures deposits are not paused
     /// @dev Prevents deposit operations when circuit breaker is active
     modifier whenDepositsOpen() {
@@ -203,22 +189,20 @@ contract record MercataBridge is Ownable {
 
     /**
      * @dev Initializes the bridge system with essential configuration
-     * @notice Sets up token factory, relayer, and default values for the bridge
+     * @notice Sets up token factory and default values for the bridge
      * @notice Must be called after deployment to configure the bridge properly
      * @notice Configures decimal places, USDST address, and withdrawal timeout
      * @param _tokenFactory The token factory contract address for creating STRATO tokens
-     * @param _relayer The relayer address responsible for off-chain operations
      */
     function initialize(
-        address _tokenFactory, address _relayer
+        address _tokenFactory
     ) external onlyOwner {
         DECIMAL_PLACES = 18;
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
         WITHDRAWAL_ABORT_DELAY = 172800;
 
-        require(_tokenFactory != address(0) && _relayer != address(0), "MB: zero");
+        require(_tokenFactory != address(0), "MB: zero");
         tokenFactory = _tokenFactory;
-        relayer      = _relayer;
     }
 
     // ───────────── Admin related functions ─────────────
@@ -338,7 +322,7 @@ contract record MercataBridge is Ownable {
      */
     function setLastProcessedBlock(
         uint256 externalChainId, uint256 lastProcessedBlock
-    ) external onlyRelayer {
+    ) external onlyOwner {
         require(externalChainId > 0, "MB: invalid external chain id");
         ChainInfo chainInfo = chains[externalChainId];
         require(chainInfo.custody != address(0), "MB: chain missing");
@@ -359,17 +343,6 @@ contract record MercataBridge is Ownable {
         depositsPaused    = _deposits;
         withdrawalsPaused = _withdrawals;
         emit PauseToggled(_deposits, _withdrawals);
-    }
-
-    /**
-     * @dev Sets the relayer address
-     * @notice Only the owner can update the relayer address
-     * @param newRelayer The new relayer address (must not be zero address)
-     */
-    function setRelayer(address newRelayer) external onlyOwner {
-        require(newRelayer != address(0), "MB: zero");
-        emit RelayerUpdated(newRelayer, relayer);
-        relayer = newRelayer;
     }
 
     /**
@@ -483,7 +456,7 @@ contract record MercataBridge is Ownable {
     // ───────────── Deposit flow functions ─────────────
     /**
      * @dev Records a deposit transaction from an external chain
-     * @notice Step-1 of the deposit flow - relayer observes external transaction
+     * @notice Step-1 of the deposit flow - observes external transaction
      * @notice Creates deposit record but does NOT mint tokens yet
      * @notice Allows off-chain confirmation windows and fraud checks before step-2
      * @notice Converts external token amounts to STRATO token amounts using decimal conversion
@@ -496,7 +469,7 @@ contract record MercataBridge is Ownable {
      */
     function deposit(
         uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient
-    ) public onlyRelayer whenDepositsOpen {
+    ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(externalSender != address(0), "MB: invalid external sender");
         require(externalTokenAmount > 0, "MB: invalid external token amount");
@@ -539,7 +512,7 @@ contract record MercataBridge is Ownable {
      */
     function depositBatch(
         uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients
-    ) external onlyRelayer whenDepositsOpen {
+    ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
         require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
@@ -557,7 +530,7 @@ contract record MercataBridge is Ownable {
      */
     function confirmDeposit(
         uint256 externalChainId, string externalTxHash
-    ) public onlyRelayer whenDepositsOpen {
+    ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
         require(externalTxHash.length > 0, "MB: invalid external tx hash");
@@ -587,7 +560,7 @@ contract record MercataBridge is Ownable {
      */
     function confirmDepositBatch(
         uint256[] externalChainIds, string[] externalTxHashes
-    ) external onlyRelayer whenDepositsOpen {   
+    ) external onlyOwner whenDepositsOpen {   
         uint256 n = externalChainIds.length;
         require(n > 0 && n == externalTxHashes.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
@@ -605,7 +578,7 @@ contract record MercataBridge is Ownable {
      */
     function reviewDeposit(
         uint256 externalChainId, string externalTxHash
-    ) public onlyRelayer whenDepositsOpen {
+    ) public onlyOwner whenDepositsOpen {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
         require(externalTxHash.length > 0, "MB: invalid external tx hash");
@@ -632,7 +605,7 @@ contract record MercataBridge is Ownable {
      */
     function reviewDepositBatch(
         uint256[] externalChainIds, string[] externalTxHashes
-    ) external onlyRelayer whenDepositsOpen {
+    ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
         require(n > 0 && n == externalTxHashes.length, "MB: len");
 
@@ -741,7 +714,7 @@ contract record MercataBridge is Ownable {
      */
     function confirmWithdrawal(
         uint256 id, string custodyTxHash
-    ) public onlyRelayer whenWithdrawalsOpen {
+    ) public onlyOwner whenWithdrawalsOpen {
         require(id > 0, "MB: invalid withdrawal id");
         require(custodyTxHash.length > 0, "MB: invalid custody tx hash");
 
@@ -769,7 +742,7 @@ contract record MercataBridge is Ownable {
      */
     function confirmWithdrawalBatch(
         uint256[] ids, string[] custodyTxHashes
-    ) external onlyRelayer whenWithdrawalsOpen {
+    ) external onlyOwner whenWithdrawalsOpen {
         uint256 n = ids.length;
         require(n > 0 && n == custodyTxHashes.length, "MB: len");
 
@@ -787,7 +760,7 @@ contract record MercataBridge is Ownable {
      */
     function finaliseWithdrawal(
         uint256 id
-    ) public onlyRelayer whenWithdrawalsOpen {
+    ) public onlyOwner whenWithdrawalsOpen {
         require(id > 0, "MB: invalid withdrawal id");
 
         WithdrawalInfo w = withdrawals[id];
@@ -810,7 +783,7 @@ contract record MercataBridge is Ownable {
      */
     function finaliseWithdrawalBatch(
         uint256[] ids
-    ) external onlyRelayer whenWithdrawalsOpen {
+    ) external onlyOwner whenWithdrawalsOpen {
         uint256 n = ids.length;
         require(n > 0, "MB: len");
 
@@ -822,9 +795,9 @@ contract record MercataBridge is Ownable {
     /**
      * @dev Aborts a withdrawal and refunds the escrowed tokens
      * @notice Step-4 of the withdrawal flow - abort a withdrawal and refund tokens
-     * @notice Relayer can abort any withdrawal in INITIATED or PENDING_REVIEW status
+     * @notice Admin can abort any withdrawal in INITIATED or PENDING_REVIEW status
      * @notice User can only abort their own withdrawal in INITIATED status after timeout
-     * @notice Covers the scenario where relayer disappears before confirming
+     * @notice Covers the scenario where admin disappears before confirming
      * @notice Does not cover the scenario where custody transaction is waiting to be signed
      * @param id The unique withdrawal identifier
      */
@@ -836,7 +809,8 @@ contract record MercataBridge is Ownable {
         WithdrawalInfo w = withdrawals[id];
         uint256 currentTimestamp = block.timestamp;
 
-        if (msg.sender == relayer) {
+        AdminRegistry admin = AdminRegistry(owner());
+        if (admin.whitelist(address(this), "abortWithdrawal", msg.sender)) {
             require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
         }
         else {
