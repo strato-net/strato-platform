@@ -33,7 +33,7 @@ contract DepositRouter is
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
     // https://etherscan.io/address/0x000000000022d473030f116ddee9f6b43ac78ba3
-    IPermit2 public immutable PERMIT2;
+    IPermit2 public PERMIT2;
 
     address public gnosisSafe;
     uint96 public depositId;
@@ -57,22 +57,28 @@ contract DepositRouter is
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address permit2_) {
-        if (permit2_ == address(0)) revert InvalidAddress();
-        PERMIT2 = IPermit2(permit2_);
+    constructor() {
         _disableInitializers();
     }
 
     function initialize(
+        address permit2_,
         address gnosisSafe_,
         address owner_
     ) public initializer {
-        if (owner_ == address(0) || gnosisSafe_ == address(0))
-            revert InvalidAddress();
+        if (
+            owner_ == address(0) ||
+            gnosisSafe_ == address(0) ||
+            permit2_ == address(0)
+        ) revert InvalidAddress();
         __Ownable_init(owner_);
         __ReentrancyGuard_init();
         __Pausable_init();
         __UUPSUpgradeable_init();
+
+        // Set PERMIT2 once during initialization - this value persists across all upgrades
+        PERMIT2 = IPermit2(permit2_);
+
         gnosisSafe = gnosisSafe_;
         emit GnosisSafeUpdated(address(0), gnosisSafe_);
     }
