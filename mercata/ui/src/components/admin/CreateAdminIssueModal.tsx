@@ -168,7 +168,10 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
               name="target"
               rules={{
                 required: 'Contract address is required',
-                validate: (v) => v.trim().length > 0 || 'Contract address cannot be empty',
+                validate: (v) => {
+                  const [success, w] = validateFunctionArg('address', v);
+                  return success || w;
+                },
               }}
               render={({ field }) => (
                 <FormItem>
