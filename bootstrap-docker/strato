@@ -13,9 +13,6 @@ function checkDocker {
       echo -e "${Red}Error: docker is required: https://www.docker.com/ . If you have it installed - you may need to run STRATO with sudo user${NC}"
       exit 1
   fi
-}
-
-function checkCompose {
   if ! docker compose version  &> /dev/null && ! docker-compose -v  &> /dev/null
   then
       echo -e "${Red}Error: Docker Compose is required: https://docs.docker.com/compose/install/"
@@ -31,7 +28,9 @@ function checkCompose {
       CNAME_SEP="-"
     fi
   fi
-  
+}
+
+function checkComposeFile {
   if [ ! -f docker-compose.yml ]
   then
     echo -e "${Red}docker-compose.yml not found. Please download the docker-compose.yml first or build the platform (see README.md).${NC}"
@@ -133,13 +132,13 @@ while [ ${#} -gt 0 ]; do
     ;;
   --down)
     checkDocker
-    checkCompose
+    checkComposeFile
     down
     exit 0
     ;;
   --wipe)
     checkDocker
-    checkCompose
+    checkComposeFile
     wipe
     exit 0
     ;;
@@ -148,7 +147,7 @@ while [ ${#} -gt 0 ]; do
     ;;
   --pull)
     checkDocker
-    checkCompose
+    checkComposeFile
     pullImages
     exit 0
     ;;
@@ -181,7 +180,7 @@ while [ ${#} -gt 0 ]; do
 done
 
 checkDocker
-checkCompose
+checkComposeFile
 
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
