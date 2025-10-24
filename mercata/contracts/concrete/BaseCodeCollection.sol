@@ -32,7 +32,7 @@ import "Lending/RateStrategy.sol";
 import "Lending/SafetyModule.sol";
 
 //Bridging
-import "./Bridge/BridgeCore.sol";
+import "./Bridge/MercataBridge.sol";
 
 //CDP
 import "CDP/CDPRegistry.sol";
@@ -52,7 +52,7 @@ contract record Mercata is Authorizable {
     LendingPool public lendingPool;
     PoolConfigurator public poolConfigurator;
     LendingRegistry public lendingRegistry;
-    BridgeCore public bridgeCore;
+    MercataBridge public mercataBridge;
     PoolFactory public poolFactory;
     TokenFactory public tokenFactory;
     FeeCollector public feeCollector;
@@ -138,10 +138,10 @@ contract record Mercata is Authorizable {
         poolConfigurator.initializeProtocol(address(lendingPool),address(liquidityPool),address(collateralVault),address(rateStrategy),address(priceOracle),address(tokenFactory),[],[],[],[],[],[],[],0,0,1000);
 
         // Create Services
-        address bridgeCoreImpl = address(new BridgeCore(implOwnerIgnored));
-        bridgeCore = BridgeCore(address(new Proxy(bridgeCoreImpl, this)));
-        bridgeCore.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
-        Ownable(address(bridgeCore)).transferOwnership(address(adminRegistry));
+        address mercataBridgeImpl = address(new MercataBridge(implOwnerIgnored));
+        mercataBridge = MercataBridge(address(new Proxy(mercataBridgeImpl, this)));
+        mercataBridge.initialize(address(tokenFactory), address(adminRegistry));// TODO set relayer address correctly
+        Ownable(address(mercataBridge)).transferOwnership(address(adminRegistry));
 
         // Create RewardsChef (without initialization - to be initialized in tests)
         address rewardsChefImpl = address(new RewardsChef(implOwnerIgnored));
