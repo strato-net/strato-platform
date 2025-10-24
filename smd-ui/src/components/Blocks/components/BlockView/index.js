@@ -239,60 +239,42 @@ class BlockView extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Address</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {valRows && valRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : valRows}
-              </tbody>
-            </table>
+            {valRows && valRows.length === 0 
+                ? <p>—</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {valRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">New Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Address</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {newValRows && newValRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : newValRows}
-              </tbody>
-            </table>
+            {newValRows && newValRows.length === 0 
+                ? <p>-</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {newValRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">Removed Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Address</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {removedValRows && removedValRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : removedValRows}
-              </tbody>
-            </table>
+            {removedValRows && removedValRows.length === 0 
+                ? <p>-</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {removedValRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">
