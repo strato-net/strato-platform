@@ -85,7 +85,9 @@ instance Show Address where
 instance Read Address where
   readsPrec _ input =
     let trimmed = dropWhile isSpace input
-        (hexPart, rest) = splitAt 40 trimmed
+        (hexPart, rest) = splitAt 40 $ case trimmed of
+          '0':'x':rest' -> rest'
+          _ -> trimmed
     in case readHex hexPart of
          [(num, "")] -> [(Address num, rest)]
          _           -> []
