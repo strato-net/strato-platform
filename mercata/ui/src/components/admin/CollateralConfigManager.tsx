@@ -132,7 +132,7 @@ const CollateralConfigManager = () => {
     setEditingAsset(asset.asset);
     
     // Convert debt floor/ceiling from wei back to USD
-    const debtFloorUI = (BigInt(asset.debtFloor) / (BigInt(10) ** BigInt(18)));
+    const debtFloorUI = (BigInt(asset.debtFloor || 0) / (BigInt(10) ** BigInt(18)));
     const debtCeilingUI = (BigInt(asset.debtCeiling) / (BigInt(10) ** BigInt(18)));
     
     // Convert unit scale from 1eX back to decimal count
