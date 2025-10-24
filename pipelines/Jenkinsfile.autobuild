@@ -315,7 +315,7 @@ pipeline {
                   script {
                     def VERSION = sh(
                         returnStdout: true,
-                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" docker-compose.yml"
+                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" bootstrap-docker/docker-compose.yml"
                     ).trim()
                     slackSend(
                         channel: '#engineering',
