@@ -143,7 +143,7 @@ const CRSlider: React.FC<CRSliderProps> = ({
       
       {/* Slider Labels */}
       <div className="flex justify-between text-xs text-gray-500">
-        <span className="text-yellow-600">LT: {formatPercentage(liquidationThreshold)}</span>
+        <span className="text-yellow-600">minCR: {formatPercentage(liquidationThreshold)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
