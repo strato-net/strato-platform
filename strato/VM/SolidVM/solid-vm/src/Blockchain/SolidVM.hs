@@ -106,7 +106,7 @@ import qualified LabeledError
 --import Blockchain.DB.MemAddressStateDB
 
 import Network.Haskoin.Crypto.BigWord ()
-import qualified Numeric (readHex, showHex)
+import qualified Numeric (showHex)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -260,12 +260,10 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
   parentName <-  getParentName creator
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
-      !abstracts' = getAbstractParentsFromContract contract' cc
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
-  !abstracts <- M.fromList <$> traverse (resolveNameParts newAddress (T.pack issuerName) (T.pack parentName)) abstracts'
 
-  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc abstracts
+  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -464,12 +462,10 @@ call' from to' fnCalltype functionName valList = do
       _ -> pure (n, "")
 
   let parentName' = if parentName == (CC._contractName contract) then "" else parentName
-      !abstracts' = getAbstractParentsFromContract contract cc
 
   (_, oAddr, ctrName) <- getCreator codeAddress
-  !abstracts <- M.fromList <$> traverse (resolveNameParts storageAddress (T.pack ctrName) (T.pack parentName')) abstracts'
 
-  initializeAction storageAddress (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc abstracts
+  initializeAction storageAddress (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc
 
   Mod.modifyStatefully_ (Mod.Proxy @Action) $
     Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) storageAddress
@@ -2151,11 +2147,16 @@ parseBaseInt :: String -> Integer -> Either String Integer
 parseBaseInt s n =
   case n of
     10 -> readEither s
-    16 -> case B16.decode (BC.pack s) of
-      Right l ->
-        let zeros = 32 - B.length l
-         in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
-      _ -> Left $ "numeric cast - not a hex string " <> s
+    16 ->
+      let s' = case s of
+                 '0':'x':rest -> rest
+                 _ -> s
+          prefix' = bool "0" "" . even $ length s'
+       in case B16.decode (BC.pack $ prefix' ++ s') of
+            Right l ->
+              let zeros = 32 - B.length l
+               in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+            _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
 castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
@@ -2167,7 +2168,7 @@ callBuiltin "string" [SString s] = return $ SString s
 callBuiltin "string" [SAccount a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i
 callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ show i
-callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ Numeric.showHex i ""
+callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ "0x" ++ Numeric.showHex i ""
 callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
@@ -2248,14 +2249,14 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
   Right bytestringHash -> do
     rIntHash <- case r' of
       SInteger r -> pure r
-      SString r -> case Numeric.readHex r of
-        [(x, "")] -> return x
+      SString r -> case parseBaseInt r 16 of
+        Right x -> return x
         _ -> invalidArguments "parseHex: error parsing r: " r
       _ -> invalidArguments "ecrecover: r must be a hex string or an integer" r'
     sIntHash <- case s' of
       SInteger s -> pure s
-      SString s -> case Numeric.readHex s of
-        [(y, "")] -> return y
+      SString s -> case parseBaseInt s 16 of
+        Right y -> return y
         _ -> invalidArguments "parseHex: error parsing s: " s
       _ -> invalidArguments "ecrecover: s must be a hex string or an integer" s'
     let theSignerAddress = whoSignedThisTransactionEcrecover (unsafeCreateKeccak256FromByteString bytestringHash) rIntHash sIntHash v

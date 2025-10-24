@@ -1,4 +1,6 @@
-contract record MercataGovernance {
+import "../contracts/abstract/ERC20/access/Ownable.sol";
+
+contract record MercataGovernance is Ownable {
     address[] public record validators;
     mapping (address => uint) public record validatorMap;
 
@@ -11,8 +13,6 @@ contract record MercataGovernance {
     mapping (address => mapping (address => uint)) public record adminVoteMap;
     mapping (address => address[]) public record adminVotes;
 
-    address public owner;
-
     event ValidatorVoteMade(address voter, address recipient, bool voteDirection);
     event ValidatorAdded(address validator);
     event ValidatorRemoved(address validator);
@@ -21,7 +21,9 @@ contract record MercataGovernance {
     event AdminAdded(address admin);
     event AdminRemoved(address admin);
 
-    function voteToAddValidator(address proposedValidator) public {
+    constructor(address _initialOwner) Ownable(_initialOwner) { }
+
+    function voteToAddValidator(address proposedValidator) external onlyOwner {
         uint a = adminMap[msg.sender];
         require(a > 0, "Only registered network admins can vote for validators");
 
@@ -31,7 +33,7 @@ contract record MercataGovernance {
         voteForValidator(msg.sender, proposedValidator);
     }
 
-    function voteToRemoveValidator(address proposedValidator) public {
+    function voteToRemoveValidator(address proposedValidator) external onlyOwner {
         uint a = adminMap[msg.sender];
         require(a > 0, "Only registered network admins can vote for validators");
 
@@ -74,7 +76,7 @@ contract record MercataGovernance {
         }
     }
 
-    function voteToAddAdmin(address proposedAdmin) public {
+    function voteToAddAdmin(address proposedAdmin) external onlyOwner {
         uint a = adminMap[msg.sender];
         require(a > 0, "Only registered network admins can vote for admins");
 
@@ -84,7 +86,7 @@ contract record MercataGovernance {
         voteForAdmin(msg.sender, proposedAdmin);
     }
 
-    function voteToRemoveAdmin(address proposedAdmin) public {
+    function voteToRemoveAdmin(address proposedAdmin) external onlyOwner {
         uint a = adminMap[msg.sender];
         require(a > 0, "Only registered network admins can vote for admins");
 

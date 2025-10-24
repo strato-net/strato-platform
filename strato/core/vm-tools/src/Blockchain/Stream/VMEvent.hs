@@ -14,14 +14,13 @@ where
 import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
-import Blockchain.Strato.Model.Address
+
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Stream.Action (Action)
 import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
 import Data.Binary
-import Data.Map.Strict (Map)
 import Data.Text (Text)
 import GHC.Generics
 import SolidVM.Model.CodeCollection
@@ -34,8 +33,7 @@ data VMEvent
       { codeCollection :: CodeCollectionF (),
         codePtr :: CodePtr,
         creator :: Text,
-        application :: Text,
-        abstracts :: Map (Address, Text) (Text, Text, [Text])
+        application :: Text
       }
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
@@ -46,7 +44,7 @@ vmType (ExternallyOwned _) = "EVM"
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cp cr ap _) =
+  format (CodeCollectionAdded _ cp cr ap) =
     "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 

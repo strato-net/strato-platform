@@ -37,11 +37,15 @@ pipeline {
     stage('Deploy') {
 
       steps {
-        // Copy .pem and .key for SSL
-        sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
-        sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
         
         dir ('bootstrap-docker') {
+          // Copy .pem and .key for SSL
+          sh 'cp /home/ubuntu/letsencrypt-ssl/server.pem ssl/certs/'
+          sh 'cp /home/ubuntu/letsencrypt-ssl/server.key ssl/private/'
+          
+          sh 'cp ../docker-compose.allDocker.yml docker-compose.yml'
+          sh 'cp ../docker-compose.vault.yml .'
+          sh 'cp ../docker-compose.highway.yml .'
           script {
             lib.spinUpVault()
             lib.replaceServerPortsDocker()
@@ -171,7 +175,6 @@ pipeline {
                   '''
                   archiveArtifacts artifacts: "bridge_image_tag, bridge_image_tag_ecr"
                   stash includes: 'bootstrap-docker/**', name: 'bootstrapDocker'
-                  stash includes: 'docker-compose.allDocker.yml', name: 'dc-alldocker-yaml'
                   //stash includes: 'strato/indexer/slipstream/integrity_tests/**', name: 'slipstream_integrity_tests'
                 }
                 
@@ -287,14 +290,12 @@ pipeline {
                 ]) {
                   sh "sudo docker login -u $DOCKER_USER -p $DOCKER_PASSWD registry-aws.blockapps.net:5000"
                 }
-                dir("strato-getting-started"){
-                  unstash 'dc-alldocker-yaml'
-                  sh 'cp docker-compose.allDocker.yml docker-compose.yml'
+                unstash 'bootstrapDocker'
+                dir("bootstrap-docker"){
                   withCredentials([usernamePassword(credentialsId: 'mercata-testnet-buildtest-client', passwordVariable: 'BUILDTEST_CLIENT_SECRET', usernameVariable: 'BUILDTEST_CLIENT_ID')]) {
                     writeFile file: "strato-run.sh", text: """#!/bin/bash
                         NODE_HOST='buildtest.mercata-testnet.blockapps.net' \\
                           network='helium' \\
-                          OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \\
                           OAUTH_CLIENT_ID='$BUILDTEST_CLIENT_ID' \\
                           OAUTH_CLIENT_SECRET='$BUILDTEST_CLIENT_SECRET' \\
                           ssl='true' \\
@@ -314,7 +315,7 @@ pipeline {
                   script {
                     def VERSION = sh(
                         returnStdout: true,
-                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" docker-compose.allDocker.yml"
+                        script: "grep -oP \"#strato-version:\\\\K[^#]*\" bootstrap-docker/docker-compose.yml"
                     ).trim()
                     slackSend(
                         channel: '#engineering',

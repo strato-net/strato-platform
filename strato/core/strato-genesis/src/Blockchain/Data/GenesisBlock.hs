@@ -20,26 +20,25 @@ import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.DB.RawStorageDB
+import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.GenesisInfo
-import Blockchain.Data.RLP
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
-import Control.Arrow ((***))
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
-import Data.ByteString as BS hiding (map, zip)
 import qualified Data.Map as Map
 import Data.Maybe (catMaybes)
 import qualified Data.Text.Encoding as T
 import Numeric
+import SolidVM.Model.Storable
 
 initializeBlankStateDB ::
   ( (Maybe Word256 `A.Alters` StateRoot) m,
@@ -58,10 +57,10 @@ putStorageTrie ::
     (Address `A.Alters` AddressState) m
   ) =>
   Address ->
-  [(BS.ByteString, BS.ByteString)] ->
+  [(StoragePath, BasicValue)] ->
   m ()
 putStorageTrie account slots = do
-  mapM_ (\slot -> putRawStorageKeyVal' (account, fst slot) (snd slot)) slots
+  mapM_ (\(theKey, theValue) -> putSolidStorageKeyVal' account theKey theValue) slots
   flushMemStorageDB
   Mem.flushMemAddressStateDB
 
@@ -87,15 +86,6 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-  ContractWithStorage address balance' codeHash' slots -> do
-    A.insert
-      A.Proxy
-      address
-      blankAddressState
-        { addressStateBalance = balance',
-          addressStateCodeHash = codeHash'
-        }
-    putStorageTrie address $ map (word256ToBytes *** (rlpSerialize . rlpEncode)) slots
   SolidVMContractWithStorage address balance' codeHash' slots -> do
     A.insert
       A.Proxy
@@ -104,7 +94,7 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-    putStorageTrie address $ map (\(k, v) -> (k, rlpSerialize $ rlpEncode v)) $ slots
+    putStorageTrie address slots
 
 initializeStateDB ::
   ( MonadLogger m,
@@ -143,8 +133,6 @@ zipSourceInfo accounts codes =
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
    in catMaybes $ map findCodeFor accounts

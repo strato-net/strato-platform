@@ -5,5 +5,5 @@ scp "$1" mercata-testnet-node-app:/datadrive/testnet/strato-getting-started/dock
 
 for i in {1..5}; do ssh mercata-testnet-node$i "cd /datadrive/testnet/strato-getting-started && sudo ./strato-run.sh"; done
 
-ssh mercata-testnet-buildtest "cd /home/ec2-user/strato-getting-started-symlink && sudo ./strato-run.sh"
+ssh mercata-testnet-buildtest "cd /home/ec2-user/bootstrap-docker-symlink && sudo ./strato-run.sh"
 ssh mercata-testnet-node-app "cd /datadrive/testnet/strato-getting-started && sudo ./strato-run.sh"

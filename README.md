@@ -70,16 +70,17 @@
   
 ### Dockerized:
 - Start:
+  - `cp docker-compose.allDocker.yml bootstrap-docker/docker-compose.yml`
   - `cd bootstrap-docker`
-  - Create `strato-run.sh`, e.g. for testnet:
+  - Update `strato-run.sh` with your credentials, e.g. for testnet:
     ```
     NODE_HOST='localhost' \
     network='helium' \
-    OAUTH_DISCOVERY_URL='https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration' \
     OAUTH_CLIENT_ID='localhost' \
     OAUTH_CLIENT_SECRET='client-secret-here' \
     ./strato
     ```
+    (for mainnet use `network=upquark`)
   - `chmod +x strato-run.sh`
   - `sudo ./strato-run.sh`
 

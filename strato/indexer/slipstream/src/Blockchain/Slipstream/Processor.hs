@@ -26,15 +26,12 @@ where
 import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
-import qualified BlockApps.Solidity.Contract as OLD
 import BlockApps.Solidity.Value
-import qualified BlockApps.SolidityVarReader as SVR
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.Metrics (recordAction)
 import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
@@ -48,7 +45,6 @@ import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import qualified Data.IntMap as I
-import qualified Data.Map.Ordered as OMap
 import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
@@ -56,16 +52,11 @@ import Data.Ord (Down (..))
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Traversable (for)
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
-
-diffNull :: Action.DataDiff -> Bool
-diffNull (Action.EVMDiff m) = Map.null m
-diffNull (Action.SolidVMDiff m) = Map.null m
 
 data BatchedInserts = BatchedInserts
   { indexInsert :: E.ProcessedContract
@@ -74,9 +65,7 @@ data BatchedInserts = BatchedInserts
   deriving (Show)
 
 matters :: AggregateAction -> Bool
-matters AggregateAction {..} =
-  (actionType == Action.Create || (not $ diffNull actionStorage))
-    && (codePtrToSHA actionCodeHash /= emptyHash)
+matters AggregateAction {..} = codePtrToSHA actionCodeHash /= emptyHash
 
 
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
@@ -114,11 +103,9 @@ processedContract ABIID {..} state AggregateAction {..} =
 rowToInsert ::
   ABIID ->
   AggregateAction ->
-  OLD.Contract ->
   E.ProcessedContract
-rowToInsert abiid row cont =
+rowToInsert abiid row =
   let newState = case actionStorage row of
-        Action.EVMDiff mp -> SVR.decodeCacheValues cont (flip Map.lookup mp) []
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
    in processedContract abiid (Map.fromList $ newState) row
 
@@ -127,7 +114,6 @@ rowToCollections :: AggregateAction -> Map.Map Text Value
 rowToCollections row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
-        _ -> [] 
    in Map.fromList newState
 
 processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
@@ -193,7 +179,6 @@ parseEvents = concatMap parseEvent
           eventBlockNumber = Action._blockNumber a,
           eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
-          eventAbstracts = maybe Map.empty Action._actionDataAbstracts . OMap.lookup (evContractAddress e) $ Action._actionData a,
           eventEvent = e, 
           eventIndex = idx
         }
@@ -206,13 +191,6 @@ getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . 
         extractKeys (SVMType.Array entry _)     = let (ks, v) = extractKeys entry in ((SVMType.Int Nothing Nothing):ks, v)
         extractKeys (SVMType.Mapping _ k entry) = let (ks, v) = extractKeys entry in (k:ks, v)
         extractKeys v                           = ([], v)
-
--- Function to duplicate each collection row for each parent, changing the contract name, and include the original
-duplicateForParentsAndIncludeOriginal :: [ProcessedCollectionRow] -> [(Text,Text,Text)] -> [ProcessedCollectionRow]
-duplicateForParentsAndIncludeOriginal collections parentz = concatMap duplicateForSingle collections
-  where
-    duplicateForSingle :: ProcessedCollectionRow -> [ProcessedCollectionRow]
-    duplicateForSingle row = row : [ row { creator = c, application = a, contractname = n } | (c,a,n) <- parentz ]
 
 processTheMessages ::
   ( MonadIO m
@@ -231,7 +209,7 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap _ <- messages]
+        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
@@ -270,7 +248,6 @@ processTheMessages messages = do
     forM changes $ \(_, actions) -> do
       forM actions $ \(row) -> do
         case actionStorage row of
-          Action.EVMDiff {} -> pure $ Left "EVM code indexing ignored"
           Action.SolidVMDiff {} -> do
             let name = case actionCodeHash row of
                   SolidVMCode name' _ -> name'
@@ -280,31 +257,13 @@ processTheMessages messages = do
                     { aiName = T.pack name,
                       aiChain = ""
                     }
-                cont = error "internal error: contract should be unused for SolidVM"
             $logInfoLS "Contract name is: " $ T.pack $ show name
-            let indexContract = rowToInsert abiid row cont
-                abstracts = actionAbstracts row
+            let indexContract = rowToInsert abiid row
             --get columns for abstract table
-            $logInfoLS "abstractColumns" $ T.pack $ "Getting abstract columns from " ++ (show abstracts)
-            abstractColumns' <- fmap catMaybes . for (Map.toList abstracts) $ \((_, n'), (cr', ap', cols)) -> do
-                let cregator = fromMaybe cr' (actionCCCreator row)
-                    tableName = AbstractTableName cregator ap' n'
-                    tableNameText = tableNameToDoubleQuoteText tableName
-                $logDebugLS "actionCCCreator" $ T.pack (show (actionCCCreator row))
-                $logDebugLS "cregator" $ T.pack (show cregator)
-                $logInfoS "Row will be inserted into abstract table: " tableNameText
-                $logInfoS "cols: " $ T.pack (show cols)
-                
-                let result = (indexContract, tableName, (cr', ap', n'), cols)
-                $logInfoS "result: " $ T.pack (show result)
-                pure (Just result)
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
-                parents' = map (\(_,_,p ,_)-> p) abstractColumns'
                 pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
-                pCollectionsWithAbstracts = duplicateForParentsAndIncludeOriginal pCollections parents'
-            recordAction row
-            pure . Right $ BatchedInserts indexContract pCollectionsWithAbstracts
+            pure . Right $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
 
@@ -321,11 +280,10 @@ processTheMessages messages = do
 
     forM_ delegatecalls insertDelegatecall
 
-  let processedEvents = concatMap getAllEvents events'
-      processedEventArrays = concatMap aggEventToCollectionRows processedEvents
+  let processedEventArrays = concatMap aggEventToCollectionRows events'
 
   when (not (null events')) $ do
-    mapOutput Right . outputData $ pipeInsertGlobalEventTable processedEvents
+    mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ insertCollectionTable processedEventArrays
 
@@ -365,7 +323,7 @@ processTheMessages messages = do
             _delegatecallContractName
             (T.pack $ evName e)
         ]) (Map.lookup (evContractAddress e) delegateMap)
-        ) =<< eventEvent <$> processedEvents
+        ) =<< eventEvent <$> events'
       eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
         eventCollectionTableName
           (creator e)
