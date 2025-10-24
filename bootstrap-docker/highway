@@ -29,7 +29,7 @@ The entrypoints are mutually exclusive.
 --help|-h       - this help.
 --down          - remove highway server containers and leave all volumes intact.
 --wipe          - stop and remove highway server containers and wipe out volumes.
---pull          - pull images used in ../docker-compose.highway.yml.
+--pull          - pull images used in docker-compose.highway.yml.
 
 ${Yellow}Environment variables:${NC}
 HTTP_PORT           - (default: 80) Port for HTTP traffic listener.
@@ -67,12 +67,6 @@ function pullImages {
   ${docker_compose} pull
 }
 
-
-if [ ! -f $(pwd)/highway ]; then
-    echo -e "${Red}Script must be executed from the strato-platform/bootstrap-docker directory. Exiting.${NC}"
-    exit 4
-fi
-
 if ! docker ps &> /dev/null
 then
     echo -e "${Red}Error: docker is required: https://www.docker.com/ . If you have it installed - you may need to execute as super user${NC}"
@@ -86,9 +80,9 @@ then
 else
   if ! docker compose version &> /dev/null
   then
-    docker_compose="docker-compose -p highway -f ../docker-compose.highway.yml --log-level ERROR"
+    docker_compose="docker-compose -p highway -f docker-compose.highway.yml --log-level ERROR"
   else
-    docker_compose="docker -l error compose -p highway -f ../docker-compose.highway.yml"
+    docker_compose="docker -l error compose -p highway -f docker-compose.highway.yml"
   fi
 fi
 
@@ -135,12 +129,12 @@ echo "HTTPS_PORT: $HTTPS_PORT"
 echo "ssl: $ssl"
 echo "sslCertFileType: $sslCertFileType"
 
-if [ ! -f ../docker-compose.highway.yml ]
+if [ ! -f docker-compose.highway.yml ]
 then
-  echo -e "${Red}../docker-compose.highway.yml not found. Please build the platform first with 'make' (see README.md).${NC}"
+  echo -e "${Red}docker-compose.highway.yml not found. Please download the docker-compose.highway.yml first or build the platform (see README.md).${NC}"
   exit 3
 else
-  echo -e "${Yellow}Using the ../docker-compose.highway.yml${NC}"
+  echo -e "${Yellow}Using the docker-compose.highway.yml${NC}"
 fi
 
 # COMPOSE FILE PRE-PROCESSING
@@ -150,12 +144,12 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' ../docker-compose.highway.yml > docker-compose-highway-temp.yml
+  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' docker-compose.highway.yml > docker-compose-highway-temp.yml
 else
   if [ "$HTTPS_PORT" != "443" ]; then
-    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' ../docker-compose.highway.yml > docker-compose-highway-temp.yml
+    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' docker-compose.highway.yml > docker-compose-highway-temp.yml
   else
-    cp ../docker-compose.highway.yml docker-compose-highway-temp.yml
+    cp docker-compose.highway.yml docker-compose-highway-temp.yml
   fi
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
