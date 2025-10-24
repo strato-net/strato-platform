@@ -54,7 +54,7 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
+                {v}
               </Text>
             </td>
           </tr>
@@ -68,7 +68,7 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
+                {v}
               </Text>
             </td>
           </tr>
@@ -82,34 +82,6 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
-              </Text>
-            </td>
-          </tr>
-        )
-      }
-    );
-    const newCerts = block && block.blockData && block.blockData.newCerts
-    let newCertRows = newCerts && newCerts.map(
-      function (v, i) {
-        return (
-          <tr key={i}>
-            <td width="60%">
-              <Text ellipsize={true} classes="small smd-pad-4">
-                {v}
-              </Text>
-            </td>
-          </tr>
-        )
-      }
-    );
-    const revokedCerts = block && block.blockData && block.blockData.revokedCerts
-    let revokedCertRows = revokedCerts && revokedCerts.map(
-      function (v, i) {
-        return (
-          <tr key={i}>
-            <td width="60%">
-              <Text ellipsize={true} classes="small smd-pad-4">
                 {v}
               </Text>
             </td>
@@ -319,44 +291,6 @@ class BlockView extends Component {
                 {removedValRows && removedValRows.length === 0 ? <tr>
                   <td colSpan={5}>No Data</td>
                 </tr> : removedValRows}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="h3">New Certificates </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Certificate Data</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {newCertRows && newCertRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : newCertRows}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="h3">Revoked Certificates </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Address</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {revokedCertRows && revokedCertRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : revokedCertRows}
               </tbody>
             </table>
           </div>
