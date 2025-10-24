@@ -233,6 +233,7 @@ interface AssetConfig {
   asset: string;
   symbol: string;
   liquidationRatio: number;
+  minCR: number;
   liquidationPenaltyBps: number;
   closeFactorBps: number;
   stabilityFeeRate: number;
@@ -561,11 +562,11 @@ export const getMaxWithdraw = async (
       throw new Error("Invalid price");
     }
 
-    // Compute collateral required to keep CR >= LR
-    const liquidationRatio = BigInt(config.liquidationRatio);
+    // Compute collateral required to keep CR >= minCR (NOT liquidationRatio)
+    const minCR = BigInt(config.minCR || config.liquidationRatio);
     const unitScale = BigInt(config.unitScale);
     
-    const requiredCollateralValue = (debt * liquidationRatio) / WAD;
+    const requiredCollateralValue = (debt * minCR) / WAD;
     const requiredCollateral = (requiredCollateralValue * unitScale) / price;
 
     // Enforce a 1 wei buffer when debt exists to protect against rounding
@@ -662,16 +663,15 @@ export const getMaxMint = async (
     throw new Error("Invalid price");
   }
 
-  // Compute borrow headroom from collateral value and liquidation ratio
+  // Compute borrow headroom from collateral value and minCR (NOT liquidationRatio)
   const collateralAmount = BigInt(vault.collateral || "0");
-  const liquidationRatio = BigInt(config.liquidationRatio);
+  const minCR = BigInt(config.minCR || config.liquidationRatio);
   const unitScale = BigInt(config.unitScale);
   
   const collateralValueUSD = (collateralAmount * price) / unitScale;
   
-  // Calculate max borrowable amount without safety buffer (matches contract's mintMax behavior)
-  // This results in CR exactly at liquidation threshold
-  const maxBorrowableUSD = (collateralValueUSD * WAD) / liquidationRatio;
+  // Calculate max borrowable amount with minCR safety buffer (matches contract's mintMax behavior)
+  const maxBorrowableUSD = (collateralValueUSD * WAD) / minCR;
 
   let maxAmount: bigint;
 
@@ -1014,6 +1014,7 @@ export const getAssetConfig = async (
     asset,
     symbol: tokenInfo.symbol,
     liquidationRatio: Number(config.liquidationRatio) / Number(WAD) * 100,
+    minCR: Number(config.minCR) / Number(WAD) * 100,
     liquidationPenaltyBps: parseInt(config.liquidationPenaltyBps),
     closeFactorBps: parseInt(config.closeFactorBps),
     stabilityFeeRate,
@@ -1149,6 +1150,7 @@ export const setCollateralConfig = async (
   configData: {
     asset: string;
     liquidationRatio: string;
+    minCR: string;
     liquidationPenaltyBps: string;
     closeFactorBps: string;
     stabilityFeeRate: string;
@@ -1171,6 +1173,7 @@ export const setCollateralConfig = async (
     args: {
       asset: configData.asset,
       liquidationRatio: configData.liquidationRatio,
+      minCR: configData.minCR,
       liquidationPenaltyBps: configData.liquidationPenaltyBps,
       closeFactorBps: configData.closeFactorBps,
       stabilityFeeRate: configData.stabilityFeeRate,

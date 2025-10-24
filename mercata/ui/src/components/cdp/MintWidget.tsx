@@ -79,7 +79,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     return isFinite(projectedCR) ? projectedCR : 0;
   }, [depositAsset, getTotalCollateralValue, existingVaultDebt, borrowAmount]);
 
-  // Get max borrowable amount from backend (includes safety buffer and debt constraints)
+  // Get max borrowable amount from backend (respects minCR, not liquidationRatio)
   // Note: This only considers existing vault collateral, not new deposits
   const getMaxBorrowable = useCallback(async (): Promise<number> => {
     if (!depositAsset) return 0;
@@ -87,6 +87,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     try {
       setMaxBorrowLoading(true);
       // Use the backend endpoint that calculates max borrowable amount with safety buffer
+      // This calls CDPEngine.mintMax which respects minCR
       const result = await cdpService.getMaxMint(depositAsset.asset);
       // Convert from wei to decimal format (USDST is 18 decimals)
       const maxAmount = parseFloat(formatWeiToDecimalHP(result.maxAmount, 18));
@@ -109,7 +110,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     const assetPriceUSD = getAssetPrice();
     if (assetPriceUSD <= 0) return 0;
     
-    // Start with backend max from existing collateral (includes safety buffer and constraints)
+    // Start with backend max from existing collateral (respects minCR with safety buffer)
     let totalMaxBorrowable = maxBorrowableUSD;
     
     // Add additional borrowing power from new deposit input
@@ -118,9 +119,9 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
       // Calculate additional collateral value from new deposit
       const additionalCollateralValueUSD = newDepositAmount * assetPriceUSD;
       
-      // Calculate additional borrowing power based on liquidation ratio
-      const liquidationRatioDecimal = (depositAsset.liquidationRatio || 150) / 100;
-      const additionalBorrowingPower = additionalCollateralValueUSD / liquidationRatioDecimal;
+      // Calculate additional borrowing power based on minCR (NOT liquidationRatio)
+      const minCRDecimal = (depositAsset.minCR || depositAsset.liquidationRatio) / 100;
+      const additionalBorrowingPower = additionalCollateralValueUSD / minCRDecimal;
       
       totalMaxBorrowable += additionalBorrowingPower;
     }
@@ -150,7 +151,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
   // This will be higher than backend max if user is adding new collateral
   const maxBorrowableAmount = calculateMaxBorrowableWithDeposit();
   const projectedCR = calculateProjectedCR();
-  const liquidationRatio = depositAsset?.liquidationRatio || 150;
+  const minCR = depositAsset?.minCR || depositAsset?.liquidationRatio;
   const userDepositBalance = getUserDepositBalance();
 
   // Check if current amounts are above their respective max values
@@ -441,15 +442,12 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     }
   };
 
-  // Check if projected CR is below liquidation threshold (dangerous)
-  const isPositionDangerous = projectedCR > 0 && projectedCR < liquidationRatio;
-  
   // Check if any pause conditions are active
   const isAnyPaused = isGlobalPaused || isAssetPaused;
   
-  // Check if there's no more borrowing room due to being at liquidation threshold
+  // Check if there's no more borrowing room due to being at min collateral ratio threshold
   // This should trigger when user has collateral (existing or being deposited) but no borrowing power
-  const isAtLiquidationThreshold = useCallback((): boolean => {
+  const isAtMinCRThreshold = useCallback((): boolean => {
     const hasExistingCollateral = parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18)) > 0;
     const hasDepositInput = parseFloat(depositAmount || "0") > 0;
     const hasAnyCollateral = hasExistingCollateral || hasDepositInput;
@@ -546,25 +544,18 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         const RAY = BigInt("1000000000000000000000000000"); // 1e27
         const existingScaledDebtWei = BigInt(vaultData.scaledDebt || "0");
         const rateAccumulatorWei = BigInt(vaultData.rateAccumulator || "1000000000000000000000000000");
-        
+
         // Step 1: Convert borrow amount to scaled debt (same as contract)
-        const scaledAddWei = (borrowAmountWei * RAY) / rateAccumulatorWei;
-        
+        const scaledAddWei = (borrowAmountWei * RAY + rateAccumulatorWei - 1n) / rateAccumulatorWei;
+
         // Step 2: Add to existing scaled debt (same as contract)
         const newScaledDebtWei = existingScaledDebtWei + scaledAddWei;
-        
+
         // Step 3: Convert back to debt for floor check (same as contract)
         const totalDebtAfterWei = (newScaledDebtWei * rateAccumulatorWei) / RAY;
         
 
         if (totalDebtAfterWei > 0n && totalDebtAfterWei < debtFloorWei) {
-          // Calculate how much more is needed to reach debt floor
-          const currentDebtWei = (existingScaledDebtWei * rateAccumulatorWei) / RAY;
-          const minRequiredWei = debtFloorWei > currentDebtWei ? debtFloorWei - currentDebtWei : 0n;
-          const minRequired = parseFloat(formatWeiToDecimalHP(minRequiredWei.toString(), 18));
-          const debtFloorDecimal = parseFloat(formatWeiToDecimalHP(debtFloorWei.toString(), 18));
-          const currentDebt = parseFloat(formatWeiToDecimalHP(currentDebtWei.toString(), 18));
-          
           toast({
             title: "Below Debt Floor",
             description: `Borrow more USDST to reach the minimum debt floor`,
@@ -844,7 +835,7 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
                 className={`flex-1 text-right ${
                   isBorrowMaxEnabled 
                     ? 'text-blue-600 bg-blue-50 border-blue-300' 
-                    : isAtLiquidationThreshold 
+                    : isAtMinCRThreshold 
                       ? 'bg-gray-100 text-gray-400 border-gray-300' 
                       : isBorrowAmountAboveMax()
                         ? 'text-red-600 bg-red-50 border-red-300'
@@ -855,8 +846,8 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
               placeholder="0.0"
               type="number"
               step="any"
-                readOnly={isAtLiquidationThreshold}
-                disabled={isAtLiquidationThreshold}
+                readOnly={isAtMinCRThreshold}
+                disabled={isAtMinCRThreshold}
             />
             <Button 
               variant={isBorrowMaxEnabled ? "default" : "outline"}
@@ -869,11 +860,11 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
             </Button>
             </div>
             
-            {/* Overlay when at liquidation threshold */}
-            {isAtLiquidationThreshold && (
+            {/* Overlay when at min collateral ratio threshold */}
+            {isAtMinCRThreshold && (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-200 bg-opacity-90 rounded pointer-events-none">
                 <span className="text-gray-600 font-medium text-sm text-center px-2">
-                  Liquidation Threshold reached — Add more collateral to borrow.
+                  Min Collateral Ratio reached — Add more collateral to borrow.
                 </span>
               </div>
             )}
@@ -889,13 +880,15 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         <div className="lg:col-span-2 border border-gray-200 rounded-xl p-4">
           <CRSlider
             projectedCR={projectedCR}
-            liquidationThreshold={liquidationRatio}
+            minCR={minCR}
             onCRChange={handleCRChange}
             disabled={!depositAsset}
             hasCollateral={
               parseFloat(formatWeiToDecimalHP(existingVaultCollateral, 18)) > 0 || 
               parseFloat(depositAmount || "0") > 0
             }
+            collateralValueUSD={getTotalCollateralValue()}
+            totalDebtUSD={parseFloat(formatWeiToDecimalHP(existingVaultDebt, 18)) + parseFloat(borrowAmount || "0")}
           />
         </div>
 
@@ -904,21 +897,6 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
           <p className="text-3xl font-semibold">{formatPercentage(borrowRate)}</p>
         </div>
       </div>
-
-      {/* Warning for dangerous positions */}
-      {isPositionDangerous && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-xs font-bold">!</span>
-            </div>
-            <span className="text-sm text-red-700 font-medium">
-              Warning: Position is at liquidation threshold ({formatPercentage(liquidationRatio, 0)}). 
-              Consider increasing collateral or reducing borrow amount.
-            </span>
-          </div>
-        </div>
-      )}
 
       {/* Transaction Fee Display */}
       {depositAsset && (parseFloat(depositAmount || "0") > 0 || parseFloat(borrowAmount || "0") > 0) && (

@@ -124,6 +124,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000, // 150% liquidation ratio (1.5e18)
+            1600000000000000000, // 160% minCollateralRatio (1.6e18) - must be >= liquidationRatio
             500, // 5% liquidation penalty (500 bps)
             10000, // 100% close factor (10000 bps)
             1000000000315522921573372069, // ~1% APR stability fee rate
@@ -221,6 +222,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             minLiquidationRatio,
+            1600000000000000000, // 160% minCollateralRatio - must be >= liquidationRatio
             500, // 5% penalty
             10000, // 100% close factor
             1000000000315522921573372069, // ~1% APR
@@ -236,6 +238,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             highLiquidationRatio,
+            3200000000000000000, // 320% minCollateralRatio - must be >= liquidationRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -266,6 +269,7 @@ contract Describe_CDPGeneral is Authorizable {
         try engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -371,6 +375,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -392,6 +397,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -411,6 +417,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             newLiquidationRatio,
+            2100000000000000000, // 210% minCollateralRatio - must be >= liquidationRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -425,6 +432,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             ETHST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             1000, // 10% penalty
             10000,
             1000000000315522921573372069,
@@ -453,6 +461,7 @@ contract Describe_CDPGeneral is Authorizable {
         engine.setCollateralAssetParams(
             GOLDST,
             1500000000000000000,
+            1600000000000000000, // minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
@@ -543,6 +552,7 @@ contract Describe_CDPGeneral is Authorizable {
         try engine.setCollateralAssetParams(
             ETHST,
             500000000000000000, // 50% (invalid - too low)
+            600000000000000000, // 60% minCollateralRatio
             500,
             10000,
             1000000000315522921573372069,
