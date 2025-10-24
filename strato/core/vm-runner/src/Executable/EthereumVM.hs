@@ -22,7 +22,6 @@ where
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
 import qualified Blockchain.Bagger.Transactions as Flush
-import qualified Blockchain.Bagger.Transactions (FlushScope)
 --import Blockchain.BlockChain
 import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
@@ -209,7 +208,7 @@ consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
 
 -- | Handle flush mempool event by converting scope and calling Bagger.flush
-handleVmFlushMempool :: (MonadLogger m, MonadIO m) => FlushMempoolRequest -> m ()
+handleVmFlushMempool :: Bagger.MonadBagger m => FlushMempoolRequest -> m ()
 handleVmFlushMempool (FlushMempoolRequest scope reqId) = do
   $logInfoS "EthereumVM.flush" $ T.pack $
     "Processing flush request " ++ reqId ++ " with scope " ++ show scope
@@ -218,7 +217,7 @@ handleVmFlushMempool (FlushMempoolRequest scope reqId) = do
     "Flushed " ++ show (length flushedTxs) ++ " transactions for request " ++ reqId
   where
     -- Convert event scope to Bagger scope
-    convertFlushScope :: FlushMempoolScope -> FlushScope
+    convertFlushScope :: FlushMempoolScope -> Flush.FlushScope
     convertFlushScope FlushPending = Flush.FlushPending
     convertFlushScope FlushQueued = Flush.FlushQueued
     convertFlushScope FlushAll = Flush.FlushAll

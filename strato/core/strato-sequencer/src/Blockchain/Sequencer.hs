@@ -173,6 +173,10 @@ unseqEventHandler events = do
         (IEPreprepareResponse decis) -> do
           record "inevent_type_preprepare_response" "PreprepareResponse" 1
           blockstanbulSend [PreprepareResponse decis]
+        (IEFlushMempool req) -> do
+          record "inevent_type_flush_mempool" "FlushMempool" 1
+          yield $ Right [VmFlushMempool req]
+          return ()
 
 bootstrapBlockstanbul :: (MonadBlockstanbul m, Mod.Accessible View m) =>
                          ConduitT i SeqOutEvent m ()
