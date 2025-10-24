@@ -68,7 +68,7 @@ data StateDiff = StateDiff
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map B.ByteString (Diff BasicValue v))
+  | SolidVMDiff (Map StoragePath (Diff BasicValue v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -84,6 +84,9 @@ instance StorableValue Word256 where
 
 instance StorableKey B.ByteString where
   lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
+
+instance StorableKey StoragePath where
+  lookupStorageKey = fmap (either (error . ("malformed storage path " ++)) id . parsePath . fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
 instance StorableValue BasicValue where
   decodeMPDBValue = rlpDecode
