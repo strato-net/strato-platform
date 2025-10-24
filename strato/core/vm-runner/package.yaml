@@ -35,6 +35,7 @@ library:
   - dlist
   - ethereum-rlp
 #  - ethereum-vm
+  - exceptions
   - extra
   - format
   - lens

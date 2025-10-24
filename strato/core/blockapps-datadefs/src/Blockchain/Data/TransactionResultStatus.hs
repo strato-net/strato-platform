@@ -38,6 +38,7 @@ data TransactionFailureType
   | TXSizeLimitError
   | GasLimitError
   | KnownFailedTXError
+  | AdminFlushedError
   deriving (Eq, Read, Show, Generic, NFData)
 
 derivePersistField "TransactionResultStatus"
