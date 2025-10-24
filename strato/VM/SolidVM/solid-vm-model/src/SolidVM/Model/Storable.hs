@@ -209,6 +209,43 @@ instance JSON.ToJSON StoragePath where
 
 instance Binary StoragePath where
 
+instance PersistField StoragePath where
+  toPersistValue = toPersistValue . C8.unpack . unparsePath
+  fromPersistValue v =
+    case fromPersistValue v of
+      Left e -> Left e
+      Right theString ->
+        case parsePath theString of
+          Left e -> Left $ T.pack $ "malformed value string in call to fromPersistValue: " ++ show theString ++ "\n" ++ e
+          Right theStoragePath -> Right theStoragePath
+
+instance PersistFieldSql StoragePath where
+  sqlType _ = SqlString
+
+instance E.SqlString StoragePath where
+
+instance ToHttpApiData StoragePath where
+  toUrlPiece = decodeUtf8 . unparsePath
+
+instance FromHttpApiData StoragePath where
+  parseUrlPiece v =
+    case parsePath $ encodeUtf8 v of
+      Left e -> Left $ T.pack $ "malformed value string in call to parseUrlPiece: " ++ show v ++ "\n" ++ e
+      Right theStoragePath -> Right theStoragePath
+
+instance SWAGGER.ToParamSchema StoragePath where
+  toParamSchema _ =
+      mempty
+        & SWAGGER.type_   ?~ SWAGGER.SwaggerString
+        & SWAGGER.format  ?~ "Path to SolidVM storage location"
+
+instance SWAGGER.ToSchema StoragePath where
+  declareNamedSchema _ =
+    pure $ SWAGGER.NamedSchema (Just "StoragePath") $
+      mempty
+        & SWAGGER.type_        ?~ SWAGGER.SwaggerString
+        & SWAGGER.format       ?~ "Path to SolidVM storage location"
+
 empty :: StoragePath
 empty = StoragePath []
 

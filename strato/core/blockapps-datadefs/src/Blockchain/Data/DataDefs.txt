@@ -92,7 +92,7 @@ RawTransaction
 
 Storage json
     addressStateRefId AddressStateRefId
-    key Text
+    key StoragePath
     value BasicValue
     deriving Eq Read Show
 

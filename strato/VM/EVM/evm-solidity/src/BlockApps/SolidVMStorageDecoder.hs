@@ -37,9 +37,9 @@ import SolidVM.Model.Storable
 import Text.Printf
 import Text.Read
 
-decodeSolidVMValues :: [(T.Text, BasicValue)] -> [(T.Text, SolidityValue)]
+decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
 decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM storageKeyToPath Right) hxs
+  pathValues <- mapM (bimapM return return) hxs
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
