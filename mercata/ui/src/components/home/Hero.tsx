@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
+import heroBackground from '../../assets/home/hero-background.png';
 
 const Hero = () => {
   return (
@@ -8,7 +9,7 @@ const Hero = () => {
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{
-          backgroundImage: 'url(/src/assets/home/hero-background.png)'
+          backgroundImage: `url(${heroBackground})`
         }}
       />
       <div className="container mx-auto px-4 py-48 relative z-10">
