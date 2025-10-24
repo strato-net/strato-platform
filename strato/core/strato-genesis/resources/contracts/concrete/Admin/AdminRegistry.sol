@@ -139,6 +139,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function _addAdmin(address _admin) external onlyOwner {
+        require(_admin != address(0), "Invalid admin address");
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
