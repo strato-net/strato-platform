@@ -6,8 +6,8 @@ import Blocks from './components/Blocks';
 import Transactions from './components/Transactions';
 import Accounts from './components/Accounts';
 import Contracts from './components/Contracts';
-// import TransactionView from './components/Transactions/components/TransactionView';
-// import BlockView from './components/Blocks/components/BlockView';
+import TransactionView from './components/Transactions/components/TransactionView';
+import BlockView from './components/Blocks/components/BlockView';
 import ContractQuery from './components/ContractQuery';
 import App from './App';
 import CodeEditor from './components/CodeEditor';
@@ -25,10 +25,10 @@ export const routes =
     <Route exact path="/external_storage" component={ExternalStorage} />
     {/* <Route exact path="/nodes" component={Nodes} /> */}
     <Route exact path="/blocks" component={Blocks} />
-    {/* <Route exact path="/blocks/:block" component={BlockView} /> */}
+    <Route exact path="/blocks/:block" component={BlockView} />
     {/* <Route exact path="/shards" component={Chains} /> */}
     <Route exact path="/transactions" component={Transactions} />
-    {/* <Route exact path="/transactions/:hash" component={TransactionView} /> */}
+    <Route exact path="/transactions/:hash" component={TransactionView} />
     <Route exact path="/contracts" component={Contracts} />
     <Route exact path="/contracts/:name/query" component={ContractQuery} />
     <Route exact path="/code_editor" component={CodeEditor} />
