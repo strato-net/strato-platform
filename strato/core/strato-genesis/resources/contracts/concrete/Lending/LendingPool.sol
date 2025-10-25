@@ -1142,7 +1142,7 @@ contract record LendingPool is Ownable, Pausable {
     *      - Iterates configured assets and seizes any leftover collateral balances (>0) to `feeCollector`.
     *      - No-op if borrower still has liquidation-weighted value or has no scaled debt.
     */
-    function recognizeBadDebt(address borrower) external whenNotPaused onlyPoolConfigurator {
+    function recognizeBadDebt(address borrower) external onlyPoolConfigurator {
         _accrue();
         if (_getTotalCollateralValueForHealth(borrower) > 0) return;
 
@@ -1192,7 +1192,7 @@ contract record LendingPool is Ownable, Pausable {
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
-    function writeOffBadDebtFromReserves(uint amount) external whenNotPaused onlyPoolConfigurator {
+    function writeOffBadDebtFromReserves(uint amount) external onlyPoolConfigurator {
         if (amount == 0) return;
         _accrue();
 
@@ -1213,7 +1213,7 @@ contract record LendingPool is Ownable, Pausable {
     /// @notice LAST-RESORT: write off bad debt without funding (haircut depositors).
     /// @dev Reduces `badDebt` directly, which lowers getExchangeRate() once, pro-rata for all mToken holders.
     ///      Use only after attempting SM coverage and reserves write-off.
-    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external whenNotPaused onlyPoolConfigurator
+    function writeOffBadDebtWithHaircut(uint amount, string calldata reason) external onlyPoolConfigurator
     {
         require(amount > 0, "LP:zero");
         _accrue();
