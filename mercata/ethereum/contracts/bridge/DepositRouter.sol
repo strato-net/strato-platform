@@ -175,7 +175,6 @@ contract DepositRouter is
         TokenConfig storage c = tokenConfig[token];
         if (c.min == minAmount) return;
         c.min = minAmount;
-        c.isPermitted = true;
         emit TokenConfigUpdated(token, minAmount, c.isPermitted);
     }
 
@@ -238,7 +237,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "1.0.0";
+        return "2.0.0";
     }
 
     function _authorizeUpgrade(
