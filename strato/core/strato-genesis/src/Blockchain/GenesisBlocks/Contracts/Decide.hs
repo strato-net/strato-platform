@@ -26,7 +26,7 @@ mercataAddress = 0x1000
 insertDecideContract :: GenesisInfo -> GenesisInfo
 insertDecideContract gi =
   gi
-    { genesisInfoAccountInfo = genesisInfoAccountInfo gi ++ [decideAcct] ++ [decideStateAcct],
+    { genesisInfoAddressInfo = genesisInfoAddressInfo gi ++ [decideAcct] ++ [decideStateAcct],
       genesisInfoCodeInfo = genesisInfoCodeInfo gi
                          ++ [ CodeInfo (decodeUtf8 dec1deContract) (Just "Decider")
                             , CodeInfo (decodeUtf8 dec1deStateContract) (Just "DeciderState")

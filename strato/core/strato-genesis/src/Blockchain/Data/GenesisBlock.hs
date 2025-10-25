@@ -151,7 +151,7 @@ genesisInfoToGenesisBlock ::
   m ([(AddressInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
   let codes = genesisInfoCodeInfo gi
-  let accounts = genesisInfoAccountInfo gi
+  let accounts = genesisInfoAddressInfo gi
   initializeCodeDB "SolidVM" codes
   initializeStateDB accounts
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)

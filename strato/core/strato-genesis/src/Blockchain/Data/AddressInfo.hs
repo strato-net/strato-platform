@@ -101,7 +101,7 @@ instance ToJSON AddressInfo where
       ]
 
 accountExtractor :: JS.Parser [AddressInfo]
-accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
+accountExtractor = many ("addressInfo" JS..: JS.arrayOf acctInfo)
 
 acctInfo :: JS.Parser AddressInfo
 acctInfo = JS.value

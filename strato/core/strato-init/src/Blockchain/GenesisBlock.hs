@@ -239,9 +239,10 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
-  let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
+  let addresses = acctInfoAddress <$> genesisInfoAddressInfo genesisInfo
       events = genesisInfoEvents genesisInfo
       delegatecalls = genesisInfoDelegatecalls genesisInfo
+
   ccas <- fmap catMaybes . for (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo src mName) -> for mName $ \name -> do
     let srcHash = hash $ T.encodeUtf8 src
         codePtr' = SolidVMCode (T.unpack name) srcHash

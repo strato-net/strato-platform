@@ -43,7 +43,7 @@ import qualified Data.Sequence as S
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
     genesisInfoUnclesHash :: Keccak256,
-    genesisInfoAccountInfo :: [AddressInfo],
+    genesisInfoAddressInfo :: [AddressInfo],
     genesisInfoCodeInfo :: [CodeInfo],
     genesisInfoTransactionRoot :: StateRoot, -- Misspelled to match the existing parser
     genesisInfoReceiptsRoot :: StateRoot,
@@ -68,8 +68,8 @@ instance Format GenesisInfo where
     "GenesisInfo\n" ++ tab (
     "genesisInfoParentHash: " ++ format genesisInfoParentHash ++ "\n"
     ++ "genesisInfoUnclesHash: " ++ format genesisInfoUnclesHash ++ "\n"
-    ++ "genesisInfoAccountInfo:\n"
-    ++  tab (unlines $ map format genesisInfoAccountInfo) ++ "\n"
+    ++ "genesisInfoAddressInfo:\n"
+    ++  tab (unlines $ map format genesisInfoAddressInfo) ++ "\n"
     ++ "genesisInfoCodeInfo:\n"
     ++  tab (unlines $ map format genesisInfoCodeInfo) ++ "\n"
     ++ "genesisInfoTransactionRoot: " ++ format genesisInfoTransactionRoot ++ "\n"
@@ -97,7 +97,7 @@ defaultGenesisInfo =
   GenesisInfo
     { genesisInfoParentHash = unsafeCreateKeccak256FromWord256 0,
       genesisInfoUnclesHash = unsafeCreateKeccak256FromWord256 13478047122767188135818125966132228187941283477090363246179690878162135454535,
-      genesisInfoAccountInfo = [],
+      genesisInfoAddressInfo = [],
       genesisInfoCodeInfo = [],
       genesisInfoTransactionRoot = nullStateRoot,
       genesisInfoReceiptsRoot = nullStateRoot,
@@ -119,7 +119,7 @@ instance FromJSON GenesisInfo where
     GenesisInfo
       <$> o .: "parentHash"
       <*> o .: "unclesHash"
-      <*> o .: "accountInfo"
+      <*> o .: "addressInfo"
       <*> o .:? "codeInfo" .!= []
       <*> o .: "transactionRoot" -- This is manual to account for GenesisInfos missing codeInfo
       <*> o .: "receiptsRoot"

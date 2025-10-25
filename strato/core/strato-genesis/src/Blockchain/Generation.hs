@@ -17,7 +17,7 @@ import Data.String
 import SolidVM.Model.Storable hiding (size)
 
 readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
-readValidatorsFromGenesisInfo gi = concat . flip map (genesisInfoAccountInfo gi) $ \case
+readValidatorsFromGenesisInfo gi = concat . flip map (genesisInfoAddressInfo gi) $ \case
   SolidVMContractWithStorage 0x100 _ _ storage ->
     let storageMap = M.fromList storage
      in case M.lookup ".validators.length" storageMap of
