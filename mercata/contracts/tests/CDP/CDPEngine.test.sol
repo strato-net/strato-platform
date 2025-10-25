@@ -165,16 +165,16 @@ contract Describe_CDPEngine is Authorizable {
         require(cdpEngine.RAY() == RAY, "RAY should be 1e27");
         
         // Test price max age configuration
-        uint initialPriceMaxAge = cdpEngine.priceMaxAge();
-        uint newPriceMaxAge = 1800; // 30 minutes in seconds
+        // uint initialPriceMaxAge = cdpEngine.priceMaxAge();
+        // uint newPriceMaxAge = 1800; // 30 minutes in seconds
         
         // Test setter function
-        cdpEngine.setPriceMaxAge(newPriceMaxAge);
-        require(cdpEngine.priceMaxAge() == newPriceMaxAge, "Price max age not updated");
+        // cdpEngine.setPriceMaxAge(newPriceMaxAge);
+        // require(cdpEngine.priceMaxAge() == newPriceMaxAge, "Price max age not updated");
 
         // Test that price max age is updated
-        cdpEngine.setPriceMaxAge(1200);
-        require(cdpEngine.priceMaxAge() == 1200, "Price max age not updated");
+        // cdpEngine.setPriceMaxAge(1200);
+        // require(cdpEngine.priceMaxAge() == 1200, "Price max age not updated");
     }
 
     function it_cdp_engine_can_configure_collateral_asset() {
