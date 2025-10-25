@@ -148,11 +148,12 @@ class BridgeContractService {
     depositRouterAddress: string; 
   }): Promise<{
     minAmount: string;
+    isPermitted: boolean;
   }> {
     const client = await this.getClient(chainId.toString());
     const normalizedAddress = this.formatAddress(tokenAddress);
     
-    const minAmount = await client.readContract({
+    const config = await client.readContract({
       address: this.formatAddress(depositRouterAddress),
       abi: DEPOSIT_ROUTER_ABI,
       functionName: "tokenConfig",
@@ -160,7 +161,8 @@ class BridgeContractService {
     });
     
     return {
-      minAmount: minAmount.toString()
+      minAmount: config[0].toString(),
+      isPermitted: config[1]
     };
   }
 
@@ -184,12 +186,14 @@ class BridgeContractService {
       const depositAmount = safeParseUnits(amount, parseInt(decimals) || 18);
       
       // Get token configuration from router
-      const minAmount = await client.readContract({
+      const config = await client.readContract({
         address: this.formatAddress(depositRouterAddress),
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "tokenConfig",
         args: [normalizedTokenAddress]
       });
+      const minAmount = config[0];
+      const isPermitted = config[1];
 
       // Check if deposit is allowed using canDeposit
       const canDeposit = await client.readContract({
@@ -204,6 +208,17 @@ class BridgeContractService {
       
       // Check if operation is permitted
       if (!canDeposit) {
+        // Check if it's because token is not permitted
+        if (!isPermitted) {
+          return {
+            isValid: false,
+            error: `This token is not permitted for deposits. Please contact support if you believe this is an error.`,
+            isAllowed: false,
+            minAmount: minAmount.toString(),
+            depositAmount: depositAmount.toString()
+          };
+        }
+        // Otherwise it's below minimum amount
         return {
           isValid: false,
           error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formatBalance(minAmount, undefined, parseInt(decimals) || 18)} ${tokenType}`,

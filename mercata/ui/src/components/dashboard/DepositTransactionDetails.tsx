@@ -9,6 +9,7 @@ import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiAmount } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
+import { usdstAddress } from "@/lib/constants";
 
 const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,8 +33,8 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        
-        (params as any)["value->>stratoToken"] = mintUSDST ? 'eq.USDST' : 'neq.USDST';
+        console.log('mintUSDST', mintUSDST);
+        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
