@@ -30,6 +30,7 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
   const [maxStates, setMaxStates] = useState<Record<string, boolean>>({});
   const [maxValues, setMaxValues] = useState<Record<string, number>>({});
   const [availableUsdstBalance, setAvailableUsdstBalance] = useState<number>(0);
+  const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
   const { toast } = useToast();
   const { userAddress } = useUser();
   const { fetchTokens, fetchUsdstBalance, usdstBalance } = useUserTokens();
@@ -39,9 +40,19 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // Fetch global pause status
+        let globalPaused = false;
+        try {
+          const globalPauseStatus = await cdpService.getGlobalPaused();
+          globalPaused = globalPauseStatus.isPaused;
+          setIsGlobalPaused(globalPaused);
+        } catch (error) {
+          console.error("Failed to fetch global pause status:", error);
+          setIsGlobalPaused(false); // Default to not paused if we can't fetch
+        }
+        
         // Fetch liquidatable vaults
         const liquidatable = await cdpService.getLiquidatable();
-        setLiquidatableVaults(liquidatable);
         
         // Fetch asset configs for each unique asset
         const uniqueAssets = [...new Set(liquidatable.map(vault => vault.asset))];
@@ -63,6 +74,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           }
         });
         setAssetConfigs(configsMap);
+        
+        // Filter out paused positions (global pause OR individual asset pause)
+        const filteredLiquidatable = liquidatable.filter(vault => {
+          const assetConfig = configsMap[vault.asset];
+          // Exclude if globally paused OR if this specific asset is paused
+          const isPaused = globalPaused || (assetConfig?.isPaused ?? false);
+          return !isPaused;
+        });
+        setLiquidatableVaults(filteredLiquidatable);
         
         // Fetch USDST balance once for the entire component
         if (userAddress) {
@@ -291,9 +311,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           description: `Liquidated ${liquidationAmount} USDST. Tx: ${result.hash}`,
         });
         
-        // Refresh liquidatable vaults
+        // Refresh liquidatable vaults and filter out paused ones
         const updatedLiquidatable = await cdpService.getLiquidatable();
-        setLiquidatableVaults(updatedLiquidatable);
+        const filteredUpdatedLiquidatable = updatedLiquidatable.filter(v => {
+          const assetConfig = assetConfigs[v.asset];
+          // Exclude if globally paused OR if this specific asset is paused
+          const isPaused = isGlobalPaused || (assetConfig?.isPaused ?? false);
+          return !isPaused;
+        });
+        setLiquidatableVaults(filteredUpdatedLiquidatable);
         
         // Clear the input
         setLiquidationAmounts(prev => ({ ...prev, [vaultKey]: "" }));

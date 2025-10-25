@@ -442,8 +442,10 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
     }
   };
 
-  // Check if any pause conditions are active
-  const isAnyPaused = isGlobalPaused || isAssetPaused;
+  // Check if borrow (mint) operations are paused
+  // Note: Deposit is NOT affected by pause (no whenNotPaused modifier on deposit())
+  // Only mint/mintMax have whenNotPaused modifier
+  const isBorrowPaused = isGlobalPaused || isAssetPaused;
   
   // Check if there's no more borrowing room due to being at min collateral ratio threshold
   // This should trigger when user has collateral (existing or being deposited) but no borrowing power
@@ -922,25 +924,30 @@ const BorrowWidget: React.FC<BorrowWidgetProps> = ({ onSuccess }) => {
         disabled={
           loading || 
           maxBorrowLoading ||
-          isAnyPaused ||
           !depositAsset || 
           (parseFloat(depositAmount || "0") <= 0 && parseFloat(borrowAmount || "0") <= 0) || 
           getAssetPrice() <= 0 ||
           isDepositAmountAboveMax() ||
-          isBorrowAmountAboveMax()
+          isBorrowAmountAboveMax() ||
+          (parseFloat(borrowAmount || "0") > 0 && isBorrowPaused) // Only block if borrowing AND paused
         }
       >
         {(() => {
           if (loading) return "Processing...";
           if (maxBorrowLoading) return "Loading max borrow...";
-          if (isGlobalPaused) return "Deposit/Borrow paused by admin at this time";
-          if (isAssetPaused) return `Deposit/Borrow for ${depositAsset?.symbol} paused by admin at this time`;
-          if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
-          if (getAssetPrice() <= 0) return "Price data required";
-          if (!depositAsset) return "Select asset";
           
           const hasDeposit = parseFloat(depositAmount || "0") > 0;
           const hasBorrow = parseFloat(borrowAmount || "0") > 0;
+          
+          // Pause message only shown when trying to borrow while paused
+          if (hasBorrow && isBorrowPaused) {
+            if (isGlobalPaused) return "Borrow paused by admin at this time";
+            if (isAssetPaused) return `Borrow for ${depositAsset?.symbol} paused by admin at this time`;
+          }
+          
+          if (isDepositAmountAboveMax() || isBorrowAmountAboveMax()) return "Amount exceeds maximum";
+          if (getAssetPrice() <= 0) return "Price data required";
+          if (!depositAsset) return "Select asset";
           
           if (!hasDeposit && !hasBorrow) return "Enter amount";
           if (hasDeposit && hasBorrow) return "Deposit + Borrow";
