@@ -338,8 +338,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken,
-      mint: false, // bridge-in always uses mint = false
+      tokenAddress: ctx.selectedToken.externalToken
     });
 
     if (!validation.isValid) {
@@ -475,8 +474,7 @@ const BridgeIn: React.FC = () => {
           bridgeContractService.formatAddress(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
-          permitData!.signature as `0x${string}`,
-          false, // mintUSDST = false for bridge-in
+          permitData!.signature as `0x${string}`
         ],
         account: ctx.address as `0x${string}`,
       });
@@ -492,8 +490,7 @@ const BridgeIn: React.FC = () => {
           bridgeContractService.formatAddress(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
-          permitData!.signature as `0x${string}`,
-          false, // mintUSDST = false for bridge-in
+          permitData!.signature as `0x${string}`
         ],
         chain,
         account: ctx.address as `0x${string}`,
@@ -639,7 +636,7 @@ const BridgeIn: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
+              <SelectItem key={t.id} value={t.externalSymbol}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}

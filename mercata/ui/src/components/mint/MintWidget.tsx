@@ -110,7 +110,7 @@ const MintWidget: React.FC = () => {
     ensureNetwork();
   }, [chainId, expectedChainId, isConnected, selectedNetwork, switchChain]);
 
-  // Min deposit amount for router with mint=true
+  // Min deposit amount for router
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!selectedNetworkConfig) return;
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
@@ -120,8 +120,7 @@ const MintWidget: React.FC = () => {
         amount: "0",
         decimals: decimals.toString(),
         chainId: selectedNetworkConfig.chainId,
-        tokenAddress,
-        mint: true,
+        tokenAddress
       });
       const formattedMinAmount = validation.minAmount ? (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
       setMinDepositInfo({ amount: formattedMinAmount, loading: false });
@@ -218,8 +217,7 @@ const MintWidget: React.FC = () => {
         amount,
         decimals: selectedMintToken.externalDecimals,
         chainId: selectedNetworkConfig.chainId,
-        tokenAddress: selectedMintToken.externalToken,
-        mint: true,
+        tokenAddress: selectedMintToken.externalToken
       });
       if (!validation.isValid) throw new Error(validation.error || "Validation failed");
 
@@ -256,8 +254,7 @@ const MintWidget: React.FC = () => {
           bridgeContractService.formatAddress(userAddress),
           nonce,
           deadline,
-          signature as `0x${string}`,
-          true,
+          signature as `0x${string}`
         ],
         account: address as `0x${string}`,
       });
@@ -272,8 +269,7 @@ const MintWidget: React.FC = () => {
           bridgeContractService.formatAddress(userAddress),
           nonce,
           deadline,
-          signature as `0x${string}`,
-          true,
+          signature as `0x${string}`
         ],
         chain: await resolveViemChain(selectedNetworkConfig.chainId),
         account: address as `0x${string}`,
@@ -366,15 +362,15 @@ const MintWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Select Stablecoin</Label>
         <Select
-          value={selectedMintToken?.stratoToken || ""}
-          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.stratoToken === v) || null)}
+          value={selectedMintToken?.externalToken || ""}
+          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.externalToken === v) || null)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
             {redeemableTokens.map(t => (
-              <SelectItem key={t.stratoToken} value={t.stratoToken}>
+              <SelectItem key={t.id} value={t.externalToken}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}
