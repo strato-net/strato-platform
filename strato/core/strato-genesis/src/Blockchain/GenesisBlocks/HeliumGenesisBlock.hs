@@ -48,22 +48,22 @@ mercataContracts = map (\(fp, bs) -> [takeFileName fp, T.unpack $ decodeUtf8 bs]
 
 data BridgeChainInfo = BridgeChainInfo
   { bci_chainId :: Integer
+  , bci_chainName :: Text
   , bci_custody :: Address
   , bci_depositRouter :: Address
-  , bci_lastProcessedBlock :: Integer
   , bci_enabled :: Bool
-  , bci_chainName :: Text
+  , bci_lastProcessedBlock :: Integer
   }
 
 data BridgeAssetInfo = BridgeAssetInfo
-  { bai_asset :: Address
-  , bai_externalToken :: Address
-  , bai_externalDecimals :: Integer
+  { bai_enabled :: Bool
   , bai_externalChainId :: Integer
+  , bai_externalDecimals :: Integer
   , bai_externalName :: Text
   , bai_externalSymbol :: Text
-  , bai_maxPerTx :: Integer
-  , bai_permissions :: Integer
+  , bai_externalToken :: Address
+  , bai_maxPerWithdrawal :: Integer
+  , bai_stratoToken :: Address
   }
 
 data HeliumGenesisBlockConfig = HeliumGenesisBlockConfig
@@ -71,6 +71,8 @@ data HeliumGenesisBlockConfig = HeliumGenesisBlockConfig
   , hgbc_admins :: [Address]
   , hgbc_chainInfos :: [BridgeChainInfo]
   , hgbc_assetInfos :: [BridgeAssetInfo]
+  , hgbc_bridgeRelayer :: (Address, Integer)
+  , hgbc_oracleRelayers :: [(Address, Integer)]
   }
 
 list :: b -> (a -> [a] -> b) -> [a] -> b
@@ -315,95 +317,80 @@ sepoliaChainId :: Integer
 sepoliaChainId = 11155111
 
 ethChainId :: Integer
-ethChainId = 0
+ethChainId = 1
 
 sepolia :: BridgeChainInfo
 sepolia = BridgeChainInfo sepoliaChainId
-  0x8713850e9ff0fd0200ce87c32e3cdb24ed021631
-  0x8223f1a6a4710c110a3c4333b7682de23cd072a5
-  9217425
-  True
   "Ethereum Sepolia"
-
-meth :: BridgeAssetInfo
-meth = BridgeAssetInfo
-  0x93fb7295859b2d70199e0a4883b7c320cf874e6c
-  0xe46550c8d3c4e5a04da14a948543d918d69f3df1
-  18
-  sepoliaChainId
-  "METH"
-  "METH"
-  0
-  1
-
-musdc :: BridgeAssetInfo
-musdc = BridgeAssetInfo
-  0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
-  0x46e96acf148b019da71e41f36239833f550dfeb9
-  6
-  sepoliaChainId
-  "MUSDC"
-  "MUSDC"
-  0
-  2
+  0x8713850e9ff0fd0200ce87c32e3cdb24ed021631
+  0x1f0457D1d8c3f0dA3e579bE3843DD6E093163B84
+  True
+  9217425
 
 eth :: BridgeAssetInfo
 eth = BridgeAssetInfo
-  0x93fb7295859b2d70199e0a4883b7c320cf874e6c
-  0x0000000000000000000000000000000000000000
+  True
+  sepoliaChainId
   18
-  ethChainId
   "Ether"
   "ETH"
+  0x0000000000000000000000000000000000000000
   0
-  1
+  0x93fb7295859b2d70199e0a4883b7c320cf874e6c
 
 wbtc :: BridgeAssetInfo
 wbtc = BridgeAssetInfo
-  0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
-  0x29f2d40b0605204364af54ec677bd022da425d03
+  True
+  sepoliaChainId
   8
-  ethChainId
+  "Wrapped Bitcoin"
   "WBTC"
-  "WBTC"
+  0x29f2d40b0605204364af54ec677bd022da425d03
   0
-  1
+  0x7a99b5ba11ac280cdd5caf52c12fe89fb1b8d2f9
+  
 
 paxg :: BridgeAssetInfo
 paxg = BridgeAssetInfo
-  0x491cdfe98470bfe69b662ab368826dca0fc2f24d
-  0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3
+  True
+  sepoliaChainId
   18
-  ethChainId
   "PAXG"
   "PAXG"
+  0x8599ea38e03e9d0a8b9e86a47ac119fc78d6b6d3
   0
-  1
+  0x491cdfe98470bfe69b662ab368826dca0fc2f24d
 
 usdc :: BridgeAssetInfo
 usdc = BridgeAssetInfo
-  0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
-  0x1c7d4b196cb0c7b01d743fbc6116a902379c7238
+  True
+  sepoliaChainId
   6
-  ethChainId
   "USDC"
   "USDC"
+  0x94a9d9ac8a22534e3faca9f4e7f2e2cf85d5e4c8
   0
-  2
+  usdstAddress
 
 usdt :: BridgeAssetInfo
 usdt = BridgeAssetInfo
-  0x86a5ae535ded415203c3e27d654f9a1d454c553b
-  0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0
+  True
+  sepoliaChainId
   6
-  ethChainId
   "USDT"
   "USDT"
+  0xaa8e23fb1079ea71e0a56f48a2aa51851d8433d0
   0
-  2
+  usdstAddress
 
 heliumConfig :: HeliumGenesisBlockConfig
-heliumConfig = HeliumGenesisBlockConfig validators admins [sepolia] [meth, musdc]
+heliumConfig = HeliumGenesisBlockConfig
+  validators
+  admins
+  [sepolia]
+  [eth, wbtc, paxg, usdc, usdt]
+  (bridgeRelayerAddress, 100_000 * oneE18)
+  ((,100_000 * oneE18) <$> [oracleAddress1, oracleAddress2])
 
 genesisBlock :: GenesisInfo
 genesisBlock = genesisBlockTemplate heliumConfig
@@ -475,9 +462,9 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             , mercataBridge hgbc_chainInfos hgbc_assetInfos
             , poolFactory
             , tokenFactory
-            , adminRegistry hgbc_admins
+            , adminRegistry hgbc_admins (fst hgbc_bridgeRelayer) (fst <$> hgbc_oracleRelayers)
             , feeCollector
-            , voucher
+            , voucher $ hgbc_bridgeRelayer : hgbc_oracleRelayers
             , mToken
             , rewardsChef
             , cdpEngine
@@ -742,31 +729,29 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 proxy $ to
 
 mercataBridge :: [BridgeChainInfo] -> [BridgeAssetInfo] -> AddressInfo
 mercataBridge bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
-  [ (".relayer", BAddress bridgeRelayerAddress)
-  , (".logicContract", BAddress mercataBridgeImplAddress)
+  [ (".logicContract", BAddress mercataBridgeImplAddress)
   , (".tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
   , (".depositsPaused", BBool False)
   , (".withdrawalCounter", BInteger 0)
   , (".withdrawalsPaused", BBool False)
   , (".WITHDRAWAL_ABORT_DELAY", BInteger 172800)
-  , (".PERMISSION_WRAP", BInteger 1)
-  , (".PERMISSION_MINT", BInteger 2)
-  , (".PERMISSION_MASK", BInteger 3)
+  , (".DECIMAL_PLACES", BInteger 18)
   , (".USDST_ADDRESS", BAddress usdstAddress)
   ] ++ concatMap (\BridgeChainInfo{..} ->
-  [ (".chains[" <> BC.pack (show bci_chainId) <> "].custody", BAddress bci_custody)
+  [ (".chains[" <> BC.pack (show bci_chainId) <> "].chainName", BString $ encodeUtf8 bci_chainName)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].custody", BAddress bci_custody)
   , (".chains[" <> BC.pack (show bci_chainId) <> "].depositRouter", BAddress bci_depositRouter)
-  , (".chains[" <> BC.pack (show bci_chainId) <> "].lastProcessedBlock", BInteger bci_lastProcessedBlock)
   , (".chains[" <> BC.pack (show bci_chainId) <> "].enabled", BBool bci_enabled)
-  , (".chains[" <> BC.pack (show bci_chainId) <> "].chainName", BString $ encodeUtf8 bci_chainName)
+  , (".chains[" <> BC.pack (show bci_chainId) <> "].lastProcessedBlock", BInteger bci_lastProcessedBlock)
   ]) bcis ++ concatMap (\BridgeAssetInfo{..} ->
-  [ (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalToken", BAddress bai_externalToken)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalDecimals", BInteger bai_externalDecimals)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalChainId", BInteger bai_externalChainId)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalName", BString $ encodeUtf8 bai_externalName)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].externalSymbol", BString $ encodeUtf8 bai_externalSymbol)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].maxPerTx", BInteger bai_maxPerTx)
-  , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].permissions", BInteger bai_permissions)
+  [ (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].enabled", BBool bai_enabled)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].externalChainId", BInteger bai_externalChainId)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].externalDecimals", BInteger bai_externalDecimals)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].externalName", BString $ encodeUtf8 bai_externalName)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].externalSymbol", BString $ encodeUtf8 bai_externalSymbol)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].externalToken", BAddress bai_externalToken)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].maxPerWithdrawal", BInteger bai_maxPerWithdrawal)
+  , (".assets[" <> addrBS bai_externalToken <> "][" <> BC.pack (show bai_externalChainId) <> "].stratoToken", BAddress bai_stratoToken)
   ]) bais
 
 poolFactory :: AddressInfo
@@ -790,22 +775,31 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths 
   ++ ((\GA.Asset{..} -> (".isFactoryToken[" <> addrBS root <> "]", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAddress root)) <$> zip [(9 :: Integer)..] GA.assets)
 
-adminRegistry :: [Address] -> AddressInfo
-adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
+adminRegistry :: [Address] -> Address -> [Address] -> AddressInfo
+adminRegistry adminList bridgeRelayer oracleRelayers = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".logicContract", BAddress adminRegistryImplAddress)
      , (".defaultVotingThresholdBps", BInteger 6000)
      , (".admins.length", BInteger . fromIntegral $ length adminList)
      , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
-     , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS bridgeRelayerAddress <> "]", BBool True)
+     , (".whitelist[" <> addrBS voucherAddress <> "][mint][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][setLastProcessedBlock][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][deposit][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][depositBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][confirmDeposit][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][confirmDepositBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][reviewDeposit][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][reviewDepositBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][confirmWithdrawal][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][confirmWithdrawalBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][finaliseWithdrawal][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][finaliseWithdrawalBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][abortWithdrawal][" <> addrBS bridgeRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS mercataBridgeAddress <> "][abortWithdrawalBatch][" <> addrBS bridgeRelayer <> "]", BBool True)
      , (".whitelist[" <> addrBS mTokenAddress <> "][mint][" <> addrBS liquidityPoolAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS mTokenAddress <> "][burn][" <> addrBS liquidityPoolAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS sUsdstAddress <> "][mint][" <> addrBS safetyModuleAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS sUsdstAddress <> "][burn][" <> addrBS safetyModuleAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS tokenFactoryAddress <> "][createTokenWithInitialOwner][" <> addrBS poolFactoryAddress <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleAddress1 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleAddress1 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleAddress2 <> "]", BBool True)
-     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleAddress2 <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setLendingPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setLiquidityPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , (".whitelist[" <> addrBS lendingRegistryAddress <> "][setCollateralVault][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
@@ -818,6 +812,10 @@ adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 prox
      [ (".admins[" <> BC.pack (show i) <> "]", BAddress adminAddress)
      , (".adminMap[" <> addrBS adminAddress <> "]", BInteger $ i + 1)
      ]) (zip [0..] adminList)
+  ++ concatMap (\oracleRelayer ->
+     [ (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrice][" <> addrBS oracleRelayer <> "]", BBool True)
+     , (".whitelist[" <> addrBS priceOracleAddress <> "][setAssetPrices][" <> addrBS oracleRelayer <> "]", BBool True)
+     ]) oracleRelayers
   ++ concatMap (\GA.Asset{..} ->
       if name `elem` ["ETHST", "WBTCST", "PAXGST"]
          then [ (".whitelist[" <> addrBS root <> "][mint][" <> addrBS mercataBridgeAddress <> "]", BBool True)
@@ -841,18 +839,16 @@ feeCollector :: AddressInfo
 feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [(".logicContract", BAddress feeCollectorImplAddress)]
 
-voucher :: AddressInfo
-voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
+voucher :: [(Address, Integer)] -> AddressInfo
+voucher extraAccounts = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , (".logicContract", BAddress voucherImplAddress)
      , ("._symbol", BString "VOUCHER")
      , ("._erc20Initialized", BBool True)
      , ("._totalSupply", BInteger $ 1_300_000 * oneE18)
      , ("._balances[" <> addrBS blockappsAddress <> "]", BInteger $ 1_000_000 * oneE18)
-     , ("._balances[" <> addrBS bridgeRelayerAddress <> "]", BInteger $ 100_000 * oneE18) -- $1,000 worth of txs
-     , ("._balances[" <> addrBS oracleAddress1 <> "]", BInteger $ 100_000 * oneE18)
-     , ("._balances[" <> addrBS oracleAddress2 <> "]", BInteger $ 100_000 * oneE18)
      ]
+  ++ ((\(acct, bal) -> ("._balances[" <> addrBS acct <> "]", BInteger bal)) <$> extraAccounts)
 
 mToken :: AddressInfo
 mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
@@ -1086,11 +1082,7 @@ validators = [
   ]
 
 admins :: [Address]
-admins = [
-  0x7630b673862a2807583834908f10192e00c58b00, --Kieren
-  0x292dd9591f506845ef05a9f3b8116e641cbcb4bb, --Victor
-  0xf1ba16a6cfb2a17fb34ad477eaaf0c76eac64f14 --Jamshid
-  ]
+admins = [blockappsAddress]
 
 descriptions :: M.Map Text Text
 descriptions = M.fromList

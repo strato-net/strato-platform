@@ -24,7 +24,7 @@ const WithdrawWidget: React.FC = () => {
   const { toast } = useToast();
 
   const {
-    redeemOut,
+    requestWithdrawal: redeemOut,
     availableNetworks,
     redeemableTokens,
     selectedNetwork,
@@ -83,8 +83,8 @@ const WithdrawWidget: React.FC = () => {
     const maxTransferable = computeMaxTransferable(usdstBalanceWei, true, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_USDST_FEE).toString(), setFeeError);
     
     // Apply token max per transaction limit if it exists
-    if (selectedMintToken && selectedMintToken.maxPerTx && selectedMintToken.maxPerTx !== "0") {
-      const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerTx, 18);
+    if (selectedMintToken && selectedMintToken.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0") {
+      const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerWithdrawal, 18);
       const maxTransferableBigInt = BigInt(maxTransferable);
       const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
       return finalMax.toString();
@@ -102,10 +102,11 @@ const WithdrawWidget: React.FC = () => {
       const externalChainId = selectedNetworkConfig?.chainId || "";
       const stratoTokenAmount = safeParseUnits(amount).toString();
       const res = await redeemOut({
-        stratoTokenAmount,
+        externalChainId: externalChainId,
         externalRecipient: address,
+        externalToken: selectedMintToken.externalToken,
         stratoToken: selectedMintToken.stratoToken,
-        externalChainId: String(externalChainId)
+        stratoTokenAmount
       });
       if (res?.success) {
         toast({
@@ -166,9 +167,9 @@ const WithdrawWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Receive Stablecoin</Label>
         <Select
-          value={selectedMintToken?.stratoToken || ""}
+          value={selectedMintToken?.externalToken || ""}
           onValueChange={(v) => {
-            const token = redeemableTokens.find(t => t.stratoToken === v);
+            const token = redeemableTokens.find(t => t.externalToken === v);
             if (token) {
               setSelectedMintToken(token);
             }
@@ -179,7 +180,7 @@ const WithdrawWidget: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {redeemableTokens.map(t => (
-              <SelectItem key={t.stratoToken} value={t.stratoToken}>{t.externalName} ({t.externalSymbol})</SelectItem>
+              <SelectItem key={t.id} value={t.externalToken}>{t.externalName} ({t.externalSymbol})</SelectItem>
             ))}
           </SelectContent>
         </Select>

@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Blockchain.Bagger.BaggerState where
 
@@ -14,6 +15,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Applicative (Alternative, empty)
 import Control.DeepSeq
+import Control.Monad.State (runState, state)
 import qualified Data.DList as DL
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -201,3 +203,19 @@ upsertPT tx@OutputTx {otSigner = addr, otBaseTx = bt} pt = ret
     filtered = filter (not . (\t -> otSigner t == addr && nonce' (otBaseTx t) <= nonce' bt)) pt
     nonce' = TD.transactionNonce
     !ret = tx : filtered
+
+flushPendingOnly :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushPendingOnly s@BaggerState {pending = p} =
+  (map (, Pending) $ concatMap toList $ M.elems p, s {pending = M.empty})
+
+flushQueuedOnly :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushQueuedOnly s@BaggerState {queued = q} =
+  (map (, Queued) $ concatMap toList $ M.elems q, s {queued = M.empty})
+
+flushBoth :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushBoth s = runState flushBothState s
+  where
+    flushBothState = do
+      pendingTxs <- state flushPendingOnly
+      queuedTxs <- state flushQueuedOnly
+      return (pendingTxs ++ queuedTxs)

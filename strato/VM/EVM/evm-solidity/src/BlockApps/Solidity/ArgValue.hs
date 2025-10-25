@@ -8,6 +8,7 @@ import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 
 import Blockchain.Strato.Model.Address
+import Control.Applicative ((<|>))
 import Control.Lens ((&), (?~))
 import Control.Monad
 import qualified Data.Aeson as A
@@ -76,7 +77,13 @@ instance ToSchema ArgValue where
 argValueToType :: ArgValue -> Type
 argValueToType (ArgInt _) = SimpleType typeInt
 argValueToType (ArgBool _) = SimpleType TypeBool
-argValueToType (ArgString _) = SimpleType TypeString
+argValueToType (ArgString s') = maybe (SimpleType TypeString) id $
+  let s = Text.unpack s'
+   in case s of
+        '0':'x':_ -> (SimpleType TypeAddress <$ ((readMaybe s) :: Maybe Address))
+                 <|> (SimpleType typeInt <$ ((readMaybe s) :: Maybe Integer))
+        _         -> (SimpleType typeInt <$ ((readMaybe s) :: Maybe Integer))
+                 <|> (SimpleType TypeAddress <$ ((readMaybe s) :: Maybe Address))
 argValueToType (ArgDecimal _) = SimpleType TypeDecimal
 argValueToType (ArgArray v) = TypeArrayDynamic $ argValueToType $ V.head v
 argValueToType (ArgObject _) = TypeStruct ""
@@ -190,7 +197,8 @@ argValueToSimpleValue theType argVal = case theType of
       ValueAddress <$> case stringAddress (Text.unpack str) of
         Nothing -> Left $ "argValueToSimpleValue: provided argument '" <> str <> "' is not a valid address"
         Just x -> return x
-    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
+    ArgInt i -> Right . ValueAddress $ fromIntegral i
+    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string or an integer, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o

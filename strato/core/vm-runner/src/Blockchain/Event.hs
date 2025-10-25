@@ -70,6 +70,7 @@ insertInBatch e b = case e of
   VmMPNodesReceived nds -> b {mpNodesResps = nds : mpNodesResps b}
   VmRunPreprepare b' -> b {preprepareBlock = Just b'}
   VmSelfAddress sa -> b {selfAddress = Just sa}
+  VmFlushMempool _ -> b  -- Flush mempool events are handled immediately, not batched
   
 data BlockDelta a = BlockDelta 
   { _inBlock :: a

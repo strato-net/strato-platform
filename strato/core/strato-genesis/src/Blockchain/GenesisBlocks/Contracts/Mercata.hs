@@ -14,6 +14,7 @@ mercataContractFiles = [
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
   "contracts/concrete/BaseCodeCollection.sol",
+  "contracts/libraries/Bridge/BridgeTypes.sol",
   "contracts/concrete/Bridge/MercataBridge.sol",
   "contracts/concrete/CDP/CDPEngine.sol",
   "contracts/concrete/CDP/CDPRegistry.sol",

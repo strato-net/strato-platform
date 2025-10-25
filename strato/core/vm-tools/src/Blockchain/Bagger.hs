@@ -192,6 +192,8 @@ baggerRejectionToTransactionResultBits rejection = case rejection of
     (p s q ++ "transaction gas limit exceeded. Limit: " ++ show l ++ " Actual: " ++ show e, hsh)
   KnownFailedTX s q OutputTx {otHash = hsh} ->
     (p s q ++ "known failed tx: " ++ format hsh, hsh)
+  AdminFlushed s q scope OutputTx {otHash = hsh} ->
+    (p s q ++ "administratively flushed from mempool with scope " ++ show scope, hsh)
   where
     p stage queue = "Rejected from mempool at " ++ show stage ++ "/" ++ show queue ++ " due to "
     p' s q = p s q ++ "low "
@@ -212,6 +214,25 @@ addTransactionsToMempool txs = do
   withBagger $ do
     sequence_ (addToQueued Insertion <$> txs)
     promoteExecutables
+
+flush :: MonadBagger m => FlushScope -> m [OutputTx]
+flush scope = do
+  state <- getBaggerState
+  let txShas = B.bestBlockTxHashes (B.miningCache state)
+  $logInfoS "Bagger.flush" . T.pack $ "Flushing mempool with scope: " ++ show scope
+  let (flushedTxsWithQueue, newState) = case scope of
+        FlushPending -> B.flushPendingOnly state
+        FlushQueued -> B.flushQueuedOnly state
+        FlushAll -> B.flushBoth state
+  -- Clear the 'seen' set for flushed transactions
+  let flushedTxs = map fst flushedTxsWithQueue
+  let newState' = foldl (flip B.removeFromSeen) newState flushedTxs
+  putBaggerState newState'
+  $logInfoS "Bagger.flush" . T.pack $ "Flushed " ++ show (length flushedTxs) ++ " transactions"
+  -- Notify that transactions were dropped, using the correct queue for each transaction
+  let rejections = map (\(tx, queue) -> AdminFlushed Demotion queue scope tx) flushedTxsWithQueue
+  txsDroppedCallback rejections txShas
+  return flushedTxs
 
 processNewBestBlock :: MonadBagger m => Keccak256 -> BlockHeader -> [Keccak256] -> m ()
 processNewBestBlock bh bd txShas = do
