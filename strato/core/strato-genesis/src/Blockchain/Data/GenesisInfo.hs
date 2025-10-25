@@ -9,7 +9,6 @@
 
 module Blockchain.Data.GenesisInfo
   ( GenesisInfo (..),
-    defaultGenesisInfo,
     getGenesisInfo,
     module Blockchain.Data.AddressInfo,
     module Blockchain.Data.CodeInfo
@@ -27,6 +26,7 @@ import Control.Monad.IO.Class
 import Data.Aeson
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy.Char8 as BLC
+import Data.Default
 import qualified Data.JsonStream.Parser as JS
 import Data.Time
 import GHC.Generics (Generic)
@@ -72,9 +72,9 @@ nullStateRoot =
   StateRoot . LabeledError.b16Decode "nullStateRoot" $
     "56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421"
 
-defaultGenesisInfo :: GenesisInfo
-defaultGenesisInfo =
-  GenesisInfo
+instance Default GenesisInfo where
+  def =
+    GenesisInfo
     { parentHash = unsafeCreateKeccak256FromWord256 0,
       addressInfo = [],
       codeInfo = [],

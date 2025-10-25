@@ -28,6 +28,7 @@ import           Data.ByteString                                 (ByteString)
 import qualified Data.ByteString                                 as B
 import qualified Data.ByteString.Char8                           as BC
 import qualified Data.ByteString.Lazy                            as BL
+import           Data.Default
 import           Data.List                                       (find)
 import qualified Data.Map.Strict                                 as M
 import           Data.Maybe                                      (fromMaybe, mapMaybe)
@@ -400,7 +401,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
   insertMercataGovernanceContract adminRegistryAddress hgbc_validators [adminRegistryAddress]
   . insertUserRegistryContract
   . insertDecideContract
-  $ defaultGenesisInfo{
+  $ def{
         logBloom=B.replicate 256 0,
         addressInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,

@@ -23,6 +23,7 @@ library:
       - common-log
       - containers
       - crypto-api
+      - data-default
       - directory
       - file-embed
       - filepath
