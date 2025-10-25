@@ -52,7 +52,7 @@ const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null =
     return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }
   
-  if (!findInternalEthTransfer(traces, ctx.safe, ctx.expectedAmount)) {
+  if (!findInternalEthTransfer(traces, ctx.safe, ctx.stratoTokenAmount)) {
     return new Error(`No internal ETH transfer to Safe ${ctx.safe} found`);
   }
   
