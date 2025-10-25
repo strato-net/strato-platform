@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Blockchain.Data.AddressInfo
-  ( AccountInfo (..),
+  ( AddressInfo (..),
     accountExtractor,
     acctInfoAddress
   )
@@ -18,7 +18,7 @@ import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
 
-data AccountInfo
+data AddressInfo
   = NonContract Address Integer
   | ContractNoStorage Address Integer CodePtr
   | SolidVMContractWithStorage
@@ -34,22 +34,22 @@ data AccountInfo
       -- ContractWithStorage which uses (Word256, Word256) pairs for EVM storage
   deriving (Show, Eq, Read)
 
-acctInfoAddress :: AccountInfo ->  Address
+acctInfoAddress :: AddressInfo ->  Address
 acctInfoAddress (NonContract a _) = a
 acctInfoAddress (ContractNoStorage a _ _) = a
 acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
 
-instance Format AccountInfo where
+instance Format AddressInfo where
   format (NonContract addr nonce) =
     unlines
-      [ "AccountInfo - NonContract",
+      [ "AddressInfo - NonContract",
         "-------------------------",
         tab' $ "Address: " ++ format addr,
         tab' $ "Nonce:   " ++ show nonce
       ]
   format (ContractNoStorage addr nonce ch) =
     unlines
-      [ "AccountInfo - ContractNoStorage",
+      [ "AddressInfo - ContractNoStorage",
         "-------------------------",
         tab' $ "Address:   " ++ format addr,
         tab' $ "Nonce:     " ++ show nonce,
@@ -57,7 +57,7 @@ instance Format AccountInfo where
       ]
   format (SolidVMContractWithStorage addr nonce ch s) =
     unlines
-      [ "AccountInfo - SolidVMContractWithStorage",
+      [ "AddressInfo - SolidVMContractWithStorage",
         "-------------------------",
         tab' $ "Address:   " ++ format addr,
         tab' $ "Balance:     " ++ show nonce,
@@ -65,7 +65,7 @@ instance Format AccountInfo where
         tab' $ "Storage:   " ++ show s
       ]
 
-instance FromJSON AccountInfo where
+instance FromJSON AddressInfo where
   parseJSON (Object o) = do
     a <- (o .: "address")
     b <- (o .: "balance")
@@ -78,9 +78,9 @@ instance FromJSON AccountInfo where
           Nothing -> return $ ContractNoStorage a b c
           Just s -> do
             return $ SolidVMContractWithStorage a b c s
-  parseJSON x = error $ "parseJSON failed for AccountInfo: " ++ show x
+  parseJSON x = error $ "parseJSON failed for AddressInfo: " ++ show x
 
-instance ToJSON AccountInfo where
+instance ToJSON AddressInfo where
   toJSON (NonContract a b) =
     object
       [ "address" .= a,
@@ -100,8 +100,8 @@ instance ToJSON AccountInfo where
         "storage" .= s
       ]
 
-accountExtractor :: JS.Parser [AccountInfo]
+accountExtractor :: JS.Parser [AddressInfo]
 accountExtractor = many ("accountInfo" JS..: JS.arrayOf acctInfo)
 
-acctInfo :: JS.Parser AccountInfo
+acctInfo :: JS.Parser AddressInfo
 acctInfo = JS.value

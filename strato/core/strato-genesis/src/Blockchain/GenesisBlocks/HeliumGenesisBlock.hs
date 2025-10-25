@@ -307,7 +307,7 @@ mercataContract = flip SolidVMCode (KECCAK256.hash $ BL.toStrict $ JSON.encode m
 proxy :: CodePtr
 proxy = mercataContract "Proxy"
 
-implContract :: Address -> String -> AccountInfo
+implContract :: Address -> String -> AddressInfo
 implContract implAddress contractName =
   SolidVMContractWithStorage implAddress 0 (mercataContract contractName) $ toPaths $ ownedByBlockApps implAddress
 
@@ -592,7 +592,7 @@ assetBalances GA.Asset{..} =
             [(o, correctQuantity decimals name q)]
     ) . filter ((>0) . GA.quantity) $ M.elems balances
 
-assetToAccountInfos :: GA.Asset -> Maybe AccountInfo
+assetToAccountInfos :: GA.Asset -> Maybe AddressInfo
 assetToAccountInfos asset@GA.Asset{..} =
   let accountBalances' = assetBalances asset
       allBalances = (\(a, b) -> ("._balances[" <> addrBS a <> "]", BInteger b)) <$> accountBalances'
@@ -633,11 +633,11 @@ assetToEvents asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Blo
     totalSupply = sum $ snd <$> allBalances
 
 -- To be deleted
-rateStrategy :: AccountInfo
+rateStrategy :: AddressInfo
 rateStrategy = SolidVMContractWithStorage rateStrategyAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [(".logicContract", BAddress rateStrategyImplAddress)]
 
-priceOracle :: AccountInfo
+priceOracle :: AddressInfo
 priceOracle = SolidVMContractWithStorage priceOracleAddress 0 proxy $ toPaths $
   (".logicContract", BAddress priceOracleImplAddress)
   : (".prices[" <> addrBS usdstAddress <> "]", BInteger oneE18)
@@ -647,20 +647,20 @@ priceOracle = SolidVMContractWithStorage priceOracleAddress 0 proxy $ toPaths $
     (".prices[" <> addrBS assetRootAddress <> "]", BInteger . round $ lastUpdatedOraclePrice * (10.0 ** (fromInteger $ 18 + getDecimals (GA.decimals a) (GA.name a))))
   ) GR.reserves
 
-collateralVault :: AccountInfo
+collateralVault :: AddressInfo
 collateralVault = SolidVMContractWithStorage collateralVaultAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" lendingRegistryAddress)
   , (".logicContract", BAddress collateralVaultImplAddress)
   ]
 
-liquidityPool :: AccountInfo
+liquidityPool :: AddressInfo
 liquidityPool = SolidVMContractWithStorage liquidityPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" lendingRegistryAddress)
   , (".logicContract", BAddress liquidityPoolImplAddress)
   , (".mToken", BContract "Token" mTokenAddress)
   ]
 
-lendingPool :: AccountInfo
+lendingPool :: AddressInfo
 lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" lendingRegistryAddress)
   , (".logicContract", BAddress lendingPoolImplAddress)
@@ -714,7 +714,7 @@ lendingPoolEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Block
   ) supportedCollaterals
   )
 
-poolConfigurator :: AccountInfo
+poolConfigurator :: AddressInfo
 poolConfigurator = SolidVMContractWithStorage poolConfiguratorAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".registry", BContract "LendingRegistry" lendingRegistryAddress)
   , (".logicContract", BAddress poolConfiguratorImplAddress)
@@ -732,7 +732,7 @@ poolConfiguratorEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "
   ) supportedCollaterals
   )
 
-lendingRegistry :: AccountInfo
+lendingRegistry :: AddressInfo
 lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".lendingPool", BContract "LendingPool" lendingPoolAddress)
   , (".logicContract", BAddress lendingRegistryImplAddress)
@@ -742,7 +742,7 @@ lendingRegistry = SolidVMContractWithStorage lendingRegistryAddress 0 proxy $ to
   , (".priceOracle", BContract "PriceOracle" priceOracleAddress)
   ]
 
-mercataBridge :: [BridgeChainInfo] -> [BridgeAssetInfo] -> AccountInfo
+mercataBridge :: [BridgeChainInfo] -> [BridgeAssetInfo] -> AddressInfo
 mercataBridge bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".relayer", BAddress bridgeRelayerAddress)
   , (".logicContract", BAddress mercataBridgeImplAddress)
@@ -771,7 +771,7 @@ mercataBridge bcis bais = SolidVMContractWithStorage mercataBridgeAddress 0 prox
   , (".assets[" <> addrBS bai_asset <> "][" <> BC.pack (show bai_externalChainId) <> "].permissions", BInteger bai_permissions)
   ]) bais
 
-poolFactory :: AccountInfo
+poolFactory :: AddressInfo
 poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress ++
   [ (".tokenFactory", BAddress tokenFactoryAddress)
   , (".logicContract", BAddress poolFactoryImplAddress)
@@ -780,7 +780,7 @@ poolFactory = SolidVMContractWithStorage poolFactoryAddress 0 proxy $ toPaths $ 
   , (".lpSharePercent", BInteger 7000)
   ]
 
-tokenFactory :: AccountInfo
+tokenFactory :: AddressInfo
 tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".logicContract", BAddress tokenFactoryImplAddress)
      , (".isFactoryToken[" <> addrBS mTokenAddress <> "]", BBool True)
@@ -792,7 +792,7 @@ tokenFactory = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths 
   ++ ((\GA.Asset{..} -> (".isFactoryToken[" <> addrBS root <> "]", BBool True)) <$> GA.assets)
   ++ ((\(i, GA.Asset{..}) -> (".allTokens[" <> BC.pack (show i) <> "]", BAddress root)) <$> zip [(9 :: Integer)..] GA.assets)
 
-adminRegistry :: [Address] -> AccountInfo
+adminRegistry :: [Address] -> AddressInfo
 adminRegistry adminList = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".logicContract", BAddress adminRegistryImplAddress)
      , (".defaultVotingThresholdBps", BInteger 6000)
@@ -839,11 +839,11 @@ adminEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" 
     [("AdminAdded", [("admin", show blockappsAddress)])]
   )
 
-feeCollector :: AccountInfo
+feeCollector :: AddressInfo
 feeCollector = SolidVMContractWithStorage feeCollectorAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [(".logicContract", BAddress feeCollectorImplAddress)]
 
-voucher :: AccountInfo
+voucher :: AddressInfo
 voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "Voucher")
      , (".logicContract", BAddress voucherImplAddress)
@@ -856,7 +856,7 @@ voucher = SolidVMContractWithStorage voucherAddress 0 proxy $ toPaths $ ownedByB
      , ("._balances[" <> addrBS oracleAddress2 <> "]", BInteger $ 100_000 * oneE18)
      ]
 
-mToken :: AccountInfo
+mToken :: AddressInfo
 mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "MUSDST")
      , (".logicContract", BAddress tokenImplAddress)
@@ -869,7 +869,7 @@ mToken = SolidVMContractWithStorage mTokenAddress 0 proxy $ toPaths $ ownedByBlo
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
      ]
 
-rewardsChef :: AccountInfo
+rewardsChef :: AddressInfo
 rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".MAX_INT", BInteger 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff)
      , (".PRECISION_MULTIPLIER", BInteger oneE18)
@@ -901,7 +901,7 @@ rewardsChef = SolidVMContractWithStorage rewardsChefAddress 0 proxy $ toPaths $ 
      , (".pools.length", BInteger 2)
      ]
 
-cdpEngine :: AccountInfo
+cdpEngine :: AddressInfo
 cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".registry", BContract "CDPRegistry" cdpRegistryAddress)
      , (".logicContract", BAddress cdpEngineImplAddress)
@@ -965,7 +965,7 @@ cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockAp
   ) supportedCollaterals
   )
 
-cdpRegistry :: AccountInfo
+cdpRegistry :: AddressInfo
 cdpRegistry = SolidVMContractWithStorage cdpRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".cdpVault", BContract "CDPVault" cdpVaultAddress)
      , (".logicContract", BAddress cdpRegistryImplAddress)
@@ -991,7 +991,7 @@ cdpRegistryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Block
     )
   ])
 
-cdpVault :: AccountInfo
+cdpVault :: AddressInfo
 cdpVault = SolidVMContractWithStorage cdpVaultAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".registry", BContract "CDPRegistry" cdpRegistryAddress)
      , (".logicContract", BAddress cdpVaultImplAddress)
@@ -1011,13 +1011,13 @@ cdpVaultEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApp
   ) (M.toList $ foldr (\e -> M.insertWith (+) (GE.borrower e) (GE.borrowedAmount e)) M.empty combinedEscrows)
   )
 
-cdpReserve :: AccountInfo
+cdpReserve :: AddressInfo
 cdpReserve = SolidVMContractWithStorage cdpReserveAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".registry", BContract "CDPRegistry" cdpRegistryAddress)
      , (".logicContract", BAddress cdpReserveImplAddress)
      ]
 
-safetyModule :: AccountInfo
+safetyModule :: AddressInfo
 safetyModule = SolidVMContractWithStorage safetyModuleAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ (".lendingRegistry", BContract "LendingRegistry" lendingRegistryAddress)
      , (".logicContract", BAddress safetyModuleImplAddress)
@@ -1038,7 +1038,7 @@ safetyModuleEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "Bloc
   , ("TokensUpdated", [("_asset", show usdstAddress), ("_sToken", show sUsdstAddress)])
   ])
 
-sUsdst :: AccountInfo
+sUsdst :: AddressInfo
 sUsdst = SolidVMContractWithStorage sUsdstAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
   ++ [ ("._name", BString "sUSDST")
      , (".logicContract", BAddress tokenImplAddress)
@@ -1051,7 +1051,7 @@ sUsdst = SolidVMContractWithStorage sUsdstAddress 0 proxy $ toPaths $ ownedByBlo
      , (".status", BEnumVal "TokenStatus" "ACTIVE" 2)
      ]
 
--- paxgstPool :: AccountInfo
+-- paxgstPool :: AddressInfo
 -- paxgstPool = SolidVMContractWithStorage paxgstPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
 --   ++ [ (".poolFactory", BAddress poolFactoryAddress)
 --      , (".tokenA", BContract "Token" paxgstRoot)
@@ -1067,7 +1067,7 @@ sUsdst = SolidVMContractWithStorage sUsdstAddress 0 proxy $ toPaths $ ownedByBlo
 --      , (".zapSwapFeesEnabled", BBool True)
 --      ]
 --
--- paxgstLpToken :: AccountInfo
+-- paxgstLpToken :: AddressInfo
 -- paxgstLpToken = SolidVMContractWithStorage paxgstLpTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress
 --   ++ [ ("._name", BString "PAXGST-USDST LP Token")
 --      , ("._symbol", BString "PAXGST-USDST-LP")

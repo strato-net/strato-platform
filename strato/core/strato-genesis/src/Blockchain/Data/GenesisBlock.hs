@@ -73,7 +73,7 @@ putAccount ::
     HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
-  AccountInfo ->
+  AddressInfo ->
   m ()
 putAccount acc = case acc of
   NonContract address balance' ->
@@ -105,7 +105,7 @@ initializeStateDB ::
     HasMemStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
-  [AccountInfo] ->
+  [AddressInfo] ->
   m ()
 initializeStateDB addressInfo = do
   initializeBlankStateDB
@@ -125,11 +125,11 @@ initializeCodeDB "SolidVM" x = do
   mapM_ (addCode . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
-zipSourceInfo :: [AccountInfo] -> [CodeInfo] -> [(AccountInfo, CodeInfo)]
+zipSourceInfo :: [AddressInfo] -> [CodeInfo] -> [(AddressInfo, CodeInfo)]
 zipSourceInfo accounts codes =
   let hashPair c@(CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
       codeMap = Map.fromList . map hashPair $ codes
-      findCodeFor :: AccountInfo -> Maybe (AccountInfo, CodeInfo)
+      findCodeFor :: AddressInfo -> Maybe (AddressInfo, CodeInfo)
       findCodeFor (NonContract _ _) = Nothing
       findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
       findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
@@ -148,7 +148,7 @@ genesisInfoToGenesisBlock ::
     (Address `A.Alters` AddressState) m
   ) =>
   GenesisInfo ->
-  m ([(AccountInfo, CodeInfo)], Block)
+  m ([(AddressInfo, CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
   let codes = genesisInfoCodeInfo gi
   let accounts = genesisInfoAccountInfo gi

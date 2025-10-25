@@ -43,7 +43,7 @@ import qualified Data.Sequence as S
 data GenesisInfo = GenesisInfo
   { genesisInfoParentHash :: Keccak256,
     genesisInfoUnclesHash :: Keccak256,
-    genesisInfoAccountInfo :: [AccountInfo],
+    genesisInfoAccountInfo :: [AddressInfo],
     genesisInfoCodeInfo :: [CodeInfo],
     genesisInfoTransactionRoot :: StateRoot, -- Misspelled to match the existing parser
     genesisInfoReceiptsRoot :: StateRoot,

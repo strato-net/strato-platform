@@ -85,7 +85,7 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasMemStorageDB m,
     (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, ([(AddressInfo, CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- getGenesisInfo
   let validators = readValidatorsFromGenesisInfo genesisInfo
