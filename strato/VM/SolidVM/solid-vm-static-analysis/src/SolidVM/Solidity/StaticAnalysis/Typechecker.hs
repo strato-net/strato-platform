@@ -747,7 +747,7 @@ typecheckIndex (Static (SVMType.Array t _) x) i = i ~> (pure $ intType' x) !> pu
 typecheckIndex (Product [(Static (SVMType.Array t _) x)] _) i = i ~> (pure $ intType' x) !> pure (Static t x)
 typecheckIndex (Static SVMType.Variadic x) i = i ~> (pure $ intType' x) !> pure (topType' x)
 typecheckIndex (Product [(Static SVMType.Variadic x)] _) i = i ~> (pure $ intType' x) !> pure (topType' x)
-typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (Static (SVMType.Bytes Nothing (Just 1)) x)
+typecheckIndex (Static (SVMType.Bytes _ _) x) i = i ~> (pure $ intType' x) !> pure (intType' x)
 typecheckIndex (Static (SVMType.Mapping _ k v) x) i = do
   t <- typecheck (Static k x) i
   pure $ case t of
@@ -1375,6 +1375,7 @@ stringArgs x =
       :| [ addressType' x,
            intType' x,
            boolType' x,
+           bytesType' x,
            Product [intType' x, intType' x] x,
            Product [intType' x, intType' x, intType' x] x
          ]
@@ -1385,6 +1386,7 @@ addressArgs x =
     stringType' x
       :| [ addressType' x,
            intType' x,
+           bytesType' x,
            contractType' x
          ]
 
@@ -1399,7 +1401,7 @@ boolArgs x =
          ]
 
 byteArgs :: SourceAnnotation Text -> Type'
-byteArgs x = intType' x
+byteArgs x = Sum $ stringType' x :| [intType' x, addressType' x]
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = topType' x

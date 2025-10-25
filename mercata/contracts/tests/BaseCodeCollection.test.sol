@@ -293,4 +293,33 @@ contract Describe_Mercata is Authorizable {
         admin.removeAdmin(address(adminUser));
         require(admin.admins(0) == address(this) && admin.admins(1) == address(0), "Voting logic was not overwritten properly");
     }
+
+    function it_can_call_toLower() {
+        string v = "HeLlO wOrLd";
+        string w = toLower(v);
+        string x = toUpper(v);
+        string y = toUpper(w);
+        require(w == "hello world", w);
+        require(x == y, x + ", " + y);
+    }
+
+    function toLower(string s) pure returns (string) {
+        bytes b = bytes(s);
+        for (uint i = 0; i < b.length; i++) {
+            if (b[i] >= 0x41 && b[i] <= 0x5a) {
+                b[i] = b[i] + 0x20;
+            }
+        }
+        return string(b);
+    }
+
+    function toUpper(string s) pure returns (string) {
+        bytes b = bytes(s);
+        for (uint i = 0; i < b.length; i++) {
+            if (b[i] >= 0x61 && b[i] <= 0x7a) {
+                b[i] = b[i] - 0x20;
+            }
+        }
+        return string(b);
+    }
 }
