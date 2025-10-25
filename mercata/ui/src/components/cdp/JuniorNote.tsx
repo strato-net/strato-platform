@@ -28,6 +28,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
   // State for showing claim button
   const [showClaimButton, setShowClaimButton] = useState<boolean>(false);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+  const [isGlobalPaused, setIsGlobalPaused] = useState<boolean>(false);
 
   // Fetch junior note from backend
   const fetchJuniorNote = useCallback(async (showRefreshing = false) => {
@@ -44,6 +45,15 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
     }
     
     try {
+      // Fetch global pause status
+      try {
+        const globalPauseStatus = await cdpService.getGlobalPaused();
+        setIsGlobalPaused(globalPauseStatus.isPaused);
+      } catch (error) {
+        console.error("Failed to fetch global pause status:", error);
+        setIsGlobalPaused(false); // Default to not paused if we can't fetch
+      }
+      
       // Fetch the user's junior note from the backend
       const fetchedNote = await cdpService.getJuniorNotes(userAddress);
       
@@ -78,7 +88,7 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
 
   // Handle claimable amount click
   const handleClaimableClick = () => {
-    if (parseFloat(note?.claimableAmount || "0") > 0) {
+    if (parseFloat(note?.claimableAmount || "0") > 0 && !isGlobalPaused) {
       setShowClaimButton(!showClaimButton);
     }
   };
@@ -194,17 +204,30 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
           <p className="text-xs text-gray-500 mb-1">Claimable Now</p>
           <p 
             className={`font-semibold ${
-              parseFloat(note.claimableAmount) > 0 
+              parseFloat(note.claimableAmount) > 0 && !isGlobalPaused
                 ? 'text-green-600 cursor-pointer hover:text-green-700 hover:underline' 
-                : 'text-gray-600'
+                : parseFloat(note.claimableAmount) > 0 && isGlobalPaused
+                  ? 'text-gray-600 cursor-not-allowed'
+                  : 'text-gray-600'
             }`}
             onClick={handleClaimableClick}
-            title={parseFloat(note.claimableAmount) > 0 ? "Click to claim rewards" : "No rewards available"}
+            title={
+              parseFloat(note.claimableAmount) > 0 && !isGlobalPaused
+                ? "Click to claim rewards" 
+                : parseFloat(note.claimableAmount) > 0 && isGlobalPaused
+                  ? "Claim paused by admin"
+                  : "No rewards available"
+            }
           >
             {formatNumber(parseFloat(formatWeiToDecimalHP(note.claimableAmount, 18)))} USDST
           </p>
           <p className="text-xs text-gray-400">
-            {parseFloat(note.claimableAmount) > 0 ? 'Click to claim' : 'No rewards'} • Gas-free calculation
+            {parseFloat(note.claimableAmount) > 0 && !isGlobalPaused
+              ? 'Click to claim' 
+              : parseFloat(note.claimableAmount) > 0 && isGlobalPaused
+                ? 'Claim paused'
+                : 'No rewards'
+            } • Gas-free calculation
           </p>
         </div>
       </div>
@@ -221,9 +244,14 @@ const JuniorNote: React.FC<JuniorNoteProps> = ({ refreshTrigger, onNoteActionSuc
             <Button 
               className="w-full" 
               onClick={handleClaimAction}
-              disabled={actionLoading}
+              disabled={actionLoading || isGlobalPaused}
             >
-              {actionLoading ? "Claiming..." : `Claim ${formatNumber(parseFloat(formatWeiToDecimalHP(note.claimableAmount, 18)))} USDST`}
+              {actionLoading 
+                ? "Claiming..." 
+                : isGlobalPaused
+                  ? "Claim paused by admin at this time"
+                  : `Claim ${formatNumber(parseFloat(formatWeiToDecimalHP(note.claimableAmount, 18)))} USDST`
+              }
             </Button>
           </div>
         </div>
