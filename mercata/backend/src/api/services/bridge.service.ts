@@ -99,7 +99,7 @@ export const getBridgeableTokens = async (accessToken: string, chainId: string):
   const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
   if (!assets?.length) return [];
   
-  const tokenAddresses = assets.map((a: any) => a.externalToken).filter(Boolean);
+  const tokenAddresses = assets.map((a: any) => a.AssetInfo.stratoToken).filter(Boolean);
   const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
   
   return enrichAssetsWithTokenData(assets, tokenMap);
@@ -117,10 +117,12 @@ export const getRedeemableTokens = async (accessToken: string, chainId: string):
   const { data: assets } = await cirrus.get(accessToken, `/${MercataBridge}-assets`, { params });
   if (!assets?.length) return [];
   
-  const tokenAddresses = assets.map((a: any) => a.externalToken).filter(Boolean);
-  const tokenMap = await getTokenMetadata(accessToken, tokenAddresses);
-  
-  return enrichAssetsWithTokenData(assets, tokenMap);
+  return assets.map((asset: any) => ({
+    ...asset.AssetInfo,
+    stratoTokenName: "USDST",
+    stratoTokenSymbol: "USDST",
+    id: `${asset.externalToken}-${asset.externalChainId}`
+  }));
 };
 
 export const getNetworkConfigs = async (accessToken: string): Promise<NetworkConfig[]> => { 

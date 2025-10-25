@@ -85,14 +85,15 @@ export async function executeParallelQueries(
 // Bridge-specific helper function to enrich assets with token metadata
 export function enrichAssetsWithTokenData(assets: any[], tokenMap: Map<string, any>) {
   return assets.map((asset: any) => {
-    const info = tokenMap.get(asset.externalToken);
+    const info = tokenMap.get(asset.AssetInfo.stratoToken);
     if (asset?.externalToken) {
       asset.AssetInfo.externalToken = ensureHexPrefix(asset.AssetInfo.externalToken);
     }
     return {
       ...asset.AssetInfo,
       stratoTokenName: info?.name || "",
-      stratoTokenSymbol: info?.symbol || ""
+      stratoTokenSymbol: info?.symbol || "",
+      id: `${asset.externalToken}-${asset.externalChainId}`
     };
   });
 }
