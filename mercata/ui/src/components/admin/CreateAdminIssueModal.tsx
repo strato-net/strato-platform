@@ -64,7 +64,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
     if (Array.isArray(functionArgs) && functionArgs.length > 0) {
       replace(functionArgs.map(() => ({ value: '' })));
     } else {
-      replace([{ value: '' }]);
+      replace([]);
     }
   }, [functionArgs?.length, replace]);
 
