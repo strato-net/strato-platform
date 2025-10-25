@@ -31,7 +31,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
+        (params as any)["value->>stratoToken"] = mintUSDST ? 'eq.USDST' : 'neq.USDST';
         
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
