@@ -580,13 +580,13 @@ call' from to' fnCalltype functionName valList = do
           -- right now I just ignore this and allow anything to be called as a getter
           case args' of
             [] -> do
-              let path = AccountPath storageAddress $ MS.singleton $ BC.pack $ labelToString functionName
+              let path = AddressPath storageAddress $ MS.singleton $ BC.pack $ labelToString functionName
               withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 _ -> pure $ handleSimple path
             _ -> do
-              let path = apSnocList (AccountPath storageAddress . MS.singleton $ BC.pack $ labelToString functionName) args'
+              let path = apSnocList (AddressPath storageAddress . MS.singleton $ BC.pack $ labelToString functionName) args'
               withCallInfo storageAddress codeAddress contract functionName hsh cc M.empty True False $ case returnType _varType of
                 SVMType.Struct _ s -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
                 SVMType.UnknownLabel s _ -> pure $ (<|>) <$> handleStruct s path <*> handleSimple path
@@ -1101,7 +1101,7 @@ doWhile condition code = do
     Just SContinue -> doWhile condition code
     _ -> return result
 
-expToPath :: MonadSM m => CC.Expression -> m AccountPath
+expToPath :: MonadSM m => CC.Expression -> m AddressPath
 expToPath (CC.Variable _ x) = do
   callInfo <- getCurrentCallInfo
   let path = MS.singleton $ BC.pack $ labelToString x
@@ -1111,7 +1111,7 @@ expToPath (CC.Variable _ x) = do
       case val of
         SReference apt -> return apt
         _ -> typeError "expToPath should never be called for a local variable" ((show x) ++ " = " ++ show val)
-    Nothing -> return $ AccountPath (currentAddress callInfo) path
+    Nothing -> return $ AddressPath (currentAddress callInfo) path
 expToPath x@(CC.IndexAccess _ parent mIndex) = do
   parPath <- do
     parvar <- expToVar parent
@@ -1321,9 +1321,9 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
             , " inside parent contract: "
             ]) (p ^. CC.functions)
           Just f -> pure . Constant . SFunction method $ Just f
-    (SAddress a _, n) -> evaluateAccountMember a False n
-    (SContractItem a _, n) -> evaluateAccountMember a False n
-    (SContract _ a, n) -> evaluateAccountMember a True n
+    (SAddress a _, n) -> evaluateAddressMember a False n
+    (SContractItem a _, n) -> evaluateAddressMember a False n
+    (SContract _ a, n) -> evaluateAddressMember a True n
     (r@(SReference _), "push") -> return $ Constant $ SPush r Nothing
     (a@(SArray _), "push") -> return $ Constant $ SPush a (Just var)
     (SNULL, "push") -> case var of
@@ -1620,8 +1620,8 @@ expToVar' (CC.FunctionCall _ e args) = do
             Just sci -> sci
             Nothing -> expToVar' e
           case var of
-            Constant (SReference (AccountPath address (MS.StoragePath pieces))) -> do
-              val' <- getVar $ Constant $ SReference $ AccountPath address $ MS.StoragePath $ init pieces
+            Constant (SReference (AddressPath address (MS.StoragePath pieces))) -> do
+              val' <- getVar $ Constant $ SReference $ AddressPath address $ MS.StoragePath $ init pieces
               case (val', last pieces) of
                 (SContract _ toAddress, MS.Field funcName) -> do
                   fromAddress <- getCurrentAddress
@@ -1872,13 +1872,13 @@ expToVar' x = todo "expToVar/unhandled" x
 
 --------------
 
-evaluateAccountMember ::
+evaluateAddressMember ::
   MonadSM m =>
   Address ->
   Bool -> -- Is SContract
   SolidString ->
   m Variable
-evaluateAccountMember a _ "codehash" = do
+evaluateAddressMember a _ "codehash" = do
   -- Get the chainId for the account
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
@@ -1886,7 +1886,7 @@ evaluateAccountMember a _ "codehash" = do
     SolidVMCode _ ch' -> return (Constant $ SString . keccak256ToHex $ ch')
     cp -> missingCodeCollection "Address is not a SolidVM contract" (format cp)
 --Get the whole code collection when nothing is supplied to the code function
-evaluateAccountMember a _ "code" = do
+evaluateAddressMember a _ "code" = do
   -- Get the code at the address
   -- Retreive and resolve the codehash
   codeHash' <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) a
@@ -1901,25 +1901,25 @@ evaluateAccountMember a _ "code" = do
   let decodeCD = DT.decodeUtf8 cd'
   -- Format the result
   return $ Constant $ SString $ T.unpack decodeCD
-evaluateAccountMember a _ "nonce" = do
+evaluateAddressMember a _ "nonce" = do
   mAddrSt <- A.lookup (A.Proxy @AddressState) a
   case mAddrSt of
     Just as -> return $ Constant $ SInteger $ addressStateNonce as
     _ -> return $ Constant $ SInteger 0
-evaluateAccountMember a _ "balance" = do
+evaluateAddressMember a _ "balance" = do
   bal <- A.lookup (A.Proxy @AddressState) a
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0
-evaluateAccountMember a _ "creator" = do
+evaluateAddressMember a _ "creator" = do
   (_, _, issuerName) <- getCreator a
   return $ Constant $ SString $ issuerName
-evaluateAccountMember a _ "root" = do
+evaluateAddressMember a _ "root" = do
   (_, originAddress, _) <- getCreator a
   return $ Constant $ SAddress originAddress False
--- evaluateAccountMember a _ "call" =
-evaluateAccountMember a True funcName = return $ Constant $ SContractFunction a funcName
-evaluateAccountMember a False itemName = do
+-- evaluateAddressMember a _ "call" =
+evaluateAddressMember a True funcName = return $ Constant $ SContractFunction a funcName
+evaluateAddressMember a False itemName = do
   --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAddress
   result <- callWithResult from a CC.DefaultCall itemName []
@@ -2383,7 +2383,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
 
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
-      setVar (Constant (SReference (AccountPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
+      setVar (Constant (SReference (AddressPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
 
     forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
       case theType of

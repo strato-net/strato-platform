@@ -109,7 +109,7 @@ setVal (STuple dstVector) (STuple srcVector) =
         return (dstItem, srcItemVal)
       forM_ zipped' $ \(dstItem, srcItemVal) -> do
         setVar dstItem srcItemVal
-setVal dst@(SReference (AccountPath addr path)) src = do
+setVal dst@(SReference (AddressPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   let basicSrc = case src of
@@ -129,7 +129,7 @@ weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
-getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
+getVar (Constant (SReference addressedPath@(AddressPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> pure $ SReference addressedPath
@@ -206,7 +206,7 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference (AccountPath addr path))) = do
+deleteVar (Constant (SReference (AddressPath addr path))) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
   markDiffForAction addr path $ MS.BDefault

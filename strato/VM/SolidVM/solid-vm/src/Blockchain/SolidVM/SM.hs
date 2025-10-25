@@ -664,7 +664,7 @@ getVariableOfName name = do
         if name `elem` M.keys (currentContract currentCallInfo ^. CC.storageDefs)
           then
             Just . Constant . SReference $
-              AccountPath
+              AddressPath
                 (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
@@ -832,14 +832,7 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-{-
-getCurrentAccount :: MonadSM m => m Account
-getCurrentAccount = do
-  cs <- Mod.get (Mod.Proxy @[CallInfo])
-  case cs of
-    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentAccount called with an empty stack" ()
--}
+    
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])

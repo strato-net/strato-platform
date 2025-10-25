@@ -77,7 +77,6 @@ valueToSolidityValue = \case
     ValueInt _ _ n -> fromShowable n
     ValueDecimal n -> Right . Just $ SolidityValueAsString $ decodeUtf8 n
     ValueAddress a -> fromShowable a
-    ValueAccount a -> fromShowable a
     ValueString s -> fromText s
   ValueEnum _ ev _ -> fromText ev
   ValueArraySentinel {} -> fromText ""
@@ -100,7 +99,6 @@ valueToSolidityValue = \case
       ValueInt _ _ n -> Right . T.pack . show $ n
       ValueDecimal n -> Right . T.pack . show $ n
       ValueAddress a -> Right . T.pack . show $ a
-      ValueAccount a -> Right . T.pack . show $ a
       ValueString t -> Right t
       -- The collapse of bytes and str to a single types means that selecting an encoding
       -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
@@ -219,7 +217,7 @@ fromBasic = \case
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
   BDecimal v -> SimpleValue $! ValueDecimal v
-  BAddress a -> SimpleValue $! ValueAccount a
+  BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
   BDefault -> SimpleValue $ ValueAddress 0x0

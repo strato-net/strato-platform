@@ -58,7 +58,6 @@ simpleToStorage = \case
         else go False v
   ValueDecimal v -> padRight32 v
   ValueAddress v -> simpleToStorage . valueUInt . fromIntegral $ unAddress v
-  ValueAccount v -> simpleToStorage . valueUInt . fromIntegral $ v
   ValueBytes Nothing v -> padRight32 $ ByteString.append (simpleToStorage (valueUInt (toInteger $ ByteString.length v))) v
   ValueBytes (Just _) v -> padRight32 v
   ValueString v -> simpleToStorage . valueBytes $ Text.encodeUtf8 v

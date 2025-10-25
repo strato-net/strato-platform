@@ -77,8 +77,6 @@ valueToSolidityValue = \case
   SimpleValue (ValueString s) -> SolidityValueAsString s
   SimpleValue (ValueAddress (Address addr)) ->
     SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
-  SimpleValue (ValueAccount acct) ->
-    SolidityValueAsString $ Text.pack $ show acct
   ValueContract acct ->
     SolidityValueAsString $ Text.pack $ show acct
   ValueArrayFixed _ values -> SolidityArray $ map valueToSolidityValue values
@@ -406,8 +404,8 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
      in Just . SimpleValue . ValueAddress . Address $ fromIntegral addr
   TypeContract _ ->
     let addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAddress of
-          Just (SimpleValue (ValueAccount addr')) -> addr'
-          _ -> error "decodeValue': Expected ValueAccount" -- ++ show v
+          Just (SimpleValue (ValueAddress addr')) -> addr'
+          _ -> error "decodeValue': Expected ValueAddress" -- ++ show v
      in Just $ ValueContract addr
   SimpleType (TypeBytes (Just n)) -> Just $ decodeByteString storage offset byte $ fromInteger n
   SimpleType (TypeBytes Nothing)
@@ -557,7 +555,6 @@ encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
   SimpleValue (ValueDecimal v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  SimpleValue (ValueAccount a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   ValueContract a -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]

@@ -63,7 +63,6 @@ data Value
 data SimpleValue
   = ValueBool Bool
   | ValueAddress Address
-  | ValueAccount Address
   | ValueString Text
   | ValueInt
       { intSigned :: Bool,
@@ -82,7 +81,6 @@ zeroOf = \case
   SimpleValue sv -> SimpleValue $ case sv of
     ValueBool {} -> ValueBool False
     ValueAddress {} -> ValueAddress 0x0
-    ValueAccount {} -> ValueAccount 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
     ValueDecimal _ -> ValueDecimal "0"
@@ -272,7 +270,6 @@ simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
   ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
-  ValueAccount acct -> Text.pack $ "0x" ++ show acct
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b

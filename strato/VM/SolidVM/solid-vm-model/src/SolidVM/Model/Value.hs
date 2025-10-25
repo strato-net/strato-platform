@@ -4,7 +4,7 @@
 module SolidVM.Model.Value
   ( Variable (..),
     Value (..),
-    AccountPath (..),
+    AddressPath (..),
     ValList,
     rlpEncodeVariable,
     rlpEncodeValue,
@@ -42,20 +42,20 @@ import qualified SolidVM.Model.Storable as MS
 import qualified SolidVM.Model.Type as SVMType
 import Text.Printf
 
-data AccountPath = AccountPath
-  { apAccount :: Address,
+data AddressPath = AddressPath
+  { apAddress :: Address,
     apPath :: MS.StoragePath
   }
   deriving (Eq)
 
-apSnoc :: AccountPath -> MS.StoragePathPiece -> AccountPath
-apSnoc (AccountPath loc path) piece = AccountPath loc $! path `MS.snoc` piece
+apSnoc :: AddressPath -> MS.StoragePathPiece -> AddressPath
+apSnoc (AddressPath loc path) piece = AddressPath loc $! path `MS.snoc` piece
 
-apSnocList :: AccountPath -> [MS.StoragePathPiece] -> AccountPath
-apSnocList (AccountPath loc path) pieces = AccountPath loc $! path `MS.snocList` pieces
+apSnocList :: AddressPath -> [MS.StoragePathPiece] -> AddressPath
+apSnocList (AddressPath loc path) pieces = AddressPath loc $! path `MS.snocList` pieces
 
-instance Show AccountPath where
-  show (AccountPath a p) = printf "%s//%s" (show a) (show p)
+instance Show AddressPath where
+  show (AddressPath a p) = printf "%s//%s" (show a) (show p)
 
 data Variable
   = Variable (IORef Value)
@@ -100,7 +100,7 @@ data Value
     -- | SStaticCall Value (Maybe Variable)
     -- | SCall Value (Maybe Variable)
     SNULL
-  | SReference AccountPath -- An alias to an existing variable, so that modifications
+  | SReference AddressPath -- An alias to an existing variable, so that modifications
   -- can be canonicalized
   | SHexDecodeAndTrim -- Hack to implement blockapps-sol's bytes32ToString without
   -- supporting indexing into bytes32s.
