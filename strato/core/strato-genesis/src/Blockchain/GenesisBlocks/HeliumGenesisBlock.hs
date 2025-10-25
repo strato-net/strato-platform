@@ -466,7 +466,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
               , (".cdpReserve", BContract "CDPReserve" cdpReserveAddress)
               , (".safetyModule", BContract "SafetyModule" safetyModuleAddress)
               ]
-            ] ++ mapMaybe assetToAccountInfos GA.assets ++
+            ] ++ mapMaybe assetToAddressInfos GA.assets ++
             [ rateStrategy
             , priceOracle
             , collateralVault
@@ -592,8 +592,8 @@ assetBalances GA.Asset{..} =
             [(o, correctQuantity decimals name q)]
     ) . filter ((>0) . GA.quantity) $ M.elems balances
 
-assetToAccountInfos :: GA.Asset -> Maybe AddressInfo
-assetToAccountInfos asset@GA.Asset{..} =
+assetToAddressInfos :: GA.Asset -> Maybe AddressInfo
+assetToAddressInfos asset@GA.Asset{..} =
   let accountBalances' = assetBalances asset
       allBalances = (\(a, b) -> ("._balances[" <> addrBS a <> "]", BInteger b)) <$> accountBalances'
       takeCaps = T.pack . filter (\c -> (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')) . T.unpack
