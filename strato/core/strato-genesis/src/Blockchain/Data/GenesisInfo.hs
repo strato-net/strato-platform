@@ -12,12 +12,12 @@ module Blockchain.Data.GenesisInfo
     defaultGenesisInfo,
     genesisParser,
     getGenesisInfo,
-    module Blockchain.Data.AccountInfo,
+    module Blockchain.Data.AddressInfo,
     module Blockchain.Data.CodeInfo
   )
 where
 
-import Blockchain.Data.AccountInfo
+import Blockchain.Data.AddressInfo
 import Blockchain.Data.CodeInfo
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Address

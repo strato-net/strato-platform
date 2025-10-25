@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Blockchain.Data.AccountInfo
+module Blockchain.Data.AddressInfo
   ( AccountInfo (..),
     accountExtractor,
     acctInfoAddress
