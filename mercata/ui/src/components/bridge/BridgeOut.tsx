@@ -23,6 +23,7 @@ import BridgeWalletStatus from "./BridgeWalletStatus";
 import { BRIDGE_OUT_FEE, usdstAddress } from "@/lib/constants";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import { useUserTokens } from "@/context/UserTokensContext";
+import { NATIVE_TOKEN_ADDRESS } from "@/lib/bridge/constants";
 
 const BridgeOut: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -115,7 +116,7 @@ const BridgeOut: React.FC = () => {
       const response = await bridgeOutAPI({
         externalChainId: String(externalChainId),
         externalRecipient: address,
-        externalToken: selectedToken.externalToken,
+        externalToken: selectedToken.externalToken? selectedToken.externalToken : NATIVE_TOKEN_ADDRESS,
         stratoToken: selectedToken.stratoToken,
         stratoTokenAmount: amountInSmallestUnit,
       });

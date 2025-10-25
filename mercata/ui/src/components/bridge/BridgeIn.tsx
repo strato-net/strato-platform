@@ -95,7 +95,7 @@ const BridgeIn: React.FC = () => {
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken === NATIVE_TOKEN_ADDRESS;
+  const isNativeToken = selectedToken?.externalToken? false : true;
 
   // ============================================
   // Balance Hooks
@@ -323,7 +323,7 @@ const BridgeIn: React.FC = () => {
       amount,
       parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.externalToken === NATIVE_TOKEN_ADDRESS;
+    const isNative = selectedToken.externalToken? false : true;
 
     return {
       selectedToken,
@@ -344,7 +344,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken
+      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
     });
 
     if (!validation.isValid) {
@@ -529,7 +529,6 @@ const BridgeIn: React.FC = () => {
       // Validate
       const ctx = preflight();
       await validateOnChain(ctx);
-
       let permitData:
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
@@ -539,7 +538,6 @@ const BridgeIn: React.FC = () => {
       }
 
       const txHash = await simulateAndSend(ctx, permitData);
-
       const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
       toast({
         title: "Transaction Sent",
