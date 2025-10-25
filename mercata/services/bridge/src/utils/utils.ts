@@ -39,9 +39,9 @@ export function convertDecimals(
 export function convertToStratoDecimals(
   amount: string | bigint,
   extDecimals: number,
-): string {
+): bigint {
   const converted = convertDecimals(amount, extDecimals, 18);
-  return converted.toString();
+  return converted;
 }
 
 /**

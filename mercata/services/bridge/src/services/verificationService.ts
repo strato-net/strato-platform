@@ -40,6 +40,7 @@ const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) =>
     isETH: externalToken === ZERO_ADDRESS,
     externalToken,
     depositRouter,
+    stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
     externalDecimals: deposit.externalDecimals
   };
 };
@@ -68,11 +69,9 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
       return false;
     }
     
-    const convertedAmount = ctx.externalDecimals 
-      ? convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
-      : ctx.expectedAmount.toString();
+    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
     
-    return convertedAmount === ctx.expectedAmount.toString();
+    return convertedAmount === ctx.stratoTokenAmount;
   });
   
   if (!validTransfer) {

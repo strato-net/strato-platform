@@ -8,6 +8,7 @@ import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiAmount } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
+import { usdstAddress } from '@/lib/constants';
 
 const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,7 +32,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>stratoToken"] = mintUSDST ? 'eq.USDST' : 'neq.USDST';
+        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
