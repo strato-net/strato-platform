@@ -362,15 +362,15 @@ const MintWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Select Stablecoin</Label>
         <Select
-          value={selectedMintToken?.stratoToken || ""}
-          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.stratoToken === v) || null)}
+          value={selectedMintToken?.externalToken || ""}
+          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.externalToken === v) || null)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
             {redeemableTokens.map(t => (
-              <SelectItem key={t.stratoToken} value={t.stratoToken}>
+              <SelectItem key={t.id} value={t.externalToken}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}

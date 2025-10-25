@@ -9,10 +9,10 @@ export function validateRequestWithdrawal(args: any) {
   // Step 1: Basic presence and types
   const baseSchema = Joi.object({
     externalChainId: Joi.string().required(),
+    externalToken: Joi.string().required(),
     stratoToken: Joi.string().required(),
     stratoTokenAmount: Joi.string().required(),
     externalRecipient: Joi.string().required(),
-    targetStratoToken: Joi.string().optional(),
   }).strict();
 
   const { error: baseError } = baseSchema.validate(args);
@@ -35,10 +35,10 @@ export function validateRequestWithdrawal(args: any) {
         "any.invalid": "externalChainId must be a positive integer.",
         "any.required": "externalChainId is required.",
       }),
+    externalToken: validateAddressField("externalToken"),
     stratoToken: validateAddressField("stratoToken"),
     stratoTokenAmount: numericStringField("stratoTokenAmount"),
     externalRecipient: validateAddressField("externalRecipient"),
-    targetStratoToken: validateAddressField("targetStratoToken").optional(),
   }).strict();
 
   const { error } = finalSchema.validate(args);

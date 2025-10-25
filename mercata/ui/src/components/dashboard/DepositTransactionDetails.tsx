@@ -33,7 +33,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
+        (params as any)["value->>stratoToken"] = mintUSDST ? 'eq.USDST' : 'neq.USDST';
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;

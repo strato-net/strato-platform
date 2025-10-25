@@ -24,6 +24,7 @@ export interface NetworkConfig {
  * Bridge token information
  */
 export interface BridgeToken {
+  id: string;
   stratoToken: string;           // Key: address of the STRATO token
   stratoTokenName: string;       // From TokenFactory (not in AssetInfo)
   stratoTokenSymbol: string;     // From TokenFactory (not in AssetInfo)

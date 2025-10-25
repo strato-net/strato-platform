@@ -6,7 +6,7 @@ import './BridgeTransactionsPage.css';
 import DepositTransactionDetails from './DepositTransactionDetails';
 import WithdrawTransactionDetails from './WithdrawTransactionDetails';
 import { useBridgeContext } from '@/context/BridgeContext';
-import { BridgeTransactionTab } from '@/lib/bridge/types';
+import { BridgeTransactionTab } from '@mercata/shared-types';
 
 const BridgeTransactionsPage = () => {
   const { loadNetworksAndTokens, targetTransactionTab, setTargetTransactionTab } = useBridgeContext();

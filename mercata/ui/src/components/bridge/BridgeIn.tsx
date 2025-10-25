@@ -636,7 +636,7 @@ const BridgeIn: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
+              <SelectItem key={t.id} value={t.externalSymbol}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}
