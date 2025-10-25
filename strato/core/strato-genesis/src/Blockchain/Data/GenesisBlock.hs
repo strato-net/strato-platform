@@ -26,7 +26,8 @@ import Blockchain.DB.StorageDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
-import Blockchain.Data.GenesisInfo
+import Blockchain.Data.GenesisInfo (GenesisInfo)
+import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
@@ -73,12 +74,12 @@ putAccount ::
     HasMemRawStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
-  AddressInfo ->
+  GI.AddressInfo ->
   m ()
 putAccount acc = case acc of
-  NonContract address balance' ->
+  GI.NonContract address balance' ->
     A.insert A.Proxy address blankAddressState {addressStateBalance = balance'}
-  ContractNoStorage address balance' codeHash' -> do
+  GI.ContractNoStorage address balance' codeHash' -> do
     A.insert
       A.Proxy
       address
@@ -86,7 +87,7 @@ putAccount acc = case acc of
         { addressStateBalance = balance',
           addressStateCodeHash = codeHash'
         }
-  SolidVMContractWithStorage address balance' codeHash' slots -> do
+  GI.SolidVMContractWithStorage address balance' codeHash' slots -> do
     A.insert
       A.Proxy
       address
@@ -105,7 +106,7 @@ initializeStateDB ::
     HasMemStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
-  [AddressInfo] ->
+  [GI.AddressInfo] ->
   m ()
 initializeStateDB addressInfo = do
   initializeBlankStateDB
@@ -118,23 +119,23 @@ parseHex theString =
     [(value, "")] -> value
     _ -> error $ "parseHex: error parsing string: " ++ theString
 
-initializeCodeDB :: HasCodeDB m => String -> [CodeInfo] -> m ()
+initializeCodeDB :: HasCodeDB m => String -> [GI.CodeInfo] -> m ()
 --initializeCodeDB "EVM" x = do
 --  mapM_ (addCode . (\(CodeInfo bin _ _) -> bin)) x
 initializeCodeDB "SolidVM" x = do
-  mapM_ (addCode . (\(CodeInfo src _) -> T.encodeUtf8 src)) x
+  mapM_ (addCode . (\(GI.CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
-zipSourceInfo :: [AddressInfo] -> [CodeInfo] -> [(AddressInfo, CodeInfo)]
+zipSourceInfo :: [GI.AddressInfo] -> [GI.CodeInfo] -> [(GI.AddressInfo, GI.CodeInfo)]
 zipSourceInfo accounts codes =
-  let hashPair c@(CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
+  let hashPair c@(GI.CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
       codeMap = Map.fromList . map hashPair $ codes
-      findCodeFor :: AddressInfo -> Maybe (AddressInfo, CodeInfo)
-      findCodeFor (NonContract _ _) = Nothing
-      findCodeFor acc@(ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor :: GI.AddressInfo -> Maybe (GI.AddressInfo, GI.CodeInfo)
+      findCodeFor (GI.NonContract _ _) = Nothing
+      findCodeFor acc@(GI.ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(GI.ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(GI.SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
+      findCodeFor acc@(GI.SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
    in catMaybes $ map findCodeFor accounts
 
 genesisInfoToGenesisBlock ::
@@ -148,31 +149,31 @@ genesisInfoToGenesisBlock ::
     (Address `A.Alters` AddressState) m
   ) =>
   GenesisInfo ->
-  m ([(AddressInfo, CodeInfo)], Block)
+  m ([(GI.AddressInfo, GI.CodeInfo)], Block)
 genesisInfoToGenesisBlock gi = do
-  let codes = genesisInfoCodeInfo gi
-  let accounts = genesisInfoAddressInfo gi
+  let codes = GI.codeInfo gi
+  let accounts = GI.addressInfo gi
   initializeCodeDB "SolidVM" codes
   initializeStateDB accounts
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let sourceInfo = zipSourceInfo accounts codes
       bData =
         BlockHeader
-          { parentHash = genesisInfoParentHash gi,
-            ommersHash = genesisInfoUnclesHash gi,
+          { parentHash = GI.parentHash gi,
+            ommersHash = GI.unclesHash gi,
             beneficiary = 0x0,
             stateRoot = sr,
-            transactionsRoot = genesisInfoTransactionRoot gi,
-            receiptsRoot = genesisInfoReceiptsRoot gi,
-            logsBloom = genesisInfoLogBloom gi,
-            difficulty = genesisInfoDifficulty gi,
-            number = genesisInfoNumber gi,
-            gasLimit = genesisInfoGasLimit gi,
-            gasUsed = genesisInfoGasUsed gi,
-            timestamp = genesisInfoTimestamp gi,
-            extraData = i2bs_unsized $ genesisInfoExtraData gi,
-            mixHash = genesisInfoMixHash gi,
-            nonce = genesisInfoNonce gi
+            transactionsRoot = GI.transactionRoot gi,
+            receiptsRoot = GI.receiptsRoot gi,
+            logsBloom = GI.logBloom gi,
+            difficulty = GI.difficulty gi,
+            number = GI.number gi,
+            gasLimit = GI.gasLimit gi,
+            gasUsed = GI.gasUsed gi,
+            timestamp = GI.timestamp gi,
+            extraData = i2bs_unsized $ GI.extraData gi,
+            mixHash = GI.mixHash gi,
+            nonce = GI.nonce gi
           }
   return
     ( sourceInfo,

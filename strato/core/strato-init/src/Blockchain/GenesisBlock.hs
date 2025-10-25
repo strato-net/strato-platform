@@ -28,7 +28,8 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
-import Blockchain.Data.GenesisInfo
+import Blockchain.Data.GenesisInfo (GenesisInfo)
+import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
@@ -85,9 +86,9 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasMemStorageDB m,
     (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([Validator], GenesisInfo, ([(AddressInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, ([(GI.AddressInfo, GI.CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
-  genesisInfo <- getGenesisInfo
+  genesisInfo <- GI.getGenesisInfo
   let validators = readValidatorsFromGenesisInfo genesisInfo
 
   (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
@@ -136,7 +137,7 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
-  let rewrite (_, CodeInfo src name) =
+  let rewrite (_, GI.CodeInfo src name) =
         ( hash $ T.encodeUtf8 src,
           Map.fromList $
             [("src", src)]
@@ -239,11 +240,11 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
-  let addresses = acctInfoAddress <$> genesisInfoAddressInfo genesisInfo
-      events = genesisInfoEvents genesisInfo
-      delegatecalls = genesisInfoDelegatecalls genesisInfo
+  let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
+      events = GI.events genesisInfo
+      delegatecalls = GI.delegatecalls genesisInfo
 
-  ccas <- fmap catMaybes . for (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo src mName) -> for mName $ \name -> do
+  ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \name -> do
     let srcHash = hash $ T.encodeUtf8 src
         codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash

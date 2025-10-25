@@ -13,5 +13,5 @@ buildGenesisInfo extraFaucets validators admins gi =
       faucetAccounts = map (flip NonContract faucetBalance) extraFaucets
    in insertUserRegistryContract
         . insertMercataGovernanceContract (admins !! 0) validators admins
-        $ gi {genesisInfoAddressInfo = faucetAccounts ++ (genesisInfoAddressInfo gi)}
+        $ gi {addressInfo = faucetAccounts ++ (addressInfo gi)}
 

@@ -414,10 +414,10 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
   . insertUserRegistryContract
   . insertDecideContract
   $ defaultGenesisInfo{
-        genesisInfoDifficulty=8192,
-        genesisInfoLogBloom=B.replicate 256 0,
-        genesisInfoGasLimit=22517998136852480000000000000000,
-        genesisInfoAddressInfo=[
+        difficulty=8192,
+        logBloom=B.replicate 256 0,
+        gasLimit=22517998136852480000000000000000,
+        addressInfo=[
             NonContract 0xe1fd0d4a52b75a694de8b55528ad48e2e2cf7859 1809251394333065553493296640760748560207343510400633813116524750123642650624,
             implContract rateStrategyImplAddress "RateStrategy",
             implContract priceOracleImplAddress "PriceOracle",
@@ -491,8 +491,8 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             -- , paxgstPool
             -- , paxgstLpToken
             ],
-        genesisInfoCodeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")],
-        genesisInfoEvents = M.fromList $
+        codeInfo=[CodeInfo (decodeUtf8 $ BL.toStrict $ JSON.encode mercataContracts) (Just "Mercata")],
+        events = M.fromList $
           (assetToEvents <$> GA.assets)
           ++ [ adminEvents
              , lendingPoolEvents
@@ -502,7 +502,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , cdpVaultEvents
              , safetyModuleEvents
              ],
-        genesisInfoDelegatecalls = M.fromList . map (fmap S.singleton) $
+        delegatecalls = M.fromList . map (fmap S.singleton) $
           ((\t -> (GA.root t, Delegatecall (GA.root t) tokenImplAddress "BlockApps" "Mercata" "Token")) <$> GA.assets)
           ++ [ (rateStrategyAddress, Delegatecall rateStrategyAddress rateStrategyImplAddress "BlockApps" "Mercata" "RateStrategy")
              , (priceOracleAddress, Delegatecall priceOracleAddress priceOracleImplAddress "BlockApps" "Mercata" "PriceOracle")

@@ -28,12 +28,12 @@ import           Text.Printf
 insertMercataGovernanceContract :: Address -> [Validator] -> [Address] -> GenesisInfo -> GenesisInfo
 insertMercataGovernanceContract owner validators admins gi =
   gi
-    { genesisInfoAddressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")]
+    { addressInfo = initialAccounts ++ [govLogicAcct, govStorageAcct],
+      codeInfo = initialCode ++ [CodeInfo governanceSrc (Just "MercataGovernance")]
     }
   where
-    initialAccounts = genesisInfoAddressInfo gi
-    initialCode = genesisInfoCodeInfo gi
+    initialAccounts = addressInfo gi
+    initialCode = codeInfo gi
 
     governanceSrc = decodeUtf8 mercataGovernanceContract
 

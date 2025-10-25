@@ -2,18 +2,15 @@
 
 module Blockchain.Data.AddressInfo
   ( AddressInfo (..),
-    accountExtractor,
-    acctInfoAddress
+    addrInfoAddress
   )
 where
 
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr
-import Control.Applicative (many)
 
 import Data.Aeson
-import qualified Data.JsonStream.Parser as JS
 import SolidVM.Model.Storable
 import Text.Format
 import Text.Tools
@@ -34,10 +31,10 @@ data AddressInfo
       -- ContractWithStorage which uses (Word256, Word256) pairs for EVM storage
   deriving (Show, Eq, Read)
 
-acctInfoAddress :: AddressInfo ->  Address
-acctInfoAddress (NonContract a _) = a
-acctInfoAddress (ContractNoStorage a _ _) = a
-acctInfoAddress (SolidVMContractWithStorage a _ _ _) = a
+addrInfoAddress :: AddressInfo ->  Address
+addrInfoAddress (NonContract a _) = a
+addrInfoAddress (ContractNoStorage a _ _) = a
+addrInfoAddress (SolidVMContractWithStorage a _ _ _) = a
 
 instance Format AddressInfo where
   format (NonContract addr nonce) =
@@ -99,9 +96,3 @@ instance ToJSON AddressInfo where
         "codeHash" .= c,
         "storage" .= s
       ]
-
-accountExtractor :: JS.Parser [AddressInfo]
-accountExtractor = many ("addressInfo" JS..: JS.arrayOf acctInfo)
-
-acctInfo :: JS.Parser AddressInfo
-acctInfo = JS.value
