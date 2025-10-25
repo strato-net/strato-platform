@@ -1404,7 +1404,8 @@ stringArgs x =
            accountType' x,
            intType' x,
            boolType' x,
-           Product [intType' x, intType' x] x
+           Product [intType' x, intType' x] x,
+           Product [intType' x, intType' x, intType' x] x
          ]
 
 addressArgs :: SourceAnnotation Text -> Type'

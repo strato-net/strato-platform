@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 import {
   Select,
   SelectContent,
@@ -116,7 +117,7 @@ const BridgeIn: React.FC = () => {
     isLoading: tokenLoading,
   } = useBalance({
     address,
-    token: selectedToken?.externalToken as `0x${string}`,
+    token: ensureHexPrefix(selectedToken?.externalToken),
     chainId: expectedChainId || undefined,
     query: {
       enabled:
@@ -363,7 +364,7 @@ const BridgeIn: React.FC = () => {
 
       try {
         const approveTx = await writeContractAsync({
-          address: ctx.selectedToken.externalToken as `0x${string}`,
+          address: ensureHexPrefix(ctx.selectedToken.externalToken),
           abi: ERC20_ABI,
           functionName: "approve",
           args: [
@@ -442,7 +443,7 @@ const BridgeIn: React.FC = () => {
         address: ctx.depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        args: [ensureHexPrefix(ctx.userAddress)],
         value: ctx.depositAmount,
         account: ctx.address as `0x${string}`,
       });
@@ -452,7 +453,7 @@ const BridgeIn: React.FC = () => {
         address: ctx.depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        args: [ensureHexPrefix(ctx.userAddress)],
         value: ctx.depositAmount,
         chain,
         account: ctx.address as `0x${string}`,
@@ -469,9 +470,9 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),  
+          ensureHexPrefix(ctx.selectedToken.externalToken),  
           ctx.depositAmount,
-          bridgeContractService.formatAddress(ctx.userAddress),
+          ensureHexPrefix(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`
@@ -485,9 +486,9 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),
+          ensureHexPrefix(ctx.selectedToken.externalToken),
           ctx.depositAmount,
-          bridgeContractService.formatAddress(ctx.userAddress),
+          ensureHexPrefix(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
           permitData!.signature as `0x${string}`

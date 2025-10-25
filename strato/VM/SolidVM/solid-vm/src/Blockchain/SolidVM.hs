@@ -2169,6 +2169,7 @@ callBuiltin "string" [SAccount a _] = return . SString $ show a
 callBuiltin "string" [SInteger i] = return . SString $ show i
 callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ show i
 callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ "0x" ++ Numeric.showHex i ""
+callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = return . SString $ printf ("0x%0" ++ show (2*bytes) ++ "x") i
 callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""

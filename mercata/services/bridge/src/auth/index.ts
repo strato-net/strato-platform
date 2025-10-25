@@ -88,16 +88,16 @@ export const getBAUserToken = async (): Promise<string> => {
   const userTokenData = CACHED_DATA[cacheKey];
   const currentTime = Math.floor(Date.now() / 1000);
 
-  console.debug(`[Auth] Token cache check:`, {
-    username: config.auth.baUsername,
-    cacheKey,
-    currentTime,
-    hasCachedToken: !!userTokenData,
-    cachedTokenExpiresAt: userTokenData?.expiresAt,
-    timeUntilExpiry: userTokenData ? userTokenData.expiresAt - currentTime : 'N/A',
-    thresholdSeconds: TOKEN_LIFETIME_THRESHOLD_SECONDS,
-    isTokenValid: userTokenData ? userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_THRESHOLD_SECONDS : false
-  });
+  // console.debug(`[Auth] Token cache check:`, {
+  //   username: config.auth.baUsername,
+  //   cacheKey,
+  //   currentTime,
+  //   hasCachedToken: !!userTokenData,
+  //   cachedTokenExpiresAt: userTokenData?.expiresAt,
+  //   timeUntilExpiry: userTokenData ? userTokenData.expiresAt - currentTime : 'N/A',
+  //   thresholdSeconds: TOKEN_LIFETIME_THRESHOLD_SECONDS,
+  //   isTokenValid: userTokenData ? userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_THRESHOLD_SECONDS : false
+  // });
 
   // Check if a valid cached token exists
   if (
@@ -105,11 +105,11 @@ export const getBAUserToken = async (): Promise<string> => {
     userTokenData.token &&
     userTokenData.expiresAt > currentTime + TOKEN_LIFETIME_THRESHOLD_SECONDS
   ) {
-    console.debug(`[Auth] Using cached token`);
+    // console.debug(`[Auth] Using cached token`);
     return userTokenData.token;
   }
 
-  console.debug(`[Auth] Need to fetch new token`);
+  // console.debug(`[Auth] Need to fetch new token`);
 
   try {
     if (!oauthInstance) {
@@ -122,7 +122,7 @@ export const getBAUserToken = async (): Promise<string> => {
       throw new Error("BA_PASSWORD is not configured");
     }
 
-    console.debug(`[Auth] Calling OAuth getAccessTokenByResourceOwnerCredential...`);
+    // console.debug(`[Auth] Calling OAuth getAccessTokenByResourceOwnerCredential...`);
 
     // Fetch a new token using Resource Owner Password Credentials
     const tokenObj =
@@ -131,25 +131,25 @@ export const getBAUserToken = async (): Promise<string> => {
         config.auth.baPassword,
       );
 
-    console.debug(`[Auth] Token object received:`, {
-      hasToken: !!tokenObj?.token,
-      tokenKeys: tokenObj?.token ? Object.keys(tokenObj.token) : 'No token',
-      tokenField: getOAuthConfig().tokenField
-    });
+    // console.debug(`[Auth] Token object received:`, {
+    //   hasToken: !!tokenObj?.token,
+    //   tokenKeys: tokenObj?.token ? Object.keys(tokenObj.token) : 'No token',
+    //   tokenField: getOAuthConfig().tokenField
+    // });
 
     // Type assertion for token object
     const token = tokenObj.token[getOAuthConfig().tokenField] as string;
     const expiresAt = tokenObj.token.expires_at as number;
 
-    console.debug(`[Auth] Token extracted:`, {
-      hasAccessToken: !!token,
-      expiresAt,
-      expiresIn: expiresAt - currentTime
-    });
+    // console.debug(`[Auth] Token extracted:`, {
+    //   hasAccessToken: !!token,
+    //   expiresAt,
+    //   expiresIn: expiresAt - currentTime
+    // });
 
     // Cache the new token
     CACHED_DATA[cacheKey] = { token, expiresAt };
-    console.debug(`[Auth] Token cached successfully`);
+    // console.debug(`[Auth] Token cached successfully`);
     
     return token;
   } catch (error: any) {

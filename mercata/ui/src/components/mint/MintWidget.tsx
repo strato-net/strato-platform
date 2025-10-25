@@ -20,7 +20,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
-import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalance, ensureHexPrefix } from "@/utils/numberUtils";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { formatUnits } from "ethers";
 import { api } from "@/lib/axios";
@@ -53,7 +53,7 @@ const MintWidget: React.FC = () => {
   // Get external token balance for percentage buttons
   const { data: externalTokenBalance } = useBalance({
     address: address,
-    token: selectedMintToken?.externalToken as `0x${string}` | undefined,
+    token: ensureHexPrefix(selectedMintToken?.externalToken),
     chainId: selectedMintToken ? parseInt(availableNetworks.find(n => n.chainName === selectedNetwork)?.chainId || "0") : undefined,
     query: {
       enabled: !!address && !!selectedMintToken?.externalToken && !!isConnected,
@@ -186,21 +186,28 @@ const MintWidget: React.FC = () => {
 
   // Core on-chain flow
   const ensurePermit2Approval = async (tokenAddress: string, amount: bigint, activeChainId: string) => {
+    console.log("Checking Permit2 approval for token:", tokenAddress);
+    
     const approval = await bridgeContractService.checkPermit2Approval({
       token: tokenAddress,
       owner: address as string,
       amount,
       chainId: activeChainId,
     });
+    
+    console.log("Permit2 approval status:", approval);
+    
     if (!approval.isApproved) {
+      console.log("Approving Permit2...");
       await writeContractAsync({
-        address: tokenAddress as `0x${string}`,
+        address: ensureHexPrefix(tokenAddress),
         abi: ERC20_ABI,
         functionName: "approve",
         args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
         chain: await resolveViemChain(activeChainId),
         account: address as `0x${string}`,
       });
+      console.log("Permit2 approval completed");
     }
   };
 
@@ -249,9 +256,9 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedMintToken.externalToken),
           depositAmount,
-          bridgeContractService.formatAddress(userAddress),
+          ensureHexPrefix(userAddress),
           nonce,
           deadline,
           signature as `0x${string}`
@@ -264,9 +271,9 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedMintToken.externalToken),
           depositAmount,
-          bridgeContractService.formatAddress(userAddress),
+          ensureHexPrefix(userAddress),
           nonce,
           deadline,
           signature as `0x${string}`
@@ -321,6 +328,7 @@ const MintWidget: React.FC = () => {
         }
       }
     } catch (err: any) {
+      console.error("Error minting:", err);
       const msg = err?.message || "Transaction failed";
       toast({ title: "Mint failed", description: msg, variant: "destructive" });
     } finally {

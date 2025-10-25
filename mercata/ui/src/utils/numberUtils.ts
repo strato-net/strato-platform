@@ -1,6 +1,28 @@
 import { parseUnits, formatUnits } from "ethers";
 
 /**
+ * Ensures an address has the 0x prefix and proper checksum format
+ * @param address - The address to format
+ * @returns Address with 0x prefix and proper checksum format
+ */
+export const ensureHexPrefix = (address: string | undefined | null): `0x${string}` | undefined => {
+  if (!address) return undefined;
+  
+  // Add 0x prefix if missing
+  const withPrefix = address.startsWith('0x') ? address : `0x${address}`;
+  
+  // Convert to proper checksum format (mixed case)
+  try {
+    // Use viem's getAddress to get proper checksum format
+    const { getAddress } = require('viem');
+    return getAddress(withPrefix);
+  } catch (error) {
+    // If checksum conversion fails, return the address with prefix
+    return withPrefix as `0x${string}`;
+  }
+};
+
+/**
  * Safely parses a string to BigInt using parseUnits, handling edge cases
  * that would normally cause parseUnits to throw an error.
  * 
