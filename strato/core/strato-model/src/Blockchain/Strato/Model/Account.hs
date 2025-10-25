@@ -11,8 +11,7 @@
 
 module Blockchain.Strato.Model.Account
   ( NamedAccount (..),
-    namedAccountAddress,
-    unspecifiedChain
+    namedAccountAddress
   )
 where
 
@@ -47,9 +46,6 @@ makeLenses ''NamedAccount
 deriving instance Eq NamedAccount
 deriving instance Ord NamedAccount
 deriving instance Hashable NamedAccount
-
-unspecifiedChain :: Address -> NamedAccount
-unspecifiedChain = NamedAccount
 
 instance Show NamedAccount where
   show (NamedAccount a) = printf "%040x" a

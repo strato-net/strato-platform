@@ -1298,13 +1298,13 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SBuiltinVariable "block", "proposer") -> do
       env' <- getEnv
       let acc = Env.proposer env'
-      return $ Constant (flip SAccount False (unspecifiedChain acc))
+      return $ Constant (flip SAccount False (NamedAccount acc))
     (SBuiltinVariable "block", "timestamp") -> do
       env' <- getEnv
       let baseTimestamp = utcTimeToPOSIXSeconds $ BlockHeader.timestamp $ Env.blockHeader env'
       return $ Constant $ SInteger $ round baseTimestamp
     (SBuiltinVariable "block", "number") -> (Constant . SInteger . BlockHeader.number . Env.blockHeader) <$> getEnv
-    (SBuiltinVariable "block", "coinbase") -> Constant . flip SAccount False . unspecifiedChain . Env.proposer <$> getEnv
+    (SBuiltinVariable "block", "coinbase") -> Constant . flip SAccount False . NamedAccount . Env.proposer <$> getEnv
     (SBuiltinVariable "block", "difficulty") ->
       (Constant . SInteger . BlockHeader.difficulty . Env.blockHeader) <$> getEnv
     (SBuiltinVariable "block", "gaslimit") ->
@@ -1363,11 +1363,11 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
             Just SString{} -> pure $ Constant $ SString ""
             Just SDecimal{} -> pure $ Constant $ SDecimal 0.0
             Just SBool{} -> pure $ Constant $ SBool False
-            Just (SAccount _ p) -> pure $ Constant $ SAccount (unspecifiedChain 0x0) p
+            Just (SAccount _ p) -> pure $ Constant $ SAccount (NamedAccount 0x0) p
             Just (SStruct n _) -> pure $ Constant $ SStruct n M.empty
             Just (SEnumVal t n _) -> pure $ Constant $ SEnumVal t n 0
             Just (SArray _) -> pure $ Constant $ SArray mempty
-            Just (SContractItem _ n) -> pure $ Constant $ SContractItem (unspecifiedChain 0x0) n
+            Just (SContractItem _ n) -> pure $ Constant $ SContractItem (NamedAccount 0x0) n
             Just (SMap _) -> pure $ Constant $ SMap M.empty
             _ -> internalError "Type of Mapping not allowed" theMap
         (SReference _, _) -> Constant . SReference <$> expToPath x
@@ -1684,7 +1684,7 @@ expToVar' (CC.FunctionCall _ e args) = do
               case argVals of
                 [SInteger address] ->
                   --TODO- clean up this ambiguity between SAddress and SInteger....
-                  return $ Constant $ SContract contractName' $ unspecifiedChain $ fromInteger address
+                  return $ Constant $ SContract contractName' $ NamedAccount $ fromInteger address
                 [SAccount address _] ->
                   return $ Constant $ SContract contractName' address
                 [SContract _ addr] ->
@@ -2168,16 +2168,16 @@ callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
 callBuiltin "string" vs = typeError "string cast" vs
-callBuiltin "address" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
-callBuiltin "address" [SAccount na b] = return $ SAccount (unspecifiedChain (_namedAccountAddress na)) b
+callBuiltin "address" [SInteger a] = return . ((flip SAccount) False) . NamedAccount $ fromIntegral a
+callBuiltin "address" [SAccount na b] = return $ SAccount (NamedAccount (_namedAccountAddress na)) b
 callBuiltin "address" [SContract _ a] = return $ SAccount a False
 callBuiltin "address" [ss@(SString s)] =
   maybe
     (typeError "address cast" ss)
     (return . flip SAccount False)
     $ readMaybe s
-callBuiltin "address" [SNULL] = return $ SAccount (unspecifiedChain 0) False
-callBuiltin "address" [SReference{}] = return $ SAccount (unspecifiedChain 0) False
+callBuiltin "address" [SNULL] = return $ SAccount (NamedAccount 0) False
+callBuiltin "address" [SReference{}] = return $ SAccount (NamedAccount 0) False
 callBuiltin "address" vs = typeError "address cast" vs
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a * b) `mod` c
@@ -2229,8 +2229,8 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
     let theZero :: Integer
         theZero = 0
     case theSignerAddress of
-      Nothing -> return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral theZero
-      Just theAddress -> return . ((flip SAccount) False) . unspecifiedChain $ theAddress
+      Nothing -> return . ((flip SAccount) False) . NamedAccount $ fromIntegral theZero
+      Just theAddress -> return . ((flip SAccount) False) . NamedAccount $ theAddress
 callBuiltin "sha256" args = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "ripemd160" args = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
 callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
@@ -3153,15 +3153,15 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
       case (v, t) of
         (SInteger i, SVMType.Int _ _) -> pure . Just $ SInteger i
         (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
-        (SInteger i, SVMType.Address b) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) b
-        (SInteger i, SVMType.Account b) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) b
-        (SInteger i, SVMType.UnknownLabel _ _) -> pure . Just $ SAccount (unspecifiedChain $ fromInteger i) False
+        (SInteger i, SVMType.Address b) -> pure . Just $ SAccount (NamedAccount $ fromInteger i) b
+        (SInteger i, SVMType.Account b) -> pure . Just $ SAccount (NamedAccount $ fromInteger i) b
+        (SInteger i, SVMType.UnknownLabel _ _) -> pure . Just $ SAccount (NamedAccount $ fromInteger i) False
         (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
         (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
         (SString s, SVMType.String _) -> pure . Just $ SString s
         (SString s, SVMType.Bytes _ _) -> pure . Just $ SString s
-        (SString s, SVMType.Address b) -> pure $ flip SAccount b . unspecifiedChain <$> stringAddress s
-        (SString s, SVMType.Account b) -> pure $ flip SAccount b . unspecifiedChain <$> stringAddress s
+        (SString s, SVMType.Address b) -> pure $ flip SAccount b . NamedAccount <$> stringAddress s
+        (SString s, SVMType.Account b) -> pure $ flip SAccount b . NamedAccount <$> stringAddress s
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAccount a _, SVMType.Address b) -> pure . Just $ SAccount a b
         (SAccount a _, SVMType.Account b) -> pure . Just $ SAccount a b

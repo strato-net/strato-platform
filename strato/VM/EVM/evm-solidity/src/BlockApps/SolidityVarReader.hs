@@ -232,13 +232,13 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
   SimpleType TypeAccount ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-          Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
+          Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAccount . NamedAccount $ fromIntegral addr
           Just (a@(SimpleValue (ValueAccount _))) -> Just a
           o -> error $ "decodeCacheValue': Expected ValueInt or ValueAccount, but got: " ++ show o
   TypeContract _ ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-          Just (SimpleValue (ValueInt _ _ addr)) -> Just . ValueContract . unspecifiedChain $ fromIntegral addr
+          Just (SimpleValue (ValueInt _ _ addr)) -> Just . ValueContract . NamedAccount $ fromIntegral addr
           Just (c@(ValueContract _)) -> Just c
           o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
   SimpleType (TypeBytes (Just n)) -> Just $ decodeCacheByteString cache offset byte (fromInteger n) value
@@ -415,7 +415,7 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
     let addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
           Just (SimpleValue (ValueInt _ _ addr')) -> addr'
           _ -> error "decodeValue': Expected ValueInt 3" -- ++ show v
-     in Just . SimpleValue . ValueAccount . unspecifiedChain $ fromIntegral addr
+     in Just . SimpleValue . ValueAccount . NamedAccount $ fromIntegral addr
   TypeContract _ ->
     let addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount of
           Just (SimpleValue (ValueAccount addr')) -> addr'

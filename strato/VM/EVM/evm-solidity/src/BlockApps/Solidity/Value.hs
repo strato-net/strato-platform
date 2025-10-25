@@ -83,12 +83,12 @@ zeroOf = \case
   SimpleValue sv -> SimpleValue $ case sv of
     ValueBool {} -> ValueBool False
     ValueAddress {} -> ValueAddress 0x0
-    ValueAccount {} -> ValueAccount $ unspecifiedChain 0x0
+    ValueAccount {} -> ValueAccount $ NamedAccount 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
     ValueDecimal _ -> ValueDecimal "0"
     ValueBytes size _ -> ValueBytes size ""
-  ValueContract {} -> ValueContract $ unspecifiedChain 0x0
+  ValueContract {} -> ValueContract $ NamedAccount 0x0
   ValueArrayDynamic {} -> ValueArrayDynamic I.empty
   ValueMapping {} -> ValueMapping Map.empty
   ValueStruct fs -> ValueStruct $ fmap zeroOf fs
@@ -105,7 +105,7 @@ bytesToSimpleValue bs = \case
       then Just $ ValueBool True
       else Just $ ValueBool False
   TypeAddress -> ValueAddress <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
-  TypeAccount -> ValueAccount . unspecifiedChain <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
+  TypeAccount -> ValueAccount . NamedAccount <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs

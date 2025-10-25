@@ -137,7 +137,7 @@ textToBasicValue v =
            $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
          <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
          <|> (BInteger <$> readMaybe (T.unpack v))
-         <|> (BAccount . unspecifiedChain <$> readMaybe (T.unpack v))
+         <|> (BAccount . NamedAccount <$> readMaybe (T.unpack v))
          <|> (case T.split (=='.') v of [a,b,c] -> BEnumVal (textToLabel a) (textToLabel b) <$> readMaybe (T.unpack c); _ -> Nothing)
    in if isDefault v' then BDefault else v'
 
@@ -146,9 +146,9 @@ isDefault (BInteger i) = i == 0
 isDefault (BString bs) = B.null bs
 isDefault (BDecimal v) = v == "0"
 isDefault (BBool b) = not b
-isDefault (BAccount a) = a == unspecifiedChain 0x0
+isDefault (BAccount a) = a == NamedAccount 0x0
 isDefault (BEnumVal _ _ w) = w == 0
-isDefault (BContract _ a) = a == unspecifiedChain 0x0
+isDefault (BContract _ a) = a == NamedAccount 0x0
 isDefault BDefault = True
 
 instance Format BasicValue where
