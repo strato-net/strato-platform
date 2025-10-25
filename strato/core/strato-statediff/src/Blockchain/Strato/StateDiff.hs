@@ -27,7 +27,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.Internal (Key, Val, StateRoot, unsafeGetAllKeyVals)
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
@@ -37,7 +37,6 @@ import Control.Monad (when)
 import Control.Monad.Change (Alters, Modifiable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.Function
 import Data.Kind (Type)
 import Data.Map (Map)
@@ -48,8 +47,8 @@ import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
-import Text.Format
 import SolidVM.Model.Storable
+import Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
 -- database in a given block.
@@ -81,9 +80,6 @@ instance StorableKey Word256 where
 
 instance StorableValue Word256 where
   decodeMPDBValue = retrieveMPDBValue
-
-instance StorableKey B.ByteString where
-  lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
 instance StorableKey StoragePath where
   lookupStorageKey = fmap (either (error . ("malformed storage path " ++)) id . parsePath . fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
