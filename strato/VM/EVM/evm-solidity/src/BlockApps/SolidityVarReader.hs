@@ -33,7 +33,6 @@ import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 import BlockApps.Storage (Cache, Storage)
 import qualified BlockApps.Storage as Storage
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -232,13 +231,13 @@ decodeCacheValue' typeDefs'@TypeDefs {..} cache position@Storage.Position {..} v
   SimpleType TypeAccount ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-          Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAccount . NamedAccount $ fromIntegral addr
+          Just (SimpleValue (ValueInt _ _ addr)) -> Just . SimpleValue . ValueAccount $ fromIntegral addr
           Just (a@(SimpleValue (ValueAccount _))) -> Just a
           o -> error $ "decodeCacheValue': Expected ValueInt or ValueAccount, but got: " ++ show o
   TypeContract _ ->
     let v = decodeCacheValue' typeDefs' cache position value $ SimpleType $ TypeInt False (Just 20)
      in case v of
-          Just (SimpleValue (ValueInt _ _ addr)) -> Just . ValueContract . NamedAccount $ fromIntegral addr
+          Just (SimpleValue (ValueInt _ _ addr)) -> Just . ValueContract $ fromIntegral addr
           Just (c@(ValueContract _)) -> Just c
           o -> error $ "decodeCacheValue': Expected ValueInt or ValueContract, but got: " ++ show o
   SimpleType (TypeBytes (Just n)) -> Just $ decodeCacheByteString cache offset byte (fromInteger n) value
@@ -415,7 +414,7 @@ decodeValue' typeDefs'@TypeDefs {..} storage ofs cnt len position@Storage.Positi
     let addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType $ TypeInt False (Just 20) of
           Just (SimpleValue (ValueInt _ _ addr')) -> addr'
           _ -> error "decodeValue': Expected ValueInt 3" -- ++ show v
-     in Just . SimpleValue . ValueAccount . NamedAccount $ fromIntegral addr
+     in Just . SimpleValue . ValueAccount $ fromIntegral addr
   TypeContract _ ->
     let addr = case decodeValue' typeDefs' storage ofs cnt len position $ SimpleType TypeAccount of
           Just (SimpleValue (ValueAccount addr')) -> addr'
@@ -569,8 +568,8 @@ encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
   SimpleValue (ValueDecimal v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  SimpleValue (ValueAccount (NamedAccount a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  ValueContract (NamedAccount a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  SimpleValue (ValueAccount a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  ValueContract a -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueString v) -> encodeValue' typeDefs' position ty . SimpleValue . ValueBytes Nothing $ Text.encodeUtf8 v

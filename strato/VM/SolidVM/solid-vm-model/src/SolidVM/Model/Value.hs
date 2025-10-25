@@ -21,9 +21,8 @@ where
 
 import Blockchain.Data.RLP
 import Blockchain.SolidVM.Exception
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
-import Control.Lens ((.~), (^.))
+import Control.Lens ((^.))
 import Control.Monad (forM, when)
 import Control.Monad.IO.Class
 import Data.ByteString (ByteString)
@@ -76,7 +75,7 @@ data Value
   | SDecimal Decimal
   | SString String
   | SBool Bool
-  | SAccount NamedAccount Bool --isPayable
+  | SAccount Address Bool --isPayable
   | SUserDefined SolidString SolidString Value
   | -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
     SEnum SolidString
@@ -91,9 +90,9 @@ data Value
   | SSetterGetter String (Maybe Value)
   | SContractDef SolidString
   | -- | SBuiltinTypeF SolidString SolidString CodeCollection
-    SContractItem NamedAccount SolidString
-  | SContract SolidString NamedAccount
-  | SContractFunction NamedAccount SolidString -- address, functionName
+    SContractItem Address SolidString
+  | SContract SolidString Address
+  | SContractFunction Address SolidString -- address, functionName
   | SPush Value (Maybe Variable) -- The array function
   | -- | SSend Value (Maybe Variable)
     -- | STransfer Value (Maybe Variable)
@@ -141,15 +140,15 @@ instance Eq Value where
   SReference{} == (SBool b2) = False == b2
   (SBool b1) == SReference{} = b1 == False
   (SAccount a1 b1) == (SAccount a2 b2) = (a1 == a2 && b1 == b2)
-  SNULL == (SAccount a2 b2) = (NamedAccount 0x0 == a2 && False == b2)
-  (SAccount a1 b1) == SNULL = (a1 == NamedAccount 0x0 && b1 == False)
-  SReference{} == (SAccount a2 b2) = (NamedAccount 0x0 == a2 && False == b2)
-  (SAccount a1 b1) == SReference{} = (a1 == NamedAccount 0x0 && b1 == False)
+  SNULL == (SAccount a2 b2) = (0x0 == a2 && False == b2)
+  (SAccount a1 b1) == SNULL = (a1 == 0x0 && b1 == False)
+  SReference{} == (SAccount a2 b2) = (0x0 == a2 && False == b2)
+  (SAccount a1 b1) == SReference{} = (a1 == 0x0 && b1 == False)
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
-  SNULL == (SContract c2 a2) = "" == c2 && NamedAccount 0x0 == a2
-  (SContract c1 a1) == SNULL = c1 == "" && a1 == NamedAccount 0x0
-  SReference{} == (SContract c2 a2) = "" == c2 && NamedAccount 0x0 == a2
-  (SContract c1 a1) == SReference{} = c1 == "" && a1 == NamedAccount 0x0
+  SNULL == (SContract c2 a2) = "" == c2 && 0x0 == a2
+  (SContract c1 a1) == SNULL = c1 == "" && a1 == 0x0
+  SReference{} == (SContract c2 a2) = "" == c2 && 0x0 == a2
+  (SContract c1 a1) == SReference{} = c1 == "" && a1 == 0x0
   (SEnumVal t1 _ n1) == (SEnumVal t2 _ n2) = t1 == t2 && n1 == n2
   SNULL == (SEnumVal _ _ n2) = 0 == n2
   (SEnumVal _ _ n1) == SNULL = n1 == 0
@@ -180,10 +179,10 @@ instance Ord Value where
   compare SReference{} (SBool b2) = compare False b2
   compare (SBool b1) SReference{} = compare b1 False
   compare (SAccount a1 _) (SAccount a2 _) = compare a1 a2
-  compare SNULL (SAccount a2 _) = compare (NamedAccount 0x0) a2
-  compare (SAccount a1 _) SNULL = compare a1 (NamedAccount 0x0)
-  compare SReference{} (SAccount a2 _) = compare (NamedAccount 0x0) a2
-  compare (SAccount a1 _) SReference{} = compare a1 (NamedAccount 0x0)
+  compare SNULL (SAccount a2 _) = compare 0x0 a2
+  compare (SAccount a1 _) SNULL = compare a1 0x0
+  compare SReference{} (SAccount a2 _) = compare 0x0 a2
+  compare (SAccount a1 _) SReference{} = compare a1 0x0
   compare x y = todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where
@@ -223,12 +222,12 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 -- it is determined that their expected type is
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger {} n = SInteger n
-coerceFromInt _ (SAccount a b) n = (SAccount $ (namedAccountAddress .~ fromIntegral n) a) b
+coerceFromInt _ (SAccount _ b) n = SAccount (fromIntegral n) b
 coerceFromInt _ SBool {} n = SBool $ n /= 0
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
 coerceFromInt _ SDecimal {} n = SDecimal $ Decimal 0 n
-coerceFromInt _ (SContract c a) n = SContract c $ (namedAccountAddress .~ fromIntegral n) a
+coerceFromInt _ (SContract c _) n = SContract c $ fromIntegral n
 coerceFromInt ct (SEnumVal tipe _ _) n' =
   fromMaybe (typeError "missing enum val" (tipe, n')) $ do
     let n = fromIntegral n'
@@ -280,13 +279,13 @@ defaultValue _ (SVMType.Array _ _) = SArray V.empty
 defaultValue _ (SVMType.Mapping _ _ _) = SMap M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
-defaultValue _ (SVMType.Address _) = (SAccount $ NamedAccount (Address 0)) False
-defaultValue _ (SVMType.Account _) = (SAccount $ NamedAccount (Address 0)) False
+defaultValue _ (SVMType.Address _) = (SAccount 0) False
+defaultValue _ (SVMType.Account _) = (SAccount 0) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue _ SVMType.Decimal = SDecimal 0
 defaultValue ctract (SVMType.UnknownLabel name _) =
-  fromMaybe (SContract name $ NamedAccount 0x0) $
+  fromMaybe (SContract name 0x0) $
     asum
       [ do
           ns <- M.lookup name $ CC._enums ctract
@@ -311,8 +310,8 @@ createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
 createDefaultValue _ _ (SVMType.Mapping _ _ _) = return $ SMap M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
-createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount $ NamedAccount (Address 0)) False
-createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount $ NamedAccount (Address 0)) False
+createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount 0) False
+createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount 0) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
@@ -336,7 +335,7 @@ createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
               itemVar <- createVar itemVal
               return (n, itemVar)
           return $ SStruct name $ M.fromList items
-        _ -> return $ SContract name (NamedAccount 0x0)
+        _ -> return $ SContract name 0x0
 createDefaultValue _ _ x = todo "createDefaultValue" x
 
 {-

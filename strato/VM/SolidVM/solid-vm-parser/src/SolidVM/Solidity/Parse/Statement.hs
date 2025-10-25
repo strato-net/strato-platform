@@ -2,7 +2,7 @@
 
 module SolidVM.Solidity.Parse.Statement where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Monad
 import Data.Decimal
 import Data.Foldable (asum, foldl')
@@ -481,7 +481,7 @@ parseExternalCallArgs = do
     return (name, args)
   return (fname, args)
 
-accountLiteral :: SolidityParser NamedAccount
+accountLiteral :: SolidityParser Address
 accountLiteral = do
   void $ char '<'
   addr <- many1 hexDigit
@@ -514,7 +514,7 @@ literal =
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of
-          Just addr -> AccountLiteral a (NamedAccount addr)
+          Just addr -> AccountLiteral a addr
           _ -> StringLiteral a str,
       uncurry AccountLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),

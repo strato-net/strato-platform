@@ -10,7 +10,6 @@ module Blockchain.GenesisBlocks.Contracts.GovernanceV2 (
 
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.TH
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
@@ -52,10 +51,10 @@ insertMercataGovernanceContract owner validators admins gi =
         0x100
         0
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
-        $ [ ("._owner", BAccount $ NamedAccount owner)
+        $ [ ("._owner", BAccount owner)
           , (".validators.length", BInteger . toInteger $ length validators)
           , (".admins.length", BInteger . toInteger $ length admins)
-          , (".logicContract", BAccount $ NamedAccount govLogicAddr)
+          , (".logicContract", BAccount govLogicAddr)
           ]
           ++ concatMap
             ( \case
@@ -64,7 +63,7 @@ insertMercataGovernanceContract owner validators admins gi =
                     , BInteger $ i + 1
                     )
                   , ( fromString $ ".validators[" ++ show i ++ "]"
-                    , BAccount (NamedAccount c)
+                    , BAccount c
                     )
                   ]
             )
@@ -76,7 +75,7 @@ insertMercataGovernanceContract owner validators admins gi =
                     , BInteger $ i + 1
                     )
                   , ( fromString $ ".admins[" ++ show i ++ "]"
-                    , BAccount (NamedAccount c)
+                    , BAccount c
                     )
                   ]
             )

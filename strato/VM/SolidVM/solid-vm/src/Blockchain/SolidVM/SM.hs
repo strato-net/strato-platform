@@ -72,7 +72,6 @@ import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -671,7 +670,7 @@ getVariableOfName name = do
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (NamedAccount $ currentAddress currentCallInfo) False
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (currentAddress currentCallInfo) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 

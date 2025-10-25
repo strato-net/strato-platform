@@ -42,7 +42,6 @@ import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -336,7 +335,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           =<< lookupSolidDiff ".:creator" storageDiff
 
         mkOriginAddress =
-            (\case BAccount (NamedAccount a') -> T.pack $ show a'; _ -> "")
+            (\case BAccount a' -> T.pack $ show a'; _ -> "")
           . maybe BDefault id
           $ lookupSolidDiff ".:originAddress" storageDiff
 

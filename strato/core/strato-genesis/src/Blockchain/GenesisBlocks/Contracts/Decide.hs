@@ -9,7 +9,6 @@ where
 
 import           Blockchain.Data.GenesisInfo
 import           Blockchain.GenesisBlocks.Contracts.TH
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import           Blockchain.Strato.Model.CodePtr
 import qualified Blockchain.Strato.Model.Keccak256 as KECCAK256
@@ -46,10 +45,10 @@ insertDecideContract gi =
         0
         (SolidVMCode "DeciderState" $ KECCAK256.hash dec1deStateContract)
         [ (".:creator", BString $ encodeUtf8 "BlockApps"),
-          (".:creatorAddress", BAccount $ NamedAccount blockappsAddress),
-          (".:originAddress", BAccount $ NamedAccount mercataAddress),
-          (".owner", BAccount $ NamedAccount blockappsAddress),
-          (".currentFeeContract", BAccount $ NamedAccount 0xDEC1DE02)
+          (".:creatorAddress", BAccount blockappsAddress),
+          (".:originAddress", BAccount mercataAddress),
+          (".owner", BAccount blockappsAddress),
+          (".currentFeeContract", BAccount 0xDEC1DE02)
         ]
 
 dec1deContract :: ByteString

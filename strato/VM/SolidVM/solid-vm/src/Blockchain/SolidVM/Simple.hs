@@ -36,7 +36,6 @@ module Blockchain.SolidVM.Simple
     module Blockchain.Data.DataDefs,
     module Blockchain.Data.ExecResults,
     module Blockchain.Strato.Model.ExtendedWord,
-    module Blockchain.Strato.Model.Account,
     module Blockchain.Strato.Model.Gas,
     module Blockchain.Strato.Model.Keccak256,
     module Blockchain.VM.SolidException,
@@ -50,7 +49,6 @@ import Blockchain.Data.ExecResults
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM as SolidVM
 import qualified Blockchain.SolidVM.Environment as Env
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
