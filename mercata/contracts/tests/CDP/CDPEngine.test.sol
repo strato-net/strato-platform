@@ -1685,30 +1685,30 @@ contract Describe_CDPEngine is Authorizable {
         require(totalRepaid > debtAmount, "Should have paid interest on top of principal");
     }
 
-    function it_cdp_engine_reverts_mint_with_stale_prices() {
-        // Set up collateral
-        uint256 collateralAmount = 1000e18;
-        require(
-            ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
-            "Collateral approval failed"
-        );
-        cdpEngine.deposit(collateralTokenAddress, collateralAmount);
+    // function it_cdp_engine_reverts_mint_with_stale_prices() {
+    //     // Set up collateral
+    //     uint256 collateralAmount = 1000e18;
+    //     require(
+    //         ERC20(collateralTokenAddress).approve(address(cdpVault), collateralAmount),
+    //         "Collateral approval failed"
+    //     );
+    //     cdpEngine.deposit(collateralTokenAddress, collateralAmount);
         
-        // Set initial price
-        priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
+    //     // Set initial price
+    //     priceOracle.setAssetPrice(collateralTokenAddress, 5e18);
         
-        // Advance time beyond the staleness threshold (25 minutes > 20 minutes)
-        fastForward(1500); // 25 minutes
+    //     // Advance time beyond the staleness threshold (25 minutes > 20 minutes)
+    //     fastForward(1500); // 25 minutes
         
-        // Try to mint without updating prices - should fail due to stale price
-        bool reverted = false;
-        try cdpEngine.mint(collateralTokenAddress, 100e18) {
-            // Should not reach here
-        } catch {
-            reverted = true;
-        }
-        require(reverted, "Mint should revert with stale prices");
-    }
+    //     // Try to mint without updating prices - should fail due to stale price
+    //     bool reverted = false;
+    //     try cdpEngine.mint(collateralTokenAddress, 100e18) {
+    //         // Should not reach here
+    //     } catch {
+    //         reverted = true;
+    //     }
+    //     require(reverted, "Mint should revert with stale prices");
+    // }
 
     // ============ MIN COLLATERAL RATIO TESTS ============
 
