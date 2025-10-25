@@ -34,6 +34,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8, decodeUtf8', encodeUtf8)
 import qualified Database.Esqueleto.Internal.Internal as E
+import Database.Persist.Sql
 import Foreign.Ptr
 import Foreign.Storable
 import GHC.Generics
@@ -42,7 +43,6 @@ import System.IO.Unsafe
 import Text.Format
 import Text.Read
 import Text.Regex.TDFA
-import Database.Persist.Sql
 import Servant
 
 data BasicValue
