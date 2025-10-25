@@ -12,8 +12,8 @@ ssh mercata-testnet-buildtest "cd /home/ec2-user/bootstrap-docker-symlink && sud
 ssh mercata-testnet-node-app "cd /datadrive/testnet/strato-getting-started && sudo ./strato-run.sh"
 
 # Restarting oracles
-ssh mercata-testnet-oracle1 "cd /home/ec2-user/symlink-to-oracle && pm2 delete oracle && pm2 start dist/index.js --name oracle"
-ssh mercata-testnet-oracle2 "pm2 delete oracle"
+ssh mercata-testnet-oracle1 "cd /home/ec2-user/symlink-to-oracle && pm2 delete oracle ; pm2 start dist/index.js --name oracle"
+ssh mercata-testnet-oracle2 "pm2 delete oracle || true"
 echo "Network and one oracle is up. Now sleeping 7.5 minutes to start oracle2..."
 sleep 450
 ssh mercata-testnet-oracle2 "cd /home/ec2-user/symlink-to-oracle && pm2 start dist/index.js --name oracle"
