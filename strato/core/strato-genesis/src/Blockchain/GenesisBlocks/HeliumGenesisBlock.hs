@@ -666,7 +666,6 @@ lendingPool = SolidVMContractWithStorage lendingPoolAddress 0 proxy $ toPaths $ 
   , (".debtCeilingUSD", BInteger 0)
   , (".badDebt", BInteger 0)
   , (".safetyShareBps", BInteger 1000)
-  , (".priceMaxAge", BInteger 1200)
   ] ++
   [ (".assetConfigs[" <> addrBS usdstAddress <> "].ltv", BInteger 7500)
   , (".assetConfigs[" <> addrBS usdstAddress <> "].interestRate", BInteger 500)
