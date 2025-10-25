@@ -272,7 +272,7 @@ fi
 # WAIT FOR STRATO TO RUN
 started=$(date +%s)
 timeout=180
-hc_container=$(${docker_compose} ps | grep "${CNAME_SEP}nginx${CNAME_SEP}" | awk '{print $1}')
+hc_container=$(${docker_compose} ps | grep "\\${CNAME_SEP}nginx${CNAME_SEP}" | awk '{print $1}')
 printf "Waiting for STRATO to rise and shine..."
 i=0
 while ! [[ -n $(docker ps -q -f name=${hc_container} -f health=healthy) ]];  do
