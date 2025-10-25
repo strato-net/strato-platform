@@ -32,6 +32,7 @@ import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
@@ -148,9 +149,10 @@ genesisInfoToGenesisBlock ::
     HasMemStorageDB m,
     (Address `A.Alters` AddressState) m
   ) =>
+  [Validator] ->
   GenesisInfo ->
   m ([(GI.AddressInfo, GI.CodeInfo)], Block)
-genesisInfoToGenesisBlock gi = do
+genesisInfoToGenesisBlock validators gi = do
   let codes = GI.codeInfo gi
   let accounts = GI.addressInfo gi
   initializeCodeDB "SolidVM" codes
@@ -158,22 +160,20 @@ genesisInfoToGenesisBlock gi = do
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
   let sourceInfo = zipSourceInfo accounts codes
       bData =
-        BlockHeader
+        BlockHeaderV2
           { parentHash = GI.parentHash gi,
-            ommersHash = GI.unclesHash gi,
-            beneficiary = 0x0,
             stateRoot = sr,
-            transactionsRoot = GI.transactionRoot gi,
+            transactionsRoot = GI.transactionsRoot gi,
             receiptsRoot = GI.receiptsRoot gi,
             logsBloom = GI.logBloom gi,
-            difficulty = GI.difficulty gi,
             number = GI.number gi,
-            gasLimit = GI.gasLimit gi,
-            gasUsed = GI.gasUsed gi,
             timestamp = GI.timestamp gi,
             extraData = i2bs_unsized $ GI.extraData gi,
-            mixHash = GI.mixHash gi,
-            nonce = GI.nonce gi
+            currentValidators=validators,
+            newValidators=[],
+            removedValidators=[],
+            proposalSignature=Nothing,
+            signatures=[]
           }
   return
     ( sourceInfo,

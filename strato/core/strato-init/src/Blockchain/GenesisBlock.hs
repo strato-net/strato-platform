@@ -91,7 +91,7 @@ getGenesisBlockAndPopulateInitialMPs = do
   genesisInfo <- GI.getGenesisInfo
   let validators = readValidatorsFromGenesisInfo genesisInfo
 
-  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
+  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock validators genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
