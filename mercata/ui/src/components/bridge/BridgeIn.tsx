@@ -76,12 +76,15 @@ const BridgeIn: React.FC = () => {
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
-    loading: boolean 
+    loading: boolean;
   }>({ 
     amount: "", 
     amountWei: 0n,
-    loading: false 
+    loading: false
   });
+  
+  // State for token permission status
+  const [isTokenPermitted, setIsTokenPermitted] = useState(true);
 
   // ============================================
   // Derived State & Computed Values
@@ -162,15 +165,17 @@ const BridgeIn: React.FC = () => {
       setMinDepositInfo({ 
         amount: formattedMinAmount, 
         amountWei: minAmountWei,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(tokenConfig.isPermitted);
     } catch (error) {
       console.error("Error fetching min deposit amount:", error);
       setMinDepositInfo({ 
         amount: "0", 
         amountWei: 0n,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(true);
     }
   };
 
@@ -733,7 +738,8 @@ const BridgeIn: React.FC = () => {
             !amount ||
             !selectedToken ||
             !isConnected ||
-            !isCorrectNetwork
+            !isCorrectNetwork ||
+            !isTokenPermitted
           }
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
@@ -763,6 +769,14 @@ const BridgeIn: React.FC = () => {
             selectedToken &&
             amount &&
             isCorrectNetwork &&
+            !isTokenPermitted &&
+            "Token Not Permitted"}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            amount &&
+            isCorrectNetwork &&
+            isTokenPermitted &&
             "Bridge Assets"}
         </Button>
       </div>
