@@ -84,7 +84,8 @@ export const DEPOSIT_ROUTER_ABI = [
     inputs: [{ name: 'token', type: 'address' }],
     name: 'tokenConfig',
     outputs: [
-      { name: 'min', type: 'uint96' }
+      { name: 'min', type: 'uint96' },
+      { name: 'isPermitted', type: 'bool' }
     ],
     stateMutability: 'view',
     type: 'function'

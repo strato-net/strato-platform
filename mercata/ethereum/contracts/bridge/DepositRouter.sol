@@ -28,7 +28,6 @@ contract DepositRouter is
     error SameAddressProposed();
     error SweepEthFailed();
     error NotPermitted();
-    error InvalidPermissions();
 
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
@@ -43,6 +42,7 @@ contract DepositRouter is
     // ============ Structs ============
     struct TokenConfig {
         uint96 min;
+        bool isPermitted;
     }
 
     // ============ Events ============
@@ -53,7 +53,11 @@ contract DepositRouter is
         address indexed stratoAddress,
         uint96 depositId
     );
-    event TokenConfigUpdated(address indexed token, uint256 minAmount);
+    event TokenConfigUpdated(
+        address indexed token,
+        uint256 minAmount,
+        bool isPermitted
+    );
     event GnosisSafeUpdated(address indexed oldSafe, address indexed newSafe);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -98,6 +102,7 @@ contract DepositRouter is
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) revert BelowMinimum();
+        if (!c.isPermitted) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -144,6 +149,7 @@ contract DepositRouter is
 
         TokenConfig storage c = tokenConfig[address(0)];
         if (msg.value < c.min) revert BelowMinimum();
+        if (!c.isPermitted) revert NotPermitted();
 
         address safe = gnosisSafe;
         unchecked {
@@ -169,22 +175,33 @@ contract DepositRouter is
         TokenConfig storage c = tokenConfig[token];
         if (c.min == minAmount) return;
         c.min = minAmount;
-        emit TokenConfigUpdated(token, minAmount);
+        emit TokenConfigUpdated(token, minAmount, c.isPermitted);
+    }
+
+    function setPermitted(address token, bool isPermitted) external onlyOwner {
+        TokenConfig storage c = tokenConfig[token];
+        if (c.isPermitted == isPermitted) return;
+        c.isPermitted = isPermitted;
+        emit TokenConfigUpdated(token, c.min, isPermitted);
     }
 
     function batchUpdateTokens(
         address[] calldata tokens,
-        uint96[] calldata minAmounts
+        uint96[] calldata minAmounts,
+        bool[] calldata isPermitteds
     ) external onlyOwner {
         uint256 len = tokens.length;
         if (len != minAmounts.length) revert ArrayLengthMismatch();
+        if (len != isPermitteds.length) revert ArrayLengthMismatch();
 
         for (uint256 i; i < len; ) {
             address t = tokens[i];
             uint96 m = minAmounts[i];
+            bool p = isPermitteds[i];
             TokenConfig storage c = tokenConfig[t];
             c.min = m;
-            emit TokenConfigUpdated(t, m);
+            c.isPermitted = p;
+            emit TokenConfigUpdated(t, m, p);
             unchecked {
                 ++i;
             }
@@ -215,11 +232,12 @@ contract DepositRouter is
 
         TokenConfig storage c = tokenConfig[token];
         if (amount < c.min) return false;
+        if (!c.isPermitted) return false;
         return true;
     }
 
     function version() external pure virtual returns (string memory) {
-        return "1.0.0";
+        return "2.0.0";
     }
 
     function _authorizeUpgrade(
