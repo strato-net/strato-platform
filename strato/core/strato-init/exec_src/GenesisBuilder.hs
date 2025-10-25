@@ -14,6 +14,7 @@ import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
+import Data.Default
 import Data.Foldable (foldlM)
 import System.Console.GetOpt
 import System.Environment
@@ -89,11 +90,7 @@ options =
       ['i']
       ["input"]
       ( ReqArg
-          ( \s opts -> do
-              inputStr <- readFile s
-              let eInput = Ae.eitherDecodeStrict (C8.pack inputStr) :: Either String GenesisInfo
-                  !input = either error id eInput
-              return opts {optInput = input}
+          ( \_ opts -> return opts
           )
           "Input Genesis Info"
       )
@@ -131,6 +128,6 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optValidators optAdmins optInput
+  let gi' = buildGenesisInfo optFaucets optValidators optAdmins def
   B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName

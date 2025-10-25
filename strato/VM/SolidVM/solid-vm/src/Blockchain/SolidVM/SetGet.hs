@@ -54,7 +54,7 @@ fromBasic = \case
     Left _ -> SString $ BC.unpack s
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
-  MS.BAccount a -> SAccount a False
+  MS.BAddress a -> SAddress a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
   MS.BDefault -> SNULL
@@ -65,7 +65,7 @@ toBasic = \case
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
-  SAccount a _ -> Just $ MS.BAccount a
+  SAddress a _ -> Just $ MS.BAddress a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
@@ -109,7 +109,7 @@ setVal (STuple dstVector) (STuple srcVector) =
         return (dstItem, srcItemVal)
       forM_ zipped' $ \(dstItem, srcItemVal) -> do
         setVar dstItem srcItemVal
-setVal dst@(SReference (AccountPath addr path)) src = do
+setVal dst@(SReference (AddressPath addr path)) src = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid write during read-only access" $ "src: " ++ show src ++ ", dst: " ++ show dst
   let basicSrc = case src of
@@ -129,7 +129,7 @@ weakGetVar (Constant c) = return c
 weakGetVar (Variable v) = liftIO $ readIORef v
 --fromm variable to value
 getVar :: MonadSM m => Variable -> m Value
-getVar (Constant (SReference addressedPath@(AccountPath addr key))) = do
+getVar (Constant (SReference addressedPath@(AddressPath addr key))) = do
   theValue <- getSolidStorageKeyVal' addr key
   case theValue of
     MS.BDefault -> pure $ SReference addressedPath
@@ -206,7 +206,7 @@ getBool p = do
     _ -> typeError "getBool" (p, v)
 
 deleteVar :: MonadSM m => Variable -> m ()
-deleteVar (Constant (SReference (AccountPath addr path))) = do
+deleteVar (Constant (SReference (AddressPath addr path))) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
   markDiffForAction addr path $ MS.BDefault
@@ -222,7 +222,7 @@ showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) =
   return $
     printf "%s.%s (= %x)" enumName valName num
-showSM (SAccount a _) = return $ show a
+showSM (SAddress a _) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
@@ -270,7 +270,7 @@ jsonSM = go False
     go b (SString v) = return $ bool id show b v
     go _ (SBool v) = return $ bool "false" "true" v
     go _ (SEnumVal _ _ num) = return $ show num
-    go b (SAccount a _) = return . bool id show b $ show a
+    go b (SAddress a _) = return . bool id show b $ show a
     go _ (STuple v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)

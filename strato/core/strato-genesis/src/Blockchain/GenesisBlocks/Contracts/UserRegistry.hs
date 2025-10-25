@@ -18,12 +18,12 @@ import Data.Text.Encoding
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
   gi
-    { genesisInfoAccountInfo = initialAccounts ++ [registryAcct],
-      genesisInfoCodeInfo = initialCode ++ [CodeInfo (decodeUtf8 userRegistryContract) (Just "UserRegistry")]
+    { addressInfo = initialAccounts ++ [registryAcct],
+      codeInfo = initialCode ++ [CodeInfo (decodeUtf8 userRegistryContract) (Just "UserRegistry")]
     }
   where
-    initialAccounts = genesisInfoAccountInfo gi
-    initialCode = genesisInfoCodeInfo gi
+    initialAccounts = addressInfo gi
+    initialCode = codeInfo gi
 
     registryAcct =
       SolidVMContractWithStorage

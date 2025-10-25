@@ -397,6 +397,6 @@ optimizeExpression e@BoolLiteral{}       _ = pure e
 optimizeExpression e@NumberLiteral{}     _ = pure e
 optimizeExpression e@DecimalLiteral{}    _ = pure e
 optimizeExpression e@StringLiteral{}     _ = pure e
-optimizeExpression e@AccountLiteral{}    _ = pure e
+optimizeExpression e@AddressLiteral{}    _ = pure e
 optimizeExpression e@HexaLiteral{}       _ = pure e
 optimizeExpression e@InlineBoundsCheck{} _ = pure e

@@ -1237,7 +1237,6 @@ getSolidityType _ (Xabi.String _) = Right . SimpleType $ TypeString
 getSolidityType _ (Xabi.Bytes _ b) = Right . SimpleType . TypeBytes $ fmap toInteger b
 getSolidityType _ Xabi.Bool = Right . SimpleType $ TypeBool
 getSolidityType _ Xabi.Address = Right . SimpleType $ TypeAddress
-getSolidityType _ Xabi.Account = Right . SimpleType $ TypeAccount
 getSolidityType _ (Xabi.Struct _ name) = Right $ TypeStruct name
 getSolidityType _ (Xabi.Enum _ name _) = Right $ TypeEnum name
 getSolidityType _ (Xabi.Contract name) = Right $ TypeContract name

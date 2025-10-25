@@ -28,7 +28,8 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockDB
 import Blockchain.Data.Extra
 import Blockchain.Data.GenesisBlock
-import Blockchain.Data.GenesisInfo
+import Blockchain.Data.GenesisInfo (GenesisInfo)
+import qualified Blockchain.Data.GenesisInfo as GI
 import qualified Blockchain.Data.TXOrigin as Origin
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
@@ -42,7 +43,6 @@ import qualified Blockchain.Strato.Indexer.Kafka as IdxKafka
 import qualified Blockchain.Strato.Indexer.Model as IdxModel
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Account
 import qualified Blockchain.Strato.Model.Address as Ad
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
@@ -86,12 +86,12 @@ getGenesisBlockAndPopulateInitialMPs ::
     HasMemStorageDB m,
     (Ad.Address `Alters` AddressState) m
   ) =>
-  m ([Validator], GenesisInfo, ([(AccountInfo, CodeInfo)], Block))
+  m ([Validator], GenesisInfo, ([(GI.AddressInfo, GI.CodeInfo)], Block))
 getGenesisBlockAndPopulateInitialMPs = do
-  genesisInfo <- getGenesisInfo
+  genesisInfo <- GI.getGenesisInfo
   let validators = readValidatorsFromGenesisInfo genesisInfo
 
-  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock genesisInfo
+  (validators, genesisInfo,) <$> genesisInfoToGenesisBlock validators genesisInfo
 
 initializeGenesisBlock ::
   ( HasCodeDB m,
@@ -137,7 +137,7 @@ initializeGenesisBlock = do
   $logInfoS "initgen" "best block info inserted"
   liftIO $ bootstrapIndexer obGB
   $logInfoS "initgen" "indexer has been bootstrapped"
-  let rewrite (_, CodeInfo src name) =
+  let rewrite (_, GI.CodeInfo src name) =
         ( hash $ T.encodeUtf8 src,
           Map.fromList $
             [("src", src)]
@@ -240,10 +240,11 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
   A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr
 
   -- Step 3: Address Processing - Iterate through all genesis account addresses
-  let addresses = acctInfoAddress <$> genesisInfoAccountInfo genesisInfo
-      events = genesisInfoEvents genesisInfo
-      delegatecalls = genesisInfoDelegatecalls genesisInfo
-  ccas <- fmap catMaybes . for (genesisInfoCodeInfo genesisInfo) $ \(CodeInfo src mName) -> for mName $ \name -> do
+  let addresses = GI.addrInfoAddress <$> GI.addressInfo genesisInfo
+      events = GI.events genesisInfo
+      delegatecalls = GI.delegatecalls genesisInfo
+
+  ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \name -> do
     let srcHash = hash $ T.encodeUtf8 src
         codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash
@@ -336,7 +337,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           =<< lookupSolidDiff ".:creator" storageDiff
 
         mkOriginAddress =
-            (\case BAccount (NamedAccount a' _) -> T.pack $ show a'; _ -> "")
+            (\case BAddress a' -> T.pack $ show a'; _ -> "")
           . maybe BDefault id
           $ lookupSolidDiff ".:originAddress" storageDiff
 

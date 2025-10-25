@@ -199,12 +199,6 @@ argValueToSimpleValue theType argVal = case theType of
         Just x -> return x
     ArgInt i -> Right . ValueAddress $ fromIntegral i
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string or an integer, but got " ++ show o
-  TypeAccount -> case argVal of
-    ArgString str ->
-      ValueAccount <$> case readMaybe (Text.unpack str) of
-        Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
-        Just x -> return x
-    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAccount to be a string, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o

@@ -17,7 +17,6 @@ where
 
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
-import Blockchain.Strato.Model.Account (unspecifiedChain)
 import Control.DeepSeq
 import Control.Monad.Extra
 import Data.Bifunctor
@@ -38,8 +37,7 @@ import Text.Printf
 import Text.Read
 
 decodeSolidVMValues :: [(StoragePath, BasicValue)] -> [(T.Text, SolidityValue)]
-decodeSolidVMValues hxs = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
-  pathValues <- mapM (bimapM return return) hxs
+decodeSolidVMValues pathValues = either (error . printf "decodeSolidVMValues: %s" . show) id $ do
   totalStorage <- bimap show HM.toList $ synthesize pathValues
   mapMaybeM (bimapValue bsToText) totalStorage
 
@@ -79,7 +77,6 @@ valueToSolidityValue = \case
     ValueInt _ _ n -> fromShowable n
     ValueDecimal n -> Right . Just $ SolidityValueAsString $ decodeUtf8 n
     ValueAddress a -> fromShowable a
-    ValueAccount a -> fromShowable a
     ValueString s -> fromText s
   ValueEnum _ ev _ -> fromText ev
   ValueArraySentinel {} -> fromText ""
@@ -102,7 +99,6 @@ valueToSolidityValue = \case
       ValueInt _ _ n -> Right . T.pack . show $ n
       ValueDecimal n -> Right . T.pack . show $ n
       ValueAddress a -> Right . T.pack . show $ a
-      ValueAccount a -> Right . T.pack . show $ a
       ValueString t -> Right t
       -- The collapse of bytes and str to a single types means that selecting an encoding
       -- for keys is not obvious. bytestrings may contain non UTF8 text, and at the same time
@@ -186,7 +182,7 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
-  BAccount a | a == unspecifiedChain 0x0 -> ValueArraySentinel 0
+  BAddress a | a == 0x0 -> ValueArraySentinel 0
   BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
@@ -221,7 +217,7 @@ fromBasic = \case
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
   BDecimal v -> SimpleValue $! ValueDecimal v
-  BAccount a -> SimpleValue $! ValueAccount a
+  BAddress a -> SimpleValue $! ValueAddress a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
   BDefault -> SimpleValue $ ValueAddress 0x0

@@ -75,7 +75,6 @@ import qualified Blockchain.Slipstream.Events               as E
 import           Blockchain.Slipstream.Options
 import           Blockchain.Slipstream.QueryFormatHelper
 import           Blockchain.Slipstream.SolidityValue
-import           Blockchain.Strato.Model.Account
 import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
@@ -1079,7 +1078,6 @@ solidityTypeToSQLType _ _ _ SVMType.Bytes{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.UserDefined{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Decimal = Just SqlDecimal
 solidityTypeToSQLType _ _ _ SVMType.Address{} = Just SqlText
-solidityTypeToSQLType _ _ _ SVMType.Account{} = Just SqlText
 solidityTypeToSQLType isEvent _ _ SVMType.Array{} = if isEvent then Just SqlJsonb else Nothing
 solidityTypeToSQLType _ _ _ SVMType.Mapping{} = Nothing -- Just SqlJsonb
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc
@@ -1107,19 +1105,15 @@ valueToSQLText' _ (SimpleValue (ValueString s)) = Just s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) =
-  if fromIntegral addr == (0 :: Integer)
-    then Just ""
-    else Just . T.pack $ show acct
 valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
   case decodeUtf8' bytes of
     Left _ -> decodeUtf8 $ Base16.encode bytes
     Right x -> x
 valueToSQLText' _ (ValueEnum _ _ index) = Just . T.pack $ show index
-valueToSQLText' _ (ValueContract acct@(NamedAccount (Address addr) _)) =
-  if fromIntegral addr == (0 :: Integer)
+valueToSQLText' _ (ValueContract addr) =
+  if addr == 0
     then Just ""
-    else Just . T.pack $ show acct
+    else Just . T.pack $ show addr
 valueToSQLText' _ ValueFunction{} = Nothing
 valueToSQLText' z (ValueMapping m) = Just
   . decodeUtf8

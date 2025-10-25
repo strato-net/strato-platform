@@ -72,7 +72,6 @@ import qualified Blockchain.SolidVM.Environment as Env
 import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
@@ -665,13 +664,13 @@ getVariableOfName name = do
         if name `elem` M.keys (currentContract currentCallInfo ^. CC.storageDefs)
           then
             Just . Constant . SReference $
-              AccountPath
+              AddressPath
                 (currentAddress currentCallInfo)
                 (MS.singleton $ BC.pack $ labelToString name)
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (NamedAccount (currentAddress currentCallInfo) UnspecifiedChain) False
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 
@@ -833,14 +832,7 @@ getCurrentContract = do
   case cs of
     (currentCallInfo : _) -> return $ currentContract currentCallInfo
     _ -> internalError "getCurrentContract called with an empty stack" ()
-{-
-getCurrentAccount :: MonadSM m => m Account
-getCurrentAccount = do
-  cs <- Mod.get (Mod.Proxy @[CallInfo])
-  case cs of
-    (currentCallInfo : _) -> return $ currentAddress currentCallInfo
-    _ -> internalError "getCurrentAccount called with an empty stack" ()
--}
+    
 getCurrentAddress :: MonadSM m => m Address
 getCurrentAddress = do
   cs <- Mod.get (Mod.Proxy @[CallInfo])

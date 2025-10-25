@@ -2,7 +2,7 @@
 
 module SolidVM.Solidity.Parse.Statement where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Monad
 import Data.Decimal
 import Data.Foldable (asum, foldl')
@@ -410,7 +410,7 @@ primaryExpression = do
             pure $ NumberLiteral a val nu
         )
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
-    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
+    <|> (uncurry AddressLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -481,7 +481,7 @@ parseExternalCallArgs = do
     return (name, args)
   return (fname, args)
 
-accountLiteral :: SolidityParser NamedAccount
+accountLiteral :: SolidityParser Address
 accountLiteral = do
   void $ char '<'
   addr <- many1 hexDigit
@@ -514,9 +514,9 @@ literal =
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of
-          Just addr -> AccountLiteral a (NamedAccount addr UnspecifiedChain)
+          Just addr -> AddressLiteral a addr
           _ -> StringLiteral a str,
-      uncurry AccountLiteral <$> withPosition accountLiteral,
+      uncurry AddressLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),
       uncurry BoolLiteral <$> withPosition (True <$ reserved "true"),
       uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal),
