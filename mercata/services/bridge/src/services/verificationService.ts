@@ -27,8 +27,8 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: DepositInfo, chainId: number, safe: string) => {
-  if (deposit.externalChainId !== chainId.toString()) {
+const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) => {
+  if (Number(deposit.externalChainId) !== chainId) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
 

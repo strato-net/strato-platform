@@ -82,7 +82,6 @@ const createClient = (
     const headers = {
       Accept: "application/json",
       "Content-Type": "application/json",
-      "User-Agent": "Mercata-Bridge-Service/1.0.0",
       "X-Requested-With": "XMLHttpRequest",
       ...config?.headers,
     };

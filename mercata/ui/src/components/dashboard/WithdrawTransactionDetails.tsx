@@ -7,7 +7,7 @@ import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleC
 import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
 import { formatWeiAmount } from '@/utils/numberUtils';
-import { bridgeContractService } from '@/lib/bridge/contractService';
+import { ensureHexPrefix } from '@/utils/numberUtils';
 
 const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,9 +59,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = record?.WithdrawalInfo?.stratoSender
-          ? bridgeContractService.formatAddress(record.WithdrawalInfo.stratoSender)
-          : '';
+        const addr = ensureHexPrefix(record?.WithdrawalInfo?.stratoSender) || '';
         return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
       },
       width: 100,
@@ -73,9 +71,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
         const chainName = record?.WithdrawalInfo?.externalChainId
           ? getChainName(parseInt(record.WithdrawalInfo.externalChainId))
           : 'Unknown Chain';
-        const addr = record?.WithdrawalInfo?.externalRecipient
-          ? bridgeContractService.formatAddress(record.WithdrawalInfo.externalRecipient)
-          : '';
+        const addr = ensureHexPrefix(record?.WithdrawalInfo?.externalRecipient) || '';
         const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];

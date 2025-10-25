@@ -8,7 +8,7 @@ import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
 import { formatWeiAmount } from "@/utils/numberUtils";
-import { bridgeContractService } from "@/lib/bridge/contractService";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 
 const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,9 +64,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "from",
       render: (_: any, record: any) => {
         const chainName = record.externalChainId ? getChainName(record.externalChainId) : "Unknown Chain";
-        const addr = record?.DepositInfo?.externalSender
-          ? bridgeContractService.formatAddress(record.DepositInfo.externalSender)
-          : "";
+        const addr = ensureHexPrefix(record?.DepositInfo?.externalSender) || "";
         const chainIdStr = record?.externalChainId ? String(record.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
@@ -100,9 +98,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "to",
       render: (_: any, record: any) =>
         renderTruncatedAddressWithCopy(
-          record?.DepositInfo?.stratoRecipient
-            ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
-            : "",
+          ensureHexPrefix(record?.DepositInfo?.stratoRecipient) || "",
           handleCopyToClipboard
         ),
       width: 100,

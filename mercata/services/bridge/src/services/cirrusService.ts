@@ -49,12 +49,11 @@ export const getAssetInfo = async (
   stratoTokenAddress: string | string[],
 ): Promise<any | null | any[]> => {
   const isArray = Array.isArray(stratoTokenAddress);
-  const key = isArray ? `in.(${stratoTokenAddress.join(",")})` : `eq.${stratoTokenAddress}`;
   
   const data = await cirrus.get(`/${MERCATA_URL}-assets`, {
     params: {
-      key,
-      "value->>permissions": "gt.0",
+      "value->>stratoToken": isArray ? `in.(${stratoTokenAddress.join(",")})` : `eq.${stratoTokenAddress}`,
+      "value->>enabled": "eq.true",
       address: `eq.${config.bridge.address}`,
     },
   });
@@ -64,8 +63,8 @@ export const getAssetInfo = async (
   }
 
   return isArray 
-    ? data.map(item => ({ ...item.value, stratoToken: item.key }))
-    : data[0].value ? { ...data[0].value, stratoToken: data[0].key } : null;
+    ? data.map(item => ({ ...item.value, stratoToken: item.value.stratoToken }))
+    : data[0].value ? { ...data[0].value, stratoToken: data[0].value.stratoToken } : null;
 };
 
 // Get withdrawals by status (reusable function)
