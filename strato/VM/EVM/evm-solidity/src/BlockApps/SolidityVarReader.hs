@@ -569,8 +569,8 @@ encodeValue' typeDefs'@TypeDefs {} position@Storage.Position {..} ty = \case
   SimpleValue (ValueInt _ _ v) -> encodeInt offset byte v
   SimpleValue (ValueDecimal v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueAddress (Address a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  SimpleValue (ValueAccount (NamedAccount a _)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
-  ValueContract (NamedAccount a _) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  SimpleValue (ValueAccount (NamedAccount a)) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
+  ValueContract (NamedAccount a) -> encodeValue' typeDefs' position ty . SimpleValue $ ValueInt False (Just 20) $ toInteger a
   SimpleValue (ValueBytes (Just n) v) -> encodeByteString offset byte (fromInteger n) v
   SimpleValue (ValueBytes Nothing v) -> [(offset, byteStringToWord256 v)]
   SimpleValue (ValueString v) -> encodeValue' typeDefs' position ty . SimpleValue . ValueBytes Nothing $ Text.encodeUtf8 v

@@ -107,7 +107,7 @@ getContractByAccountsFilterParams aParams = runMaybeT $ do
             }
       logicContract <- MaybeT $ pure $
             case v of
-              BAccount (NamedAccount address' _) -> Just address'
+              BAccount (NamedAccount address') -> Just address'
               _ -> Nothing
       (AddressStateRef' l _) <- MaybeT
         . fmap listToMaybe

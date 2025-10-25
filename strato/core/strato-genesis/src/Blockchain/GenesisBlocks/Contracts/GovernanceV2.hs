@@ -52,10 +52,10 @@ insertMercataGovernanceContract owner validators admins gi =
         0x100
         0
         (SolidVMCode "Proxy" (KECCAK256.hash mercataGovernanceContract))
-        $ [ ("._owner", BAccount $ NamedAccount owner UnspecifiedChain)
+        $ [ ("._owner", BAccount $ NamedAccount owner)
           , (".validators.length", BInteger . toInteger $ length validators)
           , (".admins.length", BInteger . toInteger $ length admins)
-          , (".logicContract", BAccount $ NamedAccount govLogicAddr UnspecifiedChain)
+          , (".logicContract", BAccount $ NamedAccount govLogicAddr)
           ]
           ++ concatMap
             ( \case
@@ -64,7 +64,7 @@ insertMercataGovernanceContract owner validators admins gi =
                     , BInteger $ i + 1
                     )
                   , ( fromString $ ".validators[" ++ show i ++ "]"
-                    , BAccount (NamedAccount c UnspecifiedChain)
+                    , BAccount (NamedAccount c)
                     )
                   ]
             )
@@ -76,7 +76,7 @@ insertMercataGovernanceContract owner validators admins gi =
                     , BInteger $ i + 1
                     )
                   , ( fromString $ ".admins[" ++ show i ++ "]"
-                    , BAccount (NamedAccount c UnspecifiedChain)
+                    , BAccount (NamedAccount c)
                     )
                   ]
             )

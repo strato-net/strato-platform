@@ -514,7 +514,7 @@ literal =
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of
-          Just addr -> AccountLiteral a (NamedAccount addr UnspecifiedChain)
+          Just addr -> AccountLiteral a (NamedAccount addr)
           _ -> StringLiteral a str,
       uncurry AccountLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),

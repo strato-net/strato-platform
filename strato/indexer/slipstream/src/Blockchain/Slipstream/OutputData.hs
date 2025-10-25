@@ -1107,7 +1107,7 @@ valueToSQLText' _ (SimpleValue (ValueString s)) = Just s
 valueToSQLText' _ (SimpleValue (ValueAddress (Address 0))) = Just ""
 valueToSQLText' _ (SimpleValue (ValueAddress (Address addr))) =
   Just . T.pack $ printf "%040x" (fromIntegral addr :: Integer)
-valueToSQLText' _ (SimpleValue (ValueAccount acct@(NamedAccount (Address addr) _))) =
+valueToSQLText' _ (SimpleValue (ValueAccount acct@(NamedAccount (Address addr)))) =
   if fromIntegral addr == (0 :: Integer)
     then Just ""
     else Just . T.pack $ show acct
@@ -1116,7 +1116,7 @@ valueToSQLText' _ (SimpleValue (ValueBytes _ bytes)) = Just $
     Left _ -> decodeUtf8 $ Base16.encode bytes
     Right x -> x
 valueToSQLText' _ (ValueEnum _ _ index) = Just . T.pack $ show index
-valueToSQLText' _ (ValueContract acct@(NamedAccount (Address addr) _)) =
+valueToSQLText' _ (ValueContract acct@(NamedAccount (Address addr))) =
   if fromIntegral addr == (0 :: Integer)
     then Just ""
     else Just . T.pack $ show acct

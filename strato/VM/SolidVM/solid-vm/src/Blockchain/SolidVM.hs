@@ -81,7 +81,6 @@ import Data.Bool (bool)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
-import Data.Char as CHAR
 import Data.Decimal
 import Data.Foldable (for_)
 import Data.List
@@ -640,7 +639,7 @@ setCreator creator originAddress contract _ _ = do
     Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
 
   $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
-  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (NamedAccount creator MainChain))
+  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAccount (NamedAccount creator))
   let putCreatorField ctr = do
         $logDebugS "setCreator/versioning" . T.pack $ "setting the creator as " ++ (show ctr)
         putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack ctr)
@@ -650,7 +649,7 @@ setCreator creator originAddress contract _ _ = do
     else do
       $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty creator field"
   
-  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress MainChain)
+  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAccount $ NamedAccount originAddress)
 
 getCreator :: MonadSM m => Address -> m (Address, Address, String) -- (creatorAddress, originAddress, creatorName)
 getCreator caller = do
@@ -1265,7 +1264,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
         Just enumVals -> do
           let !num = maybe (missingType "Enum nonexistent member" (enumName, name)) fromIntegral (name `elemIndex` fst enumVals)
           return $ Constant $ SEnumVal enumName name num
-    (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v UnspecifiedChain) . Env.sender) <$> getEnv
+    (SBuiltinVariable "msg", "sender") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v) . Env.sender) <$> getEnv
     (SBuiltinVariable "msg", "data") -> do
       contract' <- getCurrentContract
       functionName <- getCurrentFunctionName
@@ -1277,7 +1276,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
     (SBuiltinVariable "msg", "sig") -> do
       functionName <- getCurrentFunctionName
       return . Constant $ SString functionName
-    (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v UnspecifiedChain) . Env.origin) <$> getEnv
+    (SBuiltinVariable "tx", "origin") -> (Constant . ((flip SAccount) False) . (\v -> NamedAccount v) . Env.origin) <$> getEnv
     (SStruct _ theMap, fieldName) -> case M.lookup fieldName theMap of
       Nothing -> missingField "struct member access" fieldName
       Just v -> return v
@@ -1502,7 +1501,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $
     Constant $
       SContract contractName' $
-        (\v -> NamedAccount v UnspecifiedChain) $
+        (\v -> NamedAccount v) $
           fromMaybe (internalError "a call to create did not create an address" execResults) $
             erNewContractAddress execResults
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractName' (Just saltExpressionText))) args) = do
@@ -1530,7 +1529,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   return $
     Constant $
       SContract contractName' $
-        (\v -> NamedAccount v UnspecifiedChain) $
+        (\v -> NamedAccount v) $
           fromMaybe (internalError "a call to create did not create an address" execResults) $
             erNewContractAddress execResults
   where
@@ -1558,7 +1557,7 @@ expToVar' (CC.FunctionCall _ e args) = do
           var1 <- expToVar expr
           val1 <- getVar var1
           case (val1, name) of
-            (SAccount (NamedAccount addr _) _, "derive") -> do
+            (SAccount (NamedAccount addr) _, "derive") -> do
               (_, hsh, _) <- getCodeAndCollection addr
               let (salt, args'') = case argVals of
                     (SString s:vs) -> (s,) $ case reverse vs of
@@ -1582,7 +1581,7 @@ expToVar' (CC.FunctionCall _ e args) = do
                         "\n   arguments      " ++ C.yellow (show argVals),
                         "\n   salted address " ++ C.yellow (show newAddress)
                       ]
-              return . Constant $ SAccount (NamedAccount newAddress UnspecifiedChain) False
+              return . Constant $ SAccount (NamedAccount newAddress) False
             (SAccount addr _, "delegatecall") -> do
               let (funcName, args') = case argVals of
                     (SString fname : a) -> (fname, a)
@@ -1927,9 +1926,9 @@ evaluateAccountMember a _ "creator" = do
   return $ Constant $ SString $ issuerName
 evaluateAccountMember a _ "root" = do
   (_, originAddress, _) <- getCreator a
-  return $ Constant $ SAccount (NamedAccount originAddress MainChain) False
+  return $ Constant $ SAccount (NamedAccount originAddress) False
 -- evaluateAccountMember a _ "call" =
-evaluateAccountMember a True funcName = return $ Constant $ SContractFunction (NamedAccount a UnspecifiedChain) funcName
+evaluateAccountMember a True funcName = return $ Constant $ SContractFunction (NamedAccount a) funcName
 evaluateAccountMember a False itemName = do
   --return $ Constant $ SContractItem addr itemName
   from <- getCurrentAddress
@@ -2159,10 +2158,6 @@ parseBaseInt s n =
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
-castToAncestor :: MonadSM m => NamedAccount -> String -> m Value
-castToAncestor a _ = 
-    return $ SAccount (NamedAccount (a^.namedAccountAddress) MainChain) False
-
 callBuiltin :: MonadSM m => SolidString -> [Value] -> m Value
 callBuiltin "string" [SString s] = return $ SString s
 callBuiltin "string" [SAccount a _] = return . SString $ show a
@@ -2179,40 +2174,11 @@ callBuiltin "address" [SContract _ a] = return $ SAccount a False
 callBuiltin "address" [ss@(SString s)] =
   maybe
     (typeError "address cast" ss)
-    (return . ((flip SAccount) False) . (namedAccountChainId .~ UnspecifiedChain))
+    (return . flip SAccount False)
     $ readMaybe s
 callBuiltin "address" [SNULL] = return $ SAccount (unspecifiedChain 0) False
 callBuiltin "address" [SReference{}] = return $ SAccount (unspecifiedChain 0) False
 callBuiltin "address" vs = typeError "address cast" vs
-callBuiltin "account" [SInteger a] = return . ((flip SAccount) False) . unspecifiedChain $ fromIntegral a
-callBuiltin "account" [a@SAccount {}] = return a
-callBuiltin "account" [SContract _ a] = return $ SAccount a False
-callBuiltin "account" [ss@(SString s)] =
-  maybe
-    (typeError "account cast" ss)
-    (return . ((flip SAccount) False))
-    $ readMaybe s
-callBuiltin "account" [SInteger a, SInteger b] = return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromInteger b)
-callBuiltin "account" [SInteger a, SString "main"] = return . ((flip SAccount) False) $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString "self"] = do
-  pure . ((flip SAccount) False) $ mainChain (fromIntegral a)
-callBuiltin "account" [SInteger a, SString ('0' : 'x' : xs)] = do
-  return . ((flip SAccount) False) $ explicitChain (fromIntegral a) (fromIntegral $ base16ToIntegral xs)
-  where
-    hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
-    base16ToIntegral = foldl' (\n c -> 16 * n + (hexChar $ CHAR.toUpper c)) 0
-callBuiltin "account" [SInteger a, SString name] = unspecifiedChain (fromIntegral a) `castToAncestor` name
-callBuiltin "account" [(SAccount a _), SInteger b] = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral b)) a
-callBuiltin "account" [(SAccount a _), SString "main"] = return . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [(SAccount a _), SString "self"] = do
-  pure . ((flip SAccount) False) $ (namedAccountChainId .~ MainChain) a
-callBuiltin "account" [(SAccount a _), SString ('0' : 'x' : xs)] = return . ((flip SAccount) False) $ (namedAccountChainId .~ ExplicitChain (fromIntegral $ base16ToIntegral xs)) a
-  where
-    hexChar ch = fromMaybe (invalidArguments "illegal character in chainId hexstring" [ch]) $ elemIndex ch "0123456789ABCDEF"
-    base16ToIntegral = foldl' (\n c -> 16 * n + (hexChar $ CHAR.toUpper c)) 0
-callBuiltin "account" [(SAccount a _), SString name] = a `castToAncestor` name
-callBuiltin "account" [SNULL] = return $ SAccount (unspecifiedChain 0) False
-callBuiltin "account" [SReference{}] = return $ SAccount (unspecifiedChain 0) False
 callBuiltin ("addmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a + b) `mod` c
 callBuiltin ("mulmod") [SInteger a, SInteger b, SInteger c] = return . SInteger $ (a * b) `mod` c
 callBuiltin ("blockhash") [SInteger blockNum] | blockNum < 0 = invalidArguments "blockhash() only accepts arguments greater than or equal to 0" [blockNum]
@@ -2345,7 +2311,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator newAddress ctr ctrName newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
-    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
@@ -2365,7 +2331,7 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   (ctr, originAddress, ctrName) <- getCreator creator
   execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
-    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca UnspecifiedChain
+    Just nca -> pure $ ((flip SAccount) False) $ NamedAccount nca
     Nothing -> internalError "a call to create did not create an address" execResults
 callBuiltin "fastForward" [SInteger seconds] = do
   -- Only allow fastForward during testing
@@ -3199,8 +3165,8 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAccount a _, SVMType.Address b) -> pure . Just $ SAccount a b
         (SAccount a _, SVMType.Account b) -> pure . Just $ SAccount a b
-        (SAccount (NamedAccount a _) _, SVMType.String _) -> pure . Just . SString $ show a
-        (SAccount (NamedAccount a _) _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
+        (SAccount (NamedAccount a) _, SVMType.String _) -> pure . Just . SString $ show a
+        (SAccount (NamedAccount a) _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
         (SStruct r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
         (SContract r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SContract r x) $ r == u
