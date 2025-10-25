@@ -104,7 +104,7 @@ export function buildTxDescriptor(params: {
   }
 
   const externalToken = params.externalToken!;
-  if (externalToken.toLowerCase() === ZERO_ADDRESS) {
+  if (ensureHexPrefix(externalToken) === ZERO_ADDRESS) {
     throw new Error(
       "ERC20 transfer requested with ZERO_ADDRESS token; use 'eth' type instead",
     );
@@ -208,10 +208,10 @@ export async function createWithdrawalProposals(
   for (const withdrawal of withdrawals) {
     const nonce = currentNonce++;
     const descriptor = buildTxDescriptor({
-      type: withdrawal.externalToken.toLowerCase() === ZERO_ADDRESS ? "eth" : "erc20",
+      type: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? "eth" : "erc20",
       externalRecipient: withdrawal.externalRecipient,
       externalTokenAmount: withdrawal.externalTokenAmount,
-      externalToken: withdrawal.externalToken.toLowerCase() === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
+      externalToken: ensureHexPrefix(withdrawal.externalToken) === ZERO_ADDRESS ? undefined : withdrawal.externalToken,
       nonce,
     });
 
