@@ -124,7 +124,7 @@ basicParse input =
       [
         ("false", \[] -> Just $ BBool False),
         ("true", \[] -> Just $ BBool True),
-        ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAddress $ read accountString),
+        ("address\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAddress $ read accountString),
         ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
         ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
@@ -157,7 +157,7 @@ instance Format BasicValue where
   format (BDecimal v) = show v
   format (BBool True) = "true"
   format (BBool False) = "false"
-  format (BAddress a) = "account(" ++ show a ++ ")"
+  format (BAddress a) = "address(" ++ show a ++ ")"
   format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
   format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
   format BDefault = "<unknown>"
