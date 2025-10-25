@@ -2040,7 +2040,7 @@ tcExpr (NumberLiteral x n _) = if n < 0
                                   else pure $ intType' x
 tcExpr (DecimalLiteral x _) = pure $ decimalType' x
 tcExpr (StringLiteral x _) = pure $ stringType' x
-tcExpr (AccountLiteral x _) = pure $ accountType' x
+tcExpr (AddressLiteral x _) = pure $ accountType' x
 tcExpr (HexaLiteral x _) = pure $ stringType' x
 tcExpr (InlineBoundsCheck x _ _ a) = intType' x ~> tcExpr a
 tcExpr (TupleExpression x es) =

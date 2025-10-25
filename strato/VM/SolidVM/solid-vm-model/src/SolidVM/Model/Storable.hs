@@ -50,7 +50,7 @@ data BasicValue
   | BString !B.ByteString
   | BDecimal !B.ByteString
   | BBool !Bool
-  | BAccount !Address
+  | BAddress !Address
   | BEnumVal !SolidString !SolidString !Word32
   | BContract !SolidString !Address
   | BDefault -- Indicates a not present value
@@ -124,7 +124,7 @@ basicParse input =
       [
         ("false", \[] -> Just $ BBool False),
         ("true", \[] -> Just $ BBool True),
-        ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAccount $ read accountString),
+        ("account\\(([a-zA-Z0-9\\:]+)\\)", \[accountString] -> Just $ BAddress $ read accountString),
         ("([a-zA-Z0-9_]+)\\.([a-zA-Z0-9_]+)\\.([0-9]+)", \[enumName, enumValName, enumValNum] -> BEnumVal enumName enumValName <$> readMaybe enumValNum),
         ("([a-zA-Z0-9_]+)\\(([a-zA-Z0-9\\:]+)\\)", \[contractName, accountString] -> Just $ BContract contractName $ read accountString),
         ("([0-9]+)", \[numString] -> Just $ BInteger $ read numString),
@@ -137,7 +137,7 @@ textToBasicValue v =
            $ (bool Nothing (Just $ BBool True) $ T.toLower v == "true")
          <|> (bool Nothing (Just $ BBool False) $ T.toLower v == "false")
          <|> (BInteger <$> readMaybe (T.unpack v))
-         <|> (BAccount <$> readMaybe (T.unpack v))
+         <|> (BAddress <$> readMaybe (T.unpack v))
          <|> (case T.split (=='.') v of [a,b,c] -> BEnumVal (textToLabel a) (textToLabel b) <$> readMaybe (T.unpack c); _ -> Nothing)
    in if isDefault v' then BDefault else v'
 
@@ -146,7 +146,7 @@ isDefault (BInteger i) = i == 0
 isDefault (BString bs) = B.null bs
 isDefault (BDecimal v) = v == "0"
 isDefault (BBool b) = not b
-isDefault (BAccount a) = a == 0x0
+isDefault (BAddress a) = a == 0x0
 isDefault (BEnumVal _ _ w) = w == 0
 isDefault (BContract _ a) = a == 0x0
 isDefault BDefault = True
@@ -157,7 +157,7 @@ instance Format BasicValue where
   format (BDecimal v) = show v
   format (BBool True) = "true"
   format (BBool False) = "false"
-  format (BAccount a) = "account(" ++ show a ++ ")"
+  format (BAddress a) = "account(" ++ show a ++ ")"
   format (BEnumVal n1 n2 w) = labelToString n1 ++ "." ++ labelToString n2 ++ "." ++ show w
   format (BContract n a) = labelToString n ++ "(" ++ show a ++ ")"
   format BDefault = "<unknown>"
@@ -168,7 +168,7 @@ formatBasicValueForSQL (BString s) = either (const . T.pack $ C8.unpack s) id $ 
 formatBasicValueForSQL (BDecimal v) = T.pack $ show v
 formatBasicValueForSQL (BBool True) = "true"
 formatBasicValueForSQL (BBool False) = "false"
-formatBasicValueForSQL (BAccount a) = T.pack $ show a
+formatBasicValueForSQL (BAddress a) = T.pack $ show a
 formatBasicValueForSQL (BEnumVal n1 n2 w) = labelToText n1 <> "." <> labelToText n2 <> "." <> T.pack (show w)
 formatBasicValueForSQL (BContract _ a) = T.pack $ show a
 formatBasicValueForSQL BDefault = ""
@@ -392,7 +392,7 @@ instance RLPSerializable BasicValue where
     BInteger n -> RLPArray [RLPScalar 0, rlpEncode n]
     BString t -> RLPArray [RLPScalar 1, rlpEncode t]
     BBool b -> RLPArray [RLPScalar 2, rlpEncode b]
-    BAccount a -> RLPArray [RLPScalar 3, rlpEncode a]
+    BAddress a -> RLPArray [RLPScalar 3, rlpEncode a]
     BContract n a -> RLPArray [RLPScalar 4, rlpEncode n, rlpEncode a]
     BEnumVal a b c -> RLPArray [RLPScalar 5, rlpEncode a, rlpEncode b, rlpEncode c]
     BDecimal v -> RLPArray [RLPScalar 7, rlpEncode v]
@@ -401,7 +401,7 @@ instance RLPSerializable BasicValue where
       (0, [f]) -> BInteger $ rlpDecode f
       (1, [f]) -> BString $ rlpDecode f
       (2, [f]) -> BBool $ rlpDecode f
-      (3, [f]) -> BAccount $ rlpDecode f
+      (3, [f]) -> BAddress $ rlpDecode f
       (4, [f, a']) -> BContract (rlpDecode f) (rlpDecode a')
       (5, [f, s', c']) -> BEnumVal (rlpDecode f) (rlpDecode s') (rlpDecode c')
       (7, [f]) -> BDecimal (rlpDecode f)

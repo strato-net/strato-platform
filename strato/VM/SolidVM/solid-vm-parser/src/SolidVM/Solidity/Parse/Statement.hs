@@ -410,7 +410,7 @@ primaryExpression = do
             pure $ NumberLiteral a val nu
         )
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
-    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
+    <|> (uncurry AddressLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -514,9 +514,9 @@ literal =
       do
         (a, str) <- withPosition stringLiteral
         pure $ case readMaybe str of
-          Just addr -> AccountLiteral a addr
+          Just addr -> AddressLiteral a addr
           _ -> StringLiteral a str,
-      uncurry AccountLiteral <$> withPosition accountLiteral,
+      uncurry AddressLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),
       uncurry BoolLiteral <$> withPosition (True <$ reserved "true"),
       uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal),

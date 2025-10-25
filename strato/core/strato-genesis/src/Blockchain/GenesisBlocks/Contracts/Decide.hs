@@ -45,10 +45,10 @@ insertDecideContract gi =
         0
         (SolidVMCode "DeciderState" $ KECCAK256.hash dec1deStateContract)
         [ (".:creator", BString $ encodeUtf8 "BlockApps"),
-          (".:creatorAddress", BAccount blockappsAddress),
-          (".:originAddress", BAccount mercataAddress),
-          (".owner", BAccount blockappsAddress),
-          (".currentFeeContract", BAccount 0xDEC1DE02)
+          (".:creatorAddress", BAddress blockappsAddress),
+          (".:originAddress", BAddress mercataAddress),
+          (".owner", BAddress blockappsAddress),
+          (".currentFeeContract", BAddress 0xDEC1DE02)
         ]
 
 dec1deContract :: ByteString

@@ -22,7 +22,7 @@ readValidatorsFromGenesisInfo gi = concat . flip map (genesisInfoAccountInfo gi)
     let storageMap = M.fromList storage
      in case M.lookup ".validators.length" storageMap of
           Just (BInteger l) -> mapMaybe (\i -> case M.lookup (fromString $ ".validators[" ++ show i ++ "]") storageMap of
-            Just (BAccount a) -> Just $ Validator a
+            Just (BAddress a) -> Just $ Validator a
             _ -> Nothing) [0..l-1]
           _ -> []
   _ -> []

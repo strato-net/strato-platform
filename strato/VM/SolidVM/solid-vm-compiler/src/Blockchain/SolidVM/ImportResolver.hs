@@ -173,7 +173,7 @@ resolveFile getCCFromHash getNamedSUnits expr (seen, resolved) =
   if tShowExpr expr `S.member` seen
     then pure (seen, resolved)
     else case expr of
-      AccountLiteral x addr -> do
+      AddressLiteral x addr -> do
         lift (A.select (A.Proxy @AddressState) addr) >>= \case
           Nothing -> pure (seen, resolved)
           Just AddressState {..} ->
@@ -309,5 +309,5 @@ lit' a = StringLiteral a . T.unpack
 
 tShowExpr :: Show a => ExpressionF a -> Text
 tShowExpr (StringLiteral _ str) = T.pack str
-tShowExpr (AccountLiteral _ addr) = "<" <> T.pack (show addr) <> ">"
+tShowExpr (AddressLiteral _ addr) = "<" <> T.pack (show addr) <> ">"
 tShowExpr expr = T.pack $ show expr

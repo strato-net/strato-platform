@@ -184,7 +184,7 @@ constructFromNothing' :: [StoragePathPiece] -> BasicValue -> V.Value
 constructFromNothing' [] = fromBasic
 constructFromNothing' [Field "length"] = \case
   BInteger n -> ValueArraySentinel $ fromIntegral n
-  BAccount a | a == 0x0 -> ValueArraySentinel 0
+  BAddress a | a == 0x0 -> ValueArraySentinel 0
   BDefault -> ValueArraySentinel 0
   bv -> ValueStruct . M.singleton "length" $ constructFromNothing' [] bv
 constructFromNothing' (Field n : sp) = ValueStruct . M.singleton (decodeUtf8 n) . constructFromNothing' sp
@@ -219,7 +219,7 @@ fromBasic = \case
   BInteger n -> SimpleValue $! valueInt n
   BString bs -> SimpleValue $! valueBytes bs
   BDecimal v -> SimpleValue $! ValueDecimal v
-  BAccount a -> SimpleValue $! ValueAccount a
+  BAddress a -> SimpleValue $! ValueAccount a
   BContract _ c -> ValueContract c
   BEnumVal tipe name num -> ValueEnum (labelToText tipe) (labelToText name) (fromIntegral num)
   BDefault -> SimpleValue $ ValueAddress 0x0

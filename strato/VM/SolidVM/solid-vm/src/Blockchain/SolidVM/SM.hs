@@ -670,7 +670,7 @@ getVariableOfName name = do
           else Nothing
 
       maybeThis :: Maybe Variable
-      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAccount (currentAddress currentCallInfo) False
+      maybeThis = toMaybe (name == "this") . t "this" . Constant $ SAddress (currentAddress currentCallInfo) False
 
   --        M.lookup (currentAddress currentCallInfo) (accounts sstate) >>= M.lookup name . storage
 

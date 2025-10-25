@@ -75,7 +75,7 @@ data Value
   | SDecimal Decimal
   | SString String
   | SBool Bool
-  | SAccount Address Bool --isPayable
+  | SAddress Address Bool --isPayable
   | SUserDefined SolidString SolidString Value
   | -- This is a payable account, which means it can use .transfer() , .send() , .call() , .delegatecall() and .staticcall()
     SEnum SolidString
@@ -139,11 +139,11 @@ instance Eq Value where
   (SBool b1) == SNULL = b1 == False
   SReference{} == (SBool b2) = False == b2
   (SBool b1) == SReference{} = b1 == False
-  (SAccount a1 b1) == (SAccount a2 b2) = (a1 == a2 && b1 == b2)
-  SNULL == (SAccount a2 b2) = (0x0 == a2 && False == b2)
-  (SAccount a1 b1) == SNULL = (a1 == 0x0 && b1 == False)
-  SReference{} == (SAccount a2 b2) = (0x0 == a2 && False == b2)
-  (SAccount a1 b1) == SReference{} = (a1 == 0x0 && b1 == False)
+  (SAddress a1 b1) == (SAddress a2 b2) = (a1 == a2 && b1 == b2)
+  SNULL == (SAddress a2 b2) = (0x0 == a2 && False == b2)
+  (SAddress a1 b1) == SNULL = (a1 == 0x0 && b1 == False)
+  SReference{} == (SAddress a2 b2) = (0x0 == a2 && False == b2)
+  (SAddress a1 b1) == SReference{} = (a1 == 0x0 && b1 == False)
   (SContract c1 a1) == (SContract c2 a2) = c1 == c2 && a1 == a2
   SNULL == (SContract c2 a2) = "" == c2 && 0x0 == a2
   (SContract c1 a1) == SNULL = c1 == "" && a1 == 0x0
@@ -178,11 +178,11 @@ instance Ord Value where
   compare (SBool b1) SNULL = compare b1 False
   compare SReference{} (SBool b2) = compare False b2
   compare (SBool b1) SReference{} = compare b1 False
-  compare (SAccount a1 _) (SAccount a2 _) = compare a1 a2
-  compare SNULL (SAccount a2 _) = compare 0x0 a2
-  compare (SAccount a1 _) SNULL = compare a1 0x0
-  compare SReference{} (SAccount a2 _) = compare 0x0 a2
-  compare (SAccount a1 _) SReference{} = compare a1 0x0
+  compare (SAddress a1 _) (SAddress a2 _) = compare a1 a2
+  compare SNULL (SAddress a2 _) = compare 0x0 a2
+  compare (SAddress a1 _) SNULL = compare a1 0x0
+  compare SReference{} (SAddress a2 _) = compare 0x0 a2
+  compare (SAddress a1 _) SReference{} = compare a1 0x0
   compare x y = todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where
@@ -205,7 +205,7 @@ rlpEncodeValue (SInteger i) = pure $ rlpEncode i
 rlpEncodeValue (SString s) = pure $ rlpEncode s
 rlpEncodeValue (SDecimal decimal) = pure $ rlpEncode $ show decimal
 rlpEncodeValue (SBool b) = pure $ rlpEncode b
-rlpEncodeValue (SAccount a _) = pure $ rlpEncode a
+rlpEncodeValue (SAddress a _) = pure $ rlpEncode a
 rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
 rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
 rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
@@ -222,7 +222,7 @@ rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 -- it is determined that their expected type is
 coerceFromInt :: CC.Contract -> Value -> Integer -> Value
 coerceFromInt _ SInteger {} n = SInteger n
-coerceFromInt _ (SAccount _ b) n = SAccount (fromIntegral n) b
+coerceFromInt _ (SAddress _ b) n = SAddress (fromIntegral n) b
 coerceFromInt _ SBool {} n = SBool $ n /= 0
 coerceFromInt _ SString {} 0 = SString ""
 coerceFromInt _ SString {} n = SString $ showHex n ""
@@ -279,8 +279,8 @@ defaultValue _ (SVMType.Array _ _) = SArray V.empty
 defaultValue _ (SVMType.Mapping _ _ _) = SMap M.empty
 defaultValue _ (SVMType.Int _ _) = SInteger 0
 defaultValue _ SVMType.Bool = SBool False
-defaultValue _ (SVMType.Address _) = (SAccount 0) False
-defaultValue _ (SVMType.Account _) = (SAccount 0) False
+defaultValue _ (SVMType.Address _) = (SAddress 0) False
+defaultValue _ (SVMType.Account _) = (SAddress 0) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue _ SVMType.Decimal = SDecimal 0
@@ -310,8 +310,8 @@ createDefaultValue _ _ (SVMType.Array _ _) = return $ SArray V.empty
 createDefaultValue _ _ (SVMType.Mapping _ _ _) = return $ SMap M.empty
 createDefaultValue _ _ (SVMType.Int _ _) = return $ SInteger 0
 createDefaultValue _ _ SVMType.Bool = return $ SBool False
-createDefaultValue _ _ (SVMType.Address _) = return $ (SAccount 0) False
-createDefaultValue _ _ (SVMType.Account _) = return $ (SAccount 0) False
+createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
+createDefaultValue _ _ (SVMType.Account _) = return $ (SAddress 0) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0

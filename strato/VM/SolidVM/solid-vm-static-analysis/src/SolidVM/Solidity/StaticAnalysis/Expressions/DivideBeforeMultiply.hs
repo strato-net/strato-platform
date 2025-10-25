@@ -103,7 +103,7 @@ expressionHelper (BoolLiteral _ _) = []
 expressionHelper (NumberLiteral _ _ _) = []
 expressionHelper (DecimalLiteral _ _) = []
 expressionHelper (StringLiteral _ _) = []
-expressionHelper (AccountLiteral _ _) = []
+expressionHelper (AddressLiteral _ _) = []
 expressionHelper (TupleExpression _ es) =
   concat $ maybe [] expressionHelper <$> es
 expressionHelper (ArrayExpression _ es) = concat $ expressionHelper <$> es

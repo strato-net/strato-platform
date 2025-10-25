@@ -54,7 +54,7 @@ fromBasic = \case
     Left _ -> SString $ BC.unpack s
   MS.BDecimal v -> SDecimal $ read $ BC.unpack v
   MS.BBool b -> SBool b
-  MS.BAccount a -> SAccount a False
+  MS.BAddress a -> SAddress a False
   MS.BContract n a -> SContract n a
   MS.BEnumVal k v num -> SEnumVal k v num
   MS.BDefault -> SNULL
@@ -65,7 +65,7 @@ toBasic = \case
   SString s -> Just . MS.BString . encodeUtf8 $ T.pack s
   SDecimal v -> Just $ MS.BDecimal $ BC.pack $ show v
   SBool b -> Just $ MS.BBool b
-  SAccount a _ -> Just $ MS.BAccount a
+  SAddress a _ -> Just $ MS.BAddress a
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
@@ -222,7 +222,7 @@ showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) =
   return $
     printf "%s.%s (= %x)" enumName valName num
-showSM (SAccount a _) = return $ show a
+showSM (SAddress a _) = return $ show a
 showSM (STuple v) = do
   vals <- mapM getVar (V.toList v)
   strings <- forM vals showSM
@@ -270,7 +270,7 @@ jsonSM = go False
     go b (SString v) = return $ bool id show b v
     go _ (SBool v) = return $ bool "false" "true" v
     go _ (SEnumVal _ _ num) = return $ show num
-    go b (SAccount a _) = return . bool id show b $ show a
+    go b (SAddress a _) = return . bool id show b $ show a
     go _ (STuple v) = do
       vals <- mapM getVar (V.toList v)
       strings <- forM vals (go True)

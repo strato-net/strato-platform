@@ -375,7 +375,7 @@ lookupX509AddrFromCBHash k = do
   mAccount <- A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
   $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
   case mAccount of
-    Just (BAccount a) -> pure . Just $ a
+    Just (BAddress a) -> pure . Just $ a
     _ -> pure Nothing
 
 runTestContextM ::

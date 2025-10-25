@@ -333,7 +333,7 @@ convertSvmResultResToVals resp = do
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
-expressionToValue (AccountLiteral _ n) = Just $ SimpleValue $ ValueAddress n
+expressionToValue (AddressLiteral _ n) = Just $ SimpleValue $ ValueAddress n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
 expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)

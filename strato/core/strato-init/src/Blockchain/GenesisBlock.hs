@@ -335,7 +335,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
           =<< lookupSolidDiff ".:creator" storageDiff
 
         mkOriginAddress =
-            (\case BAccount a' -> T.pack $ show a'; _ -> "")
+            (\case BAddress a' -> T.pack $ show a'; _ -> "")
           . maybe BDefault id
           $ lookupSolidDiff ".:originAddress" storageDiff
 
