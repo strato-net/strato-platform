@@ -318,7 +318,7 @@ sepoliaChainId :: Integer
 sepoliaChainId = 11155111
 
 ethChainId :: Integer
-ethChainId = 0
+ethChainId = 1
 
 sepolia :: BridgeChainInfo
 sepolia = BridgeChainInfo sepoliaChainId
@@ -331,7 +331,7 @@ sepolia = BridgeChainInfo sepoliaChainId
 eth :: BridgeAssetInfo
 eth = BridgeAssetInfo
   True
-  ethChainId
+  sepolia
   18
   "Ether"
   "ETH"
@@ -342,7 +342,7 @@ eth = BridgeAssetInfo
 wbtc :: BridgeAssetInfo
 wbtc = BridgeAssetInfo
   True
-  ethChainId
+  sepolia
   8
   "Wrapped Bitcoin"
   "WBTC"
@@ -354,7 +354,7 @@ wbtc = BridgeAssetInfo
 paxg :: BridgeAssetInfo
 paxg = BridgeAssetInfo
   True
-  ethChainId
+  sepolia
   18
   "PAXG"
   "PAXG"
@@ -365,7 +365,7 @@ paxg = BridgeAssetInfo
 usdc :: BridgeAssetInfo
 usdc = BridgeAssetInfo
   True
-  ethChainId
+  sepolia
   6
   "USDC"
   "USDC"
@@ -376,7 +376,7 @@ usdc = BridgeAssetInfo
 usdt :: BridgeAssetInfo
 usdt = BridgeAssetInfo
   True
-  ethChainId
+  sepolia
   6
   "USDT"
   "USDT"
