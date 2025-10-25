@@ -58,6 +58,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
+import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
@@ -77,7 +78,6 @@ import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
 import Data.Bool (bool)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
@@ -2142,9 +2142,7 @@ parseBaseInt s n =
                  _ -> s
           prefix' = bool "0" "" . even $ length s'
        in case B16.decode (BC.pack $ prefix' ++ s') of
-            Right l ->
-              let zeros = 32 - B.length l
-               in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+            Right l -> Right $ byteString2Integer l
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
