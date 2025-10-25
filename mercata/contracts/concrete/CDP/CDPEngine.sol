@@ -461,7 +461,7 @@ contract record CDPEngine is Ownable {
         address collateralAsset,
         address borrower,
         uint debtToCover
-    ) external onlyKnownAsset(collateralAsset) {
+    ) external onlyKnownAsset(collateralAsset) whenNotPaused(collateralAsset) {
         require(borrower != address(0) && borrower != msg.sender, "CDPEngine: invalid borrower");
         require(debtToCover > 0, "CDPEngine: zero debt amount");
 
@@ -862,7 +862,6 @@ contract record CDPEngine is Ownable {
     function openJuniorNote(address asset, uint256 amountUSDST)
         external
         onlyKnownAsset(asset)
-        whenNotPaused(asset)
         returns (uint256 burnedUSDST, uint256 capUSDST)
     {
         require(amountUSDST > 0, "junior: zero amount");
@@ -947,6 +946,7 @@ contract record CDPEngine is Ownable {
     }
 
     function claimJunior() external {
+        require(!globalPaused, "CDPEngine: global pause");
         _syncReserveToIndex();
         JuniorNote storage note = juniorNotes[msg.sender];
         require(note.owner != address(0), "junior: no note");
