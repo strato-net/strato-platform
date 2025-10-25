@@ -136,7 +136,6 @@ unparseVarType (SVMType.Int Nothing Nothing) = "uint"
 unparseVarType (SVMType.Bool) = "bool"
 unparseVarType (SVMType.String _) = "string"
 unparseVarType (SVMType.Address _) = "address"
-unparseVarType (SVMType.Account _) = "account"
 unparseVarType (SVMType.Bytes (Just True) _) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes)) = "bytes" <> (show bytes)
 unparseVarType (SVMType.UnknownLabel str _) = labelToString str

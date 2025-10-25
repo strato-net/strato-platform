@@ -47,7 +47,6 @@ formatArg _ (SimpleType (TypeBytes Nothing)) = "bytes"
 formatArg _ (SimpleType (TypeBytes (Just b))) = "bytes" ++ show b
 formatArg _ (SimpleType TypeBool) = "bool"
 formatArg _ (SimpleType TypeAddress) = "address"
-formatArg _ (SimpleType TypeAccount) = "account"
 formatArg _ (SimpleType TypeString) = "string"
 formatArg _ (TypeContract name) = Text.unpack name
 formatArg enumSizes (TypeArrayFixed size x) = formatArg enumSizes x ++ "[" ++ show size ++ "]"

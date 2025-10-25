@@ -104,7 +104,6 @@ bytesToSimpleValue bs = \case
       then Just $ ValueBool True
       else Just $ ValueBool False
   TypeAddress -> ValueAddress <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
-  TypeAccount -> ValueAccount <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
@@ -323,10 +322,6 @@ textToSimpleValue str = \case
   TypeAddress ->
     ValueAddress <$> case stringAddress (Text.unpack str) of
       Nothing -> Left $ "textToSimpleValue: could not decode as address: " <> str
-      Just x -> return x
-  TypeAccount ->
-    ValueAccount <$> case readMaybe (Text.unpack str) of
-      Nothing -> Left $ "textToSimpleValue: could not decode as account: " <> str
       Just x -> return x
   TypeString -> return $ ValueString $ unEscapeStringValue str
   TypeInt s b -> ValueInt s b <$> readNum

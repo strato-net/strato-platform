@@ -3144,17 +3144,14 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         (SInteger i, SVMType.Int _ _) -> pure . Just $ SInteger i
         (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
         (SInteger i, SVMType.Address b) -> pure . Just $ SAddress (fromInteger i) b
-        (SInteger i, SVMType.Account b) -> pure . Just $ SAddress (fromInteger i) b
         (SInteger i, SVMType.UnknownLabel _ _) -> pure . Just $ SAddress (fromInteger i) False
         (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
         (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
         (SString s, SVMType.String _) -> pure . Just $ SString s
         (SString s, SVMType.Bytes _ _) -> pure . Just $ SString s
         (SString s, SVMType.Address b) -> pure $ flip SAddress b <$> stringAddress s
-        (SString s, SVMType.Account b) -> pure $ flip SAddress b <$> stringAddress s
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAddress a _, SVMType.Address b) -> pure . Just $ SAddress a b
-        (SAddress a _, SVMType.Account b) -> pure . Just $ SAddress a b
         (SAddress a _, SVMType.String _) -> pure . Just . SString $ show a
         (SAddress a _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u

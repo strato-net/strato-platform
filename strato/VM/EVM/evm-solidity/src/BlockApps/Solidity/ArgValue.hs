@@ -191,12 +191,6 @@ argValueToSimpleValue theType argVal = case theType of
         Nothing -> Left $ "argValueToSimpleValue: provided argument '" <> str <> "' is not a valid address"
         Just x -> return x
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
-  TypeAccount -> case argVal of
-    ArgString str ->
-      ValueAccount <$> case readMaybe (Text.unpack str) of
-        Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
-        Just x -> return x
-    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAccount to be a string, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o

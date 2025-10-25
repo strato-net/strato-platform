@@ -1078,7 +1078,6 @@ solidityTypeToSQLType _ _ _ SVMType.Bytes{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.UserDefined{} = Just SqlText
 solidityTypeToSQLType _ _ _ SVMType.Decimal = Just SqlDecimal
 solidityTypeToSQLType _ _ _ SVMType.Address{} = Just SqlText
-solidityTypeToSQLType _ _ _ SVMType.Account{} = Just SqlText
 solidityTypeToSQLType isEvent _ _ SVMType.Array{} = if isEvent then Just SqlJsonb else Nothing
 solidityTypeToSQLType _ _ _ SVMType.Mapping{} = Nothing -- Just SqlJsonb
 solidityTypeToSQLType _ mc cc (SVMType.UnknownLabel l _) = Just . maybe SqlText (const SqlJsonb) $ (\c -> structDef c cc l) =<< mc

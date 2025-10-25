@@ -369,7 +369,6 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
-              Xabi.Account -> Right . SimpleType $ TypeAccount
               Xabi.Struct _ name -> Right $ TypeStruct name
               Xabi.Enum _ name _ -> Right $ TypeEnum name
               Xabi.Array ety len ->
@@ -381,7 +380,6 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress
-                      Xabi.Account -> Right . SimpleType $ TypeAccount
                       Xabi.Struct _ name -> Right $ TypeStruct name
                       Xabi.Enum _ name _ -> Right $ TypeEnum name
                       Xabi.Array {} -> Left "Arrays of arrays are not allowed as function arguments"

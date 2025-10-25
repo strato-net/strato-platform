@@ -50,7 +50,6 @@ addPositions typeDefs' p0 (theType : rest) =
 xabiTypeToSimpleType :: Xabi.Type -> SimpleType
 xabiTypeToSimpleType Xabi.String {} = TypeString
 xabiTypeToSimpleType Xabi.Address = TypeAddress
-xabiTypeToSimpleType Xabi.Account = TypeAccount
 xabiTypeToSimpleType Xabi.Int {Xabi.signed = signed, Xabi.bytes = b} =
   case signed of
     Just True -> TypeInt True $ fmap toInteger b
@@ -260,7 +259,6 @@ simpleTypeToXabiType :: SimpleType -> Xabi.Type
 simpleTypeToXabiType TypeBool = Xabi.Bool
 simpleTypeToXabiType (TypeInt s b) = Xabi.Int (Just s) $ fmap fromInteger b
 simpleTypeToXabiType TypeAddress = Xabi.Address
-simpleTypeToXabiType TypeAccount = Xabi.Account
 simpleTypeToXabiType TypeString = Xabi.String $ Just True
 simpleTypeToXabiType (TypeBytes b) = Xabi.Bytes Nothing $ fmap fromInteger b
 simpleTypeToXabiType TypeDecimal = Xabi.Decimal
