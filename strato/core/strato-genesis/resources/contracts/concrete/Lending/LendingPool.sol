@@ -1177,7 +1177,7 @@ contract record LendingPool is Ownable, Pausable {
         emit ExchangeRateUpdated(borrowableAsset, getExchangeRate());
     }
 
-    function coverShortfall(uint amount) external whenNotPaused {
+    function coverShortfall(uint amount) external {
         require(msg.sender == address(safetyModule), "LP:not SM");
         require(amount > 0, "LP:zero");
 
