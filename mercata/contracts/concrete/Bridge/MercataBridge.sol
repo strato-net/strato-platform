@@ -728,7 +728,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the custody tx hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedCustodyTxHash = string(uint(custodyTxHash, 16), 16, 32);
+        string normalizedCustodyTxHash = custodyTxHash.normalizeHex();
         w.custodyTxHash = normalizedCustodyTxHash;
 
         emit WithdrawalPending(normalizedCustodyTxHash, id);
