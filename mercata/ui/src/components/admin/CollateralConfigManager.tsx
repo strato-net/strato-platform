@@ -13,6 +13,52 @@ import { Form, Input, Switch, Button as AntButton } from 'antd';
 import { ExclamationCircleOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { handleRecipientAddress, handleAdminNumericInputChange } from '@/utils/transferValidation';
 
+// Helper functions for stability fee rate conversion
+const RAY = BigInt(10) ** BigInt(27);
+
+const rpow = (x: bigint, n: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : RAY;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / RAY;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / RAY;
+    }
+  }
+  return z;
+};
+
+const convertAnnualPercentageToStabilityFeeRate = (annualPercentage: number): bigint => {
+  const secondsPerYear = 31536000n;
+  const targetAnnualFactorRay = RAY + BigInt(Math.floor((annualPercentage / 100) * Number(RAY)));
+  
+  let low = RAY;
+  let high = RAY + (RAY / 100n);
+  
+  for (let i = 0; i < 100; i++) {
+    const mid = (low + high) / 2n;
+    const result = rpow(mid, secondsPerYear);
+    
+    if (result < targetAnnualFactorRay) {
+      low = mid;
+    } else {
+      high = mid;
+    }
+    
+    if (high - low <= 1n) {
+      break;
+    }
+  }
+  
+  const lowResult = rpow(low, secondsPerYear);
+  const highResult = rpow(high, secondsPerYear);
+  const lowDiff = lowResult > targetAnnualFactorRay ? lowResult - targetAnnualFactorRay : targetAnnualFactorRay - lowResult;
+  const highDiff = highResult > targetAnnualFactorRay ? highResult - targetAnnualFactorRay : targetAnnualFactorRay - highResult;
+  
+  return lowDiff < highDiff ? low : high;
+};
+
 const CollateralConfigManager = () => {
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('add');
@@ -90,9 +136,9 @@ const CollateralConfigManager = () => {
       const minCRContract = (BigInt(Math.floor(Number(values.minCR) * 100)) * WAD) / BigInt(100);
       
       // Convert stability fee rate from annual percentage to per-second RAY
-      const [intPart, decPart = ''] = values.stabilityFeeRate.toString().split('.');
-      const scale = BigInt(10) ** BigInt(decPart.length);
-      const stabilityFeeRateContract = (BigInt(intPart + decPart) * RAY) / (BigInt(100) * scale * secondsPerYear) + RAY;
+      // Uses shared utility function from @mercata/shared-types
+      const annualPercentage = Number(values.stabilityFeeRate);
+      const stabilityFeeRateContract = convertAnnualPercentageToStabilityFeeRate(annualPercentage);
       
       // Convert unit scale from decimal count to 1eX format
       const unitScaleContract = BigInt(10) ** BigInt(values.unitScale);
@@ -144,7 +190,9 @@ const CollateralConfigManager = () => {
       minCR: ((asset.minCR || asset.liquidationRatio) / 100).toString(), // Convert percentage to decimal for form, fallback to liquidationRatio
       liquidationPenaltyBps: asset.liquidationPenaltyBps.toString(),
       closeFactorBps: asset.closeFactorBps.toString(),
-      stabilityFeeRate: asset.stabilityFeeRate.toString(), // Backend already provides annual percentage
+      // Round to 2 decimals for display to avoid showing floating-point artifacts like 2.0000000099
+      // The binary search ensures the saved value is optimal
+      stabilityFeeRate: asset.stabilityFeeRate.toFixed(2),
       debtFloor: debtFloorUI.toString(),
       debtCeiling: debtCeilingUI.toString(),
       unitScale: unitScaleUI.toString(),
