@@ -115,7 +115,7 @@ import qualified Data.NibbleString as N
 import qualified Data.Set as S
 import Data.String
 import qualified Data.Text as T
- import qualified Database.LevelDB as DB
+import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
 import Debugger
