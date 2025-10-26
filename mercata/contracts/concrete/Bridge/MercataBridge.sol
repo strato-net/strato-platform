@@ -17,6 +17,7 @@ contract record MercataBridge is Ownable {
     /// @notice Enables BridgeTypes library functions for all types
     /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
     using BridgeTypes for *;
+    using StringUtils for string;
 
     /* ===================================================================== */
     /*                                EVENTS                                 */
@@ -480,7 +481,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
+        string normalizedTxHash = externalTxHash.normalizeHex();
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
 
         AssetInfo a = assets[externalToken][externalChainId];
@@ -538,7 +539,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
+        string normalizedTxHash = externalTxHash.normalizeHex();
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
@@ -586,7 +587,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
+        string normalizedTxHash = externalTxHash.normalizeHex();
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
@@ -632,7 +633,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
+        string normalizedTxHash = externalTxHash.normalizeHex();
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 

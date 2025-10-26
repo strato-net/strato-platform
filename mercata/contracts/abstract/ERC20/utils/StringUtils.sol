@@ -1,5 +1,5 @@
 library StringUtils {
-    function fromHex(uint x) pure returns (uint) {
+    function fromHex(uint x) internal pure returns (uint) {
         if (x >= 0x30 && x <= 0x39) {
             return x - 0x30;
         } else if (x >= 0x61 && x <= 0x66) {
@@ -10,7 +10,7 @@ library StringUtils {
         }
     }
 
-    function b16encode(string s) pure returns (string) {
+    function b16encode(string s) internal pure returns (string) {
         bytes b = bytes(s);
         bytes dst = new bytes(2 * b.length);
         for (uint i = 0; i < b.length; i++) {
@@ -30,21 +30,21 @@ library StringUtils {
         return string(dst);
     }
 
-    function b16decode(string s) pure returns (string) {
+    function b16decode(string s) internal pure returns (string) {
         bytes b = bytes(s);
         bool isEven = b.length % 2 == 0;
         uint offset = isEven ? 0 : 1;
         bytes dst = new bytes((b.length / 2) + offset);
         if (!isEven) {
-            dst[0] = StringUtils.fromHex(b[0]);
+            dst[0] = fromHex(b[0]);
         }
         for (uint i = offset; i < b.length; i += 2) {
-            dst[i/2 + offset] = (StringUtils.fromHex(b[i]) << 4) | StringUtils.fromHex(b[i+1]);
+            dst[i/2 + offset] = (fromHex(b[i]) << 4) | fromHex(b[i+1]);
         }
         return string(dst);
     }
 
-    function toLower(string s) pure returns (string) {
+    function toLower(string s) internal pure returns (string) {
         bytes b = bytes(s);
         for (uint i = 0; i < b.length; i++) {
             if (b[i] >= 0x41 && b[i] <= 0x5a) {
@@ -54,7 +54,7 @@ library StringUtils {
         return string(b);
     }
 
-    function toUpper(string s) pure returns (string) {
+    function toUpper(string s) internal pure returns (string) {
         bytes b = bytes(s);
         for (uint i = 0; i < b.length; i++) {
             if (b[i] >= 0x61 && b[i] <= 0x7a) {
@@ -64,7 +64,7 @@ library StringUtils {
         return string(b);
     }
 
-    function intercalate(string s, string[] strs) pure returns (string) {
+    function intercalate(string s, string[] strs) internal pure returns (string) {
         string r = "";
         for (uint i = 0; i < strs.length; i++) {
             if (i > 0) {
@@ -75,11 +75,11 @@ library StringUtils {
         return r;
     }
 
-    function substring(string s, uint start) pure returns (string) {
-        return StringUtils.substring(s, start, s.length);
+    function substring(string s, uint start) internal pure returns (string) {
+        return substring(s, start, s.length);
     }
     
-    function substring(string s, uint start, uint end) pure returns (string) {
+    function substring(string s, uint start, uint end) internal pure returns (string) {
         require(end > start, "substring: end index must be greater than starting index");
         bytes b = bytes(s);
         bytes ret = new bytes(end - start);
@@ -89,8 +89,8 @@ library StringUtils {
         return string(ret);
     }
 
-    function normalizeHex(string s) pure returns (string) {
-        string hexPart = StringUtils.substring(s,0,2) == "0x" ? StringUtils.substring(s,2) : s;
-        return "0x" + StringUtils.b16encode(StringUtils.b16decode(hexPart));
+    function normalizeHex(string s) internal pure returns (string) {
+        string hexPart = substring(s,0,2) == "0x" ? substring(s,2) : s;
+        return "0x" + b16encode(b16decode(hexPart));
     }
 }
