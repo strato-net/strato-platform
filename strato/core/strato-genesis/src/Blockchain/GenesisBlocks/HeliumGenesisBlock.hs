@@ -1139,10 +1139,6 @@ prodPrimaryAccounts = M.fromList
     , [ 0x0dbd21cefacd6db82fc1786d9f638f18f196488a
       ]
     )
-  , ( 0xbfe7966421a5a6cb6e4223a571a065ed535f875c
-    , [ 0x0dbd21cefacd6db82fc1786d9f638f18f196488a
-      ]
-    )
   , ( 0xe883c985bf04b48b1a3cc949cbe6474c4bb0edd9
     , [ 0x4ad52875d110c65325bff65efdfce8759631284a
       , 0x92332449f8939e28111ba77ff77fe6df360dae29
