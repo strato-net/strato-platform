@@ -709,7 +709,6 @@ typecheckStatic (SVMType.Mapping d1 k1 v1) (SVMType.Mapping d2 k2 v2) = do
   case (d1, d2) of
     (Just a, Just b) | a /= b -> Left "Mismatched dynamicity between mapping values"
     _ -> Right $ SVMType.Mapping (d1 <|> d2) k v
-typecheckStatic (SVMType.Bytes d1 b1) (SVMType.String _) = Right (SVMType.Bytes d1 b1)
 typecheckStatic (SVMType.UserDefined alias1 a) (SVMType.UserDefined alias2 b) =
   if alias1 == alias2 
     then typecheckStatic a b
@@ -728,7 +727,6 @@ typecheckStatic (SVMType.UserDefined a c) b =
       <> showType b
       <> " do not match."
 typecheckStatic _ (SVMType.UserDefined _ _) = Left "Type mismatch"
-typecheckStatic theType (SVMType.Bytes _ _) = Right theType
 typecheckStatic _ SVMType.Variadic = Right SVMType.Variadic
 typecheckStatic SVMType.Variadic _ = Right SVMType.Variadic
 typecheckStatic t1 t2 =
@@ -790,8 +788,8 @@ typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "bytes32ToStrin
 typecheckMember (Static (SVMType.UnknownLabel "Util" Nothing) x) "b32" = pure $ Function (Static (SVMType.Bytes Nothing (Just 32)) x) (Static (SVMType.Bytes Nothing (Just 32)) x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "string" Nothing) x) "concat" = pure $ Function (stringConcatArgs x) (Static (SVMType.String Nothing) x) x [] [] False
 typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sender" = pure $ Static (SVMType.Address False) x
-typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "data" = pure $ Static (SVMType.String Nothing) x
-typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sig" = pure $ Static (SVMType.Bytes Nothing (Just 4)) x
+typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "data" = pure $ Static SVMType.Variadic x
+typecheckMember (Static (SVMType.UnknownLabel "msg" Nothing) x) "sig" = pure $ stringType' x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "origin" = pure $ Static (SVMType.Address False) x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "username" = pure $ Static (SVMType.String Nothing) x
 typecheckMember (Static (SVMType.UnknownLabel "tx" Nothing) x) "organization" = pure $ Static (SVMType.String Nothing) x

@@ -1,5 +1,6 @@
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
 import "../Admin/AdminRegistry.sol";
@@ -479,7 +480,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = string(uint(externalTxHash, 16), 16, 32);
+        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
         require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
 
         AssetInfo a = assets[externalToken][externalChainId];
@@ -537,7 +538,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = string(uint(externalTxHash, 16), 16, 32);
+        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 
@@ -585,7 +586,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = string(uint(externalTxHash, 16), 16, 32);
+        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
@@ -631,7 +632,7 @@ contract record MercataBridge is Ownable {
 
         // Normalize the transaction hash to prevent case-variation replay attacks
         // This is because SolidVm does not support bytes32
-        string normalizedTxHash = string(uint(externalTxHash, 16), 16, 32);
+        string normalizedTxHash = StringUtils.normalizeHex(externalTxHash);
         DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
 

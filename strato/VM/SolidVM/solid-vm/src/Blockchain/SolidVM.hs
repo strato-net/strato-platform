@@ -1498,7 +1498,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) args) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
-      return . Constant . SString $ replicate (fromIntegral len) '\NUL'
+      return . Constant . SBytes $ B.replicate (fromIntegral len) 0
     _ -> arityMismatch "newBytes" 1 (length args)
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t})) args) = do
   case args of
@@ -1570,8 +1570,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
 expToVar' (CC.FunctionCall _ e args) = do
       argVals <- argsToVals args
       case e of -- FunctionCall Special Case when calling a function via Member Access
-        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall argVals Nothing --Because of the hardcoded Util functions
-        (CC.MemberAccess _ expr name) -> do
+        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals Nothing --Because of the hardcoded Util functions
+        (CC.MemberAccess ctx' expr name) -> do
           var1 <- expToVar expr
           val1 <- getVar var1
           case (val1, name) of
@@ -1628,18 +1628,29 @@ expToVar' (CC.FunctionCall _ e args) = do
               case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
-            (SAddress addr _, itemName) -> regularFunctionCall argVals $ Just (return $ Constant $ SContractItem addr itemName)
+            (SAddress addr _, itemName) -> regularFunctionCall e argVals $ Just (return $ Constant $ SContractItem addr itemName)
             (SDecimal v, "truncate") -> case argVals of
               (SInteger n:_) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
               _ -> invalidArguments ("truncate() called with non-integer value as argument") args
-            _ -> regularFunctionCall argVals Nothing
-        _ -> regularFunctionCall argVals Nothing
+            (SContractDef _, _) -> regularFunctionCall e argVals Nothing
+            _ -> do
+              ctrct <- getCurrentContract
+              contracts <- CC._contracts . snd <$> getCurrentCodeCollection
+              let usingContracts = mapMaybe
+                    (flip M.lookup contracts . CC._usingContract)
+                    (concat . M.elems $ ctrct ^. CC.usings)
+              case mapMaybe (\y -> y <$ M.lookup name (y ^. CC.functions)) usingContracts of
+                [] -> regularFunctionCall e argVals Nothing
+                c:_ -> regularFunctionCall
+                  (CC.MemberAccess ctx' (CC.Variable ctx' $ c ^. CC.contractName) name)
+                  (val1 : argVals) Nothing
+        _ -> regularFunctionCall e argVals Nothing
       where
-        regularFunctionCall :: MonadSM m => ValList -> Maybe (m Variable) -> m Variable
-        regularFunctionCall argVals mSCI = do
+        regularFunctionCall :: MonadSM m => CC.Expression -> ValList -> Maybe (m Variable) -> m Variable
+        regularFunctionCall expr argVals mSCI = do
           var <- case mSCI of
             Just sci -> sci
-            Nothing -> expToVar' e
+            Nothing -> expToVar' expr
           case var of
             Constant (SReference (AddressPath address (MS.StoragePath pieces))) -> do
               val' <- getVar $ Constant $ SReference $ AddressPath address $ MS.StoragePath $ init pieces

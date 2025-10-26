@@ -1,4 +1,4 @@
-contract Pairing {
+library Pairing {
     struct G1Point {
         uint X;
         uint Y;
@@ -103,7 +103,7 @@ contract Pairing {
     }
 }
 
-contract Verifier is Pairing {
+contract Verifier {
     using Pairing for *;
     struct VerifyingKey {
         G1Point alfa1;
