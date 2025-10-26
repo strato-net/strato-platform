@@ -136,7 +136,6 @@ const CollateralConfigManager = () => {
       const minCRContract = (BigInt(Math.floor(Number(values.minCR) * 100)) * WAD) / BigInt(100);
       
       // Convert stability fee rate from annual percentage to per-second RAY
-      // Uses shared utility function from @mercata/shared-types
       const annualPercentage = Number(values.stabilityFeeRate);
       const stabilityFeeRateContract = convertAnnualPercentageToStabilityFeeRate(annualPercentage);
       
