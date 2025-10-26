@@ -322,9 +322,11 @@ addTransactions blockData txs proposer =
     yield . OutASM $ foldr (flip M.union) M.empty $ map trrAfterMap trrs
     pure trrs
   where
+    go :: (VMBase m, MonadMonitor m) =>
+          Integer -> [OutputTx] -> DL.DList TxRunResult -> m [TxRunResult]
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
-      let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+      let bt = otBaseTx t
       flushMemAddressStateTxToBlockDB
       flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
@@ -350,8 +352,7 @@ mineTransactions bd remGas otxs mSelfAddress = mineTransactions' bd remGas DL.em
 mineTransactions' :: (VMBase m, MonadMonitor m) => BlockHeader -> Integer -> DL.DList TxRunResult -> [OutputTx] -> Address-> m Bagger.TxMiningResult
 mineTransactions' _ remGas ran [] _ = return $ Bagger.TxMiningResult Nothing (DL.toList ran) [] remGas
 mineTransactions' header remGas ran unran@(tx : txs) mSelfAddress = do
-
-  let bt = fromMaybe (otBaseTx tx) (otPrivatePayload tx)
+  let bt = otBaseTx tx
   beforeMap <- getAddressStateTxDBMap
   (!time', !result) <- timeIt . runExceptT $ addTransaction header remGas tx mSelfAddress
   afterMap <- getAddressStateTxDBMap
@@ -397,7 +398,7 @@ addTransaction ::
 addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   nonceValid <- lift $ isNonceValid t
 
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
   let maxGas = fromIntegral (maxBound :: Int)
   acctNonce <- lift $ addressStateNonce <$> A.lookupWithDefault (Proxy @AddressState) tAddr
 
@@ -470,7 +471,7 @@ runCodeForTransaction ::
   Address ->
   ExceptT TransactionFailureCause m ExecResults
 runCodeForTransaction b availableGas tAddr t proposer =
-  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let ut = otBaseTx t
    in if isContractCreationTX ut
         then do
           when flags_debug $ $logInfoS "runCodeForTransaction" "runCodeForTransaction: ContractCreationTX"
@@ -516,7 +517,6 @@ payFees ::
   Address ->
   ExceptT TransactionFailureCause m ExecResults
 payFees b availableGas tAddr t proposer = do
-  let ut = fromMaybe (otBaseTx t) (otPrivatePayload t)
   -- BEGIN: Custom Validation Check
   -- Call validation contract at 0xDEC1DE. Require it returns True.
 
@@ -528,7 +528,7 @@ payFees b availableGas tAddr t proposer = do
       proposer  --proposer
       (fromIntegral availableGas) --availableGas
       tAddr -- origin
-      (txHash ut) -- txHash
+      (txHash $ otBaseTx t) -- txHash
       "decide"
       []
       (Just DelegateCall)
@@ -537,7 +537,7 @@ payFees b availableGas tAddr t proposer = do
 {-
 codeOrDataLength :: OutputTx -> Int
 codeOrDataLength t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in if isMessageTX bt
         then B.length $ transactionData bt
         else codeLength $ transactionInit bt --is ContractCreationTX
@@ -548,7 +548,7 @@ codeLength (PtrToCode _) = 20
 
 zeroBytesLength :: OutputTx -> Int
 zeroBytesLength t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in if isMessageTX bt
         then length $ filter (== 0) $ B.unpack $ transactionData bt
         else length $ filter (== 0) $ B.unpack $ codeBytes' bt --is ContractCreationTX
@@ -562,7 +562,7 @@ calculateIntrinsicGas' blockNum = intrinsicGas (blockIsHomestead blockNum)
 
 intrinsicGas :: Bool -> OutputTx -> Gas
 intrinsicGas isHomestead t =
-  let bt = fromMaybe (otBaseTx t) (otPrivatePayload t)
+  let bt = otBaseTx t
    in gTXDATAZERO * zeroLen + gTXDATANONZERO * (fromIntegral (codeOrDataLength t) - zeroLen) + txCost bt
   where
     zeroLen = fromIntegral $ zeroBytesLength t
@@ -600,7 +600,7 @@ outputTransactionResult ::
   TxRunResult ->
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
-  let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+  let t = otBaseTx ot
       (txrStatus, message, gasRemaining, creator, appName) =
         case result of
           Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
@@ -687,8 +687,7 @@ printTransactionMessage ::
   NominalDiffTime ->
   m ()
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left errMsg) deltaT = do
-  let baseTx = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      tNonce = transactionNonce baseTx
+  let tNonce = transactionNonce $ otBaseTx ot
   multilineLog "printTx/err" $
     boringBox
       [ "Adding transaction signed by: " ++ format tAddr,
@@ -698,7 +697,7 @@ printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Left e
         "t = " ++ printf "%.5f" (realToFrac deltaT :: Double) ++ "s"
       ]
 printTransactionMessage ot@OutputTx {otSigner = tAddr, otHash = theHash} (Right results) deltaT = do
-  let t = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
+  let t = otBaseTx ot
       tNonce = transactionNonce t
       extra =
         if isMessageTX t

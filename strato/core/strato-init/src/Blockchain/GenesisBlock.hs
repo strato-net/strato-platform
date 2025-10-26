@@ -333,7 +333,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         fromDiff (Value v) = v
 
         mkCreator =
-            (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
+          (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
           =<< lookupSolidDiff ".:creator" storageDiff
 
         mkOriginAddress =

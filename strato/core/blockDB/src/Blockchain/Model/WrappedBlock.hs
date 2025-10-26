@@ -34,7 +34,7 @@ import           Blockchain.Strato.Model.Keccak256 (Keccak256)
 import           Control.DeepSeq
 import           Data.Binary
 import           Data.Data
-import           Data.Maybe                        (fromJust, fromMaybe)
+import           Data.Maybe                        (fromJust)
 import qualified GHC.Generics                      as GHCG
 import           Test.QuickCheck
 import           Test.QuickCheck.Arbitrary.Generic
@@ -69,8 +69,7 @@ data OutputTx = OutputTx
   { otOrigin         :: TO.TXOrigin,
     otHash           :: Keccak256,
     otSigner         :: A.Address,
-    otBaseTx         :: TX.Transaction,
-    otPrivatePayload :: Maybe TX.Transaction
+    otBaseTx         :: TX.Transaction
   }
   deriving (Eq, Read, Show, GHCG.Generic, NFData, Data)
 
@@ -130,8 +129,7 @@ wrapTransaction tx@IngestTx {} = do
             { otOrigin = itOrigin tx,
               otHash = TX.transactionHash baseTx,
               otSigner = signer,
-              otBaseTx = baseTx,
-              otPrivatePayload = Nothing
+              otBaseTx = baseTx
             }
 
 wrapTransactionUnanchored :: IngestTx -> Maybe OutputTx
@@ -145,8 +143,7 @@ wrapTransactionUnanchored tx@IngestTx {} =
               { otOrigin = itOrigin tx,
                 otHash = TX.transactionHash baseTx,
                 otSigner = signer,
-                otBaseTx = baseTx,
-                otPrivatePayload = Nothing
+                otBaseTx = baseTx
               }
 
 wrapIngestBlockTransaction :: Keccak256 -> TX.Transaction -> Maybe OutputTx
@@ -159,8 +156,7 @@ wrapIngestBlockTransaction hash tx =
           { otOrigin = TO.BlockHash hash,
             otSigner = signer,
             otBaseTx = tx,
-            otHash = TX.transactionHash tx,
-            otPrivatePayload = Nothing
+            otHash = TX.transactionHash tx
           }
 
 wrapIngestBlockTransactionUnanchored :: Keccak256 -> TX.Transaction -> Maybe OutputTx
@@ -173,8 +169,7 @@ wrapIngestBlockTransactionUnanchored hash tx =
           { otOrigin = TO.BlockHash hash,
             otSigner = signer,
             otBaseTx = tx,
-            otHash = TX.transactionHash tx,
-            otPrivatePayload = Nothing
+            otHash = TX.transactionHash tx
           }
 
 ingestBlockHash :: IngestBlock -> Keccak256
@@ -187,9 +182,7 @@ outputBlockToBlock :: OutputBlock -> BDB.Block
 outputBlockToBlock OutputBlock {obBlockData = bd, obReceiptTransactions = txs, obBlockUncles = us} = BDB.Block bd (otBaseTx <$> txs) us
 
 outputBlockToBlockRetainPayloads :: OutputBlock -> BDB.Block
-outputBlockToBlockRetainPayloads OutputBlock {obBlockData = bd, obReceiptTransactions = txs, obBlockUncles = us} =
-  let payload t = fromMaybe (otBaseTx t) (otPrivatePayload t)
-   in BDB.Block bd (payload <$> txs) us
+outputBlockToBlockRetainPayloads OutputBlock {obBlockData = bd, obReceiptTransactions = txs, obBlockUncles = us} = BDB.Block bd (otBaseTx <$> txs) us
 
 instance Witnessable IngestTx where
   witnessableHash = TX.partialTransactionHash . itTransaction
@@ -305,8 +298,7 @@ instance TransactionLike OutputTx where
       { otOrigin = TO.Direct, -- todo: introduce a "morph" conversion?
         otHash = txHash t,
         otSigner = fromJust (txSigner t), -- todo: D A N G E R
-        otBaseTx = morphTx t,
-        otPrivatePayload = Nothing
+        otBaseTx = morphTx t
       }
 
 instance RLPSerializable OutputBlock where
