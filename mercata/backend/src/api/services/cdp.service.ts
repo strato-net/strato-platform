@@ -9,6 +9,32 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
+
+const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string | bigint): number => {
+  const secondsPerYear = 31536000n; // 365 * 24 * 60 * 60
+  const annualFactorRay = rpow(BigInt(stabilityFeeRateRay), secondsPerYear, RAY);
+  const factorMinusOne = annualFactorRay - RAY;
+  const integerPart = factorMinusOne / RAY;
+  const remainder = factorMinusOne % RAY;
+  const PRECISION_SCALE = BigInt(1e18);
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
+  return annualPercentage;
+};
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -318,9 +344,7 @@ export const getVaults = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -412,9 +436,7 @@ export const getVault = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -1007,9 +1029,6 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
-  // Convert stability fee rate from RAY per second to annual percentage
-  const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
-  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1017,7 +1036,7 @@ export const getAssetConfig = async (
     minCR: Number(config.minCR) / Number(WAD) * 100,
     liquidationPenaltyBps: parseInt(config.liquidationPenaltyBps),
     closeFactorBps: parseInt(config.closeFactorBps),
-    stabilityFeeRate,
+    stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate),
     debtFloor: config.debtFloor,
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,

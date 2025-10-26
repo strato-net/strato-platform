@@ -199,7 +199,7 @@ const MintWidget: React.FC = () => {
     
     if (!approval.isApproved) {
       console.log("Approving Permit2...");
-      await writeContractAsync({
+      const approveTx = await writeContractAsync({
         address: ensureHexPrefix(tokenAddress),
         abi: ERC20_ABI,
         functionName: "approve",
@@ -207,6 +207,12 @@ const MintWidget: React.FC = () => {
         chain: await resolveViemChain(activeChainId),
         account: address as `0x${string}`,
       });
+      
+      await bridgeContractService.waitForTransaction(
+        approveTx,
+        activeChainId,
+      );
+      
       console.log("Permit2 approval completed");
     }
   };

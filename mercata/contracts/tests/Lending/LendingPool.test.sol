@@ -2,6 +2,7 @@ import "../../concrete/BaseCodeCollection.sol";
 import "../../abstract/ERC20/IERC20.sol";
 import "../../abstract/ERC20/access/Authorizable.sol";
 import "../../concrete/Tokens/Token.sol";
+import "../Util.sol";
 
 contract User {
     function do(address a, string f, variadic args) public returns (variadic) {
@@ -11,6 +12,7 @@ contract User {
 }
 
 contract Describe_LendingPool_Basic is Authorizable {
+    using TestUtils for *;
 
     struct LoanInfo {
         uint scaledDebt;     // user debt in index-scaled units
@@ -995,13 +997,11 @@ contract Describe_LendingPool_Basic is Authorizable {
         require(pool.paused() == true, "Pool should be paused");
 
         // Try to borrow while paused - should fail with custom message
-        try user.do(address(pool), "borrow", 100e18) {
-            revert("Borrow should fail when paused");
-        } catch {
-            /* expected - borrow blocked during pause */
-        }
+        string expectedErr = "This functionality has been paused and is currently not available";
+        TestUtils.callExpectFailure(user, address(pool), "borrow", expectedErr, 100e18);
 
         // Unpause and verify borrow works
+
         pool.unpause();
         require(pool.paused() == false, "Pool should be unpaused");
 

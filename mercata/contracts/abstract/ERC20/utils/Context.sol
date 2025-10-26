@@ -16,7 +16,7 @@ abstract contract Context {
         return msg.sender;
     }
 
-    function _msgData() internal view virtual returns (bytes ) {//MERCATA_COMPATIBILITY: This exists as bytes calldata in OpenZeppelin but that is not compatible with solidvm so changed to just bytes.
+    function _msgData() internal view virtual returns (variadic) {//MERCATA_COMPATIBILITY: This exists as bytes calldata in OpenZeppelin but that is not compatible with solidvm so changed to just bytes.
         return msg.data;
     }
 

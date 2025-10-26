@@ -147,6 +147,7 @@ contract record AdminRegistry is Ownable {
     }
 
     function _removeAdmin(address _admin) external onlyOwner {
+        require(admins.length > 1, "Cannot remove the last admin");
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];

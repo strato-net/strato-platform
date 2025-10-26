@@ -737,13 +737,14 @@ const VaultsList: React.FC<VaultsListProps> = ({ refreshTrigger, onVaultActionSu
               {/* Conditional Action Input/Button */}
               {activeActions[position.asset] && (
                 <div className="mt-4">
-                  {/* Show pause message for deposit/borrow when globally paused or asset paused */}
-                  {(isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'deposit' || activeActions[position.asset] === 'borrow') ? (
+                  {/* Show pause message only for borrow/withdraw when paused */}
+                  {/* Note: deposit and repay are NOT affected by pause (no whenNotPaused modifier) */}
+                  {(isGlobalPaused || assetPauseStates[position.asset]) && (activeActions[position.asset] === 'borrow' || activeActions[position.asset] === 'withdraw') ? (
                     <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-center">
                       <p className="text-sm text-yellow-700 font-medium">
                         {isGlobalPaused 
-                          ? "Deposit/Borrow paused by admin at this time"
-                          : `Deposit/Borrow for ${position.symbol} paused by admin at this time`
+                          ? `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} paused by admin at this time`
+                          : `${activeActions[position.asset] === 'borrow' ? 'Borrow' : 'Withdraw'} for ${position.symbol} paused by admin at this time`
                         }
                       </p>
                     </div>

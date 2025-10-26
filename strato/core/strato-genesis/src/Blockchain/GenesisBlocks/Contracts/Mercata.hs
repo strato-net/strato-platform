@@ -11,6 +11,7 @@ mercataContractFiles = [
   "contracts/abstract/ERC20/extensions/IERC20Metadata.sol",
   "contracts/abstract/ERC20/utils/Context.sol",
   "contracts/abstract/ERC20/utils/Pausable.sol",
+  "contracts/abstract/ERC20/utils/StringUtils.sol",
   "contracts/concrete/Admin/AdminRegistry.sol",
   "contracts/concrete/Admin/FeeCollector.sol",
   "contracts/concrete/BaseCodeCollection.sol",

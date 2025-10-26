@@ -39,6 +39,7 @@ import qualified Blockchain.Data.BlockHeader as BlockHeader
 import Blockchain.Data.ExecResults
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction (whoSignedThisTransactionEcrecover)
+import Blockchain.Data.Util (integer2Bytes)
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.SolidVM.Builtins as Builtins
 import Blockchain.SolidVM.CodeCollectionDB
@@ -58,6 +59,7 @@ import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
+import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
@@ -77,7 +79,7 @@ import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
 import Data.Bool (bool)
-import qualified Data.ByteString as B
+import qualified Data.ByteString        as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
 import Data.Decimal
@@ -768,7 +770,7 @@ runStatement (CC.RevertStatement mString theArgs pos) = do
       return $ revertError "REVERT" listOfVals
 
 -- Assignment to an index into an array or mapping
-runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
+runStatement st@(CC.SimpleStatement (CC.ExpressionStatement ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src)) pos) = do
   solidVMBreakpoint pos
   srcVar <- expToVar src
   srcVal <- getVar srcVar
@@ -799,6 +801,22 @@ runStatement st@(CC.SimpleStatement (CC.ExpressionStatement (CC.Binary _ "=" dst
       let newMap = M.insert theIndex srcVar theMap
       setVar pVar (SMap newMap)
       return Nothing
+    SBytes bs -> do
+      indVal <- getVar =<< expToVar indExp
+      case (indVal, srcVal) of
+        (SInteger ind, SInteger val) -> do
+          let ind' = fromIntegral ind
+          when ((ind' >= B.length bs || 0 > ind')) (invalidWrite "Cannot assign a value outside the allocated space for a bytestring" (unparseExpression ep))
+          let (pre', post) = B.splitAt ind' bs
+              newVal = SBytes $ B.concat
+                [ pre'
+                , B.singleton . fromIntegral $ val .&. 0xff
+                , maybe "" snd $ B.uncons post
+                ]
+          setVar pVar newVal
+          pure Nothing
+        (_, SInteger _) -> typeError ("bytestring index value (" ++ (show indVal) ++ ") is not an integer") (unparseExpression ep)
+        _ -> typeError ("bytestring element cannot be set to a non-integer (" ++ (show srcVal) ++ ")") (unparseExpression ep)
     _ -> do
       -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
       dstVar <- expToVar dst
@@ -1176,7 +1194,6 @@ expToVar' (CC.InlineBoundsCheck _ mL mU expr) = do
   pure var
 expToVar' (CC.Variable _ "bytes32ToString") = return $ Constant $ SHexDecodeAndTrim
 expToVar' (CC.Variable _ "addressToAsciiString") = return $ Constant SAddressToAscii
-expToVar' (CC.Variable _ "bytes") = return $ Constant $ SFunction "identity" Nothing
 expToVar' (CC.Variable _ "now") = Constant . SInteger . round . utcTimeToPOSIXSeconds . BlockHeader.timestamp . Env.blockHeader <$> getEnv
 expToVar' (CC.Variable _ name) = getVariableOfName name
 expToVar' (CC.Unitary _ "-" e) = do
@@ -1331,6 +1348,7 @@ expToVar' x@(CC.MemberAccess _ expr name) = do
       _ -> pure . Constant $ SPush (SArray V.empty) (Just var)
     (SArray theVector, "length") -> return $ Constant $ SInteger $ fromIntegral $ V.length theVector
     (SString s, "length") -> return . Constant . SInteger . fromIntegral $ length s
+    (SBytes bs, "length") -> return . Constant . SInteger . fromIntegral $ B.length bs
     (SNULL, "length") -> return . Constant $ SInteger 0
     (SReference p, itemName) -> return . Constant . SReference $ apSnoc p $ MS.Field $ BC.pack $ labelToString itemName
     ((SUserDefined alias notSure actualType), "wrap") -> return . Constant $ (SUserDefined alias notSure actualType) -- return $ Constant . SUserDefined alias val actualType
@@ -1351,6 +1369,9 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
           if (fromIntegral i) >= length theVector
             then indexOutOfBounds ("index value was " ++ (show i) ++ ", but the array length was " ++ (show $ length theVector)) $ unparseExpression x
             else return $ theVector V.! fromIntegral i
+        (SBytes bs, SInteger i) -> case bs B.!? fromIntegral i of
+          Just w -> pure . Constant . SInteger $ fromIntegral w
+          Nothing -> indexOutOfBounds ("index value was " ++ (show i) ++ ", but the bytes length was " ++ (show $ B.length bs)) $ unparseExpression x
         (SVariadic theList, SInteger i) -> case theList !? fromInteger i of
           Just v -> pure $ Constant v
           Nothing -> indexOutOfBounds ("index out of range: " ++ (show i)) $ unparseExpression x
@@ -1370,7 +1391,7 @@ expToVar' x@(CC.IndexAccess _ parent (Just mIndex)) = do
             Just (SMap _) -> pure $ Constant $ SMap M.empty
             _ -> internalError "Type of Mapping not allowed" theMap
         (SReference _, _) -> Constant . SReference <$> expToPath x
-        _ -> typeError "unsupported types for index access" $ unparseExpression x
+        _ -> typeError "unsupported types for index access" $ (val, theIndex, unparseExpression x)
 --    _ -> error $ "unknown case in expToVar' for IndexAccess: " ++ show var
 
 expToVar' (CC.Binary _ "+" expr1 expr2) = expToVarAdd expr1 expr2
@@ -1477,7 +1498,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ SVMType.Bytes {}) args) = do
   case args of
     [a] -> do
       len <- getInt =<< expToVar a
-      return . Constant . SString $ replicate (fromIntegral len) '\NUL'
+      return . Constant . SBytes $ B.replicate (fromIntegral len) 0
     _ -> arityMismatch "newBytes" 1 (length args)
 expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.Array {SVMType.entry = t})) args) = do
   case args of
@@ -1549,8 +1570,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
 expToVar' (CC.FunctionCall _ e args) = do
       argVals <- argsToVals args
       case e of -- FunctionCall Special Case when calling a function via Member Access
-        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall argVals Nothing --Because of the hardcoded Util functions
-        (CC.MemberAccess _ expr name) -> do
+        (CC.MemberAccess _ (CC.Variable _ "Util") _) -> regularFunctionCall e argVals Nothing --Because of the hardcoded Util functions
+        (CC.MemberAccess ctx' expr name) -> do
           var1 <- expToVar expr
           val1 <- getVar var1
           case (val1, name) of
@@ -1607,18 +1628,29 @@ expToVar' (CC.FunctionCall _ e args) = do
               case res of
                 Just a -> return $ Constant a
                 Nothing -> return $ Constant SNULL
-            (SAddress addr _, itemName) -> regularFunctionCall argVals $ Just (return $ Constant $ SContractItem addr itemName)
+            (SAddress addr _, itemName) -> regularFunctionCall e argVals $ Just (return $ Constant $ SContractItem addr itemName)
             (SDecimal v, "truncate") -> case argVals of
               (SInteger n:_) -> return . Constant $ SDecimal $ roundTo' truncate (fromInteger n) v
               _ -> invalidArguments ("truncate() called with non-integer value as argument") args
-            _ -> regularFunctionCall argVals Nothing
-        _ -> regularFunctionCall argVals Nothing
+            (SContractDef _, _) -> regularFunctionCall e argVals Nothing
+            _ -> do
+              ctrct <- getCurrentContract
+              contracts <- CC._contracts . snd <$> getCurrentCodeCollection
+              let usingContracts = mapMaybe
+                    (flip M.lookup contracts . CC._usingContract)
+                    (concat . M.elems $ ctrct ^. CC.usings)
+              case mapMaybe (\y -> y <$ M.lookup name (y ^. CC.functions)) usingContracts of
+                [] -> regularFunctionCall e argVals Nothing
+                c:_ -> regularFunctionCall
+                  (CC.MemberAccess ctx' (CC.Variable ctx' $ c ^. CC.contractName) name)
+                  (val1 : argVals) Nothing
+        _ -> regularFunctionCall e argVals Nothing
       where
-        regularFunctionCall :: MonadSM m => ValList -> Maybe (m Variable) -> m Variable
-        regularFunctionCall argVals mSCI = do
+        regularFunctionCall :: MonadSM m => CC.Expression -> ValList -> Maybe (m Variable) -> m Variable
+        regularFunctionCall expr argVals mSCI = do
           var <- case mSCI of
             Just sci -> sci
-            Nothing -> expToVar' e
+            Nothing -> expToVar' expr
           case var of
             Constant (SReference (AddressPath address (MS.StoragePath pieces))) -> do
               val' <- getVar $ Constant $ SReference $ AddressPath address $ MS.StoragePath $ init pieces
@@ -1835,7 +1867,6 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
 
   !pVar <- expToVar parent
   !pVal <- weakGetVar pVar
-
   -- If it's an array, calling (expToVar dst) gives us
   -- the value at the index, NOT a reference that we can
   -- assign to....so we need to make a new vector and reset the whole array
@@ -1854,6 +1885,22 @@ expToVar' ep@(CC.Binary _ "=" dst@(CC.IndexAccess _ parent (Just indExp)) src) =
       let newMap = M.insert theIndex srcVar theMap
       setVar pVar (SMap newMap)
       return $ Constant $ SBool True
+    SBytes bs -> do
+      indVal <- getVar =<< expToVar indExp
+      case (indVal, srcVal) of
+        (SInteger ind, SInteger val) -> do
+          let ind' = fromIntegral ind
+          when ((ind' >= B.length bs || 0 > ind')) (invalidWrite "Cannot assign a value outside the allocated space for a bytestring" (unparseExpression ep))
+          let (pre', post) = B.splitAt ind' bs
+              newVal = SBytes $ B.concat
+                [ pre'
+                , B.singleton . fromIntegral $ val .&. 0xff
+                , maybe "" snd $ B.uncons post
+                ]
+          setVar pVar newVal
+          pure $ Constant srcVal
+        (_, SInteger _) -> typeError ("bytestring index value (" ++ (show indVal) ++ ") is not an integer") (unparseExpression ep)
+        _ -> typeError ("bytestring element cannot be set to a non-integer (" ++ (show srcVal) ++ ")") (unparseExpression ep)
     _ -> do
       -- If it's a mapping, (expToVar dst) IS a reference, so we can set directly to it
       dstVar <- expToVar dst
@@ -2142,9 +2189,7 @@ parseBaseInt s n =
                  _ -> s
           prefix' = bool "0" "" . even $ length s'
        in case B16.decode (BC.pack $ prefix' ++ s') of
-            Right l ->
-              let zeros = 32 - B.length l
-               in Right . fromIntegral . bytesToWord256 $ B.replicate zeros 0x0 <> l
+            Right l -> Right $ byteString2Integer l
             _ -> Left $ "numeric cast - not a hex string " <> s
     _ -> Left $ "Cannot convert string " <> s <> " to base " <> show n
 
@@ -2156,6 +2201,9 @@ callBuiltin "string" [SInteger i, SInteger 10] = return . SString $ show i
 callBuiltin "string" [SInteger i, SInteger 16] = return . SString $ "0x" ++ Numeric.showHex i ""
 callBuiltin "string" [SInteger i, SInteger 16, SInteger bytes] = return . SString $ printf ("0x%0" ++ show (2*bytes) ++ "x") i
 callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
+callBuiltin "string" [SBytes bs] = pure . SString $ case DT.decodeUtf8' bs of
+  Left _ -> BC.unpack bs
+  Right t -> T.unpack t
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
 callBuiltin "string" vs = typeError "string cast" vs
@@ -2167,6 +2215,7 @@ callBuiltin "address" [ss@(SString s)] =
     (typeError "address cast" ss)
     (return . flip SAddress False)
     $ readMaybe s
+callBuiltin "address" [SBytes bs] = pure . flip SAddress False . Address . bytesToWord160 $ B.unpack bs
 callBuiltin "address" [SNULL] = return $ SAddress 0 False
 callBuiltin "address" [SReference{}] = return $ SAddress 0 False
 callBuiltin "address" vs = typeError "address cast" vs
@@ -2195,6 +2244,9 @@ callBuiltin "bool" vs = typeError "bool cast" vs
 callBuiltin "byte" [SInteger n] = return $ SInteger (n .&. 0xff)
 callBuiltin "byte" [SNULL] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" vs
+callBuiltin "bytes" [SInteger i] = pure . SBytes $ integer2Bytes i
+callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
 callBuiltin "uint" args = return $ intBuiltin args
 callBuiltin "int" args = return $ intBuiltin args
 callBuiltin "decimal" args = return $ decimalBuiltin args
@@ -3143,17 +3195,17 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
       -- These cases might not be all inclusive of all valid combinations.
       case (v, t) of
         (SInteger i, SVMType.Int _ _) -> pure . Just $ SInteger i
-        (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
+        -- (SInteger i, SVMType.String _) -> pure . Just . SString $ show i
         (SInteger i, SVMType.Address b) -> pure . Just $ SAddress (fromInteger i) b
         (SInteger i, SVMType.UnknownLabel _ _) -> pure . Just $ SAddress (fromInteger i) False
         (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
         (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
         (SString s, SVMType.String _) -> pure . Just $ SString s
         (SString s, SVMType.Bytes _ _) -> pure . Just $ SString s
-        (SString s, SVMType.Address b) -> pure $ flip SAddress b <$> stringAddress s
+        -- (SString s, SVMType.Address b) -> pure $ flip SAddress b <$> stringAddress s
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAddress a _, SVMType.Address b) -> pure . Just $ SAddress a b
-        (SAddress a _, SVMType.String _) -> pure . Just . SString $ show a
+        -- (SAddress a _, SVMType.String _) -> pure . Just . SString $ show a
         (SAddress a _, SVMType.Int _ _) -> pure . Just . SInteger . fromIntegral $ unAddress a
         (SEnumVal r x y, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SEnumVal r x y) $ r == u
         (SStruct r x, SVMType.UnknownLabel u _) -> pure . bool Nothing (Just $ SStruct r x) $ r == u
