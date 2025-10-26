@@ -30,6 +30,7 @@ import Blockchain.SolidVM.SM
 import Control.Monad
 import Control.Monad.IO.Class
 import qualified Data.ByteString.Char8 as BC
+import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.UTF8 as UTF8
 import Data.Bool (bool)
 import Data.Decimal
@@ -218,6 +219,7 @@ showSM :: MonadSM m => Value -> m String
 showSM SNULL = return "NULL"
 showSM (SInteger v) = return $ show v
 showSM (SString v) = return v
+showSM (SBytes v) = return . BC.unpack $ B16.encode v
 showSM (SDecimal v) = return $ show v
 showSM (SBool v) = return $ show v
 showSM (SEnumVal enumName valName num) =
@@ -269,6 +271,7 @@ jsonSM = go False
     go _ SNULL = return "null"
     go _ (SInteger v) = return $ show v
     go b (SString v) = return $ bool id show b v
+    go b (SBytes v) = return . bool id show b . BC.unpack $ B16.encode v
     go _ (SBool v) = return $ bool "false" "true" v
     go _ (SEnumVal _ _ num) = return $ show num
     go b (SAddress a _) = return . bool id show b $ show a
