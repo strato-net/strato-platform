@@ -69,6 +69,7 @@ toBasic = \case
   SContract n a -> Just $ MS.BContract n a
   SEnumVal k t num -> Just $ MS.BEnumVal k t num
   SUserDefined _ _ x -> toBasic x
+  SBytes bs -> Just $ MS.BString bs
   _ -> Nothing
 
 setVar :: MonadSM m => Variable -> Value -> m ()

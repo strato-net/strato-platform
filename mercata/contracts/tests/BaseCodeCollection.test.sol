@@ -1,4 +1,5 @@
 import "../abstract/ERC20/access/Authorizable.sol";
+import "../abstract/ERC20/utils/StringUtils.sol";
 import "../concrete/BaseCodeCollection.sol";
 import "General/main.groth16.sol";
 
@@ -10,6 +11,7 @@ contract User {
 }
 
 contract Describe_Mercata is Authorizable {
+    using StringUtils for string;
     constructor() {
     }
 
@@ -127,7 +129,7 @@ contract Describe_Mercata is Authorizable {
         string x = string(w, 16);
         uint y = uint(x);
         string z = string(y, 16);
-        require(w == y && x == z, "Hex encoding failed: " + intercalate(", ", [string(w), x, string(y), z]));
+        require(w == y && x == z, "Hex encoding failed: " + ", ".intercalate([string(w), x, string(y), z]));
     }
 
     struct Transaction {
@@ -188,21 +190,10 @@ contract Describe_Mercata is Authorizable {
         require(success, "Groth16 proof failed!");
     }
 
-    function intercalate(string s, string[] strs) internal returns (string) {
-        string r = "";
-        for (uint i = 0; i < strs.length; i++) {
-            if (i > 0) {
-                r += s;
-            }
-            r += strs[i];
-        }
-        return r;
-    }
-
     string output;
 
     function performIssue(uint num, bool should, address isDeadbeef, string message) public {
-        output = intercalate(",", [string(num), string(should), string(isDeadbeef), string(message)]);
+        output = ",".intercalate([string(num), string(should), string(isDeadbeef), string(message)]);
     }
 
     function it_can_execute_issues() {
@@ -292,5 +283,18 @@ contract Describe_Mercata is Authorizable {
         adminUser.do(address(admin), "castVoteOnIssue", address(admin), "updateDelegate", "_shouldExecute", newVotingRules);
         admin.removeAdmin(address(adminUser));
         require(admin.admins(0) == address(this) && admin.admins(1) == address(0), "Voting logic was not overwritten properly");
+    }
+
+    function it_can_use_string_utils() {
+        string v = "HeLlO wOrLd";
+        string w = v.toLower();
+        string x = v.toUpper();
+        string y = w.toUpper();
+        string z = v.b16encode();
+        string alpha = z.b16decode();
+        require(w == "hello world", w);
+        require(x == y, x + ", " + y);
+        require(z == "48654c6c4f20774f724c64", z);
+        require(alpha == v, alpha);
     }
 }

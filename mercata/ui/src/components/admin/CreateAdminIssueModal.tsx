@@ -120,7 +120,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
         return [false, 'Invalid JSON'];
       }
     }
-    return [true, value.trim()];
+    return [true, `"${value.trim().replace("\"","\\\"")}"`];
   }
 
   const getTypeName = (_type: object): string => {
