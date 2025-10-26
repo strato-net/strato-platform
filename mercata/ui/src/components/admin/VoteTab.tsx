@@ -119,7 +119,8 @@ const VoteTab = () => {
             <Button
               size="sm"
               onClick={() => setRemoveAdminOpen(true)}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={admins.length <= 1}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Remove Admin
             </Button>
