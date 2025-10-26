@@ -995,13 +995,17 @@ contract Describe_LendingPool_Basic is Authorizable {
         require(pool.paused() == true, "Pool should be paused");
 
         // Try to borrow while paused - should fail with custom message
+        string e;
+        string expectedErr = "This functionality has been paused and is currently not available";
         try user.do(address(pool), "borrow", 100e18) {
             revert("Borrow should fail when paused");
-        } catch {
-            /* expected - borrow blocked during pause */
+        } catch Error(string z) {
+            e = z;
         }
+        require(e == 'SString "' + expectedErr + '"', "borrow threw the wrong error: " + e);
 
         // Unpause and verify borrow works
+
         pool.unpause();
         require(pool.paused() == false, "Pool should be unpaused");
 
