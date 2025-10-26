@@ -543,4 +543,36 @@ contract Describe_AdminRegistry is Authorizable {
         require(reverted, "Should revert when delegatecalling into an internal function");
     }
 
+    function it_admin_registry_prevents_removal_of_last_admin() {
+        // Scenario: Start with 2 admins, remove one, then try to remove the last one
+        // Should revert with "Cannot remove the last admin"
+
+        // Verify we start with 2 admins
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should be an admin");
+        require(adminRegistry.isAdminAddress(address(user1)), "User1 should be an admin");
+
+        // Step 1: Remove user1 (second admin) - this should succeed
+        adminRegistry.removeAdmin(address(user1));
+        user1.do(address(adminRegistry), "removeAdmin", address(user1));
+
+        // Verify user1 is no longer an admin and only admin1 remains
+        require(!adminRegistry.isAdminAddress(address(user1)), "User1 should no longer be an admin");
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin");
+
+        // Step 2: Try to remove the last admin (admin1) - this should revert
+        bool reverted = false;
+        try {
+            // Since we're now the only admin, our single vote would normally execute immediately
+            // But the _removeAdmin function should revert before execution
+            adminRegistry.removeAdmin(admin1);
+        } catch {
+            reverted = true;
+        }
+
+        require(reverted, "Should revert when trying to remove the last admin");
+
+        // Verify admin1 is still an admin
+        require(adminRegistry.isAdminAddress(admin1), "Admin1 should still be an admin after failed removal");
+    }
+
 }
