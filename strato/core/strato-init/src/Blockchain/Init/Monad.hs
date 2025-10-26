@@ -37,7 +37,6 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans.Resource
-import qualified Data.ByteString as B
 import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
@@ -55,8 +54,8 @@ data SetupDBs = SetupDBs
     hashDB :: HashDB,
     codeDB :: CodeDB,
     vaultDB :: ClientEnv,
-    localStorageTx :: IORef (M.Map (Address, B.ByteString) BasicValue),
-    localStorageBlock :: IORef (M.Map (Address, B.ByteString) BasicValue),
+    localStorageTx :: IORef (M.Map (Address, StoragePath) BasicValue),
+    localStorageBlock :: IORef (M.Map (Address, StoragePath) BasicValue),
     localAddressStateTx :: IORef (M.Map Address AddressStateModification),
     localAddressStateBlock :: IORef (M.Map Address AddressStateModification)
   }

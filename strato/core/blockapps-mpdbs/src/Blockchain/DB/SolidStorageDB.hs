@@ -43,7 +43,7 @@ type FullSolidStorage m =
   )
 
 toKey :: Address -> StoragePath -> RawStorageKey
-toKey = curry $ fmap unparsePath
+toKey k v = (k, v)
 
 toVal :: BasicValue -> RawStorageValue
 toVal bv =

@@ -65,7 +65,6 @@ import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
 import Debugger
@@ -247,10 +246,9 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
 
 instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => (Address `A.Selectable` X509Certificate) (ReaderT Context m) where
   select _ k = do
-    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      mBString <- A.lookup (A.Proxy) (certAddress, ".certificateString" :: StoragePath)
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
