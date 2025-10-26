@@ -76,12 +76,15 @@ const BridgeIn: React.FC = () => {
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
-    loading: boolean 
+    loading: boolean;
   }>({ 
     amount: "", 
     amountWei: 0n,
-    loading: false 
+    loading: false
   });
+  
+  // State for token permission status
+  const [isTokenPermitted, setIsTokenPermitted] = useState(true);
 
   // ============================================
   // Derived State & Computed Values
@@ -92,7 +95,7 @@ const BridgeIn: React.FC = () => {
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken === NATIVE_TOKEN_ADDRESS;
+  const isNativeToken = selectedToken?.externalToken? false : true;
 
   // ============================================
   // Balance Hooks
@@ -162,15 +165,17 @@ const BridgeIn: React.FC = () => {
       setMinDepositInfo({ 
         amount: formattedMinAmount, 
         amountWei: minAmountWei,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(tokenConfig.isPermitted);
     } catch (error) {
       console.error("Error fetching min deposit amount:", error);
       setMinDepositInfo({ 
         amount: "0", 
         amountWei: 0n,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(true);
     }
   };
 
@@ -318,7 +323,7 @@ const BridgeIn: React.FC = () => {
       amount,
       parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.externalToken === NATIVE_TOKEN_ADDRESS;
+    const isNative = selectedToken.externalToken? false : true;
 
     return {
       selectedToken,
@@ -339,7 +344,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken
+      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
     });
 
     if (!validation.isValid) {
@@ -524,7 +529,6 @@ const BridgeIn: React.FC = () => {
       // Validate
       const ctx = preflight();
       await validateOnChain(ctx);
-
       let permitData:
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
@@ -534,7 +538,6 @@ const BridgeIn: React.FC = () => {
       }
 
       const txHash = await simulateAndSend(ctx, permitData);
-
       const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
       toast({
         title: "Transaction Sent",
@@ -733,7 +736,8 @@ const BridgeIn: React.FC = () => {
             !amount ||
             !selectedToken ||
             !isConnected ||
-            !isCorrectNetwork
+            !isCorrectNetwork ||
+            !isTokenPermitted
           }
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
@@ -763,6 +767,14 @@ const BridgeIn: React.FC = () => {
             selectedToken &&
             amount &&
             isCorrectNetwork &&
+            !isTokenPermitted &&
+            "Token Not Permitted"}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            amount &&
+            isCorrectNetwork &&
+            isTokenPermitted &&
             "Bridge Assets"}
         </Button>
       </div>

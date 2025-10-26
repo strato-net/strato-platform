@@ -980,4 +980,34 @@ contract Describe_LendingPool_Basic is Authorizable {
         require(address(registry.priceOracle()) == priceOracle, "Price oracle should be reset");
     }
 
+    function it_lending_hb_paused_functions_are_blocked_during_pause() public {
+        LendingPool pool = m.lendingPool();
+        CollateralVault cv = m.collateralVault();
+
+        // Create a user with collateral to attempt borrow
+        User user = new User();
+        Token(GOLDST).mint(address(user), 1e18);
+        user.do(GOLDST, "approve", address(cv), 1e18);
+        user.do(address(pool), "supplyCollateral", address(GOLDST), 1e18);
+
+        // Pause the lending pool
+        pool.pause();
+        require(pool.paused() == true, "Pool should be paused");
+
+        // Try to borrow while paused - should fail with custom message
+        try user.do(address(pool), "borrow", 100e18) {
+            revert("Borrow should fail when paused");
+        } catch {
+            /* expected - borrow blocked during pause */
+        }
+
+        // Unpause and verify borrow works
+        pool.unpause();
+        require(pool.paused() == false, "Pool should be unpaused");
+
+        // Now borrow should succeed
+        user.do(address(pool), "borrow", 100e18);
+        require(pool.getUserDebt(address(user)) > 0, "Borrow should succeed after unpause");
+    }
+
 }

@@ -906,6 +906,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ toPaths $ owne
      , (".collateralConfigs[" <> addrBS usdstAddress <> "].debtCeiling", BInteger $ 10_000_000 * oneE18)
      , (".collateralConfigs[" <> addrBS usdstAddress <> "].closeFactorBps", BInteger 5_000)
      , (".collateralConfigs[" <> addrBS usdstAddress <> "].liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
+     , (".collateralConfigs[" <> addrBS usdstAddress <> "].minCR", BInteger $ 31 * oneE18 `div` 20)
      , (".collateralConfigs[" <> addrBS usdstAddress <> "].stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
      , (".collateralConfigs[" <> addrBS usdstAddress <> "].liquidationPenaltyBps", BInteger 1_000)
      , (".collateralGlobalStates[" <> addrBS usdstAddress <> "].rateAccumulator", BInteger ray)
@@ -917,7 +918,6 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ toPaths $ owne
      , (".juniorIndex", BInteger ray)
      , (".totalJuniorOutstandingUSDST", BInteger 0)
      , (".prevReserveBalance", BInteger 0)
-     , (".priceMaxAge", BInteger 1200)
      ]
   ++ concatMap (\a ->
     [ (".collateralConfigs[" <> addrBS a <> "].debtFloor", BInteger oneE18)
@@ -925,6 +925,7 @@ cdpEngine = SolidVMContractWithStorage cdpEngineAddress 0 proxy $ toPaths $ owne
     , (".collateralConfigs[" <> addrBS a <> "].debtCeiling", BInteger $ 10_000_000 * oneE18)
     , (".collateralConfigs[" <> addrBS a <> "].closeFactorBps", BInteger 5_000)
     , (".collateralConfigs[" <> addrBS a <> "].liquidationRatio", BInteger $ 3 * oneE18 `div` 2)
+    , (".collateralConfigs[" <> addrBS a <> "].minCR", BInteger $ 31 * oneE18 `div` 20)
     , (".collateralConfigs[" <> addrBS a <> "].stabilityFeeRate", BInteger $ ray + 627_937_192_293_877_252)
     , (".collateralConfigs[" <> addrBS a <> "].liquidationPenaltyBps", BInteger 1_000)
     , (".collateralGlobalStates[" <> addrBS a <> "].rateAccumulator", BInteger ray)
@@ -944,9 +945,10 @@ cdpEngineEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockAp
     ("Deposited", [("user", show borrower), ("asset", show assetRootAddress), ("amount", show collateralQuantity)])
   ) combinedEscrows
   ++ map (\a ->
-    ("Deposited",
+    ("CollateralConfigured",
       [ ("asset", show a)
       , ("liquidationRatio", show $ 3 * oneE18 `div` 2)
+      , ("minCR", show $ 31 * oneE18 `div` 20)
       , ("liquidationPenaltyBps", "1000")
       , ("closeFactorBps", "5000")
       , ("stabilityFeeRate", show $ ray + oneE18 + 547_000_000_000_000_000)
