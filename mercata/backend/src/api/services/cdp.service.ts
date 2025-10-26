@@ -24,6 +24,31 @@ const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
 
 /**
+ * Convert stability fee rate from RAY per-second format to annual percentage
+ * @param stabilityFeeRateRay - On-chain rate in RAY format (e.g. 1000000001756337899543379 for 5.54% APY)
+ * @returns Annual percentage rate (e.g. 5.54)
+ * 
+ * Note: Uses compound interest calculation matching the contract's _rpow behavior
+ * Formula: APR = ((stabilityFeeRate / RAY) ^ secondsPerYear - 1) * 100
+ */
+const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string | bigint): number => {
+  const secondsPerYear = 31536000; // 365 * 24 * 60 * 60
+  
+  // Convert RAY format to decimal (per-second factor)
+  // stabilityFeeRate is stored as RAY format (e.g., 1.000000000627... * 1e27)
+  const perSecondFactor = Number(BigInt(stabilityFeeRateRay)) / Number(RAY);
+  
+  // Apply compound interest: raise to the power of seconds per year
+  // This matches the contract's rpow(stabilityFeeRate, dt, RAY) calculation
+  const annualFactor = Math.pow(perSecondFactor, secondsPerYear);
+  
+  // Convert to percentage: (factor - 1) * 100
+  const annualPercentage = (annualFactor - 1) * 100;
+  
+  return annualPercentage;
+};
+
+/**
  * Generic Cirrus fetch for the CDPRegistry row.
  * Similar to getPool() in lending service
  */
@@ -318,9 +343,7 @@ export const getVaults = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -412,9 +435,7 @@ export const getVault = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -1007,9 +1028,6 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
-  // Convert stability fee rate from RAY per second to annual percentage
-  const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
-  
   return {
     asset,
     symbol: tokenInfo.symbol,
@@ -1017,7 +1035,7 @@ export const getAssetConfig = async (
     minCR: Number(config.minCR) / Number(WAD) * 100,
     liquidationPenaltyBps: parseInt(config.liquidationPenaltyBps),
     closeFactorBps: parseInt(config.closeFactorBps),
-    stabilityFeeRate,
+    stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate),
     debtFloor: config.debtFloor,
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
