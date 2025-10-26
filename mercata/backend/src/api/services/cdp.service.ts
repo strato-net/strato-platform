@@ -9,6 +9,32 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
+
+const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string | bigint): number => {
+  const secondsPerYear = 31536000n; // 365 * 24 * 60 * 60
+  const annualFactorRay = rpow(BigInt(stabilityFeeRateRay), secondsPerYear, RAY);
+  const factorMinusOne = annualFactorRay - RAY;
+  const integerPart = factorMinusOne / RAY;
+  const remainder = factorMinusOne % RAY;
+  const PRECISION_SCALE = BigInt(1e18);
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
+  return annualPercentage;
+};
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -22,31 +48,6 @@ const {
 
 const RAY = BigInt(10) ** BigInt(27);
 const WAD = BigInt(10) ** BigInt(18);
-
-/**
- * Convert stability fee rate from RAY per-second format to annual percentage
- * @param stabilityFeeRateRay - On-chain rate in RAY format (e.g. 1000000001756337899543379 for 5.54% APY)
- * @returns Annual percentage rate (e.g. 5.54)
- * 
- * Note: Uses compound interest calculation matching the contract's _rpow behavior
- * Formula: APR = ((stabilityFeeRate / RAY) ^ secondsPerYear - 1) * 100
- */
-const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string | bigint): number => {
-  const secondsPerYear = 31536000; // 365 * 24 * 60 * 60
-  
-  // Convert RAY format to decimal (per-second factor)
-  // stabilityFeeRate is stored as RAY format (e.g., 1.000000000627... * 1e27)
-  const perSecondFactor = Number(BigInt(stabilityFeeRateRay)) / Number(RAY);
-  
-  // Apply compound interest: raise to the power of seconds per year
-  // This matches the contract's rpow(stabilityFeeRate, dt, RAY) calculation
-  const annualFactor = Math.pow(perSecondFactor, secondsPerYear);
-  
-  // Convert to percentage: (factor - 1) * 100
-  const annualPercentage = (annualFactor - 1) * 100;
-  
-  return annualPercentage;
-};
 
 /**
  * Generic Cirrus fetch for the CDPRegistry row.
