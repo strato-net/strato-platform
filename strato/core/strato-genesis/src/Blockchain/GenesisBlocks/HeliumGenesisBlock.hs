@@ -280,6 +280,7 @@ combinedEscrows :: [GE.Escrow]
 combinedEscrows = M.elems
                 . foldr (\e -> M.unionWith go $ M.singleton (GE.assetRootAddress e, GE.borrower e) e) M.empty
                 . map alloy
+                . map correctBorrower
                 . map correctQ
                 $ filter GE.isActive GE.escrows
   where go e1 e2 = e2
@@ -293,6 +294,7 @@ combinedEscrows = M.elems
                                     }
             | a == altSilvstRoot -> e{ GE.assetRootAddress = silvstRoot }
             | otherwise -> e
+        correctBorrower e = e{GE.borrower = maybe (GE.borrower e) id . M.lookup (GE.borrower e) $ prodSecondaryAccounts}
         correctQ e = case M.lookup (GE.assetRootAddress e) assetMap of
           Nothing -> e
           Just GA.Asset{..} -> e{ GE.collateralQuantity = correctQuantity decimals name (GE.collateralQuantity e) }
@@ -557,6 +559,7 @@ assetBalances GA.Asset{..} =
          in case mEscrowBalance of
               Nothing -> [(o, q)]
               Just escrowBalance -> [(o, max 0 $ q - escrowBalance), (cdpVaultAddress, escrowBalance)])
+    . map (\(o, q) -> (maybe o id $ M.lookup o prodSecondaryAccounts, q))
     . concatMap (\case
       (GA.Balance _ o c q)
         | root == usdstAddress &&  c == "mercata_usdst" ->
@@ -1099,3 +1102,77 @@ descriptions = M.fromList
     ("ETHST", "ETHST brings staked Ethereum into STRATO Mercata, giving users a flexible way to earn rewards while benefiting from integrated DeFi features."),
     ("GOLDST", "GOLDST provides fractional ownership of investment-grade gold backed by audited and insured physical gold; this combines traditional stability with digital efficiency. Each token represents one troy ounce of 99.5% pure gold (minimum), and can be redeemed for physical gold (fees apply).")
   ]
+
+-- These are sets of accounts on prod v1 that are linked to the same common name,
+-- and are being aggregated in v2. The keys of the map are the primary account
+-- for each common name, and the values are the list of accounts linked to the
+-- same common name which should be aggregated into the primary account
+prodPrimaryAccounts :: M.Map Address [Address]
+prodPrimaryAccounts = M.fromList
+  [ ( 0x1a7e8a2b83e3114e71c95e3a4620e5d928b85ade
+    , [ 0x72b0e71ec6f82c373f491e36c882731a74a2e5e2
+      , 0xd4cca588d55027a1d6ab17896ecad1d9cd986b63
+      , 0xef06f75dc290b3ca9a331269dbdcc53a020b49ff
+      , 0x800269512ec3f5d5a87050c59d734d212296d02c
+      , 0x4b69496c84b395f0e1be0ab56ac9dd16f63874ad
+      ]
+    )
+  , ( 0x29c7f5bea128fcf2d994a15b251f302b4e80be24
+    , [ 0x630b45a42355a6b7f3336a2b0c2c2bf802792d08
+      , 0x42b55b0147ae7c64bbb2c36bae897584f2e951b6
+      , 0x094eccc85da10f9a5f66a374bade59ee8567c89c
+      , 0xc5f218ad4e41c41748838e0224f8f05fca8c96df
+      , 0xa45419065d5d1aad59a49db23eacf97e250c25c5
+      , 0xe962c4daf836a146460fbb4f17bdd0ef51c0d049
+      ]
+    )
+  , ( 0x7f325e966cca5dd9e0e09ee633a7d2f64876e2b0
+    , [ 0x88c86a17438dbf6735597ac4c315471df0967cff
+      , 0xb373b00913501a0b8560344bfdf5d2d970d9bca2
+      ]
+    )
+  , ( 0xfe7349b08cb8cd8a816a806e653152549cf72ee3
+    , [ 0xa8d0373e51b1cbdff071b93b2f27276f9a14d47d
+      ]
+    )
+  , ( 0xbfe7966421a5a6cb6e4223a571a065ed535f875c
+    , [ 0x0dbd21cefacd6db82fc1786d9f638f18f196488a
+      ]
+    )
+  , ( 0xe883c985bf04b48b1a3cc949cbe6474c4bb0edd9
+    , [ 0x4ad52875d110c65325bff65efdfce8759631284a
+      , 0x92332449f8939e28111ba77ff77fe6df360dae29
+      , 0xdf56022365441de788e875bb7928fefb18940f96
+      ]
+    )
+  , ( 0x7630b673862a2807583834908f10192e00c58b00
+    , [ 0x1d3e6e35bbf6a63118412b4dc7c9d9db1e19d89f
+      ]
+    )
+  , ( 0x0b46ddfc56961593efd9f84d31f68e51c4314077
+    , [ 0x23d6588a3f019fb60933f3200bdfa59ade356ed8
+      , 0x8c470fdfec4fb75590236a6635492283de90c8e7
+      ]
+    )
+  , ( 0xa2e3baef89827f62e4ae41a2c8c67bae577f7223
+    , [ 0xd42f17b97c178a382cd9d804c52479c966d0629c
+      ]
+    )
+  , ( 0xb31809071175b200185b3d6fc1a5aaea27c0e39d
+    , [ 0x224bc061fbd530f5d3dbc9acd443f648da2de5b8
+      , 0x069ec0c2399f6e870d038f5d915c2775021a191b
+      ]
+    )
+  , ( 0xb24419e1cdb9f05d5a31e2e7d0f3f3383a7e77ed
+    , [ 0xe2bcc65bd1130423c997da94caa4c47eea6674bc
+      , 0xdcdcbe6b4632d818cb81b3ad10e1640f87347dc4
+      , 0xe8c0f42a18464706c5e71362a046bc20a14e735b
+      ]
+    )
+  ]
+
+-- Map that links each secondary account back to the primary
+prodSecondaryAccounts :: M.Map Address Address
+prodSecondaryAccounts = M.fromList
+                      . concatMap (\(p, ss) -> (,p) <$> ss)
+                      $ M.toList prodPrimaryAccounts
