@@ -109,7 +109,7 @@ contract record LendingPool is Ownable, Pausable {
         // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
         RAY = 1e27;
         SECONDS_PER_YEAR = 31536000;
-        
+
         require(_registry != address(0), "Invalid registry address");
         registry = LendingRegistry(_registry);
         require(_poolConfigurator != address(0), "Invalid pool configurator address");
@@ -129,6 +129,13 @@ contract record LendingPool is Ownable, Pausable {
     modifier onlyTokenFactory(address token) {
         require(token != address(0) && tokenFactory.isTokenActive(token), "Invalid or inactive token");
         _;
+    }
+
+    /**
+     * @dev Override to provide custom error message when contract is paused
+     */
+    function _requireNotPaused() internal view override {
+        require(!paused(), "This functionality has been paused and is currently not available");
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
