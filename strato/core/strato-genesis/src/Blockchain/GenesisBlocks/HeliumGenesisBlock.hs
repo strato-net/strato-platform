@@ -139,8 +139,37 @@ silvstRoot = 0x2c59ef92d08efde71fe1a1cb5b45f4f6d48fcc94
 altSilvstRoot :: Address
 altSilvstRoot = 0x7b5f6d756c4e02104d5039205442cf7aa913a8a6
 
+usdtstRoot :: Address
+usdtstRoot = 0x86a5ae535ded415203c3e27d654f9a1d454c553b
+
+usdcstRoot :: Address
+usdcstRoot = 0x3d351a4a339f6eef7371b0b1b025b3a434ad0399
+
+stratRoot :: Address
+stratRoot = 0xd2810818e0401e85693f83107ed2b96faeed329c
+
+saddogsRoot :: Address
+saddogsRoot = 0x43ae2c4bf5d7d16f53c9f6439d834b3d9f647b40
+
+saddogsObsolete :: [Address]
+saddogsObsolete =
+  [ 0xa6ef33a73aa86cd39fea0f3316c9ad997a0be7c1
+  , 0xba97647cea97eec3fe1680584e0401e918ea6c6d
+  , 0xdbf23119bb52a7419c66c7b5055dd3f31545dc14
+  ]
+
 -- paxgstRoot :: Address
 -- paxgstRoot = 0x491cdfe98470bfe69b662ab368826dca0fc2f24d
+
+obsoleteTokens :: [Address]
+obsoleteTokens =
+  [ goldOunceRoot
+  , goldGramRoot
+  , altSilvstRoot
+  , usdtstRoot
+  , usdcstRoot
+  , stratRoot
+  ] ++ saddogsObsolete
 
 mercataAddress :: Address
 mercataAddress = 0x1000
@@ -552,7 +581,7 @@ ray :: Integer
 ray = 1_000_000_000 * oneE18
 
 lastAccrual :: Integer
-lastAccrual = 1761192000 -- October 23th, 2025, 12:00:00 AM
+lastAccrual = 1761537600 -- October 27th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
@@ -567,9 +596,13 @@ assetBalances GA.Asset{..} =
     . map (\(o, q) -> (maybe o id $ M.lookup o prodSecondaryAccounts, q))
     . concatMap (\case
       (GA.Balance _ o _ q)
-        -- | root == usdstAddress &&  c == "mercata_usdst" ->
-        --     [ (blockappsTestAddress, correctQuantity decimals name q)
-        --     ]
+        | root == usdstAddress ->
+            let usdstBalance = correctQuantity decimals name q
+                usdtstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup usdtstRoot assetMap
+                usdcstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup usdcstRoot assetMap
+             in [(o, usdstBalance + usdtstBalance + usdcstBalance)]
+        | root == usdtstRoot -> []
+        | root == usdcstRoot -> []
         | root == goldstRoot ->
             let goldstBalance = correctQuantity decimals name q
                 goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
@@ -595,27 +628,29 @@ assetToAddressInfos blockappsAddress asset@GA.Asset{..} =
       description' = fromMaybe description $ M.lookup name' descriptions
    in case allBalances of
         [] -> Nothing
-        _ -> Just . SolidVMContractWithStorage root 0 proxy $ toPaths $
-          ownedByBlockApps root blockappsAddress ++
-          [ ("logicContract", BAddress tokenImplAddress)
-          , ("_name", BString $ encodeUtf8 name')
-          , ("_symbol", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 $ takeCaps name)
-          , ("_erc20Initialized", BBool True)
-          , ("description", BString $ encodeUtf8 description')
-          , ("customDecimals", BInteger 18)
-          , ("_totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
-          , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
-          , ("images.length", BInteger . fromIntegral $ length images)
-          , ("files.length", BInteger . fromIntegral $ length files)
-          , ("fileNames.length", BInteger . fromIntegral $ length fileNames)
-          ] ++ map (\(k,v) -> ("images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
-            ++ map (\(k,v) -> ("files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
-            ++ map (\(k,v) -> ("fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
-            ++ map (\(k,v) -> ("attributes[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList assetData)
-            ++ [(maybe ("status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3)
-                (const ("status", if not (name `elem` ["USDCST", "USDTST"]) then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3))
-                $ find (== root) supportedCollaterals)]
-            ++ allBalances
+        _ -> if root `elem` obsoleteTokens
+          then Nothing
+          else Just . SolidVMContractWithStorage root 0 proxy $ toPaths $
+            ownedByBlockApps root blockappsAddress ++
+            [ ("logicContract", BAddress tokenImplAddress)
+            , ("_name", BString $ encodeUtf8 name')
+            , ("_symbol", if root == silvstRoot then BString "SILVST" else BString $ encodeUtf8 $ takeCaps name)
+            , ("_erc20Initialized", BBool True)
+            , ("description", BString $ encodeUtf8 description')
+            , ("customDecimals", BInteger 18)
+            , ("_totalSupply", BInteger . sum $ (\(_, v) -> case v of BInteger i -> i; _ -> 0) <$> allBalances)
+            , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
+            , ("images.length", BInteger . fromIntegral $ length images)
+            , ("files.length", BInteger . fromIntegral $ length files)
+            , ("fileNames.length", BInteger . fromIntegral $ length fileNames)
+            ] ++ map (\(k,v) -> ("images[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList images)
+              ++ map (\(k,v) -> ("files[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList files)
+              ++ map (\(k,v) -> ("fileNames[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList fileNames)
+              ++ map (\(k,v) -> ("attributes[" <> encodeUtf8 (T.pack $ show k) <> "]", BString $ encodeUtf8 v)) (M.toList assetData)
+              ++ [(maybe ("status", if root == usdstAddress then BEnumVal "TokenStatus" "ACTIVE" 2 else BEnumVal "TokenStatus" "LEGACY" 3)
+                  (const ("status", BEnumVal "TokenStatus" "ACTIVE" 2))
+                  $ find (== root) supportedCollaterals)]
+              ++ allBalances
 
 assetToEvents :: Address -> GA.Asset -> (Address, S.Seq Event)
 assetToEvents blockappsAddress asset = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "Token" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (GA.root asset, S.fromList $
