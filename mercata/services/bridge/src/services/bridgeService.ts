@@ -11,7 +11,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
   const externalSenders = depositArgs.map((deposit) => deposit.externalSender);
   const externalTokens = depositArgs.map((deposit) => deposit.externalToken);
   const externalTokenAmounts = depositArgs.map((deposit) => deposit.externalTokenAmount);
-  const externalTxHashes = depositArgs.map((deposit) => `"${deposit.externalTxHash.trim().replace("\"","\\\"")}"`);
+  const externalTxHashes = depositArgs.map((deposit) => deposit.externalTxHash);
   const stratoRecipients = depositArgs.map((deposit) => deposit.stratoRecipient);
 
   try {
@@ -52,7 +52,7 @@ export const depositBatch = async (depositArgs: NonEmptyArray<DepositArgs>) => {
 
 export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => `"${deposit.externalTxHash.trim().replace("\"","\\\"")}"`);
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
   const stratoRecipients = deposits.map((deposit) => deposit.stratoRecipient);
 
   try {
@@ -91,7 +91,7 @@ export const confirmDepositBatch = async (deposits: NonEmptyArray<ConfirmDeposit
 
 export const reviewDepositBatch = async (deposits: NonEmptyArray<ConfirmDepositArgs>) => {
   const externalChainIds = deposits.map((deposit) => deposit.externalChainId);
-  const externalTxHashes = deposits.map((deposit) => `"${deposit.externalTxHash.trim().replace("\"","\\\"")}"`);
+  const externalTxHashes = deposits.map((deposit) => deposit.externalTxHash);
 
   try {
     await execute({
@@ -132,7 +132,7 @@ export const confirmWithdrawalBatch = async (
 
   if (transactionProposals && transactionProposals.length > 0) {
     const withdrawalIds = withdrawals.map((w) => w.withdrawalId);
-    const custodyTxHashes = transactionProposals.map((tx) => `"${tx.safeTxHash.trim().replace("\"","\\\"")}"`);
+    const custodyTxHashes = transactionProposals.map((tx) => tx.safeTxHash);
 
     try {
       await execute({
