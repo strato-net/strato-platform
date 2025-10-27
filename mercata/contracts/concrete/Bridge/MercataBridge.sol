@@ -698,6 +698,7 @@ contract record MercataBridge is Ownable {
         require(stratoTokenAmount > 0, "MB: invalid strato token amount to burn");
 
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
+
         uint256 actualStratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
         require(actualStratoTokenAmount > 0, "MB: no tokens escrowed");
 
