@@ -692,13 +692,10 @@ contract record MercataBridge is Ownable {
         // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
         // Round down to the nearest integer
         uint256 externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
-        require(externalTokenAmount > 0, "MB: invalid external token amount");
-        // Example: 1e6 USDC * 10^(18-6) = 1e6 * 10^12 = 1e18 USDCST tokens
+        require(externalTokenAmount > 0, "MB: not enough external tokens");
+
         stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
-        require(stratoTokenAmount > 0, "MB: invalid strato token amount to burn");
-
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
-
         stratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
         require(stratoTokenAmount > 0, "MB: no tokens escrowed");
 
