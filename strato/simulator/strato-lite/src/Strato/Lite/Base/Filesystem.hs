@@ -268,7 +268,6 @@ valueToSQLiteText t v = case t of
             SimpleValue ValueString{} -> wrapEscapeDouble w
             SimpleValue ValueBytes{} -> wrapEscapeDouble w
             SimpleValue ValueAddress{} -> wrapEscapeDouble w
-            SimpleValue ValueAccount{} -> wrapEscapeDouble w
             ValueContract{} -> wrapEscapeDouble w
             ValueArraySentinel _ -> "\"\""
             _ -> w

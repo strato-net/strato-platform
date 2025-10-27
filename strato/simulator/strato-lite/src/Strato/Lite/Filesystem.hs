@@ -20,7 +20,6 @@
 module Strato.Lite.Filesystem where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate as X509
 import BlockApps.X509.Keys as X509
 import Blockchain.Data.BlockDB ()
 import qualified Blockchain.Data.DataDefs as DataDefs
@@ -29,11 +28,8 @@ import Blockchain.Database.MerklePatricia.MPDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
-import Blockchain.GenesisBlocks.Contracts.BitcoinBridge
-import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
-import qualified Blockchain.GenesisBlocks.ProductionGenesisBlock as Production
 import Blockchain.Network
 import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
@@ -83,19 +79,9 @@ resolvePath path = do
     then pure expanded
     else liftIO $ makeAbsolute expanded
 
-makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
-makeValidators = map (\(a,b) -> (fromPrivateKey a, b))
-
-selfSignCert :: PrivateKey -> Validator -> IO X509Certificate
-selfSignCert pk (Validator c) = flip runReaderT pk $ do
-  let iss = Issuer (T.unpack c) "" (Just "") Nothing
-      sub = Subject (T.unpack c) "" (Just "") Nothing (derivePublicKey pk)
-  makeSignedCert Nothing Nothing iss sub
-
 createFilesystemPeerAndCorePeer ::
   String ->
   PrivateKey ->
-  Validator ->
   Text ->
   TCPPort ->
   UDPPort ->
@@ -105,25 +91,18 @@ createFilesystemPeerAndCorePeer ::
   FilesystemDBs ->
   (Text -> LoggingT IO () -> IO ()) ->
   IO (FilesystemPeer, CorePeer)
-createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav sock fsDBs logF = do
+createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav sock fsDBs logF = do
   bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
   genesisInfo' <- case network' of
-    "mercata" -> pure Production.productionGenesisBlock
-    "mercata-hydrogen" -> pure Production.productionGenesisBlock
     "helium" -> pure Helium.genesisBlock
     _ -> do
-      let privAndIds = [(privKey, selfId)]
-          validatorsPrivKeys = id privAndIds
-          vals' = makeValidators validatorsPrivKeys
-      certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
-      let vals = snd <$> vals'
-      pure . insertBitcoinBridgeContract
-           . insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals)
-           $ insertCertRegistryContract certs defaultGenesisInfo
+      let self = fromPrivateKey privKey
+      pure . insertMercataGovernanceContract self [Validator self] [self]
+           $ Helium.genesisBlock
   B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo'
   genesisInfo <- getGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
-  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav logF
+  corePeer <- createCorePeer network' (T.unpack name) genesisInfo valBehav logF
   pure (fsPeer, corePeer)
 
 hoistFilesystem :: FilesystemPeer -> (forall a. FilesystemT (ReaderT MemPeerDBEnv BaseM) a -> BaseM a)
@@ -176,14 +155,13 @@ createFilesystemNode ::
   FilePath ->
   String ->
   FilePath ->
-  Validator ->
   Text ->
   TCPPort ->
   UDPPort ->
   Host ->
   Bool ->
   m (FilesystemPeer, CorePeer)
-createFilesystemNode dir' network' privKeyFile selfId name tcpPort udpPort myHost valBehav = do
+createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBehav = do
   dir <- getNodeDirectory dir' network' $ T.unpack name
   logsMapVar <- atomically $ newTVar M.empty
   let logsDir = getLogsDirectory dir
@@ -218,9 +196,9 @@ createFilesystemNode dir' network' privKeyFile selfId name tcpPort udpPort myHos
       Right p -> pure p
     -- either error id . bsToPriv <$> B.readFile privKeyFile
   (ethPool, cirrusPool) <- liftIO . logF "strato-setup" $ do
-    eth <- Lite.createSqlitePool "eth.sqlite" 1
+    eth' <- Lite.createSqlitePool "eth.sqlite" 1
     cirrus <- Lite.createSqlitePool "cirrus.sqlite" 1
-    pure (eth, cirrus)
+    pure (eth', cirrus)
   liftIO . withResource ethPool $ \c -> logF "strato-setup" $ do
     flip runReaderT c $ do
       Lite.runMigration DataDefs.migrateAuto
@@ -255,4 +233,4 @@ createFilesystemNode dir' network' privKeyFile selfId name tcpPort udpPort myHos
         , _ethSqlPool = ethPool
         , _cirrusSqlPool = cirrusPool
         }
-  liftIO $ createFilesystemPeerAndCorePeer network' privKey selfId name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF
+  liftIO $ createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav (error "socket not initialized") fsDBs logF
