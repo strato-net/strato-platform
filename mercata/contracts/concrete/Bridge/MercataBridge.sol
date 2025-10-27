@@ -698,15 +698,16 @@ contract record MercataBridge is Ownable {
         require(stratoTokenAmount > 0, "MB: invalid strato token amount to burn");
 
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
-        require(_escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount) > 0, "MB: no tokens escrowed");
+        uint256 actualStratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
+        require(actualStratoTokenAmount > 0, "MB: no tokens escrowed");
 
         id = ++withdrawalCounter;
 
         withdrawals[id] = WithdrawalInfo(
-            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, stratoTokenAmount, block.timestamp
+            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, actualStratoTokenAmount, block.timestamp
         );
 
-        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, a.stratoToken, msg.sender, id);
+        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, actualStratoTokenAmount, a.stratoToken, msg.sender, id);
     }
 
     /**
