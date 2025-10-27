@@ -2204,6 +2204,10 @@ callBuiltin "string" [SBool b] = return . SString $ bool "false" "true" b
 callBuiltin "string" [SBytes bs] = pure . SString $ case DT.decodeUtf8' bs of
   Left _ -> BC.unpack bs
   Right t -> T.unpack t
+callBuiltin "string" [SBytes bs, SString "utf-8"] = pure . SString $ case DT.decodeUtf8' bs of
+  Left _ -> malformedData "bytestring is not UTF-8 encoded" bs
+  Right t -> T.unpack t
+callBuiltin "string" [SBytes bs, SString "raw"] = pure . SString $ BC.unpack bs
 callBuiltin "string" [SNULL] = return $ SString ""
 callBuiltin "string" [SReference{}] = return $ SString ""
 callBuiltin "string" vs = typeError "string cast" vs
@@ -2246,6 +2250,8 @@ callBuiltin "byte" [SNULL] = return $ SInteger 0
 callBuiltin "byte" vs = typeError "byte cast" vs
 callBuiltin "bytes" [SInteger i] = pure . SBytes $ integer2Bytes i
 callBuiltin "bytes" [SString s] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SString s, SString "utf-8"] = pure . SBytes . DT.encodeUtf8 $ T.pack s
+callBuiltin "bytes" [SString s, SString "raw"] = pure . SBytes $ BC.pack s
 callBuiltin "bytes" [SAddress a _] = pure . SBytes . B.pack . word160ToBytes $ unAddress a
 callBuiltin "uint" args = return $ intBuiltin args
 callBuiltin "int" args = return $ intBuiltin args
