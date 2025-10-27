@@ -91,6 +91,6 @@ library StringUtils {
 
     function normalizeHex(string s) internal pure returns (string) {
         string hexPart = substring(s,0,2) == "0x" ? substring(s,2) : s;
-        return "0x" + b16encode(b16decode(hexPart));
+        return "0x" + toLower(hexPart);
     }
 }
