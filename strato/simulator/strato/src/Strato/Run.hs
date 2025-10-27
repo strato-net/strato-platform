@@ -16,7 +16,7 @@ import Blockchain.Options (flags_address, flags_listen)
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Options (flags_network)
-import Blockchain.Strato.Model.Validator
+import qualified Blockchain.Strato.Model.Secp256k1 as S
 import Blockchain.VMOptions ()
 import Common.API
 import Control.Monad (unless, when)
@@ -120,7 +120,6 @@ runStratoNode runUI = do
                flags_directory
                flags_network
                flags_private_key
-               (Validator $ T.pack flags_username)
                (T.pack flags_username)
                (TCPPort flags_listen)
                (UDPPort flags_listen)
@@ -140,7 +139,8 @@ runStratoNode runUI = do
               globalNonceCounter = nonceCache,
               userRegistryAddress = 0x100,
               userRegistryCodeHash = Nothing,
-              useWalletsByDefault = False
+              useWalletsByDefault = False,
+              nodePubKey = S.derivePublicKey $ _filesystemPeerPrivKey f
             }
     as <- liftIO $ runFilesystemNode f c
     a <- liftIO . async $ Wai.run flags_backend_port $

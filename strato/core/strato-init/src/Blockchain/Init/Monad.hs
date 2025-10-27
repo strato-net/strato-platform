@@ -41,7 +41,6 @@ import qualified Data.ByteString as B
 import Data.IORef
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
-import qualified Data.Text as T
 import qualified Database.LevelDB as DB
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
@@ -148,9 +147,6 @@ instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String Str
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
   select _ = error "SetupDBM select @X509Certificate"
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
-  select _ = error "SetupDBM select @X509CertificateField"
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (N.NibbleString `A.Alters` N.NibbleString) m where
   lookup _ = genericLookupHashDB $ fmap hashDB $ Mod.access Mod.Proxy

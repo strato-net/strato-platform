@@ -20,9 +20,7 @@
 module Strato.Lite.Simulator where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate as X509
 import Blockchain.Data.BlockDB ()
-import Blockchain.GenesisBlocks.Contracts.CertRegistry
 import Blockchain.GenesisBlocks.Contracts.GovernanceV2
 import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
 import Blockchain.Sequencer.Event
@@ -38,7 +36,6 @@ import Control.Monad (when)
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
-import Data.Bifunctor (first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Char8 as BC
@@ -91,8 +88,7 @@ makeLenses ''ThreadPool
 data NetworkManager = NetworkManager
   { _threads :: TVar ThreadPool
   , _network :: TVar Network
-  , _initialCerts :: [X509Certificate]
-  , _initialValidators :: [(Address, Validator)]
+  , _initialValidators :: [Validator]
   }
 
 makeLenses ''NetworkManager
@@ -100,9 +96,7 @@ makeLenses ''NetworkManager
 createSimulatorPeerAndCorePeer ::
   String ->
   PrivateKey ->
-  Validator ->
-  [(Address, Validator)] ->
-  [X509Certificate] ->
+  [Validator] ->
   TVar Internet ->
   Text ->
   Host ->
@@ -111,11 +105,14 @@ createSimulatorPeerAndCorePeer ::
   [Host] ->
   Bool ->
   IO (SimulatorPeer, CorePeer)
-createSimulatorPeerAndCorePeer network' privKey selfId initialValidators' extraCerts inet name ipAsText tcpPort udpPort bootNodes valBehav = do
+createSimulatorPeerAndCorePeer network' privKey initialValidators' inet name ipAsText tcpPort udpPort bootNodes valBehav = do
   simPeer <- createSimulatorPeer privKey inet ipAsText tcpPort udpPort bootNodes
-  let vals = snd <$> initialValidators'
-      genesisInfo = insertMercataGovernanceContract vals ((\(Validator v) -> v) <$> take 1 vals) $ insertCertRegistryContract extraCerts Helium.genesisBlock
-  corePeer <- createCorePeer network' (T.unpack name) selfId genesisInfo valBehav $ const runLoggingT
+  let vals = initialValidators'
+      owner = case vals of
+        (Validator o):_ -> o
+        _ -> error "no validators provided"
+      genesisInfo = insertMercataGovernanceContract owner vals [owner] Helium.genesisBlock
+  corePeer <- createCorePeer network' (T.unpack name) genesisInfo valBehav $ const runLoggingT
   pure (simPeer, corePeer)
 
 createSimulatorConnection ::
@@ -216,9 +213,6 @@ createGermophobicSimulatorConnection server'' client'' = do
       serverExceptionTVar
       clientExceptionTVar
 
-makeValidators :: [(PrivateKey, a)] -> [(Address, a)]
-makeValidators = map (first fromPrivateKey)
-
 runSimulatorConnection ::
   SimulatorP2PConnection ->
   BaseM ()
@@ -243,18 +237,17 @@ hoistSimulator s f = do
 runSimulatorNode :: SimulatorPeer -> CorePeer -> IO [Async ()]
 runSimulatorNode s c = runNode (hoistSimulator s) id c
 
-createSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager BaseM (SimulatorPeer, CorePeer)
-createSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes inet = do
-  certs <- asks _initialCerts
+createSimulatorNode :: String -> Text -> Host -> TCPPort -> UDPPort -> [Host] -> TVar Internet -> ReaderT NetworkManager BaseM (SimulatorPeer, CorePeer)
+createSimulatorNode network' nodeLabel ipAddr tcpPort udpPort bootNodes inet = do
   vals <- asks _initialValidators
   pKey <- liftIO $ newPrivateKey
-  liftIO $ createSimulatorPeerAndCorePeer network' pKey identity vals certs inet nodeLabel ipAddr tcpPort udpPort bootNodes True
+  liftIO $ createSimulatorPeerAndCorePeer network' pKey vals inet nodeLabel ipAddr tcpPort udpPort bootNodes True
 
-addSimulatorNode :: String -> Text -> Validator -> Host -> TCPPort -> UDPPort -> [Host] -> ReaderT NetworkManager BaseM Bool
-addSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes = do
+addSimulatorNode :: String -> Text -> Host -> TCPPort -> UDPPort -> [Host] -> ReaderT NetworkManager BaseM Bool
+addSimulatorNode network' nodeLabel ipAddr tcpPort udpPort bootNodes = do
   mgr <- ask
   inet <- _internet <$> readTVarIO (mgr ^. network)
-  node <- createSimulatorNode network' nodeLabel identity ipAddr tcpPort udpPort bootNodes inet
+  node <- createSimulatorNode network' nodeLabel ipAddr tcpPort udpPort bootNodes inet
   didCreate <- liftIO . atomically $ do
     net <- readTVar $ mgr ^. network
     case M.lookup nodeLabel $ net ^. nodes of
@@ -308,41 +301,27 @@ removeSimulatorConnection serverLabel clientLabel = do
   liftIO $ traverse_ cancel mAsync
   pure $ isJust mAsync
 
-selfSignCert :: PrivateKey -> Validator -> IO X509Certificate
-selfSignCert pk (Validator c) = flip runReaderT pk $ do
-  let iss = Issuer (T.unpack c) "" (Just "") Nothing
-      sub = Subject (T.unpack c) "" (Just "") Nothing (derivePublicKey pk)
-  makeSignedCert Nothing Nothing iss sub
-
-runNetwork :: [(Text, (Validator, Host, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> BaseM NetworkManager
+runNetwork :: [(Text, (PrivateKey, Host, TCPPort, UDPPort))] -> (forall a. [a] -> [a]) -> BaseM NetworkManager
 runNetwork nodesList validatorsFilter = do
-  privKeys <- liftIO $ traverse (const newPrivateKey) nodesList
-  let identities = (\(_, (c, _, _, _)) -> c) <$> nodesList
-      privAndIds = zip privKeys identities
-      validatorsPrivKeys = validatorsFilter privAndIds
-      validators' = makeValidators validatorsPrivKeys
-  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
+  let privKeys = (\(_, (p,_,_,_)) -> p) <$> nodesList
+      validators' = Validator . fromPrivateKey <$> validatorsFilter privKeys
   inet <- newTVarIO preAlGoreInternet
   let bootNodes = (\(_, (_, i, _, _)) -> i) <$> nodesList
-  peers <- liftIO $ traverse (\(p, (n, (c, i, t, u))) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i t u bootNodes True) $ zip privKeys nodesList
+  peers <- liftIO $ traverse (\(n, (p, i, t, u)) -> createSimulatorPeerAndCorePeer "simulator" p validators' inet n i t u bootNodes True) nodesList
   let nodesMap = M.fromList $ zip (fst <$> nodesList) peers
       network' = Network nodesMap M.empty inet
   nodeThreads' <- liftIO . for nodesMap $ uncurry runSimulatorNode
   let threadPool = ThreadPool nodeThreads' M.empty
   networkTVar <- newTVarIO network'
   threadsTVar <- newTVarIO threadPool
-  pure $ NetworkManager threadsTVar networkTVar certs validators'
+  pure $ NetworkManager threadsTVar networkTVar validators'
 
 runNetworkWithStaticConnections :: [(Text, Host, Validator)] -> [(Text, Text)] -> (forall a. [a] -> [a]) -> BaseM (Either Text NetworkManager)
 runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
   privKeys <- liftIO $ traverse (const newPrivateKey) nodesList
-  let identities = (\(_, _, c) -> c) <$> nodesList
-      privAndIds = zip privKeys identities
-      validatorsPrivKeys = validatorsFilter privAndIds
-      validators' = makeValidators validatorsPrivKeys
-  certs <- liftIO $ traverse (uncurry selfSignCert) privAndIds
+  let validators' = Validator . fromPrivateKey <$> validatorsFilter privKeys
   inet <- newTVarIO preAlGoreInternet
-  peers <- liftIO $ traverse (\(p, (n, i, c)) -> createSimulatorPeerAndCorePeer "simulator" p c validators' certs inet n i (TCPPort 30303) (UDPPort 30303) [] True) $ zip privKeys nodesList
+  peers <- liftIO $ traverse (\(p, (n, i, _)) -> createSimulatorPeerAndCorePeer "simulator" p validators' inet n i (TCPPort 30303) (UDPPort 30303) [] True) $ zip privKeys nodesList
   let nodesMap = M.fromList $ zip ((\(a, _, _) -> a) <$> nodesList) peers
   eConnections <- runExceptT . for connectionsList $ \(server', client') -> do
     serverPeer <- maybeToExceptT ("Couldn't find server " <> server') . MaybeT . pure $ M.lookup server' nodesMap
@@ -356,7 +335,7 @@ runNetworkWithStaticConnections nodesList connectionsList validatorsFilter = do
     let threadPool = ThreadPool nodeThreads' connectionThreads'
     networkTVar <- newTVarIO network'
     threadsTVar <- newTVarIO threadPool
-    pure $ NetworkManager threadsTVar networkTVar certs validators'
+    pure $ NetworkManager threadsTVar networkTVar validators'
 
 runNetworkOld :: [(SimulatorPeer, CorePeer)] -> [SimulatorP2PConnection] -> BaseM ()
 runNetworkOld nodes' connections' =
