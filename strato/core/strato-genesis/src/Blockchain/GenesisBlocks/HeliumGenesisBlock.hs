@@ -326,6 +326,8 @@ combinedEscrows = M.elems
                                     , GE.collateralQuantity = gramsToOz $ GE.collateralQuantity e
                                     }
             | a == altSilvstRoot -> e{ GE.assetRootAddress = silvstRoot }
+            | a == usdtstRoot -> e{ GE.assetRootAddress = usdstAddress }
+            | a == usdcstRoot -> e{ GE.assetRootAddress = usdstAddress }
             | otherwise -> e
         correctBorrower e = e{GE.borrower = maybe (GE.borrower e) id . M.lookup (GE.borrower e) $ prodSecondaryAccounts}
         correctQ e = case M.lookup (GE.assetRootAddress e) assetMap of
