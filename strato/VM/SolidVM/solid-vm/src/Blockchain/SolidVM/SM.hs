@@ -90,7 +90,6 @@ import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Reader
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
 import Data.Either (isLeft)
 import Data.Foldable (for_)
@@ -125,7 +124,7 @@ data CallInfo = CallInfo
     collectionHash :: Keccak256,
     localVariables :: NE.NonEmpty (Map SolidString Variable),
     stateMap :: !(M.Map Address AddressStateModification),
-    storageMap :: !(M.Map (Address, B.ByteString) MS.BasicValue),
+    storageMap :: !(M.Map (Address, MS.StoragePath) MS.BasicValue),
     readOnly :: Bool,
     isUncheckedSection :: Bool, -- TODO: Perform overflow/underflow checks for all arithmetic operations and revert if so, use this flag to disable checks
     currentSourcePos :: Maybe SourcePosition,

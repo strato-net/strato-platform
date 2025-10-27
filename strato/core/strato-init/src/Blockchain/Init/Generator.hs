@@ -52,6 +52,7 @@ createGenesisInfo network = do
             where config = HELIUM.HeliumGenesisBlockConfig
                     upquarkValidators
                     upquarkAdmins
+                    HELIUM.blockappsProdAddress
                     []
                     []
                     upquarkBridgeRelayer

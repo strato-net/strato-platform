@@ -80,7 +80,6 @@ import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
-import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import Debugger
 import GHC.Generics
@@ -300,10 +299,9 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM m) where
 
 instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509Certificate) (MemContextM m) where
   select _ k = do
-    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      mBString <- A.lookup (A.Proxy) (certAddress, ".certificateString" :: StoragePath)
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing

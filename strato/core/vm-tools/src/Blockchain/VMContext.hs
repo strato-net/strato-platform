@@ -109,13 +109,12 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Binary
-import qualified Data.ByteString as B
 import Data.Default
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
+import Data.String
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
@@ -237,8 +236,8 @@ makeLenses ''ContextDBs
 data MemDBs = MemDBs
   { _stateTxMap :: !(M.Map Address AddressStateModification),
     _stateBlockMap :: !(M.Map Address AddressStateModification),
-    _storageTxMap :: !(M.Map (Address, B.ByteString) BasicValue),
-    _storageBlockMap :: !(M.Map (Address, B.ByteString) BasicValue),
+    _storageTxMap :: !(M.Map (Address, StoragePath) BasicValue),
+    _storageBlockMap :: !(M.Map (Address, StoragePath) BasicValue),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
     _currentBlock :: !(Maybe CurrentBlockHash)
   }
@@ -365,14 +364,12 @@ instance Show Context where
 
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
-    (A.Alters (Address, B.ByteString) BasicValue) m
+    (A.Alters (Address, StoragePath) BasicValue) m
   ) =>
   Address ->
   m (Maybe Address)
 lookupX509AddrFromCBHash k = do
-  let certKey addr = (addr,) . Text.encodeUtf8
-      certRegistryKey = certKey (Address 0x509)
-  mAccount <- A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+  mAccount <- A.lookup (A.Proxy) (Address 0x509,  fromString $ ".addressToCertMap<a:" ++ show k ++ ">" :: StoragePath)
   $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
   case mAccount of
     Just (BAddress a) -> pure . Just $ a

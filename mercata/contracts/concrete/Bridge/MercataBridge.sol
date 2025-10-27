@@ -246,6 +246,7 @@ contract record MercataBridge is Ownable {
         require(externalName.length > 0, "MB: invalid external name");
         require(externalSymbol.length > 0, "MB: invalid external symbol");
         require(stratoToken != address(0), "MB: invalid strato token");
+        require(externalDecimals <= DECIMAL_PLACES, "MB: decimals exceed max");
         assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
         emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
     }
@@ -626,7 +627,7 @@ contract record MercataBridge is Ownable {
      */
     function abortDeposit(
         uint256 externalChainId, string externalTxHash
-    ) public onlyOwner whenDepositsOpen {
+    ) public onlyOwner {
         require(externalChainId > 0, "MB: invalid external chain id");
         require(chains[externalChainId].enabled, "MB: chain not enabled");
         require(externalTxHash.length > 0, "MB: invalid external tx hash");
@@ -653,7 +654,7 @@ contract record MercataBridge is Ownable {
      */
     function abortDepositBatch(
         uint256[] externalChainIds, string[] externalTxHashes
-    ) external onlyOwner whenDepositsOpen {
+    ) external onlyOwner {
         uint256 n = externalChainIds.length;
         require(n > 0 && n == externalTxHashes.length, "MB: len");
 
@@ -669,10 +670,11 @@ contract record MercataBridge is Ownable {
      * @notice Returns deterministic withdrawal ID for indexers to enumerate without extra mappings
      * @notice Tokens are escrowed until the withdrawal is confirmed or aborted
      * @notice Converts STRATO token amounts to external token amounts using decimal conversion
+     * @notice Any dust from decimal conversion rounding is kept by the user
      * @param externalChainId The external chain identifier where tokens should be sent
      * @param externalRecipient The address on the external chain to receive the tokens
      * @param externalToken The token address on the external chain
-     * @param stratoTokenAmount The amount of STRATO tokens to withdraw (in STRATO token decimals)
+     * @param stratoTokenAmount The amount of STRATO tokens to withdraw (any dust from decimal conversion will be kept by user)
      * @return id The unique withdrawal identifier
      */
     function requestWithdrawal(
@@ -687,17 +689,20 @@ contract record MercataBridge is Ownable {
         require(a.enabled, "MB: asset not enabled");
         require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
 
+        // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
+        // Round down to the nearest integer
+        uint256 externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
+        // Example: 1e6 USDC * 10^(18-6) = 1e6 * 10^12 = 1e18 USDCST tokens
+        stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount to burn");
+
         require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
 
         uint256 actualStratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
         require(actualStratoTokenAmount > 0, "MB: no tokens escrowed");
 
         id = ++withdrawalCounter;
-
-        // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
-        // Round down to the nearest integer
-        uint256 externalTokenAmount = actualStratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
-        require(externalTokenAmount > 0, "MB: invalid external token amount");
 
         withdrawals[id] = WithdrawalInfo(
             BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, actualStratoTokenAmount, block.timestamp
@@ -805,7 +810,7 @@ contract record MercataBridge is Ownable {
      */
     function abortWithdrawal(
         uint256 id
-    ) public whenWithdrawalsOpen {
+    ) public {
         require(id > 0, "MB: invalid withdrawal id");
 
         WithdrawalInfo w = withdrawals[id];
@@ -838,7 +843,7 @@ contract record MercataBridge is Ownable {
      */
     function abortWithdrawalBatch(
         uint256[] ids
-    ) external whenWithdrawalsOpen {
+    ) external {
         uint256 n = ids.length;
         require(n > 0, "MB: len");
 
