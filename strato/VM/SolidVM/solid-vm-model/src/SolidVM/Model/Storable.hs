@@ -187,7 +187,7 @@ instance Binary StoragePathPiece
 newtype StoragePath = StoragePath [StoragePathPiece] deriving (Eq, Ord, Show, Read, Generic, NFData, Hashable)
 
 instance IsString StoragePath where
-  fromString = either (error . ("error parsing String to StoragePath" ++)) id . parsePath . C8.pack
+  fromString s = either (error ("error parsing String to StoragePath: " ++ s)) id . parsePath . C8.pack $ s
 
 instance Format StoragePath where
   format (StoragePath []) = "<empty path>"
@@ -199,7 +199,7 @@ instance Format StoragePath where
       addConditionalDot w = w
 
 instance JSON.FromJSON StoragePath where
-  parseJSON (JSON.String v) = return $ either (error . ("malformed StoragePath: " ++)) id $ parsePath $ encodeUtf8 v
+  parseJSON (JSON.String v) = return $ either (error . (("malformed StoragePath: " ++ show v ++ "\n") ++)) id $ parsePath $ encodeUtf8 v
   parseJSON v = error $ "wrong format in call to parseJSON for StoragePath: " ++ show v
 
 instance JSON.ToJSONKey StoragePath where
@@ -292,6 +292,17 @@ parseInt = do
 
 pathParser :: Parser [StoragePathPiece]
 pathParser = do
+  ( do
+      n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
+      (Field n :) <$> pathParser'
+    )
+    <|> ((string ":creator") *> pathParser')
+    <|> ((string ":creatorAddress") *> pathParser')
+    <|> ((string ":originAddress") *> pathParser')
+    <|> endOfInput *> return []
+
+pathParser' :: Parser [StoragePathPiece]
+pathParser' = do
   ch <- fmap w82c <$> peekWord8
   case ch of
     Nothing -> return []
@@ -313,18 +324,18 @@ parseIndex = do
       ignoreEscapedClosingBracket _ _ = Just False
   idx <- scan False ignoreEscapedClosingBracket
   skip (== c2w8 ']')
-  (Index (unescapeKey idx) :) <$> pathParser
+  (Index (unescapeKey idx) :) <$> pathParser'
 
 parseField :: Parser [StoragePathPiece]
 parseField = do
   skip (== c2w8 '.')
   ( do
       n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
-      (Field n :) <$> pathParser
+      (Field n :) <$> pathParser'
     )
-    <|> ((string ":creator") *> pathParser)
-    <|> ((string ":creatorAddress") *> pathParser)
-    <|> ((string ":originAddress") *> pathParser)
+    <|> ((string ":creator") *> pathParser')
+    <|> ((string ":creatorAddress") *> pathParser')
+    <|> ((string ":originAddress") *> pathParser')
 
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
@@ -380,12 +391,15 @@ unescapeKey srcBS = unsafePerformIO $ do
       copyAndUnescape 0 0
 
 unparsePath :: StoragePath -> B.ByteString
-unparsePath (StoragePath ps) = B.concat . concatMap go $ ps
+unparsePath (StoragePath []) = B.empty
+unparsePath (StoragePath (Field p : rest)) =
+  B.concat (p : concatMap go rest)
   where
     go :: StoragePathPiece -> [B.ByteString]
-    go (Field p) = [".", p]
+    go (Field q) = [".", q]
     go (Index i) = ["[", escapeKey i, "]"]
-
+unparsePath v = error $ "StoragePath must always start with a Field: " ++ show v
+    
 instance RLPSerializable BasicValue where
   rlpEncode = \case
     BDefault -> RLPString ""
