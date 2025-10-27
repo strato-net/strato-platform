@@ -1,40 +1,34 @@
-library StringUtils {
+library BytesUtils {
     function fromHex(uint x) internal pure returns (uint) {
         if (x >= 0x30 && x <= 0x39) {
             return x - 0x30;
         } else if (x >= 0x61 && x <= 0x66) {
             return x - 0x57;
         } else {
-            require(x >= 0x41 && x <= 0x46, "not a valid hex digit: " + string(x));
+            require(x >= 0x41 && x <= 0x46, "not a valid hex digit: " + string(x, 16));
             return x - 0x37;
         }
     }
 
-    function b16encodeBytes(bytes b) internal pure returns (bytes) {
+    function toHex(uint x) internal pure returns (uint) {
+        uint y = x & 0xf;
+        if (y >= 0xa) {
+            y += 0x27;
+        }
+        y += 0x30;
+        return y;
+    }
+
+    function b16encode(bytes b) internal pure returns (bytes) {
         bytes dst = new bytes(2 * b.length);
         for (uint i = 0; i < b.length; i++) {
-            uint upper = (b[i] >> 4) & 0xf;
-            if (upper >= 0xa) {
-                upper += 0x27;
-            }
-            upper += 0x30;
-            dst[2*i] = upper; 
-            uint lower = b[i] & 0xf;
-            if (lower >= 0xa) {
-                lower += 0x27;
-            }
-            lower += 0x30;
-            dst[2*i + 1] = lower; 
+            dst[2*i] = toHex((b[i] >> 4) & 0xf);
+            dst[2*i + 1] = toHex(b[i] & 0xf);
         }
         return dst;
     }
 
-    function b16encode(string s) internal pure returns (string) {
-        bytes b = bytes(s);
-        return string(b16encodeBytes(b));
-    }
-
-    function b16decodeBytes(bytes b) internal pure returns (bytes) {
+    function b16decode(bytes b) internal pure returns (bytes) {
         bool isEven = b.length % 2 == 0;
         uint offset = isEven ? 0 : 1;
         bytes dst = new bytes((b.length / 2) + offset);
@@ -46,11 +40,10 @@ library StringUtils {
         }
         return dst;
     }
+}
 
-    function b16decode(string s) internal pure returns (string) {
-        bytes b = bytes(s);
-        return string(b16decodeBytes(b));
-    }
+library StringUtils {
+    using BytesUtils for bytes;
 
     function toLower(string s) internal pure returns (string) {
         bytes b = bytes(s);
@@ -99,7 +92,6 @@ library StringUtils {
 
     function normalizeHex(string s) internal pure returns (string) {
         string hexPart = substring(s,0,2) == "0x" ? substring(s,2) : s;
-        bytes b = bytes(hexPart);
-        return "0x" + string(b16encodeBytes(b16decodeBytes(b)));
+        return "0x" + string(bytes(hexPart).b16decode().b16encode());
     }
 }

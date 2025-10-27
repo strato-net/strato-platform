@@ -1374,6 +1374,7 @@ stringArgs x =
            intType' x,
            boolType' x,
            bytesType' x,
+           Product [bytesType' x, stringType' x] x,
            Product [intType' x, intType' x] x,
            Product [intType' x, intType' x, intType' x] x
          ]
@@ -1399,7 +1400,13 @@ boolArgs x =
          ]
 
 byteArgs :: SourceAnnotation Text -> Type'
-byteArgs x = Sum $ stringType' x :| [intType' x, addressType' x]
+byteArgs x =
+  Sum $
+    stringType' x
+      :| [ intType' x
+         , addressType' x
+         , Product [stringType' x, stringType' x] x
+         ]
 
 keccak256Args :: SourceAnnotation Text -> Type'
 keccak256Args x = topType' x
