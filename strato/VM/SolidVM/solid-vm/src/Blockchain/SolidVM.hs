@@ -3201,7 +3201,8 @@ validateFunctionArguments func argVals = checkFunc $ func : CC._funcOverload fun
         (SInteger i, SVMType.Decimal) -> pure . Just . SDecimal $ fromInteger i
         (SDecimal d, SVMType.Decimal) -> pure . Just $ SDecimal d
         (SString s, SVMType.String _) -> pure . Just $ SString s
-        (SString s, SVMType.Bytes _ _) -> pure . Just $ SString s
+        (SString s, SVMType.Bytes _ _) -> pure . Just $ SBytes $ DT.encodeUtf8 $ T.pack s
+        (SBytes bs, SVMType.Bytes _ _) -> pure . Just $ SBytes bs
         -- (SString s, SVMType.Address b) -> pure $ flip SAddress b <$> stringAddress s
         (SBool b, SVMType.Bool) -> pure . Just $ SBool b
         (SAddress a _, SVMType.Address b) -> pure . Just $ SAddress a b
