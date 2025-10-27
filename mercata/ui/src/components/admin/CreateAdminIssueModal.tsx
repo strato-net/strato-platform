@@ -229,7 +229,7 @@ const CreateAdminIssueModal: React.FC<CreateAdminIssueModalProps> = ({
                           <option
                             key={address}
                             value={address}
-                            label={`${val.contractName ?? 'Storage'}`}
+                            label={`${val.contractName ?? 'Storage'} - ${address}`}
                           />
                         ))}
                       </datalist>
