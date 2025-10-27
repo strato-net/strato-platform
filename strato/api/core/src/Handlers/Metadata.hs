@@ -29,8 +29,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
-import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
-import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
+import Blockchain.SyncDB (SyncStatus(..))
 import Control.Lens
 import Control.Monad.Change.Modify
 import Control.Monad.Reader
@@ -68,6 +67,8 @@ server
   :: ( MonadUnliftIO m
      , MonadLogger m
      , Accessible UrlMap m
+     , Accessible (Maybe BestSequencedBlock) m
+     , Accessible (Maybe SyncStatus) m
      , Accessible V.PublicKey m
      )
   => ServerT API m
@@ -106,12 +107,14 @@ getMetaData ::
   ( MonadLogger m,
     MonadUnliftIO m,
     Accessible V.PublicKey m,
+    Accessible (Maybe BestSequencedBlock) m,
+    Accessible (Maybe SyncStatus) m,
     Accessible UrlMap m
   ) =>
   m MetadataResponse
 getMetaData =
   do
-    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
+    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> access (Proxy @(Maybe BestSequencedBlock))
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)
@@ -122,5 +125,5 @@ getPubKeyAndAddress = do
   pub <- access (Proxy @V.PublicKey)
   pure $ V.AddressAndKey (fromPublicKey pub) pub
 
-checkIsSynced :: MonadIO m => m Bool
-checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow
+checkIsSynced :: (MonadIO m, Accessible (Maybe SyncStatus) m) => m Bool
+checkIsSynced = maybe False unSyncStatus <$> access (Proxy @(Maybe SyncStatus))
