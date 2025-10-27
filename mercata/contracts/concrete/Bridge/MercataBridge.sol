@@ -246,6 +246,7 @@ contract record MercataBridge is Ownable {
         require(externalName.length > 0, "MB: invalid external name");
         require(externalSymbol.length > 0, "MB: invalid external symbol");
         require(stratoToken != address(0), "MB: invalid strato token");
+        require(externalDecimals <= DECIMAL_PLACES, "MB: decimals exceed max");
         assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
         emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
     }
