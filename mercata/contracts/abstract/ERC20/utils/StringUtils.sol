@@ -10,8 +10,7 @@ library StringUtils {
         }
     }
 
-    function b16encode(string s) internal pure returns (string) {
-        bytes b = bytes(s);
+    function b16encodeBytes(bytes b) internal pure returns (bytes) {
         bytes dst = new bytes(2 * b.length);
         for (uint i = 0; i < b.length; i++) {
             uint upper = (b[i] >> 4) & 0xf;
@@ -20,18 +19,22 @@ library StringUtils {
             }
             upper += 0x30;
             dst[2*i] = upper; 
-            uint lower = uint(b[i]) & 0xf;
+            uint lower = b[i] & 0xf;
             if (lower >= 0xa) {
                 lower += 0x27;
             }
             lower += 0x30;
             dst[2*i + 1] = lower; 
         }
-        return string(dst);
+        return dst;
     }
 
-    function b16decode(string s) internal pure returns (string) {
+    function b16encode(string s) internal pure returns (string) {
         bytes b = bytes(s);
+        return string(b16encodeBytes(b));
+    }
+
+    function b16decodeBytes(bytes b) internal pure returns (bytes) {
         bool isEven = b.length % 2 == 0;
         uint offset = isEven ? 0 : 1;
         bytes dst = new bytes((b.length / 2) + offset);
@@ -41,7 +44,12 @@ library StringUtils {
         for (uint i = offset; i < b.length; i += 2) {
             dst[i/2 + offset] = (fromHex(b[i]) << 4) | fromHex(b[i+1]);
         }
-        return string(dst);
+        return dst;
+    }
+
+    function b16decode(string s) internal pure returns (string) {
+        bytes b = bytes(s);
+        return string(b16decodeBytes(b));
     }
 
     function toLower(string s) internal pure returns (string) {
@@ -91,6 +99,7 @@ library StringUtils {
 
     function normalizeHex(string s) internal pure returns (string) {
         string hexPart = substring(s,0,2) == "0x" ? substring(s,2) : s;
-        return "0x" + toLower(hexPart);
+        bytes b = bytes(hexPart);
+        return "0x" + string(b16encodeBytes(b16decodeBytes(b)));
     }
 }

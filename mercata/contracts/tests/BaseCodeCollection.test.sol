@@ -12,6 +12,7 @@ contract User {
 
 contract Describe_Mercata is Authorizable {
     using StringUtils for string;
+    using StringUtils for bytes;
     constructor() {
     }
 
@@ -296,5 +297,11 @@ contract Describe_Mercata is Authorizable {
         require(x == y, x + ", " + y);
         require(z == "48654c6c4f20774f724c64", z);
         require(alpha == v, alpha);
+        string blob0 = "16dad75a9959f69f811ebca00b839206cdee3f51611f2f44283d3c19ae429e47";
+        bytes blob = bytes(blob0).b16decodeBytes();
+        string blob2 = string(blob.b16encodeBytes());
+        require(blob0 == blob2, blob0 + ", " + blob2);
+        string blob3 = "0x" + blob0;
+        require(blob3.normalizeHex() == blob3, blob0 + ", " + blob2);
     }
 }
