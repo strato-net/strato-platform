@@ -471,10 +471,9 @@ instance {-# OVERLAPPING #-} MonadBase m => (Maybe Word256 `A.Alters` MP.StateRo
 
 instance {-# OVERLAPPING #-} MonadBase m => (Address `A.Selectable` X509.X509Certificate) (CoreT m) where
   select _ k = do
-    let certKey addr = (addr,) . Text.encodeUtf8
     mCertAddress <- lookupX509AddrFromCBHash k
     fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certKey certAddress ".certificateString")
+      mBString <- A.lookup (A.Proxy) (certAddress, "certificateString" :: StoragePath)
       case mBString of
         Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
         _ -> pure Nothing
