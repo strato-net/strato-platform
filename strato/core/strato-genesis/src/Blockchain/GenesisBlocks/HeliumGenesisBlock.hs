@@ -151,11 +151,13 @@ stratRoot = 0xd2810818e0401e85693f83107ed2b96faeed329c
 saddogsRoot :: Address
 saddogsRoot = 0x43ae2c4bf5d7d16f53c9f6439d834b3d9f647b40
 
-saddogsBundleRoot :: Address
-saddogsBundleRoot = 0xdbf23119bb52a7419c66c7b5055dd3f31545dc14
-
 saddogsObsolete :: [Address]
-saddogsObsolete = [0xa6ef33a73aa86cd39fea0f3316c9ad997a0be7c1, 0xba97647cea97eec3fe1680584e0401e918ea6c6d]
+saddogsObsolete =
+  [ 0xa6ef33a73aa86cd39fea0f3316c9ad997a0be7c1
+  , 0xba97647cea97eec3fe1680584e0401e918ea6c6d
+  , 0xdbf23119bb52a7419c66c7b5055dd3f31545dc14
+  ]
+
 -- paxgstRoot :: Address
 -- paxgstRoot = 0x491cdfe98470bfe69b662ab368826dca0fc2f24d
 
@@ -167,7 +169,6 @@ obsoleteTokens =
   , usdtstRoot
   , usdcstRoot
   , stratRoot
-  , saddogsBundleRoot
   ] ++ saddogsObsolete
 
 mercataAddress :: Address
@@ -614,11 +615,6 @@ assetBalances GA.Asset{..} =
                 altSilvstBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup altSilvstRoot assetMap
              in [(o, silvstBalance + altSilvstBalance)]
         | root == altSilvstRoot -> []
-        | root == saddogsRoot ->
-            let saddogsBalance = correctQuantity decimals name q
-                saddogsBundleBalance = maybe 0 (\a -> maybe 0 (\b -> (10*) $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup saddogsBundleRoot assetMap
-             in [(o, saddogsBalance + saddogsBundleBalance)]
-        | root == saddogsBundleRoot -> []
         | otherwise ->
             [(o, correctQuantity decimals name q)]
     ) . filter ((>0) . GA.quantity) $ M.elems balances
