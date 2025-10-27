@@ -20,8 +20,8 @@ readValidatorsFromGenesisInfo :: GenesisInfo -> [Validator]
 readValidatorsFromGenesisInfo gi = concat . flip map (addressInfo gi) $ \case
   SolidVMContractWithStorage 0x100 _ _ storage ->
     let storageMap = M.fromList storage
-     in case M.lookup ".validators.length" storageMap of
-          Just (BInteger l) -> mapMaybe (\i -> case M.lookup (fromString $ ".validators[" ++ show i ++ "]") storageMap of
+     in case M.lookup "validators.length" storageMap of
+          Just (BInteger l) -> mapMaybe (\i -> case M.lookup (fromString $ "validators[" ++ show i ++ "]") storageMap of
             Just (BAddress a) -> Just $ Validator a
             _ -> Nothing) [0..l-1]
           _ -> []
