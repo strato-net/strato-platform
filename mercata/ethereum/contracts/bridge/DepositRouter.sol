@@ -28,6 +28,7 @@ contract DepositRouter is
     error SameAddressProposed();
     error SweepEthFailed();
     error NotPermitted();
+    error FeesNotSupported();
 
     // ============ State Variables ============
     //Notice that in most chains, PERMIT2 is deployed at 0x000000000022D473030F116dDEE9F6B43aC78BA3
@@ -130,6 +131,9 @@ contract DepositRouter is
         );
 
         uint256 depositedAmount = IERC20(token).balanceOf(safe) - balanceBefore;
+
+        if (depositedAmount == 0) revert ZeroAmount();
+        if (depositedAmount < amount) revert FeesNotSupported();
 
         emit DepositRouted(
             token,
