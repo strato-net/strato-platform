@@ -86,7 +86,7 @@ const WithdrawWidget: React.FC = () => {
     
     // Apply token max per transaction limit if it exists
     if (selectedMintToken && selectedMintToken.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0") {
-      const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerWithdrawal, 18);
+      const tokenMaxBigInt = BigInt(selectedMintToken.maxPerWithdrawal || "0");
       const maxTransferableBigInt = BigInt(maxTransferable);
       const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
       return finalMax.toString();
@@ -250,7 +250,7 @@ const WithdrawWidget: React.FC = () => {
         {selectedMintToken?.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0" && (
           <div className="flex items-center justify-between">
             <span>Max Per Withdrawal</span>
-            <span className="font-medium">{selectedMintToken.maxPerWithdrawal}</span>
+            <span className="font-medium">{formatUnits(selectedMintToken.maxPerWithdrawal || "0", 18)}</span>
           </div>
         )}
         <div className="flex items-center justify-between">

@@ -17,6 +17,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
   formatBalance,
+  formatUnits,
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
@@ -56,7 +57,16 @@ const BridgeOut: React.FC = () => {
 
   const maxAmount = useMemo(() => {
     const tokenBalanceWei = balanceData?.balance?.toString() || "0";
-    return computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
+    const maxTransferable = computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
+
+    if (selectedToken?.maxPerWithdrawal && selectedToken.maxPerWithdrawal !== "0") {
+      const tokenMaxBigInt = BigInt(selectedToken.maxPerWithdrawal || "0");
+      const maxTransferableBigInt = BigInt(maxTransferable);
+      const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
+      return finalMax.toString();
+    }
+
+    return maxTransferable;
   }, [balanceData?.balance, selectedToken?.stratoToken, voucherBalance, usdstBalance]);
 
   // Balance impact preview
@@ -269,7 +279,7 @@ const BridgeOut: React.FC = () => {
         {selectedToken?.maxPerWithdrawal && selectedToken.maxPerWithdrawal !== "0" && (
           <div className="flex items-center justify-between">
             <span>Max Per Withdrawal</span>
-            <span className="font-medium">{selectedToken.maxPerWithdrawal}</span>
+            <span className="font-medium">{formatUnits(selectedToken.maxPerWithdrawal || "0", 18).toString()}</span>
           </div>
         )}
         <div className="flex items-center justify-between">

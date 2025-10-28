@@ -106,7 +106,7 @@ export const handleAmountInputChange = (
   if (amountWei <= 0n) return setError("Amount must be greater than 0");
 
   const maxWei = BigInt(maxBalanceWei || "0");
-  if (maxWei <= 0n || amountWei > maxWei) return setError("Insufficient balance");
+  if (maxWei <= 0n || amountWei > maxWei) return setError("Maximum amount exceeded");
 
   setError("");
 };
