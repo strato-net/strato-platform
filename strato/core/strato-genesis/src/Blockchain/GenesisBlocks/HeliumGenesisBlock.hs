@@ -590,7 +590,7 @@ assetBalances GA.Asset{..} =
   M.toList
     . foldr (uncurry $ M.insertWith (+)) M.empty
     . concatMap (\(o, q) ->
-        let mEscrowBalance = correctQuantity decimals name . GE.collateralQuantity
+        let mEscrowBalance = GE.collateralQuantity
                          <$> find (\e -> GE.borrower e == o && GE.assetRootAddress e == root) combinedEscrows
          in case mEscrowBalance of
               Nothing -> [(o, q)]

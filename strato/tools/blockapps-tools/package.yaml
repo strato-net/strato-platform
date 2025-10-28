@@ -42,6 +42,7 @@ library:
     - persistent-postgresql
     - resourcet
     - seqevents
+    - solid-vm-model
     - strato-conf
     - strato-model
     - strato-redis-blockdb
