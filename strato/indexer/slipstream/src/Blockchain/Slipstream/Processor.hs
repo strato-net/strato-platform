@@ -35,7 +35,6 @@ import Blockchain.Slipstream.OutputData
 import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
@@ -65,7 +64,7 @@ data BatchedInserts = BatchedInserts
   deriving (Show)
 
 matters :: AggregateAction -> Bool
-matters AggregateAction {..} = codePtrToSHA actionCodeHash /= emptyHash
+matters AggregateAction {} = True -- codePtrToSHA actionCodeHash /= emptyHash
 
 
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
@@ -251,7 +250,7 @@ processTheMessages messages = do
           Action.SolidVMDiff {} -> do
             let name = case actionCodeHash row of
                   SolidVMCode name' _ -> name'
-                  _ -> error "internal error: contract should be SolidVM for SolidVM"
+                  _ -> "something" -- error "internal error: contract should be SolidVM for SolidVM"
                 abiid =
                   ABIID
                     { aiName = T.pack name,
