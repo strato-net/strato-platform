@@ -660,7 +660,7 @@ createEventArrayTable (creator, a, n, e) cc inherited (arr, arrType) = do
     ["creator", "application", "contract_name"]
     keyNames
     "key"
-    (["address", "transaction_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
+    (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
@@ -953,7 +953,7 @@ createEventTable (creator, a, n) evName ev cc inherited = do
             ["creator", "application", "contract_name"]
             cols'
             "attributes"
-            ["transaction_hash", "event_index"]
+            ["block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
@@ -1239,7 +1239,7 @@ initialSlipstreamQueries =
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
       ]
-      ["transaction_hash", "event_index"]
+      ["block_hash", "event_index"]
       (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
   , CreateTable
       eventArrayTableName
@@ -1259,6 +1259,6 @@ initialSlipstreamQueries =
       , ("key", SqlJsonb)
       , ("value", SqlJsonb)
       ]
-      ["address", "transaction_hash", "event_index", "collection_name", "key"]
-      (Just $ Foreign "event_event_array" ["transaction_hash", "event_index"] globalEventTableName ["transaction_hash", "event_index"])
+      ["address", "block_hash", "event_index", "collection_name", "key"]
+      (Just $ Foreign "event_event_array" ["block_hash", "event_index"] globalEventTableName ["block_hash", "event_index"])
   ]
