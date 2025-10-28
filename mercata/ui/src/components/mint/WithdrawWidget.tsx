@@ -247,10 +247,12 @@ const WithdrawWidget: React.FC = () => {
           <span>Transaction Fee</span>
           <span className="font-medium">{WITHDRAW_USDST_FEE} USDST ({parseFloat(WITHDRAW_USDST_FEE) * 100} voucher)</span>
         </div>
-        <div className="flex items-center justify-between">
-          <span>Max Per Withdrawal</span>
-          <span className="font-medium">{selectedMintToken?.maxPerWithdrawal || "Unlimited"}</span>
-        </div>
+        {selectedMintToken?.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0" && (
+          <div className="flex items-center justify-between">
+            <span>Max Per Withdrawal</span>
+            <span className="font-medium">{selectedMintToken.maxPerWithdrawal}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span>USDST Balance</span>
           <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}{amountError? "" : " → " + balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
