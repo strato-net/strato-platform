@@ -14,7 +14,7 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { WITHDRAW_USDST_FEE } from "@/lib/constants";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
@@ -165,9 +165,9 @@ const WithdrawWidget: React.FC = () => {
   const balanceImpact = useMemo(() => {
     try {
       const beforeWei = BigInt(currentUsdst || "0");
-      const before = Number((beforeWei / 10n ** 18n).toString());
-      const v = Number(amount || "0");
-      const after = Math.max(0, before - v - Number(WITHDRAW_USDST_FEE));
+      const before = parseFloat(formatUnits(beforeWei, 18));
+      const v = parseFloat(amount || "0");
+      const after = Math.max(0, before - v - parseFloat(WITHDRAW_USDST_FEE));
       return { before, after };
     } catch {
       return { before: 0, after: 0 };
