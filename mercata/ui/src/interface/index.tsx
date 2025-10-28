@@ -247,6 +247,7 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface CollateralRatioItem {

@@ -524,11 +524,11 @@ export const liquidityAndBalance = async (
   accessToken: string,
   userAddress: string,
 ) => {
-  // Fetch pool data with explicit select (index fields + userLoan + prices)
+  // Fetch pool data with explicit select (index fields + userLoan + prices + pause status)
   const registry = await getPool(accessToken, {
     select:
       `lendingPool:lendingPool_fkey(` +
-        `address,borrowableAsset,mToken,` +
+        `address,borrowableAsset,mToken,_paused,` +
         `borrowIndex::text,totalScaledDebt::text,reservesAccrued::text,lastAccrual::text,badDebt::text,` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
         `userLoan:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
@@ -544,8 +544,9 @@ export const liquidityAndBalance = async (
     "lendingPool.userLoan.key": `eq.${userAddress}`
   });
 
-  const { borrowableAsset, mToken, assetConfigs } = registry.lendingPool || {};
+  const { borrowableAsset, mToken, assetConfigs, _paused } = registry.lendingPool || {};
   const allCollaterals = registry.collateralVault?.userCollaterals || [];
+  const isPaused = _paused;
 
   if (!borrowableAsset || !mToken) {
     throw new Error("Lending pool, borrowable asset, or mToken not found");
@@ -696,6 +697,8 @@ export const liquidityAndBalance = async (
     totalAmountOwedPreview: totalAmountOwedPreviewClamped,
     // Compat:
     totalBorrowPrincipal,
+    // Pause status
+    isPaused,
   };
 };
 
