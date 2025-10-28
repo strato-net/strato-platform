@@ -213,6 +213,7 @@ export interface CollateralData {
   liquidationBonus?: string;
   bonus?: string;
   expectedProfit?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface TokenInfo {

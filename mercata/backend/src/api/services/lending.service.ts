@@ -442,7 +442,7 @@ export const collateralAndBalance = async (
     select:
       `lendingPool:lendingPool_fkey(` +
         `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
-        `borrowableAsset` +
+        `borrowableAsset,_paused` +
       `),` +
       `collateralVault:collateralVault_fkey(` +
         `userCollaterals:${CollateralVault}-userCollaterals(user:key,asset:key2,amount:value::text)` +
@@ -455,6 +455,8 @@ export const collateralAndBalance = async (
   if (!registry.lendingPool || !registry.collateralVault) {
     throw new Error("Lending pool or collateral vault not found");
   }
+
+  const isPaused = registry.lendingPool._paused;
 
   const assets = registry.lendingPool.assetConfigs?.map((a: any) => a.asset).filter((asset: string) => asset !== registry.lendingPool.borrowableAsset) || [];
   const userCollaterals = (registry.collateralVault.userCollaterals || []).filter((c: any) => c.user === userAddress);
@@ -516,6 +518,7 @@ export const collateralAndBalance = async (
         assetPrice,
         ltv,
         liquidationThreshold,
+        isPaused,
       };
     });
 };
@@ -1139,6 +1142,7 @@ export const listLoansForLiquidation = async (
       `address,` +
       `borrowableAsset,` +
       `borrowIndex::text,` +
+      `_paused,` +
       `assetConfigs:${LendingPool}-assetConfigs(asset:key,AssetConfig:value),` +
       `loans:${LendingPool}-userLoan(user:key,LoanInfo:value)` +
     `),` +
@@ -1153,6 +1157,7 @@ export const listLoansForLiquidation = async (
 
   const borrowableAsset: string = registry.lendingPool?.borrowableAsset;
   const borrowIndexStr = registry.lendingPool?.borrowIndex || "0";
+  const isPaused = registry.lendingPool?._paused;
   const assetConfigsArr = registry.lendingPool?.assetConfigs || [];
   const loansArr = registry.lendingPool?.loans || [];
   const collateralsArr = registry.collateralVault?.userCollaterals || [];
@@ -1251,6 +1256,7 @@ export const listLoansForLiquidation = async (
         expectedProfit: expectedProfit.toString(),
         maxRepay: effectiveMaxRepay.toString(),
         liquidationBonus,
+        isPaused,
       };
     })
     // Filter out zero-amount or zero-USD-value collaterals
