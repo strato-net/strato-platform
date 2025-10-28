@@ -23,7 +23,7 @@ const Hero = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Link
-              to="/dashboard"
+              to="/dashboard/deposits"
               className="group bg-[#f5a623] hover:bg-[#e09615] text-[#001f5c] px-10 py-4 rounded-full font-bold text-sm uppercase tracking-wide transition-all shadow-lg hover:shadow-xl flex items-center justify-center w-fit"
             >
               START EARNING
