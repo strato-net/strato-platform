@@ -59,7 +59,7 @@ const BridgeOut: React.FC = () => {
     const tokenBalanceWei = balanceData?.balance?.toString() || "0";
     const maxTransferable = computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
 
-    if (selectedToken?.maxPerWithdrawal && selectedToken.maxPerWithdrawal !== "0") {
+    if (selectedToken?.maxPerWithdrawal && BigInt(selectedToken.maxPerWithdrawal || "0") > 0n) {
       const tokenMaxBigInt = BigInt(selectedToken.maxPerWithdrawal || "0");
       const maxTransferableBigInt = BigInt(maxTransferable);
       const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;

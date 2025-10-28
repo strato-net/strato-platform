@@ -85,7 +85,7 @@ const WithdrawWidget: React.FC = () => {
     const maxTransferable = computeMaxTransferable(usdstBalanceWei, true, voucherBalance, usdstBalance, safeParseUnits(WITHDRAW_USDST_FEE).toString(), setFeeError);
     
     // Apply token max per transaction limit if it exists
-    if (selectedMintToken && selectedMintToken.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0") {
+    if (selectedMintToken && selectedMintToken.maxPerWithdrawal && BigInt(selectedMintToken.maxPerWithdrawal || "0") > 0n) {
       const tokenMaxBigInt = BigInt(selectedMintToken.maxPerWithdrawal || "0");
       const maxTransferableBigInt = BigInt(maxTransferable);
       const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
