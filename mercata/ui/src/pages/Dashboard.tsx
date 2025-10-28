@@ -154,9 +154,8 @@ const Dashboard = () => {
             />
 
             <AssetSummary
-              title="CATA Points Rewards"
+              title="Rewards"
               value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA Points`}
-              tooltip={cataBalance === 0 ? "No rewards yet - start staking to earn CATA Points!" : undefined}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />
