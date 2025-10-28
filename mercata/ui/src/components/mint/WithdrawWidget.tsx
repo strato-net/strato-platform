@@ -144,7 +144,7 @@ const WithdrawWidget: React.FC = () => {
       if (res?.success) {
         toast({
           title: "Withdrawal requested",
-          description: `Withdrawal is pending approval. ${amount} ${selectedMintToken.externalSymbol} will be transferred to ${address}.`,
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedMintToken.externalSymbol} will be transferred to ${address}.`,
         });
         setAmount("");
         // Refresh USDST balance to reflect burn

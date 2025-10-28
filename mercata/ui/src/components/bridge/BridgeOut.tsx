@@ -134,7 +134,7 @@ const BridgeOut: React.FC = () => {
       if (response?.success) {
         toast({
           title: "Transaction Proposed Successfully",
-          description: `Withdrawal is pending approval. ${amount} ${selectedToken.externalSymbol} will be transferred to ${address}.`,
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
         });
         await refetchBalance();
         await fetchUsdstBalance(address);
