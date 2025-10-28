@@ -82,8 +82,8 @@ list onEmpty onCons as = case as of
   [] -> onEmpty
   (a:as') -> onCons a as'
 
-gramsToOz :: Integer -> Integer
-gramsToOz n = (10000 * n) `div` 283495
+gramsToTroyOz :: Integer -> Integer
+gramsToTroyOz n = (10000000 * n) `div` 311034768
 
 assetMap :: M.Map Address GA.Asset
 assetMap = foldr (\k -> M.insert (GA.root k) k) M.empty GA.assets
@@ -323,7 +323,7 @@ combinedEscrows = M.elems
         alloy e = case GE.assetRootAddress e of
           a | a == goldOunceRoot -> e{ GE.assetRootAddress = goldstRoot }
             | a == goldGramRoot -> e{ GE.assetRootAddress = goldstRoot
-                                    , GE.collateralQuantity = gramsToOz $ GE.collateralQuantity e
+                                    , GE.collateralQuantity = gramsToTroyOz $ GE.collateralQuantity e
                                     }
             | a == altSilvstRoot -> e{ GE.assetRootAddress = silvstRoot }
             | a == usdtstRoot -> e{ GE.assetRootAddress = usdstAddress }
@@ -608,7 +608,7 @@ assetBalances GA.Asset{..} =
         | root == goldstRoot ->
             let goldstBalance = correctQuantity decimals name q
                 goldOzBalance = maybe 0 (\a -> maybe 0 (\b -> correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldOunceRoot assetMap
-                goldGmBalance = maybe 0 (\a -> maybe 0 (\b -> gramsToOz $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldGramRoot assetMap
+                goldGmBalance = maybe 0 (\a -> maybe 0 (\b -> gramsToTroyOz $ correctQuantity (GA.decimals a) (GA.name a) (GA.quantity b)) . M.lookup o $ GA.balances a) $ M.lookup goldGramRoot assetMap
              in [(o, goldstBalance + goldOzBalance + goldGmBalance)]
         | root == goldOunceRoot -> []
         | root == goldGramRoot -> []
