@@ -305,7 +305,9 @@ addBlockTransactions OutputBlock {obBlockData = bd, obReceiptTransactions = tran
   $logDebugS "addBlockTransactions" . T.pack $ "All transactions: " ++ show transactions
   trrs <- addTransactions bd transactions proposer
 
+  flushMemStorageTxDBToBlockDB
   lift $ timeit "flushMemStorageDB" (Just vmBlockInsertionMined) flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
   lift $ timeit "flushMemAddressStateDB" (Just vmBlockInsertionMined) flushMemAddressStateDB
   pure trrs
 
@@ -328,6 +330,9 @@ addTransactions blockData txs proposer =
     go blockGas (t : rest) trrs = do
       let bt = otBaseTx t
       beforeMap <- getAddressStateTxDBMap
+      flushMemAddressStateTxToBlockDB
+      flushMemStorageTxDBToBlockDB
+
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer
 
       afterMap <- getAddressStateTxDBMap
@@ -341,9 +346,6 @@ addTransactions blockData txs proposer =
             case result of
               Left _ -> blockGas
               Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
-
-      flushMemAddressStateTxToBlockDB
-      flushMemStorageTxDBToBlockDB
 
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 

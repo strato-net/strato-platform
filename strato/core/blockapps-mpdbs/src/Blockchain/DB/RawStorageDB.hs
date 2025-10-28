@@ -22,7 +22,7 @@ module Blockchain.DB.RawStorageDB
     getAllRawStorageKeyVals',
     deleteRawStorageKey',
     flushMemRawStorageTxDBToBlockDB,
-    flushMemRawStorageDB,
+    flushMemRawStorageDB
   )
 where
 
@@ -175,7 +175,6 @@ flushMemRawStorageTxDBToBlockDB = do
 
 flushMemRawStorageDB :: (MonadLogger m, FullRawStorage m) => m ()
 flushMemRawStorageDB = do
-  flushMemRawStorageTxDBToBlockDB
   theMap <- getMemRawStorageBlockDB
 
   let changesByAddress :: Map Address [(StoragePath, RawStorageValue)]
