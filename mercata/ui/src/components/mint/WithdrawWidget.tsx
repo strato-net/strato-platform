@@ -247,7 +247,7 @@ const WithdrawWidget: React.FC = () => {
           <span>Transaction Fee</span>
           <span className="font-medium">{WITHDRAW_USDST_FEE} USDST ({parseFloat(WITHDRAW_USDST_FEE) * 100} voucher)</span>
         </div>
-        {selectedMintToken?.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0" && (
+        {selectedMintToken?.maxPerWithdrawal && BigInt(selectedMintToken.maxPerWithdrawal || "0") > 0n && (
           <div className="flex items-center justify-between">
             <span>Max Per Withdrawal</span>
             <span className="font-medium">{formatUnits(selectedMintToken.maxPerWithdrawal || "0", 18)}</span>

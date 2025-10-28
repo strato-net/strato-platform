@@ -276,7 +276,7 @@ const BridgeOut: React.FC = () => {
           <span>Transaction Fee</span>
           <span className="font-medium">{BRIDGE_OUT_FEE} USDST ({parseFloat(BRIDGE_OUT_FEE) * 100} voucher)</span>
         </div>
-        {selectedToken?.maxPerWithdrawal && selectedToken.maxPerWithdrawal !== "0" && (
+        {selectedToken?.maxPerWithdrawal && BigInt(selectedToken.maxPerWithdrawal || "0") > 0n && (
           <div className="flex items-center justify-between">
             <span>Max Per Withdrawal</span>
             <span className="font-medium">{formatUnits(selectedToken.maxPerWithdrawal || "0", 18).toString()}</span>
