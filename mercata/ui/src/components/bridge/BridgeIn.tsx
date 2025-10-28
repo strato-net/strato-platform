@@ -265,6 +265,17 @@ const BridgeIn: React.FC = () => {
       }
     }
 
+    const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
+    const decimalIndex = value.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > tokenDecimals) {
+        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
+        return false;
+      }
+    }
+
     const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
     const bal = balanceMatch
       ? parseFloat(balanceMatch[1].replace(/,/g, ""))

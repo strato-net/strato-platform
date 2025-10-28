@@ -218,11 +218,21 @@ class BridgeContractService {
             depositAmount: depositAmount.toString()
           };
         }
-        // Otherwise it's below minimum amount
+        // Check if it's because amount is below minimum
+        if (depositAmount < minAmount) {
+          return {
+            isValid: false,
+            error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formatBalance(minAmount, undefined, parseInt(decimals) || 18)} ${tokenType}`,
+            isAllowed: true,
+            minAmount: minAmount.toString(),
+            depositAmount: depositAmount.toString()
+          };
+        }
+        // Fallback for other reasons
         return {
           isValid: false,
-          error: `Deposit amount ${amount} ${tokenType} is below minimum required ${formatBalance(minAmount, undefined, parseInt(decimals) || 18)} ${tokenType}`,
-          isAllowed: true,
+          error: `Deposit validation failed. Please check your input and try again.`,
+          isAllowed: false,
           minAmount: minAmount.toString(),
           depositAmount: depositAmount.toString()
         };
