@@ -343,6 +343,7 @@ sendNewActionMessage b trrs = do
         _actionData=O.fromList $ M.toList recombined,
         _src=Nothing,
         _name=Nothing,
+        _newCodeCollections=[],
         _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
         _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }

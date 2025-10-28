@@ -324,6 +324,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     storageDiff),
               A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
+              A._newCodeCollections = [],
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
             }

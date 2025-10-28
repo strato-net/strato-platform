@@ -519,6 +519,7 @@ startingAction maybeCode env' =
             Just theCode
           Nothing -> Env.src env',
       _name = Env.name env',
+      _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
