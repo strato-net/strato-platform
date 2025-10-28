@@ -148,7 +148,7 @@ const Dashboard = () => {
           <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
             <AssetSummary
               title="Net Balance"
-              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
+              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
