@@ -710,12 +710,6 @@ const BridgeIn: React.FC = () => {
                   </div>
                 )}
               </div>
-              {selectedToken?.stratoTokenSymbol && amount && (
-                <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
-                  You will receive ≈ {amount} {selectedToken.stratoTokenName} (
-                  {selectedToken.stratoTokenSymbol}) on STRATO
-                </p>
-              )}
             </div>
           ) : null)}
       </div>
