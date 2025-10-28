@@ -234,6 +234,30 @@ safetyModuleAddress = 0x1015
 sUsdstAddress :: Address
 sUsdstAddress = 0x1016
 
+ethstPoolAddress :: Address
+ethstPoolAddress = 0x1017
+
+ethstLpTokenAddress :: Address
+ethstLpTokenAddress = 0x1018
+
+wbtcstPoolAddress :: Address
+wbtcstPoolAddress = 0x1019
+
+wbtcstLpTokenAddress :: Address
+wbtcstLpTokenAddress = 0x101a
+
+goldstPoolAddress :: Address
+goldstPoolAddress = 0x101b
+
+goldstLpTokenAddress :: Address
+goldstLpTokenAddress = 0x101c
+
+silvstPoolAddress :: Address
+silvstPoolAddress = 0x101d
+
+silvstLpTokenAddress :: Address
+silvstLpTokenAddress = 0x101e
+
 rewardsChefAddress :: Address
 rewardsChefAddress = 0x101f
 
@@ -512,6 +536,14 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
             , cdpReserve hgbc_blockappsAddress
             , safetyModule hgbc_blockappsAddress
             , sUsdst hgbc_blockappsAddress
+            , ethstPool hgbc_blockappsAddress
+            , ethstLpToken hgbc_blockappsAddress
+            , wbtcstPool hgbc_blockappsAddress
+            , wbtcstLpToken hgbc_blockappsAddress
+            , goldstPool hgbc_blockappsAddress
+            , goldstLpToken hgbc_blockappsAddress
+            , silvstPool hgbc_blockappsAddress
+            , silvstLpToken hgbc_blockappsAddress
             -- , paxgstPool
             -- , paxgstLpToken
             ],
@@ -521,6 +553,7 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
           ++ [ adminEvents hgbc_blockappsAddress
              , lendingPoolEvents
              , poolConfiguratorEvents
+             , poolFactoryEvents
              , cdpEngineEvents
              , cdpRegistryEvents
              , cdpVaultEvents
@@ -549,6 +582,14 @@ genesisBlockTemplate HeliumGenesisBlockConfig{..} =
              , (safetyModuleAddress, Delegatecall safetyModuleAddress safetyModuleImplAddress "BlockApps" "Mercata" "SafetyModule")
              , (rewardsChefAddress, Delegatecall rewardsChefAddress rewardsChefImplAddress "BlockApps" "Mercata" "RewardsChef")
              , (sUsdstAddress, Delegatecall sUsdstAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (ethstPoolAddress, Delegatecall ethstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (ethstLpTokenAddress, Delegatecall ethstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (wbtcstPoolAddress, Delegatecall wbtcstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (wbtcstLpTokenAddress, Delegatecall wbtcstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (goldstPoolAddress, Delegatecall goldstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (goldstLpTokenAddress, Delegatecall goldstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
+             , (silvstPoolAddress, Delegatecall silvstPoolAddress poolImplAddress "BlockApps" "Mercata" "Pool")
+             , (silvstLpTokenAddress, Delegatecall silvstLpTokenAddress tokenImplAddress "BlockApps" "Mercata" "Token")
              ]
         }
 
@@ -806,19 +847,44 @@ poolFactory blockappsAddress = SolidVMContractWithStorage poolFactoryAddress 0 p
   , ("feeCollector", BAddress feeCollectorAddress)
   , ("swapFeeRate", BInteger 30)
   , ("lpSharePercent", BInteger 7000)
+  , ("pools[" <> addrBS ethstRoot <> "][" <> addrBS usdstAddress <> "]", BAddress ethstPoolAddress)
+  , ("pools[" <> addrBS wbtcstRoot <> "][" <> addrBS usdstAddress <> "]", BAddress wbtcstPoolAddress)
+  , ("pools[" <> addrBS goldstRoot <> "][" <> addrBS usdstAddress <> "]", BAddress goldstPoolAddress)
+  , ("pools[" <> addrBS silvstRoot <> "][" <> addrBS usdstAddress <> "]", BAddress silvstPoolAddress)
+  , ("allPools[0]", BAddress ethstPoolAddress)
+  , ("allPools[1]", BAddress wbtcstPoolAddress)
+  , ("allPools[2]", BAddress goldstPoolAddress)
+  , ("allPools[3]", BAddress silvstPoolAddress)
+  , ("allPools.length", BInteger 4)
   ]
+
+poolFactoryEvents :: (Address, S.Seq Event)
+poolFactoryEvents = (\(a, evs) -> (a, (\(n,v) -> Event KECCAK256.zeroHash "BlockApps" "Mercata" "PoolFactory" a n ((\(v1,v2) -> (v1,v2,"Other")) <$> v)) <$> evs)) (poolFactoryAddress, S.fromList $
+  [ ("NewPool", [("tokenA", show ethstRoot), ("tokenB", show usdstAddress), ("pool", show ethstPoolAddress)])
+  , ("NewPool", [("tokenA", show wbtcstRoot), ("tokenB", show usdstAddress), ("pool", show wbtcstPoolAddress)])
+  , ("NewPool", [("tokenA", show goldstRoot), ("tokenB", show usdstAddress), ("pool", show goldstPoolAddress)])
+  , ("NewPool", [("tokenA", show silvstRoot), ("tokenB", show usdstAddress), ("pool", show silvstPoolAddress)])
+  ])
 
 tokenFactory :: Address -> AddressInfo
 tokenFactory blockappsAddress = SolidVMContractWithStorage tokenFactoryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
   ++ [ ("logicContract", BAddress tokenFactoryImplAddress)
      , ("isFactoryToken[" <> addrBS mTokenAddress <> "]", BBool True)
      , ("isFactoryToken[" <> addrBS sUsdstAddress <> "]", BBool True)
+     , ("isFactoryToken[" <> addrBS ethstLpTokenAddress <> "]", BBool True)
+     , ("isFactoryToken[" <> addrBS wbtcstLpTokenAddress <> "]", BBool True)
+     , ("isFactoryToken[" <> addrBS goldstLpTokenAddress <> "]", BBool True)
+     , ("isFactoryToken[" <> addrBS silvstLpTokenAddress <> "]", BBool True)
      , ("allTokens[0]", BAddress mTokenAddress)
      , ("allTokens[1]", BAddress sUsdstAddress)
-     , ("allTokens.length", BInteger . fromIntegral $ 2 + length GA.assets)
+     , ("allTokens[2]", BAddress ethstLpTokenAddress)
+     , ("allTokens[3]", BAddress wbtcstLpTokenAddress)
+     , ("allTokens[4]", BAddress goldstLpTokenAddress)
+     , ("allTokens[5]", BAddress silvstLpTokenAddress)
+     , ("allTokens.length", BInteger . fromIntegral $ 6 + length GA.assets)
      ]
   ++ ((\GA.Asset{..} -> ("isFactoryToken[" <> addrBS root <> "]", BBool True)) <$> GA.assets)
-  ++ ((\(i, GA.Asset{..}) -> ("allTokens[" <> BC.pack (show i) <> "]", BAddress root)) <$> zip [(9 :: Integer)..] GA.assets)
+  ++ ((\(i, GA.Asset{..}) -> ("allTokens[" <> BC.pack (show i) <> "]", BAddress root)) <$> zip [(6 :: Integer)..] GA.assets)
 
 adminRegistry :: Address -> [Address] -> Address -> [Address] -> AddressInfo
 adminRegistry blockappsAddress adminList bridgeRelayer oracleRelayers = SolidVMContractWithStorage adminRegistryAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
@@ -844,6 +910,14 @@ adminRegistry blockappsAddress adminList bridgeRelayer oracleRelayers = SolidVMC
      , ("whitelist[" <> addrBS mTokenAddress <> "][burn][" <> addrBS liquidityPoolAddress <> "]", BBool True)
      , ("whitelist[" <> addrBS sUsdstAddress <> "][mint][" <> addrBS safetyModuleAddress <> "]", BBool True)
      , ("whitelist[" <> addrBS sUsdstAddress <> "][burn][" <> addrBS safetyModuleAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS ethstLpTokenAddress <> "][mint][" <> addrBS ethstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS ethstLpTokenAddress <> "][burn][" <> addrBS ethstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS wbtcstLpTokenAddress <> "][mint][" <> addrBS wbtcstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS wbtcstLpTokenAddress <> "][burn][" <> addrBS wbtcstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS goldstLpTokenAddress <> "][mint][" <> addrBS goldstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS goldstLpTokenAddress <> "][burn][" <> addrBS goldstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS silvstLpTokenAddress <> "][mint][" <> addrBS silvstPoolAddress <> "]", BBool True)
+     , ("whitelist[" <> addrBS silvstLpTokenAddress <> "][burn][" <> addrBS silvstPoolAddress <> "]", BBool True)
      , ("whitelist[" <> addrBS tokenFactoryAddress <> "][createTokenWithInitialOwner][" <> addrBS poolFactoryAddress <> "]", BBool True)
      , ("whitelist[" <> addrBS lendingRegistryAddress <> "][setLendingPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
      , ("whitelist[" <> addrBS lendingRegistryAddress <> "][setLiquidityPool][" <> addrBS poolConfiguratorAddress <> "]", BBool True)
@@ -897,11 +971,11 @@ voucher blockappsAddress extraAccounts = SolidVMContractWithStorage voucherAddre
 
 mToken :: Address -> AddressInfo
 mToken blockappsAddress = SolidVMContractWithStorage mTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
-  ++ [ ("_name", BString "MUSDST")
+  ++ [ ("_name", BString "mUSDST")
      , ("logicContract", BAddress tokenImplAddress)
      , ("_symbol", BString "MUSDST")
      , ("_erc20Initialized", BBool True)
-     , ("description", BString "MUSDST")
+     , ("description", BString "mUSDST")
      , ("customDecimals", BInteger 18)
      , ("_totalSupply", BInteger 0)
      , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
@@ -915,11 +989,15 @@ rewardsChef blockappsAddress = SolidVMContractWithStorage rewardsChefAddress 0 p
      , ("rewardToken", BContract "Token" cataAddress)
      , ("logicContract", BAddress rewardsChefImplAddress)
      , ("cataPerSecond", BInteger 100000000000000)
-     , ("totalAllocPoint", BInteger 200)
+     , ("totalAllocPoint", BInteger 600)
      , ("minFutureTime", BInteger 3600)
      -- lpTokenInUse mapping entries
      , ("lpTokenInUse[" <> addrBS mTokenAddress <> "]", BBool True)
      , ("lpTokenInUse[" <> addrBS sUsdstAddress <> "]", BBool True)
+     , ("lpTokenInUse[" <> addrBS goldstLpTokenAddress <> "]", BBool True)
+     , ("lpTokenInUse[" <> addrBS silvstLpTokenAddress <> "]", BBool True)
+     , ("lpTokenInUse[" <> addrBS ethstLpTokenAddress <> "]", BBool True)
+     , ("lpTokenInUse[" <> addrBS wbtcstLpTokenAddress <> "]", BBool True)
      -- mUSDST
      , ("pools[0].lpToken", BAddress mTokenAddress)
      , ("pools[0].allocPoint", BInteger 100)
@@ -936,8 +1014,40 @@ rewardsChef blockappsAddress = SolidVMContractWithStorage rewardsChefAddress 0 p
      , ("pools[1].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
      , ("pools[1].bonusPeriods[0].bonusMultiplier", BInteger 1)
      , ("pools[1].bonusPeriods.length", BInteger 1)
+     -- goldst
+     , ("pools[2].lpToken", BAddress goldstLpTokenAddress)
+     , ("pools[2].allocPoint", BInteger 100)
+     , ("pools[2].lastRewardTimestamp", BInteger lastAccrual)
+     , ("pools[2].accPerToken", BInteger 0)
+     , ("pools[2].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , ("pools[2].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , ("pools[2].bonusPeriods.length", BInteger 1)
+     -- silvst
+     , ("pools[3].lpToken", BAddress silvstLpTokenAddress)
+     , ("pools[3].allocPoint", BInteger 100)
+     , ("pools[3].lastRewardTimestamp", BInteger lastAccrual)
+     , ("pools[3].accPerToken", BInteger 0)
+     , ("pools[3].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , ("pools[3].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , ("pools[3].bonusPeriods.length", BInteger 1)
+     -- ethst
+     , ("pools[4].lpToken", BAddress ethstLpTokenAddress)
+     , ("pools[4].allocPoint", BInteger 100)
+     , ("pools[4].lastRewardTimestamp", BInteger lastAccrual)
+     , ("pools[4].accPerToken", BInteger 0)
+     , ("pools[4].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , ("pools[4].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , ("pools[4].bonusPeriods.length", BInteger 1)
+     -- wbtcst
+     , ("pools[5].lpToken", BAddress wbtcstLpTokenAddress)
+     , ("pools[5].allocPoint", BInteger 100)
+     , ("pools[5].lastRewardTimestamp", BInteger lastAccrual)
+     , ("pools[5].accPerToken", BInteger 0)
+     , ("pools[5].bonusPeriods[0].startTimestamp", BInteger lastAccrual)
+     , ("pools[5].bonusPeriods[0].bonusMultiplier", BInteger 1)
+     , ("pools[5].bonusPeriods.length", BInteger 1)
      -- pools length
-     , ("pools.length", BInteger 2)
+     , ("pools.length", BInteger 6)
      ]
 
 cdpEngine :: Address -> AddressInfo
@@ -1086,6 +1196,126 @@ sUsdst blockappsAddress = SolidVMContractWithStorage sUsdstAddress 0 proxy $ toP
      , ("_symbol", BString "SUSDST")
      , ("_erc20Initialized", BBool True)
      , ("description", BString "sUSDST")
+     , ("customDecimals", BInteger 18)
+     , ("_totalSupply", BInteger 0)
+     , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
+     , ("status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     ]
+
+ethstPool :: Address -> AddressInfo
+ethstPool blockappsAddress = SolidVMContractWithStorage ethstPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("poolFactory", BAddress poolFactoryAddress)
+     , ("logicContract", BAddress poolImplAddress)
+     , ("tokenA", BContract "Token" ethstRoot)
+     , ("tokenB", BContract "Token" usdstAddress)
+     , ("lpToken", BContract "Token" ethstLpTokenAddress)
+     , ("locked", BBool False)
+     , ("aToBRatio", BDecimal "0.000000000000000000")
+     , ("bToARatio", BDecimal "0.000000000000000000")
+     , ("tokenABalance", BInteger 0)
+     , ("tokenBBalance", BInteger 0)
+     , ("swapFeeRate", BInteger 0)
+     , ("lpSharePercent", BInteger 0)
+     , ("zapSwapFeesEnabled", BBool True)
+     ]
+
+ethstLpToken :: Address -> AddressInfo
+ethstLpToken blockappsAddress = SolidVMContractWithStorage ethstLpTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("_name", BString "ETHST-USDST LP Token")
+     , ("logicContract", BAddress tokenImplAddress)
+     , ("_symbol", BString "ETHST-USDST-LP")
+     , ("_erc20Initialized", BBool True)
+     , ("description", BString "Liquidity Provider Token")
+     , ("customDecimals", BInteger 18)
+     , ("_totalSupply", BInteger 0)
+     , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
+     , ("status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     ]
+
+wbtcstPool :: Address -> AddressInfo
+wbtcstPool blockappsAddress = SolidVMContractWithStorage wbtcstPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("poolFactory", BAddress poolFactoryAddress)
+     , ("logicContract", BAddress poolImplAddress)
+     , ("tokenA", BContract "Token" wbtcstRoot)
+     , ("tokenB", BContract "Token" usdstAddress)
+     , ("lpToken", BContract "Token" wbtcstLpTokenAddress)
+     , ("locked", BBool False)
+     , ("aToBRatio", BDecimal "0.000000000000000000")
+     , ("bToARatio", BDecimal "0.000000000000000000")
+     , ("tokenABalance", BInteger 0)
+     , ("tokenBBalance", BInteger 0)
+     , ("swapFeeRate", BInteger 0)
+     , ("lpSharePercent", BInteger 0)
+     , ("zapSwapFeesEnabled", BBool True)
+     ]
+
+wbtcstLpToken :: Address -> AddressInfo
+wbtcstLpToken blockappsAddress = SolidVMContractWithStorage wbtcstLpTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("_name", BString "WBTCST-USDST LP Token")
+     , ("logicContract", BAddress tokenImplAddress)
+     , ("_symbol", BString "WBTCST-USDST-LP")
+     , ("_erc20Initialized", BBool True)
+     , ("description", BString "Liquidity Provider Token")
+     , ("customDecimals", BInteger 18)
+     , ("_totalSupply", BInteger 0)
+     , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
+     , ("status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     ]
+
+goldstPool :: Address -> AddressInfo
+goldstPool blockappsAddress = SolidVMContractWithStorage goldstPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("poolFactory", BAddress poolFactoryAddress)
+     , ("logicContract", BAddress poolImplAddress)
+     , ("tokenA", BContract "Token" goldstRoot)
+     , ("tokenB", BContract "Token" usdstAddress)
+     , ("lpToken", BContract "Token" goldstLpTokenAddress)
+     , ("locked", BBool False)
+     , ("aToBRatio", BDecimal "0.000000000000000000")
+     , ("bToARatio", BDecimal "0.000000000000000000")
+     , ("tokenABalance", BInteger 0)
+     , ("tokenBBalance", BInteger 0)
+     , ("swapFeeRate", BInteger 0)
+     , ("lpSharePercent", BInteger 0)
+     , ("zapSwapFeesEnabled", BBool True)
+     ]
+
+goldstLpToken :: Address -> AddressInfo
+goldstLpToken blockappsAddress = SolidVMContractWithStorage goldstLpTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("_name", BString "GOLDST-USDST LP Token")
+     , ("logicContract", BAddress tokenImplAddress)
+     , ("_symbol", BString "GOLDST-USDST-LP")
+     , ("_erc20Initialized", BBool True)
+     , ("description", BString "Liquidity Provider Token")
+     , ("customDecimals", BInteger 18)
+     , ("_totalSupply", BInteger 0)
+     , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
+     , ("status", BEnumVal "TokenStatus" "ACTIVE" 2)
+     ]
+
+silvstPool :: Address -> AddressInfo
+silvstPool blockappsAddress = SolidVMContractWithStorage silvstPoolAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("poolFactory", BAddress poolFactoryAddress)
+     , ("logicContract", BAddress poolImplAddress)
+     , ("tokenA", BContract "Token" silvstRoot)
+     , ("tokenB", BContract "Token" usdstAddress)
+     , ("lpToken", BContract "Token" silvstLpTokenAddress)
+     , ("locked", BBool False)
+     , ("aToBRatio", BDecimal "0.000000000000000000")
+     , ("bToARatio", BDecimal "0.000000000000000000")
+     , ("tokenABalance", BInteger 0)
+     , ("tokenBBalance", BInteger 0)
+     , ("swapFeeRate", BInteger 0)
+     , ("lpSharePercent", BInteger 0)
+     , ("zapSwapFeesEnabled", BBool True)
+     ]
+
+silvstLpToken :: Address -> AddressInfo
+silvstLpToken blockappsAddress = SolidVMContractWithStorage silvstLpTokenAddress 0 proxy $ toPaths $ ownedByBlockApps mercataAddress blockappsAddress
+  ++ [ ("_name", BString "SILVST-USDST LP Token")
+     , ("logicContract", BAddress tokenImplAddress)
+     , ("_symbol", BString "SILVST-USDST-LP")
+     , ("_erc20Initialized", BBool True)
+     , ("description", BString "Liquidity Provider Token")
      , ("customDecimals", BInteger 18)
      , ("_totalSupply", BInteger 0)
      , ("tokenFactory", BContract "TokenFactory" tokenFactoryAddress)
