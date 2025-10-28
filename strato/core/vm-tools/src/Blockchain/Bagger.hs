@@ -97,7 +97,9 @@ runFromStateRoot mineTransactions remainingGas theBlockHeader txs mSelfAddress= 
   (TxMiningResult res ranTxs unranTxs newGas) <-
     timeit "mineTransactions bagger" (Just vmBlockInsertionMined) $
       mineTransactions theBlockHeader remainingGas txs mSelfAddress
+  flushMemStorageTxDBToBlockDB
   timeit "flushMemStorageDB bagger" (Just vmBlockInsertionMined) flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
   timeit "flushMemAddressStateDB bagger" (Just vmBlockInsertionMined) flushMemAddressStateDB
   newStateRoot <- A.lookupWithDefault (A.Proxy @StateRoot) (Nothing :: Maybe Word256)
   let recoverable f = Left (RecoverableFailure (tfToBaggerTxRejection f) ranTxs unranTxs newStateRoot newGas)
