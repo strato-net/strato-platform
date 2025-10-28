@@ -11,7 +11,7 @@ module Blockchain.DB.RawStorageDB
     RawStorageValue,
     HasRawStorageDB,
     HasMemRawStorageDB (..),
-    FullRawStorage,
+    --FullRawStorage,
     genericLookupRawStorageDB,
     genericInsertRawStorageDB,
     genericInsertManyRawStorageDB,
@@ -23,7 +23,6 @@ module Blockchain.DB.RawStorageDB
     deleteRawStorageKey',
     flushMemRawStorageTxDBToBlockDB,
     flushMemRawStorageDB,
-    flushMemDBs
   )
 where
 
@@ -37,7 +36,6 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ExtendedWord
 import Control.Arrow ((***))
 import Control.Monad (forM_, join)
 import qualified Control.Monad.Change.Alter as A
@@ -188,28 +186,6 @@ flushMemRawStorageDB = do
 
   putMemRawStorageBlockMap M.empty
 
-flushMemDBs :: (MonadLogger m, FullRawStorage m) => m ()
-flushMemDBs = do
-  flushMemRawStorageTxDBToBlockDB
-  storageMap <- getMemRawStorageBlockDB
-
-  let changesByAddress :: Map Address [(StoragePath, RawStorageValue)]
-      changesByAddress = M.fromListWith (++) $ map (\((a, k), v) -> (a, [(k, v)])) $ M.toList storageMap
-
-  forM_ (M.toList changesByAddress) $ \(a, changes) -> do
-    addressState <- A.lookupWithDefault A.Proxy a
-    cr' <- putAllRawStorageKeyValForStateRoot (addressStateContractRoot addressState) changes
-    A.insert A.Proxy a addressState {addressStateContractRoot = cr'}
-
-  flushMemAddressStateTxToBlockDB
-  addrStMap <- getAddressStateBlockDBMap
-  sr <- A.lookupWithDefault (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256)
-  sr' <- putAllAddressStateKeyValForStateRoot sr $ M.toList addrStMap
-  A.insert (A.Proxy @MP.StateRoot) (Nothing :: Maybe Word256) sr'
-
-  putMemRawStorageBlockMap M.empty
-  putAddressStateBlockDBMap M.empty
-
 --The following are the DB versions of the functions
 
 -- TODO(tim): This is kind of ugly, because it makes the assumption that the
@@ -239,18 +215,6 @@ putAllRawStorageKeyValForStateRoot ::
 putAllRawStorageKeyValForStateRoot sr rawChanges = do
   let changes :: [(MP.Key, MP.Val)]
       changes = map ((N.EvenNibbleString . unparsePath) *** rlpEncode) rawChanges
-  putAllKeyValForStateRoot sr changes
-
-putAllAddressStateKeyValForStateRoot ::
-  (MonadLogger m, FullRawStorage m) =>
-  MP.StateRoot ->
-  [(Address, AddressStateModification)] ->
-  m MP.StateRoot
-putAllAddressStateKeyValForStateRoot sr rawChanges = do
-  let changes :: [(MP.Key, MP.Val)]
-      changes = map (addressAsNibbleString *** encodeASM) rawChanges
-      encodeASM (ASModification as) = rlpEncode as
-      encodeASM ASDeleted = rlpEncode blankVal
   putAllKeyValForStateRoot sr changes
 
 putAllKeyValForStateRoot ::

@@ -327,8 +327,6 @@ addTransactions blockData txs proposer =
     go _ [] trrs = return $ DL.toList trrs
     go blockGas (t : rest) trrs = do
       let bt = otBaseTx t
-      flushMemAddressStateTxToBlockDB
-      flushMemStorageTxDBToBlockDB
       beforeMap <- getAddressStateTxDBMap
       (!deltaT, !result) <- timeIt $ runExceptT $ addTransaction blockData blockGas t proposer
 
@@ -343,6 +341,9 @@ addTransactions blockData txs proposer =
             case result of
               Left _ -> blockGas
               Right execResult -> blockGas - (transactionGasLimit bt - calculateReturned bt execResult)
+
+      flushMemAddressStateTxToBlockDB
+      flushMemStorageTxDBToBlockDB
 
       go remainingBlockGas rest (trrs `DL.snoc` trr)
 
