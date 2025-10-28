@@ -14,10 +14,11 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useUser } from "@/context/UserContext";
-import { formatBalance, safeParseUnits } from "@/utils/numberUtils";
+import { formatBalance, safeParseUnits, formatUnits } from "@/utils/numberUtils";
 import { WITHDRAW_USDST_FEE } from "@/lib/constants";
 import { handleAmountInputChange, computeMaxTransferable } from "@/utils/transferValidation";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
+import BridgeConfirmationModal from "@/components/bridge/BridgeConfirmationModal";
 
 const WithdrawWidget: React.FC = () => {
   const { address, isConnected } = useAccount();
@@ -42,6 +43,7 @@ const WithdrawWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [amountError, setAmountError] = useState<string>("");
   const [feeError, setFeeError] = useState<string>("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // USDST balance (formatted already in wei string) reusing bridge context balance hook requires token address; we simply use provided usdstBalance for preview
   const currentUsdst = useMemo(() => usdstBalance, [usdstBalance]);
@@ -84,7 +86,7 @@ const WithdrawWidget: React.FC = () => {
     
     // Apply token max per transaction limit if it exists
     if (selectedMintToken && selectedMintToken.maxPerWithdrawal && selectedMintToken.maxPerWithdrawal !== "0") {
-      const tokenMaxBigInt = safeParseUnits(selectedMintToken.maxPerWithdrawal, 18);
+      const tokenMaxBigInt = BigInt(selectedMintToken.maxPerWithdrawal || "0");
       const maxTransferableBigInt = BigInt(maxTransferable);
       const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
       return finalMax.toString();
@@ -93,7 +95,38 @@ const WithdrawWidget: React.FC = () => {
     return maxTransferable;
   }, [selectedMintToken, usdstBalance, voucherBalance]);
 
+  const showConfirmModal = () => {
+    if (!selectedMintToken || !address) {
+      toast({
+        title: "Error",
+        description: "Invalid configuration",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!selectedNetwork) {
+      toast({
+        title: "Select Network",
+        description: "Please choose a destination network.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!amount || amountError) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleModalCancel = () => setIsModalOpen(false);
+
   const handleWithdraw = async () => {
+    setIsModalOpen(false);
     if (!selectedMintToken || !selectedNetwork || !address) return;
     if (!amount || amountError) return;
     setIsLoading(true);
@@ -111,7 +144,7 @@ const WithdrawWidget: React.FC = () => {
       if (res?.success) {
         toast({
           title: "Withdrawal requested",
-          description: `Burned ${amount} USDST; ${selectedMintToken.externalSymbol} will be sent to your ${selectedNetwork} address after review.`,
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedMintToken.externalSymbol} will be transferred to ${address}.`,
         });
         setAmount("");
         // Refresh USDST balance to reflect burn
@@ -132,9 +165,9 @@ const WithdrawWidget: React.FC = () => {
   const balanceImpact = useMemo(() => {
     try {
       const beforeWei = BigInt(currentUsdst || "0");
-      const before = Number((beforeWei / 10n ** 18n).toString());
-      const v = Number(amount || "0");
-      const after = Math.max(0, before - v - Number(WITHDRAW_USDST_FEE));
+      const before = parseFloat(formatUnits(beforeWei, 18));
+      const v = parseFloat(amount || "0");
+      const after = Math.max(0, before - v - parseFloat(WITHDRAW_USDST_FEE));
       return { before, after };
     } catch {
       return { before: 0, after: 0 };
@@ -198,7 +231,7 @@ const WithdrawWidget: React.FC = () => {
           disabled={!isConnected}
         />
         <span className="text-xs text-gray-500">
-        {selectedMintToken && `Max: ${formatBalance(maxAmount, undefined, 18, 2, 2)} USDST`}
+        {selectedMintToken && `Max: ${formatBalance(maxAmount, "USDST", 18, 2, 18)}`}
         </span>
         {amountError && <p className="text-sm text-red-500">{amountError}</p>}
         {feeError && <p className="text-sm text-yellow-600">{feeError}</p>}
@@ -206,9 +239,20 @@ const WithdrawWidget: React.FC = () => {
 
       <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
         <div className="flex items-center justify-between">
+          <span>
+            Amount will be rounded down to {selectedMintToken?.externalDecimals || "18"} decimal places
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
           <span>Transaction Fee</span>
           <span className="font-medium">{WITHDRAW_USDST_FEE} USDST ({parseFloat(WITHDRAW_USDST_FEE) * 100} voucher)</span>
         </div>
+        {selectedMintToken?.maxPerWithdrawal && BigInt(selectedMintToken.maxPerWithdrawal || "0") > 0n && (
+          <div className="flex items-center justify-between">
+            <span>Max Per Withdrawal</span>
+            <span className="font-medium">{formatUnits(selectedMintToken.maxPerWithdrawal || "0", 18)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span>USDST Balance</span>
           <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}{amountError? "" : " → " + balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -220,10 +264,23 @@ const WithdrawWidget: React.FC = () => {
       </div>
 
       <div className="flex justify-end">
-        <Button onClick={handleWithdraw} disabled={isLoading || !isConnected || !selectedNetwork || !selectedMintToken || !amount || !!amountError || !!feeError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
+        <Button onClick={showConfirmModal} disabled={isLoading || !isConnected || !selectedNetwork || !selectedMintToken || !amount || !!amountError || !!feeError} className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90">
           {isLoading ? "Processing..." : "Withdraw"}
         </Button>
       </div>
+
+      <BridgeConfirmationModal
+        open={isModalOpen}
+        onOk={handleWithdraw}
+        onCancel={handleModalCancel}
+        title="Confirm Withdrawal Transaction"
+        okText="Yes, Withdraw Assets"
+        cancelText="Cancel"
+        fromNetwork="STRATO"
+        toNetwork={selectedNetwork || "Not selected"}
+        amount={amount}
+        selectedToken={selectedMintToken}
+      />
     </div>
   );
 };

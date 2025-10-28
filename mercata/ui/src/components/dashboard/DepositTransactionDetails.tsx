@@ -7,7 +7,7 @@ import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard,
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
-import { formatWeiAmount } from "@/utils/numberUtils";
+import { formatWeiToDecimalHP } from "@/utils/numberUtils";
 import { ensureHexPrefix } from "@/utils/numberUtils";
 import { usdstAddress } from "@/lib/constants";
 
@@ -132,7 +132,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       title: "Amount",
       key: "amount",
       render: (_: any, record: any) =>
-        formatWeiAmount(record?.DepositInfo?.stratoTokenAmount || '0'),
+        formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18),
       width: 80,
     },
     {

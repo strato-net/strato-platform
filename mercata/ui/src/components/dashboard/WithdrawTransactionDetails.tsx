@@ -6,7 +6,7 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
 import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
-import { formatWeiAmount } from '@/utils/numberUtils';
+import { formatWeiToDecimalHP } from '@/utils/numberUtils';
 import { ensureHexPrefix } from '@/utils/numberUtils';
 import { usdstAddress } from '@/lib/constants';
 
@@ -133,7 +133,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
     {
       title: 'Amount',
       key: 'amount',
-      render: (_: any, record: any) => formatWeiAmount(record?.WithdrawalInfo?.stratoTokenAmount || '0'),
+      render: (_: any, record: any) => formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18),
       width: 80,
     },
     {

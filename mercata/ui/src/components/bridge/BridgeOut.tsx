@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
-import { Modal } from "antd";
+import BridgeConfirmationModal from "./BridgeConfirmationModal";
 import {
   Select,
   SelectContent,
@@ -16,7 +16,8 @@ import { useAccount } from "wagmi";
 import { useBridgeContext } from "@/context/BridgeContext";
 import PercentageButtons from "@/components/ui/PercentageButtons";
 import {
-  roundToDecimals,
+  formatBalance,
+  formatUnits,
   safeParseUnits,
 } from "@/utils/numberUtils";
 import BridgeWalletStatus from "./BridgeWalletStatus";
@@ -54,12 +55,31 @@ const BridgeOut: React.FC = () => {
     refetch: refetchBalance,
   } = useBalance(selectedToken?.stratoToken || null);
 
-  const tokenBalance = balanceData?.formatted || "0";
-
   const maxAmount = useMemo(() => {
     const tokenBalanceWei = balanceData?.balance?.toString() || "0";
-    return computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
+    const maxTransferable = computeMaxTransferable(tokenBalanceWei, selectedToken?.stratoToken === usdstAddress, voucherBalance, usdstBalance, safeParseUnits(BRIDGE_OUT_FEE).toString(), setFeeError);
+
+    if (selectedToken?.maxPerWithdrawal && selectedToken.maxPerWithdrawal !== "0") {
+      const tokenMaxBigInt = BigInt(selectedToken.maxPerWithdrawal || "0");
+      const maxTransferableBigInt = BigInt(maxTransferable);
+      const finalMax = maxTransferableBigInt < tokenMaxBigInt ? maxTransferableBigInt : tokenMaxBigInt;
+      return finalMax.toString();
+    }
+
+    return maxTransferable;
   }, [balanceData?.balance, selectedToken?.stratoToken, voucherBalance, usdstBalance]);
+
+  // Balance impact preview
+  const balanceImpact = useMemo(() => {
+    try {
+      const before = Number(maxAmount || "0")/10**18;
+      const v = Number(amount || "0");
+      const after = Math.max(0, before - v);
+      return { before, after };
+    } catch {
+      return { before: 0, after: 0 };
+    }
+  }, [maxAmount, amount]);
 
   // Set initial network selection
   useEffect(() => {
@@ -124,7 +144,7 @@ const BridgeOut: React.FC = () => {
       if (response?.success) {
         toast({
           title: "Transaction Proposed Successfully",
-          description: `Your tokens have been burned and ${amount} ${selectedToken.stratoTokenSymbol} will be transferred to ${address}. Withdrawal is pending approval.`,
+          description: `Your withdrawal request is pending approval. The approved amount of ${selectedToken.externalSymbol} will be transferred to ${address}.`,
         });
         await refetchBalance();
         await fetchUsdstBalance(address);
@@ -226,12 +246,6 @@ const BridgeOut: React.FC = () => {
             className="mt-2"
           />
         )}
-        {amount && selectedToken && (
-          <p className="text-sm text-gray-500">
-            Amount will be rounded down to {selectedToken.externalDecimals} decimal places
-          </p>
-        )}
-        
           <div className="flex items-center gap-2 mt-1">
             {isBalanceLoading ? (
               <div className="flex items-center gap-2">
@@ -239,54 +253,42 @@ const BridgeOut: React.FC = () => {
                 <p className="text-sm text-gray-500">Fetching balance...</p>
               </div>
             ) : (
-              tokenBalance && (
+              maxAmount && (
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <p className="text-sm text-gray-500">
-                      Balance: {tokenBalance} {selectedToken?.stratoTokenSymbol}
+                      Max: {formatBalance(maxAmount, selectedToken?.stratoTokenSymbol, 18, 2, 18)}
                     </p>
-                    {selectedToken && (
-                      <div className="flex items-center gap-1">
-                        {isBalanceLoading ? (
-                          <Loader2 className="h-3 w-3 animate-spin text-blue-500" />
-                        ) : (
-                          <span className="text-xs text-gray-500">
-                            { `Max: ${selectedToken.maxPerWithdrawal} ${selectedToken.stratoTokenSymbol}`}
-                          </span>
-                        )}
-                      </div>
-                    )}
                   </div>
-                  {selectedToken?.externalSymbol && (
-                    <div className="text-sm">
-                      <p className="bg-blue-50 p-2 rounded-md border border-blue-100">
-                        You will receive{" "}
-                        {amount
-                          ? `${selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount} `
-                          : ""}
-                        {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
-                        {selectedNetwork || "selected"} network
-                      </p>
-                    </div>
-                  )}
                 </div>
               )
             )}
           </div>
         
       </div>
-
-      <div className="text-sm text-gray-500 space-y-1">
-        {[
-          "Transaction time varies by network congestion",
-        ].map((text, i) => (
-          <p key={i}>• {text}</p>
-        ))}
-      </div>
-      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Transaction Fee</span>
+      <div className="rounded-xl border bg-gray-50 p-4 space-y-3 text-sm text-gray-600">
+        <div className="flex items-center justify-between">
+          <span>
+            Amount will be rounded down to {selectedToken?.externalDecimals || "18"} decimal places
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Transaction Fee</span>
           <span className="font-medium">{BRIDGE_OUT_FEE} USDST ({parseFloat(BRIDGE_OUT_FEE) * 100} voucher)</span>
+        </div>
+        {selectedToken?.maxPerWithdrawal && BigInt(selectedToken.maxPerWithdrawal || "0") > 0n && (
+          <div className="flex items-center justify-between">
+            <span>Max Per Withdrawal</span>
+            <span className="font-medium">{formatUnits(selectedToken.maxPerWithdrawal || "0", 18).toString()}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span>{selectedToken?.stratoTokenSymbol} Balance</span>
+          <span className="font-medium">{balanceImpact.before.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: parseInt(selectedToken?.externalDecimals || "18")})}{amountError? "" : " → " + balanceImpact.after.toLocaleString(undefined,{ minimumFractionDigits: 2, maximumFractionDigits: parseInt(selectedToken?.externalDecimals || "18") })}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span>Outcome</span>
+          <span className="font-medium">{amount || "0.00"} {selectedToken?.externalSymbol || "bridged"} to {selectedNetwork || "external network"}</span>
         </div>
       </div>
 
@@ -316,47 +318,18 @@ const BridgeOut: React.FC = () => {
         </div>
       )}
 
-      <Modal
-        title="Confirm Bridge Transaction"
+      <BridgeConfirmationModal
         open={isModalOpen}
         onOk={handleBridgeOut}
         onCancel={handleModalCancel}
+        title="Confirm Bridge Transaction"
         okText="Yes, Bridge Assets"
         cancelText="Cancel"
-      >
-        <div className="space-y-4">
-          <p>Are you sure you want to bridge your assets?</p>
-          <div className="bg-gray-50 p-4 rounded-md">
-            <p className="font-medium">Transaction Details:</p>
-            <div className="mt-2 space-y-2">
-              <p>From: STRATO</p>
-              <p>To: {selectedNetwork || "Not selected"}</p>
-              <p>
-                Amount: {selectedToken ? roundToDecimals(amount, parseInt(selectedToken.externalDecimals)) : amount}{" "}
-                {selectedToken?.stratoTokenSymbol}
-              </p>
-              {selectedToken?.externalSymbol && (
-                <p className="text-blue-600">
-                  You will receive{" "}
-                  {selectedToken
-                    ? roundToDecimals(
-                        amount,
-                        parseInt(selectedToken.externalDecimals),
-                      )
-                    : amount}{" "}
-                  {selectedToken?.externalName} ({selectedToken?.externalSymbol}) on{" "}
-                  {selectedNetwork || "selected"} network
-                </p>
-              )}
-              {!selectedToken?.maxPerWithdrawal &&  (
-                <p className="text-orange-600 text-sm">
-                  Transfer limit: {selectedToken?.maxPerWithdrawal} {selectedToken?.externalSymbol}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </Modal>
+        fromNetwork="STRATO"
+        toNetwork={selectedNetwork || "Not selected"}
+        amount={amount}
+        selectedToken={selectedToken}
+      />
     </div>
   );
 };
