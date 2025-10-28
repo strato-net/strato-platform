@@ -63,7 +63,9 @@ putStorageTrie ::
   m ()
 putStorageTrie account slots = do
   mapM_ (\(theKey, theValue) -> putSolidStorageKeyVal' account theKey theValue) slots
+  flushMemStorageTxDBToBlockDB
   flushMemStorageDB
+  Mem.flushMemAddressStateTxToBlockDB
   Mem.flushMemAddressStateDB
 
 putAccount ::
@@ -112,6 +114,7 @@ initializeStateDB ::
 initializeStateDB addressInfo = do
   initializeBlankStateDB
   mapM_ putAccount addressInfo
+  Mem.flushMemAddressStateTxToBlockDB
   Mem.flushMemAddressStateDB
 
 parseHex :: (Num a, Eq a) => String -> a

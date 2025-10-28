@@ -352,7 +352,9 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
+  flushMemStorageTxDBToBlockDB
   flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
   flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
