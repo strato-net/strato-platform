@@ -27,7 +27,6 @@ import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import BlockApps.Solidity.Value
-import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
 import qualified Blockchain.Slipstream.Events as E
@@ -221,10 +220,6 @@ processTheMessages messages = do
       forM actions $ \(row) -> do
         case actionStorage row of
           Action.SolidVMDiff {} -> do
-            let name = case actionCodeHash row of
-                  SolidVMCode name' _ -> name'
-                  _ -> "something" -- error "internal error: contract should be SolidVM for SolidVM"
-            $logInfoLS "Contract name is: " $ T.pack $ show name
             let indexContract = rowToInsert row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
