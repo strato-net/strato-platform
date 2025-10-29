@@ -27,18 +27,15 @@ import Bloc.Server.Utils
 import BlockApps.Logging
 import qualified BlockApps.SolidVMStorageDecoder as SolidVM
 import BlockApps.Solidity.Value
-import Blockchain.Data.AddressStateDB
 import Blockchain.Data.TransactionResult
 import Blockchain.Slipstream.Data.Action
 import qualified Blockchain.Slipstream.Events as E
 import Blockchain.Slipstream.OutputData
-import Blockchain.Slipstream.QueryFormatHelper
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Event
 import qualified Blockchain.Stream.Action as Action
 import qualified Blockchain.Stream.VMEvent as VME
 import Conduit
-import Control.Lens ((^.), (<&>))
+import Control.Lens ((^.))
 import Control.Monad (forM, forM_, unless, when)
 import Data.Either (lefts, rights)
 import Data.Foldable (toList)
@@ -69,43 +66,26 @@ matters AggregateAction {} = True -- codePtrToSHA actionCodeHash /= emptyHash
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
 splitActions = partitionWith actionAddress
 
-data ABIID = ABIID
-  { aiName :: Text,
-    aiChain :: Text
-  }
-  deriving (Eq, Show)
-
 processedContract ::
-  ABIID ->
   Map.Map Text Value ->
   AggregateAction ->
   E.ProcessedContract
-processedContract ABIID {..} state AggregateAction {..} =
+processedContract state AggregateAction {..} =
   E.ProcessedContract
     { address = actionAddress,
-      codehash = actionCodeHash,
-      creator = actionCreator,
-      cc_creator = actionCCCreator,
-      root = actionRoot,
-      application = actionApplication,
-      contractName = aiName,
-      chain = aiChain,
       contractData = state,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
-      blockNumber = actionBlockNumber,
-      transactionHash = actionTxHash,
-      transactionSender = actionTxSender
+      blockNumber = actionBlockNumber
     }
 
 rowToInsert ::
-  ABIID ->
   AggregateAction ->
   E.ProcessedContract
-rowToInsert abiid row =
+rowToInsert row =
   let newState = case actionStorage row of
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValues mp
-   in processedContract abiid (Map.fromList $ newState) row
+   in processedContract (Map.fromList $ newState) row
 
 
 rowToCollections :: AggregateAction -> Map.Map Text Value
@@ -114,8 +94,8 @@ rowToCollections row =
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
    in Map.fromList newState
 
-processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state row abiid cregator =
+processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state row =
   let extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
       extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
       extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
@@ -127,26 +107,20 @@ processedContractToProcessedCollectionRows state row abiid cregator =
             _  -> Just (a, t, ks, v)
           ) $ extractValues value
         ) $ Map.toList state
-      processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
+      processRecord (n, t, ks, v) = processedCollectionRow n t row ks v
    in processRecord <$> recordVMs  
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> [Value] -> Value ->  ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator ks v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> [Value] -> Value ->  ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ks v =
   ProcessedCollectionRow
     { address = actionAddress,
       -- codehash = actionCodeHash,
-      creator = actionCreator,
-      cc_creator = cregator,
-      root = actionRoot,
-      contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,
       collection_type = ttype,
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
-      transactionHash = actionTxHash,
-      transactionSender = actionTxSender,
       collectionDataKeys = ks,
       collectionDataValue = v 
     }
@@ -246,20 +220,11 @@ processTheMessages messages = do
       forM actions $ \(row) -> do
         case actionStorage row of
           Action.SolidVMDiff {} -> do
-            let name = case actionCodeHash row of
-                  SolidVMCode name' _ -> name'
-                  _ -> "something" -- error "internal error: contract should be SolidVM for SolidVM"
-                abiid =
-                  ABIID
-                    { aiName = T.pack name,
-                      aiChain = ""
-                    }
-            $logInfoLS "Contract name is: " $ T.pack $ show name
-            let indexContract = rowToInsert abiid row
+            let indexContract = rowToInsert row
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
-                pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
+                pCollections = processedContractToProcessedCollectionRows stateDiff row --get all collection rows to insert
             pure . Right $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"
@@ -283,61 +248,6 @@ processTheMessages messages = do
     mapOutput Right . outputData $ pipeInsertGlobalEventTable events'
     unless (null processedEventArrays) $
       mapOutput Right . outputData $ insertCollectionTable processedEventArrays
-
-  let delegateMap = Map.fromList $ (\d -> (Action._delegatecallStorageAddress d, d)) <$> delegatecalls
-      insertViews = insertsByCodeHash >>= \ins ->
-        let indexView = (\i ->
-              indexTableName
-                (E.creator i)
-                (E.contractName i)
-              ) $ indexInsert ins
-            collViews = (\c ->
-              collectionTableName
-                (creator c)
-                (contractname c)
-                (collection_name c)
-              : maybe [] (\Action.Delegatecall{..} -> [
-                  collectionTableName
-                    _delegatecallOrganization
-                    _delegatecallContractName
-                    (collection_name c)
-                ]) (Map.lookup (address c) delegateMap)
-              ) =<< collectionInserts ins
-         in indexView : collViews
-      eventViews = (\e ->
-        eventTableName
-          (T.pack $ evContractCreator e)
-          (T.pack $ evContractName e)
-          (T.pack $ evName e)
-        : maybe [] (\Action.Delegatecall{..} -> [
-          eventTableName
-            _delegatecallOrganization
-            _delegatecallContractName
-            (T.pack $ evName e)
-        ]) (Map.lookup (evContractAddress e) delegateMap)
-        ) =<< eventEvent <$> events'
-      eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
-        eventCollectionTableName
-          (creator e)
-          (contractname e)
-          eName
-          (collection_name e)
-        : maybe [] (\Action.Delegatecall{..} -> [
-          eventCollectionTableName
-            _delegatecallOrganization
-            _delegatecallContractName
-            eName
-            (collection_name e)
-        ]) (Map.lookup (address e) delegateMap)
-        ) processedEventArrays
-      delegateViews = (\Action.Delegatecall{..} ->
-        indexTableName
-          _delegatecallOrganization
-          _delegatecallContractName
-        ) <$> delegatecalls
-      allViews = insertViews ++ eventViews ++ eventArrViews ++ delegateViews
-
-  _ <- mapOutput Right . outputDataDedup $ traverse refreshMaterializedView allViews
 
   when (not $ null fkeys) $ do
     $logDebugLS "processTheMessages" $ T.pack $ "Updating PostgREST schema cache for " ++ show (length fkeys) ++ " foreign keys"

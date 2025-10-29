@@ -15,19 +15,11 @@
 
 
 module Blockchain.Slipstream.OutputData (
-  SqlType(..),
-  TableConstraint(..),
-  OnConflict(..),
-  sqlTypePostgres,
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
-  slipstreamQueryText,
   outputData,
-  outputData',
   outputDataDedup,
-  OutputM,
   ProcessedCollectionRow(..),
-  insertGlobalEventTable,
   pipeInsertGlobalEventTable,
   insertIndexTable,
   insertDelegatecall,
@@ -39,16 +31,8 @@ module Blockchain.Slipstream.OutputData (
   createExpandEventTables,
   notifyPostgREST,
   cirrusInfo,
-  historyTableName,
-  getTableColumnAndType,
-  aggEventToCollectionRow,
   aggEventToCollectionRows,
-  removeArrayEvArgs,
-  getArraysFromEvents,
   dbQueryCatchError,
-  valueToSQLText',
-  storageTableName,
-  globalEventTableName,
   initialSlipstreamQueries
   ) where
 
@@ -79,8 +63,6 @@ import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
-import           Data.List                       ( groupBy, nubBy, sortBy)
-import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
 import           Blockchain.Slipstream.PostgresqlTypedShim
@@ -88,7 +70,6 @@ import           SolidVM.Model.CodeCollection    hiding (contractName, contracts
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
-import           Text.Tools
 import           UnliftIO.Exception              (SomeException, handle)
 import qualified Data.Text.Encoding as TE
 
@@ -389,18 +370,12 @@ slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    creator :: Text,
-    cc_creator :: Maybe Text,
-    root :: Text,
-    contractname :: Text,
     eventInfo :: Maybe (Text, Int),
     collection_name :: Text,
     collection_type ::Text,
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
-    transactionHash :: Keccak256,
-    transactionSender :: Address,
     collectionDataKeys :: [V.Value],
     collectionDataValue :: V.Value
   }
@@ -452,9 +427,6 @@ cirrusInfo =
       pgDBParams = []
     }
 
-dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (TableName, TableColumns)) -> m ()
-dbQueryCatchError' conn (insrt, b) = handle (handlePostgresError' b) $ dbQuery conn insrt
-
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
@@ -463,24 +435,11 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn $! encodeUtf8 insrt
 
-handlePostgresError' :: (MonadLogger m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
-handlePostgresError' myStuff e =
-  case myStuff of
-    Nothing -> handlePostgresError e
-    Just (_, _) -> handlePostgresError e
-
 handlePostgresError :: MonadLogger m => SomeException -> m ()
 handlePostgresError e =
   if crashOnSQLError
     then error . show $ e
     else $logErrorLS "handlePGError" e
-
-outputData' ::
-  (MonadUnliftIO m, OutputM m) =>
-  PGConnection ->
-  ConduitM () (Text, Maybe (TableName, TableColumns)) m a ->
-  m a
-outputData' conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError' conn)
 
 outputData ::
   OutputM m =>
@@ -513,9 +472,6 @@ baseColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
-  , ("transaction_sender", SqlText)
-  , ("root", SqlText)
   ]
 
 baseEventColumns :: TableColumns
@@ -524,11 +480,8 @@ baseEventColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
   , ("transaction_sender", SqlText)
   , ("event_index", SqlDecimal)
-  , ("creator", SqlText)
-  , ("contract_name", SqlText)
   ]
 
 baseEventCollectionColumns :: TableColumns
@@ -544,24 +497,9 @@ baseMappingColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
-  , ("transaction_sender", SqlText)
-  , ("root", SqlText)
   , ("collection_name", SqlText)
   , ("collection_type", SqlText)
   ]
-
-compareCollectionRows :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
-compareCollectionRows x y = collectionDataKeys x == collectionDataKeys y &&
-                   creator x == creator y &&
-                   contractname x == contractname y &&
-                   collection_name x == collection_name y
-
-compareCollectionRows' :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
-compareCollectionRows' x y =
-                   creator x == creator y &&
-                   contractname x == contractname y &&
-                   collection_name x == collection_name y
 
 notifyPostgREST ::
   OutputM m =>
@@ -669,32 +607,20 @@ insertIndexTable ::
 insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
-          let keySt = baseColumns ++ [("creator", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
-              contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
+          let keySt = baseColumns ++ [("data", SqlJsonb)]
               baseVals =
                 [ ValueAddress . E.address,
                   ValueString . T.pack . keccak256ToHex . E.blockHash,
                   ValueString . tshow . E.blockTimestamp,
-                  ValueInt False Nothing . E.blockNumber,
-                  ValueString . T.pack . keccak256ToHex . E.transactionHash,
-                  ValueAddress . E.transactionSender,
-                  ValueString . E.root,
-                  ValueString . E.creator,
-                  ValueString . E.contractName
+                  ValueInt False Nothing . E.blockNumber
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
               dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
               valsForSQL = baseRowVals ++ dataVals
-              contractValsForSQL = map (Just . SimpleValue . ($ contract))
-                [ ValueAddress . E.address,
-                  ValueString . E.creator,
-                  ValueString . E.contractName
-                ]
-              conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
+              conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
-             , InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
              ]
    in yieldMany $ processContract cs'
 
@@ -717,15 +643,7 @@ insertCollectionTable ::
   ConduitM () SlipstreamQuery m ()
 insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
 insertCollectionTable maps = do
-  -- Removing duplicates with all relevant fields
-  let newMaps = nubBy compareCollectionRows maps
-  multilineLog "insertCollectionTable/newCollections" $ boringBox $ map show newMaps
-  -- Sorting by 'creator', 'contractname' before grouping
-  let sortedMaps = sortBy (comparing (\x -> (creator x, contractname x))) newMaps
-  -- Grouping by 'creator', 'contractname'
-  let grouped = groupBy compareCollectionRows' sortedMaps
-  -- Processing grouped data with another function if necessary
-  let results = concatMap processGroupedData grouped
+  let results = processGroupedData maps
   yieldMany results
 
 refreshMaterializedView ::
@@ -756,7 +674,6 @@ eventBaseColumnsQuery =
     ("block_hash", SqlText),
     ("block_timestamp", SqlText),
     ("block_number", SqlText),
-    ("transaction_hash", SqlText),
     ("transaction_sender", SqlText),
     ("event_index", SqlDecimal)
   ]
@@ -842,9 +759,6 @@ insertCollectionTableQuery rows =
               ValueString . T.pack . keccak256ToHex . blockHash,
               ValueString . tshow . blockTimestamp,
               ValueInt False Nothing . blockNumber,
-              ValueString . T.pack . keccak256ToHex . transactionHash,
-              ValueAddress . transactionSender,
-              ValueString . root,
               ValueString . collection_name,
               ValueString . collection_type
             ]
@@ -868,8 +782,6 @@ insertCollectionTableQuery rows =
                 "block_hash",
                 "block_timestamp",
                 "block_number",
-                "transaction_hash",
-                "transaction_sender",
                 "collection_name",
                 "collection_type"
               ]
@@ -889,11 +801,7 @@ insertEventArrayTableQuery ms =
                     ValueString . T.pack . keccak256ToHex . blockHash,
                     ValueString . tshow . blockTimestamp,
                     ValueInt False Nothing . blockNumber,
-                    ValueString . T.pack . keccak256ToHex . transactionHash,
-                    ValueAddress . transactionSender,
                     ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
-                    ValueString . creator,
-                    ValueString . contractname,
                     ValueString . collection_name,
                     ValueString . collection_type
                   ]
@@ -965,24 +873,15 @@ aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Val
 aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
     { address = Action.evContractAddress ev,
-      creator = T.pack $ Action.evContractCreator ev,
-      contractname = T.pack $ Action.evContractName ev,
       eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
       collection_name = arrayName,
       collection_type = "Event Array",
       blockHash = eventBlockHash ae,
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
-      transactionHash = eventTxHash ae,
-      transactionSender = eventTxSender ae,
       collectionDataKeys = [index],
-      collectionDataValue = value,
-      root = "",
-      cc_creator = Just ""
+      collectionDataValue = value
     }
-
-removeArrayEvArgs :: Action.Event -> Action.Event
-removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
 
 getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
 getArraysFromEvents evArgs = do
@@ -1016,14 +915,11 @@ insertGlobalEventTable agEv = do
 -- corresponding JSON value.
 insertGlobalEventTableQuery :: AggregateEvent -> SlipstreamQuery
 insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
-  let creator = T.pack $ Action.evContractCreator ev
-      contractName = T.pack $ Action.evContractName ev
-      eventName = T.pack $ Action.evName ev
+  let eventName = T.pack $ Action.evName ev
       address = Action.evContractAddress ev
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
-      transactionHash = T.pack . keccak256ToHex $ eventTxHash agEv
       transactionSender = eventTxSender agEv
       eventIdx = eventIndex agEv
 
@@ -1041,11 +937,8 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , SimpleValue $ ValueString blockHash
         , SimpleValue $ ValueString blockTimestamp
         , SimpleValue $ ValueInt False Nothing blockNumber
-        , SimpleValue $ ValueString transactionHash
         , SimpleValue $ ValueAddress transactionSender
         , SimpleValue . ValueInt False Nothing $ fromIntegral eventIdx
-        , SimpleValue $ ValueString creator
-        , SimpleValue $ ValueString contractName
         , SimpleValue $ ValueString eventName
         , attributesMap
         ]
@@ -1159,11 +1052,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("creator", SqlText)
-      , ("root", SqlText)
-      , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
       ["address"]
@@ -1174,11 +1062,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("creator", SqlText)
-      , ("root", SqlText)
-      , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
       []
@@ -1197,9 +1080,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("root", SqlText)
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
@@ -1214,11 +1094,8 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
       , ("transaction_sender", SqlText)
       , ("event_index", SqlDecimal)
-      , ("creator", SqlText)
-      , ("contract_name", SqlText)
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
       ]
@@ -1230,12 +1107,8 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
       , ("event_name", SqlText)
       , ("event_index", SqlDecimal)
-      , ("creator", SqlText)
-      , ("contract_name", SqlText)
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
