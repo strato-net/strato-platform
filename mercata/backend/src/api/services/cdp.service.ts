@@ -6,7 +6,7 @@ import { strato, cirrus } from "../../utils/mercataApiHelper";
 import { buildFunctionTx } from "../../utils/txBuilder";
 import { FunctionInput } from "../../types/types";
 import { postAndWaitForTx } from "../../utils/txHelper";
-import { extractContractName } from "../../utils/utils";
+import { extractContractName, normalizeBooleanFromAddress } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 
 // Helper function for fixed-point exponentiation (matches contract's _rpow)
@@ -133,6 +133,24 @@ export const getCDPRegistry = async (
         vaultValue: registryData.cdpVault,
         vaultType: typeof registryData.cdpVault
       });
+    }
+
+    // Normalize boolean values from addresses at the source
+    // This ensures all downstream code gets normalized values
+    if (registryData.cdpEngine) {
+      // Normalize globalPaused
+      if ('globalPaused' in registryData.cdpEngine) {
+        registryData.cdpEngine.globalPaused = normalizeBooleanFromAddress(registryData.cdpEngine.globalPaused);
+      }
+      
+      // Normalize isPaused in all collateral configs
+      if (registryData.cdpEngine.collateralConfigs && Array.isArray(registryData.cdpEngine.collateralConfigs)) {
+        registryData.cdpEngine.collateralConfigs.forEach((configEntry: any) => {
+          if (configEntry?.CollateralConfig && 'isPaused' in configEntry.CollateralConfig) {
+            configEntry.CollateralConfig.isPaused = normalizeBooleanFromAddress(configEntry.CollateralConfig.isPaused);
+          }
+        });
+      }
     }
 
     return registryData;
