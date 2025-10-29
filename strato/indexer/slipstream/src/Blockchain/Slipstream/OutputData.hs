@@ -370,8 +370,6 @@ slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
-    creator :: Text,
-    contractname :: Text,
     eventInfo :: Maybe (Text, Int),
     collection_name :: Text,
     collection_type ::Text,
@@ -610,7 +608,6 @@ insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
           let keySt = baseColumns ++ [("data", SqlJsonb)]
-              contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
               baseVals =
                 [ ValueAddress . E.address,
                   ValueString . T.pack . keccak256ToHex . E.blockHash,
@@ -620,16 +617,10 @@ insertIndexTable cs =
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
               dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
               valsForSQL = baseRowVals ++ dataVals
-              contractValsForSQL = map (Just . SimpleValue . ($ contract))
-                [ ValueAddress . E.address,
-                  ValueString . E.creator,
-                  ValueString . E.contractName
-                ]
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
-             , InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
              ]
    in yieldMany $ processContract cs'
 
@@ -882,8 +873,6 @@ aggEventToCollectionRow :: AggregateEvent -> Action.Event -> Text -> (Value, Val
 aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
     { address = Action.evContractAddress ev,
-      creator = T.pack $ Action.evContractCreator ev,
-      contractname = T.pack $ Action.evContractName ev,
       eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
       collection_name = arrayName,
       collection_type = "Event Array",
