@@ -53,7 +53,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
-import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
@@ -208,13 +207,13 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap <- messages]
+        [(cc, cr, ap) | VME.CodeCollectionAdded cc cr ap <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cp, cr, ap) -> do
-    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr, ap) -> do
+    $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do

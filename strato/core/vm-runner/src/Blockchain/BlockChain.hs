@@ -689,11 +689,21 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
   yield . OutVMEvents . (txr:) $ if not flags_diffPublish
     then []
     else case erAction <$> result of
-      Right (Just act) -> maybeToList $ extractCodeCollectionAddedMessages act
+      Right (Just act) -> extractCodeCollectionAddedMessages act
       _ -> []
 
-extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
+extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
+  {-
+  let mkCCAnouncement cc =
+        CodeCollectionAdded
+              { codeCollection = const () <$> cc,
+                codePtr = undefined,
+                creator = "BlockApps",
+                application = ""
+              }
+  in map mkCCAnouncement $ _newCodeCollections a
+-}
   case ( a ^. Action.src,
          a ^. Action.name,
          O.assocs $ a ^. Action.actionData
@@ -710,14 +720,15 @@ extractCodeCollectionAddedMessages a =
                                              . (modifiers .~ M.empty)
                                              )
           cc' = emptyCodeCollection & contracts .~ contracts'
-       in Just $
+       in [
             CodeCollectionAdded
               { codeCollection = const () <$> cc',
-                codePtr = cp,
                 creator = cn,
                 application = n
               }
-    _ -> Nothing
+          ]
+    _ -> []
+
 
 printTransactionMessage ::
   MonadLogger m =>

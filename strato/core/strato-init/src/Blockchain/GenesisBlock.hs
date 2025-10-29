@@ -246,9 +246,8 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
 
   ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \name -> do
     let srcHash = hash $ T.encodeUtf8 src
-        codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash
-    pure $ CodeCollectionAdded (() <$ cc) codePtr' "BlockApps" name
+    pure $ CodeCollectionAdded (() <$ cc) "BlockApps" name
 
   pub Nothing ccas
 

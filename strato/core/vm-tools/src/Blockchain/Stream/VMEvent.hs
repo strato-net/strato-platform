@@ -15,7 +15,6 @@ import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Stream.Action (Action)
 import Conduit
 import Control.Monad.Composable.Kafka
@@ -31,21 +30,16 @@ data VMEvent
   = NewAction Action
   | CodeCollectionAdded
       { codeCollection :: CodeCollectionF (),
-        codePtr :: CodePtr,
         creator :: Text,
         application :: Text
       }
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
 
-vmType :: CodePtr -> String
-vmType (SolidVMCode _ _) = "SolidVM"
-vmType (ExternallyOwned _) = "EVM"
-
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cp cr ap) =
-    "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") " ++ vmType cp
+  format (CodeCollectionAdded _ cr ap) =
+    "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") "
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 instance Binary VMEvent
