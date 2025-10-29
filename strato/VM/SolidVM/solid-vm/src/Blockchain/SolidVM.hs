@@ -2670,7 +2670,8 @@ encodeForReturn' (SStruct _ vs) = do
                      . encodeForReturn' =<< getVar v
   encodedItems <- mapM (uncurry encodePair) $ M.toList vs
   pure $ "{" ++ intercalate "," encodedItems ++ "}"
-encodeForReturn' SNULL = pure "[]"
+encodeForReturn' SNULL = pure "0"
+encodeForReturn' SReference{} = pure "0"
 encodeForReturn' x = todo "Cannot encode this return type: " x
 
 --formatAddressWithoutColor : padded the address with 40 bytes
