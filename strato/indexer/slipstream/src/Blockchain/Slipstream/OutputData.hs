@@ -261,7 +261,7 @@ slipstreamQueryText _ CreateView{..} =
             , "')"
             , case t of
                 SqlDecimal -> "::numeric"
-                SqlBool -> " <> 'false'"
+                SqlBool -> " = 'true'"
                 _ -> ""
             , " ELSE "
             , case t of
@@ -943,7 +943,7 @@ createEventTable (creator, n) evName ev cc inherited = do
             ["creator", "contract_name"]
             cols'
             "attributes"
-            ["block_hash", "event_index"]
+            ["address", "block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
@@ -1222,7 +1222,7 @@ initialSlipstreamQueries =
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
       ]
-      ["block_hash", "event_index"]
+      ["address", "block_hash", "event_index"]
       (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
   , CreateTable
       eventArrayTableName
@@ -1242,5 +1242,5 @@ initialSlipstreamQueries =
       , ("value", SqlJsonb)
       ]
       ["address", "block_hash", "event_index", "collection_name", "key"]
-      (Just $ Foreign "event_event_array" ["block_hash", "event_index"] globalEventTableName ["block_hash", "event_index"])
+      (Just $ Foreign "event_event_array" ["address", "block_hash", "event_index"] globalEventTableName ["address", "block_hash", "event_index"])
   ]
