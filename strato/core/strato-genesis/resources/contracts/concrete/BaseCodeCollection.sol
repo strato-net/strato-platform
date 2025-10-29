@@ -86,7 +86,7 @@ contract record Mercata is Authorizable {
 
         address poolFactoryImpl = address(new PoolFactory(implOwnerIgnored));
         poolFactory = PoolFactory(address(new Proxy(poolFactoryImpl, this)));
-        poolFactory.initialize(address(tokenFactory), address(adminRegistry), address(feeCollector));
+        poolFactory.initialize(address(tokenFactory), address(feeCollector));
         Ownable(poolFactory).transferOwnership(address(adminRegistry));
         adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(tokenFactory), "createTokenWithInitialOwner", address(poolFactory));
 

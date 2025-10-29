@@ -30,9 +30,6 @@ contract record PoolFactory is Ownable {
     /// @notice Event emitted when pools are migrated
     event PoolsMigrated(address oldFactory, address newFactory, uint256 poolCount);
 
-    /// @notice Event emitted when the admin registry is updated
-    event AdminRegistryUpdated(address newRegistry);
-
     /// @notice Event emitted when the token factory is updated
     event TokenFactoryUpdated(address newFactory);
 
@@ -52,9 +49,6 @@ contract record PoolFactory is Ownable {
 
     /// @notice Array of all pool addresses
     address[] public record allPools;
-
-    /// @notice Admin registry contract address
-    address public adminRegistry;
     
     /// @notice Token factory contract address
     address public tokenFactory;
@@ -76,14 +70,11 @@ contract record PoolFactory is Ownable {
 
     /// @notice Initialize the contract
     /// @param _tokenFactory The address of the token factory
-    /// @param _adminRegistry The address of the admin registry
     /// @param _feeCollector The address of the fee collector
-    function initialize(address _tokenFactory, address _adminRegistry, address _feeCollector) external onlyOwner {
-        require(_adminRegistry != address(0), "Zero admin registry address");
+    function initialize(address _tokenFactory, address _feeCollector) external onlyOwner {
         require(_tokenFactory  != address(0), "Zero token factory address");
         require(_feeCollector  != address(0), "Zero fee collector address");
         
-        adminRegistry = _adminRegistry;
         tokenFactory = _tokenFactory;
         feeCollector = _feeCollector;
         swapFeeRate = 30;
@@ -91,7 +82,6 @@ contract record PoolFactory is Ownable {
 
         emit FeeParametersUpdated(swapFeeRate, lpSharePercent);
         emit FeeCollectorsUpdated(feeCollector);
-        emit AdminRegistryUpdated(adminRegistry);
         emit TokenFactoryUpdated(tokenFactory);
     }
 
@@ -107,14 +97,6 @@ contract record PoolFactory is Ownable {
 
     // ============ ADMIN FUNCTIONS ============
     
-    /// @notice Update the admin registry address (owner only)
-    function setAdminRegistry(address _adminRegistry) external onlyOwner {
-        require(_adminRegistry != address(0), "Zero admin registry address");
-        address oldRegistry = address(adminRegistry);
-        adminRegistry = _adminRegistry;
-        emit AdminRegistryUpdated(_adminRegistry);
-    }
-
     /// @notice Update the token factory address (owner or admin)
     function setTokenFactory(address _tokenFactory) external onlyOwner {
         require(_tokenFactory != address(0), "Zero token factory address");
@@ -205,7 +187,7 @@ contract record PoolFactory is Ownable {
     // ============ POOL MANAGEMENT ============
     
     /// @notice Create a new pool for tokenA/tokenB
-    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP tokenby the admin registry
+    /// @dev After pool creation, the pool should be whitelisted for mint and burn of the LP token by the admin registry
     function createPool(address tokenA, address tokenB) external tokensActive(tokenA, tokenB) onlyOwner returns (address pool) {
         require(tokenA != address(0) && tokenB != address(0), "Zero address");
         require(tokenA != tokenB, "Identical addresses");

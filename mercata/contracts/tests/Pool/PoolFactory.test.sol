@@ -58,7 +58,6 @@ contract Describe_PoolFactory is Authorizable {
         
         // Verify factory has required components
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify factory is ready for pool creation
@@ -71,7 +70,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool tracking functionality without creating pools
         // Verify factory can track pools (test the tracking mechanism)
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify factory is ready to track pools
@@ -84,7 +82,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test duplicate pool prevention logic without creating pools
         // Verify factory has duplicate prevention mechanisms
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify tokens are different (prevents identical pool creation)
@@ -110,7 +107,6 @@ contract Describe_PoolFactory is Authorizable {
 
     function it_pool_factory_getter_functions_work_correctly() {
         // Test all getter functions without creating pools
-        require(m.poolFactory().adminRegistry() != address(0), "adminRegistry should not be zero");
         require(m.poolFactory().tokenFactory() != address(0), "tokenFactory should not be zero");
         require(m.poolFactory().feeCollector() != address(0), "feeCollector should not be zero");
         require(m.poolFactory().swapFeeRate() > 0, "swapFeeRate should be positive");
@@ -126,13 +122,6 @@ contract Describe_PoolFactory is Authorizable {
     }
 
     // ============ ADMIN FUNCTION TESTS ============
-
-    function it_pool_factory_can_set_admin_registry() {
-        // Test setting admin registry (owner only)
-        address newAdminRegistry = address(0x123);
-        m.poolFactory().setAdminRegistry(newAdminRegistry);
-        require(m.poolFactory().adminRegistry() == newAdminRegistry, "adminRegistry should be updated");
-    }
 
     function it_pool_factory_can_set_token_factory() {
         // Test setting token factory (owner only)
@@ -162,7 +151,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool fee parameter setting validation without creating pools
         // Verify factory has the setPoolFeeParameters function
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test fee parameter validation
@@ -180,7 +168,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool syncing functionality without creating pools
         // Verify factory has syncPools function
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test syncPools function with empty array (should sync all pools)
@@ -193,7 +180,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool skimming functionality without creating pools
         // Verify factory has skimPools function
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test skimPools function with empty array (should skim all pools)
@@ -207,7 +193,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test syncing all pools functionality without creating pools
         // Verify factory has syncPools function for all pools
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test syncPools function with empty array (should sync all pools)
@@ -225,7 +210,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test skimming all pools functionality without creating pools
         // Verify factory has skimPools function for all pools
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test skimPools function with empty array (should skim all pools)
@@ -246,7 +230,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool transfer functionality without creating pools
         // Verify factory has transferPoolsToFactory function
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test transfer validation
@@ -261,7 +244,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool registration functionality without creating pools
         // Verify factory has registerPoolsFromFactory function
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Test registration validation
@@ -294,7 +276,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test multiple pool creation validation without creating pools
         // Verify factory can handle multiple pool creation
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify all tokens are different (required for multiple pools)
@@ -312,7 +293,6 @@ contract Describe_PoolFactory is Authorizable {
         // Test pool operations validation without creating pools
         // Verify factory can handle pool operations after creation
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify tokens are ready for pool operations
@@ -341,7 +321,6 @@ contract Describe_PoolFactory is Authorizable {
         
         // Verify factory can validate active tokens
         require(m.poolFactory().tokenFactory() != address(0), "Factory should have tokenFactory");
-        require(m.poolFactory().adminRegistry() != address(0), "Factory should have adminRegistry");
         require(m.poolFactory().feeCollector() != address(0), "Factory should have feeCollector");
         
         // Verify tokens are ready for pool creation
