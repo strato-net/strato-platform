@@ -67,12 +67,6 @@ matters AggregateAction {} = True -- codePtrToSHA actionCodeHash /= emptyHash
 splitActions :: [AggregateAction] -> [(Address, [AggregateAction])]
 splitActions = partitionWith actionAddress
 
-data ABIID = ABIID
-  { aiName :: Text,
-    aiChain :: Text
-  }
-  deriving (Eq, Show)
-
 processedContract ::
   Map.Map Text Value ->
   AggregateAction ->
