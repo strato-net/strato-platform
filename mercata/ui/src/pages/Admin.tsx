@@ -59,16 +59,37 @@ const Admin = () => {
                 <span className="hidden sm:inline">Create Pools</span>
                 <span className="sm:hidden">Pools</span>
               </TabsTrigger>
-              <TabsTrigger value="lending" className="flex items-center space-x-1 md:space-x-2 text-xs md:text-sm">
-                <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
-                <span className="hidden sm:inline">Lending</span>
-                <span className="sm:hidden">Lending</span>
-              </TabsTrigger>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
-                      ['tokens', 'pricing', 'configs', 'status'].includes(activeTab)
+                      ['lending', 'configs'].includes(activeTab)
+                        ? 'bg-background text-foreground shadow-sm'
+                        : 'hover:bg-muted hover:text-accent-foreground'
+                    }`}
+                  >
+                    <TrendingUp className="h-3 w-3 md:h-4 md:w-4" />
+                    <span className="hidden sm:inline">Lending</span>
+                    <span className="sm:hidden">Lending</span>
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem onClick={() => setActiveTab('lending')}>
+                    <TrendingUp className="h-4 w-4 mr-2" />
+                    Lending Config
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('configs')}>
+                    <Cog className="h-4 w-4 mr-2" />
+                    Token Configs
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs md:text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 space-x-1 md:space-x-2 ${
+                      ['tokens', 'pricing', 'status'].includes(activeTab)
                         ? 'bg-background text-foreground shadow-sm'
                         : 'hover:bg-muted hover:text-accent-foreground'
                     }`}
@@ -87,10 +108,6 @@ const Admin = () => {
                   <DropdownMenuItem onClick={() => setActiveTab('pricing')}>
                     <DollarSign className="h-4 w-4 mr-2" />
                     Set Prices
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('configs')}>
-                    <Cog className="h-4 w-4 mr-2" />
-                    Token Configs
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setActiveTab('status')}>
                     <ToggleLeft className="h-4 w-4 mr-2" />
