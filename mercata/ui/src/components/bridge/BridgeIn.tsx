@@ -742,7 +742,9 @@ const BridgeIn: React.FC = () => {
             !selectedToken ||
             !isConnected ||
             !isCorrectNetwork ||
-            !isTokenPermitted
+            !isTokenPermitted ||
+            !!errors.amount ||
+            !!errors.network
           }
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >

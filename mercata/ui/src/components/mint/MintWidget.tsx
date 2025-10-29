@@ -514,7 +514,7 @@ const MintWidget: React.FC = () => {
       <div className="flex justify-end">
         <Button
           onClick={handleMint}
-          disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork}
+          disabled={isLoading || !selectedMintToken || !amount || !isConnected || !isCorrectNetwork || !!errors.amount || !!errors.network}
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
           {isLoading ? "Processing..." : "Get USDST"}
