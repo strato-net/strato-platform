@@ -37,7 +37,7 @@ const createTransactionObject = async (method, toAddress, value, txHash, contrac
 
   // Fetch certificates based on the transaction hash
   const queryResponse = await dbApiClient.get(
-    `/BlockApps-Mercata-MercataETHBridge`,
+    `/BlockApps-MercataETHBridge`,
     {
       params: {
         address: `eq.${contractAddress}`,

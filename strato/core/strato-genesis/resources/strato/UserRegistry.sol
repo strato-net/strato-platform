@@ -51,14 +51,14 @@ contract record UserRegistry {
 
 contract record User {
     address private owner;
-    string public commonName;
+    string public userName;
     IssuerStatus public issuerStatus;
     bool public isAdmin;
 
-    constructor(string _commonName) {
-        commonName = _commonName;
+    constructor(string _userName) {
+        userName = _userName;
         issuerStatus = IssuerStatus.UNAUTHORIZED;
-        owner = msg.sender;
+        owner = tx.origin;
     }
 
     modifier onlyOwner() {
@@ -68,7 +68,7 @@ contract record User {
 
     modifier authenticated() {
         // Only the user that this contract is associated with, can use this function.
-        require(authenticate(), "You don't have permission to use this function!");
+        require(authenticate(), "You don't have permission to use this function! " + string(msg.sender) + " != " + string(owner));
         _;
     }
 
@@ -87,8 +87,7 @@ contract record User {
 
     // Checks if the caller is indeed the user the wallet belongs to.
     function authenticate() internal returns (bool) {
-        mapping (string => string) cert = getUserCert(msg.sender);
-        return cert["commonName"] == commonName;
+        return msg.sender == owner;
     }
 
     function requestReview() public authenticated {

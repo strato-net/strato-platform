@@ -68,7 +68,7 @@ require("dotenv").config();
   };
 
   const getBalance = async (tokenAddr, holderAddr) => {
-    const rows = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
+    const rows = await cirrusGet("/BlockApps-Token-_balances", {
       address: `eq.${tokenAddr.toLowerCase()}`,
       key: `eq.${holderAddr.toLowerCase()}`,
       select: "balance:value::text",

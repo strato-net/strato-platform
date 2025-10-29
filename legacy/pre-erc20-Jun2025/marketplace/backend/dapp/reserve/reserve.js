@@ -3,9 +3,9 @@ import constants, { DECIMAL_FACTOR_18 } from '../../helpers/constants';
 import { searchAllWithQueryArgs } from '/helpers/utils';
 import BigNumber from 'bignumber.js';
 
-const contractName = 'BlockApps-Mercata-Reserve';
+const contractName = 'BlockApps-Reserve';
 const contractTable = 'Reserve';
-const OracleContractName = 'BlockApps-Mercata-OracleService';
+const OracleContractName = 'BlockApps-OracleService';
 const contractEvents = {
   STAKE_CREATED: 'StakeCreated',
   STAKE_UNLOCKED: 'StakeUnlocked',
@@ -104,7 +104,7 @@ async function get(user, address, options) {
 
   const activeEscrows = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Escrow' },
+    { name: 'BlockApps-Escrow' },
     escrowTVLSearchOptions
   );
 
@@ -126,7 +126,7 @@ async function get(user, address, options) {
 
   const allEscrows = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Escrow' },
+    { name: 'BlockApps-Escrow' },
     escrowTotalCataRewardSearchOptions
   );
 
@@ -153,7 +153,7 @@ async function get(user, address, options) {
 
   const results = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Asset' },
+    { name: 'BlockApps-Asset' },
     combinedSearchOptions
   );
 
@@ -198,7 +198,7 @@ async function fetchTotalCataRewards(user, options) {
 
   const allEscrows = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Escrow' },
+    { name: 'BlockApps-Escrow' },
     totalCataRewardIssued
   );
 
@@ -251,7 +251,7 @@ async function getAll(user, options) {
 
   const relatedAssetsAndTokens = await rest.search(
     user,
-    { name: 'BlockApps-Mercata-Asset' },
+    { name: 'BlockApps-Asset' },
     combinedSearchOptions
   );
 
@@ -269,7 +269,7 @@ async function getAll(user, options) {
 
     const activeEscrows = await rest.search(
       user,
-      { name: 'BlockApps-Mercata-Escrow' },
+      { name: 'BlockApps-Escrow' },
       escrowTVLSearchOptions
     );
 
@@ -289,7 +289,7 @@ async function getAll(user, options) {
 
     const allEscrows = await rest.search(
       user,
-      { name: 'BlockApps-Mercata-Escrow' },
+      { name: 'BlockApps-Escrow' },
       escrowTotalCataRewardSearchOptions
     );
 
@@ -419,7 +419,7 @@ async function unstake(user, args, options) {
 
     const escrows = await rest.search(
       user,
-      { name: 'BlockApps-Mercata-Escrow' },
+      { name: 'BlockApps-Escrow' },
       escrowSearchOptions
     );
 
@@ -495,7 +495,7 @@ async function borrow(user, args, options) {
 
     const escrows = await rest.search(
       user,
-      { name: 'BlockApps-Mercata-Escrow' },
+      { name: 'BlockApps-Escrow' },
       escrowSearchOptions
     );
 

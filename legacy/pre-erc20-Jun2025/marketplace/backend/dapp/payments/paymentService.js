@@ -10,7 +10,7 @@ import {
 } from '/helpers/utils';
 // import dayjs from 'dayjs';
 
-const tablePrefix = 'BlockApps-Mercata-';
+const tablePrefix = 'BlockApps-';
 const contractName = 'PaymentService';
 const externalContractName = 'ExternalPaymentService';
 const onboardedEventName = 'PaymentService.SellerOnboarded';

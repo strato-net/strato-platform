@@ -42,7 +42,7 @@ export interface Token {
   collateralBalance?: string;
   key?: string;
   value?: string;
-  "BlockApps-Mercata-ERC20"?: {
+  "BlockApps-ERC20"?: {
     data: {
       token: string;
       oracle: string;
@@ -213,6 +213,7 @@ export interface CollateralData {
   liquidationBonus?: string;
   bonus?: string;
   expectedProfit?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface TokenInfo {
@@ -247,6 +248,7 @@ export interface LiquidityData {
   // new (optional)
   totalAmountOwed?: string;
   totalAmountOwedPreview?: string;
+  isPaused: boolean;              // LendingPool pause status
 }
 
 export interface CollateralRatioItem {

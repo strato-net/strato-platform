@@ -53,7 +53,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection hiding (contractName)
 import qualified SolidVM.Model.Type as SVMType
-import Text.Format
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
 
@@ -139,7 +138,6 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       creator = actionCreator,
       cc_creator = cregator,
       root = actionRoot,
-      application = actionApplication,
       contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,
@@ -208,13 +206,13 @@ processTheMessages messages = do
       -- TODO (Dan) : would be nice if we didn't just rip events out at the top
       -- level like this
       creates =
-        [(cc, cp, cr, ap) | VME.CodeCollectionAdded cc cp cr ap <- messages]
+        [(cc, cr) | VME.CodeCollectionAdded cc cr <- messages]
       delegatecalls = concatMap toList
         [Action._delegatecalls a | VME.NewAction a <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
-  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cp, cr, ap) -> do
-    $logInfoS "processTheMessages" $ "CodeCollection Added: " <> T.pack (format cp) 
+  fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr) -> do
+    $logInfoS "processTheMessages" $ "CodeCollection Added"
     multilineLog "processTheMessages/contracts" $ boringBox $ map show (Map.keys $ cc ^. contracts)
 
     fmap concat . forM (filter (_isContractRecord . snd) . Map.toList $ cc ^. contracts) $ \(_, c) -> do
@@ -227,8 +225,8 @@ processTheMessages messages = do
       let collectionNamesAndTypes = getCollectionsFromContract c
       $logInfoS "processTheMessages/collectionNamesAndTypes" $ T.pack $ show collectionNamesAndTypes
 
-      let nameParts@(cr', ap',  n'') = (cr, ap, T.pack $ _contractName c)
-      $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", app=" <> ap' <> ", name=" <> n''
+      let nameParts@(cr', n'') = (cr, T.pack $ _contractName c)
+      $logInfoS "processTheMessages/Contract Added" $ "ccreator=" <> cr' <> ", name=" <> n''
       multilineLog "processTheMessages/fields" $ boringBox $ map (show) $ Map.toList $ fmap _varType $ c ^. storageDefs
 
       -- Create collection tables
@@ -291,19 +289,16 @@ processTheMessages messages = do
         let indexView = (\i ->
               indexTableName
                 (E.creator i)
-                (E.application i)
                 (E.contractName i)
               ) $ indexInsert ins
             collViews = (\c ->
               collectionTableName
                 (creator c)
-                (application c)
                 (contractname c)
                 (collection_name c)
               : maybe [] (\Action.Delegatecall{..} -> [
                   collectionTableName
                     _delegatecallOrganization
-                    _delegatecallApplication
                     _delegatecallContractName
                     (collection_name c)
                 ]) (Map.lookup (address c) delegateMap)
@@ -312,13 +307,11 @@ processTheMessages messages = do
       eventViews = (\e ->
         eventTableName
           (T.pack $ evContractCreator e)
-          (T.pack $ evContractApplication e)
           (T.pack $ evContractName e)
           (T.pack $ evName e)
         : maybe [] (\Action.Delegatecall{..} -> [
           eventTableName
             _delegatecallOrganization
-            _delegatecallApplication
             _delegatecallContractName
             (T.pack $ evName e)
         ]) (Map.lookup (evContractAddress e) delegateMap)
@@ -326,14 +319,12 @@ processTheMessages messages = do
       eventArrViews = concat $ mapMaybe (\e -> eventInfo e <&> \(eName, _) ->
         eventCollectionTableName
           (creator e)
-          (application e)
           (contractname e)
           eName
           (collection_name e)
         : maybe [] (\Action.Delegatecall{..} -> [
           eventCollectionTableName
             _delegatecallOrganization
-            _delegatecallApplication
             _delegatecallContractName
             eName
             (collection_name e)
@@ -342,7 +333,6 @@ processTheMessages messages = do
       delegateViews = (\Action.Delegatecall{..} ->
         indexTableName
           _delegatecallOrganization
-          _delegatecallApplication
           _delegatecallContractName
         ) <$> delegatecalls
       allViews = insertViews ++ eventViews ++ eventArrViews ++ delegateViews

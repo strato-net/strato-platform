@@ -429,9 +429,9 @@ const Inventory = ({ user }) => {
               <div className="mr-2 w-[74px] h-[52px] flex items-center justify-center">
                 <img
                   src={
-                    record['BlockApps-Mercata-Asset-images'] &&
-                      record['BlockApps-Mercata-Asset-images'].length > 0
-                      ? record['BlockApps-Mercata-Asset-images'][0].value
+                    record['BlockApps-Asset-images'] &&
+                      record['BlockApps-Asset-images'].length > 0
+                      ? record['BlockApps-Asset-images'][0].value
                       : image_placeholder
                   }
                   alt={'Asset image...'}

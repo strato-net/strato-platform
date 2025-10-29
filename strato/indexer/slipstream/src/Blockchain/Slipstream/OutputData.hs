@@ -177,8 +177,8 @@ slipstreamQueryText sqlTypeText CreateTable{..} = T.concat $
         ]
   , ");"
   ] ++ (case tableName of
-    HistoryTableName c a n ->
-      let normalTableName = indexTableName c a n
+    HistoryTableName c n ->
+      let normalTableName = indexTableName c n
           triggerFunctionName = "\"" <> "insert_or_update_" <> tableNameToText normalTableName <> "_history_table" <> "\""
        in [ "\n\n",
             -- Create or replace the function for handling insert and update triggers
@@ -279,8 +279,6 @@ slipstreamQueryText _ CreateView{..} =
         , tableNameToText contractTableName
         , " c ON s.address = c.address WHERE c.creator = '"
         , tableNameCreator viewName
-        , "' AND c.application = '"
-        , tableNameApplication viewName
         , "' AND (c.contract_name = '"
         , tableNameContractName viewName
         , T.concat $ ("' OR c.contract_name = '" <>) <$> inheritedContractNames
@@ -394,7 +392,6 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     creator :: Text,
     cc_creator :: Maybe Text,
     root :: Text,
-    application :: Text,
     contractname :: Text,
     eventInfo :: Maybe (Text, Int),
     collection_name :: Text,
@@ -531,7 +528,6 @@ baseEventColumns =
   , ("transaction_sender", SqlText)
   , ("event_index", SqlDecimal)
   , ("creator", SqlText)
-  , ("application", SqlText)
   , ("contract_name", SqlText)
   ]
 
@@ -558,14 +554,12 @@ baseMappingColumns =
 compareCollectionRows :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
 compareCollectionRows x y = collectionDataKeys x == collectionDataKeys y &&
                    creator x == creator y &&
-                   application x == application y &&
                    contractname x == contractname y &&
                    collection_name x == collection_name y
 
 compareCollectionRows' :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
 compareCollectionRows' x y =
                    creator x == creator y &&
-                   application x == application y &&
                    contractname x == contractname y &&
                    collection_name x == collection_name y
 
@@ -579,16 +573,16 @@ createIndexTable ::
   --
   ContractF () ->
   CodeCollectionF () ->
-  (Text, Text, Text) ->
+  (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createIndexTable contract cc (creator, a, n) inherited = do
-  let tableName = indexTableName creator a n
+createIndexTable contract cc (creator, n) inherited = do
+  let tableName = indexTableName creator n
       -- histTableName = historyTableName creator a n
       cols = getTableColumnAndType False cc $ map (\(x, y) -> (labelToText x, y ^. varType)) $ Map.toList $ contract ^. storageDefs
-      contractCols = ["creator", "application", "contract_name"]
+      contractCols = ["creator", "contract_name"]
       cols' = (\(x, t, _) -> (x, t)) <$> cols
-      fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator a f) x t) <$> mf) cols
+      fkeys = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo tableName (indexTableName creator f) x t) <$> mf) cols
   yield $ CreateView
     tableName
     inherited
@@ -603,14 +597,14 @@ createIndexTable contract cc (creator, a, n) inherited = do
 
 createCollectionTable ::
   OutputM m =>
-  (Text, Text, Text) ->
+  (Text, Text) ->
   ContractF () ->
   CodeCollectionF () ->
   [Text] ->
   (Text, [SVMType.Type], SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createCollectionTable (creator, a, n) c cc inherited (collectionName, keyTypes, valueType) = do
-  let tableName = collectionTableName creator a n collectionName
+createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, valueType) = do
+  let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       mappingCols = (fst <$> baseMappingColumns) ++ ["value"]
@@ -629,20 +623,20 @@ createCollectionTable (creator, a, n) c cc inherited (collectionName, keyTypes, 
     , ([Left "jsonb_typeof(", Right "value", Left ")"], Just "IS", "NOT NULL")
     ]
   pure $ case getTableColumnAndType False cc [("value", valueType)] of
-    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator a f) x SqlJsonb
+    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
     _ -> Nothing
 
 createEventArrayTable ::
   OutputM m =>
-  (Text, Text, Text, Text) ->
+  (Text, Text, Text) ->
   CodeCollectionF () ->
   [Text] ->
   (Text, SVMType.Type) ->
   ConduitM () SlipstreamQuery m (Maybe ForeignKeyInfo)
-createEventArrayTable (creator, a, n, e) cc inherited (arr, arrType) = do
+createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
   let keyTypes (SVMType.Array t _) = SqlDecimal : keyTypes t
       keyTypes _                   = []
-      tableName = eventCollectionTableName creator a n e arr
+      tableName = eventCollectionTableName creator n e arr
       cols = (fst <$> eventBaseColumnsQuery) ++
         [ "collection_name"
         , "collection_type"
@@ -650,22 +644,22 @@ createEventArrayTable (creator, a, n, e) cc inherited (arr, arrType) = do
         ]
       keyNames = keyColumnNames $ keyTypes arrType
   $logInfoS "createEventArrayTable/tableExists"  $ T.pack ( "Table Name: " ++ show tableName ++ ", table exists: ")
-  $logInfoS "createEventArrayTable/(creator, a, n, e) " (T.pack $ show (creator, a, n, e))
+  $logInfoS "createEventArrayTable/(creator, n, e) " (T.pack $ show (creator, n, e))
   $logInfoS "createEventArrayTable/(arr, arrType) " (T.pack $ show (arr, arrType))
   yield $ CreateView
     tableName
     inherited
     eventArrayTableName
     cols
-    ["creator", "application", "contract_name"]
+    ["creator", "contract_name"]
     keyNames
     "key"
-    (["address", "transaction_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
+    (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     ]
   pure $ case getTableColumnAndType False cc [("value", arrType)] of
-    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator a f) x SqlJsonb
+    [(x, _, Just f)] -> Just $ ForeignKeyInfo tableName (indexTableName creator f) x SqlJsonb
     _ -> Nothing
 
 insertIndexTable ::
@@ -675,8 +669,8 @@ insertIndexTable ::
 insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
-          let keySt = baseColumns ++ [("creator", SqlText), ("application", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
-              contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
+          let keySt = baseColumns ++ [("creator", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
+              contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
               baseVals =
                 [ ValueAddress . E.address,
                   ValueString . T.pack . keccak256ToHex . E.blockHash,
@@ -686,7 +680,6 @@ insertIndexTable cs =
                   ValueAddress . E.transactionSender,
                   ValueString . E.root,
                   ValueString . E.creator,
-                  ValueString . E.application,
                   ValueString . E.contractName
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
@@ -695,7 +688,6 @@ insertIndexTable cs =
               contractValsForSQL = map (Just . SimpleValue . ($ contract))
                 [ ValueAddress . E.address,
                   ValueString . E.creator,
-                  ValueString . E.application,
                   ValueString . E.contractName
                 ]
               conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
@@ -710,12 +702,11 @@ insertDelegatecall ::
   OutputM m =>
   Delegatecall ->
   ConduitM () SlipstreamQuery m ()
-insertDelegatecall (Delegatecall s _ c a n) = do
-  let contractKeySt = (,SqlText) <$> ["address", "creator", "application", "contract_name"]
+insertDelegatecall (Delegatecall s _ c _ n) = do
+  let contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
       contractValsForSQL = map (Just . SimpleValue)
         [ ValueAddress s,
           ValueString c,
-          ValueString a,
           ValueString n
         ]
    in yield $ InsertTable contractTableName contractKeySt [contractValsForSQL] (Just DoNothing)
@@ -729,9 +720,9 @@ insertCollectionTable maps = do
   -- Removing duplicates with all relevant fields
   let newMaps = nubBy compareCollectionRows maps
   multilineLog "insertCollectionTable/newCollections" $ boringBox $ map show newMaps
-  -- Sorting by 'creator', 'application', 'contractname' before grouping
-  let sortedMaps = sortBy (comparing (\x -> (creator x, application x, contractname x))) newMaps
-  -- Grouping by 'creator', 'application', 'contractname'
+  -- Sorting by 'creator', 'contractname' before grouping
+  let sortedMaps = sortBy (comparing (\x -> (creator x, contractname x))) newMaps
+  -- Grouping by 'creator', 'contractname'
   let grouped = groupBy compareCollectionRows' sortedMaps
   -- Processing grouped data with another function if necessary
   let results = concatMap processGroupedData grouped
@@ -902,7 +893,6 @@ insertEventArrayTableQuery ms =
                     ValueAddress . transactionSender,
                     ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
                     ValueString . creator,
-                    ValueString . application,
                     ValueString . contractname,
                     ValueString . collection_name,
                     ValueString . collection_type
@@ -916,7 +906,7 @@ createExpandEventTables ::
   OutputM m =>
   ContractF () ->
   CodeCollectionF () ->
-  (Text, Text, Text) ->
+  (Text, Text) ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
 createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.toList $ c ^. events
@@ -925,20 +915,20 @@ createExpandEventTables c cc nameParts inherited = fmap concat . mapM go . Map.t
 
 createEventTable ::
   OutputM m =>
-  (Text, Text, Text) ->
+  (Text, Text) ->
   SolidString ->
   EventF () ->
   CodeCollectionF () ->
   [Text] ->
   ConduitM () SlipstreamQuery m [ForeignKeyInfo]
-createEventTable (creator, a, n) evName ev cc inherited = do
+createEventTable (creator, n) evName ev cc inherited = do
   $logInfoS "createEventTable" . T.pack $ show ev
-  let (crtr, app, cname) = constructTableNameParameters creator a n
-      eventTable = EventTableName crtr app cname (escapeQuotes $ labelToText evName)
+  let (crtr, cname) = constructTableNameParameters creator n
+      eventTable = EventTableName crtr cname (escapeQuotes $ labelToText evName)
       isEvent = True
       evLogToPair (EventLog n' _ t') = (n', t')
       cols = getTableColumnAndType isEvent cc [(x, indexedTypeType y) | (x, y) <- fillFirstEmptyEntries . map evLogToPair $ ev ^. eventLogs]
-      fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator a f) x t) <$> mf) cols
+      fcols = mapMaybe (\(x, t, mf) -> (\f -> ForeignKeyInfo eventTable (indexTableName creator f) x t) <$> mf) cols
       arrayNamesAndTypes = [(key, entry) | (key, IndexedType _ (SVMType.Array entry _)) <- map evLogToPair $ ev ^. eventLogs]
   $logInfoS "keys" (T.pack $ show arrayNamesAndTypes)
   yieldMany $
@@ -950,14 +940,14 @@ createEventTable (creator, a, n) evName ev cc inherited = do
             inherited
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
-            ["creator", "application", "contract_name"]
+            ["creator", "contract_name"]
             cols'
             "attributes"
-            ["transaction_hash", "event_index"]
+            ["block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]
   arrayFkeys <- forM arrayNamesAndTypes $
-    createEventArrayTable (crtr, app, cname, escapeQuotes $ labelToText evName) cc inherited
+    createEventArrayTable (crtr, cname, escapeQuotes $ labelToText evName) cc inherited
   pure $ fcols ++ catMaybes arrayFkeys
 
 -- Function to convert AggregateEvent to ProcessedCollectionRow
@@ -976,7 +966,6 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
   ProcessedCollectionRow
     { address = Action.evContractAddress ev,
       creator = T.pack $ Action.evContractCreator ev,
-      application = T.pack $ Action.evContractApplication ev,
       contractname = T.pack $ Action.evContractName ev,
       eventInfo = Just (T.pack $ Action.evName ev, eventIndex ae),
       collection_name = arrayName,
@@ -1028,7 +1017,6 @@ insertGlobalEventTable agEv = do
 insertGlobalEventTableQuery :: AggregateEvent -> SlipstreamQuery
 insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
   let creator = T.pack $ Action.evContractCreator ev
-      application = T.pack $ Action.evContractApplication ev
       contractName = T.pack $ Action.evContractName ev
       eventName = T.pack $ Action.evName ev
       address = Action.evContractAddress ev
@@ -1057,7 +1045,6 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , SimpleValue $ ValueAddress transactionSender
         , SimpleValue . ValueInt False Nothing $ fromIntegral eventIdx
         , SimpleValue $ ValueString creator
-        , SimpleValue $ ValueString application
         , SimpleValue $ ValueString contractName
         , SimpleValue $ ValueString eventName
         , attributesMap
@@ -1147,22 +1134,22 @@ valueToSQLText t v =
    in (\w -> pref <> w <> suff) <$> v'
 
 storageTableName :: TableName
-storageTableName = indexTableName "" "" "storage"
+storageTableName = indexTableName "" "storage"
 
 storageHistoryTableName :: TableName
-storageHistoryTableName = historyTableName "" "" "storage"
+storageHistoryTableName = historyTableName "" "storage"
 
 globalEventTableName :: TableName
-globalEventTableName = indexTableName "" "" "event"
+globalEventTableName = indexTableName "" "event"
 
 contractTableName :: TableName
-contractTableName = indexTableName "" "" "contract"
+contractTableName = indexTableName "" "contract"
 
 mappingTableName :: TableName
-mappingTableName = indexTableName "" "" "mapping"
+mappingTableName = indexTableName "" "mapping"
 
 eventArrayTableName :: TableName
-eventArrayTableName = indexTableName "" "" "event_array"
+eventArrayTableName = indexTableName "" "event_array"
 
 initialSlipstreamQueries :: [SlipstreamQuery]
 initialSlipstreamQueries =
@@ -1176,7 +1163,6 @@ initialSlipstreamQueries =
       , ("transaction_sender", SqlText)
       , ("creator", SqlText)
       , ("root", SqlText)
-      , ("application", SqlText)
       , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
@@ -1192,7 +1178,6 @@ initialSlipstreamQueries =
       , ("transaction_sender", SqlText)
       , ("creator", SqlText)
       , ("root", SqlText)
-      , ("application", SqlText)
       , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
@@ -1202,10 +1187,9 @@ initialSlipstreamQueries =
       contractTableName
       [ ("address", SqlText)
       , ("creator", SqlText)
-      , ("application", SqlText)
       , ("contract_name", SqlText)
       ]
-      ["address", "creator", "application", "contract_name"]
+      ["address", "creator", "contract_name"]
       (Just $ Foreign "contract_storage" ["address"] storageTableName ["address"])
   , CreateTable
       mappingTableName
@@ -1234,12 +1218,11 @@ initialSlipstreamQueries =
       , ("transaction_sender", SqlText)
       , ("event_index", SqlDecimal)
       , ("creator", SqlText)
-      , ("application", SqlText)
       , ("contract_name", SqlText)
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
       ]
-      ["transaction_hash", "event_index"]
+      ["block_hash", "event_index"]
       (Just $ Foreign "contract_event" ["address"] storageTableName ["address"])
   , CreateTable
       eventArrayTableName
@@ -1252,13 +1235,12 @@ initialSlipstreamQueries =
       , ("event_name", SqlText)
       , ("event_index", SqlDecimal)
       , ("creator", SqlText)
-      , ("application", SqlText)
       , ("contract_name", SqlText)
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
       , ("value", SqlJsonb)
       ]
-      ["address", "transaction_hash", "event_index", "collection_name", "key"]
-      (Just $ Foreign "event_event_array" ["transaction_hash", "event_index"] globalEventTableName ["transaction_hash", "event_index"])
+      ["address", "block_hash", "event_index", "collection_name", "key"]
+      (Just $ Foreign "event_event_array" ["block_hash", "event_index"] globalEventTableName ["block_hash", "event_index"])
   ]

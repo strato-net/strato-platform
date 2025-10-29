@@ -8,7 +8,7 @@ import { getBAUserAddress } from "../auth";
 const fetchVoucherBalance = async (): Promise<bigint> => {
   const userAddress = await getBAUserAddress();
   const response = await cirrus.get(
-    '/BlockApps-Mercata-Voucher-_balances',
+    '/BlockApps-Voucher-_balances',
     {
       params: {
         key: `eq.${userAddress}`,
@@ -24,7 +24,7 @@ const fetchVoucherBalance = async (): Promise<bigint> => {
 const fetchUSDSTBalance = async (): Promise<bigint> => {
   const userAddress = await getBAUserAddress();
   const response = await cirrus.get(
-    '/BlockApps-Mercata-Token-_balances',
+    '/BlockApps-Token-_balances',
     {
       params: {
         address: `eq.${config.usdst.address}`,

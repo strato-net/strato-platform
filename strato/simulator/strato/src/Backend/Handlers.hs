@@ -156,7 +156,7 @@ callCirrus t = liftIO $ do
 
 getUserMe :: Handler Value
 getUserMe = do
-  result <- callCirrus "BlockApps-Mercata-AdminRegistry"
+  result <- callCirrus "BlockApps-AdminRegistry"
   pure result
 
 getUserAdmin :: Handler Value

@@ -87,7 +87,7 @@ export const getSafetyModuleInfo = async (
       // Query SafetyModule contract configuration
       const response1 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-SafetyModule`,
+        `/BlockApps-SafetyModule`,
         {
           params: {
             address: `eq.${safetyModuleAddress}`,
@@ -105,11 +105,11 @@ export const getSafetyModuleInfo = async (
       // Use the nested relationship pattern like other services
       const response2 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${safetyModuleConfig.asset.address}`,
-            select: `address,balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
+            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
             "balances.key": `eq.${safetyModuleAddress}`
           }
         }
@@ -124,7 +124,7 @@ export const getSafetyModuleInfo = async (
       // Query sToken total supply (this represents totalShares)
       const response3 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${sTokenAddress}`,
@@ -141,11 +141,11 @@ export const getSafetyModuleInfo = async (
       // Query user's sUSDST token balance using nested relationship pattern
       const response4 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-Token`,
+        `/BlockApps-Token`,
         {
           params: {
             address: `eq.${sTokenAddress}`,
-            select: `address,balances:BlockApps-Mercata-Token-_balances(user:key,balance:value::text)`,
+            select: `address,balances:BlockApps-Token-_balances(user:key,balance:value::text)`,
             "balances.key": `eq.${userAddress.toLowerCase()}`
           }
         }
@@ -160,7 +160,7 @@ export const getSafetyModuleInfo = async (
       // Query user's cooldown start from SafetyModule
       const response5 = await cirrus.get(
         accessToken,
-        `/BlockApps-Mercata-SafetyModule-cooldownStart`,
+        `/BlockApps-SafetyModule-cooldownStart`,
         {
           params: {
             key: `eq.${userAddress.toLowerCase()}`,

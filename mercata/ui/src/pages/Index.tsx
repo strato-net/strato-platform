@@ -1,6 +1,5 @@
 
 import { useEffect } from 'react';
-import Link from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Hero from '../components/home/Hero';
 import MERCATALOGO from '@/assets/mercata.png';
@@ -30,34 +29,34 @@ const Index = () => {
             
             <div className="grid grid-cols-2 gap-8 md:col-span-2">
               <div>
-                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Resources</h3>
+                {/* <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Resources</h3>
                 <ul className="space-y-2">
                   <li><a href="#" className="text-gray-400 hover:text-white">Litepaper</a></li>
                   <li><a href="#" className="text-gray-400 hover:text-white">Documentation</a></li>
                   <li><a href="#" className="text-gray-400 hover:text-white">FAQ</a></li>
                   <li><a href="#" className="text-gray-400 hover:text-white">Security</a></li>
-                </ul>
+                </ul> */}
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Connect</h3>
+                {/* <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Connect</h3>
                 <ul className="space-y-2">
                   <li><a href="https://x.com/STRATO_MERCATA" className="text-gray-400 hover:text-white">Twitter</a></li>
                   <li><a href="https://discord.gg/z5jwzD6x" className="text-gray-400 hover:text-white">Discord</a></li>
                   <li><a href="https://t.me/mercatamarket" className="text-gray-400 hover:text-white">Telegram</a></li>
                   <li><a href="https://github.com/blockapps" className="text-gray-400 hover:text-white">GitHub</a></li>
-                </ul>
+                </ul> */}
               </div>
             </div>
           </div>
           
           <div className="mt-12 pt-8 border-t border-gray-800 text-sm text-gray-400">
             <div className="flex flex-col md:flex-row justify-between">
-              <p>&copy; 2025 BlockApps Inc. All rights reserved.</p>
-              <div className="flex space-x-6 mt-4 md:mt-0">
+              <p>&copy; {new Date().getFullYear()} BlockApps Inc. All rights reserved.</p>
+              {/* <div className="flex space-x-6 mt-4 md:mt-0">
                 <a href="#" className="hover:text-white">Terms of Service</a>
                 <a href="#" className="hover:text-white">Privacy Policy</a>
                 <a href="#" className="hover:text-white">Legal</a>
-              </div>
+              </div> */}
             </div>
           </div>
         </div>

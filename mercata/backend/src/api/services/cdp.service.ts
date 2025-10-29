@@ -1337,7 +1337,7 @@ export const getBadDebt = async (
         // Query the token contract's symbol
         const symbolResponse = await cirrus.get(
           accessToken,
-          `/BlockApps-Mercata-Token`,
+          `/BlockApps-Token`,
           {
             params: {
               select: "_symbol",
@@ -1450,7 +1450,7 @@ export const getClaimableAmount = async (
       }),
       
       // 5. Get current reserve balance from USDST contract
-      cirrus.get(accessToken, `/BlockApps-Mercata-Token-_balances`, {
+      cirrus.get(accessToken, `/BlockApps-Token-_balances`, {
         params: {
           select: "key,value::text", 
           key: `eq.${reserveAddress}`,

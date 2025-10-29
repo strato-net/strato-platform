@@ -47,7 +47,7 @@ async function until(hash, timeout = DEFAULT_TIMEOUT) {
   while (totalSleep < timeout) {
     try {
       const result = await dbApiClient.get(
-        `/BlockApps-Mercata-MercataETHBridge-ETHBridgeHashAdded`,
+        `/BlockApps-MercataETHBridge-ETHBridgeHashAdded`,
         { params: { txhash: `eq.${encodeURIComponent(hash)}` } }
       );
 

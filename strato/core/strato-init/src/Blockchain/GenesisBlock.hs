@@ -244,11 +244,10 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
       events = GI.events genesisInfo
       delegatecalls = GI.delegatecalls genesisInfo
 
-  ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \name -> do
+  ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
     let srcHash = hash $ T.encodeUtf8 src
-        codePtr' = SolidVMCode (T.unpack name) srcHash
     cc <- codeCollectionFromHash False True srcHash
-    pure $ CodeCollectionAdded (() <$ cc) codePtr' "BlockApps" name
+    pure $ CodeCollectionAdded (() <$ cc) "BlockApps"
 
   pub Nothing ccas
 
@@ -324,6 +323,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
                     storageDiff),
               A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
+              A._newCodeCollections = [],
               A._events = addressEvents,
               A._delegatecalls = delegatecalls
             }

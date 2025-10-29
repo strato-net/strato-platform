@@ -1,5 +1,5 @@
 import { formatUnits } from "ethers";
-import { CircleArrowDown, CircleArrowUp, HelpCircle } from "lucide-react";
+import { CircleArrowDown, CircleArrowUp, HelpCircle, PauseCircle } from "lucide-react";
 import { useLendingContext } from "@/context/LendingContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
@@ -321,25 +321,41 @@ const LendingPoolSection = () => {
                       />
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs font-medium">USDST</span>
                     </div>
-                    <Button
-                      onClick={() => handleLiquidityAction("withdraw")}
-                      variant="outline"
-                      className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full sm:w-28 hidden sm:flex sm:items-center sm:justify-center"
-                      disabled={
-                        loadingLiquidity ||
-                        isProcessing ||
-                        !isWithdrawAmountValid()
-                      }
-                    >
-                      {isProcessing ? (
-                        "Processing..."
-                      ) : (
-                        <>
-                          <CircleArrowUp className="mr-2 h-4 w-4" />
-                          Withdraw
-                        </>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="w-full sm:w-28 hidden sm:inline-block">
+                          <Button
+                            onClick={() => handleLiquidityAction("withdraw")}
+                            variant="outline"
+                            className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
+                            disabled={
+                              loadingLiquidity ||
+                              isProcessing ||
+                              !isWithdrawAmountValid() ||
+                              liquidityInfo?.isPaused
+                            }
+                          >
+                            {isProcessing ? (
+                              "Processing..."
+                            ) : (
+                              <>
+                                {liquidityInfo?.isPaused ? (
+                                  <PauseCircle className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <CircleArrowUp className="mr-2 h-4 w-4" />
+                                )}
+                                Withdraw
+                              </>
+                            )}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {liquidityInfo?.isPaused && (
+                        <TooltipContent className="bg-orange-50 border-orange-200 text-orange-900">
+                          <p>Lending Pool is on pause. This action currently disabled.</p>
+                        </TooltipContent>
                       )}
-                    </Button>
+                    </Tooltip>
                   </div>
                   <div className="text-sm text-gray-500 mt-1">
                     <button
@@ -453,25 +469,41 @@ const LendingPoolSection = () => {
                     );
                   })()}
                   {/* Mobile Button */}
-                  <Button
-                    onClick={() => handleLiquidityAction("withdraw")}
-                    variant="outline"
-                    className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full mt-4 sm:hidden"
-                    disabled={
-                      loadingLiquidity ||
-                      isProcessing ||
-                      !isWithdrawAmountValid()
-                    }
-                  >
-                    {isProcessing ? (
-                      "Processing..."
-                    ) : (
-                      <>
-                        <CircleArrowUp className="mr-2 h-4 w-4" />
-                        Withdraw
-                      </>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="w-full mt-4 sm:hidden block">
+                        <Button
+                          onClick={() => handleLiquidityAction("withdraw")}
+                          variant="outline"
+                          className="border-strato-blue text-strato-blue hover:bg-strato-blue/10 w-full"
+                          disabled={
+                            loadingLiquidity ||
+                            isProcessing ||
+                            !isWithdrawAmountValid() ||
+                            liquidityInfo?.isPaused
+                          }
+                        >
+                          {isProcessing ? (
+                            "Processing..."
+                          ) : (
+                            <>
+                              {liquidityInfo?.isPaused ? (
+                                <PauseCircle className="mr-2 h-4 w-4" />
+                              ) : (
+                                <CircleArrowUp className="mr-2 h-4 w-4" />
+                              )}
+                              Withdraw
+                            </>
+                          )}
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {liquidityInfo?.isPaused && (
+                      <TooltipContent className="bg-orange-50 border-orange-200 text-orange-900">
+                        <p>Lending Pool is on pause. This action currently disabled.</p>
+                      </TooltipContent>
                     )}
-                  </Button>
+                  </Tooltip>
                 </div>
               </div>
             </div>

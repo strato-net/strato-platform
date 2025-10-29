@@ -200,7 +200,7 @@ async function main() {
     // Query the asset balances.
     const balancesResult = await rest.search(
       token,
-      { name: 'BlockApps-Mercata-Asset' },
+      { name: 'BlockApps-Asset' },
       { config, query: balancesQuery }
     );
     const stratBalances = transformResponseToTupleList(balancesResult);
