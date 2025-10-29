@@ -71,8 +71,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 import Data.Traversable (for)
-import SolidVM.Model.CodeCollection (emptyCodeCollection)
-import SolidVM.Model.Storable hiding (toList)
 import Text.Format
 
 getGenesisBlockAndPopulateInitialMPs ::
@@ -296,13 +294,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
       let cPtr = codeHash d
       let
           theMetadata = getMetadata $ genesisBlockCodePtr cPtr
-          creator' = fromMaybe "" mkCreator
-          originAddress' = mkOriginAddress
 
-      let appName' =
-            case cPtr of
-              SolidVMCode n _ -> T.pack n
-              _ -> ""
       pure . NewAction $ A.Action
             { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
               A._blockTimestamp =
@@ -312,15 +304,7 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
               A._transactionHash = rlpHash a,
               A._transactionSender = Ad.Address 0,
               A._actionData =
-                OMap.singleton (a,
-                  A.ActionData
-                    cPtr
-                    emptyCodeCollection
-                    creator'
-                    mkCreator
-                    originAddress'
-                    appName'
-                    storageDiff),
+                OMap.singleton (a, A.ActionData storageDiff),
               A._src = fmap Code $ join $ fmap (Map.lookup "src") theMetadata,
               A._name = join $ fmap (Map.lookup "name") theMetadata,
               A._newCodeCollections = [],
@@ -332,23 +316,12 @@ populateStorageDBs' getMetadata genesisInfo genesisBlock genesisChainId sr pub =
         fromDiff :: Diff a 'Eventual -> a
         fromDiff (Value v) = v
 
-        mkCreator =
-          (\case BString str -> Just $ T.decodeUtf8 str; _ -> Nothing)
-          =<< lookupSolidDiff ":creator" storageDiff
-
-        mkOriginAddress =
-            (\case BAddress a' -> T.pack $ show a'; _ -> "")
-          . maybe BDefault id
-          $ lookupSolidDiff ":originAddress" storageDiff
-
         storageDiff = case storage d of
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
           EVMDiff _ -> error "evm state in genesis block isn't supported"
 
         genesisBlockCodePtr (ExternallyOwned ch') = ch'
         genesisBlockCodePtr (SolidVMCode _ ch') = ch'
-
-        lookupSolidDiff k (A.SolidVMDiff m) = Map.lookup k m
 
 
 bootstrapIndexer :: OutputBlock -> IO ()

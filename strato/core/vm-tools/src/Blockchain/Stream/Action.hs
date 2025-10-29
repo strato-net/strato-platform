@@ -24,12 +24,6 @@ module Blockchain.Stream.Action (
   delegatecalls,
 
   ActionData(..),
-  actionDataCodeHash,
-  actionDataCodeCollection,
-  actionDataCreator,
-  actionDataCCCreator,
-  actionDataRoot,
-  actionDataApplication,
   actionDataStorageDiffs,
   
   DataDiff(..),
@@ -48,7 +42,6 @@ module Blockchain.Stream.Action (
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Code
-import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -149,13 +142,7 @@ parseDiffSolidVM (Object obs) =
 parseDiffSolidVM x = typeMismatch "SolidVMDiff" x
 
 data ActionData = ActionData
-  { _actionDataCodeHash :: CodePtr,
-    _actionDataCodeCollection :: CodeCollection,
-    _actionDataCreator :: Text,
-    _actionDataCCCreator :: Maybe Text,
-    _actionDataRoot :: Text,
-    _actionDataApplication :: Text,
-    _actionDataStorageDiffs :: DataDiff
+  { _actionDataStorageDiffs :: DataDiff
   }
   deriving (Eq, Show, Generic, NFData)
 
@@ -163,21 +150,7 @@ makeLenses ''ActionData
 
 instance Format ActionData where
   format ActionData {..} =
-    "actionDataCodeHash: " ++ format _actionDataCodeHash ++ "\n"
-      ++ "actionDataCreator: "
-      ++ T.unpack _actionDataCreator
-      ++ "\n"
-      ++ "actionDataCCCreator: "
-      ++ maybe "Nothing" T.unpack _actionDataCCCreator
-      ++ "\n"
-      ++ "actionDataRoot: "
-      ++ T.unpack _actionDataRoot
-      ++ "\n"
-      ++ "actionDataApplication: "
-      ++ T.unpack _actionDataApplication
-      ++ "\n"
-      ++ "actionDataStorageDiffs: "
-      ++ format _actionDataStorageDiffs
+    "actionDataStorageDiffs: " ++ format _actionDataStorageDiffs
 
 instance Binary ActionData
 
@@ -186,12 +159,6 @@ mergeActionData newData oldData =
   let SolidVMDiff n = _actionDataStorageDiffs newData
       SolidVMDiff o = _actionDataStorageDiffs oldData
    in ActionData
-          (_actionDataCodeHash oldData)
-          (_actionDataCodeCollection oldData <> _actionDataCodeCollection newData)
-          (_actionDataCreator newData)
-          (_actionDataCCCreator newData)
-          (_actionDataRoot newData)
-          (_actionDataApplication newData)
           (SolidVMDiff $ n <> o)
 
 mergeActionDataStorageDiffs :: ActionData -> ActionData -> ActionData
@@ -207,25 +174,13 @@ instance Semigroup ActionData where
 instance ToJSON ActionData where
   toJSON ActionData {..} =
     object
-      [ "codeHash" .= _actionDataCodeHash,
-        "codeCollection" .= _actionDataCodeCollection,
-        "creator" .= _actionDataCreator,
-        "cc_creator" .= _actionDataCCCreator,
-        "root" .= _actionDataRoot,
-        "application" .= _actionDataApplication,
-        "diff" .= _actionDataStorageDiffs
+      [ "diff" .= _actionDataStorageDiffs
       ]
 
 instance FromJSON ActionData where
   parseJSON (Object o) = do
-    ch <- o .: "codeHash"
-    cc <- o .: "codeCollection"
-    cr <- o .: "creator"
-    ccr <- o .: "cc_creator"
-    rt <- o .: "root"
-    ap <- o .: "application"
     df <- explicitParseField parseDiffSolidVM o "diff"
-    return $ ActionData ch cc cr ccr rt ap df
+    return $ ActionData df
   parseJSON o = fail $ "parseJSON ActionData: Expected object, got: " ++ show o
 
 data Delegatecall = Delegatecall
