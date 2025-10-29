@@ -695,8 +695,7 @@ extractCodeCollectionAddedMessages a =
   let mkCCAnouncement (userName, cc) =
         CodeCollectionAdded
               { codeCollection = const () <$> cc,
-                creator = userName,
-                application = "Mercata"
+                creator = userName
               }
   in map mkCCAnouncement $ _newCodeCollections a
 

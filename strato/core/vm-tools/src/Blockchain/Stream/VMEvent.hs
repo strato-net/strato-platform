@@ -30,16 +30,15 @@ data VMEvent
   = NewAction Action
   | CodeCollectionAdded
       { codeCollection :: CodeCollectionF (),
-        creator :: Text,
-        application :: Text
+        creator :: Text
       }
   | NewTransactionResult TransactionResult
   deriving (Show, Generic)
 
 instance Format VMEvent where
   format (NewAction a) = "NewAction:\n" ++ tab (format a)
-  format (CodeCollectionAdded _ cr ap) =
-    "CodeCollectionAdded: (" ++ show cr ++ "/" ++ show ap ++ ") "
+  format (CodeCollectionAdded _ cr) =
+    "CodeCollectionAdded: (" ++ show cr ++ ") "
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)
 
 instance Binary VMEvent
