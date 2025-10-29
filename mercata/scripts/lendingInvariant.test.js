@@ -103,7 +103,7 @@ require("dotenv").config();
   // Fetch total liquidity for USDST held by LiquidityPool
   const getPoolLiquidity = async () => {
     try {
-      const rows = await cirrusGet("/BlockApps-Mercata-Token-_balances", {
+      const rows = await cirrusGet("/BlockApps-Token-_balances", {
         key: `eq.${cfg.LIQUIDITY_POOL.toLowerCase()}`,
         address: `eq.${cfg.USDST.toLowerCase()}`,
         select: "balance:value::text",
@@ -153,7 +153,7 @@ require("dotenv").config();
       };
       if (assetAddr) params.key2 = `eq.${assetAddr.toLowerCase()}`;
 
-      const rows = await cirrusGet("/BlockApps-Mercata-CollateralVault-userCollaterals", params);
+      const rows = await cirrusGet("/BlockApps-CollateralVault-userCollaterals", params);
 
       if (!Array.isArray(rows) || rows.length === 0) return 0n;
 
@@ -223,7 +223,7 @@ require("dotenv").config();
 
   const getUserDebt = async () => {
     try {
-      const rows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
+      const rows = await cirrusGet("/BlockApps-LendingPool-userLoan", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
         key: `eq.${USER_ADDRESS}`,
         select: "*",
@@ -329,7 +329,7 @@ require("dotenv").config();
 
     /* Ensure no existing collateral of any asset before collateral-less borrow test */
     try {
-      const rows = await cirrusGet("/BlockApps-Mercata-CollateralVault-userCollaterals", {
+      const rows = await cirrusGet("/BlockApps-CollateralVault-userCollaterals", {
         address: `eq.${cfg.COLLATERAL_VAULT.toLowerCase()}`,
         key: `eq.${USER_ADDRESS}`,
         key2: `eq.${cfg.GOLDST.toLowerCase()}`,
@@ -458,7 +458,7 @@ require("dotenv").config();
 
     // ---- Debug: show any remaining loan on-chain ----
     try {
-      const loanRows = await cirrusGet("/BlockApps-Mercata-LendingPool-userLoan", {
+      const loanRows = await cirrusGet("/BlockApps-LendingPool-userLoan", {
         address: `eq.${cfg.LENDING_POOL.toLowerCase()}`,
         key: `eq.${USER_ADDRESS}`,
         select: "*",

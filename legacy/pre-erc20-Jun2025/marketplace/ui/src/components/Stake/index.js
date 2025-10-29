@@ -55,9 +55,9 @@ function combineInventories(items) {
     const {
       root,
       name,
-      'BlockApps-Mercata-Asset-fileNames': assetFileNames,
-      'BlockApps-Mercata-Asset-files': assetFiles,
-      'BlockApps-Mercata-Asset-images': assetImages,
+      'BlockApps-Asset-fileNames': assetFileNames,
+      'BlockApps-Asset-files': assetFiles,
+      'BlockApps-Asset-images': assetImages,
     } = firstItem;
 
     const decimals = 18
@@ -76,9 +76,9 @@ function combineInventories(items) {
     const inventoriesArr = group.map((item) => {
       const inventory = { ...item };
       // Remove common top-level fields
-      delete inventory['BlockApps-Mercata-Asset-fileNames'];
-      delete inventory['BlockApps-Mercata-Asset-files'];
-      delete inventory['BlockApps-Mercata-Asset-images'];
+      delete inventory['BlockApps-Asset-fileNames'];
+      delete inventory['BlockApps-Asset-files'];
+      delete inventory['BlockApps-Asset-images'];
       return inventory;
     });
 
@@ -86,9 +86,9 @@ function combineInventories(items) {
     return {
       root,
       name,
-      'BlockApps-Mercata-Asset-fileNames': assetFileNames,
-      'BlockApps-Mercata-Asset-files': assetFiles,
-      'BlockApps-Mercata-Asset-images': assetImages,
+      'BlockApps-Asset-fileNames': assetFileNames,
+      'BlockApps-Asset-files': assetFiles,
+      'BlockApps-Asset-images': assetImages,
       decimals,
       totalQuantity,
       totalSaleQuantity,

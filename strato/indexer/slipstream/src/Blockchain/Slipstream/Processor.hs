@@ -138,7 +138,6 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator
       creator = actionCreator,
       cc_creator = cregator,
       root = actionRoot,
-      application = actionApplication,
       contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,

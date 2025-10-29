@@ -226,12 +226,12 @@ const ProductDetails = ({ user, users }) => {
   let fileValues = [];
   let fileNames = [];
 
-  if (details && Array.isArray(details['BlockApps-Mercata-Asset-fileNames'])) {
-    fileNames = details['BlockApps-Mercata-Asset-fileNames'];
+  if (details && Array.isArray(details['BlockApps-Asset-fileNames'])) {
+    fileNames = details['BlockApps-Asset-fileNames'];
   }
 
-  if (details && Array.isArray(details['BlockApps-Mercata-Asset-files'])) {
-    fileValues = details['BlockApps-Mercata-Asset-files'].map((file, index) => {
+  if (details && Array.isArray(details['BlockApps-Asset-files'])) {
+    fileValues = details['BlockApps-Asset-files'].map((file, index) => {
       let name = fileNames[index]?.value
         ? fileNames[index]?.value
         : `Information-${index + 1}.pdf`;
@@ -575,7 +575,7 @@ const ProductDetails = ({ user, users }) => {
           </Row>
           <div className="flex w-full flex-col lg:leading-12 px-4 sm:px-8 md:px-0  items-center lg:items-start  md:w-[750px] lg:w-[835px] xl:w-[858px]  md:mx-auto ">
             <div className="flex md:justify-center gap-[15px] lg:gap-6 flex-col lg:flex-row   ">
-              {details['BlockApps-Mercata-Asset-images'].length > 0 ? (
+              {details['BlockApps-Asset-images'].length > 0 ? (
                 <Swiper
                   spaceBetween={30}
                   effect={'fade'}
@@ -587,8 +587,8 @@ const ProductDetails = ({ user, users }) => {
                   modules={[Autoplay, EffectFade, Navigation, Pagination]}
                   className="product-detail-swiper"
                 >
-                  {details['BlockApps-Mercata-Asset-images'].length > 0 &&
-                    details['BlockApps-Mercata-Asset-images'].map(
+                  {details['BlockApps-Asset-images'].length > 0 &&
+                    details['BlockApps-Asset-images'].map(
                       (element, index) => {
                         return (
                           <SwiperSlide>

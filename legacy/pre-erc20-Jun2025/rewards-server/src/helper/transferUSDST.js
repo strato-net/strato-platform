@@ -148,7 +148,7 @@ async function createTransactionPayload(token, transactions) {
 async function getAdminUSDSTContractAddress(token) {
   const domain = NODE_ENV === "prod" ? prodMarketplaceUrl : testnetMarketplaceUrl;
   const originAddress = NODE_ENV === "prod" ? prodUSDSTAddress : testnetUSDSTAddress;
-  const url = `https://${domain}/cirrus/search/BlockApps-Mercata-Asset`;
+  const url = `https://${domain}/cirrus/search/BlockApps-Asset`;
 
   const queryParams = new URLSearchParams({
     ownerCommonName: `eq.${baUsername}`,

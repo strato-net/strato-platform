@@ -135,8 +135,8 @@ const RedemptionsOutgoingDetails = ({ user }) => {
     ...inventoryDetails,
     images:
       inventoryDetails &&
-      Array.isArray(inventoryDetails['BlockApps-Mercata-Asset-images'])
-        ? inventoryDetails['BlockApps-Mercata-Asset-images'][0].value
+      Array.isArray(inventoryDetails['BlockApps-Asset-images'])
+        ? inventoryDetails['BlockApps-Asset-images'][0].value
         : [],
   };
 

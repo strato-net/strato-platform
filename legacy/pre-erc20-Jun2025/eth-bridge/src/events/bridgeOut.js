@@ -22,7 +22,7 @@ const signer = new Wallet(blockAppsPrivateKey, alchemy);
 async function getContractAddress(mercataContractAddress) {
   try {
     const response = await dbApiClient.get(
-      `/BlockApps-Mercata-MercataETHBridge-ETHBridgeHashAdded`,
+      `/BlockApps-MercataETHBridge-ETHBridgeHashAdded`,
       {
         params: { address: `eq.${encodeURIComponent(mercataContractAddress)}` },
       }
