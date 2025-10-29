@@ -246,7 +246,7 @@ const ActivityFeedList = () => {
             `"${event.transaction_hash}"`,
             `"${event.transaction_sender}"`,
             `"${event.address}"`,
-            event.event_index
+            event.id
           ];
           
           // Add attribute values in the same order as headers
@@ -340,7 +340,7 @@ const ActivityFeedList = () => {
 
   // Memoized event card renderer to prevent unnecessary re-renders
   const renderEventCard = useCallback((event: Event) => (
-    <Card key={`${event.transaction_hash}-${event.id}`} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
+    <Card key={event.id} className="mb-3 sm:mb-4 hover:shadow-md transition-shadow">
       <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -509,7 +509,7 @@ const ActivityFeedList = () => {
           </Card>
         ) : (
           events.map((event) => (
-            <div key={`${event.transaction_hash}-${event.id}`}>
+            <div key={event.id}>
               {renderEventCard(event)}
             </div>
           ))
