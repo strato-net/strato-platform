@@ -30,7 +30,6 @@ export interface Event {
   transaction_hash: string;
   transaction_sender: string;
   event_index: number;
-  creator: string;
   contract_name: string;
   event_name: string;
   attributes: Record<string, string>;
