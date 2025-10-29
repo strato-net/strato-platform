@@ -135,7 +135,6 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} ks v =
     { address = actionAddress,
       -- codehash = actionCodeHash,
       creator = actionCreator,
-      root = actionRoot,
       contractname = aiName,
       eventInfo = Nothing,
       collection_name = collection,
@@ -143,8 +142,6 @@ processedCollectionRow collection ttype AggregateAction {..} ABIID {..} ks v =
       blockHash = actionBlockHash,
       blockTimestamp = actionBlockTimestamp,
       blockNumber = actionBlockNumber,
-      transactionHash = actionTxHash,
-      transactionSender = actionTxSender,
       collectionDataKeys = ks,
       collectionDataValue = v 
     }

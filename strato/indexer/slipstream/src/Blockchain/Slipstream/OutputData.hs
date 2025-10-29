@@ -390,7 +390,6 @@ slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     creator :: Text,
-    root :: Text,
     contractname :: Text,
     eventInfo :: Maybe (Text, Int),
     collection_name :: Text,
@@ -398,8 +397,6 @@ data ProcessedCollectionRow = ProcessedCollectionRow
     blockHash :: Keccak256,
     blockTimestamp :: UTCTime,
     blockNumber :: Integer,
-    transactionHash :: Keccak256,
-    transactionSender :: Address,
     collectionDataKeys :: [V.Value],
     collectionDataValue :: V.Value
   }
@@ -512,9 +509,6 @@ baseColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
-  , ("transaction_sender", SqlText)
-  , ("root", SqlText)
   ]
 
 baseEventColumns :: TableColumns
@@ -523,11 +517,8 @@ baseEventColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
   , ("transaction_sender", SqlText)
   , ("event_index", SqlDecimal)
-  , ("creator", SqlText)
-  , ("contract_name", SqlText)
   ]
 
 baseEventCollectionColumns :: TableColumns
@@ -543,9 +534,6 @@ baseMappingColumns =
   , ("block_hash", SqlText)
   , ("block_timestamp", SqlText)
   , ("block_number", SqlText)
-  , ("transaction_hash", SqlText)
-  , ("transaction_sender", SqlText)
-  , ("root", SqlText)
   , ("collection_name", SqlText)
   , ("collection_type", SqlText)
   ]
@@ -668,18 +656,13 @@ insertIndexTable ::
 insertIndexTable cs =
   let cs' = (\c@E.ProcessedContract {contractData = contractData} -> (c, Map.toList contractData)) cs
       processContract (contract, list) =
-          let keySt = baseColumns ++ [("creator", SqlText), ("contract_name", SqlText), ("data", SqlJsonb)]
+          let keySt = baseColumns ++ [("data", SqlJsonb)]
               contractKeySt = (,SqlText) <$> ["address", "creator", "contract_name"]
               baseVals =
                 [ ValueAddress . E.address,
                   ValueString . T.pack . keccak256ToHex . E.blockHash,
                   ValueString . tshow . E.blockTimestamp,
-                  ValueInt False Nothing . E.blockNumber,
-                  ValueString . T.pack . keccak256ToHex . E.transactionHash,
-                  ValueAddress . E.transactionSender,
-                  ValueString . E.root,
-                  ValueString . E.creator,
-                  ValueString . E.contractName
+                  ValueInt False Nothing . E.blockNumber
                 ]
               baseRowVals = map (Just . SimpleValue . ($ contract)) baseVals
               dataVals = [Just . ValueMapping . Map.fromList $ (\(k, v) -> (ValueString k, v)) <$> list]
@@ -689,7 +672,7 @@ insertIndexTable cs =
                   ValueString . E.creator,
                   ValueString . E.contractName
                 ]
-              conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number", "transaction_hash", "transaction_sender"]
+              conflictUpdateCols = ["address", "block_hash", "block_timestamp", "block_number"]
               tblText = tableNameToDoubleQuoteText storageTableName
               dataUpdateSQL = jsonbUpdateClause tblText "data"
           in [ InsertTable storageTableName keySt [valsForSQL] . Just $ OnConflict ["address"] conflictUpdateCols (Just dataUpdateSQL)
@@ -755,7 +738,6 @@ eventBaseColumnsQuery =
     ("block_hash", SqlText),
     ("block_timestamp", SqlText),
     ("block_number", SqlText),
-    ("transaction_hash", SqlText),
     ("transaction_sender", SqlText),
     ("event_index", SqlDecimal)
   ]
@@ -841,9 +823,6 @@ insertCollectionTableQuery rows =
               ValueString . T.pack . keccak256ToHex . blockHash,
               ValueString . tshow . blockTimestamp,
               ValueInt False Nothing . blockNumber,
-              ValueString . T.pack . keccak256ToHex . transactionHash,
-              ValueAddress . transactionSender,
-              ValueString . root,
               ValueString . collection_name,
               ValueString . collection_type
             ]
@@ -867,8 +846,6 @@ insertCollectionTableQuery rows =
                 "block_hash",
                 "block_timestamp",
                 "block_number",
-                "transaction_hash",
-                "transaction_sender",
                 "collection_name",
                 "collection_type"
               ]
@@ -888,11 +865,7 @@ insertEventArrayTableQuery ms =
                     ValueString . T.pack . keccak256ToHex . blockHash,
                     ValueString . tshow . blockTimestamp,
                     ValueInt False Nothing . blockNumber,
-                    ValueString . T.pack . keccak256ToHex . transactionHash,
-                    ValueAddress . transactionSender,
                     ValueInt False Nothing . fromIntegral . maybe 0 snd . eventInfo,
-                    ValueString . creator,
-                    ValueString . contractname,
                     ValueString . collection_name,
                     ValueString . collection_type
                   ]
@@ -972,11 +945,8 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       blockHash = eventBlockHash ae,
       blockTimestamp = eventBlockTimestamp ae,
       blockNumber = eventBlockNumber ae,
-      transactionHash = eventTxHash ae,
-      transactionSender = eventTxSender ae,
       collectionDataKeys = [index],
-      collectionDataValue = value,
-      root = ""
+      collectionDataValue = value
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
@@ -1014,14 +984,11 @@ insertGlobalEventTable agEv = do
 -- corresponding JSON value.
 insertGlobalEventTableQuery :: AggregateEvent -> SlipstreamQuery
 insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
-  let creator = T.pack $ Action.evContractCreator ev
-      contractName = T.pack $ Action.evContractName ev
-      eventName = T.pack $ Action.evName ev
+  let eventName = T.pack $ Action.evName ev
       address = Action.evContractAddress ev
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
-      transactionHash = T.pack . keccak256ToHex $ eventTxHash agEv
       transactionSender = eventTxSender agEv
       eventIdx = eventIndex agEv
 
@@ -1039,11 +1006,8 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
         , SimpleValue $ ValueString blockHash
         , SimpleValue $ ValueString blockTimestamp
         , SimpleValue $ ValueInt False Nothing blockNumber
-        , SimpleValue $ ValueString transactionHash
         , SimpleValue $ ValueAddress transactionSender
         , SimpleValue . ValueInt False Nothing $ fromIntegral eventIdx
-        , SimpleValue $ ValueString creator
-        , SimpleValue $ ValueString contractName
         , SimpleValue $ ValueString eventName
         , attributesMap
         ]
@@ -1157,11 +1121,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("creator", SqlText)
-      , ("root", SqlText)
-      , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
       ["address"]
@@ -1172,11 +1131,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("creator", SqlText)
-      , ("root", SqlText)
-      , ("contract_name", SqlText)
       , ("data", SqlJsonb)
       ]
       []
@@ -1195,9 +1149,6 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
-      , ("root", SqlText)
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
@@ -1212,11 +1163,8 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
       , ("transaction_sender", SqlText)
       , ("event_index", SqlDecimal)
-      , ("creator", SqlText)
-      , ("contract_name", SqlText)
       , ("event_name", SqlText)
       , ("attributes", SqlJsonb)
       ]
@@ -1228,12 +1176,8 @@ initialSlipstreamQueries =
       , ("block_hash", SqlText)
       , ("block_timestamp", SqlText)
       , ("block_number", SqlText)
-      , ("transaction_hash", SqlText)
-      , ("transaction_sender", SqlText)
       , ("event_name", SqlText)
       , ("event_index", SqlDecimal)
-      , ("creator", SqlText)
-      , ("contract_name", SqlText)
       , ("collection_name", SqlText)
       , ("collection_type", SqlText)
       , ("key", SqlJsonb)
