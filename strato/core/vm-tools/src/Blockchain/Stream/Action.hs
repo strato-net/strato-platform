@@ -285,7 +285,7 @@ data Action = Action
     _actionData :: OMap.OMap Address ActionData,
     _src :: Maybe Code,
     _name :: Maybe Text,
-    _newCodeCollections :: [CodeCollection],
+    _newCodeCollections :: [(Text, CodeCollection)],
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }
