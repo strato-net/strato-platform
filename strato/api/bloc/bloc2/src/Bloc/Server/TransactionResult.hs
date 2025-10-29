@@ -346,6 +346,12 @@ expressionToValue (ObjectLiteral _ fields) = do
   pure $ ValueStruct $ Map.fromList convertedFields
 expressionToValue _ = Nothing
 
+-- Convert expression to value with type information to handle SNULL/SReference
+-- cases (see functionResult for context)
+expressionToValueWithType :: Expression -> SVMType.Type -> Maybe Value
+expressionToValueWithType (NumberLiteral _ 0 _) svmType = Just $ defaultValueForType svmType
+expressionToValueWithType expr _ = expressionToValue expr
+
 -- Generate appropriate default value based on the expected type
 defaultValueForType :: SVMType.Type -> Value
 defaultValueForType SVMType.Bool = SimpleValue $ ValueBool False
