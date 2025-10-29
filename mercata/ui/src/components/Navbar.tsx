@@ -38,12 +38,12 @@ const Navbar = () => {
           </div>
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn && (
-              <Link 
-                to="/dashboard"
-                className="bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
-              >
-                Launch STRATO
-              </Link>
+            <Link 
+              to="/dashboard"
+              className="bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
+            >
+              Launch App
+            </Link>
             )}
             <button 
               onClick={handleAuthClick}
