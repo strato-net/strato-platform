@@ -171,7 +171,9 @@ applyDelta' sp@[Field "length"] b@(BInteger n) s@(ValueMapping vs) =
       . I.fromList
       <$> traverse toArrayElem (M.toList vs)
 applyDelta' [Field "length"] (BInteger n) (ValueArraySentinel {}) = Right . ValueArraySentinel $ fromIntegral n
-applyDelta' [Field _] bv _ = Right $ fromBasic bv -- Handle struct value assignment case
+applyDelta' [Field n] bv _ = do
+  n' <- first (UnicodeError n) $ decodeUtf8' n
+  Right . ValueStruct . M.singleton n' $ fromBasic bv
 applyDelta' sp bv (ValueArraySentinel {}) = Right $ constructFromNothing' sp bv
 applyDelta' sp@[Index _] BDefault _ = Right $ constructFromNothing' sp BDefault
 applyDelta' sp@[Index _] _ _ = Right $ constructFromNothing' sp BDefault

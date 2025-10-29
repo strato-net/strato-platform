@@ -265,6 +265,17 @@ const BridgeIn: React.FC = () => {
       }
     }
 
+    const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
+    const decimalIndex = value.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > tokenDecimals) {
+        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
+        return false;
+      }
+    }
+
     const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
     const bal = balanceMatch
       ? parseFloat(balanceMatch[1].replace(/,/g, ""))
@@ -710,12 +721,6 @@ const BridgeIn: React.FC = () => {
                   </div>
                 )}
               </div>
-              {selectedToken?.stratoTokenSymbol && amount && (
-                <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
-                  You will receive ≈ {amount} {selectedToken.stratoTokenName} (
-                  {selectedToken.stratoTokenSymbol}) on STRATO
-                </p>
-              )}
             </div>
           ) : null)}
       </div>

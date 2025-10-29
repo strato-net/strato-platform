@@ -64,7 +64,11 @@ const MintWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
   const [autoDeposit, setAutoDeposit] = useState<boolean>(false);
-  const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ amount: "", loading: false });
+  const [minDepositInfo, setMinDepositInfo] = useState<{ 
+    amount: string; 
+    amountWei: bigint; 
+    loading: boolean;
+  }>({ amount: "", amountWei: 0n, loading: false });
   const inFlightRef = useRef(false);
 
 
@@ -123,9 +127,10 @@ const MintWidget: React.FC = () => {
         tokenAddress
       });
       const formattedMinAmount = validation.minAmount ? (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
-      setMinDepositInfo({ amount: formattedMinAmount, loading: false });
+      const amountWei = validation.minAmount ? BigInt(validation.minAmount) : 0n;
+      setMinDepositInfo({ amount: formattedMinAmount, amountWei, loading: false });
     } catch {
-      setMinDepositInfo({ amount: "0", loading: false });
+      setMinDepositInfo({ amount: "0", amountWei: 0n, loading: false });
     }
   };
 
@@ -137,14 +142,62 @@ const MintWidget: React.FC = () => {
     }
   }, [selectedMintToken, selectedNetworkConfig]);
 
-  const validateAmount = (value: string) => {
-    if (!value) { setErrors(e => ({ ...e, amount: "" })); return true; }
+  const validateAmount = (value: string): boolean => {
+    if (!value) {
+      setErrors((e) => ({ ...e, amount: "" }));
+      return true;
+    }
+
     const num = parseFloat(value);
-    if (isNaN(num) || num <= 0 || num > Number(externalTokenBalance?.formatted)) {
-      setErrors(e => ({ ...e, amount: "Enter a valid amount" }));
+    if (isNaN(num) || num <= 0) {
+      setErrors((e) => ({
+        ...e,
+        amount:
+          num <= 0
+            ? "Amount must be greater than 0"
+            : "Please enter a valid number",
+      }));
       return false;
     }
-    setErrors(e => ({ ...e, amount: "" }));
+
+    // Check minimum amount using stored wei value
+    if (minDepositInfo.amountWei > 0n) {
+      const inputAmountWei = safeParseUnits(value, parseInt(selectedMintToken?.externalDecimals || "18"));
+      
+      if (inputAmountWei < minDepositInfo.amountWei) {
+        setErrors((e) => ({
+          ...e,
+          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedMintToken?.externalSymbol}`,
+        }));
+        return false;
+      }
+    }
+
+    const tokenDecimals = parseInt(selectedMintToken?.externalDecimals || "18");
+    const decimalIndex = value.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > tokenDecimals) {
+        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
+        return false;
+      }
+    }
+
+    const balanceMatch = externalTokenBalance?.formatted?.match(/^([\d,]+\.?\d*)/);
+    const bal = balanceMatch
+      ? parseFloat(balanceMatch[1].replace(/,/g, ""))
+      : 0;
+
+    if (num > bal) {
+      setErrors((e) => ({
+        ...e,
+        amount: `Insufficient balance. Maximum: ${externalTokenBalance?.formatted || "0"} ${selectedMintToken?.externalSymbol}`,
+      }));
+      return false;
+    }
+
+    setErrors((e) => ({ ...e, amount: "" }));
     return true;
   };
 
