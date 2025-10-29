@@ -346,6 +346,35 @@ expressionToValue (ObjectLiteral _ fields) = do
   pure $ ValueStruct $ Map.fromList convertedFields
 expressionToValue _ = Nothing
 
+-- Generate appropriate default value based on the expected type
+defaultValueForType :: SVMType.Type -> Value
+defaultValueForType SVMType.Bool = SimpleValue $ ValueBool False
+defaultValueForType (SVMType.Int signed bytes) =
+  SimpleValue $ ValueInt (fromMaybe False signed) (fmap fromIntegral bytes) 0
+defaultValueForType (SVMType.String _) = SimpleValue $ ValueString ""
+defaultValueForType (SVMType.Bytes _ bytes) =
+  SimpleValue $ ValueBytes (fmap fromIntegral bytes) ""
+defaultValueForType (SVMType.Address _) = SimpleValue $ ValueAddress 0
+defaultValueForType SVMType.Decimal = SimpleValue $ ValueDecimal "0"
+defaultValueForType (SVMType.Struct _ _) = ValueStruct Map.empty
+defaultValueForType (SVMType.Enum _ _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+defaultValueForType (SVMType.Array elemType (Just len)) =
+  ValueArrayFixed (fromIntegral len) $
+    replicate (fromIntegral len) (defaultValueForType elemType)
+defaultValueForType (SVMType.Array _ Nothing) =
+  ValueArrayDynamic mempty -- Empty dynamic array
+defaultValueForType (SVMType.Contract _) = SimpleValue $ ValueAddress 0
+defaultValueForType (SVMType.Mapping _ _ _) =
+  ValueStruct Map.empty -- Mappings represented as empty struct
+defaultValueForType (SVMType.UnknownLabel _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+defaultValueForType SVMType.Variadic = SimpleValue $ ValueInt False Nothing 0
+defaultValueForType (SVMType.UserDefined _ actualType) =
+  defaultValueForType actualType
+defaultValueForType (SVMType.Error _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+
 -- TODO: implement expressionToValue for tuples and mappings
 --expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
 
