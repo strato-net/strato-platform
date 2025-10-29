@@ -85,7 +85,6 @@ processedContract ABIID {..} state AggregateAction {..} =
     { address = actionAddress,
       codehash = actionCodeHash,
       creator = actionCreator,
-      cc_creator = actionCCCreator,
       root = actionRoot,
       application = actionApplication,
       contractName = aiName,
@@ -114,8 +113,8 @@ rowToCollections row =
         Action.SolidVMDiff mp -> SolidVM.decodeCacheValuesForCollections mp
    in Map.fromList newState
 
-processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> Maybe Text -> [ProcessedCollectionRow]
-processedContractToProcessedCollectionRows state row abiid cregator =
+processedContractToProcessedCollectionRows :: Map.Map Text Value -> AggregateAction -> ABIID -> [ProcessedCollectionRow]
+processedContractToProcessedCollectionRows state row abiid =
   let extractValues (ValueArrayFixed _ b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue $ ValueInt False Nothing i):ks, v)) <$> extractValues v') $ zip [0..] b
       extractValues (ValueArrayDynamic b) = concatMap (\(i, v') -> (\(_, ks, v) -> ("Array", (SimpleValue . ValueInt False Nothing $ fromIntegral i):ks, v)) <$> extractValues v') $ I.toList b
       extractValues (ValueMapping b)      = concatMap (\(k, v') -> (\(_, ks, v) -> ("Mapping", (SimpleValue k):ks, v)) <$> extractValues v') $ Map.toList b
@@ -127,16 +126,15 @@ processedContractToProcessedCollectionRows state row abiid cregator =
             _  -> Just (a, t, ks, v)
           ) $ extractValues value
         ) $ Map.toList state
-      processRecord (n, t, ks, v) = processedCollectionRow n t row abiid cregator ks v
+      processRecord (n, t, ks, v) = processedCollectionRow n t row abiid ks v
    in processRecord <$> recordVMs  
 
-processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> Maybe Text -> [Value] -> Value ->  ProcessedCollectionRow
-processedCollectionRow collection ttype AggregateAction {..} ABIID {..} cregator ks v =
+processedCollectionRow :: Text -> Text -> AggregateAction -> ABIID -> [Value] -> Value ->  ProcessedCollectionRow
+processedCollectionRow collection ttype AggregateAction {..} ABIID {..} ks v =
   ProcessedCollectionRow
     { address = actionAddress,
       -- codehash = actionCodeHash,
       creator = actionCreator,
-      cc_creator = cregator,
       root = actionRoot,
       contractname = aiName,
       eventInfo = Nothing,
@@ -259,7 +257,7 @@ processTheMessages messages = do
             --get columns for abstract table
             $logDebugLS "History inserts are: " $ T.pack $ show indexContract
             let stateDiff = rowToCollections row
-                pCollections = processedContractToProcessedCollectionRows stateDiff row abiid (actionCCCreator row) --get all collection rows to insert
+                pCollections = processedContractToProcessedCollectionRows stateDiff row abiid --get all collection rows to insert
             pure . Right $ BatchedInserts indexContract pCollections
 
   forM_ (lefts inserts) $ $logErrorS "processTheMessages"

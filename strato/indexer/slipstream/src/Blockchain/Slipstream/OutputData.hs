@@ -390,7 +390,6 @@ slipstreamQueryText _ NotifyPostgREST = "NOTIFY pgrst, 'reload schema';"
 data ProcessedCollectionRow = ProcessedCollectionRow
   { address :: Address,
     creator :: Text,
-    cc_creator :: Maybe Text,
     root :: Text,
     contractname :: Text,
     eventInfo :: Maybe (Text, Int),
@@ -977,8 +976,7 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       transactionSender = eventTxSender ae,
       collectionDataKeys = [index],
       collectionDataValue = value,
-      root = "",
-      cc_creator = Just ""
+      root = ""
     }
 
 removeArrayEvArgs :: Action.Event -> Action.Event
