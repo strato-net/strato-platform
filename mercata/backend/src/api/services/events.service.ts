@@ -8,7 +8,6 @@ export const getEvents = async (
 ): Promise<EventResponse> => {
   const params = {
     ...query,
-    creator: query.creator || "eq.BlockApps",
     order: query.order || "block_timestamp.desc"
   };
 
@@ -37,7 +36,6 @@ export const getContractInfo = async (
 
   const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
-      creator: "eq.BlockApps",
       select: "contract_name,event_name,event_name.count()",
       order: "contract_name.asc,event_name.asc"
     }
