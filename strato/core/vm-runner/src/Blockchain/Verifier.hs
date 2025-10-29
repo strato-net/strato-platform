@@ -16,7 +16,7 @@ import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Event 
 import qualified Control.Monad.Change.Alter as A
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (catMaybes)
 
 
 nextGasLimitDelta :: Integer -> Integer
@@ -48,6 +48,5 @@ checkValidity parentBSum b = do
 
 isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
-  let base = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      tNonce = transactionNonce base
+  let tNonce = transactionNonce $ otBaseTx ot
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

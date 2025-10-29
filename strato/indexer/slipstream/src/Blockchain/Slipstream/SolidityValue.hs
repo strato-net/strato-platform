@@ -83,8 +83,6 @@ valueToSolidityValue = \case
   SimpleValue (ValueDecimal v) -> Just $ SolidityValueAsString $ decodeUtf8 v
   SimpleValue (ValueAddress (Address addr)) ->
     Just $ SolidityValueAsString $ Text.pack $ printf "%040x" (fromIntegral addr :: Integer)
-  SimpleValue (ValueAccount acct) ->
-    Just $ SolidityValueAsString $ Text.pack $ show acct
   ValueContract acct ->
     Just $ SolidityValueAsString $ Text.pack $ show acct
   SimpleValue (ValueBytes _ bytes) -> Just $ SolidityValueAsString $ decodeUtf8 bytes

@@ -6,8 +6,9 @@ import { useBridgeContext } from '@/context/BridgeContext';
 import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, CHAIN_OPTIONS, handleCopyToClipboard, getExplorerUrl } from '@/lib/bridge/utils';
 import { renderTruncatedAddressWithCopy } from '@/lib/bridge/components';
 import { ITEMS_PER_PAGE } from '@/lib/bridge/constants';
-import { formatWeiAmount } from '@/utils/numberUtils';
-import { bridgeContractService } from '@/lib/bridge/contractService';
+import { formatWeiToDecimalHP } from '@/utils/numberUtils';
+import { ensureHexPrefix } from '@/utils/numberUtils';
+import { usdstAddress } from '@/lib/constants';
 
 const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -31,7 +32,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
           order: 'block_timestamp.desc',
         };
         
-        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
+        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
         if (withdrawalStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${withdrawalStatus}`;
@@ -59,9 +60,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
       title: 'From (STRATO)',
       key: 'from',
       render: (_: any, record: any) => {
-        const addr = record?.WithdrawalInfo?.stratoSender
-          ? bridgeContractService.formatAddress(record.WithdrawalInfo.stratoSender)
-          : '';
+        const addr = ensureHexPrefix(record?.WithdrawalInfo?.stratoSender) || '';
         return addr ? renderTruncatedAddressWithCopy(addr, handleCopyToClipboard) : '-';
       },
       width: 100,
@@ -73,9 +72,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
         const chainName = record?.WithdrawalInfo?.externalChainId
           ? getChainName(parseInt(record.WithdrawalInfo.externalChainId))
           : 'Unknown Chain';
-        const addr = record?.WithdrawalInfo?.externalRecipient
-          ? bridgeContractService.formatAddress(record.WithdrawalInfo.externalRecipient)
-          : '';
+        const addr = ensureHexPrefix(record?.WithdrawalInfo?.externalRecipient) || '';
         const chainIdStr = record?.WithdrawalInfo?.externalChainId ? String(record.WithdrawalInfo.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
@@ -136,7 +133,7 @@ const WithdrawTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean
     {
       title: 'Amount',
       key: 'amount',
-      render: (_: any, record: any) => formatWeiAmount(record?.WithdrawalInfo?.stratoTokenAmount || '0'),
+      render: (_: any, record: any) => formatWeiToDecimalHP(record?.WithdrawalInfo?.stratoTokenAmount || '0', 18),
       width: 80,
     },
     {

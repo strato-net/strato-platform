@@ -86,11 +86,9 @@ import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.EthConf
 import Blockchain.Model.SyncState
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
@@ -111,13 +109,12 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import Control.Monad.Trans.Resource
 import Data.Binary
-import qualified Data.ByteString as B
 import Data.Default
 import qualified Data.Map as M
 import qualified Data.NibbleString as N
 import qualified Data.Set as S
+import Data.String
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
 import qualified Database.LevelDB as DB
 import qualified Database.Persist.Sqlite as Lite
 import qualified Database.Redis as Redis
@@ -239,8 +236,8 @@ makeLenses ''ContextDBs
 data MemDBs = MemDBs
   { _stateTxMap :: !(M.Map Address AddressStateModification),
     _stateBlockMap :: !(M.Map Address AddressStateModification),
-    _storageTxMap :: !(M.Map (Address, B.ByteString) B.ByteString),
-    _storageBlockMap :: !(M.Map (Address, B.ByteString) B.ByteString),
+    _storageTxMap :: !(M.Map (Address, StoragePath) BasicValue),
+    _storageBlockMap :: !(M.Map (Address, StoragePath) BasicValue),
     _stateRoots :: !(M.Map (Keccak256, Maybe Word256) MP.StateRoot),
     _currentBlock :: !(Maybe CurrentBlockHash)
   }
@@ -333,7 +330,6 @@ type VMBase m =
     (RawStorageKey `A.Alters` RawStorageValue) m,
     (Keccak256 `A.Alters` BlockSummary) m,
     Mod.Accessible (Maybe WorldBestBlock) m,
-    (A.Selectable (Address, T.Text) X509CertificateField) m,
     (A.Selectable Address X509Certificate) m
   )
 
@@ -356,7 +352,9 @@ withCurrentBlockHash bh f = do
   cbh <- Mod.get (Mod.Proxy @CurrentBlockHash)
   Mod.put (Mod.Proxy @CurrentBlockHash) (CurrentBlockHash bh)
   a <- f
+  flushMemStorageTxDBToBlockDB
   flushMemStorageDB
+  flushMemAddressStateTxToBlockDB
   flushMemAddressStateDB
   Mod.modifyStatefully_ (Mod.Proxy @MemDBs) $ stateRoots .= M.empty
   Mod.put (Mod.Proxy @CurrentBlockHash) cbh
@@ -368,17 +366,15 @@ instance Show Context where
 
 lookupX509AddrFromCBHash ::
   ( MonadLogger m,
-    (A.Alters (Address, B.ByteString) B.ByteString) m
+    (A.Alters (Address, StoragePath) BasicValue) m
   ) =>
   Address ->
   m (Maybe Address)
 lookupX509AddrFromCBHash k = do
-  let certKey addr = (addr,) . Text.encodeUtf8
-      certRegistryKey = certKey (Address 0x509)
-  mAccount <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certRegistryKey . T.pack $ ".addressToCertMap<a:" <> show k <> ">")
+  mAccount <- A.lookup (A.Proxy) (Address 0x509,  fromString $ ".addressToCertMap<a:" ++ show k ++ ">" :: StoragePath)
   $logDebugS "lookupX509AddrFromCBHash" $ T.pack $ "Looking up certificate for address: " ++ (show mAccount)
   case mAccount of
-    Just (BAccount a) -> pure . Just $ a ^. namedAccountAddress
+    Just (BAddress a) -> pure . Just $ a
     _ -> pure Nothing
 
 runTestContextM ::

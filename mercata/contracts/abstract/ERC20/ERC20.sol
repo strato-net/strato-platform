@@ -32,14 +32,24 @@ import "./utils/Context.sol";
  * all dependent contracts to prevent silent failure vulnerabilities.
  */
 abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBILITY: Inherits also from Context.sol but that affects slipstream indexing of the ERC20 contract so copied over the same funcs for now.
-    mapping(address => uint256) public record _balances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream
+    mapping(address => uint256) private record _balances;
 
-    mapping(address => mapping(address => uint256)) public record _allowances; //MERCATA_COMPATIBILITY: This is private by default but we need to make them public and add record for slipstream. Also, I realize now that nested mappings don't work in slipstream so we need to use a different approach to query the allowances for now.
+    mapping(address => mapping(address => uint256)) private record _allowances;
 
     uint256 private _totalSupply;
 
     string private _name;
     string private _symbol;
+
+    // Follows the initializer pattern,
+    // allowing name and symbol to be set once during the first initialization
+    bool private _erc20Initialized;
+    function __ERC20_init(string name_, string symbol_) internal {
+        require(!_erc20Initialized, "ERC20: already initialized");
+        _name = name_;
+        _symbol = symbol_;
+        _erc20Initialized = true;
+    }
 
     /**
      * @dev Sets the values for {name} and {symbol}.
@@ -294,3 +304,4 @@ abstract contract ERC20 is Context, IERC20, IERC20Metadata { //MERCATA_COMPATIBI
     }
 
 }
+

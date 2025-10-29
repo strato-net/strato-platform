@@ -36,6 +36,9 @@ import { sec2Date } from "../../lib/formatSeconds";
 // import ReactGA from "react-ga4";
 import { Popover, PopoverInteractionKind, Position } from "@blueprintjs/core";
 import ValidatorsCard from "../ValidatorsCard";
+import HexText from "../HexText";
+import { toasts } from "../Toasts";
+
 
 const socket = io(env.SOCKET_SERVER, {
   path: "/apex-ws",
@@ -240,7 +243,6 @@ class Dashboard extends Component {
     const isMetadataLoading = this.props.appMetadata.loading;
     const networkHealth = this.props.dashboard.networkStatus;
     const networkStatusMessage = this.props.dashboard.networkStatusMessage;
-
     return (
       <div className="container-fluid pt-dark" id="tour-welcome">
         <Tour
@@ -364,41 +366,23 @@ class Dashboard extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-4">
+          <div className="col-sm-6">
             <NumberCard
-              number={
-                this.props.appMetadata && this.props.appMetadata.nodeInfo ? (
-                  <div>
-                    <p>
-                      {this.props.appMetadata.nodeInfo.organization}{" "}
-                      {this.props.appMetadata.nodeInfo.organizationalUnit}
-                    </p>
-                    <p>{this.props.appMetadata.nodeInfo.commonName}</p>
-                  </div>
-                ) : (
-                  "No Identity"
-                )
-              }
-              description="Node ID"
-              iconClass={
-                this.props.appMetadata && this.props.appMetadata.nodeInfo
-                  ? "fa-id-card"
-                  : "fa-exclamation-circle"
-              }
-              className={`smd-pointer`}
-              mode={
-                this.props.appMetadata && this.props.appMetadata.nodeInfo
-                  ? ""
-                  : "pt-intent-warning"
-              }
+              number={env.NODE_HOST || "N/A"}
+              description={metadata && metadata.nodeAddress ? metadata.nodeAddress : "Loading..."}
+              iconClass="fa-server"
               textSize="h4"
             />
           </div>
-          <div className="col-sm-8">
+          <div className="col-sm-6">
             <NodeCard />
           </div>
         </div>
-
+        <div className="row">
+          <div className="col-sm-12">
+            <br />
+          </div>
+        </div>
         <div className="row">
           <div className="col-sm-12">
             <hr />

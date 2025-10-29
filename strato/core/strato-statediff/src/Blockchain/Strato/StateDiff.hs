@@ -27,7 +27,7 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.Internal (Key, Val, StateRoot, unsafeGetAllKeyVals)
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
@@ -37,7 +37,6 @@ import Control.Monad (when)
 import Control.Monad.Change (Alters, Modifiable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.Function
 import Data.Kind (Type)
 import Data.Map (Map)
@@ -48,6 +47,7 @@ import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
+import SolidVM.Model.Storable
 import Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
@@ -67,7 +67,7 @@ data StateDiff = StateDiff
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map B.ByteString (Diff B.ByteString v))
+  | SolidVMDiff (Map StoragePath (Diff BasicValue v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -81,10 +81,10 @@ instance StorableKey Word256 where
 instance StorableValue Word256 where
   decodeMPDBValue = retrieveMPDBValue
 
-instance StorableKey B.ByteString where
-  lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
+instance StorableKey StoragePath where
+  lookupStorageKey = fmap (either (error . ("malformed storage path " ++)) id . parsePath . fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
-instance StorableValue B.ByteString where
+instance StorableValue BasicValue where
   decodeMPDBValue = rlpDecode
 
 -- | Describes all the changes to a particular account.  The address is not
@@ -154,6 +154,10 @@ instance Detailed (Diff StateRoot) where
   incrementalToEventual x = Value $ newValue x
 
 instance Detailed (Diff ByteString) where
+  incrementalToEventual Delete {} = Value $ fromString ""
+  incrementalToEventual x = Value $ newValue x
+
+instance Detailed (Diff BasicValue) where
   incrementalToEventual Delete {} = Value $ fromString ""
   incrementalToEventual x = Value $ newValue x
 

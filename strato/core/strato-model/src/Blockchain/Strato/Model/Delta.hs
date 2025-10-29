@@ -62,5 +62,5 @@ getDeltasFromEvents = foldr go mempty
             "ValidatorRemoved" -> maybe ds (\v -> (Delta va ((v:) . vr))) $ extractCommonName e
             _ -> ds
           _ -> ds
-        extractCommonName = fmap (Validator . read . second) . find (\(x, _, _) -> x == "commonName") . evArgs
+        extractCommonName = fmap (Validator . read . second) . find (\(x, _, _) -> x == "validator") . evArgs
         second (_, y, _)  = y

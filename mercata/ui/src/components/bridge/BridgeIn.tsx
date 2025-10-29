@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
+import { ensureHexPrefix } from "@/utils/numberUtils";
 import {
   Select,
   SelectContent,
@@ -75,12 +76,15 @@ const BridgeIn: React.FC = () => {
   const [minDepositInfo, setMinDepositInfo] = useState<{ 
     amount: string; 
     amountWei: bigint; 
-    loading: boolean 
+    loading: boolean;
   }>({ 
     amount: "", 
     amountWei: 0n,
-    loading: false 
+    loading: false
   });
+  
+  // State for token permission status
+  const [isTokenPermitted, setIsTokenPermitted] = useState(true);
 
   // ============================================
   // Derived State & Computed Values
@@ -91,7 +95,7 @@ const BridgeIn: React.FC = () => {
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken === NATIVE_TOKEN_ADDRESS;
+  const isNativeToken = selectedToken?.externalToken? false : true;
 
   // ============================================
   // Balance Hooks
@@ -116,7 +120,7 @@ const BridgeIn: React.FC = () => {
     isLoading: tokenLoading,
   } = useBalance({
     address,
-    token: selectedToken?.externalToken as `0x${string}`,
+    token: ensureHexPrefix(selectedToken?.externalToken),
     chainId: expectedChainId || undefined,
     query: {
       enabled:
@@ -161,15 +165,17 @@ const BridgeIn: React.FC = () => {
       setMinDepositInfo({ 
         amount: formattedMinAmount, 
         amountWei: minAmountWei,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(tokenConfig.isPermitted);
     } catch (error) {
       console.error("Error fetching min deposit amount:", error);
       setMinDepositInfo({ 
         amount: "0", 
         amountWei: 0n,
-        loading: false 
+        loading: false
       });
+      setIsTokenPermitted(true);
     }
   };
 
@@ -259,6 +265,17 @@ const BridgeIn: React.FC = () => {
       }
     }
 
+    const tokenDecimals = parseInt(selectedToken?.externalDecimals || "18");
+    const decimalIndex = value.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > tokenDecimals) {
+        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
+        return false;
+      }
+    }
+
     const balanceMatch = tokenBalance.match(/^([\d,]+\.?\d*)/);
     const bal = balanceMatch
       ? parseFloat(balanceMatch[1].replace(/,/g, ""))
@@ -317,7 +334,7 @@ const BridgeIn: React.FC = () => {
       amount,
       parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.externalToken === NATIVE_TOKEN_ADDRESS;
+    const isNative = selectedToken.externalToken? false : true;
 
     return {
       selectedToken,
@@ -338,8 +355,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken,
-      mint: false, // bridge-in always uses mint = false
+      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
     });
 
     if (!validation.isValid) {
@@ -364,7 +380,7 @@ const BridgeIn: React.FC = () => {
 
       try {
         const approveTx = await writeContractAsync({
-          address: ctx.selectedToken.externalToken as `0x${string}`,
+          address: ensureHexPrefix(ctx.selectedToken.externalToken),
           abi: ERC20_ABI,
           functionName: "approve",
           args: [
@@ -443,7 +459,7 @@ const BridgeIn: React.FC = () => {
         address: ctx.depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        args: [ensureHexPrefix(ctx.userAddress)],
         value: ctx.depositAmount,
         account: ctx.address as `0x${string}`,
       });
@@ -453,7 +469,7 @@ const BridgeIn: React.FC = () => {
         address: ctx.depositRouter as `0x${string}`,
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "depositETH",
-        args: [bridgeContractService.formatAddress(ctx.userAddress)],
+        args: [ensureHexPrefix(ctx.userAddress)],
         value: ctx.depositAmount,
         chain,
         account: ctx.address as `0x${string}`,
@@ -470,13 +486,12 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),  
+          ensureHexPrefix(ctx.selectedToken.externalToken),  
           ctx.depositAmount,
-          bridgeContractService.formatAddress(ctx.userAddress),
+          ensureHexPrefix(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
-          permitData!.signature as `0x${string}`,
-          false, // mintUSDST = false for bridge-in
+          permitData!.signature as `0x${string}`
         ],
         account: ctx.address as `0x${string}`,
       });
@@ -487,13 +502,12 @@ const BridgeIn: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(ctx.selectedToken.externalToken),
+          ensureHexPrefix(ctx.selectedToken.externalToken),
           ctx.depositAmount,
-          bridgeContractService.formatAddress(ctx.userAddress),
+          ensureHexPrefix(ctx.userAddress),
           permitData!.nonce,
           permitData!.deadline,
-          permitData!.signature as `0x${string}`,
-          false, // mintUSDST = false for bridge-in
+          permitData!.signature as `0x${string}`
         ],
         chain,
         account: ctx.address as `0x${string}`,
@@ -526,7 +540,6 @@ const BridgeIn: React.FC = () => {
       // Validate
       const ctx = preflight();
       await validateOnChain(ctx);
-
       let permitData:
         | { signature: string; nonce: bigint; deadline: bigint }
         | undefined;
@@ -536,7 +549,6 @@ const BridgeIn: React.FC = () => {
       }
 
       const txHash = await simulateAndSend(ctx, permitData);
-
       const explorerUrl = getExplorerUrl(ctx.activeChainId, txHash);
       toast({
         title: "Transaction Sent",
@@ -639,7 +651,7 @@ const BridgeIn: React.FC = () => {
           </SelectTrigger>
           <SelectContent>
             {bridgeableTokens.map((t) => (
-              <SelectItem key={t.externalSymbol} value={t.externalSymbol}>
+              <SelectItem key={t.id} value={t.externalSymbol}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}
@@ -709,12 +721,6 @@ const BridgeIn: React.FC = () => {
                   </div>
                 )}
               </div>
-              {selectedToken?.stratoTokenSymbol && amount && (
-                <p className="text-sm bg-blue-50 p-2 rounded-md border border-blue-100">
-                  You will receive ≈ {amount} {selectedToken.stratoTokenName} (
-                  {selectedToken.stratoTokenSymbol}) on STRATO
-                </p>
-              )}
             </div>
           ) : null)}
       </div>
@@ -735,7 +741,8 @@ const BridgeIn: React.FC = () => {
             !amount ||
             !selectedToken ||
             !isConnected ||
-            !isCorrectNetwork
+            !isCorrectNetwork ||
+            !isTokenPermitted
           }
           className="bg-gradient-to-r from-[#1f1f5f] via-[#293b7d] to-[#16737d] text-white hover:opacity-90"
         >
@@ -765,6 +772,14 @@ const BridgeIn: React.FC = () => {
             selectedToken &&
             amount &&
             isCorrectNetwork &&
+            !isTokenPermitted &&
+            "Token Not Permitted"}
+          {!isLoading &&
+            isConnected &&
+            selectedToken &&
+            amount &&
+            isCorrectNetwork &&
+            isTokenPermitted &&
             "Bridge Assets"}
         </Button>
       </div>

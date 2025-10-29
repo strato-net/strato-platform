@@ -7,6 +7,44 @@ Yellow='\033[0;33m'
 BYellow='\033[1;33m'
 NC='\033[0m'
 
+function checkDocker {
+  if ! docker ps &> /dev/null
+  then
+      echo -e "${Red}Error: docker is required: https://www.docker.com/ . If you have it installed - you may need to run STRATO with sudo user${NC}"
+      exit 1
+  fi
+  if ! docker compose version  &> /dev/null && ! docker-compose -v  &> /dev/null
+  then
+      echo -e "${Red}Error: Docker Compose is required: https://docs.docker.com/compose/install/"
+      exit 2
+  else
+    if ! docker compose version &> /dev/null
+    then
+      docker_compose="docker-compose -p strato --log-level ERROR - -f docker-compose.yml"
+      CNAME_SEP="_"
+    else
+      # The `-f docker-compose.yml` is required for the command to work correctly despite it's the default (docker bug?)
+      docker_compose="docker -l error compose -p strato -f docker-compose.yml"
+      CNAME_SEP="-"
+    fi
+  fi
+}
+
+function checkComposeFile {
+  if [ ! -f docker-compose.yml ]
+  then
+    echo -e "${Red}docker-compose.yml not found. Please download the docker-compose.yml first or build the platform (see README.md).${NC}"
+    exit 3
+  else
+    echo -e "${Yellow}Using the docker-compose.yml${NC}"
+  fi
+  
+  if ! grep -q '^[[:space:]]*strato:' docker-compose.yml; then
+    echo -e "${Red}Wrong docker-compose.yml provided - no 'strato' service found in it. Use the docker-compose.allDocker.yml as the docker-compose.yml${NC}"
+    exit 4
+  fi
+}
+
 function help {
   echo -e "${Yellow}STRATO Mercata run script${NC}
 Kickstart a STRATO Mercata node.
@@ -16,12 +54,12 @@ The flags are mutually exclusive:
 --help|-h     - this help.
 --down        - remove strato containers and leave all volumes intact.
 --wipe        - stop and remove STRATO containers and wipe out volumes.
---pull        - pull images used in ../docker-compose.allDocker.yml.
+--pull        - pull images used in docker-compose.yml
 --get-address - get the address of the running node.
 --get-pubkey  - get the public key of the running node.
---get-validators          - get the list of validating nodes in the network on the running node.
---get-metadata            - get the node's metadata in JSON format.
---single              - run a single node.
+--get-validators    - get the list of validating nodes in the network on the running node.
+--get-metadata      - get the node's metadata in JSON format.
+--single            - run a single node.
 "
 }
 
@@ -85,32 +123,6 @@ function getValidators {
   _outputMetadataValue validators
 }
 
-if [ ! -f $(pwd)/strato ]; then
-    echo -e "${Red}Script must be executed from the strato-platform/bootstrap-docker directory. Exiting.${NC}"
-    exit 4
-fi
-
-if ! docker ps &> /dev/null
-then
-    echo -e "${Red}Error: docker is required: https://www.docker.com/ . If you have it installed - you may need to run STRATO with sudo user${NC}"
-    exit 1
-fi
-
-if ! docker compose version  &> /dev/null && ! docker-compose -v  &> /dev/null
-then
-    echo -e "${Red}Error: Docker Compose is required: https://docs.docker.com/compose/install/"
-    exit 2
-else
-  if ! docker compose version &> /dev/null
-  then
-    docker_compose="docker-compose -p strato --log-level ERROR - -f ../docker-compose.allDocker.yml"
-    CNAME_SEP="_"
-  else
-    # The `-f ../docker-compose.allDocker.yml` is required for the command to work correctly despite it's the default (docker bug?)
-    docker_compose="docker -l error compose -p strato -f ../docker-compose.allDocker.yml"
-    CNAME_SEP="-"
-  fi
-fi
 
 while [ ${#} -gt 0 ]; do
   case "${1}" in
@@ -118,23 +130,15 @@ while [ ${#} -gt 0 ]; do
     help
     exit 0
     ;;
-  --version|-v)
-    echo "$(<VERSION)"
-    exit 0
-    ;;
-  --stop)
-    stop
-    exit 0
-    ;;
-  --start)
-    start
-    exit 0
-    ;;
   --down)
+    checkDocker
+    checkComposeFile
     down
     exit 0
     ;;
   --wipe)
+    checkDocker
+    checkComposeFile
     wipe
     exit 0
     ;;
@@ -142,30 +146,28 @@ while [ ${#} -gt 0 ]; do
     node_type=single
     ;;
   --pull)
+    checkDocker
+    checkComposeFile
     pullImages
     exit 0
     ;;
-  --fetch-logs)
-    fetchLogs
-    exit 0
-    ;;
-  --fetch-logs-with-db)
-    fetchLogs "withdb"
-    exit 0
-    ;;
   --get-address)
+    checkDocker
     getAddress
     exit 0
     ;;
   --get-pubkey)
+    checkDocker
     getPublicKey
     exit 0
     ;;
   --get-validators)
+    checkDocker
     getValidators
     exit 0
     ;;
   --get-metadata)
+    checkDocker
     getMetadata
     exit 0
     ;;
@@ -177,13 +179,8 @@ while [ ${#} -gt 0 ]; do
   shift 1
 done
 
-if [ ! -f ../docker-compose.allDocker.yml ]
-then
-  echo -e "${Red}../docker-compose.allDocker.yml not found. Please build the platform first with 'make' (see README.md).${NC}"
-  exit 3
-else
-  echo -e "${Yellow}Using the ../docker-compose.allDocker.yml${NC}"
-fi
+checkDocker
+checkComposeFile
 
 export NODE_HOST=${NODE_HOST:-localhost}
 export OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL:-'https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid-configuration'}
@@ -255,12 +252,12 @@ function cleanup {
 trap cleanup EXIT
 
 if [ "$ssl" != true ]; then
-  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' ../docker-compose.allDocker.yml > docker-compose-temp.yml
+  sed -n '/#TAG_REMOVE_WHEN_NO_SSL/!p' docker-compose.yml > docker-compose-temp.yml
 else
   if [ ${HTTPS_PORT} != "443" ]; then
-    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' ../docker-compose.allDocker.yml > docker-compose-temp.yml
+    sed -n '/#TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT/!p' docker-compose.yml > docker-compose-temp.yml
   else
-    cp ../docker-compose.allDocker.yml docker-compose-temp.yml
+    cp docker-compose.yml docker-compose-temp.yml
   fi
 fi
 # END OF COMPOSE FILE PRE-PROCESSING
@@ -275,7 +272,7 @@ fi
 # WAIT FOR STRATO TO RUN
 started=$(date +%s)
 timeout=180
-hc_container=$(${docker_compose} ps | grep "${CNAME_SEP}nginx${CNAME_SEP}" | awk '{print $1}')
+hc_container=$(${docker_compose} ps | grep "\\${CNAME_SEP}nginx${CNAME_SEP}" | awk '{print $1}')
 printf "Waiting for STRATO to rise and shine..."
 i=0
 while ! [[ -n $(docker ps -q -f name=${hc_container} -f health=healthy) ]];  do

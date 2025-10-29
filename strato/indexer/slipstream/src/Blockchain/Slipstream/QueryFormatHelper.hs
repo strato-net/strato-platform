@@ -22,36 +22,30 @@ sqlTypePostgres SqlSerial  = "serial"
 data TableName
   = IndexTableName
       { itCreator :: T.Text,
-        itApplication :: T.Text,
         itContractName :: T.Text
       }
   | HistoryTableName -- technically the same as index, but logically different
       { htCreator :: T.Text,
-        htApplication :: T.Text,
         htContractName :: T.Text
       }
   | EventTableName
       { etCreator :: T.Text,
-        etApplication :: T.Text,
         etContractName :: T.Text,
         etEventName :: T.Text
       }
   | CollectionTableName
       { mtCreator :: T.Text,
-        mtApplication :: T.Text,
         mtContractName :: T.Text,
         mtCollectionName :: T.Text
       }
   | EventCollectionTableName
       { ectCreator :: T.Text,
-        ectApplication :: T.Text,
         ectContractName :: T.Text,
         ectEventName :: T.Text,
         ectCollectionName :: T.Text
       }
   | AbstractTableName
       { atCreator :: T.Text,
-        atApplication :: T.Text,
         atContractName :: T.Text
       }
   deriving (Show, Eq, Ord)
@@ -116,115 +110,106 @@ tableSeparator :: T.Text
 tableSeparator = "-"
 
 tableNameToText :: TableName -> T.Text
-tableNameToText (IndexTableName c _ n) =
+tableNameToText (IndexTableName c n) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
    in prefix <> n
-tableNameToText (CollectionTableName c _ n m) =
+tableNameToText (CollectionTableName c n m) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
       contractAndCollection = n <> "-" <> m
    in prefix <> contractAndCollection
-tableNameToText (HistoryTableName c _ n) =
+tableNameToText (HistoryTableName c n) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
    in "history@" <> prefix <> n
-tableNameToText (EventTableName c _ n e) =
+tableNameToText (EventTableName c n e) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
       contractAndEvent = n <> tableSeparator <> e
    in prefix <> contractAndEvent
-tableNameToText (EventCollectionTableName c _ n e m) =
+tableNameToText (EventCollectionTableName c n e m) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
       contractEventAndCollection = n <> tableSeparator <> e <> tableSeparator <> m
    in prefix <> contractEventAndCollection
-tableNameToText (AbstractTableName c _ n) =
+tableNameToText (AbstractTableName c n) =
   let prefix
         | T.null c = ""
         | otherwise = c <> tableSeparator
    in prefix <> n
 
 indexedEventTableName :: TableName -> TableName
-indexedEventTableName (EventTableName c a n e) = EventTableName ("indexed@" <> c) a n e
+indexedEventTableName (EventTableName c n e) = EventTableName ("indexed@" <> c) n e
 indexedEventTableName tn = tn
 
 tableShortName :: TableName -> T.Text
-tableShortName (IndexTableName _ _ n) = n
-tableShortName (CollectionTableName _ _ n m) = n <> "-" <> m
-tableShortName (HistoryTableName _ _ n) = "history@" <> n
-tableShortName (EventTableName _ _ n e) = n <> "-" <> e
-tableShortName (EventCollectionTableName _ _ n e m) = n <> "-" <> e <> "-" <> m
-tableShortName (AbstractTableName _ _ n) = n
+tableShortName (IndexTableName _ n) = n
+tableShortName (CollectionTableName _ n m) = n <> "-" <> m
+tableShortName (HistoryTableName _ n) = "history@" <> n
+tableShortName (EventTableName _ n e) = n <> "-" <> e
+tableShortName (EventCollectionTableName _ n e m) = n <> "-" <> e <> "-" <> m
+tableShortName (AbstractTableName _ n) = n
 
 -- discard app if org is null
-constructTableNameParameters :: Text -> Text -> Text -> (Text, Text, Text)
-constructTableNameParameters crtr app contract
-  | T.null crtr = ("", "", contract)
-  | app == contract = (crtr, "", contract)
-  | otherwise = (crtr, app, contract)
+constructTableNameParameters :: Text -> Text -> (Text, Text)
+constructTableNameParameters crtr contract
+  | T.null crtr = ("", contract)
+  | otherwise = (crtr, contract)
 
-historyTableName :: Text -> Text -> Text -> TableName
-historyTableName creator a n = uncurry3 HistoryTableName $ constructTableNameParameters creator a n
+historyTableName :: Text -> Text -> TableName
+historyTableName creator n = uncurry HistoryTableName $ constructTableNameParameters creator n
 
-indexTableName :: Text -> Text -> Text -> TableName
-indexTableName creator a n = uncurry3 IndexTableName $ constructTableNameParameters creator a n
+indexTableName :: Text -> Text -> TableName
+indexTableName creator n = uncurry IndexTableName $ constructTableNameParameters creator n
 
-collectionTableName :: Text -> Text -> Text -> Text -> TableName
-collectionTableName creator a n m =
-  let (c', a', n') = constructTableNameParameters creator a n
-   in CollectionTableName c' a' n' m
+collectionTableName :: Text -> Text -> Text -> TableName
+collectionTableName creator n m =
+  let (c', n') = constructTableNameParameters creator n
+   in CollectionTableName c' n' m
 
-eventTableName :: Text -> Text -> Text -> Text -> TableName
-eventTableName creator a n e =
-  let (c', a', n') = constructTableNameParameters creator a n
-   in EventTableName c' a' n' e
+eventTableName :: Text -> Text -> Text -> TableName
+eventTableName creator n e =
+  let (c', n') = constructTableNameParameters creator n
+   in EventTableName c' n' e
 
-eventCollectionTableName :: Text -> Text -> Text -> Text -> Text -> TableName
-eventCollectionTableName creator a n e m =
-  let (c', a', n') = constructTableNameParameters creator a n
-   in EventCollectionTableName c' a' n' e m
+eventCollectionTableName :: Text -> Text -> Text -> Text -> TableName
+eventCollectionTableName creator n e m =
+  let (c', n') = constructTableNameParameters creator n
+   in EventCollectionTableName c' n' e m
 
 uncurry3 :: (a -> b -> c -> d) -> (a, b, c) -> d
 uncurry3 f (x, y, z) = f x y z
 
 tableNameCreator :: TableName -> T.Text
-tableNameCreator (IndexTableName c _ _) = c
-tableNameCreator (CollectionTableName c _ _ _) = c
-tableNameCreator (HistoryTableName c _ _) = c
-tableNameCreator (EventTableName c _ _ _) = c
-tableNameCreator (EventCollectionTableName c _ _ _ _) = c
-tableNameCreator (AbstractTableName c _ _) = c
-
-tableNameApplication :: TableName -> T.Text
-tableNameApplication (IndexTableName _ a _) = a
-tableNameApplication (CollectionTableName _ a _ _) = a
-tableNameApplication (HistoryTableName _ a _) = a
-tableNameApplication (EventTableName _ a _ _) = a
-tableNameApplication (EventCollectionTableName _ a _ _ _) = a
-tableNameApplication (AbstractTableName _ a _) = a
+tableNameCreator (IndexTableName c _) = c
+tableNameCreator (CollectionTableName c _ _) = c
+tableNameCreator (HistoryTableName c _) = c
+tableNameCreator (EventTableName c _ _) = c
+tableNameCreator (EventCollectionTableName c _ _ _) = c
+tableNameCreator (AbstractTableName c _) = c
 
 tableNameContractName :: TableName -> T.Text
-tableNameContractName (IndexTableName _ _ n) = n
-tableNameContractName (CollectionTableName _ _ n _) = n
-tableNameContractName (HistoryTableName _ _ n) = n
-tableNameContractName (EventTableName _ _ n _) = n
-tableNameContractName (EventCollectionTableName _ _ n _ _) = n
-tableNameContractName (AbstractTableName _ _ n) = n
+tableNameContractName (IndexTableName _ n) = n
+tableNameContractName (CollectionTableName _ n _) = n
+tableNameContractName (HistoryTableName _ n) = n
+tableNameContractName (EventTableName _ n _) = n
+tableNameContractName (EventCollectionTableName _ n _ _) = n
+tableNameContractName (AbstractTableName _ n) = n
 
 tableNameCollectionName :: TableName -> T.Text
-tableNameCollectionName (CollectionTableName _ _ _ c) = c
-tableNameCollectionName (EventCollectionTableName _ _ _ _ c) = c
+tableNameCollectionName (CollectionTableName _ _ c) = c
+tableNameCollectionName (EventCollectionTableName _ _ _ c) = c
 tableNameCollectionName _ = ""
 
 tableNameEventName :: TableName -> T.Text
-tableNameEventName (EventTableName _ _ _ e) = e
-tableNameEventName (EventCollectionTableName _ _ _ e _) = e
+tableNameEventName (EventTableName _ _ e) = e
+tableNameEventName (EventCollectionTableName _ _ e _) = e
 tableNameEventName _ = ""
 
 tableNameToTextPostgres :: TableName -> T.Text

@@ -47,7 +47,8 @@ export interface VaultData {
 export interface AssetConfig {
   asset: string;                          // Asset address
   symbol: string;                         // Asset symbol
-  liquidationRatio: number;               // Minimum collateralization ratio (percentage)
+  liquidationRatio: number;               // Liquidation threshold (decimal percentage)
+  minCR: number;                          // Min collateral ratio for user actions (decimal percentage)
   liquidationPenaltyBps: number;          // Liquidation penalty in basis points
   closeFactorBps: number;                 // Max liquidation percentage in basis points
   stabilityFeeRate: number;               // Annual interest rate (percentage)

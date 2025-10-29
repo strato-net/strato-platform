@@ -28,7 +28,6 @@ data Type
   | Bytes {dynamic :: Maybe Bool, bytes :: Maybe Int32}
   | Bool
   | Address
-  | Account
   | UnknownLabel String
   | Struct {bytes :: Maybe Int32, typedef :: Text}
   | Enum {bytes :: Maybe Int32, typedef :: Text, names :: Maybe [Text]}

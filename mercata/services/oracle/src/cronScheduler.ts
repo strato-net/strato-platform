@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { logInfo, logError, logFeedUpdate } from './utils/logger';
-import { fetchBatchPrices } from './adapters/genericRestAdapter';
+import { fetchBatchPrices, generateConstantPrices } from './adapters/genericRestAdapter';
 import { pushAssetPrices, getUpdateInterval } from './utils/oraclePusher';
 import { ConfigLoader } from './utils/configLoader';
 import { healthMonitor } from './utils/healthMonitor';
@@ -84,6 +84,26 @@ async function processBatchFeed(feed: any, configLoader: ConfigLoader): Promise<
     const resolvedFeed = configLoader.getResolvedFeeds().find(f => f.name === feed.name);
     if (!resolvedFeed) {
         throw new Error(`Feed ${feed.name} not found in resolved configuration`);
+    }
+
+    // Check if this feed uses constant pricing
+    const hasConstantSource = resolvedFeed.sources.includes('constant');
+    if (hasConstantSource) {
+        const constantPrices = generateConstantPrices(resolvedFeed.assets);
+        const assetPrices: Record<string, number> = {};
+        const assetAddresses: Record<string, string> = {};
+        const assetSources: Record<string, string[]> = {};
+        
+        resolvedFeed.assets.forEach(asset => {
+            const priceData = constantPrices[asset.name];
+            if (priceData) {
+                assetPrices[asset.name] = priceData.price;
+                assetAddresses[asset.name] = asset.targetAssetAddress;
+                assetSources[asset.name] = ['constant'];
+            }
+        });
+        
+        return { assetPrices, assetAddresses, assetSources };
     }
 
     // Prepare parallel fetch tasks for batch sources

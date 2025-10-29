@@ -30,7 +30,7 @@ module SolidVM.Model.CodeCollection.Statement
   )
 where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 --import Data.Swagger
 
 import Control.DeepSeq
@@ -175,7 +175,7 @@ data ExpressionF a
   | NumberLiteral a Integer (Maybe NumberUnit)
   | DecimalLiteral a WrappedDecimal
   | StringLiteral a String
-  | AccountLiteral a NamedAccount
+  | AddressLiteral a Address
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString
@@ -201,7 +201,7 @@ extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
 extractExpression (DecimalLiteral a _) = a
 extractExpression (StringLiteral a _) = a
-extractExpression (AccountLiteral a _) = a
+extractExpression (AddressLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a

@@ -1,22 +1,27 @@
 import React from "react";
 import { Slider } from "@/components/ui/slider";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CRSliderProps {
   projectedCR: number;
-  liquidationThreshold: number;
+  minCR: number; // Min collateral ratio for user actions
   onCRChange: (cr: number) => void;
   disabled?: boolean;
   hasCollateral?: boolean; // Whether there's existing collateral or deposit input
+  collateralValueUSD?: number; // Total collateral value in USD for tooltip
+  totalDebtUSD?: number; // Total debt value in USD for tooltip
 }
 
 const CRSlider: React.FC<CRSliderProps> = ({
   projectedCR,
-  liquidationThreshold,
+  minCR,
   onCRChange,
   disabled = false,
-  hasCollateral = false
+  hasCollateral = false,
+  collateralValueUSD = 0,
+  totalDebtUSD = 0
 }) => {
-  const sliderMin = liquidationThreshold;
+  const sliderMin = Math.round(minCR); // Use minCR as slider minimum (ensure whole number)
   const sliderMax = 750;
   
   // Determine if CR is out of slider range
@@ -59,23 +64,58 @@ const CRSlider: React.FC<CRSliderProps> = ({
   // Determine slider value and visibility
   const isInBounds = projectedCR >= sliderMin && projectedCR <= sliderMax;
   const displayValue = isInBounds ? projectedCR : sliderMin; // Default position when out of bounds
-  const isPositionDangerous = projectedCR > 0 && projectedCR < liquidationThreshold;
+  const isPositionDangerous = projectedCR > 0 && projectedCR < minCR; // Below minCR is dangerous
+  const isAtMinCR = projectedCR > 0 && Math.abs(projectedCR - minCR) < 0.1; // Within 0.1% of minCR
   
+  // Format numbers for tooltip display
+  const formatTooltipNumber = (num: number): string => {
+    if (num === 0) return '0';
+    if (num < 0.01) return '< 0.01';
+    return num.toFixed(2);
+  };
+
+  // Generate tooltip content
+  const getTooltipContent = (): string => {
+    if (totalDebtUSD <= 0) {
+      return 'CR = Collateral Value ÷ Debt Value';
+    }
+    
+    const collateralFormatted = formatTooltipNumber(collateralValueUSD);
+    const debtFormatted = formatTooltipNumber(totalDebtUSD);
+    const crFormatted = formatTooltipNumber(projectedCR);
+    
+    return `CR = Collateral Value ÷ Debt Value\n$${collateralFormatted} ÷ $${debtFormatted} = ${crFormatted}%`;
+  };
+
+  console.log(projectedCR, sliderMin);
+
   return (
-    <div className="space-y-3">
-      {/* CR Display */}
-      <div className="flex justify-between items-center text-sm font-medium">
-        <span>Collateralization Ratio (CR)</span>
-        <span className={
-          projectedCR >= 999999 
-            ? 'text-green-600' 
-            : isPositionDangerous 
-              ? 'text-red-500 font-bold' 
-              : ''
-        }>
-          {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
-        </span>
-      </div>
+    <TooltipProvider>
+      <div className="space-y-3">
+        {/* CR Display with Tooltip */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex justify-between items-center text-sm font-medium cursor-help">
+              <span>Collateralization Ratio (CR)</span>
+              <span className={
+                projectedCR >= 999999 
+                  ? 'text-green-600' 
+                  : isAtMinCR
+                    ? 'text-yellow-600 font-bold'
+                    : isPositionDangerous 
+                      ? 'text-red-600 font-bold' 
+                      : ''
+              }>
+                {projectedCR >= 999999 ? '∞' : projectedCR > 0 ? formatPercentage(projectedCR, 1) : '0.0%'}
+              </span>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent>
+            <div className="whitespace-pre-line text-center">
+              {getTooltipContent()}
+            </div>
+          </TooltipContent>
+        </Tooltip>
       
       {/* Slider Container with Click Handler */}
       <div 
@@ -103,15 +143,15 @@ const CRSlider: React.FC<CRSliderProps> = ({
       
       {/* Slider Labels */}
       <div className="flex justify-between text-xs text-gray-500">
-        <span className="text-red-500">LT: {formatPercentage(liquidationThreshold)}</span>
+        <span>{formatPercentage(minCR)}</span>
         <span>{formatPercentage(sliderMax)}</span>
       </div>
       
       {/* Status message */}
       {isOutOfBounds && !isSliderDisabled && (
         <div className="text-center text-sm text-blue-600">
-          {projectedCR < sliderMin 
-            ? `CR below liquidation threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
+          {projectedCR+0.1 < sliderMin 
+            ? `CR below minimum safe threshold (${formatPercentage(sliderMin)}) - Click slider to set new CR`
             : projectedCR > sliderMax 
               ? `CR above range - Click slider to set new CR`
               : ""
@@ -127,7 +167,8 @@ const CRSlider: React.FC<CRSliderProps> = ({
           }
         </div>
       )}
-    </div>
+      </div>
+    </TooltipProvider>
   );
 };
 

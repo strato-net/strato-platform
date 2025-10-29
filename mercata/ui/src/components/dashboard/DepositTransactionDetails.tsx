@@ -7,8 +7,9 @@ import { formatDate, getChainName, BRIDGE_STATUS_OPTIONS, handleCopyToClipboard,
 import { renderTruncatedAddressWithCopy } from "@/lib/bridge/components";
 import { DepositTransaction } from "@/lib/bridge/types";
 import { ITEMS_PER_PAGE } from "@/lib/bridge/constants";
-import { formatWeiAmount } from "@/utils/numberUtils";
-import { bridgeContractService } from "@/lib/bridge/contractService";
+import { formatWeiToDecimalHP } from "@/utils/numberUtils";
+import { ensureHexPrefix } from "@/utils/numberUtils";
+import { usdstAddress } from "@/lib/constants";
 
 const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean }) => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -32,8 +33,8 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
           offset: ((currentPage - 1) * ITEMS_PER_PAGE).toString(),
           order: 'block_timestamp.desc',
         };
-        
-        (params as any)["value->>mintUSDST"] = mintUSDST ? 'eq.true' : 'eq.false';
+        console.log('mintUSDST', mintUSDST);
+        (params as any)["value->>stratoToken"] = mintUSDST ? `eq.${usdstAddress}` : `neq.${usdstAddress}`;
         
         if (depositStatus !== null) {
           (params as any)["value->>bridgeStatus"] = `eq.${depositStatus}`;
@@ -64,9 +65,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "from",
       render: (_: any, record: any) => {
         const chainName = record.externalChainId ? getChainName(record.externalChainId) : "Unknown Chain";
-        const addr = record?.DepositInfo?.externalSender
-          ? bridgeContractService.formatAddress(record.DepositInfo.externalSender)
-          : "";
+        const addr = ensureHexPrefix(record?.DepositInfo?.externalSender) || "";
         const chainIdStr = record?.externalChainId ? String(record.externalChainId) : '1';
         const txUrl = getExplorerUrl(chainIdStr, '0x');
         const base = txUrl.split('/tx/')[0];
@@ -100,9 +99,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       key: "to",
       render: (_: any, record: any) =>
         renderTruncatedAddressWithCopy(
-          record?.DepositInfo?.stratoRecipient
-            ? bridgeContractService.formatAddress(record.DepositInfo.stratoRecipient)
-            : "",
+          ensureHexPrefix(record?.DepositInfo?.stratoRecipient) || "",
           handleCopyToClipboard
         ),
       width: 100,
@@ -135,7 +132,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
       title: "Amount",
       key: "amount",
       render: (_: any, record: any) =>
-        formatWeiAmount(record?.DepositInfo?.stratoTokenAmount || '0'),
+        formatWeiToDecimalHP(record?.DepositInfo?.stratoTokenAmount || '0', 18),
       width: 80,
     },
     {

@@ -38,7 +38,6 @@ import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.SolidityVarReader
 import Blockchain.Data.DataDefs
-import Blockchain.Strato.Model.Account (namedAccountAddress)
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
@@ -334,7 +333,7 @@ convertSvmResultResToVals resp = do
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
-expressionToValue (AccountLiteral _ n) = Just $ SimpleValue $ ValueAddress (n^.namedAccountAddress)
+expressionToValue (AddressLiteral _ n) = Just $ SimpleValue $ ValueAddress n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
 expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
@@ -370,7 +369,6 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
-              Xabi.Account -> Right . SimpleType $ TypeAccount
               Xabi.Struct _ name -> Right $ TypeStruct name
               Xabi.Enum _ name _ -> Right $ TypeEnum name
               Xabi.Array ety len ->
@@ -382,7 +380,6 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress
-                      Xabi.Account -> Right . SimpleType $ TypeAccount
                       Xabi.Struct _ name -> Right $ TypeStruct name
                       Xabi.Enum _ name _ -> Right $ TypeEnum name
                       Xabi.Array {} -> Left "Arrays of arrays are not allowed as function arguments"

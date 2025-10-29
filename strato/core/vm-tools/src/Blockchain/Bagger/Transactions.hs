@@ -82,6 +82,7 @@ data TxRejection
   | TXSizeLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | GasLimitExceeded BaggerStage BaggerTxQueue Integer Integer OutputTx
   | KnownFailedTX BaggerStage BaggerTxQueue OutputTx
+  | AdminFlushed BaggerStage BaggerTxQueue FlushScope OutputTx
   deriving (Eq, Read, Show)
 
 rejectedTx :: TxRejection -> OutputTx
@@ -94,8 +95,11 @@ rejectedTx (InvalidPragma _ _ _ t) = t
 rejectedTx (TXSizeLimitExceeded _ _ _ _ t) = t
 rejectedTx (GasLimitExceeded _ _ _ _ t) = t
 rejectedTx (KnownFailedTX _ _ t) = t
+rejectedTx (AdminFlushed _ _ _ t) = t
 
 data BaggerStage = Insertion | Validation | Promotion | Demotion | Execution deriving (Read, Eq, Show)
+
+data FlushScope = FlushPending | FlushQueued | FlushAll deriving (Read, Eq, Show)
 
 instance Format TxRejection where
   format (NonceTooLow stage queue actual o@OutputTx {otHash = hash}) =
@@ -170,6 +174,13 @@ instance Format TxRejection where
       ++ format hash
       ++ "\n"
       ++ format o
+  format (AdminFlushed stage queue scope o@OutputTx {otHash = hash}) =
+    "AdminFlushed at stage " ++ show stage ++ " in queue " ++ show queue
+      ++ " with scope " ++ show scope
+      ++ "\n\ttx hash "
+      ++ format hash
+      ++ "\n"
+      ++ format o
 
 txRejectionToAPIFailureCause :: TxRejection -> TransactionResultStatus
 txRejectionToAPIFailureCause (NonceTooLow stage queue needed tx) =
@@ -190,6 +201,8 @@ txRejectionToAPIFailureCause (GasLimitExceeded stage queue actual limit _) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.GasLimitError (Just limit) (Just actual) (Just $ "The transaction takes " ++ show actual ++ " gas but the limit is " ++ show limit)
 txRejectionToAPIFailureCause (KnownFailedTX stage queue t) =
   Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.KnownFailedTXError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " is known to fail")
+txRejectionToAPIFailureCause (AdminFlushed stage queue scope t) =
+  Failure (show stage) (Just $ show queue) Blockchain.Data.TransactionResultStatus.AdminFlushedError Nothing Nothing (Just $ "The transaction " ++ show (otHash t) ++ " was administratively flushed from mempool with scope " ++ show scope)
 
 tfToBaggerTxRejection :: TransactionFailureCause -> TxRejection
 tfToBaggerTxRejection (TFInsufficientFunds cost balance tx) = BalanceTooLow Execution Queued cost balance tx

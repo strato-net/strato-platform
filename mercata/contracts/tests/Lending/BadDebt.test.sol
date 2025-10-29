@@ -104,11 +104,16 @@ contract Describe_BadDebt_Basic is Authorizable {
     }
 
     function it_ae_can_whitelist_tokens() public {
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.liquidityPool()));
-        Token(mUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.liquidityPool()));
+        AdminRegistry adminRegistry = m.adminRegistry();
 
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "mint", address(m.safetyModule()));
-        Token(sUSDST).addWhitelist(address(m.adminRegistry()), "burn", address(m.safetyModule()));
+        // Option A: Use castVoteOnIssue
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "mint", address(m.liquidityPool()));
+        adminRegistry.castVoteOnIssue(address(adminRegistry), "addWhitelist", address(mUSDST), "burn", address(m.liquidityPool()));
+
+        // Option B: Use addWhitelist directly, since it's external;
+        // this results in a castVoteOnIssue call via the onlyOwner modifier
+        adminRegistry.addWhitelist(address(sUSDST), "mint", address(m.safetyModule()));
+        adminRegistry.addWhitelist(address(sUSDST), "burn", address(m.safetyModule()));
     }
 
     // Test complete lending pool configuration with full setup
@@ -420,7 +425,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         IERC20(USDST).approve(address(m.liquidityPool()), 1000e18);
 
         // Perform Liquidation
-        pool.liquidationCallAll(GOLDST, address(user1));
+        pool.liquidationCallAll(GOLDST, address(user1), 1);
         require(
             pool.getHealthFactor(address(user1)) == INFINITY,
             "Health factor should be inf after liquidation, not " + string(pool.getHealthFactor(address(user1)))
@@ -485,7 +490,7 @@ contract Describe_BadDebt_Basic is Authorizable {
         // Liquidate
         Token(USDST).mint(address(this), amountBorrowed); // enough to cover the debt
         IERC20(USDST).approve(address(m.liquidityPool()), INFINITY);
-        pool.liquidationCallAll(GOLDST, address(user));
+        pool.liquidationCallAll(GOLDST, address(user), 1);
 
         require(pool.badDebt() > 0, "Bad debt should be > 0 after liquidation");
 

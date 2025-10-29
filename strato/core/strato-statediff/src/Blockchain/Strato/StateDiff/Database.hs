@@ -31,7 +31,7 @@ import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf8)
 import Database.Persist hiding (Update, get)
 import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
-import SolidVM.Model.Storable (storageValueByteStringToText)
+import SolidVM.Model.Storable (StoragePath, BasicValue)
 import UnliftIO
 
 type SqlDbM m = SQL.SqlPersistT m
@@ -49,7 +49,8 @@ createAccount ::
   [(Address, AccountDiff 'Eventual)] ->
   SQL.SqlPersistT m ()
 createAccount blockNumber accountDiffs =
-  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
+  tryCreates
+--  catch tryCreates $ \(e :: SomeException) -> $logErrorS "commitSqlDiffs/createAccount" . T.pack $ "Failed to create account: " ++ show e
   where
     tryCreates = do
       let newAccounts = map (uncurry addrRef) accountDiffs
@@ -63,7 +64,7 @@ createAccount blockNumber accountDiffs =
             EVMDiff _ -> return []
             SolidVMDiff m ->
               return
-                [ Storage addrID (decodeUtf8 k) (storageValueByteStringToText v)
+                [ Storage addrID k v
                   | (k, Value v) <- Map.toList m
                 ]
 
@@ -150,22 +151,20 @@ updateAccount blockNumber account diff = do
 commitSolidStorage ::
   MonadIO m =>
   SQL.Key AddressStateRef ->
-  BS.ByteString ->
-  Diff BS.ByteString 'Incremental ->
+  StoragePath ->
+  Diff BasicValue 'Incremental ->
   SqlDbM m ()
 commitSolidStorage addrID key v =
-  let key' = decodeUtf8 key
-   in case v of
-        Create {newValue} -> SQL.insert_ $ Storage addrID key' (storageValueByteStringToText newValue)
-        Delete {} -> do
-          mStorageID <- getStorageKeySQL addrID key'
-          for_ mStorageID SQL.delete
-        Update {newValue} -> do
-          let newValue' = storageValueByteStringToText newValue
-          mStorageID <- getStorageKeySQL addrID key'
-          case mStorageID of
-            Nothing -> SQL.insert_ $ Storage addrID key' newValue'
-            Just storageID -> SQL.update storageID [StorageValue =. newValue']
+  case v of
+    Create {newValue} -> SQL.insert_ $ Storage addrID key newValue
+    Delete {} -> do
+      mStorageID <- getStorageKeySQL addrID key
+      for_ mStorageID SQL.delete
+    Update {newValue} -> do
+      mStorageID <- getStorageKeySQL addrID key
+      case mStorageID of
+        Nothing -> SQL.insert_ $ Storage addrID key newValue
+        Just storageID -> SQL.update storageID [StorageValue =. newValue]
 
 getAddressStateSQL ::
   MonadIO m =>
@@ -181,7 +180,7 @@ getAddressStateSQL addr' = do
 getStorageKeySQL ::
   MonadIO m =>
   SQL.Key AddressStateRef ->
-  T.Text ->
+  StoragePath ->
   SqlDbM m (Maybe (SQL.Key Storage))
 getStorageKeySQL addrID storageKey' = do
   storageIDs <-

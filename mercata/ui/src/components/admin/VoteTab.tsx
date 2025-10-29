@@ -94,6 +94,7 @@ const VoteTab = () => {
   const issues: any[] = (openIssues && openIssues['issues']) || [];
   const votes: any[] = (openIssues && openIssues['votes']) || [];
   const thresholds: any[] = (openIssues && openIssues['thresholds']) || [];
+  const globalThreshold: number = (openIssues && openIssues['globalThreshold']) || 6000;
   const executed: object[] = (openIssues && openIssues['executed']) || [];
   const JSONBigNative = JSONBig({ useNativeBigInt: true });
 
@@ -118,7 +119,8 @@ const VoteTab = () => {
             <Button
               size="sm"
               onClick={() => setRemoveAdminOpen(true)}
-              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={admins.length <= 1}
+              className="bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Remove Admin
             </Button>
@@ -211,7 +213,7 @@ const VoteTab = () => {
                     const issueId = issue.issueId;
                     const address = issue.target;
                     const issueArgs = JSONBigNative.parse(issue.args);
-                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || 6666)/100;
+                    const threshold = (thresholds.find((v) => v.target === address && v.func === issue.func)?.threshold || globalThreshold)/100;
                     const votesNeeded = Math.ceil((admins.length * threshold)/100);
                     const hasUserVoted = votes.some((v) => v.issueId === issueId && v.voter === userAddress);
 

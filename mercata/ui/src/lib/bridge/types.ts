@@ -28,8 +28,7 @@ export type BridgeContextType = {
   // Navigation state for bridge transactions
   targetTransactionTab: BridgeTransactionTab | null;
   setTargetTransactionTab: (tab: BridgeTransactionTab | null) => void;
-  bridgeOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
-  redeemOut: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
+  requestWithdrawal: (params: WithdrawalRequestParams) => Promise<BridgeResponse>;
   useBalance: (tokenAddress: string | null) => {
     data: { 
       balance: string; 

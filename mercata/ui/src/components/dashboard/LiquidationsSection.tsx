@@ -6,6 +6,7 @@ import LiquidateModal from "./LiquidateModal";
 import { CollateralData } from "@/interface";
 import TokenDisplay from "@/components/ui/TokenDisplay";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Table,
   TableBody,
@@ -14,7 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, PauseCircle } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 const shorten = (addr: string) => addr.slice(0, 6) + "..." + addr.slice(-4);
 const weiToEther = (v?: string) => {
@@ -164,17 +165,29 @@ const LiquidationsSection: React.FC = () => {
                                 />
                                 <span className="font-medium text-sm">{c.symbol || "UNKNOWN"}</span>
                               </div>
-                              <Button 
-                                size="sm" 
-                                variant="destructive" 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openModal(ln, c);
-                                }}
-                                disabled={isOwnLoan(ln)}
-                              >
-                                Liquidate
-                              </Button>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        openModal(ln, c);
+                                      }}
+                                      disabled={isOwnLoan(ln) || c.isPaused}
+                                    >
+                                      {c.isPaused && <PauseCircle className="h-4 w-4 mr-1" />}
+                                      Liquidate
+                                    </Button>
+                                  </span>
+                                </TooltipTrigger>
+                                {c.isPaused && (
+                                  <TooltipContent className="bg-amber-50 border-amber-300 text-amber-900">
+                                    <p>Lending Pool is on pause. Action currently disabled.</p>
+                                  </TooltipContent>
+                                )}
+                              </Tooltip>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-sm">
                               <div>
@@ -236,17 +249,29 @@ const LiquidationsSection: React.FC = () => {
                                   </span>
                                 </TableCell>
                                 <TableCell>
-                                  <Button 
-                                    size="sm" 
-                                    variant="destructive" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openModal(ln, c);
-                                    }}
-                                    disabled={isOwnLoan(ln)}
-                                  >
-                                    Liquidate
-                                  </Button>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span>
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openModal(ln, c);
+                                          }}
+                                          disabled={isOwnLoan(ln) || c.isPaused}
+                                        >
+                                          {c.isPaused && <PauseCircle className="h-4 w-4 mr-1" />}
+                                          Liquidate
+                                        </Button>
+                                      </span>
+                                    </TooltipTrigger>
+                                    {c.isPaused && (
+                                      <TooltipContent className="bg-amber-50 border-amber-300 text-amber-900">
+                                        <p>Lending Pool is on pause. Action currently disabled.</p>
+                                      </TooltipContent>
+                                    )}
+                                  </Tooltip>
                                 </TableCell>
                               </TableRow>
                             );

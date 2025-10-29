@@ -23,6 +23,7 @@ library:
       - common-log
       - containers
       - crypto-api
+      - data-default
       - directory
       - file-embed
       - filepath
@@ -39,10 +40,11 @@ library:
       - merkle-patricia-db
       - strato-model
       - text
-      - raw-strings-qq
+      - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
       - lens
+      - template-haskell
       - vm-tools
 
 tests:

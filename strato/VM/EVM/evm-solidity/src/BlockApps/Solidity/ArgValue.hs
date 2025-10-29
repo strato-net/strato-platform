@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module BlockApps.Solidity.ArgValue where
 
@@ -8,6 +9,7 @@ import BlockApps.Solidity.TypeDefs
 import BlockApps.Solidity.Value
 
 import Blockchain.Strato.Model.Address
+import Control.Applicative ((<|>))
 import Control.Lens ((&), (?~))
 import Control.Monad
 import qualified Data.Aeson as A
@@ -73,13 +75,20 @@ instance ToSchema ArgValue where
           & example ?~ A.toJSON (ArgInt 5)
 
 --Used to coerce the solidity type from the argument values, without having the actual contract type info
-argValueToType :: ArgValue -> Type
-argValueToType (ArgInt _) = SimpleType typeInt
-argValueToType (ArgBool _) = SimpleType TypeBool
-argValueToType (ArgString _) = SimpleType TypeString
-argValueToType (ArgDecimal _) = SimpleType TypeDecimal
-argValueToType (ArgArray v) = TypeArrayDynamic $ argValueToType $ V.head v
-argValueToType (ArgObject _) = TypeStruct ""
+argValueToType :: ArgValue -> (Type, ArgValue)
+argValueToType v@(ArgInt _) = (SimpleType typeInt, v)
+argValueToType v@(ArgBool _) = (SimpleType TypeBool, v)
+argValueToType v@(ArgString s') = maybe (SimpleType TypeString, v) id $
+  let s = Text.unpack s'
+   in case s of
+        '0':'x':_ -> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
+                 <|> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
+        '"':_     -> ((SimpleType TypeString,) . ArgString . Text.pack <$> ((readMaybe s) :: Maybe String))
+        _         -> ((SimpleType typeInt,) . ArgInt <$> ((readMaybe s) :: Maybe Integer))
+                 <|> ((SimpleType TypeAddress, v) <$ ((readMaybe s) :: Maybe Address))
+argValueToType v@(ArgDecimal _) = (SimpleType TypeDecimal, v)
+argValueToType v@(ArgArray vs) = (TypeArrayDynamic $ fst $ argValueToType $ V.head vs, v)
+argValueToType v@(ArgObject _) = (TypeStruct "", v)
 
 isSimple :: Type -> Bool
 isSimple (SimpleType _) = True
@@ -106,8 +115,8 @@ argValueToValue defs theType argVal = case theType of
         mp <-
           mapM
             ( \v -> do
-                let inferredType = argValueToType v
-                    value = argValueToValue defs inferredType v
+                let (inferredType, v') = argValueToType v
+                    value = argValueToValue defs inferredType v'
                 return value
             )
             hm
@@ -146,8 +155,8 @@ argValueToValue defs theType argVal = case theType of
         mp <-
           mapM
             ( \v -> do
-                let inferredType = argValueToType v
-                    value = argValueToValue defs inferredType v
+                let (inferredType, v') = argValueToType v
+                    value = argValueToValue defs inferredType v'
                 return value
             )
             hm
@@ -161,19 +170,19 @@ argValueToValue defs theType argVal = case theType of
         listOfVals <-
           mapM
             ( \v -> do
-                let inferredType = argValueToType v
-                    value = argValueToValue defs inferredType v
+                let (inferredType, v') = argValueToType v
+                    value = argValueToValue defs inferredType v'
                 case value of
-                  Right v' -> return v'
+                  Right v'' -> return v''
                   _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
             )
             $ V.toList xs
         Right $ ValueVariadic listOfVals
       v -> do
-        let inferredType = argValueToType v
-            value = argValueToValue defs inferredType v
+        let (inferredType, v') = argValueToType v
+            value = argValueToValue defs inferredType v'
         case value of
-          Right v' -> return v'
+          Right v'' -> return v''
           _ -> Left $ "argValueToValue: Could not parse array into a Variadic"
 
 argValueToSimpleValue :: SimpleType -> ArgValue -> Either Text SimpleValue
@@ -190,13 +199,8 @@ argValueToSimpleValue theType argVal = case theType of
       ValueAddress <$> case stringAddress (Text.unpack str) of
         Nothing -> Left $ "argValueToSimpleValue: provided argument '" <> str <> "' is not a valid address"
         Just x -> return x
-    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string, but got " ++ show o
-  TypeAccount -> case argVal of
-    ArgString str ->
-      ValueAccount <$> case readMaybe (Text.unpack str) of
-        Nothing -> Left $ "argValueToSimpleValue: could not decode as account: " <> str
-        Just x -> return x
-    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAccount to be a string, but got " ++ show o
+    ArgInt i -> Right . ValueAddress $ fromIntegral i
+    o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeAddress to be a string or an integer, but got " ++ show o
   TypeString -> case argVal of
     ArgString str -> return $ ValueString str
     o -> Left . Text.pack $ "argValueToSimpleValue: Expected TypeString to be a string, but got " ++ show o

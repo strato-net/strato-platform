@@ -1,661 +1,853 @@
-/*  ─────────────────────────────────────────────────────────────────────────
-    MercataBridge  –  STRATO <-> External EVM value tunnel
-    ------------------------------------------------------------------------
-    TRUST MODEL
-      • Funds on external chain live in a multisig wallet.
-      • A single on-chain contract on STRATO books mint / burn of wrapped
-        tokens; it does *not* verify Ethereum state – that’s the relayer’s job.
-      • The off-chain Relayer is accountable via `onlyRelayer` and on-chain
-        replay-protection keys.
-
-    GUARANTEES
-      • Canonical supply integrity (mint only once per depositKey).
-      • Escrow of tokens on withdrawal until tx executed on Custody wallet
-      • Deterministic abort path so users are never stuck forever.
-      • Owner can pause *in* or *out* legs independently.
-
-    NON-GOALS
-      • Light-client verification, trustless bridge, fast-finality.
-      • Multi–asset rotation (one factory-verified token list is enough).
-    ───────────────────────────────────────────────────────────────────────── */
-
 import "../../abstract/ERC20/access/Ownable.sol";
 import "../../abstract/ERC20/IERC20.sol";
+import "../../abstract/ERC20/utils/StringUtils.sol";
 import "../Tokens/TokenFactory.sol";
 import "../Tokens/Token.sol";
+import "../Admin/AdminRegistry.sol";
+import "../../libraries/Bridge/BridgeTypes.sol";
 
-/* ───────────────────────────────────────────────────────────────────────── */
+/**
+ * @title MercataBridge
+ * @dev Complete bridge system for STRATO <-> External EVM value tunnel
+ * @notice Manages deposit and withdrawal workflows with decimal conversion
+ * @notice Implements the core logic for cross-chain token bridging
+ * @notice Supports multiple external chains and token configurations
+ */
 contract record MercataBridge is Ownable {
-    // ============ Permission Constants ============
-    // Permission system uses bitwise flags for token operations
-    uint8 public PERMISSION_WRAP = 1;   // 0b01 - permission to wrap original token
-    uint8 public PERMISSION_MINT = 2;   // 0b10 - permission to mint USDST
-    uint8 public PERMISSION_MASK = 3;   // 0b11 - maximum valid permission value (both wrap and mint)
+    /// @notice Enables BridgeTypes library functions for all types
+    /// @dev Allows direct access to BridgeTypes utility functions without explicit library calls
+    using BridgeTypes for *;
+    using StringUtils for string;
 
-    function _has(uint8 perms, uint8 flag) private pure returns (bool) {
-        return (perms & flag) != 0;
-    }
-/* --------------------------------------------------------------------- */
-/*                            ─  ENUMS  ─                               */
-/* --------------------------------------------------------------------- */
-/* One shared enum keeps byte-code small.  The same values are reused
-   for deposits and withdrawals.                                         */
-    enum BridgeStatus {
-        NONE,         // default (mapping unset)
-        INITIATED,    // deposit  : relayer observed external tx
-                      // withdrawal: user escrowed tokens
-        PENDING_REVIEW, // deposit: verification failed, needs review
-                      // withdrawal: custody tx proposed, waiting for review
-        COMPLETED,    // flow fully executed
-        ABORTED       // user/relayer reclaimed escrow
-    }
+    /* ===================================================================== */
+    /*                                EVENTS                                 */
+    /* ===================================================================== */
 
-/* --------------------------------------------------------------------- */
-/*                          ─  DATA STRUCTS ─                           */
-/* --------------------------------------------------------------------- */
-    struct DepositInfo {
-        address stratoToken;       // STRATO token to mint
-        address stratoRecipient;   // STRATO recipient
-        uint256 stratoTokenAmount; // STRATO token amount to mint
-        address externalSender;    // External chain sender
-        BridgeStatus bridgeStatus; // NONE / INITIATED / COMPLETED / ABORTED
-        bool mintUSDST;            // true if minting USDST, false if minting original token (e.g. USDC)
-        uint256 timestamp;         // timestamp of the deposit
-    }
+    // ───────────── Admin related events ─────────────
+    /// @notice Emitted when pause states are toggled for deposits and withdrawals
+    event PauseToggled(bool depositsPaused, bool withdrawalsPaused);
+    
+    /// @notice Emitted when the token factory address is updated
+    event TokenFactoryUpdated(address newFactory, address oldFactory);
+    
+    /// @notice Emitted when the USDST address is updated
+    event USDSTAddressUpdated(address newAddress, address oldAddress);
+    
+    /// @notice Emitted when a chain's enabled state is toggled
+    event ChainToggled(bool enabled, uint256 externalChainId);
+    
+    /// @notice Emitted when an asset's enabled state is toggled
+    event AssetToggled(bool enabled, uint256 externalChainId, address externalToken);
 
-    struct WithdrawalInfo {
-        uint256 externalChainId;   // Chain where Custody resides
-        address externalRecipient; // External recipient address
-        address stratoToken;       // Token to burn
-        uint256 stratoTokenAmount; // Escrowed amount of stratoToken
-        address stratoSender;      // STRATO sender
-        BridgeStatus bridgeStatus; // NONE / INITIATED / PENDING_REVIEW / ...
-        bool mintUSDST;           // true = burn USDST, false = unwrap token
-        uint256 timestamp;        // timestamp of the withdrawal
-        uint256 requestedAt;      // timestamp of the withdrawal request (for abort accuracy)
-    }
+    // ───────────── Deposit & withdrawal related events ─────────────
+    /// @notice Emitted when a deposit is aborted by the owner
+    event DepositAborted(uint256 srcChainId, string srcTxHash);
+    
+    /// @notice Emitted when a deposit is completed and tokens are minted
+    event DepositCompleted(uint256 srcChainId, string srcTxHash);
+    
+    /// @notice Emitted when a deposit is initiated
+    /// @param externalChainId The external chain identifier where the deposit occurred
+    /// @param externalSender The address that sent the transaction on the external chain
+    /// @param externalTxHash The transaction hash on the external chain
+    /// @param stratoRecipient The STRATO address to receive the minted tokens
+    /// @param stratoToken The STRATO token address that will be minted
+    /// @param stratoTokenAmount The amount of STRATO tokens to be minted
+    event DepositInitiated(uint256 externalChainId, address externalSender, string externalTxHash, address stratoRecipient, address stratoToken, uint256 stratoTokenAmount);
+    
+    /// @notice Emitted when a deposit requires manual review
+    event DepositPendingReview(uint256 srcChainId, string srcTxHash);
+    
+    /// @notice Emitted when a withdrawal is aborted and funds are refunded
+    event WithdrawalAborted(uint256 withdrawalId);
+    
+    /// @notice Emitted when a withdrawal is completed and tokens are burned
+    event WithdrawalCompleted(uint256 withdrawalId);
+    
+    /// @notice Emitted when a withdrawal is pending custody transaction
+    event WithdrawalPending(string custodyTxHash, uint256 withdrawalId);
+    
+    /// @notice Emitted when a user requests a withdrawal
+    /// @param dest The external recipient address on the destination chain
+    /// @param destChainId The external chain identifier where tokens should be sent
+    /// @param externalTokenAmount The amount of external tokens to be sent
+    /// @param stratoTokenAmount The amount of STRATO tokens escrowed
+    /// @param token The STRATO token address that was escrowed
+    /// @param user The address that requested the withdrawal
+    /// @param withdrawalId The unique withdrawal identifier
+    event WithdrawalRequested(address dest, uint256 destChainId, uint256 externalTokenAmount, uint256 stratoTokenAmount, address token, address user, uint256 withdrawalId);
 
-/* --------------------------------------------------------------------- */
-/*                         ─  STORAGE  STATE ─                           */
-/* --------------------------------------------------------------------- */
-    /* Deposit replay-protection: key = (externalChainId, externalTxHash) */
-    mapping(uint256 => mapping(string => DepositInfo)) public record deposits;
+    // ───────────── Registry related events ─────────────
+    /// @notice Emitted when chain configuration is updated
+    event ChainUpdated(string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router);
+    
+    /// @notice Emitted when the last processed block is updated for a chain
+    event LastProcessedBlockUpdated(uint256 externalChainId, uint256 lastProcessedBlock);
+    
+    /// @notice Emitted during emergency block rollback operations
+    event EmergencyBlockRollback(uint256 externalChainId, uint256 lastProcessedBlock);
+    
+    /// @notice Emitted when asset configuration is updated for a chain
+    /// @param enabled Whether the asset is enabled for bridge operations
+    /// @param externalChainId The external chain identifier
+    /// @param externalDecimals The number of decimals for the external token
+    /// @param externalName The name of the external token
+    /// @param externalSymbol The symbol of the external token
+    /// @param externalToken The address of the external token contract
+    /// @param maxPerWithdrawal Maximum amount per withdrawal (0 = unlimited)
+    /// @param stratoToken The corresponding STRATO token address
+    event AssetUpdated(bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken);
 
-    /* Withdrawal key */
-    mapping(uint256 => WithdrawalInfo) public record withdrawals;
-    uint256 public withdrawalCounter;       // auto-increment id
+    /* ===================================================================== */
+    /*                            STATE VARIABLES                            */
+    /* ===================================================================== */
+    // ───────────── Admin related state variables ─────────────
+    /// @notice Standard decimal places for STRATO tokens
+    /// @dev Default: 18 decimals for all STRATO tokens
+    /// @dev Used for decimal conversion between external tokens and STRATO tokens
+    uint256 public DECIMAL_PLACES = 18;
 
-    /* ─── chain & asset registries (on-chain catalogue) ───────────── */
-    struct ChainInfo {
-        address custody;            // custody on that chain
-        address depositRouter;      // contract users interact with on L1/L2
-        uint256 lastProcessedBlock; // last processed block on the chain for polling
-        bool    enabled;            // quick toggle
-        string  chainName;
-    }
-
-    struct AssetInfo {
-        address externalToken;    // token address on external chain
-        uint256 externalDecimals; // decimals of externalToken
-        uint256 externalChainId;  // back-pointer to ChainInfo
-        string  externalName;     // external token name
-        string  externalSymbol;   // external token symbol
-        uint256 maxPerTx;         // hard ceiling; 0 means "unlimited"
-        uint8   permissions;      // bitmask: WRAP/MINT, 0 = disabled
-    }
-
-    mapping(uint256 => ChainInfo) public record chains;   
-    mapping(address => mapping(uint256 => AssetInfo)) public record assets;   
-
-    /* ─────────────────────────────── */
-
-    TokenFactory public tokenFactory;  // single source of "active token" truth
-    address      public relayer;       // off-chain orchestrator account
-
-    bool public depositsPaused;        // independent circuit breakers
+    /// @notice Circuit breaker for deposit operations
+    /// @dev When true, all deposit operations are paused
+    bool public depositsPaused;
+    
+    /// @notice Token factory contract for creating new STRATO tokens
+    /// @dev Single source of truth for active token creation
+    address public tokenFactory;
+    
+    /// @notice USDST token address for cross-chain minting/redeeming
+    /// @dev Default USDST address: 0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010
+    address public USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+    
+    /// @notice Circuit breaker for withdrawal operations
+    /// @dev When true, all withdrawal operations are paused
     bool public withdrawalsPaused;
-
-    /* Users may abort a stuck withdrawal after 48 h                     */
+    
+    /// @notice Time delay before users can abort stuck withdrawals
+    /// @dev Default: 172800 seconds (48 hours)
     uint256 public WITHDRAWAL_ABORT_DELAY = 172800;
 
-    /* USDST token address for cross-chain minting/redeeming */
-    address public USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+    // ───────────── Deposit & withdrawal related state variables ─────────────
+    /// @notice Registry of deposit transactions with replay protection
+    /// @dev Maps external chain ID and transaction hash to deposit information
+    /// @dev Key: (externalChainId, externalTxHash) -> Value: DepositInfo struct
+    /// @dev Prevents duplicate processing of the same external transaction
+    /// @dev Stores deposit state and conversion information
+    mapping(uint256 => mapping(string => DepositInfo)) public record deposits;
 
-/* --------------------------------------------------------------------- */
-/*                               EVENTS                                  */
-/* --------------------------------------------------------------------- */
-    /*  DEPOSIT FLOW  */
-    event DepositInitiated(   // relayer observed ETH tx
-        uint256 indexed externalChainId,
-        string  externalTxHash,
-        address stratoToken,
-        uint256 stratoTokenAmount,
-        address indexed stratoRecipient,
-        address externalSender,
-        bool mintUSDST
-    );
-    event DepositCompleted(uint256 indexed srcChainId, string srcTxHash);   // wrapped tokens minted
-    event DepositPendingReview(uint256 indexed srcChainId, string srcTxHash);   // verification failed, needs review
+    /// @notice Registry of withdrawal requests by withdrawal ID
+    /// @dev Maps withdrawal ID to withdrawal information
+    /// @dev Key: withdrawalId (uint256) -> Value: WithdrawalInfo struct
+    mapping(uint256 => WithdrawalInfo) public record withdrawals;
+    
+    /// @notice Auto-incrementing counter for withdrawal IDs
+    /// @dev Ensures unique withdrawal identifiers for each request
+    uint256 public withdrawalCounter;
 
-    /*  WITHDRAWAL FLOW  */
-    event WithdrawalRequested(  // user locked tokens in bridge
-        uint256 indexed withdrawalId,
-        uint256 indexed destChainId,
-        address token,
-        uint256 amount,
-        address indexed user,
-        address dest,
-        bool mint
-    );
-    event WithdrawalPending(uint256 indexed withdrawalId, string custodyTxHash);
-    event WithdrawalCompleted  (uint256 indexed withdrawalId, string custodyTxHash);
-    event WithdrawalAborted    (uint256 indexed withdrawalId);
+    // ───────────── Registry related state variables ─────────────
+    /// @notice Registry of external chains and their configuration
+    /// @dev Maps external chain ID to chain information including custody, router, and processing state
+    /// @dev Key: externalChainId (uint256) -> Value: ChainInfo struct
+    mapping(uint256 => ChainInfo) public record chains;
+    
+    /// @notice Registry of assets for each external chain
+    /// @dev Maps external token address and chain ID to asset configuration
+    /// @dev Key: (externalToken address, externalChainId) -> Value: AssetInfo struct
+    /// @dev Used to configure token mappings between external chains and STRATO
+    /// @dev Includes decimal conversion information for each token pair
+    mapping(address => mapping(uint256 => AssetInfo)) public record assets;
 
-    /*  ADMIN  */
-    event RelayerUpdated   (address indexed oldRelayer, address indexed newRelayer);
-    event TokenFactoryUpdated(address indexed oldFactory, address indexed newFactory);
-    event PauseToggled     (bool depositsPaused, bool withdrawalsPaused);
-    event ChainUpdated(uint256 indexed externalChainId, address custody, address router, uint256 lastProcessedBlock, bool enabled, string chainName);
-    event AssetUpdated(address indexed stratoToken, uint256 externalChainId, address externalToken, uint256 externalDecimals, string externalName, string externalSymbol, uint256 maxPerTx, uint8 permissions);
-    event LastProcessedBlockUpdated(uint256 indexed externalChainId, uint256 lastProcessedBlock);
-    event USDSTAddressUpdated(address indexed oldAddress, address indexed newAddress);
 
-/* --------------------------------------------------------------------- */
-/*                           ─  MODIFIERS  ─                             */
-/* --------------------------------------------------------------------- */
-    modifier onlyRelayer() {
-        require(msg.sender == relayer, "MB: relayer only");
-        _;
-    }
+    /* ===================================================================== */
+    /*                            MODIFIERS                                  */
+    /* ===================================================================== */
+    /// @notice Ensures deposits are not paused
+    /// @dev Prevents deposit operations when circuit breaker is active
     modifier whenDepositsOpen() {
         require(!depositsPaused, "MB: deposits paused");
         _;
     }
+
+    /// @notice Ensures withdrawals are not paused
+    /// @dev Prevents withdrawal operations when circuit breaker is active
     modifier whenWithdrawalsOpen() {
         require(!withdrawalsPaused, "MB: withdrawals paused");
         _;
     }
 
-/* --------------------------------------------------------------------- */
-/*                             CONSTRUCTOR                               */
-/* --------------------------------------------------------------------- */
-    constructor(address _owner) Ownable(_owner) { }
+    /* ===================================================================== */
+    /*                            FUNCTIONS                                  */
+    /* ===================================================================== */
+    // ───────────── Constructor related functions ─────────────
+    /**
+     * @dev Initializes the MercataBridge contract with the specified owner
+     * @notice Sets up the bridge system with ownership and access control
+     * @notice This is the main bridge contract that handles all cross-chain operations
+     * @param _owner The address that will be set as the contract owner
+     */
+    constructor(
+        address _owner
+    ) Ownable(_owner) { }
 
-    function initialize(address _tokenFactory, address _relayer) external onlyOwner {
-        // @dev important: must be set here for proxied instances; ensure consistency with desired initial values
-        PERMISSION_WRAP = 1;
-        PERMISSION_MINT = 2;
-        PERMISSION_MASK = 3;
-        WITHDRAWAL_ABORT_DELAY = 172800;
+    /**
+     * @dev Initializes the bridge system with essential configuration
+     * @notice Sets up token factory and default values for the bridge
+     * @notice Must be called after deployment to configure the bridge properly
+     * @notice Configures decimal places, USDST address, and withdrawal timeout
+     * @param _tokenFactory The token factory contract address for creating STRATO tokens
+     */
+    function initialize(
+        address _tokenFactory
+    ) external onlyOwner {
+        DECIMAL_PLACES = 18;
         USDST_ADDRESS = address(0x937efa7e3a77e20bbdbd7c0d32b6514f368c1010);
+        WITHDRAWAL_ABORT_DELAY = 172800;
 
-        require(_tokenFactory!=address(0)&&_relayer!=address(0),"MB: zero");
-        tokenFactory = TokenFactory(_tokenFactory);
-        relayer      = _relayer;
+        require(_tokenFactory != address(0), "MB: zero");
+        tokenFactory = _tokenFactory;
     }
 
-/* ===================================================================== */
-/*                        ADMIN / GUARDIAN ACTIONS                       */
-/* ===================================================================== */
-
-    /* rotate relayer key if compromised */
-    function setRelayer(address newRelayer) external onlyOwner {
-        require(newRelayer!=address(0),"MB: zero");
-        emit RelayerUpdated(relayer, newRelayer);
-        relayer = newRelayer;
+    // ───────────── Admin related functions ─────────────
+    /**
+     * @dev Emergency function to set the last processed block for a chain
+     * @notice Allows rollback of block processing state in emergency situations
+     * @param externalChainId The external chain identifier
+     * @param lastProcessedBlock The block number to set as last processed
+     */
+    function emergencySetLastProcessedBlock(
+        uint256 externalChainId, uint256 lastProcessedBlock
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        ChainInfo chainInfo = chains[externalChainId];
+        require(chainInfo.custody != address(0), "MB: chain missing");
+        
+        chainInfo.lastProcessedBlock = lastProcessedBlock;
+        emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+        emit EmergencyBlockRollback(externalChainId, lastProcessedBlock);
     }
 
-    /* update token factory */
-    function setTokenFactory(address newFactory) external onlyOwner {
-        require(newFactory != address(0), "MB: zero");
-        address old = address(tokenFactory);
-        tokenFactory = TokenFactory(newFactory);
-        emit TokenFactoryUpdated(old, newFactory);
+    /**
+     * @dev Sets asset configuration for a specific external chain
+     * @notice Maps external tokens to their STRATO equivalents with withdrawal limits
+     * @notice Configures decimal conversion between external tokens and STRATO tokens
+     * @param enabled Whether the asset is enabled for bridge operations
+     * @param externalChainId The external chain identifier
+     * @param externalDecimals The number of decimals for the external token (used for conversion)
+     * @param externalName The name of the external token
+     * @param externalSymbol The symbol of the external token
+     * @param externalToken The address of the external token contract
+     * @param maxPerWithdrawal Maximum amount per withdrawal (0 = unlimited)
+     * @param stratoToken The corresponding STRATO token address
+     */
+    function setAsset(
+        bool enabled, uint256 externalChainId, uint256 externalDecimals, string externalName, string externalSymbol, address externalToken, uint256 maxPerWithdrawal, address stratoToken
+    ) external onlyOwner {
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        require(externalName.length > 0, "MB: invalid external name");
+        require(externalSymbol.length > 0, "MB: invalid external symbol");
+        require(stratoToken != address(0), "MB: invalid strato token");
+        require(externalDecimals <= DECIMAL_PLACES, "MB: decimals exceed max");
+        assets[externalToken][externalChainId] = AssetInfo(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
+        emit AssetUpdated(enabled, externalChainId, externalDecimals, externalName, externalSymbol, externalToken, maxPerWithdrawal, stratoToken);
     }
-    /* independent pause toggles */
+
+    /**
+     * @dev Updates asset metadata (name and symbol) for an existing asset
+     * @notice Only the owner can update asset metadata for existing assets
+     * @notice Allows updating token display information without recreating the asset
+     * @notice Validates that the asset exists before updating metadata
+     * @param externalChainId The external chain identifier where the asset is configured
+     * @param externalName The new name of the external token
+     * @param externalSymbol The new symbol of the external token
+     * @param externalToken The external token address to update
+     */
+    function setAssetMetadata(
+        uint256 externalChainId, string externalName, string externalSymbol, address externalToken
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(externalName.length > 0, "MB: invalid external name");
+        require(externalSymbol.length > 0, "MB: invalid external symbol");
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        AssetInfo assetInfo = assets[externalToken][externalChainId];
+        require(assetInfo.externalToken == externalToken, "MB: asset not found");
+        assetInfo.externalName = externalName;
+        assetInfo.externalSymbol = externalSymbol;
+        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, externalName, externalSymbol, externalToken, assetInfo.maxPerWithdrawal, assetInfo.stratoToken);
+    }
+
+    /**
+     * @dev Sets token withdrawal limits for an existing asset
+     * @notice Only the owner can set withdrawal limits for existing assets
+     * @notice Allows configuring maximum withdrawal amounts for risk management
+     * @notice Setting maxPerWithdrawal to 0 means unlimited withdrawals
+     * @notice Validates that the asset exists before updating limits
+     * @param externalChainId The external chain identifier where the asset is configured
+     * @param externalToken The external token address to update limits for
+     * @param maxPerWithdrawal Maximum amount per withdrawal (0 = unlimited)
+     */
+    function setWithdrawalLimits(
+        uint256 externalChainId, address externalToken, uint256 maxPerWithdrawal
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(chains[externalChainId].custody != address(0), "MB: chain missing");
+        AssetInfo assetInfo = assets[externalToken][externalChainId];
+        require(assetInfo.externalToken == externalToken, "MB: asset not found");
+        assetInfo.maxPerWithdrawal = maxPerWithdrawal;
+        emit AssetUpdated(assetInfo.enabled, externalChainId, assetInfo.externalDecimals, assetInfo.externalName, assetInfo.externalSymbol, externalToken, maxPerWithdrawal, assetInfo.stratoToken);
+    }
+
+    /**
+     * @dev Sets chain configuration for bridge operations
+     * @notice Configures external chain parameters including custody and router addresses
+     * @param chainName The human-readable name of the external chain
+     * @param custody The custody contract address on the external chain
+     * @param enabled Whether the chain is enabled for bridge operations
+     * @param externalChainId The unique identifier for the external chain
+     * @param lastProcessedBlock The last processed block number for this chain
+     * @param router The router contract address for deposits
+     */
+    function setChain(
+        string chainName, address custody, bool enabled, uint256 externalChainId, uint256 lastProcessedBlock, address router
+    ) external onlyOwner {
+        require(chainName.length > 0, "MB: invalid chain name");
+        require(custody != address(0), "MB: zero custody address");
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(router != address(0), "MB: zero router address");
+        chains[externalChainId] = ChainInfo(chainName, custody, router, enabled, lastProcessedBlock);
+        emit ChainUpdated(chainName, custody, enabled, externalChainId, lastProcessedBlock, router);
+    }
+
+    /**
+     * @dev Updates the last processed block for a specific chain
+     * @notice Prevents rollback attacks by ensuring block numbers only increase
+     * @param externalChainId The external chain identifier
+     * @param lastProcessedBlock The new last processed block number
+     */
+    function setLastProcessedBlock(
+        uint256 externalChainId, uint256 lastProcessedBlock
+    ) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        ChainInfo chainInfo = chains[externalChainId];
+        require(chainInfo.custody != address(0), "MB: chain missing");
+        
+        require(lastProcessedBlock >= chainInfo.lastProcessedBlock, "MB: cannot rollback block");
+        
+        chainInfo.lastProcessedBlock = lastProcessedBlock;
+        emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
+    }
+
+    /**
+     * @dev Sets pause states for deposits and withdrawals
+     * @notice Circuit breaker functionality to pause bridge operations
+     * @param _deposits Whether to pause deposit operations
+     * @param _withdrawals Whether to pause withdrawal operations
+     */
     function setPause(bool _deposits, bool _withdrawals) external onlyOwner {
         depositsPaused    = _deposits;
         withdrawalsPaused = _withdrawals;
         emit PauseToggled(_deposits, _withdrawals);
     }
 
-    /* update USDST address */
+    /**
+     * @dev Sets the token factory address
+     * @notice Only the owner can update the token factory address
+     * @param newFactory The new token factory address (must not be zero address)
+     */
+    function setTokenFactory(address newFactory) external onlyOwner {
+        require(newFactory != address(0), "MB: zero");
+        emit TokenFactoryUpdated(newFactory, tokenFactory);
+        tokenFactory = newFactory;
+    }
+
+    /**
+     * @dev Sets the USDST token address
+     * @notice Only the owner can update the USDST address
+     * @param newUSDSTAddress The new USDST token address (must not be zero address)
+     */
     function setUSDSTAddress(address newUSDSTAddress) external onlyOwner {
         require(newUSDSTAddress != address(0), "MB: zero USDST address");
-        address old = USDST_ADDRESS;
+        emit USDSTAddressUpdated(newUSDSTAddress, USDST_ADDRESS);
         USDST_ADDRESS = newUSDSTAddress;
-        emit USDSTAddressUpdated(old, newUSDSTAddress);
     }
-
-    /* hard per-tx cap */
-    function setTokenLimits(address stratoToken, uint256 externalChainId, uint256 maxPerTx)
-        external
-        onlyOwner
-    {
-        require(assets[stratoToken][externalChainId].externalToken != address(0), "MB: asset missing");
-        AssetInfo storage a = assets[stratoToken][externalChainId];
-        a.maxPerTx = maxPerTx;
-        emit AssetUpdated(stratoToken, a.externalChainId, a.externalToken, a.externalDecimals, a.externalName, a.externalSymbol, maxPerTx, a.permissions);
-    }
-
-    function setChain(
-        uint256 externalChainId,
-        address custody,
-        address router,
-        uint256 lastProcessedBlock,
-        bool enabled,
-        string calldata chainName
-    ) external onlyOwner {
-        ChainInfo storage c = chains[externalChainId];
-        c.custody = custody;
-        c.depositRouter = router;
-        c.lastProcessedBlock = lastProcessedBlock;
-        c.enabled = enabled;
-        c.chainName = chainName;
-
-        emit ChainUpdated(externalChainId, custody, router, lastProcessedBlock, enabled, chainName);
-    }
-
-    function setLastProcessedBlock(uint256 externalChainId, uint256 lastProcessedBlock) external onlyRelayer
-    {
-        require(chains[externalChainId].custody != address(0), "MB: chain missing");
-        chains[externalChainId].lastProcessedBlock = lastProcessedBlock;
-        emit LastProcessedBlockUpdated(externalChainId, lastProcessedBlock);
-    }
-
-    function setAsset(
-        address stratoToken,
-        uint256 externalChainId,
-        address externalToken,
-        uint256 externalDecimals,
-        string calldata externalName,
-        string calldata externalSymbol,
-        uint256 maxPerTx,
-        uint8 permissions
-    ) external onlyOwner {
-        require(chains[externalChainId].custody != address(0), "MB: chain missing");
-        require((permissions & PERMISSION_MASK) == permissions, "MB: invalid permissions");
-
-        AssetInfo storage a = assets[stratoToken][externalChainId];
-        a.externalToken    = externalToken;
-        a.externalDecimals = externalDecimals;
-        a.externalChainId  = externalChainId;
-        a.externalName     = externalName;
-        a.externalSymbol   = externalSymbol;
-        a.maxPerTx         = maxPerTx;
-        a.permissions      = permissions;
-
-        emit AssetUpdated(stratoToken, externalChainId, externalToken, externalDecimals, externalName, externalSymbol, maxPerTx, permissions);
-    }
-
-    function setAssetMetadata(
-        address stratoToken,
-        uint256 externalChainId,
-        string calldata externalName,
-        string calldata externalSymbol
-    ) external onlyOwner {
-        require(assets[stratoToken][externalChainId].externalToken != address(0), "MB: asset missing");
-        AssetInfo storage a = assets[stratoToken][externalChainId];
-        a.externalName   = externalName;
-        a.externalSymbol = externalSymbol;
-        emit AssetUpdated(stratoToken, a.externalChainId, a.externalToken, a.externalDecimals, externalName, externalSymbol, a.maxPerTx, a.permissions);
-    }
-
-/* ===================================================================== */
-/*                            DEPOSIT FLOW                               */
-/* ===================================================================== */
 
     /**
-     * Step-1  (relayer) – record that a deposit happened on chain X.
-     *
-     * The relayer must call this only once per `(chainId, txHash)` pair.
-     * We deliberately *do NOT* mint here – off-chain can apply additional
-     * confirmation windows or fraud checks before step-2.
+     * @dev Toggles the enabled state of a chain
+     * @notice Only the owner can enable/disable chains
+     * @param externalChainId The external chain identifier
+     * @param enabled Whether to enable or disable the chain
+     */
+    function toggleChain(uint256 externalChainId, bool enabled) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(chains[externalChainId].custody != address(0), "MB: chain not found");
+        
+        chains[externalChainId].enabled = enabled;
+        emit ChainToggled(enabled, externalChainId);
+    }
+
+    /**
+     * @dev Toggles the enabled state of an asset
+     * @notice Only the owner can enable/disable assets
+     * @param externalToken The external token address
+     * @param externalChainId The external chain identifier
+     * @param enabled Whether to enable or disable the asset
+     */
+    function toggleAsset(address externalToken, uint256 externalChainId, bool enabled) external onlyOwner {
+        require(externalChainId > 0, "MB: invalid chain id");
+        require(assets[externalToken][externalChainId].externalChainId == externalChainId, "MB: asset not found");
+        
+        assets[externalToken][externalChainId].enabled = enabled;
+        emit AssetToggled(enabled, externalChainId, externalToken);
+    }
+
+    // ───────────── Escrow related functions ─────────────
+    /**
+     * @dev Burns tokens from the escrow contract
+     * @param token The token contract address
+     * @param amount The amount of tokens to burn
+     * @return actualAmount The actual amount of tokens burned
+     */
+    function _burnFunds(address token, uint256 amount) internal returns (uint256 actualAmount) {
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        Token(token).burn(address(this), amount);
+        actualAmount = balanceBefore - IERC20(token).balanceOf(address(this));
+        require(actualAmount > 0, "MB: no tokens burned");
+    }
+
+    /**
+     * @dev Escrows tokens from a user to this contract
+     * @param token The token contract address
+     * @param from The address to transfer tokens from
+     * @param amount The amount of tokens to escrow
+     * @return actualAmount The actual amount of tokens escrowed
+     */
+    function _escrowFunds(address token, address from, uint256 amount) internal returns (uint256 actualAmount) {
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        require(IERC20(token).transferFrom(from, address(this), amount), "MB: transfer failed");
+        actualAmount = IERC20(token).balanceOf(address(this)) - balanceBefore;
+        require(actualAmount > 0, "MB: no tokens received");
+    }
+
+    /**
+     * @dev Mints tokens to a recipient address
+     * @param token The token contract address
+     * @param to The address to mint tokens to
+     * @param amount The amount of tokens to mint
+     * @return actualAmount The actual amount of tokens minted
+     */
+    function _mintFunds(address token, address to, uint256 amount) internal returns (uint256 actualAmount) {
+        uint256 balanceBefore = IERC20(token).balanceOf(to);
+        Token(token).mint(to, amount);
+        actualAmount = IERC20(token).balanceOf(to) - balanceBefore;
+        require(actualAmount > 0, "MB: no tokens minted");
+    }
+
+    /**
+     * @dev Refunds tokens from this contract to a recipient
+     * @param token The token contract address
+     * @param to The address to refund tokens to
+     * @param amount The amount of tokens to refund
+     * @return actualAmount The actual amount of tokens refunded
+     */
+    function _refundFunds(address token, address to, uint256 amount) internal returns (uint256 actualAmount) {
+        uint256 balanceBefore = IERC20(token).balanceOf(address(this));
+        require(IERC20(token).transfer(to, amount), "MB: transfer failed");
+        actualAmount = balanceBefore - IERC20(token).balanceOf(address(this));
+        require(actualAmount > 0, "MB: no tokens sent");
+    }
+
+    // ───────────── Deposit & withdrawal related functions ─────────────
+    // ───────────── Deposit flow functions ─────────────
+    /**
+     * @dev Records a deposit transaction from an external chain
+     * @notice Step-1 of the deposit flow - observes external transaction
+     * @notice Creates deposit record but does NOT mint tokens yet
+     * @notice Allows off-chain confirmation windows and fraud checks before step-2
+     * @notice Converts external token amounts to STRATO token amounts using decimal conversion
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalSender The address that sent the transaction on the external chain
+     * @param externalToken The token address on the external chain
+     * @param externalTokenAmount The amount of external tokens to deposit (in external token decimals)
+     * @param externalTxHash The transaction hash on the external chain
+     * @param stratoRecipient The STRATO address to receive the minted tokens
      */
     function deposit(
-        uint256 externalChainId,
-        address externalSender,
-        string  externalTxHash,
-        address stratoToken,
-        uint256 stratoTokenAmount,
-        address stratoRecipient,
-        bool mintUSDST
-    )
-        public
-        onlyRelayer
-        whenDepositsOpen
-    {
-        AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.externalChainId == externalChainId, "MB: wrong chain");
-        require(chains[externalChainId].enabled, "MB: chain off");
-        require(stratoTokenAmount > 0,"MB: zero");
-        uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require(_has(a.permissions, need), "MB: not permitted");
+        uint256 externalChainId, address externalSender, address externalToken, uint256 externalTokenAmount, string externalTxHash, address stratoRecipient
+    ) public onlyOwner whenDepositsOpen {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalSender != address(0), "MB: invalid external sender");
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+        require(stratoRecipient != address(0), "MB: invalid strato recipient");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
 
-        // Allow inactive tokens only when minting USDST and asset has MINT permission
-        require(
-            tokenFactory.isTokenActive(stratoToken) ||
-            (mintUSDST && _has(a.permissions, PERMISSION_MINT)),
-            "MB: inactive token"
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        // This is because SolidVm does not support bytes32
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        require(deposits[externalChainId][normalizedTxHash].bridgeStatus == BridgeStatus.NONE, "MB: duplicate deposit");
+
+        AssetInfo a = assets[externalToken][externalChainId];
+        require(a.enabled, "MB: asset not enabled");
+        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
+
+        // Example: 1e6 USDC * 10^(18-6) = 1e6 * 10^12 = 1e18 USDCST tokens
+        uint256 stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
+
+        deposits[externalChainId][normalizedTxHash] = DepositInfo(
+            BridgeStatus.INITIATED, externalSender, externalToken, block.timestamp, stratoRecipient, a.stratoToken, stratoTokenAmount, block.timestamp
         );
 
-        // replay protection on composite key
-        require(deposits[externalChainId][externalTxHash].bridgeStatus == BridgeStatus.NONE,"MB: dup key");
-
-        deposits[externalChainId][externalTxHash] = DepositInfo(
-            stratoToken,
-            stratoRecipient,
-            stratoTokenAmount,
-            externalSender,
-            BridgeStatus.INITIATED,
-            mintUSDST,
-            block.timestamp
-        );
-
-        emit DepositInitiated(
-            externalChainId, externalTxHash, stratoToken, stratoTokenAmount, stratoRecipient, externalSender, mintUSDST
-        );
+        emit DepositInitiated(externalChainId, externalSender, normalizedTxHash, stratoRecipient, a.stratoToken, stratoTokenAmount);
     }
     
-    // ─────────────────────────── BATCH: deposit ───────────────────────────
+    /**
+     * @dev Records multiple deposit transactions from external chains in a single call
+     * @notice Batch version of deposit function for gas efficiency
+     * @notice All arrays must have the same length and correspond by index
+     * @notice Each deposit follows the same validation rules as individual deposit function
+     * @notice Converts external token amounts to STRATO token amounts using decimal conversion
+     * @param externalChainIds Array of external chain identifiers
+     * @param externalSenders Array of external sender addresses
+     * @param externalTokens Array of external token addresses
+     * @param externalTokenAmounts Array of external token amounts (in external token decimals)
+     * @param externalTxHashes Array of external transaction hashes
+     * @param stratoRecipients Array of STRATO recipient addresses
+     */
     function depositBatch(
-        // out-of-order arguments left for compatibility
-        uint256[] calldata externalChainIds,
-        string[]  calldata externalTxHashes,
-        address[] calldata stratoTokens,
-        uint256[] calldata stratoTokenAmounts,
-        address[] calldata stratoRecipients,
-        address[] calldata externalSenders,
-        bool[] calldata mintUSDSTs
-    )
-        external
-        onlyRelayer
-        whenDepositsOpen
-    {
+        uint256[] externalChainIds, address[] externalSenders, address[] externalTokens, uint256[] externalTokenAmounts, string[] externalTxHashes, address[] stratoRecipients
+    ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(
-            n == externalTxHashes.length   &&
-            n == stratoTokens.length       &&
-            n == stratoTokenAmounts.length &&
-            n == stratoRecipients.length   &&
-            n == externalSenders.length    &&
-            n == mintUSDSTs.length,
-            "MB: len"
-        );
-
+        require(n > 0 && n == externalSenders.length && n == externalTokens.length && n == externalTokenAmounts.length && n == externalTxHashes.length && n == stratoRecipients.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
-            deposit(
-                externalChainIds[i],
-                externalSenders[i],
-                externalTxHashes[i],
-                stratoTokens[i],
-                stratoTokenAmounts[i],
-                stratoRecipients[i],
-                mintUSDSTs[i]
-            );
+            deposit(externalChainIds[i], externalSenders[i], externalTokens[i], externalTokenAmounts[i], externalTxHashes[i], stratoRecipients[i]);
         }
     }
 
     /**
-     * Step-2.1 (relayer) – Verification passed, mint wrapped tokens.
+     * @dev Confirms a deposit and mints wrapped tokens
+     * @notice Step-2.1 of the deposit flow - verification passed, mint wrapped tokens
+     * @notice Only deposits in INITIATED or PENDING_REVIEW status can be confirmed
+     * @notice Mints the corresponding STRATO tokens to the recipient
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The transaction hash on the external chain
      */
-    function confirmDeposit(uint256 externalChainId, string calldata externalTxHash)
-        public
-        onlyRelayer
-        whenDepositsOpen
-    {
-        DepositInfo storage d = deposits[externalChainId][externalTxHash];
-        require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
+    function confirmDeposit(
+        uint256 externalChainId, string externalTxHash
+    ) public onlyOwner whenDepositsOpen {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
 
-        if (d.mintUSDST) {
-            Token(USDST_ADDRESS).mint(d.stratoRecipient, d.stratoTokenAmount);
-        } else {
-            Token(d.stratoToken).mint(d.stratoRecipient, d.stratoTokenAmount);
-        }
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        // This is because SolidVm does not support bytes32
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(d.bridgeStatus == BridgeStatus.INITIATED || d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+
+        uint256 actualMintedAmount = _mintFunds(d.stratoToken, d.stratoRecipient, d.stratoTokenAmount);
+        require(actualMintedAmount > 0, "MB: no tokens minted");
 
         d.bridgeStatus = BridgeStatus.COMPLETED;
-        emit DepositCompleted(externalChainId, externalTxHash);
+        d.timestamp = block.timestamp;
+
+        emit DepositCompleted(externalChainId, normalizedTxHash);
     }
 
-    // ──────────────────────── BATCH: confirmDeposit ────────────────────────
+    /**
+     * @dev Confirms multiple deposits and mints wrapped tokens in a single call
+     * @notice Batch version of confirmDeposit function for gas efficiency
+     * @notice All arrays must have the same length and correspond by index
+     * @notice Each deposit follows the same validation rules as individual confirmDeposit function
+     * @param externalChainIds Array of external chain identifiers
+     * @param externalTxHashes Array of external transaction hashes
+     */
     function confirmDepositBatch(
-        uint256[] calldata externalChainIds,
-        string[]  calldata externalTxHashes
-    )
-        external
-        onlyRelayer
-        whenDepositsOpen
-    {
+        uint256[] externalChainIds, string[] externalTxHashes
+    ) external onlyOwner whenDepositsOpen {   
         uint256 n = externalChainIds.length;
-        require(n == externalTxHashes.length, "MB: len");
-
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
         for (uint256 i = 0; i < n; i++) {
-            confirmDeposit(
-                externalChainIds[i],
-                externalTxHashes[i]
-            );
+            confirmDeposit(externalChainIds[i], externalTxHashes[i]);
         }
     }
 
     /**
-     * Step-2.2 (relayer) – Verification failed, set deposit for manual review
+     * @dev Sets a deposit for manual review when verification fails
+     * @notice Step-2.2 of the deposit flow - verification failed, set deposit for manual review
+     * @notice Only deposits in INITIATED status can be set for review
+     * @notice Owner can later abort or manually confirm reviewed deposits
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The transaction hash on the external chain
      */
-    function reviewDeposit(uint256 externalChainId, string calldata externalTxHash)
-        public
-        onlyRelayer
-        whenDepositsOpen
-    {
-        DepositInfo storage d = deposits[externalChainId][externalTxHash];
+    function reviewDeposit(
+        uint256 externalChainId, string externalTxHash
+    ) public onlyOwner whenDepositsOpen {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        // This is because SolidVm does not support bytes32
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
         require(d.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         d.bridgeStatus = BridgeStatus.PENDING_REVIEW;
-        emit DepositPendingReview(externalChainId, externalTxHash);
+        d.timestamp = block.timestamp;
+
+        emit DepositPendingReview(externalChainId, normalizedTxHash);
     }
 
-    // ──────────────────────── BATCH: reviewDeposit ────────────────────────
+    /**
+     * @dev Sets multiple deposits for manual review when verification fails
+     * @notice Batch version of reviewDeposit function for gas efficiency
+     * @notice All arrays must have the same length and correspond by index
+     * @notice Each deposit follows the same validation rules as individual reviewDeposit function
+     * @param externalChainIds Array of external chain identifiers
+     * @param externalTxHashes Array of external transaction hashes
+     */
     function reviewDepositBatch(
-        uint256[] calldata externalChainIds,
-        string[] calldata externalTxHashes
-    )
-        external
-        onlyRelayer
-        whenDepositsOpen
-    {
+        uint256[] externalChainIds, string[] externalTxHashes
+    ) external onlyOwner whenDepositsOpen {
         uint256 n = externalChainIds.length;
-        require(n == externalTxHashes.length, "MB: len");
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            reviewDeposit(
-                externalChainIds[i],
-                externalTxHashes[i]
-            );
+            reviewDeposit(externalChainIds[i], externalTxHashes[i]);
         }
     }
 
-/* ===================================================================== */
-/*                          WITHDRAWAL FLOW                              */
-/* ===================================================================== */
+    /**
+     * @dev Aborts a deposit that was marked for manual review
+     * @notice Step-2.3 of the deposit flow - cancel a deposit that was marked for review
+     * @notice Only deposits in PENDING_REVIEW status can be aborted
+     * @notice Only the owner can abort deposits, preventing token minting
+     * @param externalChainId The external chain identifier where the deposit occurred
+     * @param externalTxHash The transaction hash on the external chain
+     */
+    function abortDeposit(
+        uint256 externalChainId, string externalTxHash
+    ) public onlyOwner {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
+        require(externalTxHash.length > 0, "MB: invalid external tx hash");
+
+        // Normalize the transaction hash to prevent case-variation replay attacks
+        // This is because SolidVm does not support bytes32
+        string normalizedTxHash = externalTxHash.normalizeHex();
+        DepositInfo d = deposits[externalChainId][normalizedTxHash];
+        require(d.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+
+        d.bridgeStatus = BridgeStatus.ABORTED;
+        d.timestamp = block.timestamp;
+
+        emit DepositAborted(externalChainId, normalizedTxHash);
+    }
 
     /**
-     * Step-1 (user) – move tokens into bridge escrow and create request.
-     * Returns deterministic id  so indexers can
-     * enumerate without extra mappings.
+     * @dev Aborts multiple deposits that were marked for manual review
+     * @notice Batch version of abortDeposit function for gas efficiency
+     * @notice All arrays must have the same length and correspond by index
+     * @notice Each deposit follows the same validation rules as individual abortDeposit function
+     * @param externalChainIds Array of external chain identifiers
+     * @param externalTxHashes Array of external transaction hashes
+     */
+    function abortDepositBatch(
+        uint256[] externalChainIds, string[] externalTxHashes
+    ) external onlyOwner {
+        uint256 n = externalChainIds.length;
+        require(n > 0 && n == externalTxHashes.length, "MB: len");
+
+        for (uint256 i = 0; i < n; i++) {
+            abortDeposit(externalChainIds[i], externalTxHashes[i]);
+        }
+    }
+
+    // ───────────── Withdrawal flow functions ─────────────
+    /**
+     * @dev Initiates a withdrawal request by escrowing tokens and creating a withdrawal record
+     * @notice Step-1 of the withdrawal flow - user moves tokens into bridge escrow and creates request
+     * @notice Returns deterministic withdrawal ID for indexers to enumerate without extra mappings
+     * @notice Tokens are escrowed until the withdrawal is confirmed or aborted
+     * @notice Converts STRATO token amounts to external token amounts using decimal conversion
+     * @notice Any dust from decimal conversion rounding is kept by the user
+     * @param externalChainId The external chain identifier where tokens should be sent
+     * @param externalRecipient The address on the external chain to receive the tokens
+     * @param externalToken The token address on the external chain
+     * @param stratoTokenAmount The amount of STRATO tokens to withdraw (any dust from decimal conversion will be kept by user)
+     * @return id The unique withdrawal identifier
      */
     function requestWithdrawal(
-        uint256 externalChainId,
-        address externalRecipient,
-        address stratoToken,
-        uint256 stratoTokenAmount,
-        bool mintUSDST
-    )
-        external
-        whenWithdrawalsOpen
-        returns (uint256 id)
-    {
-        AssetInfo memory a = assets[stratoToken][externalChainId];
-        require(a.externalChainId == externalChainId, "MB: wrong chain");
-        require(chains[externalChainId].enabled, "MB: chain off");
-        require(stratoTokenAmount > 0,"MB: zero");
-        uint8 need = mintUSDST ? PERMISSION_MINT : PERMISSION_WRAP;
-        require(_has(a.permissions, need), "MB: not permitted");
+        uint256 externalChainId, address externalRecipient, address externalToken, uint256 stratoTokenAmount
+    ) external whenWithdrawalsOpen returns (uint256 id) {
+        require(externalChainId > 0, "MB: invalid external chain id");
+        require(externalRecipient != address(0), "MB: invalid external recipient");
+        require(stratoTokenAmount > 0, "MB: invalid strato token amount");
+        require(chains[externalChainId].enabled, "MB: chain not enabled");
 
-        uint256 cap = a.maxPerTx;
-        require(cap == 0 || stratoTokenAmount<=cap,"MB: per-tx cap");
+        AssetInfo a = assets[externalToken][externalChainId];
+        require(a.enabled, "MB: asset not enabled");
+        require(TokenFactory(tokenFactory).isTokenActive(a.stratoToken), "MB: inactive token");
 
-        // Allow inactive tokens only when minting USDST and asset has MINT permission
-        require(
-            tokenFactory.isTokenActive(stratoToken) ||
-            (mintUSDST && _has(a.permissions, PERMISSION_MINT)),
-            "MB: inactive token"
-        );
+        // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
+        // Round down to the nearest integer
+        uint256 externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(externalTokenAmount > 0, "MB: not enough external tokens");
 
-        /* pull user funds; bridge holds until approval */
-        IERC20(mintUSDST ? USDST_ADDRESS : stratoToken).transferFrom(msg.sender, address(this), stratoTokenAmount);
+        stratoTokenAmount = externalTokenAmount * (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(a.maxPerWithdrawal == 0 || stratoTokenAmount <= a.maxPerWithdrawal, "MB: per-withdrawal cap");
+        stratoTokenAmount = _escrowFunds(a.stratoToken, msg.sender, stratoTokenAmount);
+        require(stratoTokenAmount > 0, "MB: no tokens escrowed");
+
+        // Example: 1e18 USDCST tokens / 10^(18-6) = 1e18 / 10^12 = 1e6 USDC
+        // Round down to the nearest integer
+        externalTokenAmount = stratoTokenAmount / (10 ** (DECIMAL_PLACES - a.externalDecimals));
+        require(externalTokenAmount > 0, "MB: invalid external token amount");
 
         id = ++withdrawalCounter;
 
         withdrawals[id] = WithdrawalInfo(
-            externalChainId,
-            externalRecipient,
-            stratoToken,
-            stratoTokenAmount,
-            msg.sender,
-            BridgeStatus.INITIATED,
-            mintUSDST,
-            block.timestamp,
-            block.timestamp
+            BridgeStatus.INITIATED, "", externalChainId, externalRecipient, externalToken, externalTokenAmount, block.timestamp, msg.sender, a.stratoToken, stratoTokenAmount, block.timestamp
         );
 
-        emit WithdrawalRequested(
-            id, externalChainId, stratoToken, stratoTokenAmount, msg.sender, externalRecipient, mintUSDST
-        );
+        emit WithdrawalRequested(externalRecipient, externalChainId, externalTokenAmount, stratoTokenAmount, a.stratoToken, msg.sender, id);
     }
 
     /**
-     * Step-2 (relayer) – Custody tx has been *created* (but not executed).
-     * We store the hash so UI can show approval progress.
+     * @dev Confirms a withdrawal request and sets it to pending review
+     * @notice Step-2 of the withdrawal flow - custody transaction has been created but not executed
+     * @notice Stores the custody transaction hash so UI can show approval progress
+     * @notice Only withdrawals in INITIATED status can be confirmed
+     * @param id The unique withdrawal identifier
+     * @param custodyTxHash The custody transaction hash on the external chain
      */
-    function confirmWithdrawal(uint256 id, string custodyTxHash)
-        public
-        onlyRelayer
-        whenWithdrawalsOpen
-    {
-        WithdrawalInfo storage w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.INITIATED,"MB: bad state");
+    function confirmWithdrawal(
+        uint256 id, string custodyTxHash
+    ) public onlyOwner whenWithdrawalsOpen {
+        require(id > 0, "MB: invalid withdrawal id");
+        require(custodyTxHash.length > 0, "MB: invalid custody tx hash");
+
+        WithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: bad state");
 
         w.bridgeStatus = BridgeStatus.PENDING_REVIEW;
         w.timestamp = block.timestamp;
-        emit WithdrawalPending(id, custodyTxHash);
+
+        // Normalize the custody tx hash to prevent case-variation replay attacks
+        // This is because SolidVm does not support bytes32
+        string normalizedCustodyTxHash = custodyTxHash.normalizeHex();
+        w.custodyTxHash = normalizedCustodyTxHash;
+
+        emit WithdrawalPending(normalizedCustodyTxHash, id);
     }
 
-    // ─────────────────────── BATCH: confirmWithdrawal ──────────────────────
+    /**
+     * @dev Confirms multiple withdrawal requests and sets them to pending review
+     * @notice Batch version of confirmWithdrawal function for gas efficiency
+     * @notice All arrays must have the same length and correspond by index
+     * @notice Each withdrawal follows the same validation rules as individual confirmWithdrawal function
+     * @param ids Array of unique withdrawal identifiers
+     * @param custodyTxHashes Array of custody transaction hashes on the external chain
+     */
     function confirmWithdrawalBatch(
-        uint256[] calldata ids,
-        string[]  calldata custodyTxHashes
-    )
-        external
-        onlyRelayer
-        whenWithdrawalsOpen
-    {
+        uint256[] ids, string[] custodyTxHashes
+    ) external onlyOwner whenWithdrawalsOpen {
         uint256 n = ids.length;
-        require(n == custodyTxHashes.length, "MB: len");
+        require(n > 0 && n == custodyTxHashes.length, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            confirmWithdrawal(
-                ids[i],
-                custodyTxHashes[i]
-            );
+            confirmWithdrawal(ids[i], custodyTxHashes[i]);
         }
     }
 
     /**
-     * Step-3 (relayer) – Custody tx executed successfully; burn escrow.
+     * @dev Finalizes a withdrawal by burning the escrowed tokens
+     * @notice Step-3 of the withdrawal flow - custody transaction executed successfully, burn escrow
+     * @notice Only withdrawals in PENDING_REVIEW status can be finalized
+     * @notice Burns the corresponding STRATO tokens to complete the withdrawal
+     * @param id The unique withdrawal identifier
      */
-    function finaliseWithdrawal(uint256 id, string custodyTxHash)
-        public
-        onlyRelayer
-        whenWithdrawalsOpen
-    {
-        WithdrawalInfo storage w = withdrawals[id];
-        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW,"MB: bad state");
+    function finaliseWithdrawal(
+        uint256 id
+    ) public onlyOwner whenWithdrawalsOpen {
+        require(id > 0, "MB: invalid withdrawal id");
 
-        if (w.mintUSDST) {
-            Token(USDST_ADDRESS).burn(address(this), w.stratoTokenAmount);
-        } else {
-            Token(w.stratoToken).burn(address(this), w.stratoTokenAmount);
-        }
+        WithdrawalInfo w = withdrawals[id];
+        require(w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: bad state");
+
+        uint256 actualBurnedAmount = _burnFunds(w.stratoToken, w.stratoTokenAmount);
+        require(actualBurnedAmount > 0, "MB: no tokens burned");
 
         w.bridgeStatus = BridgeStatus.COMPLETED;
         w.timestamp = block.timestamp;
-        emit WithdrawalCompleted(id, custodyTxHash);
+
+        emit WithdrawalCompleted(id);
     }
 
-    // ─────────────────────── BATCH: finaliseWithdrawal ─────────────────────
+    /**
+     * @dev Finalizes multiple withdrawals by burning the escrowed tokens
+     * @notice Batch version of finaliseWithdrawal function for gas efficiency
+     * @notice Each withdrawal follows the same validation rules as individual finaliseWithdrawal function
+     * @param ids Array of unique withdrawal identifiers
+     */
     function finaliseWithdrawalBatch(
-        uint256[] calldata ids,
-        string[]  calldata custodyTxHashes
-    )
-        external
-        onlyRelayer
-        whenWithdrawalsOpen
-    {
+        uint256[] ids
+    ) external onlyOwner whenWithdrawalsOpen {
         uint256 n = ids.length;
-        require(n == custodyTxHashes.length, "MB: len");
+        require(n > 0, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
-            finaliseWithdrawal(
-                ids[i],
-                custodyTxHashes[i]
-            );
+            finaliseWithdrawal(ids[i]);
         }
     }
 
     /**
-     * Abort – user (after 48 h) *or* relayer may cancel and refund the escrowed tokens.
-     * Covers the scenario where relayer disappears before confirming.
-     * Does not cover the scenario where Custody tx is waiting to be signed.
+     * @dev Aborts a withdrawal and refunds the escrowed tokens
+     * @notice Step-4 of the withdrawal flow - abort a withdrawal and refund tokens
+     * @notice Admin can abort any withdrawal in INITIATED or PENDING_REVIEW status
+     * @notice User can only abort their own withdrawal in INITIATED status after timeout
+     * @notice Covers the scenario where admin disappears before confirming
+     * @notice Does not cover the scenario where custody transaction is waiting to be signed
+     * @param id The unique withdrawal identifier
      */
-    function abortWithdrawal(uint256 id) public {
-        WithdrawalInfo storage w = withdrawals[id];
+    function abortWithdrawal(
+        uint256 id
+    ) public {
+        require(id > 0, "MB: invalid withdrawal id");
 
-        if (msg.sender == relayer) {
-            /* withdrawal must not be completed */
-            if (w.bridgeStatus == BridgeStatus.ABORTED) {return;} //idempotent 
-            require(
-                w.bridgeStatus == BridgeStatus.INITIATED ||
-                w.bridgeStatus == BridgeStatus.PENDING_REVIEW,
-                "MB: not abortable"
-            );
+        WithdrawalInfo w = withdrawals[id];
+        uint256 currentTimestamp = block.timestamp;
+
+        AdminRegistry admin = AdminRegistry(owner());
+        if (admin.whitelist(address(this), "abortWithdrawal", msg.sender)) {
+            require(w.bridgeStatus == BridgeStatus.INITIATED || w.bridgeStatus == BridgeStatus.PENDING_REVIEW, "MB: not abortable");
         }
         else {
             require(msg.sender == w.stratoSender, "MB: not sender");
-            /* user path - may only abort if withdrawal not confirmed */
-            require(
-                w.bridgeStatus == BridgeStatus.INITIATED,
-                "MB: not abortable"
-            );
-            /* user path – enforce timeout */
-            require(
-                block.timestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY,
-                "MB: wait 48h"
-            );
+            require(w.bridgeStatus == BridgeStatus.INITIATED, "MB: not abortable");
+            require(currentTimestamp >= w.requestedAt + WITHDRAWAL_ABORT_DELAY, "MB: wait 48h");
         }
 
         w.bridgeStatus = BridgeStatus.ABORTED;
-        w.timestamp = block.timestamp;
+        w.timestamp = currentTimestamp;
 
-        if (w.mintUSDST) {
-            IERC20(USDST_ADDRESS).transfer(w.stratoSender, w.stratoTokenAmount);
-        } else {
-            IERC20(w.stratoToken).transfer(w.stratoSender, w.stratoTokenAmount);
-        }
+        uint256 actualRefundedAmount = _refundFunds(w.stratoToken, w.stratoSender, w.stratoTokenAmount);
+        require(actualRefundedAmount > 0, "MB: no tokens refunded");
 
         emit WithdrawalAborted(id);
     }
 
-    function abortWithdrawalBatch(uint256[] calldata ids) external {
+    /**
+     * @dev Aborts multiple withdrawals and refunds the escrowed tokens
+     * @notice Batch version of abortWithdrawal function for gas efficiency
+     * @notice Each withdrawal follows the same validation rules as individual abortWithdrawal function
+     * @param ids Array of unique withdrawal identifiers
+     */
+    function abortWithdrawalBatch(
+        uint256[] ids
+    ) external {
         uint256 n = ids.length;
-        require(n > 0, "MB: empty");
+        require(n > 0, "MB: len");
 
         for (uint256 i = 0; i < n; i++) {
             abortWithdrawal(ids[i]);

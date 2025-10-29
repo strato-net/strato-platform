@@ -27,8 +27,6 @@ simpleType =
   simple "bool" SVMType.Bool
     <|> simple "address payable" (SVMType.Address True)
     <|> simple "address" (SVMType.Address False)
-    <|> simple "account payable" (SVMType.Account True)
-    <|> simple "account" (SVMType.Account False)
     <|> simple "string" (SVMType.String $ Just True)
     <|> bytes'
     <|> simple "decimal" SVMType.Decimal

@@ -20,7 +20,7 @@ import { useBridgeContext } from "@/context/BridgeContext";
 import { useUser } from "@/context/UserContext";
 import { useUserTokens } from "@/context/UserTokensContext";
 import { useLendingContext } from "@/context/LendingContext";
-import { safeParseUnits, formatBalance } from "@/utils/numberUtils";
+import { safeParseUnits, formatBalance, ensureHexPrefix } from "@/utils/numberUtils";
 import BridgeWalletStatus from "@/components/bridge/BridgeWalletStatus";
 import { formatUnits } from "ethers";
 import { api } from "@/lib/axios";
@@ -53,7 +53,7 @@ const MintWidget: React.FC = () => {
   // Get external token balance for percentage buttons
   const { data: externalTokenBalance } = useBalance({
     address: address,
-    token: selectedMintToken?.externalToken as `0x${string}` | undefined,
+    token: ensureHexPrefix(selectedMintToken?.externalToken),
     chainId: selectedMintToken ? parseInt(availableNetworks.find(n => n.chainName === selectedNetwork)?.chainId || "0") : undefined,
     query: {
       enabled: !!address && !!selectedMintToken?.externalToken && !!isConnected,
@@ -64,7 +64,11 @@ const MintWidget: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ amount?: string; network?: string }>({});
   const [autoDeposit, setAutoDeposit] = useState<boolean>(false);
-  const [minDepositInfo, setMinDepositInfo] = useState<{ amount: string; loading: boolean }>({ amount: "", loading: false });
+  const [minDepositInfo, setMinDepositInfo] = useState<{ 
+    amount: string; 
+    amountWei: bigint; 
+    loading: boolean;
+  }>({ amount: "", amountWei: 0n, loading: false });
   const inFlightRef = useRef(false);
 
 
@@ -110,7 +114,7 @@ const MintWidget: React.FC = () => {
     ensureNetwork();
   }, [chainId, expectedChainId, isConnected, selectedNetwork, switchChain]);
 
-  // Min deposit amount for router with mint=true
+  // Min deposit amount for router
   const fetchMinDepositAmount = async (tokenAddress: string, decimals: number) => {
     if (!selectedNetworkConfig) return;
     setMinDepositInfo(prev => ({ ...prev, loading: true }));
@@ -120,13 +124,13 @@ const MintWidget: React.FC = () => {
         amount: "0",
         decimals: decimals.toString(),
         chainId: selectedNetworkConfig.chainId,
-        tokenAddress,
-        mint: true,
+        tokenAddress
       });
       const formattedMinAmount = validation.minAmount ? (Number(BigInt(validation.minAmount)) / Math.pow(10, decimals)).toString() : "0";
-      setMinDepositInfo({ amount: formattedMinAmount, loading: false });
+      const amountWei = validation.minAmount ? BigInt(validation.minAmount) : 0n;
+      setMinDepositInfo({ amount: formattedMinAmount, amountWei, loading: false });
     } catch {
-      setMinDepositInfo({ amount: "0", loading: false });
+      setMinDepositInfo({ amount: "0", amountWei: 0n, loading: false });
     }
   };
 
@@ -138,14 +142,62 @@ const MintWidget: React.FC = () => {
     }
   }, [selectedMintToken, selectedNetworkConfig]);
 
-  const validateAmount = (value: string) => {
-    if (!value) { setErrors(e => ({ ...e, amount: "" })); return true; }
+  const validateAmount = (value: string): boolean => {
+    if (!value) {
+      setErrors((e) => ({ ...e, amount: "" }));
+      return true;
+    }
+
     const num = parseFloat(value);
-    if (isNaN(num) || num <= 0 || num > Number(externalTokenBalance?.formatted)) {
-      setErrors(e => ({ ...e, amount: "Enter a valid amount" }));
+    if (isNaN(num) || num <= 0) {
+      setErrors((e) => ({
+        ...e,
+        amount:
+          num <= 0
+            ? "Amount must be greater than 0"
+            : "Please enter a valid number",
+      }));
       return false;
     }
-    setErrors(e => ({ ...e, amount: "" }));
+
+    // Check minimum amount using stored wei value
+    if (minDepositInfo.amountWei > 0n) {
+      const inputAmountWei = safeParseUnits(value, parseInt(selectedMintToken?.externalDecimals || "18"));
+      
+      if (inputAmountWei < minDepositInfo.amountWei) {
+        setErrors((e) => ({
+          ...e,
+          amount: `Amount must be at least ${minDepositInfo.amount} ${selectedMintToken?.externalSymbol}`,
+        }));
+        return false;
+      }
+    }
+
+    const tokenDecimals = parseInt(selectedMintToken?.externalDecimals || "18");
+    const decimalIndex = value.indexOf('.');
+    
+    if (decimalIndex !== -1) {
+      const decimalPlaces = value.length - decimalIndex - 1;
+      if (decimalPlaces > tokenDecimals) {
+        setErrors(e => ({ ...e, amount: `Maximum ${tokenDecimals} decimal places allowed` }));
+        return false;
+      }
+    }
+
+    const balanceMatch = externalTokenBalance?.formatted?.match(/^([\d,]+\.?\d*)/);
+    const bal = balanceMatch
+      ? parseFloat(balanceMatch[1].replace(/,/g, ""))
+      : 0;
+
+    if (num > bal) {
+      setErrors((e) => ({
+        ...e,
+        amount: `Insufficient balance. Maximum: ${externalTokenBalance?.formatted || "0"} ${selectedMintToken?.externalSymbol}`,
+      }));
+      return false;
+    }
+
+    setErrors((e) => ({ ...e, amount: "" }));
     return true;
   };
 
@@ -187,21 +239,34 @@ const MintWidget: React.FC = () => {
 
   // Core on-chain flow
   const ensurePermit2Approval = async (tokenAddress: string, amount: bigint, activeChainId: string) => {
+    console.log("Checking Permit2 approval for token:", tokenAddress);
+    
     const approval = await bridgeContractService.checkPermit2Approval({
       token: tokenAddress,
       owner: address as string,
       amount,
       chainId: activeChainId,
     });
+    
+    console.log("Permit2 approval status:", approval);
+    
     if (!approval.isApproved) {
-      await writeContractAsync({
-        address: tokenAddress as `0x${string}`,
+      console.log("Approving Permit2...");
+      const approveTx = await writeContractAsync({
+        address: ensureHexPrefix(tokenAddress),
         abi: ERC20_ABI,
         functionName: "approve",
         args: [PERMIT2_ADDRESS as `0x${string}`, BigInt(2) ** BigInt(256) - BigInt(1)],
         chain: await resolveViemChain(activeChainId),
         account: address as `0x${string}`,
       });
+      
+      await bridgeContractService.waitForTransaction(
+        approveTx,
+        activeChainId,
+      );
+      
+      console.log("Permit2 approval completed");
     }
   };
 
@@ -218,8 +283,7 @@ const MintWidget: React.FC = () => {
         amount,
         decimals: selectedMintToken.externalDecimals,
         chainId: selectedNetworkConfig.chainId,
-        tokenAddress: selectedMintToken.externalToken,
-        mint: true,
+        tokenAddress: selectedMintToken.externalToken
       });
       if (!validation.isValid) throw new Error(validation.error || "Validation failed");
 
@@ -251,13 +315,12 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedMintToken.externalToken),
           depositAmount,
-          bridgeContractService.formatAddress(userAddress),
+          ensureHexPrefix(userAddress),
           nonce,
           deadline,
-          signature as `0x${string}`,
-          true,
+          signature as `0x${string}`
         ],
         account: address as `0x${string}`,
       });
@@ -267,13 +330,12 @@ const MintWidget: React.FC = () => {
         abi: DEPOSIT_ROUTER_ABI,
         functionName: "deposit",
         args: [
-          bridgeContractService.formatAddress(selectedMintToken.externalToken),
+          ensureHexPrefix(selectedMintToken.externalToken),
           depositAmount,
-          bridgeContractService.formatAddress(userAddress),
+          ensureHexPrefix(userAddress),
           nonce,
           deadline,
-          signature as `0x${string}`,
-          true,
+          signature as `0x${string}`
         ],
         chain: await resolveViemChain(selectedNetworkConfig.chainId),
         account: address as `0x${string}`,
@@ -325,6 +387,7 @@ const MintWidget: React.FC = () => {
         }
       }
     } catch (err: any) {
+      console.error("Error minting:", err);
       const msg = err?.message || "Transaction failed";
       toast({ title: "Mint failed", description: msg, variant: "destructive" });
     } finally {
@@ -366,15 +429,15 @@ const MintWidget: React.FC = () => {
       <div className="space-y-1.5">
         <Label>Select Stablecoin</Label>
         <Select
-          value={selectedMintToken?.stratoToken || ""}
-          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.stratoToken === v) || null)}
+          value={selectedMintToken?.externalToken || ""}
+          onValueChange={(v) => setSelectedMintToken(redeemableTokens.find(t => t.externalToken === v) || null)}
         >
           <SelectTrigger>
             <SelectValue placeholder="Choose token" />
           </SelectTrigger>
           <SelectContent>
             {redeemableTokens.map(t => (
-              <SelectItem key={t.stratoToken} value={t.stratoToken}>
+              <SelectItem key={t.id} value={t.externalToken}>
                 {t.externalName} ({t.externalSymbol})
               </SelectItem>
             ))}

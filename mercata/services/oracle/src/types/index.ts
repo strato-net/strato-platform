@@ -2,6 +2,7 @@ export interface Asset {
     name: string;
     tokenAddress?: string;
     targetAssetAddress: string;
+    constantPrice?: number;
 }
 
 export interface BatchPriceResult {

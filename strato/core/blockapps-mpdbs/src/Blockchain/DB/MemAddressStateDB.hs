@@ -119,7 +119,6 @@ flushMemAddressStateDB ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   m ()
 flushMemAddressStateDB = do
-  flushMemAddressStateTxToBlockDB
   theMap <- getAddressStateBlockDBMap
   forM_ (M.toList theMap) $ \(address, modification) -> do
     case modification of

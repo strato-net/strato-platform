@@ -50,7 +50,9 @@ dependencies:
 
 library:
   source-dirs: library/
-  exposed-modules: Blockchain.Data.RLP
+  exposed-modules:
+  - Blockchain.Data.RLP
+  - Blockchain.Data.Util
   dependencies:
   - base16-bytestring
   - containers

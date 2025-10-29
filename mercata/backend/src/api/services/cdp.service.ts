@@ -9,6 +9,32 @@ import { postAndWaitForTx } from "../../utils/txHelper";
 import { extractContractName } from "../../utils/utils";
 import { StratoPaths, constants } from "../../config/constants";
 
+// Helper function for fixed-point exponentiation (matches contract's _rpow)
+const rpow = (x: bigint, n: bigint, ray: bigint): bigint => {
+  let z = n % 2n !== 0n ? x : ray;
+  let xCopy = x;
+  let nCopy = n;
+  for (nCopy = nCopy / 2n; nCopy !== 0n; nCopy = nCopy / 2n) {
+    xCopy = (xCopy * xCopy) / ray;
+    if (nCopy % 2n !== 0n) {
+      z = (z * xCopy) / ray;
+    }
+  }
+  return z;
+};
+
+const convertStabilityFeeRateToAnnualPercentage = (stabilityFeeRateRay: string | bigint): number => {
+  const secondsPerYear = 31536000n; // 365 * 24 * 60 * 60
+  const annualFactorRay = rpow(BigInt(stabilityFeeRateRay), secondsPerYear, RAY);
+  const factorMinusOne = annualFactorRay - RAY;
+  const integerPart = factorMinusOne / RAY;
+  const remainder = factorMinusOne % RAY;
+  const PRECISION_SCALE = BigInt(1e18);
+  const fractionalPart = (remainder * PRECISION_SCALE) / RAY;
+  const annualPercentage = (Number(integerPart) + Number(fractionalPart) / Number(PRECISION_SCALE)) * 100;
+  return annualPercentage;
+};
+
 // Extract constants for consistency with lending service
 const {
   cdpRegistrySelectFields,
@@ -233,6 +259,7 @@ interface AssetConfig {
   asset: string;
   symbol: string;
   liquidationRatio: number;
+  minCR: number;
   liquidationPenaltyBps: number;
   closeFactorBps: number;
   stabilityFeeRate: number;
@@ -317,9 +344,7 @@ export const getVaults = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -411,9 +436,7 @@ export const getVault = async (
     
     const liquidationRatio = Number(config.liquidationRatio) / Number(WAD) * 100;
     const healthFactor = calculateHealthFactor(cr, liquidationRatio);
-    
-    // Convert stability fee rate from RAY per second to annual percentage
-    const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
+    const stabilityFeeRate = convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate);
     
     return {
       asset,
@@ -561,11 +584,11 @@ export const getMaxWithdraw = async (
       throw new Error("Invalid price");
     }
 
-    // Compute collateral required to keep CR >= LR
-    const liquidationRatio = BigInt(config.liquidationRatio);
+    // Compute collateral required to keep CR >= minCR (NOT liquidationRatio)
+    const minCR = BigInt(config.minCR || config.liquidationRatio);
     const unitScale = BigInt(config.unitScale);
     
-    const requiredCollateralValue = (debt * liquidationRatio) / WAD;
+    const requiredCollateralValue = (debt * minCR) / WAD;
     const requiredCollateral = (requiredCollateralValue * unitScale) / price;
 
     // Enforce a 1 wei buffer when debt exists to protect against rounding
@@ -662,16 +685,15 @@ export const getMaxMint = async (
     throw new Error("Invalid price");
   }
 
-  // Compute borrow headroom from collateral value and liquidation ratio
+  // Compute borrow headroom from collateral value and minCR (NOT liquidationRatio)
   const collateralAmount = BigInt(vault.collateral || "0");
-  const liquidationRatio = BigInt(config.liquidationRatio);
+  const minCR = BigInt(config.minCR || config.liquidationRatio);
   const unitScale = BigInt(config.unitScale);
   
   const collateralValueUSD = (collateralAmount * price) / unitScale;
   
-  // Calculate max borrowable amount without safety buffer (matches contract's mintMax behavior)
-  // This results in CR exactly at liquidation threshold
-  const maxBorrowableUSD = (collateralValueUSD * WAD) / liquidationRatio;
+  // Calculate max borrowable amount with minCR safety buffer (matches contract's mintMax behavior)
+  const maxBorrowableUSD = (collateralValueUSD * WAD) / minCR;
 
   let maxAmount: bigint;
 
@@ -1007,16 +1029,14 @@ export const getAssetConfig = async (
   const config = configEntry.CollateralConfig;
   const tokenInfo = await getTokenInfo(accessToken, asset);
   
-  // Convert stability fee rate from RAY per second to annual percentage
-  const stabilityFeeRate = (Number(config.stabilityFeeRate) - Number(RAY)) * 365 * 24 * 60 * 60 / Number(RAY) * 100;
-  
   return {
     asset,
     symbol: tokenInfo.symbol,
     liquidationRatio: Number(config.liquidationRatio) / Number(WAD) * 100,
+    minCR: Number(config.minCR) / Number(WAD) * 100,
     liquidationPenaltyBps: parseInt(config.liquidationPenaltyBps),
     closeFactorBps: parseInt(config.closeFactorBps),
-    stabilityFeeRate,
+    stabilityFeeRate: convertStabilityFeeRateToAnnualPercentage(config.stabilityFeeRate),
     debtFloor: config.debtFloor,
     debtCeiling: config.debtCeiling,
     unitScale: config.unitScale,
@@ -1149,6 +1169,7 @@ export const setCollateralConfig = async (
   configData: {
     asset: string;
     liquidationRatio: string;
+    minCR: string;
     liquidationPenaltyBps: string;
     closeFactorBps: string;
     stabilityFeeRate: string;
@@ -1171,6 +1192,7 @@ export const setCollateralConfig = async (
     args: {
       asset: configData.asset,
       liquidationRatio: configData.liquidationRatio,
+      minCR: configData.minCR,
       liquidationPenaltyBps: configData.liquidationPenaltyBps,
       closeFactorBps: configData.closeFactorBps,
       stabilityFeeRate: configData.stabilityFeeRate,

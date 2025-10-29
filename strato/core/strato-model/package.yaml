@@ -65,7 +65,6 @@ library:
     - persistent-postgresql
     - pem
     - primitive
-    - raw-strings-qq
     - blockapps-secp256k1-haskell
     - servant
     - servant-docs

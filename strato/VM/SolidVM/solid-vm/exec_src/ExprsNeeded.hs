@@ -85,7 +85,7 @@ expressionCrawler = \case
   NumberLiteral {} -> ["NumberLiteral"]
   DecimalLiteral {} -> ["DecimalLiteral"]
   StringLiteral {} -> ["StringLiteral"]
-  AccountLiteral {} -> ["AccountLiteral"]
+  AddressLiteral {} -> ["AddressLiteral"]
   TupleExpression _ subexprs ->
     "TupleExpression" : do
       expr <- catMaybes subexprs

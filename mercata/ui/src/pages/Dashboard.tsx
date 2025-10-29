@@ -148,15 +148,14 @@ const Dashboard = () => {
           <div className={`grid grid-cols-1 ${rewardsEnabled ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-6 mb-8`}>
             <AssetSummary
               title="Net Balance"
-              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })}`}
+              value={`$${totalBalance.toLocaleString("en-US", { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`}
               icon={<Wallet className="text-white" size={18} />}
               color="bg-blue-500"
             />
 
             <AssetSummary
-              title="CATA Rewards"
-              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA`}
-              tooltip={cataBalance === 0 ? "No rewards yet - start staking to earn CATA!" : undefined}
+              title="Rewards"
+              value={`${cataBalance.toLocaleString("en-US", { maximumFractionDigits: 2 })} CATA Points`}
               icon={<Coins className="text-white" size={18} />}
               color="bg-purple-500"
             />

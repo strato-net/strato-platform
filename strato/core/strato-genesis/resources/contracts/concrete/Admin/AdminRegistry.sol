@@ -1,6 +1,7 @@
 import "../../abstract/ERC20/access/Authorizable.sol";
+import "../../abstract/ERC20/access/Ownable.sol";
 
-contract record AdminRegistry {
+contract record AdminRegistry is Ownable {
     address[] public record admins;
     mapping (address => uint) public record adminMap;
 
@@ -11,6 +12,8 @@ contract record AdminRegistry {
     mapping (address => mapping (string => mapping (address => bool))) public record whitelist;
 
     mapping (address => mapping (string => uint)) public record votingThresholds;
+
+    uint public defaultVotingThresholdBps = 6000; // 3/5
 
     event IssueCreated(address sender, address creator, string issueId, address target, string func, variadic args);
     event IssueVoted(address sender, address voter, string issueId, address target, string func, variadic args);
@@ -24,11 +27,13 @@ contract record AdminRegistry {
         _;
     }
 
-    constructor() { }
+    constructor() Ownable(this) { }
 
     function initialize(address[] _initialAdmins) external onlyOnce {
+        defaultVotingThresholdBps = 6000; // 3/5
         require(admins.length == 0, "AdminRegistry is already initialized");
         for (uint i = 0; i < _initialAdmins.length; i++) {
+            require(_initialAdmins[i] != address(0), "Invalid admin address");
             admins.push(_initialAdmins[i]);
             adminMap[_initialAdmins[i]] = admins.length;
         }
@@ -84,40 +89,27 @@ contract record AdminRegistry {
                 return (false, issueId);
             }
         } else {
-            try {
-                if ( _target == this && (_func == "addWhitelist" || _func == "removeWhitelist") && address(_args[0]) == msg.sender) {
-                    string issueId = _getIssueId(_target, _func, _args);
-                    variadic ret = _executeIssue(msg.sender, issueId, _target, _func, _args);
-                    return (true, ret);
-                }
-            } catch {
-
-            }
+            // Non-admin path: only execute if whitelisted
             address sender = msg.sender;
             address target = _target;
+            require(whitelist[target][_func][sender] || whitelist[sender][_func][target], "Only an admin or a whitelisted account can call castVoteOnIssue");
             if (!whitelist[target][_func][sender] && whitelist[sender][_func][target]) {
                 sender = _target;
                 target = msg.sender;
             }
             string issueId = _getIssueId(target, _func, _args);
-            if (whitelist[target][_func][sender]) {
-                variadic ret = _executeIssue(sender, issueId, target, _func, _args);
-                return (true, ret);
-            } else {
-                _createIssue(sender, issueId, target, _func, _args);
-            }
-            return (false, issueId);
+            variadic ret = _executeIssue(sender, issueId, target, _func, _args);
+            return (true, ret);
         }
     }
 
     function _shouldExecute(string _issueId, address _target, string _func, variadic _args) internal returns (bool) {
         uint issueVotes = votes[_issueId].length;
+
         uint votingThresholdBps = votingThresholds[_target][_func];
-        if (votingThresholdBps > 0) {
-            return 10000 * issueVotes >= votingThresholdBps * admins.length;
-        } else {
-            return 3 * issueVotes >= 2 * admins.length;
-        }
+        if (votingThresholdBps == 0) votingThresholdBps = defaultVotingThresholdBps;
+
+        return 10000 * issueVotes >= votingThresholdBps * admins.length;
     }
 
     function _createIssue(address _sender, string _issueId, address _target, string _func, variadic _args) internal {
@@ -139,20 +131,23 @@ contract record AdminRegistry {
         variadic ret = _target.call(_func, _args);
         for (uint i = 0; i < votes[_issueId].length; i++) {
             votesMap[_issueId][votes[_issueId][i]] = 0;
+            votes[_issueId][i] = address(0);
         }
-        delete votes[_issueId];
+        votes[_issueId].length = 0;
         delete currentIssues[_issueId];
         emit IssueExecuted(msg.sender, _sender, _issueId, _target, _func, _args);
         return ret;
     }
 
-    function _addAdmin(address _admin) internal {
+    function _addAdmin(address _admin) external onlyOwner {
+        require(_admin != address(0), "Invalid admin address");
         require(adminMap[_admin] == 0, "Account is already an admin");
         admins.push(_admin);
         adminMap[_admin] = admins.length;
     }
 
-    function _removeAdmin(address _admin) internal {
+    function _removeAdmin(address _admin) external onlyOwner {
+        require(admins.length > 1, "Cannot remove the last admin");
         uint index = adminMap[_admin];
         require(index > 0, "Account is not an admin");
         address swap = admins[admins.length - 1];
@@ -163,7 +158,7 @@ contract record AdminRegistry {
         admins.length -= 1;
     }
 
-    function _swapAdmin(address _adminToReplace, address _admin) internal {
+    function _swapAdmin(address _adminToReplace, address _admin) external onlyOwner {
         uint index = adminMap[_admin];
         require(index == 0, "Account is already an admin");
         index = adminMap[_adminToReplace];
@@ -174,7 +169,7 @@ contract record AdminRegistry {
         adminMap[_adminToReplace] = 0;
     }
 
-    function addWhitelist(address _target, string _func, address _user) internal {
+    function addWhitelist(address _target, string _func, address _user) external onlyOwner {
         if (_target == address(this)) {
             require(
                 _func != "addWhitelist" &&
@@ -186,6 +181,7 @@ contract record AdminRegistry {
                 _func != "_shouldExecute" &&
                 _func != "_swapAdmin" &&
                 _func != "setVotingThreshold" &&
+                _func != "setDefaultVotingThresholdBps" &&
                 _func != "createContract" &&
                 _func != "createSaltedContract",
                 "Cannot whitelist internal governance functions"
@@ -194,20 +190,27 @@ contract record AdminRegistry {
         whitelist[_target][_func][_user] = true;
     }
 
-    function removeWhitelist(address _target, string _func, address _user) internal {
+    function removeWhitelist(address _target, string _func, address _user) external onlyOwner {
         whitelist[_target][_func][_user] = false;
     }
 
-    function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) internal {
+    function setVotingThreshold(address _target, string _func, uint _votingThresholdBps) external onlyOwner {
+        require(_votingThresholdBps > 0, "Voting threshold must be greater than 0");
         require(_votingThresholdBps <= 10000, "Voting threshold must be less than 100%");
         votingThresholds[_target][_func] = _votingThresholdBps;
     }
 
-    function createContract(string _contractName, string _contractSrc, variadic _args) internal returns (address) {
+    function setDefaultVotingThresholdBps(uint _defaultVotingThresholdBps) external onlyOwner {
+        require(_defaultVotingThresholdBps > 0, "Default voting threshold must be greater than 0");
+        require(_defaultVotingThresholdBps <= 10000, "Default voting threshold must be less than 100%");
+        defaultVotingThresholdBps = _defaultVotingThresholdBps;
+    }
+
+    function createContract(string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
         return create(_contractName, _contractSrc, _args);
     }
 
-    function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) internal returns (address) {
+    function createSaltedContract(string _salt, string _contractName, string _contractSrc, variadic _args) external onlyOwner returns (address) {
         return create2(_salt, _contractName, _contractSrc, _args);
     }
 }

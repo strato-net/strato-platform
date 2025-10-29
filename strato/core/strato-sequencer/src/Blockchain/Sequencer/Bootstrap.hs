@@ -54,8 +54,7 @@ bootstrapSequencer
               { otOrigin = TO.BlockHash hash,
                 otSigner = Address 0,
                 otBaseTx = t,
-                otHash = TX.transactionHash t,
-                otPrivatePayload = Nothing
+                otHash = TX.transactionHash t
               }
       initLevelDB :: CablePackage -> IO ()
       initLevelDB pkg = do

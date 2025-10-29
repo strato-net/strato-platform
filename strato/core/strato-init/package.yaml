@@ -90,6 +90,7 @@ executables:
     dependencies:
       - aeson
       - bytestring
+      - data-default
       - strato-genesis
       - strato-init
       - strato-model

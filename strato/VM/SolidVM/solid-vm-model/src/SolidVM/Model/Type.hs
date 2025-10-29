@@ -28,7 +28,6 @@ data Type
   | Decimal
   | Bool
   | Address {isPayable :: Bool}
-  | Account {isPayable :: Bool}
   | UnknownLabel SolidString (Maybe SolidString)
   | Struct {bytes :: Maybe Int32, typedef :: SolidString}
   | UserDefined {alias :: SolidString, actual :: Type}
@@ -67,4 +66,4 @@ instance ToSchema Type where
     genericDeclareNamedSchemaUnrestricted defaultSchemaOptions proxy
       & mapped . name ?~ "Solidity type"
       & mapped . schema . description ?~ "Represents a soldity type"
-      & mapped . schema . example ?~ toJSON Account {isPayable = False}
+      & mapped . schema . example ?~ toJSON Address {isPayable = False}

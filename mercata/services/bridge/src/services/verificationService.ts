@@ -4,7 +4,7 @@ import {
   getInternalTransactionsBatch 
 } from "./rpcService";
 import { normalizeAddress, safeToBigInt, ensureHexPrefix, convertToStratoDecimals, parseUint256, decodeTopicAddr, isOkStatus } from "../utils/utils";
-import { Deposit } from "../types";
+import { DepositInfo } from "../types";
 
 const decodeTransferLog = (log: any, sig: string) => {
   if (!log?.topics || log.topics.length < 3) return null;
@@ -27,8 +27,8 @@ const findInternalEthTransfer = (traces: any[], toAddr: string, expectedAmount: 
     return false;
   });
 
-const validateDeposit = (deposit: Deposit, chainId: number, safe: string) => {
-  if (deposit.externalChainId !== chainId.toString()) {
+const validateDeposit = (deposit: DepositInfo, chainId: Number, safe: string) => {
+  if (Number(deposit.externalChainId) !== chainId) {
     return new Error(`Chain mismatch for token ${normalizeAddress(deposit.externalToken)}. Expected: ${chainId}, Got: ${deposit.externalChainId}`);
   }
 
@@ -38,9 +38,9 @@ const validateDeposit = (deposit: Deposit, chainId: number, safe: string) => {
   return {
     safe,
     isETH: externalToken === ZERO_ADDRESS,
-    expectedAmount: safeToBigInt(deposit.externalTokenAmount),
     externalToken,
     depositRouter,
+    stratoTokenAmount: safeToBigInt(deposit.stratoTokenAmount),
     externalDecimals: deposit.externalDecimals
   };
 };
@@ -52,7 +52,7 @@ const verifyEthDeposit = (receipt: any, traces: any[], ctx: any): Error | null =
     return new Error(`ETH receiver mismatch. Expected: ${ctx.depositRouter}, Got: ${to || "null"}`);
   }
   
-  if (!findInternalEthTransfer(traces, ctx.safe, ctx.expectedAmount)) {
+  if (!findInternalEthTransfer(traces, ctx.safe, ctx.stratoTokenAmount)) {
     return new Error(`No internal ETH transfer to Safe ${ctx.safe} found`);
   }
   
@@ -69,11 +69,9 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
       return false;
     }
     
-    const convertedAmount = ctx.externalDecimals 
-      ? convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
-      : ctx.expectedAmount.toString();
+    const convertedAmount = convertToStratoDecimals(decoded.amount, ctx.externalDecimals)
     
-    return convertedAmount === ctx.expectedAmount.toString();
+    return convertedAmount === ctx.stratoTokenAmount;
   });
   
   if (!validTransfer) {
@@ -86,11 +84,11 @@ const verifyErc20Deposit = (receipt: any, ctx: any): Error | null => {
 const fail = (txHash: string, msg: string): Error => new Error(`${msg} for ${txHash}`);
 
 // Batched verification for multiple deposits
-export const verifyDepositsBatch = async (deposits: Deposit[]): Promise<Map<string, Error | null>> => {
+export const verifyDepositsBatch = async (deposits: DepositInfo[]): Promise<Map<string, Error | null>> => {
   const results = new Map<string, Error | null>();
   
   // Group deposits by chain for batch processing
-  const depositsByChain = new Map<number, Deposit[]>();
+  const depositsByChain = new Map<number, DepositInfo[]>();
   deposits.forEach(deposit => {
     const externalChainId = typeof deposit.externalChainId === "number" 
       ? deposit.externalChainId 

@@ -1,8 +1,7 @@
 import SafeApiKit from "@safe-global/api-kit";
 import { logError, logInfo } from "../utils/logger";
-import { NonEmptyArray, Withdrawal, SafeTransactionData } from "../types";
+import { NonEmptyArray, WithdrawalInfo, SafeTransactionData } from "../types";
 import {
-  CallCache,
   groupByChain,
   createWithdrawalProposals,
   proposeTransactions,
@@ -11,18 +10,16 @@ import { retry } from "../utils/api";
 import { config } from "../config";
 
 export const createSafeTransactions = async (
-  withdrawals: NonEmptyArray<Withdrawal>,
+  withdrawals: NonEmptyArray<WithdrawalInfo>,
 ): Promise<SafeTransactionData[]> => {
   const withdrawalsByChain = groupByChain(withdrawals);
-  const callCache = new CallCache();
 
   const allTransactionProposals: SafeTransactionData[] = [];
 
   for (const [externalChainId, chainWithdrawals] of withdrawalsByChain) {
     const chainProposals = await createWithdrawalProposals(
       externalChainId,
-      chainWithdrawals,
-      callCache,
+      chainWithdrawals as NonEmptyArray<WithdrawalInfo>
     );
     allTransactionProposals.push(...chainProposals);
   }
@@ -91,30 +88,21 @@ export const checkSafeTxStatus = async (
 };
 
 export const monitorSafeTransactionStatusBatch = async (
-  withdrawals: NonEmptyArray<Withdrawal & { safeTxHash: string }>,
+  withdrawals: NonEmptyArray<{ id: Number, safeTxHash: string }>,
   chainId: bigint
-): Promise<Map<string, "executed" | "rejected" | "pending">> => {
-  const results = new Map<string, "executed" | "rejected" | "pending">();
-  
-  if (!withdrawals.length) return results;
+): Promise<Map<Number, "executed" | "rejected" | "pending">> => {
+  if (!withdrawals.length) return new Map();
 
   const apiKit = new SafeApiKit({ chainId });
 
-  // Process all withdrawals for this chain in parallel using the shared API kit
-  const chainResults = await Promise.all(
-    withdrawals.map(async (withdrawal) => {
-      const withdrawalId = String(withdrawal.withdrawalId);
-      const safeTxHash = withdrawal.safeTxHash;
-      
+  const results = new Map<Number, "executed" | "rejected" | "pending">();
+  
+  await Promise.all(
+    withdrawals.map(async ({ id, safeTxHash }) => {
       const status = await checkSafeTxStatus(safeTxHash, apiKit);
-      return { withdrawalId, status };
+      results.set(id, status);
     })
   );
-
-  // Add results to the main results map
-  chainResults.forEach(({ withdrawalId, status }) => {
-    results.set(withdrawalId, status);
-  });
 
   return results;
 };

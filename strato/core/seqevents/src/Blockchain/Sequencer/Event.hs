@@ -5,6 +5,8 @@ module Blockchain.Sequencer.Event (
   ShowConstructor,
   showConstructor,
   IngestEvent(..),
+  FlushMempoolRequest(..),
+  FlushMempoolScope(..),
   VmEvent(..),
   P2pEvent(..),
   Timestamp,
@@ -41,6 +43,25 @@ instance Format SeqLoopEvent where
 class ShowConstructor a where
   showConstructor :: a -> String
 
+data FlushMempoolScope
+  = FlushPending
+  | FlushQueued
+  | FlushAll
+  deriving (Eq, Show, Read, GHCG.Generic)
+
+instance Binary FlushMempoolScope
+
+data FlushMempoolRequest = FlushMempoolRequest
+  { flushScope :: FlushMempoolScope
+  , flushRequestId :: String  -- For tracking/logging
+  } deriving (Eq, Show, GHCG.Generic)
+
+instance Binary FlushMempoolRequest
+
+instance Format FlushMempoolRequest where
+  format (FlushMempoolRequest scope reqId) =
+    "FlushMempool{scope=" ++ show scope ++ ", id=" ++ reqId ++ "}"
+
 data IngestEvent
   = IETx Timestamp IngestTx
   | IEBlock IngestBlock
@@ -53,6 +74,7 @@ data IngestEvent
   | IEMPNodesResponse TO.TXOrigin [NodeData]
   | IEMPNodesReceived [NodeData]
   | IEPreprepareResponse PBFT.PreprepareDecision
+  | IEFlushMempool FlushMempoolRequest
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format IngestEvent where
@@ -67,6 +89,7 @@ instance Format IngestEvent where
   format (IEMPNodesResponse o n) = "Response to " ++ format o ++ ": " ++ show n
   format (IEMPNodesReceived o) = show o
   format (IEPreprepareResponse d) = format d
+  format (IEFlushMempool req) = format req
 
 type Timestamp = Microtime
 
@@ -115,6 +138,7 @@ data VmEvent
   | VmMPNodesReceived [NodeData]
   | VmRunPreprepare BDB.Block
   | VmSelfAddress Address
+  | VmFlushMempool FlushMempoolRequest
   deriving (Eq, Show, GHCG.Generic)
 
 instance Format VmEvent where
@@ -122,6 +146,7 @@ instance Format VmEvent where
   format (VmBlock o) = format o
   format (VmGetMPNodesRequest o srs) = show o ++ " requested: " ++ format srs
   format (VmMPNodesReceived nds) = show nds
+  format (VmFlushMempool req) = format req
   format x = show x
 
 instance ShowConstructor VmEvent where
@@ -133,6 +158,7 @@ instance ShowConstructor VmEvent where
   showConstructor VmMPNodesReceived{} = "VmMPNodesReceived"
   showConstructor VmRunPreprepare{} = "VmRunPreprepare"
   showConstructor VmSelfAddress{} = "VmSelfAddress"
+  showConstructor VmFlushMempool{} = "VmFlushMempool"
 
 instance Binary IngestEvent
 

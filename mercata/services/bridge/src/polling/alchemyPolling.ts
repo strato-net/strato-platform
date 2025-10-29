@@ -1,74 +1,37 @@
 import { config } from "../config";
 import {
   getEnabledChains,
-  getEnabledAssets,
 } from "../services/cirrusService";
 import { depositBatch } from "../services/bridgeService";
 import { blockTrackingService } from "../services/blockTrackingService";
-import { NonEmptyArray, Deposit, ChainInfo } from "../types";
+import { NonEmptyArray, DepositArgs, ChainInfo } from "../types";
 import {
   getCurrentBlockNumber,
   getChainLogs,
   isChainConfigured,
 } from "../services/rpcService";
 import { logError } from "../utils/logger";
-import {
-  convertToStratoDecimals,
-  normalizeAddress,
-  ensureHexPrefix,
-} from "../utils/utils";
-import { STRATO_DECIMALS } from "../config";
+import { normalizeAddress } from "../utils/utils";
 
 // DepositInitiated(uint256,string,address,uint256,address) keccak256 hash
 import { DEPOSIT_EVENT_SIGNATURE } from "../config";
 
-const getStratoTokenMapping = async (
-  externalChainId: number,
-): Promise<Map<string, { stratoToken: string; externalDecimals: number }>> => {
-  const enabledAssets = await getEnabledAssets(externalChainId);
-  return new Map(
-    enabledAssets.map(asset => [
-      ensureHexPrefix(asset.externalToken).toLowerCase(),
-      {
-        stratoToken: asset.stratoToken,
-        externalDecimals: parseInt(asset.externalDecimals) || STRATO_DECIMALS,
-      },
-    ]),
-  );
-};
-
-const parseDepositEvents = async (logs: any[], externalChainId: number) => {
-  const tokenMapping = await getStratoTokenMapping(externalChainId);
+const parseDepositEvents = async (logs: any[], externalChainId: number): Promise<DepositArgs[]> => {
   return logs.map((log) => {
     const externalToken = normalizeAddress(log.topics[1]);
     const externalSender = normalizeAddress(log.topics[2]);
     const stratoRecipient = normalizeAddress(log.topics[3]);
-    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId, bool mint)
-    // Data layout: [amount(32 bytes)][depositId(32 bytes)][mint(32 bytes)]
-    const externalTokenAmount = "0x" + log.data.substring(2, 66);
-    const depositId = "0x" + log.data.substring(66, 130);
-    const mintHex = log.data.substring(130, 194);
-    const mint = mintHex.substring(62) === "01";
-
-    const tokenInfo = tokenMapping.get(externalToken);
-    if (!tokenInfo) {
-      return null;
-    }
-
-    // Convert amount from external decimals to STRATO decimals
-    const stratoTokenAmount = convertToStratoDecimals(
-      externalTokenAmount,
-      tokenInfo.externalDecimals,
-    );
+    // Event: DepositRouted(address indexed token, uint256 amount, address indexed sender, address indexed stratoAddress, uint96 depositId)
+    // Data layout: [amount(32 bytes)][depositId(32 bytes)]
+    const externalTokenAmount = BigInt("0x" + log.data.substring(2, 66)).toString();
 
     return {
       externalChainId,
-      externalTxHash: log.transactionHash,
       externalSender,
-      stratoRecipient,
-      stratoToken: tokenInfo.stratoToken,
-      stratoTokenAmount,
-      mintUSDST: mint,
+      externalToken,
+      externalTokenAmount,
+      externalTxHash: log.transactionHash,
+      stratoRecipient
     };
   });
 };
@@ -118,7 +81,7 @@ const pollChainForDeposits = async (chainInfo: ChainInfo) => {
 
     // Process valid deposits first
     if (filteredDeposits.length > 0) {
-      await depositBatch(filteredDeposits as NonEmptyArray<Deposit>);
+      await depositBatch(filteredDeposits as NonEmptyArray<DepositArgs>);
       depositsProcessed = true;
     }
 

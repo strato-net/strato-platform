@@ -141,7 +141,6 @@ tFormTypeToType = \case
   (SolidType.UserDefined _ t) -> tFormTypeToType t
   (SolidType.Bool) -> (XabiType.Bool)
   (SolidType.Address _) -> (XabiType.Address)
-  (SolidType.Account _) -> (XabiType.Account)
   SolidType.Decimal -> XabiType.Decimal
   (SolidType.Error _ ss) -> (XabiType.UnknownLabel ss) --Questionable at best
   SolidType.Variadic -> XabiType.Variadic
