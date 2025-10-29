@@ -46,6 +46,7 @@ module Blockchain.SolidVM.SM
     getBSum,
     addEvent,
     addDelegatecall,
+    addNewCodeCollection,
     getContractNameAndHash,
     getCodeAndCollection,
     getContractsForParents,
@@ -102,8 +103,10 @@ import qualified Data.NibbleString as N
 import qualified Data.Sequence as Q
 import qualified Data.Set as S
 import Data.Source
+import Data.Text (Text)
 import qualified Data.Text as T
 import Debugger
+import SolidVM.Model.CodeCollection (CodeCollection)
 import qualified SolidVM.Model.CodeCollection as CC
 import SolidVM.Model.SolidString
 import qualified SolidVM.Model.Storable as MS
@@ -185,6 +188,7 @@ type MonadSM m =
     Mod.Modifiable Action m,
     Mod.Modifiable (Q.Seq Event) m,
     Mod.Modifiable (Q.Seq Action.Delegatecall) m,
+    Mod.Modifiable [(Text, CodeCollection)] m,
     Mod.Modifiable (Maybe DebugSettings) m,
     MonadUnliftIO m, --todo: remove
     MonadCatch m,
@@ -428,6 +432,10 @@ instance MonadUnliftIO m => Mod.Modifiable (Q.Seq Action.Delegatecall) (SM m) wh
   get _ = gets (Action._delegatecalls . _action)
   put _ q = modify $ action . Action.delegatecalls .~ q
 
+instance MonadUnliftIO m => Mod.Modifiable ([(Text, CodeCollection)]) (SM m) where
+  get _ = gets (Action._newCodeCollections . _action)
+  put _ q = modify $ action . Action.newCodeCollections .~ q
+
 variableSet :: VMBase m => SM m VariableSet
 variableSet = do
   cis <- Mod.get (Mod.Proxy @[CallInfo])
@@ -519,6 +527,7 @@ startingAction maybeCode env' =
             Just theCode
           Nothing -> Env.src env',
       _name = Env.name env',
+      _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty
     }
@@ -919,6 +928,9 @@ addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEve
 
 addDelegatecall :: Mod.Modifiable (Q.Seq Action.Delegatecall) m => Address -> Address -> T.Text -> T.Text -> T.Text -> m ()
 addDelegatecall s c o a n = Mod.modify_ (Mod.Proxy @(Q.Seq Action.Delegatecall)) $ pure . (Q.|> Action.Delegatecall s c o a n)
+
+addNewCodeCollection :: Mod.Modifiable [(Text, CodeCollection)] m => Text -> CodeCollection -> m ()
+addNewCodeCollection userName cc = Mod.modify_ (Mod.Proxy @([(Text, CodeCollection)])) $ pure . ((userName, cc):)
 
 getBlockHashWithNumber :: MonadSM m => Integer -> Keccak256 -> m (Maybe Keccak256)
 getBlockHashWithNumber num h = do

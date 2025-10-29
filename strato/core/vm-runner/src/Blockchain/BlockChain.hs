@@ -52,7 +52,6 @@ import qualified Blockchain.SolidVM as SolidVM
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -94,7 +93,6 @@ import Data.Proxy
 import qualified Data.Sequence as Seq
 import qualified Data.Set as S
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
@@ -343,6 +341,7 @@ sendNewActionMessage b trrs = do
         _actionData=O.fromList $ M.toList recombined,
         _src=Nothing,
         _name=Nothing,
+        _newCodeCollections=[],
         _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
         _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }
@@ -688,35 +687,17 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
   yield . OutVMEvents . (txr:) $ if not flags_diffPublish
     then []
     else case erAction <$> result of
-      Right (Just act) -> maybeToList $ extractCodeCollectionAddedMessages act
+      Right (Just act) -> extractCodeCollectionAddedMessages act
       _ -> []
 
-extractCodeCollectionAddedMessages :: Action.Action -> Maybe VMEvent
+extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
-  case ( a ^. Action.src,
-         a ^. Action.name,
-         O.assocs $ a ^. Action.actionData
-       ) of
-    (Just (Code c), Just n, actionDatas) ->
-      let cp = SolidVMCode (T.unpack n) . hash $ encodeUtf8 c
-          cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-            if _actionDataCodeHash == cp
-              then Just _actionDataCreator
-              else Nothing
-          cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-          contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                            --  . (constructor .~ Nothing)
-                                             . (modifiers .~ M.empty)
-                                             )
-          cc' = emptyCodeCollection & contracts .~ contracts'
-       in Just $
-            CodeCollectionAdded
-              { codeCollection = const () <$> cc',
-                codePtr = cp,
-                creator = cn,
-                application = n
+  let mkCCAnouncement (userName, cc) =
+        CodeCollectionAdded
+              { codeCollection = const () <$> cc,
+                creator = userName
               }
-    _ -> Nothing
+  in map mkCCAnouncement $ _newCodeCollections a
 
 printTransactionMessage ::
   MonadLogger m =>

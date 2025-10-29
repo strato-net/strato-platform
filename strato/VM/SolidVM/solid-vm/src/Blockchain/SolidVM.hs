@@ -2359,6 +2359,19 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   let origin = Env.origin theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator newAddress ctr ctrName newAddress hsh cc contractName' argVals
+
+  --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
+
+  currentAddress <- getCurrentAddress
+  userNameValue <- getSolidStorageKeyVal' currentAddress $ MS.StoragePath [MS.Field "userName"]
+
+  case userNameValue of
+    MS.BString userNameString -> do
+      let userName = DT.decodeUtf8 userNameString
+      addNewCodeCollection userName cc
+      addDelegatecall newAddress newAddress userName "Mercata" $ T.pack contractName'
+    _ -> return ()
+
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
