@@ -39,10 +39,10 @@ const Navbar = () => {
           <div className="hidden md:flex items-center space-x-4">
             {isLoggedIn && (
             <Link 
-              to="/dashboard/deposits"
+              to="/dashboard"
               className="bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
             >
-              Launch STRATO
+              Launch App
             </Link>
             )}
             <button 
@@ -87,7 +87,7 @@ const Navbar = () => {
             <div className="pt-4 pb-2 border-t border-gray-200 space-y-2">
               {isLoggedIn && (
                 <Link 
-                  to="/dashboard/deposits"
+                  to="/dashboard"
                   className="block text-center w-full bg-strato-blue text-white px-4 py-2 rounded-full text-sm font-medium hover:bg-strato-blue/90 transition-colors"
                 >
                   Launch App

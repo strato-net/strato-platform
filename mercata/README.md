@@ -10,7 +10,7 @@ The app consists of multiple parts:
       - In the future: can be moved to the backend - handle client-credentials, authorization-code flows, keep user sessions to avoid having access token in cookie, etc.
     - Serve backend and frontend on a single domain and port
       - In the future: can be done the other way if we want to simplify the deployment without nginx, or do serverless
-    - **Authentication Flow**: When users click "Login" or "Start Earning", they are redirected to the OAuth provider. After successful authentication, users are automatically redirected to `/dashboard/deposits` page to minimize friction and get them directly to the main app functionality.
+    - **Authentication Flow**: When users click "Login" or "Start Earning", they are redirected to the OAuth provider. After successful authentication, users are automatically redirected to `/dashboard` page to minimize friction and get them directly to the main app functionality.
 - services
   - The purpose of the services directory is to store offchain functionalities that are tied to the web application.
   - Look at the individual services read me for further details.
