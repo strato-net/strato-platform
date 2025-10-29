@@ -2359,6 +2359,10 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   let origin = Env.origin theEnv
   (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
   execResults <- create' creator newAddress ctr ctrName newAddress hsh cc contractName' argVals
+
+  addNewCodeCollection cc
+  addDelegatecall newAddress newAddress "BlockApps" "Mercata" $ T.pack contractName'
+
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
