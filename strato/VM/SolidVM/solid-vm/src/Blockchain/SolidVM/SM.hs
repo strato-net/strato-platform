@@ -478,7 +478,7 @@ runSM maybeCode envBefore gi f = do
           { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction maybeCode envBefore,
+            _action = startingAction envBefore,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -512,21 +512,14 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Maybe Code -> Env.Environment -> Action
-startingAction maybeCode env' =
+startingAction :: Env.Environment -> Action
+startingAction env' =
   Action.Action
     { _blockHash = blockHeaderHash $ Env.blockHeader env',
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
-      _transactionHash = Env.txHash env',
       _transactionSender = Env.sender env',
       _actionData = OMap.empty,
-      _src =
-        case maybeCode of
-          Just theCode ->
-            Just theCode
-          Nothing -> Env.src env',
-      _name = Env.name env',
       _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty

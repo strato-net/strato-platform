@@ -41,10 +41,8 @@ import Data.Either (lefts, rights)
 import Data.Foldable (toList)
 import Data.Function
 import qualified Data.IntMap as I
-import Data.List (sortOn)
 import qualified Data.Map as Map
 import Data.Maybe
-import Data.Ord (Down (..))
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -125,15 +123,9 @@ processedCollectionRow collection ttype AggregateAction {..} ks v =
       collectionDataValue = v 
     }
 
--- Prioritizing with-source actions prevents the issue where updates to contracts
--- at different addresses are lost because the schema has not been seen yet.
-withSourceFirst :: (a, [AggregateAction]) -> Down Bool
-withSourceFirst = Down . any (isJust . actionSrc) . snd
-
 parseActions :: [VME.VMEvent] -> [(Address, [AggregateAction])]
 parseActions events' =
-  sortOn withSourceFirst
-    . splitActions
+  splitActions
     . filter matters
     . concatMap (flatten)
     $ [a | VME.NewAction a <- events']
@@ -148,7 +140,6 @@ parseEvents = concatMap parseEvent
         { eventBlockHash = Action._blockHash a,
           eventBlockTimestamp = Action._blockTimestamp a,
           eventBlockNumber = Action._blockNumber a,
-          eventTxHash = Action._transactionHash a,
           eventTxSender = Action._transactionSender a,
           eventEvent = e, 
           eventIndex = idx
