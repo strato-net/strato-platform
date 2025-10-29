@@ -612,8 +612,9 @@ call' from to' fnCalltype functionName valList = do
       case ch of
         SolidVMCode name _ -> pure (n, stringToLabel name) -- Name of the parent
         _ -> pure (n, "")
-    (_, _, codeContractCreator) <- getCreator codeAddress
-    addDelegatecall storageAddress codeAddress (T.pack codeContractCreator) (T.pack codeContractParentName) (T.pack codeContractName)
+    -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
+    --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
+    addDelegatecall storageAddress codeAddress "BlockApps" (T.pack codeContractParentName) (T.pack codeContractName)
   ((ctrName, parentName'),) <$> logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
@@ -2362,16 +2363,6 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
 
   --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
 
-  currentAddress <- getCurrentAddress
-  userNameValue <- getSolidStorageKeyVal' currentAddress $ MS.StoragePath [MS.Field "userName"]
-
-  case userNameValue of
-    MS.BString userNameString -> do
-      let userName = DT.decodeUtf8 userNameString
-      addNewCodeCollection userName cc
-      addDelegatecall newAddress newAddress userName "Mercata" $ T.pack contractName'
-    _ -> return ()
-
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
@@ -2489,6 +2480,20 @@ runTheConstructors from to hsh cc contractName' argVals' = do
         _ <- runModifiersAndStatements modContentsList commands
         pure ()
       Nothing -> return ()
+
+    -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
+    --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
+    let getUsername []     = pure "BlockApps" -- I'm cheating
+        getUsername (x:xs) = do
+          userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "userName"]
+          case userNameValue of
+            MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
+            _ -> getUsername xs
+
+    cs <- Mod.get (Mod.Proxy @[CallInfo])
+    userName <- getUsername $ currentAddress <$> cs
+    addNewCodeCollection userName cc
+    addDelegatecall to to userName "Mercata" $ T.pack contractName'
 
   return ()
 
