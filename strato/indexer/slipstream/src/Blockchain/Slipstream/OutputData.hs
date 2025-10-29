@@ -85,6 +85,7 @@ import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encod
 import           Data.Time
 import           Blockchain.Slipstream.PostgresqlTypedShim
 import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
+import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
@@ -608,14 +609,31 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
       mappingCols = (fst <$> baseMappingColumns) ++ ["value"]
+      -- Extract struct fields if valueType is a struct
+      structFields = case valueType of
+        SVMType.UnknownLabel structName _ -> case structDef c cc structName of
+          Just fields -> Just $ map (\(fieldName, fieldType, _) ->
+            (labelToText fieldName, VarDef.fieldTypeType fieldType)) fields
+          Nothing -> Nothing
+        SVMType.Struct _ structName -> case structDef c cc structName of
+          Just fields -> Just $ map (\(fieldName, fieldType, _) ->
+            (labelToText fieldName, VarDef.fieldTypeType fieldType)) fields
+          Nothing -> Nothing
+        _ -> Nothing
+      -- Get SQL column types for struct fields
+      structViewColumns = case structFields of
+        Just fields -> getTableColumnAndType False cc fields
+        Nothing -> []
+      -- Extract just the column name and SQL type for viewColumns
+      structCols = (\(name, sqlType, _) -> (name, sqlType)) <$> structViewColumns
   yield $ CreateView
     tableName
     inherited
     mappingTableName
     mappingCols
     []
-    keyNames
-    "key"
+    structCols  -- viewColumns: struct fields extracted from "value" JSONB with proper boolean handling (replaces keyNames)
+    "value"     -- dataColumn: changed from "key" to "value" to extract struct fields from value column
     (["address", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     , ([Right "value"], Just "IS", "NOT NULL")
