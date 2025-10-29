@@ -96,7 +96,6 @@ import qualified Data.Text as T
 import Data.Time.Clock
 import Prometheus as P
 import SolidVM.Model.CodeCollection hiding (Event, Block, events, _events)
-import SolidVM.Model.Storable
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Printf
@@ -311,21 +310,9 @@ sendNewActionMessage b trrs = do
   let bd = obBlockData b
   theMap <- getMemRawStorageBlockDB
 
-  let mkActionData :: (Map StoragePath BasicValue) -> ActionData
-      mkActionData x =
-            ActionData {
-              _actionDataCodeHash = ExternallyOwned emptyHash,
-              _actionDataCodeCollection = emptyCodeCollection,
-              _actionDataCreator = "",
-              _actionDataCCCreator = Nothing,
-              _actionDataRoot = "",
-              _actionDataApplication = "",
-              _actionDataStorageDiffs=SolidVMDiff x
-              }
-
-      recombined :: Map Address ActionData
+  let recombined :: Map Address ActionData
       recombined =
-        fmap mkActionData
+        fmap (ActionData . SolidVMDiff)
         $ M.fromListWith M.union
         [ (addr, M.singleton path val)
         | ((addr, path), val) <- M.toList theMap
@@ -454,9 +441,8 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
       adjustedTxGasLimit = bool (transactionGasLimit bt) (flags_strictGasLimit) (flags_strictGas && not isKnownToBeSlow)
       availableGas = fromInteger adjustedTxGasLimit
 
-  feeResult' <- payFees b availableGas tAddr t proposer
-  let feeResult = feeResult'{ erAction = (actionData %~ (O.fromList . map (fmap $ actionDataCodeCollection .~ emptyCodeCollection) . O.assocs)) <$> erAction feeResult' }
-      combineA f x y = liftA2 f x y <|> x <|> y
+  feeResult <- payFees b availableGas tAddr t proposer
+  let combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
         { erAction = combineA (\era ->
               (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))

@@ -61,7 +61,6 @@ import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions
 import Control.Applicative
@@ -263,7 +262,7 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
 
-  initializeAction newAddress (labelToString contractName') issuerName Nothing (show originAddress) parentName ch cc
+  initializeAction newAddress
 
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
@@ -303,14 +302,6 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
     -- set creator again, in case the caller's cert changed during constructor execution
     setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
 
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack issuerName)) newAddress
-
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCCCreator .~ Nothing) newAddress
-    
-  when (useWallet && parentName == "User") $ Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataApplication .~ (T.pack "")) newAddress
   -- I'm showing these strings because I like them to be in quotes in the logs :)
   multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
 
@@ -452,23 +443,17 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
-  (toName, parentName) <- do
+  parentName <- do
     ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) storageAddress
-    let n = case ch of
-              SolidVMCode n' _ -> n' 
-              _ -> ""
     case ch of
-      SolidVMCode name _ -> pure (n, stringToLabel name) -- Name of the parent
-      _ -> pure (n, "")
+      SolidVMCode name _ -> pure $ stringToLabel name -- Name of the parent
+      _ -> pure ""
 
   let parentName' = if parentName == (CC._contractName contract) then "" else parentName
 
-  (_, oAddr, ctrName) <- getCreator codeAddress
+  (_, _, ctrName) <- getCreator codeAddress
 
-  initializeAction storageAddress (labelToString toName) (labelToString ctrName) Nothing (show oAddr) (labelToString parentName') hsh cc
-
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapAdjust (Action.actionDataCreator .~ (T.pack ctrName)) storageAddress
+  initializeAction storageAddress
 
   let functionsIncludingConstructor =
         case contract ^. CC.constructor of
