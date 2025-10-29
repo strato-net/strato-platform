@@ -15,19 +15,11 @@
 
 
 module Blockchain.Slipstream.OutputData (
-  SqlType(..),
-  TableConstraint(..),
-  OnConflict(..),
-  sqlTypePostgres,
   SlipstreamQuery(..),
   slipstreamQueryPostgres,
-  slipstreamQueryText,
   outputData,
-  outputData',
   outputDataDedup,
-  OutputM,
   ProcessedCollectionRow(..),
-  insertGlobalEventTable,
   pipeInsertGlobalEventTable,
   insertIndexTable,
   insertDelegatecall,
@@ -39,16 +31,8 @@ module Blockchain.Slipstream.OutputData (
   createExpandEventTables,
   notifyPostgREST,
   cirrusInfo,
-  historyTableName,
-  getTableColumnAndType,
-  aggEventToCollectionRow,
   aggEventToCollectionRows,
-  removeArrayEvArgs,
-  getArraysFromEvents,
   dbQueryCatchError,
-  valueToSQLText',
-  storageTableName,
-  globalEventTableName,
   initialSlipstreamQueries
   ) where
 
@@ -79,8 +63,6 @@ import           Blockchain.Strato.Model.Address
 import qualified Blockchain.Strato.Model.Event   as Action
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Stream.Action        (Delegatecall(..))
-import           Data.List                       ( groupBy, nubBy, sortBy)
-import           Data.Ord (comparing)
 import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encodeUtf8)
 import           Data.Time
 import           Blockchain.Slipstream.PostgresqlTypedShim
@@ -88,7 +70,6 @@ import           SolidVM.Model.CodeCollection    hiding (contractName, contracts
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
-import           Text.Tools
 import           UnliftIO.Exception              (SomeException, handle)
 import qualified Data.Text.Encoding as TE
 
@@ -448,9 +429,6 @@ cirrusInfo =
       pgDBParams = []
     }
 
-dbQueryCatchError' :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> (Text, Maybe (TableName, TableColumns)) -> m ()
-dbQueryCatchError' conn (insrt, b) = handle (handlePostgresError' b) $ dbQuery conn insrt
-
 dbQueryCatchError :: (MonadLogger m, MonadUnliftIO m) => PGConnection -> Text -> m ()
 dbQueryCatchError conn insrt = handle handlePostgresError $ dbQuery conn insrt
 
@@ -459,24 +437,11 @@ dbQuery conn insrt = do
   $logDebugS "outputData" insrt
   liftIO . void . pgQuery conn $! encodeUtf8 insrt
 
-handlePostgresError' :: (MonadLogger m) => Maybe (TableName, TableColumns) -> SomeException -> m ()
-handlePostgresError' myStuff e =
-  case myStuff of
-    Nothing -> handlePostgresError e
-    Just (_, _) -> handlePostgresError e
-
 handlePostgresError :: MonadLogger m => SomeException -> m ()
 handlePostgresError e =
   if crashOnSQLError
     then error . show $ e
     else $logErrorLS "handlePGError" e
-
-outputData' ::
-  (MonadUnliftIO m, OutputM m) =>
-  PGConnection ->
-  ConduitM () (Text, Maybe (TableName, TableColumns)) m a ->
-  m a
-outputData' conn c = runConduit $ c `fuseUpstream` mapM_C (dbQueryCatchError' conn)
 
 outputData ::
   OutputM m =>
@@ -537,18 +502,6 @@ baseMappingColumns =
   , ("collection_name", SqlText)
   , ("collection_type", SqlText)
   ]
-
-compareCollectionRows :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
-compareCollectionRows x y = collectionDataKeys x == collectionDataKeys y &&
-                   creator x == creator y &&
-                   contractname x == contractname y &&
-                   collection_name x == collection_name y
-
-compareCollectionRows' :: ProcessedCollectionRow -> ProcessedCollectionRow -> Bool
-compareCollectionRows' x y =
-                   creator x == creator y &&
-                   contractname x == contractname y &&
-                   collection_name x == collection_name y
 
 notifyPostgREST ::
   OutputM m =>
@@ -699,15 +652,7 @@ insertCollectionTable ::
   ConduitM () SlipstreamQuery m ()
 insertCollectionTable [] = error "insertCollectionTable: unhandled empty list"
 insertCollectionTable maps = do
-  -- Removing duplicates with all relevant fields
-  let newMaps = nubBy compareCollectionRows maps
-  multilineLog "insertCollectionTable/newCollections" $ boringBox $ map show newMaps
-  -- Sorting by 'creator', 'contractname' before grouping
-  let sortedMaps = sortBy (comparing (\x -> (creator x, contractname x))) newMaps
-  -- Grouping by 'creator', 'contractname'
-  let grouped = groupBy compareCollectionRows' sortedMaps
-  -- Processing grouped data with another function if necessary
-  let results = concatMap processGroupedData grouped
+  let results = processGroupedData maps
   yieldMany results
 
 refreshMaterializedView ::
@@ -948,9 +893,6 @@ aggEventToCollectionRow ae ev arrayName (index, value) =
       collectionDataKeys = [index],
       collectionDataValue = value
     }
-
-removeArrayEvArgs :: Action.Event -> Action.Event
-removeArrayEvArgs ev = ev { Action.evArgs = filter (\(_, _, c) -> c /= "Array") (Action.evArgs ev) }
 
 getArraysFromEvents :: [(String, String, String)] -> (String, [(Value, Value)])
 getArraysFromEvents evArgs = do
