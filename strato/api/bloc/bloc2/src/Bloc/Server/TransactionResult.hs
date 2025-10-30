@@ -306,8 +306,7 @@ contractResult txHash txResult@TransactionResult {..} name = do
             getAccount'
               accountsFilterParams
                 { _qaAddress = Just address,
-                  _qaContractName = Just name',
-                  _qaIgnoreChain = Just True
+                  _qaContractName = Just name'
                 }
           case addressRefs of
             [] -> go address name (num + 1)

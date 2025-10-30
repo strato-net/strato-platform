@@ -21,7 +21,6 @@ import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens
 import Control.Monad (unless)
@@ -64,7 +63,6 @@ type API =
     :> QueryParam "external" Bool
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
-    :> QueryParam "ignoreChain" Bool
     :> QueryParam "search" Text
     :> Get '[JSON] [AddressStateRef']
 
@@ -83,7 +81,6 @@ data AccountsFilterParams = AccountsFilterParams
     _qaExternal :: Maybe Bool,
     _qaLimit :: Maybe Natural,
     _qaOffset :: Maybe Natural,
-    _qaIgnoreChain :: Maybe Bool,
     _qaSearch :: Maybe Text
   }
   deriving (Eq, Ord, Show)
@@ -93,7 +90,6 @@ makeLenses ''AccountsFilterParams
 accountsFilterParams :: AccountsFilterParams
 accountsFilterParams =
   AccountsFilterParams
-    Nothing
     Nothing
     Nothing
     Nothing
@@ -127,7 +123,6 @@ uncurryAccountsFilterParams ::
     Maybe Bool ->
     Maybe Natural ->
     Maybe Natural ->
-    Maybe Bool ->
     Maybe Text ->
     r
   ) ->
@@ -148,17 +143,12 @@ uncurryAccountsFilterParams f AccountsFilterParams {..} =
     _qaExternal
     _qaLimit
     _qaOffset
-    _qaIgnoreChain
     _qaSearch
 
 server :: Selectable AccountsFilterParams [AddressStateRef] m => ServerT API m
 server = getAccount
 
 ---------------------------
-
-data NamedChainId
-  = UnnamedChainIdsA [ChainId]
-  | MainChainA
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams [AddressStateRef] (SQLM m) where
   select _ a@AccountsFilterParams {..}
@@ -223,11 +213,10 @@ getAccount ::
   Maybe Bool ->
   Maybe Natural ->
   Maybe Natural ->
-  Maybe Bool ->
   Maybe Text ->
   m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n o =
-  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o)
+getAccount a b c d e f g h i j k l m n =
+  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n)
 
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -252,7 +241,6 @@ accountQueryParams =
     "external",
     "limit",
     "offset",
-    "ignoreChain",
     "search"
   ]
 

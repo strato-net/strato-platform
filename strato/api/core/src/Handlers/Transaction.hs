@@ -37,7 +37,6 @@ import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event (IngestEvent (IETx), Timestamp)
 import Blockchain.Sequencer.Kafka (writeUnseqEvents)
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Blockchain.Strato.Model.MicroTime (getCurrentMicrotime)
 import Control.DeepSeq
@@ -59,7 +58,6 @@ import Data.Maybe
 import qualified Data.Text as T
 import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
-import MaybeNamed
 import Numeric.Natural
 import SQLM
 import Servant
@@ -86,8 +84,6 @@ type API =
     :> QueryParam "blocknumber" Natural
     :> QueryParam "minblocknumber" Natural
     :> QueryParam "maxblocknumber" Natural
-    :> QueryParam "chainid" (MaybeNamed ChainId)
-    :> QueryParams "chainids" ChainId
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "search" T.Text
@@ -114,8 +110,6 @@ data TxsFilterParams = TxsFilterParams
     qtBlockNumber :: Maybe Natural,
     qtMinBlockNumber :: Maybe Natural,
     qtMaxBlockNumber :: Maybe Natural,
-    qtChainId :: Maybe (MaybeNamed ChainId),
-    qtChainIds :: [ChainId],
     qtLimit :: Maybe Natural,
     qtOffset :: Maybe Natural,
     qtSearch :: Maybe T.Text,
@@ -142,8 +136,6 @@ txsFilterParams =
     Nothing
     Nothing
     Nothing
-    Nothing
-    []
     Nothing
     Nothing
     Nothing
@@ -306,15 +298,13 @@ getTransaction ::
   Maybe Natural ->
   Maybe Natural ->
   Maybe Natural ->
-  Maybe (MaybeNamed ChainId) ->
-  [ChainId] ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe T.Text ->
   Maybe Sortby ->
   m [RawTransaction']
-getTransaction a b c d e f g h i j k l m n o p q r s t u v =
-  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t u v)
+getTransaction a b c d e f g h i j k l m n o p q r s t =
+  getTransaction' (TxsFilterParams a b c d e f g h i j k l m n o p q r s t)
 
 getTransaction' ::
   Selectable TxsFilterParams [RawTransaction] m =>
@@ -342,8 +332,6 @@ transactionQueryParams =
     "maxblocknumber",
     -- "index",
     --"rejected",
-    "[chainids]",
-    "chainid",
     "limit",
     "offset",
     "search"
