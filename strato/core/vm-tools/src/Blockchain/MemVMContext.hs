@@ -36,7 +36,6 @@ module Blockchain.MemVMContext
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.DB.ChainDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
@@ -57,7 +56,6 @@ import Blockchain.VMContext
     MemDBs (..),
     currentBlock,
     debugSettings,
-    lookupX509AddrFromCBHash,
     memDBs,
     stateBlockMap,
     stateRoots,
@@ -76,14 +74,12 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader
 import qualified Data.ByteString as B
 import Data.Default
-import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import Data.Traversable (for)
 import Debugger
 import GHC.Generics
-import SolidVM.Model.Storable
 import UnliftIO
 
 data MemContextDBs = MemContextDBs
@@ -296,15 +292,6 @@ instance MonadIO m => (Keccak256 `A.Alters` DBCode) (MemContextM m) where
   lookup _ k = dbsGets $ view (codeDB . at k)
   insert _ k c = dbsModify' $ codeDB . at k ?~ c
   delete _ k = dbsModify' $ codeDB . at k .~ Nothing
-
-instance {-# OVERLAPPING #-} (MonadIO m, MonadLogger m) => (Address `A.Selectable` X509Certificate) (MemContextM m) where
-  select _ k = do
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certAddress, ".certificateString" :: StoragePath)
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
-        _ -> pure Nothing
 
 instance MonadIO m => (N.NibbleString `A.Alters` N.NibbleString) (MemContextM m) where
   lookup _ n1 = dbsGets $ view (hashDB . at n1)

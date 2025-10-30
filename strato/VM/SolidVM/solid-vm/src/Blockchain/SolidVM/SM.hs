@@ -58,7 +58,6 @@ where
 --import           Data.IORef
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
@@ -378,9 +377,6 @@ instance (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Alters` DBCode) (SM m)
   insert p k = lift . A.insert p k
   delete p = lift . A.delete p
 
-instance (Address `A.Selectable` X509Certificate) m => (Address `A.Selectable` X509Certificate) (SM m) where
-  select p k = lift $ A.select p k
-
 instance (N.NibbleString `A.Alters` N.NibbleString) m => (N.NibbleString `A.Alters` N.NibbleString) (SM m) where
   lookup p = lift . A.lookup p
   insert p k = lift . A.insert p k
@@ -615,11 +611,6 @@ getVariableOfName name = do
                        "bytes32ToString",
                        "create",
                        "create2",
-                       "getUserCert",
-                       "parseCert",
-                       "verifyCert",
-                       "verifyCertSignedBy",
-                       "verifySignature",
                        "fastForward"
                      ]
           )

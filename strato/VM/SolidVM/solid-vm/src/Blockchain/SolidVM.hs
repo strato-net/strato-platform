@@ -28,7 +28,6 @@ module Blockchain.SolidVM
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Keys
 import Blockchain.DB.CodeDB
 import Blockchain.DB.ModifyStateDB (pay)
 import Blockchain.DB.SolidStorageDB
@@ -57,7 +56,6 @@ import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Strato.Model.Secp256k1 as SEC
 import Blockchain.Strato.Model.Util (byteString2Integer)
 import Blockchain.Stream.Action (Action)
 import Blockchain.VMContext
@@ -96,7 +94,6 @@ import Data.Traversable
 import qualified Data.Vector as V
 import Debugger
 import GHC.Exts hiding (breakpoint)
-import qualified LabeledError
 --import Blockchain.DB.RawStorageDB
 --import Blockchain.Data.BlockSummary
 --import Blockchain.DB.MemAddressStateDB
@@ -2180,33 +2177,6 @@ callBuiltin "require" (SBool cond : msg) = do
   return SNULL
 callBuiltin "assert" [SBool cond] = SNULL <$ assert cond
 
--- SolidVM builtin function that verifies a ECSDA non-recoverable signature is signed by a given key with on the SECP256k1 curve
--- Expects the signature as a DER/PEM format encoded string
--- Expects the public key to be in PEM format
--- Raises an error if it can't parse either argument, however perhaps that should't happen...
-callBuiltin "verifySignature" [SString msg, SString signature, SString pubkey] = do
-  let eMesgBs = B16.decode $ BC.pack msg
-  case eMesgBs of
-    Right mesgBs -> do
-      if ((BC.length mesgBs) /= 32)
-        then malformedData "Message hash is not 32 bytes" msg
-        else do
-          let mSignature = SEC.importSignature' $ LabeledError.b16Decode "callBuiltin" $ BC.pack signature
-          let ePublicKey = bsToPub $ BC.pack pubkey
-          case (mSignature, ePublicKey) of
-            (Nothing, _) -> malformedData "Could not parse EC Signature " signature
-            (_, Left pk) -> malformedData "Could not parse public key" pk
-            (Just sig, Right publicKey) -> do
-              let isValid = SEC.verifySig publicKey sig mesgBs
-              onTraced $
-                liftIO $
-                  putStrLn $
-                    ( if isValid
-                        then C.green "The signature is valid."
-                        else C.red "The signature is invalid"
-                    )
-              return $ SBool isValid
-    Left err -> malformedData "Could not decode hex string" err
 callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create function should not be empty" args

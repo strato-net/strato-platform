@@ -26,7 +26,6 @@ where
 
 import BlockApps.Init ()
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
@@ -60,7 +59,6 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
 import Data.Default
-import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
@@ -68,7 +66,6 @@ import qualified Data.Text as T
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
 import Debugger
-import SolidVM.Model.Storable
 import UnliftIO
 
 type HasContext m = (Monad m, MonadIO m, AccessibleEnv Context m)
@@ -243,16 +240,6 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   lookup _ = genericLookupCodeDB $ getCodeDB
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
-
-instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => (Address `A.Selectable` X509Certificate) (ReaderT Context m) where
-  select _ k = do
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- A.lookup (A.Proxy) (certAddress, ".certificateString" :: StoragePath)
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bytesToCert bs
-        _ -> pure Nothing
-
 
 instance HasContext m => (N.NibbleString `A.Alters` N.NibbleString) m where
   lookup _ = genericLookupHashDB $ getHashDB
