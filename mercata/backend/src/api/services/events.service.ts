@@ -8,13 +8,14 @@ export const getEvents = async (
 ): Promise<EventResponse> => {
   const params = {
     ...query,
-    order: query.order || "block_timestamp.desc"
+    order: query.order || "block_timestamp.desc",
+    select: "*,storage!inner(contract!inner(contract_name))"
   };
 
-  const countParams = { ...params, limit: undefined, offset: undefined, order: undefined };
+  const countParams = { ...params, limit: undefined, offset: undefined, order: undefined, select: "count(),storage!inner(contract!inner(contract_name))" };
   
   const [countResponse, eventsResponse] = await Promise.all([
-    cirrus.get(accessToken, `/${constants.Event}?select=count()`, { 
+    cirrus.get(accessToken, `/${constants.Event}`, { 
       params: countParams 
     }),
     cirrus.get(accessToken, `/${constants.Event}`, { params })
@@ -23,8 +24,16 @@ export const getEvents = async (
   const total = countResponse.data?.[0]?.count || 0;
   const data = eventsResponse.data;
   
+  const events = (data || []).map((event: any) => {
+    const { storage, ...eventWithoutStorage } = event;
+    return {
+      ...eventWithoutStorage,
+      contract_name: event.storage?.contract?.[0]?.contract_name || ""
+    };
+  });
+  
   return {
-    events: data || [],
+    events,
     total: total
   };
 };
@@ -36,18 +45,18 @@ export const getContractInfo = async (
 
   const { data } = await cirrus.get(accessToken, `/${constants.Event}`, {
     params: {
-      select: "contract_name,event_name,event_name.count()",
-      order: "contract_name.asc,event_name.asc"
+      select: "event_name,event_name.count(),storage!inner(contract!inner(contract_name))",
+      "storage.contract.contract_name": "neq.Proxy",
     }
   });
 
   (data as EventData[])?.forEach(event => {
-    if (!event?.event_name || !event?.contract_name) return;
+    if (!event?.event_name || !event?.storage?.contract?.[0]?.contract_name) return;
     
-    if (!contracts.has(event.contract_name)) {
-      contracts.set(event.contract_name, new Set());
+    if (!contracts.has(event.storage.contract?.[0]?.contract_name)) {
+      contracts.set(event.storage.contract?.[0]?.contract_name, new Set());
     }
-    contracts.get(event.contract_name)!.add(event.event_name);
+    contracts.get(event.storage.contract?.[0]?.contract_name)!.add(event.event_name);
   });
 
   return {

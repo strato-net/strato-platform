@@ -243,7 +243,6 @@ const ActivityFeedList = () => {
             `"${event.contract_name}"`,
             event.block_number,
             `"${formatTimestamp(event.block_timestamp)}"`,
-            `"${event.transaction_hash}"`,
             `"${event.transaction_sender}"`,
             `"${event.address}"`,
             event.id
@@ -369,22 +368,6 @@ const ActivityFeedList = () => {
       <CardContent className="px-3 sm:px-6 pt-3">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           <div className="space-y-2">
-            <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <Hash className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
-              <span className="font-medium">Transaction:</span>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <code className="text-xs bg-gray-100 px-2 py-1 rounded cursor-help">
-                      {event?.transaction_hash ? formatAddress(event?.transaction_hash) : 'N/A'}
-                    </code>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="font-mono text-xs">{event?.transaction_hash ? event?.transaction_hash : 'N/A'}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
             <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
               <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500" />
               <span className="font-medium">Sender:</span>

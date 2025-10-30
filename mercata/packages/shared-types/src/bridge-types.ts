@@ -45,7 +45,6 @@ export interface BridgeToken {
  * Bridge transaction information
  */
 export interface BridgeTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   chainId?: number;
   from: string;
