@@ -592,6 +592,40 @@ router.post("/admin/set-debt-ceilings", authHandler.authorizeRequest(), LendingC
 
 /**
  * @openapi
+ * /lending/admin/pause:
+ *   post:
+ *     summary: Pause the lending pool (admin)
+ *     tags: [Lending]
+ *     responses:
+ *       200:
+ *         description: Pause transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/pause", authHandler.authorizeRequest(), LendingController.pausePool);
+
+/**
+ * @openapi
+ * /lending/admin/unpause:
+ *   post:
+ *     summary: Unpause the lending pool (admin)
+ *     tags: [Lending]
+ *     responses:
+ *       200:
+ *         description: Unpause transaction payload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               additionalProperties: true
+ */
+router.post("/admin/unpause", authHandler.authorizeRequest(), LendingController.unpausePool);
+
+/**
+ * @openapi
  * /lending/safety/info:
  *   get:
  *     summary: Retrieve safety module balances and state
