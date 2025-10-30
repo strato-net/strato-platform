@@ -184,6 +184,65 @@ const ActivityFeedList = () => {
     }
   }, []);
 
+  // Utility: show first 4 and last 4 characters with middle ellipsis
+  const truncateMiddle = useCallback((text: string, head: number = 4, tail: number = 4) => {
+    if (!text) return 'N/A';
+    if (text.length <= head + tail) return text;
+    return `${text.slice(0, head)}...${text.slice(-tail)}`;
+  }, []);
+
+  // Utility: parse JSON array encoded as string (e.g. "[\"a\", 123]")
+  const tryParseArray = useCallback((value: string) => {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  // Utility: flatten nested arrays (e.g. [[1,2], [3,4]] -> [1,2,3,4])
+  const flattenArray = useCallback((arr: any[]): any[] => {
+    const result: any[] = [];
+    for (const item of arr) {
+      if (Array.isArray(item)) {
+        result.push(...flattenArray(item));
+      } else {
+        result.push(item);
+      }
+    }
+    return result;
+  }, []);
+
+  // Utility: parse JSON array if possible and return flattened items, otherwise null
+  const parseAndFlatten = useCallback((maybeJsonArray: unknown) => {
+    if (typeof maybeJsonArray !== 'string') return null;
+    const parsed = tryParseArray(maybeJsonArray);
+    if (!parsed) return null;
+    return parsed.some((i) => Array.isArray(i)) ? flattenArray(parsed) : parsed;
+  }, [tryParseArray, flattenArray]);
+
+  // Small renderer for truncated tooltip list
+  const renderTruncatedList = useCallback((items: unknown[], keyPrefix: string) => (
+    <span className="break-words">
+      [
+      {items.map((item, idx) => (
+        <TooltipProvider key={`${keyPrefix}-${idx}`}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="cursor-help">{truncateMiddle(String(item))}</span>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="font-mono text-xs">{String(item)}</p>
+            </TooltipContent>
+          </Tooltip>
+          {idx < items.length - 1 ? <span>{`, `}</span> : null}
+        </TooltipProvider>
+      ))}
+      ]
+    </span>
+  ), [truncateMiddle]);
+
   const handleFiltersChange = useCallback((newFilters: FilterOptions) => {
     setFilters(newFilters);
     setCurrentPage(1); // Reset to first page when filters change
@@ -422,38 +481,42 @@ const ActivityFeedList = () => {
           <div className="space-y-2">
             <div className="text-xs sm:text-sm font-medium text-gray-700">Event Attributes:</div>
             <div className="space-y-1">
-              {Object.entries(event?.attributes).map(([key, value]) => (
-                <div key={key} className="flex justify-between text-xs sm:text-sm">
-                  <span className="text-gray-600 capitalize">{key}:</span>
-                  <span className="font-mono text-xs">
-                    {key.toLowerCase().includes('value') 
-                      ? formatValue(value)
-                      : key.toLowerCase().includes('address') || key.toLowerCase().includes('from') || key.toLowerCase().includes('to')
-                      ? (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className="cursor-help">
-                                  {value ? formatAddress(value) : 'N/A'}
-                                </span>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="font-mono text-xs">{value ? value : 'N/A'}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )
-                      : value
-                    }
-                  </span>
-                </div>
-              ))}
+              {Object.entries(event?.attributes).map(([key, value]) => {
+                const lowerKey = key.toLowerCase();
+                const items = parseAndFlatten(value);
+
+                return (
+                  <div key={key} className="flex justify-between text-xs sm:text-sm">
+                    <span className="text-gray-600 capitalize">{key}:</span>
+                    <span className="font-mono text-xs">
+                      {items ? (
+                        renderTruncatedList(items, key)
+                      ) : lowerKey.includes('value') ? (
+                        formatValue(value)
+                      ) : lowerKey.includes('address') || lowerKey.includes('from') || lowerKey.includes('to') ? (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="cursor-help">{value ? formatAddress(value) : 'N/A'}</span>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="font-mono text-xs">{value ? value : 'N/A'}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      ) : (
+                        value
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
       </CardContent>
     </Card>
-  ), [formatAddress, formatTimestamp, getEventIcon, getEventColor, formatValue]);
+  ), [formatAddress, formatTimestamp, getEventIcon, getEventColor, formatValue, tryParseArray, flattenArray, truncateMiddle]);
 
   return (
     <div>
