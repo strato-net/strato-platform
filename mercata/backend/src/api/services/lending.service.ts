@@ -1317,3 +1317,41 @@ export const withdrawCollateralMax = async (
     strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
   );
 };
+
+export const pauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "pause",
+    args: {},
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
+
+export const unpauseLendingPool = async (
+  accessToken: string,
+  userAddress: string,
+) => {
+  const { lendingPool } = await getPool(accessToken, { select: "lendingPool" });
+  if (!lendingPool) {
+    throw new Error("Lending pool address not found");
+  }
+  const builtTx = await buildFunctionTx({
+    contractName: extractContractName(LendingPool),
+    contractAddress: lendingPool,
+    method: "unpause",
+    args: {},
+  }, userAddress, accessToken);
+  return await postAndWaitForTx(accessToken, () =>
+    strato.post(accessToken, StratoPaths.transactionParallel, builtTx)
+  );
+};
