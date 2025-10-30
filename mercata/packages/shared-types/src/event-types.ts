@@ -27,7 +27,6 @@ export interface Event {
   block_hash: string;
   block_timestamp: string;
   block_number: string;
-  transaction_hash: string;
   transaction_sender: string;
   event_index: number;
   contract_name: string;

@@ -245,7 +245,7 @@ const DepositTransactionDetails = ({ mintUSDST = false }: { mintUSDST?: boolean 
               </div>
             ),
           }}
-          rowKey={(record, index) => `${record.transaction_hash}-${record.block_timestamp || ''}-${index}`}
+          rowKey={(_, index) => `${index}`}
         />
       </div>
     </div>

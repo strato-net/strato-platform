@@ -11,12 +11,12 @@ interface QueryConfig {
 const QUERY_CONFIGS: Record<string, QueryConfig> = {
   withdrawal: {
     tableName: `${constants.MercataBridge}-withdrawals`,
-    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp,transaction_hash",
+    selectFields: "withdrawalId:key,WithdrawalInfo:value,block_timestamp",
     countField: "count()",
   },
   deposit: {
     tableName: `${constants.MercataBridge}-deposits`,
-    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp,transaction_hash",
+    selectFields: "externalChainId:key,externalTxHash:key2,DepositInfo:value,block_timestamp",
     countField: "count()",
   }
 };
