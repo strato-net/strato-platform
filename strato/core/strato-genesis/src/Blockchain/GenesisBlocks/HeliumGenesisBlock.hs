@@ -614,7 +614,7 @@ ray :: Integer
 ray = 1_000_000_000 * oneE18
 
 lastAccrual :: Integer
-lastAccrual = 1761537600 -- October 27th, 2025, 12:00:00 AM
+lastAccrual = 1761796800 -- October 30th, 2025, 12:00:00 AM
 
 assetBalances :: GA.Asset -> [(Address, Integer)]
 assetBalances GA.Asset{..} =
