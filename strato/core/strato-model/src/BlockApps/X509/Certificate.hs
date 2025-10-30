@@ -12,18 +12,12 @@
 
 module BlockApps.X509.Certificate
   ( X509Certificate (..),
-    X509CertificateField (..),
     X509CertInfoState (..),
     Issuer (..),
     Subject (..),
-    x509CertToCertInfoState,
-    HasSelectX509CertDB,
-    HasSelectX509FieldDB,
-    rootCert,
     certToBytes,
     bytesToCert,
     makeSignedCertSigF,
-    getCertSubject,
     getCertIssuer
   )
 where
@@ -37,7 +31,6 @@ import Control.DeepSeq
 import qualified Control.Lens as Lens
 import Control.Lens.Operators hiding ((.=))
 import Control.Monad
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Crypto.Hash
 import qualified Crypto.Hash.Algorithms as CH
@@ -80,10 +73,6 @@ import Time.System
 newtype X509Certificate = X509Certificate CertificateChain deriving (Show, Eq)
 
 newtype X509CertificateField = X509CertificateField String deriving (Show, Eq, Binary, Generic, Read, NFData)
-
-type HasSelectX509CertDB m = (Address `A.Selectable` X509Certificate) m
-
-type HasSelectX509FieldDB m = ((Address, T.Text) `A.Selectable` X509CertificateField) m
 
 instance IsString X509CertificateField where
   fromString "" = X509CertificateField ""
@@ -283,32 +272,6 @@ instance ToSample X509Certificate where
           "prz3Yc03zv5VJ5rP/55A",
           "-----END CERTIFICATE-----"
         ]
-
-----------------------------------------------------------------------------------------------
----------------------------------------- ROOT CERT -------------------------------------------
-----------------------------------------------------------------------------------------------
-
-rootCert :: X509Certificate
-rootCert =
-  let eCert =
-        bytesToCert $
-          C8.pack $
-            unlines
-              [ "-----BEGIN CERTIFICATE-----",
-                "MIIBjTCCATKgAwIBAgIRAOPPkVoBp/GnwZGR32jcIjwwDAYIKoZIzj0EAwIFADBI",
-                "MQ4wDAYDVQQDDAVBZG1pbjESMBAGA1UECgwJQmxvY2tBcHBzMRQwEgYDVQQLDAtF",
-                "bmdpbmVlcmluZzEMMAoGA1UEBgwDVVNBMB4XDTIyMDQyMDE3NTcxM1oXDTIzMDQy",
-                "MDE3NTcxM1owSDEOMAwGA1UEAwwFQWRtaW4xEjAQBgNVBAoMCUJsb2NrQXBwczEU",
-                "MBIGA1UECwwLRW5naW5lZXJpbmcxDDAKBgNVBAYMA1VTQTBWMBAGByqGSM49AgEG",
-                "BSuBBAAKA0IABFISUeMfsGYl/sWStpv6cDeNHLwktFAO2dAwe7J8uWZzS8ONyYCs",
-                "9FEQ2NsmDj5IaCAKcRSvVFNwXOAUQDQ1pnUwDAYIKoZIzj0EAwIFAANHADBEAiA8",
-                "R0UERQZbF3qJUt5A0ZFf2ZmB0l/ZPjIvM383gOF3xwIgbxbQ8NLkDEe2mWJ/qa4n",
-                "N8txKc8G9R27ZYAUuz15zF0=",
-                "-----END CERTIFICATE-----"
-              ]
-   in case eCert of
-        Left _ -> error "Somehow, Palpatine has returned"
-        Right c -> c
 
 ----------------------------------------------------------------------------------------------
 --------------------------------------- IMPORT/EXPORT ----------------------------------------

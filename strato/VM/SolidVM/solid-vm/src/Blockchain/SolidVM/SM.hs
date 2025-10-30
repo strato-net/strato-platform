@@ -170,7 +170,6 @@ type MonadSM m =
     HasStateDB m,
     HasCodeDB m,
     (Keccak256 `A.Alters` BlockSummary) m,
-    HasSelectX509CertDB m,
     HasRawStorageDB m,
     HasMemAddressStateDB m,
     HasMemRawStorageDB m,
