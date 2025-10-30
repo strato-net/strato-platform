@@ -67,6 +67,7 @@ import           Data.Text.Encoding              (decodeUtf8, decodeUtf8', encod
 import           Data.Time
 import           Blockchain.Slipstream.PostgresqlTypedShim
 import           SolidVM.Model.CodeCollection    hiding (contractName, contracts, parents)
+import qualified SolidVM.Model.CodeCollection.VarDef as VarDef
 import           SolidVM.Model.SolidString
 import qualified SolidVM.Model.Type              as SVMType
 import           Text.Printf
@@ -109,8 +110,8 @@ data SlipstreamQuery = CreateTable
                         , sourceTableName :: TableName
                         , sourceTableColumns :: [Text]
                         , contractTableColumns :: [Text]
-                        , viewColumns :: TableColumns
-                        , dataColumn :: Text
+                        , viewColumns :: [(TableColumns, Text)]
+                        , jsonbColumns :: [(TableColumns, Text)]
                         , primaryKeyColumns :: [Text]
                         , extraJoinColumns :: [([Either Text Text], Maybe Text, Text)]
                         }
@@ -205,7 +206,7 @@ slipstreamQueryText _ CreateView{..} =
         , T.intercalate ", " $
             (("s." <>) <$> sourceTableColumns)
          ++ (("c." <>) <$> contractTableColumns)
-         ++ ((\(c, t) -> T.concat
+         ++ concatMap (\(cols', dataColumn) -> (\(c, t) -> T.concat
             [ "CASE WHEN s."
             , wrapEscapeDouble dataColumn
             , " ? '"
@@ -253,7 +254,44 @@ slipstreamQueryText _ CreateView{..} =
                 SqlSerial  -> "0::numeric"
             , " END AS "
             , wrapEscapeDouble $ if c `Set.member` baseColumnSet then "arg_" <> c else c
-            ]) <$> viewColumns)
+            ]) <$> cols') viewColumns
+         ++ ((\(cols', dataColumn) ->
+            (<> T.concat [") AS ", wrapEscapeDouble dataColumn])
+            . ("jsonb_build_object(" <>)
+            . T.intercalate ", " $ concatMap (\(c, t) ->
+            [ wrapEscapeSingle $ if c `Set.member` baseColumnSet then "arg_" <> c else c
+            , T.concat
+              [ "to_jsonb(CASE WHEN s."
+              , wrapEscapeDouble dataColumn
+              , " ? '"
+              , c
+              , "' "
+              , case t of
+                  SqlJsonb -> T.concat
+                    [ "THEN (s."
+                    , wrapEscapeDouble dataColumn
+                    , "->'"
+                    ]
+                  _ -> T.concat
+                    [ "THEN (s."
+                    , wrapEscapeDouble dataColumn
+                    , "->>'"
+                    ]
+              , c
+              , "')"
+              , case t of
+                  SqlBool -> "::text = 'true'"
+                  _ -> ""
+              , " ELSE "
+              , case t of
+                  SqlBool    -> "false::boolean"
+                  SqlDecimal -> "'0'::text"
+                  SqlText    -> "''::text"
+                  SqlJsonb   -> "to_jsonb(''::text)"
+                  SqlSerial  -> "0::numeric"
+              , " END)"
+              ]
+            ]) cols') <$> jsonbColumns)
         , " FROM "
         , tableNameToDoubleQuoteText sourceTableName
         , " s INNER JOIN "
@@ -527,8 +565,8 @@ createIndexTable contract cc (creator, n) inherited = do
     storageTableName
     (fst <$> baseColumns)
     contractCols
-    cols'
-    "data"
+    [(cols', "data")]
+    []
     ["address"]
     []
   pure fkeys
@@ -545,15 +583,28 @@ createCollectionTable (creator, n) c cc inherited (collectionName, keyTypes, val
   let tableName = collectionTableName creator n collectionName
       keySqlTypes = fromMaybe SqlText . solidityTypeToSQLType False (Just c) cc <$> keyTypes
       keyNames = keyColumnNames keySqlTypes
-      mappingCols = (fst <$> baseMappingColumns) ++ ["value"]
+      mStructName = case valueType of
+        SVMType.UnknownLabel structName _ -> Just structName
+        SVMType.Struct _ structName -> Just structName
+        _ -> Nothing
+      mStructVal = map (\(fieldName, fieldType, _) ->
+        ( labelToText fieldName
+        , maybe SqlText id $ solidityTypeToSQLType
+            False
+            (Just c)
+            cc
+            (VarDef.fieldTypeType fieldType)
+        )) <$> (structDef c cc =<< mStructName)
+      mappingCols = (fst <$> baseMappingColumns)
+        ++ maybe ["value"] (const []) mStructVal
   yield $ CreateView
     tableName
     inherited
     mappingTableName
     mappingCols
     []
-    keyNames
-    "key"
+    [(keyNames, "key")]
+    (maybe [] (\s -> [(s, "value")]) mStructVal)
     (["address", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
     , ([Right "value"], Just "IS", "NOT NULL")
@@ -590,8 +641,8 @@ createEventArrayTable (creator, n, e) cc inherited (arr, arrType) = do
     eventArrayTableName
     cols
     ["creator", "contract_name"]
-    keyNames
-    "key"
+    [(keyNames, "key")]
+    []
     (["address", "block_hash", "event_index", "collection_name"] ++ (fst <$> keyNames))
     [ ([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName)
     , ([Right "collection_name"], Nothing, wrapEscapeSingle $ tableNameCollectionName tableName)
@@ -849,8 +900,8 @@ createEventTable (creator, n) evName ev cc inherited = do
             globalEventTableName
             ("id":(fst <$> eventBaseColumnsQuery))
             ["creator", "contract_name"]
-            cols'
-            "attributes"
+            [(cols', "attributes")]
+            []
             ["address", "block_hash", "event_index"]
             [([Right "event_name"], Nothing, wrapEscapeSingle $ tableNameEventName tableName')]
     ) <$> [False] -- , (True, tableNameToText tableName)]

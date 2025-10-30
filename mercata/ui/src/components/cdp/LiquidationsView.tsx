@@ -75,12 +75,14 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
         });
         setAssetConfigs(configsMap);
         
-        // Filter out paused positions (global pause OR individual asset pause)
+        // Filter out paused positions (global pause OR individual asset pause) and positions with 0 collateral
         const filteredLiquidatable = liquidatable.filter(vault => {
           const assetConfig = configsMap[vault.asset];
           // Exclude if globally paused OR if this specific asset is paused
           const isPaused = globalPaused || (assetConfig?.isPaused ?? false);
-          return !isPaused;
+          // Exclude if collateral amount is 0
+          const hasCollateral = vault.collateralAmount && vault.collateralAmount !== "0" && BigInt(vault.collateralAmount) > 0n;
+          return !isPaused && hasCollateral;
         });
         setLiquidatableVaults(filteredLiquidatable);
         
@@ -311,13 +313,15 @@ const LiquidationsView: React.FC<LiquidationsViewProps> = () => {
           description: `Liquidated ${liquidationAmount} USDST. Tx: ${result.hash}`,
         });
         
-        // Refresh liquidatable vaults and filter out paused ones
+        // Refresh liquidatable vaults and filter out paused ones and positions with 0 collateral
         const updatedLiquidatable = await cdpService.getLiquidatable();
         const filteredUpdatedLiquidatable = updatedLiquidatable.filter(v => {
           const assetConfig = assetConfigs[v.asset];
           // Exclude if globally paused OR if this specific asset is paused
           const isPaused = isGlobalPaused || (assetConfig?.isPaused ?? false);
-          return !isPaused;
+          // Exclude if collateral amount is 0
+          const hasCollateral = v.collateralAmount && v.collateralAmount !== "0" && BigInt(v.collateralAmount) > 0n;
+          return !isPaused && hasCollateral;
         });
         setLiquidatableVaults(filteredUpdatedLiquidatable);
         
