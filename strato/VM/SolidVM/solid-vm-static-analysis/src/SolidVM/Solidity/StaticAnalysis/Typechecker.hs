@@ -1904,9 +1904,15 @@ tcExpr (IndexAccess _ a (Just b)) = do
   b' <- tcExpr b
   typecheckIndex a' b'
 tcExpr (IndexAccess _ a Nothing) = tcExpr a
-tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall", "derive"] =
+tcExpr (MemberAccess x var name) | name `elem` ["call", "delegatecall", "staticcall"] =
   sumType' (addressType' x) (addressType' x) ~> tcExpr var !> (pure $
       Function (Product [stringType' x, Static SVMType.Variadic x] x)
+               (Static SVMType.Variadic x)
+               x [] [] False
+    )
+tcExpr (MemberAccess x var "derive") =
+  sumType' (addressType' x) (addressType' x) ~> tcExpr var !> (pure $
+      Function (Product [stringType' x, stringType' x, Static SVMType.Variadic x] x)
                (Static SVMType.Variadic x)
                x [] [] False
     )
