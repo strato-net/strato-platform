@@ -28,7 +28,6 @@ module Blockchain.SolidVM
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import BlockApps.X509.Keys
 import Blockchain.DB.CodeDB
 import Blockchain.DB.ModifyStateDB (pay)
@@ -71,9 +70,7 @@ import Control.Monad
 import qualified Control.Monad.Catch as EUnsafe
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Extra (fromMaybeM)
 import Control.Monad.IO.Class
-import Control.Monad.Trans.Maybe
 import qualified Crypto.Hash.RIPEMD160 as RIPEMD160
 import qualified Crypto.Hash.SHA256 as SHA256
 import Data.Bits
@@ -234,29 +231,14 @@ createReturnEnv blockData sender' origin' proposer' availableGas newAddress code
   fmap (fmap $ either solidvmErrorResults id) . runSM (Just code) env' gasInfo' $ do
 
     (hsh, cc) <- codeCollectionFromSource isRunningTests True $ DT.encodeUtf8 initCode
-    (issuerAcct, _, issuerName) <- getCreator origin'
     let eArgExps = traverse (runParser parseArg initialParserState "" . T.unpack) argsStrings
         !argExps = either (parseError "create arguments") id eArgExps
     argVals <- argsToVals argExps
 
-    create' sender' newAddress issuerAcct issuerName newAddress hsh cc (T.unpack contractName) argVals
+    create' sender' newAddress hsh cc (T.unpack contractName) argVals
 
-getParentName :: MonadSM m => Address -> m String
-getParentName address = fromMaybeM (return "") $
-                        runMaybeT $
-                          pure address -- Code pointer's address
-                            >>= MaybeT . A.lookup (A.Proxy @AddressState) -- Address's state
-                            >>= pure . addressStateCodeHash -- state's Acodehash/CodePtr
-                            >>= ( \case
-                                    SolidVMCode name _ -> pure name -- Name of the parent
-                                    _ -> pure ""
-                            )
-
-create' :: MonadSM m => Address -> Address -> Address -> String -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
-create' creator originAddress issuerAcct issuerName newAddress ch cc contractName' valList = do
-  
-  -- Get parentName and cc_creator from maybeCodePtr or creator
-  parentName <-  getParentName creator
+create' :: MonadSM m => Address -> Address -> Keccak256 -> CC.CodeCollection -> SolidString -> ValList -> m ExecResults
+create' creator newAddress ch cc contractName' valList = do
 
   let !contract' = fromMaybe (missingType "create'/contract" contractName') (cc ^. CC.contracts . at contractName')
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
@@ -284,26 +266,13 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
 
   void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ pure ()
 
-  env <- getEnv
-  let -- metadata = Env.metadata env
-      maybeUseWallet = Nothing
---        M.lookup "useWallet" =<< metadata
-      !useWallet = maybe False (const True) maybeUseWallet
-      parentName' = bool parentName "" (useWallet && parentName == "User")
-  -- set creator
-  setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
-
   -- Run the constructor
   runTheConstructors creator newAddress ch cc contractName' valList
 
   onTraced $ liftIO $ putStrLn $ C.green $ "Done Creating Contract: " ++ show newAddress ++ " of type " ++ labelToString contractName'
 
-  void . withCallInfo newAddress newAddress contract' "constructor" ch cc M.empty False False $ do
-    -- set creator again, in case the caller's cert changed during constructor execution
-    setCreator issuerAcct originAddress newAddress contract' (BlockHeader.number $ Env.blockHeader env)
-
   -- I'm showing these strings because I like them to be in quotes in the logs :)
-  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName'), "App: " ++ (C.yellow parentName'), "Creator: " ++ (C.yellow issuerName)]
+  multilineLog "create'/versioning" $ boringBox ["Contract Name: " ++ (C.yellow contractName')]
 
   finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
   finalAct <- Mod.get (Mod.Proxy @Action)
@@ -321,12 +290,8 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
         erAction = Just finalAct,
         erException = Nothing,
         erPragmas = CC._pragmas cc,
-        erCreator = issuerName,
-        erAppName = parentName',
         erNewValidators = newV,
-        erRemovedValidators = remV,
-        erNewCerts = [],
-        erRevokedCerts = []
+        erRemovedValidators = remV
       }
 
 call ::
@@ -392,9 +357,13 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
         !argExps = either (parseError "call arguments") id eArgExps
     argVals <- argsToVals argExps
 
-    ((creator, appName), returnVal) <-
-      traverse (fmap Just . maybe (return "()") encodeForReturn)
-        =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
+    maybeVal <-
+      call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
+
+    returnVal <-
+      case maybeVal of
+        Nothing -> return "()"
+        Just ret -> encodeForReturn ret
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -404,7 +373,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
       ExecResults
         { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
           erRefund = 0,
-          erReturnVal = returnVal,
+          erReturnVal = Just returnVal,
           erTrace = [],
           erLogs = [],
           erEvents = toList finalEvs,
@@ -413,12 +382,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erAction = Just $ finalAct,
           erException = Nothing, -- tells me if theres an exception
           erPragmas = [],
-          erCreator = creator,
-          erAppName = appName,
           erNewValidators = newV,
-          erRemovedValidators = remV,
-          erNewCerts = [],
-          erRevokedCerts = []
+          erRemovedValidators = remV
         }
 
 call' ::
@@ -428,7 +393,7 @@ call' ::
   CC.FunctionCallType ->
   SolidString ->
   ValList ->
-  m ((SolidString, SolidString), Maybe Value)
+  m (Maybe Value)
 call' from to' fnCalltype functionName valList = do
   (isExternal, storageAddress, codeAddress) <- case fnCalltype of
     CC.DelegateCall -> return (True, from, to')
@@ -443,15 +408,6 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
-  parentName <- do
-    ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) storageAddress
-    case ch of
-      SolidVMCode name _ -> pure $ stringToLabel name -- Name of the parent
-      _ -> pure ""
-
-  let parentName' = if parentName == (CC._contractName contract) then "" else parentName
-
-  (_, _, ctrName) <- getCreator codeAddress
 
   initializeAction storageAddress
 
@@ -600,7 +556,7 @@ call' from to' fnCalltype functionName valList = do
     -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
     --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
     addDelegatecall storageAddress codeAddress "BlockApps" (T.pack codeContractParentName) (T.pack codeContractName)
-  ((ctrName, parentName'),) <$> logFunctionCall valList storageAddress contract functionName f
+  logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v = 
@@ -612,60 +568,7 @@ call' from to' fnCalltype functionName valList = do
         _ -> Nothing
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
-callWithResult from to fnCalltype functionName valList = snd <$> call' from to fnCalltype functionName valList
-
--- set the hidden ":creator" field
-setCreator :: MonadSM m => Address -> Address -> Address -> CC.Contract -> Integer -> m ()
-setCreator creator originAddress contract _ _ = do
-  maybeCert <- A.select (A.Proxy @X509Certificate) creator
-  let _cn = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
-
-  case maybeCert of
-    (Just cert) -> do
-      onTraced $ $logDebugS "setCreator/versioning" . T.pack . C.green $ "Found cert for " ++ (format creator) ++ ":\n\t" ++ (format $ getCertSubject cert)
-    Nothing -> $logDebugS "setCreator/versioning" . T.pack . C.red $ "No cert found for " ++ (format creator)
-
-  $logDebugS "setCreator/address" . T.pack $ "Setting creatorAddress to: " ++ show creator
-  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creatorAddress"]) (MS.BAddress creator)
-  let putCreatorField ctr = do
-        $logDebugS "setCreator/versioning" . T.pack $ "setting the creator as " ++ (show ctr)
-        putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":creator"]) (MS.BString $ BC.pack ctr)
-
-  if _cn /= ""
-    then putCreatorField _cn
-    else do
-      $logDebugS "setCreator/versioning" . T.pack . C.red $ "Ignoring creator field for empty creator field"
-  
-  putSolidStorageKeyVal' contract (MS.StoragePath [MS.Field ":originAddress"]) (MS.BAddress originAddress)
-
-getCreator :: MonadSM m => Address -> m (Address, Address, String) -- (creatorAddress, originAddress, creatorName)
-getCreator caller = do
-  $logDebugS "getCreator/versioning" . T.pack $ "Getting creator for the caller " ++ format caller
-  callerCodeHash <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) caller
-
-  case callerCodeHash of
-    ExternallyOwned _ -> do
-      -- caller is a user account, so they are creating the first instance of this app
-      -- we will look up their cert in the DB and use it to get the org name for this app
-      maybeCert <- A.select (A.Proxy @X509Certificate) caller
-      let creator' = fromMaybe "" $ fmap subCommonName $ getCertSubject =<< maybeCert
-      $logDebugS "getCreator/versioning" . T.pack $ "The creator is " ++ (show creator')
-      return (caller, caller, creator')
-    _ -> do
-      $logDebugS "getCreator/versioning" . T.pack $ "They are part of app contract " ++ (format caller)
-      appCreatorAddress <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":creatorAddress"]
-      appCreator <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":creator"]
-      case (appCreatorAddress, appCreator)  of
-        (MS.BAddress creatorAddress, MS.BString creator') -> do
-          $logDebugS "getCreator/versioning" . T.pack $ "Its creator is " ++ show creator'
-          appOriginAddress <- getSolidStorageKeyVal' caller $ MS.StoragePath [MS.Field ":originAddress"]
-          let originAddress = case appOriginAddress of
-                    MS.BAddress oa -> oa
-                    _ -> caller
-          return (creatorAddress, originAddress, BC.unpack creator')
-        (_ , _)-> do
-          $logDebugS "getCreator/versioning" . T.pack $ "Its creator is unset. Returning empty string"
-          return (caller, caller, "") --TODO: have better sane default
+callWithResult from to fnCalltype functionName valList = call' from to fnCalltype functionName valList
 
 logFunctionCall :: MonadSM m => ValList -> Address -> CC.Contract -> SolidString -> m (Maybe Value) -> m (Maybe Value)
 logFunctionCall args address contract functionName f = do
@@ -1029,18 +932,6 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
         then invalidArguments "arguments to statement are inconsistent with those declared" (unparseStatement st)
         else do
           let address = currentAddress curInfo
-          codeAddress <- getCurrentCodeAddress
-          (_, _, ctrName) <- getCreator codeAddress
-          parentName <-
-            fromMaybeM (return "") $
-              runMaybeT $
-                pure codeAddress
-                  >>= MaybeT . A.lookup (A.Proxy @AddressState)
-                  >>= pure . addressStateCodeHash
-                  >>= ( \case
-                          SolidVMCode name _ | name /= (labelToString $ CC._contractName curCnct) -> pure name
-                          _ -> pure ""
-                  )
           -- pair up field names with values one-by-one (no type checking tho, lol)
           -- let pairs = zip (map (T.unpack . fst) $ CC._eventLogs ev) expStrs
 
@@ -1056,14 +947,12 @@ runStatement st@(CC.EmitStatement eventName exptups pos) = do
             boringBox
               [ "Emitting event:",
                 "Event: " ++ C.yellow eventName,
-                "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct),
-                "App: " ++ C.yellow (show parentName),
-                "Creator: " ++ C.yellow (show ctrName)
+                "Contract: " ++ C.yellow (labelToString $ CC._contractName curCnct)
               ]
 
           bHash <- blockHeaderHash . Env.blockHeader <$> getEnv
           let contractName' = labelToString $ CC._contractName curCnct
-          addEvent $ Event bHash ctrName parentName contractName' address eventName evArgs
+          addEvent $ Event bHash contractName' address eventName evArgs
           return Nothing
 runStatement (CC.UncheckedStatement code pos) = do
   solidVMBreakpoint pos
@@ -1501,9 +1390,8 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   creator <- getCurrentAddress
   (hsh, cc) <- getCurrentCodeCollection
   newAddress <- getNewAddress creator
-  (issuerAcct, originAddress, issuerName) <- getCreator creator
   argVals <- argsToVals args
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc contractName' argVals
   return $
     Constant $
       SContract contractName' $
@@ -1518,8 +1406,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   argVals <- argsToVals args
   newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
-  (issuerAcct, originAddress, issuerName) <- getCreator creator
-  execResults <- create' creator originAddress issuerAcct issuerName newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc contractName' argVals
   onTraced $ do
     liftIO $
       putStrLn $
@@ -1944,12 +1831,6 @@ evaluateAddressMember a _ "balance" = do
   case bal of
     Just as -> return $ Constant $ SInteger $ addressStateBalance as
     _ -> return $ Constant $ SInteger 0
-evaluateAddressMember a _ "creator" = do
-  (_, _, issuerName) <- getCreator a
-  return $ Constant $ SString $ issuerName
-evaluateAddressMember a _ "root" = do
-  (_, originAddress, _) <- getCreator a
-  return $ Constant $ SAddress originAddress False
 -- evaluateAddressMember a _ "call" =
 evaluateAddressMember a True funcName = return $ Constant $ SContractFunction a funcName
 evaluateAddressMember a False itemName = do
@@ -2341,10 +2222,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   newAddress <- getNewAddress creator
-  theEnv <- getEnv
-  let origin = Env.origin theEnv
-  (ctr, _, ctrName) <- getCreator $ origin --not sure if this should be there instead
-  execResults <- create' creator newAddress ctr ctrName newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc contractName' argVals
 
   --Need to check that this is a UserRegistry contract before creating cirrus table!  Add this code
 
@@ -2366,8 +2244,7 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
   newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
-  (ctr, originAddress, ctrName) <- getCreator creator
-  execResults <- create' creator originAddress ctr ctrName newAddress hsh cc contractName' argVals
+  execResults <- create' creator newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
