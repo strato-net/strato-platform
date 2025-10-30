@@ -30,7 +30,6 @@ module Blockchain.VM.SolidException
     inaccessibleChain,
     invalidChain,
     invalidWrite,
-    invalidCertificate,
     malformedData,
     tooMuchGas,
     paymentError,
@@ -42,8 +41,7 @@ module Blockchain.VM.SolidException
     tooManyCooks,
     generalMetaProgrammingError,
     oldForeignPragmaError,
-    userDefinedError,
-    missingCertificate,
+    userDefinedError
   )
 where
 
@@ -82,7 +80,6 @@ data SolidException
   | InaccessibleChain String String
   | InvalidChain String String
   | InvalidWrite String String
-  | InvalidCertificate String String
   | MalformedData String String
   | TooMuchGas Integer Integer
   | PaymentError Integer (String, Integer)
@@ -94,7 +91,6 @@ data SolidException
   | GeneralMetaProgrammingError String String
   | OldForeignPragmaError String String
   | UserDefinedError String String
-  | MissingCertificate String String
   deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -128,7 +124,6 @@ showSolidException (MissingCodeCollection a b) = printf "missing code collection
 showSolidException (InvalidChain a b) = printf "Chain is invalid for address: %s, likely problem with %s metaprogramming" a b
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
-showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %d, but the current gasInfo was: %d" a b
 showSolidException (PaymentError a (addr, b)) = printf "There was an error sending %d wei to the following address with a balance of %d: %s" a b addr
@@ -140,7 +135,6 @@ showSolidException (TooManyCooks a b) = printf "Too many arguments were given, e
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
 showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
 showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
-showSolidException (MissingCertificate a b) = printf "Sender does not have a registered certificate: %s %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -226,9 +220,6 @@ invalidChain = toThrower InvalidChain
 invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
 
-invalidCertificate :: (Show v) => String -> v -> a
-invalidCertificate = toThrower InvalidCertificate
-
 malformedData :: (Show v) => String -> v -> a
 malformedData = toThrower MalformedData
 
@@ -261,6 +252,3 @@ oldForeignPragmaError = toThrower OldForeignPragmaError
 
 userDefinedError :: (Show v) => String -> v -> a
 userDefinedError = toThrower UserDefinedError
-
-missingCertificate :: (Show v) => String -> v -> a
-missingCertificate = toThrower MissingCertificate

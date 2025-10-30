@@ -2681,9 +2681,6 @@ solidityExceptionHandler catchBlockMap ex =
     (InvalidWrite s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 15 invalidWrite
       return res
-    (InvalidCertificate s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 16 invalidCertificate
-      return res
     (MalformedData s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 17 malformedData
       return res
@@ -2728,9 +2725,6 @@ solidityExceptionHandler catchBlockMap ex =
       return res
     (GeneralMetaProgrammingError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 31 generalMetaProgrammingError
-      return res
-    (MissingCertificate s1 s2) -> do
-      res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 32 missingCertificate
       return res
     (RevertError s1 s2) -> do
       res <- solidityExceptionHandlerHelper catchBlockMap s1 s2 33 revertError
@@ -2862,12 +2856,6 @@ solidVMExceptionHandler catchBlockMap ex =
     (InvalidWrite s1 s2) ->
       case M.lookup "InvalidWrite" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ invalidWrite s1 s2
-        Just (_, block) -> do
-          res <- runStatementBlock block
-          return res
-    (InvalidCertificate s1 s2) ->
-      case M.lookup "InvalidCertificate" catchBlockMap of
-        Nothing -> solidVMExceptionHelper catchBlockMap $ invalidCertificate s1 s2
         Just (_, block) -> do
           res <- runStatementBlock block
           return res
@@ -3016,12 +3004,6 @@ solidVMExceptionHandler catchBlockMap ex =
     (UserDefinedError s1 s2) -> do
       case M.lookup "UserDefinedError" catchBlockMap of
         Nothing -> solidVMExceptionHelper catchBlockMap $ userDefinedError s1 s2
-        Just (_, block) -> do
-          res <- runStatementBlock block
-          return res
-    (MissingCertificate s1 s2) -> do
-      case M.lookup "MissingCertificate" catchBlockMap of
-        Nothing -> solidVMExceptionHelper catchBlockMap $ missingCertificate s1 s2
         Just (_, block) -> do
           res <- runStatementBlock block
           return res
