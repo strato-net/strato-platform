@@ -32,13 +32,13 @@ contract record UserRegistry is Proxy {
         // We need the constructor arguments to be static so that
         // the CREATE2 address only depends on the _username salt,
         // allowing anyone to derive the address for a given username
-        User newUser = new User{salt: _commonName}(_username);
+        User newUser = new User{salt: _username}(_username);
         newUser.transferOwnership(_initialOwner);
         return address(newUser);
     }
         
     function deriveUserAddress(string _username) public returns (address) {
-        return this.derive("User", _username);
+        return this.derive(_username, "User", _username);
     }
 
     function canCreateUser(string _username, address _initialOwner) public returns (bool) {

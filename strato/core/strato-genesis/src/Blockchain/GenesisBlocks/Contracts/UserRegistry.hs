@@ -22,31 +22,24 @@ import System.FilePath (takeFileName)
 insertUserRegistryContract :: GenesisInfo -> GenesisInfo
 insertUserRegistryContract gi =
   gi
-    { addressInfo = initialAccounts ++ [logicAcct, proxyAcct],
+    { addressInfo = initialAccounts ++ [proxyAcct],
       codeInfo = initialCode ++ [CodeInfo (decodeUtf8 userRegistryContract) (Just "UserRegistry")]
     }
   where
     initialAccounts = addressInfo gi
     initialCode = codeInfo gi
 
-    logicAddr = 0x71f
     proxyAddr = 0x720
     owner = 0x100c
-
-    logicAcct =
-      SolidVMContractWithStorage
-        logicAddr
-        0
-        (SolidVMCode "UserRegistry" (KECCAK256.hash userRegistryContract))
-        []
 
     proxyAcct =
       SolidVMContractWithStorage
         proxyAddr
         720
-        (SolidVMCode "Proxy" (KECCAK256.hash userRegistryContract))
+        (SolidVMCode "UserRegistry" (KECCAK256.hash userRegistryContract))
         [ ("_owner", BAddress owner)
-        , ("logicContract", BAddress logicAddr)
+        , ("logicContract", BAddress 0)
+        , ("canCreateUserDelegate", BAddress 0)
         ]
 
 embeddedFiles :: [(FilePath, ByteString)]

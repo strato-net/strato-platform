@@ -442,7 +442,7 @@ postBlocTransaction' ::
 postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest mAddr txs' txParams msrcs) = do
   checkIsSynced
   userRegistry <- fmap userRegistryAddress getBlocEnv
-  userRegistryHash <- fmap userRegistryCodeHash getBlocEnv
+  userRegistryHash <- keccak256ToByteString . maybe zeroHash id . userRegistryCodeHash <$> getBlocEnv
   addr <- case mAddr of
     Nothing -> fromPublicKey <$> getPub
     Just addr' -> return addr'
@@ -456,7 +456,7 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
                 ]
       userCert <- maybe (throwIO err) pure =<<
         A.select (A.Proxy @Certificate) addr
-      pure $ deriveAddressWithSalt (Just userRegistry) (certificateCommonName userCert) userRegistryHash (Just $ show [SMV.SString $ certificateCommonName userCert])
+      pure $ getNewAddressWithSalt_unsafe userRegistry (certificateCommonName userCert) userRegistryHash [SMV.SString $ certificateCommonName userCert]
     else pure addr
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
