@@ -13,12 +13,8 @@
 module BlockApps.X509.Certificate
   ( X509Certificate (..),
     X509CertInfoState (..),
-    Issuer (..),
-    Subject (..),
     certToBytes,
-    bytesToCert,
-    makeSignedCertSigF,
-    getCertIssuer
+    bytesToCert
   )
 where
 
@@ -30,24 +26,14 @@ import Control.Applicative ((<|>))
 import Control.DeepSeq
 import qualified Control.Lens as Lens
 import Control.Lens.Operators hiding ((.=))
-import Control.Monad
-import Control.Monad.IO.Class
-import Crypto.Hash
-import qualified Crypto.Hash.Algorithms as CH
-import Crypto.Random.Entropy
-import qualified Crypto.Secp256k1 as SEC
-import Data.ASN1.OID
 import Data.ASN1.Types.String
 import Data.Aeson
 import Data.Binary
-import Data.Bits
-import qualified Data.ByteArray as BA
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 -- as Swag
 
 import Data.Either
-import Data.Hourglass
 import Data.Maybe
 import Data.PEM
 import qualified Data.Set as S
@@ -63,7 +49,6 @@ import Test.QuickCheck
 import qualified Text.Colors as CL
 import Text.Format
 import Text.Tools
-import Time.System
 
 
 -----------------------------------------------------------------------------------------------
@@ -301,93 +286,10 @@ bytesToCert bs =
 --------------------------------- CERT GENERATION AND SIGNING ------------------------------
 --------------------------------------------------------------------------------------------
 
-makeCert :: MonadIO m => Maybe DateTime -> Issuer -> Subject -> m (Certificate)
-makeCert mDateTime iss sub = do
-  serial' <- liftIO $ getEntropy 16
-  let fromBytes = B.foldl' (\a b -> a `shiftL` 8 .|. fromIntegral b) 0
-      serial = fromBytes serial'
-
-  validity <- case mDateTime of
-    Nothing -> liftIO getValidity
-    Just dateTime -> do
-      (DateTime dt tm') <- liftIO dateCurrent
-      let curDate@(DateTime _ _) = DateTime dt tm' {todNSec = 0}
-      return (curDate, dateTime)
-
-  return
-    Certificate
-      { certVersion = 0x02,
-        certSerial = serial,
-        certSignatureAlg = SignatureALG HashSHA256 PubKeyALG_EC,
-        certIssuerDN = getIssuerDN iss,
-        certValidity = validity,
-        certSubjectDN = getSubjectDN sub,
-        certPubKey = getCertPub sub,
-        certExtensions = Extensions Nothing
-      }
-
-makeSignedCertSigF ::
-  (MonadIO m) =>
-  (B.ByteString -> m Signature) -> -- Signature function
-  Maybe DateTime -> -- Expiry date
-  Maybe X509Certificate -> -- Parent certificate to append
-  Issuer -> -- Certificate issuer
-  Subject -> -- Certificate subject
-  m (Maybe X509Certificate) -- The resulting certificate (Nothing if signing failed)
-makeSignedCertSigF signF mDateTime parentCert iss sub = do
-  unsignedCert <- makeCert mDateTime iss sub
-  signedCert <- objectToSignedExactF (ecdsaWithSHA256F signF) unsignedCert
-  return . Just . X509Certificate . CertificateChain . (: (join . maybeToList $ x509ToSigneds <$> parentCert)) $ signedCert
-
-ecdsaWithSHA256F :: MonadIO m => (B.ByteString -> m Signature) -> B.ByteString -> m (B.ByteString, SignatureALG)
-ecdsaWithSHA256F signF mesg' = do
-  let mesgBS = B.pack $ BA.unpack $ hashWith CH.SHA256 mesg'
-  Signature (SEC.CompactRecSig r s v) <- signF mesgBS
-  -- I too hate that we have to do this r, s swap....but strato-model swaps it because Ethereum
-  -- swaps it, and cert validation will fail if we leave them swapped here, so we swap it back
-  let sig'' = SEC.CompactRecSig s r v
-      sig' = fromMaybe (error "could not read a sig we just made") (SEC.importCompactRecSig sig'')
-      sig = SEC.convertRecSig sig' -- Drop the 'v' because the ASN1 protocol does not support recoverable signatures
-  return (SEC.exportSig sig, SignatureALG HashSHA256 PubKeyALG_EC)
-
-toASN1CS :: String -> ASN1CharacterString
-toASN1CS = asn1CharacterString UTF8
-
 fromASN1CS :: ASN1CharacterString -> String
 fromASN1CS cs =
   let errstr = "failed to decode ASN1CharacterString: " ++ show cs
    in fromMaybe errstr (asn1CharacterToString cs)
-
-getIssuerDN :: Issuer -> DistinguishedName
-getIssuerDN iss =
-  let mList =
-        [ (getObjectID DnCommonName, Just $ issCommonName iss),
-          (getObjectID DnOrganization, Just $ issOrg iss),
-          (getObjectID DnOrganizationUnit, issUnit iss),
-          (getObjectID DnCountry, issCountry iss)
-        ]
-   in DistinguishedName $ map (fmap toASN1CS) . catMaybes $ sequence <$> mList
-
-getSubjectDN :: Subject -> DistinguishedName
-getSubjectDN sub =
-  let mList =
-        [ (getObjectID DnCommonName, Just $ subCommonName sub),
-          (getObjectID DnOrganization, Just $ subOrg sub),
-          (getObjectID DnOrganizationUnit, subUnit sub),
-          (getObjectID DnCountry, subCountry sub)
-        ]
-   in DistinguishedName $ map (fmap toASN1CS) . catMaybes $ sequence <$> mList
-
-getValidity :: IO (DateTime, DateTime)
-getValidity = do
-  (DateTime dt tm') <- dateCurrent
-  let curDate@(DateTime _ tm) = DateTime dt tm' {todNSec = 0} -- need to wipe out nanseconds b/c they won't serialize
-      oneYear = Period {periodYears = 1, periodMonths = 0, periodDays = 0}
-      endDate = DateTime (dt `dateAddPeriod` oneYear) tm -- all certs are valid for a year
-  return (curDate, endDate)
-
-getCertPub :: Subject -> PubKey
-getCertPub = serializeAndWrap . subPub
 
 -- Get the (first) subject of the certificate
 getCertSubject :: X509Certificate -> Maybe Subject
@@ -410,24 +312,3 @@ getCertSubjects certs = for (x509ToSigneds certs) $ \cert -> do
   where
     extractDn :: SignedCertificate -> DnElement -> Maybe String
     extractDn cert dn = fmap fromASN1CS . getDnElement dn . certSubjectDN $ getCertificate cert
-
---To write this function we need to convert our X509Certificate into a Certificate to use the certValidity function?
--- using c :: SignedExact Certificate ? location of this function? only mentioned in this file?
-
-getCertIssuer :: X509Certificate -> Maybe Issuer
-getCertIssuer cert = listToMaybe =<< getCertIssuers cert
-
-getCertIssuers :: X509Certificate -> Maybe [Issuer]
-getCertIssuers certs = for (x509ToSigneds certs) $ \cert -> do
-  cn <- extractDn cert DnCommonName
-  org <- extractDn cert DnOrganization
-  return $
-    Issuer
-      { issCommonName = cn,
-        issOrg = org,
-        issUnit = extractDn cert DnOrganizationUnit,
-        issCountry = extractDn cert DnCountry
-      }
-  where
-    extractDn :: SignedCertificate -> DnElement -> Maybe String
-    extractDn cert dn = fmap fromASN1CS . getDnElement dn . certIssuerDN $ getCertificate cert
