@@ -156,7 +156,7 @@ const LendingPoolOverview = () => {
             {isPaused ? (
               <span className="text-red-600 font-medium flex items-center space-x-2">
                 <ExclamationCircleOutlined />
-                <span>Lending Pool is paused - All operations are blocked</span>
+                <span>Lending Pool is paused - Certain operations are blocked</span>
               </span>
             ) : (
               <span className="text-green-600 font-medium flex items-center space-x-2">
