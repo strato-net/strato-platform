@@ -57,3 +57,4 @@ docker-compose.oracle.ecr.yml
 docker-compose.oracle.yml
 
 /app
+/mynode/
