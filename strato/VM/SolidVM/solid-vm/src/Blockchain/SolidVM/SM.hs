@@ -40,7 +40,6 @@ module Blockchain.SolidVM.SM
     getVariableOfName,
     pushSender,
     initializeAction,
-    -- lookupX509AddrFromCBHash,
     markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
@@ -52,8 +51,7 @@ module Blockchain.SolidVM.SM
     getContractsForParents,
     getAbstractParentsFromContract,
     getMapNamesFromContract,
-    getArrayNamesFromContract,
-    resolveNameParts
+    getArrayNamesFromContract
   )
 where
 
@@ -64,7 +62,6 @@ import BlockApps.X509.Certificate
 import Blockchain.DB.CodeDB
 import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
-import Blockchain.DB.SolidStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.BlockSummary
@@ -971,35 +968,3 @@ getArrayNamesFromContract c =
       storageDefsList = M.toList storageDefs'
       listOfArrays = filter (\(_, vd) -> case (CC._varType vd) of SVMType.Array _ _ -> True; _ -> False) storageDefsList
    in T.pack . fst <$> listOfArrays -- we need to change this to filter on _isRecord on testnet3
-
-resolveNameParts ::
-  ( MonadLogger m
-  , A.Selectable Address AddressState m
-  , HasSolidStorageDB m
-  ) =>
-  Address ->
-  T.Text ->
-  T.Text ->
-  CC.Contract ->
-  m ((Address, T.Text), (T.Text, T.Text, [T.Text]))
-resolveNameParts to' crtr app c = do
-  let tName = T.pack . CC._contractName
-  case c ^. CC.importedFrom of
-    Nothing -> pure ((to', tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-    Just address -> do
-      A.select (A.Proxy @AddressState) address >>= \case
-        Nothing -> do
-          $logWarnS "processTheMessages/resolveNameParts" . T.pack $
-            "Could not find address state for address " ++ show address
-          pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))
-        Just s ->
-          case addressStateCodeHash s of
-            SolidVMCode appName _ -> do
-              appCreator <- getSolidStorageKeyVal' address $ MS.StoragePath [MS.Field ":creator"]
-              case appCreator of
-                MS.BString cn' -> pure ((address, tName c), (T.pack $ BC.unpack cn', T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-                _ -> pure ((address, tName c), (crtr, T.pack appName, (map T.pack (M.keys $ CC._storageDefs c))))
-            _ -> do
-              $logWarnS "resolveNameParts" . T.pack $
-                "Could not resolve code for address " ++ show address
-              pure ((address, tName c), (crtr, app, (map T.pack (M.keys $ CC._storageDefs c))))

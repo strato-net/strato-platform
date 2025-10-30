@@ -296,9 +296,6 @@ pathParser = do
       n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
       (Field n :) <$> pathParser'
     )
-    <|> ((string ":creator") *> pathParser')
-    <|> ((string ":creatorAddress") *> pathParser')
-    <|> ((string ":originAddress") *> pathParser')
     <|> endOfInput *> return []
 
 pathParser' :: Parser [StoragePathPiece]
@@ -333,9 +330,6 @@ parseField = do
       n <- Atto.takeWhile1 (inClass "_a-zA-Z0-9")
       (Field n :) <$> pathParser'
     )
-    <|> ((string ":creator") *> pathParser')
-    <|> ((string ":creatorAddress") *> pathParser')
-    <|> ((string ":originAddress") *> pathParser')
 
 parsePath :: B.ByteString -> Either String StoragePath
 parsePath = fmap StoragePath . parseOnly pathParser
