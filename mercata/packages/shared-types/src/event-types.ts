@@ -15,7 +15,11 @@ export interface ContractInfo {
  */
 export interface EventData {
   event_name?: string;
-  contract_name?: string;
+  storage?: {
+    contract?: Array<{
+      contract_name?: string;
+    }>;
+  };
 }
 
 /**
