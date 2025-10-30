@@ -130,7 +130,9 @@ const TokenAvatar = ({ token, size = "w-4 h-4" }: TokenAvatarProps) => {
 const TokenSelectorComponent = ({ asset, onSelect, tokens, isOpen, onOpenChange }: TokenSelectorProps) => (
   <Popover open={isOpen} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>
-      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2">
+      {/* TEMP FIX: Disable dropdown if USDST is present in this dropdown's token list */}
+      <Button variant="outline" className="flex items-center gap-2 justify-between text-sm px-3 py-2" disabled={tokens.some(t => t.address === usdstAddress)}>
+        {/* ... */}
         <div className="flex items-center gap-2">
           {asset ? <TokenAvatar token={asset} /> : null}
           <span className="whitespace-nowrap">{asset?._symbol || "Select Token"}</span>
