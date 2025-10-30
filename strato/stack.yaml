@@ -34,7 +34,7 @@ packages:
 - highway/server
 
 - identity-provider/api
-- identity-provider/server
+#- identity-provider/server
 - identity-provider/client
 
 - indexer/slipstream

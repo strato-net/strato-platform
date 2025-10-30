@@ -23,7 +23,6 @@ module Blockchain.Blockstanbul.Authentication (
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Messages hiding (sequence)
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Blockstanbul.Options (flags_strictBlockstanbul)
@@ -38,7 +37,6 @@ import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Lens as L
 import Control.Monad (unless)
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Except
 import Data.Either.Extra
 import Data.List
@@ -68,7 +66,7 @@ signMessage tm = do
 blockstanbulError :: (MonadError String m) => String -> m a
 blockstanbulError = if flags_strictBlockstanbul then error else throwError
 
-authenticate :: (A.Selectable Address X509CertInfoState m) => InEvent -> m Bool
+authenticate :: (Monad m) => InEvent -> m Bool
 authenticate (IMsg (MsgAuth cm sig) tm) = do
   let msgHash = getHash tm
       mKey = recoverPub sig msgHash --recover pub key

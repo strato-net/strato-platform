@@ -33,7 +33,6 @@ module Blockchain.Sequencer.Monad
 where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul
 import Blockchain.Constants
 import Blockchain.Model.SyncState
@@ -45,7 +44,6 @@ import Blockchain.Sequencer.DB.SeenTransactionDB
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.SyncDB
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
@@ -61,10 +59,7 @@ import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Binary
-import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
-import qualified Data.ByteString.Lazy as BL
 import Data.Conduit.TMChan
 import Data.IORef
 import Data.Maybe
@@ -98,8 +93,6 @@ type MonadBlockstanbul m =
     Mod.Accessible BlockPeriod m,
     Mod.Accessible RoundPeriod m,
     Mod.Modifiable BestSequencedBlock m,
-    (Address `A.Alters` X509CertInfoState) m,
-    (Address `A.Selectable` X509CertInfoState) m,
     HasVault m
   )
 
@@ -130,59 +123,15 @@ instance {-# OVERLAPPING #-} Monad m => Mod.Accessible DependentBlockDB (ReaderT
 
 instance {-# OVERLAPPING #-} Monad m => Mod.Accessible LDB.DB (ReaderT SequencerConfig m) where
   access _ = getDependentBlockDB <$> Mod.access (Mod.Proxy @DependentBlockDB)
-
+{-
 class HasNamespace a where
   type NSKey a
-  namespace :: Mod.Proxy a -> BL.ByteString
 
-  namespaced :: Mod.Proxy a -> NSKey a -> B.ByteString
-  default namespaced :: Binary (NSKey a) => Mod.Proxy a -> NSKey a -> B.ByteString
-  namespaced p = BL.toStrict . BL.append (namespace p) . encode
-
-instance HasNamespace X509CertInfoState where
-  type NSKey X509CertInfoState = Address
-  namespace _ = "cis:" -- make a namespace instance for new mapping
 
 instance HasNamespace Checkpoint where
   type NSKey Checkpoint = ()
   namespace _ = "chkpt"
-
-lookupInLDB ::
-  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  m (Maybe a)
-lookupInLDB p k = do
-  db <- Mod.access Mod.Proxy
-  fmap (decode . BL.fromStrict) <$> LDB.get db LDB.defaultReadOptions (namespaced p k)
-
-insertInLDB ::
-  (Binary a, HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  a ->
-  m ()
-insertInLDB p k v = do
-  db <- Mod.access Mod.Proxy
-  LDB.put db LDB.defaultWriteOptions (namespaced p k) $ BL.toStrict $ encode v
-
-deleteInLDB ::
-  (HasNamespace a, MonadIO m, Mod.Accessible LDB.DB m) =>
-  Mod.Proxy a ->
-  NSKey a ->
-  m ()
-deleteInLDB p k = do
-  db <- Mod.access Mod.Proxy
-  LDB.delete db LDB.defaultWriteOptions (namespaced p k)
-
-instance (MonadIO m, Mod.Accessible LDB.DB m) => (Address `A.Alters` X509CertInfoState) m where
-  lookup = lookupInLDB
-  insert p k v = insertInLDB p k v
-  delete p k = deleteInLDB p k
-
-instance {-# OVERLAPPING #-} A.Selectable Address X509CertInfoState SequencerM where
-  select = A.lookup
-
+-}
 instance (MonadIO m, Mod.Accessible DependentBlockDB m) => (Keccak256 `A.Alters` DependentBlockEntry) m where
   lookup _ k = lookupDependentBlockDB k
   insert _ k v = insertDependentBlockDB k v

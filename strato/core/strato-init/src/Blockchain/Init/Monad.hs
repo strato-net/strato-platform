@@ -17,7 +17,6 @@ module Blockchain.Init.Monad (
   ) where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
@@ -143,9 +142,6 @@ instance (MonadIO m, MonadLogger m, HasDBs m) => (Keccak256 `A.Alters` DBCode) m
  
 instance {-# OVERLAPPING #-} Monad m => A.Selectable FilePath (Either String String) (ReaderT SetupDBs m) where
   select _ _ = pure Nothing
-
-instance (MonadIO m, MonadLogger m, HasDBs m) => (Address `A.Selectable` X509Certificate) m where
-  select _ = error "SetupDBM select @X509Certificate"
 
 instance (MonadIO m, MonadLogger m, HasDBs m) => (N.NibbleString `A.Alters` N.NibbleString) m where
   lookup _ = genericLookupHashDB $ fmap hashDB $ Mod.access Mod.Proxy

@@ -70,7 +70,6 @@ where
 
 import BlockApps.Init ()
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState, defaultBaggerState)
 import Blockchain.Constants
 import Blockchain.DB.BlockSummaryDB
@@ -329,8 +328,7 @@ type VMBase m =
     HasMemRawStorageDB m,
     (RawStorageKey `A.Alters` RawStorageValue) m,
     (Keccak256 `A.Alters` BlockSummary) m,
-    Mod.Accessible (Maybe WorldBestBlock) m,
-    (A.Selectable Address X509Certificate) m
+    Mod.Accessible (Maybe WorldBestBlock) m
   )
 
 withCurrentBlockHash ::
