@@ -31,13 +31,10 @@ import qualified Blockchain.Data.GenesisInfo as GI
 import Blockchain.Database.MerklePatricia
 import Blockchain.Strato.Model.Address hiding (parseHex)
 import Blockchain.Strato.Model.ExtendedWord
-import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Validator
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
 import Crypto.Util (i2bs_unsized)
-import qualified Data.Map as Map
-import Data.Maybe (catMaybes)
 import qualified Data.Text.Encoding as T
 import Numeric
 import SolidVM.Model.Storable
@@ -130,18 +127,6 @@ initializeCodeDB "SolidVM" x = do
   mapM_ (addCode . (\(GI.CodeInfo src _) -> T.encodeUtf8 src)) x
 initializeCodeDB invalidType _ = error $ "error, bad VM type: " ++ invalidType
 
-zipSourceInfo :: [GI.AddressInfo] -> [GI.CodeInfo] -> [(GI.AddressInfo, GI.CodeInfo)]
-zipSourceInfo accounts codes =
-  let hashPair c@(GI.CodeInfo source _) = (hash $ T.encodeUtf8 source, c)
-      codeMap = Map.fromList . map hashPair $ codes
-      findCodeFor :: GI.AddressInfo -> Maybe (GI.AddressInfo, GI.CodeInfo)
-      findCodeFor (GI.NonContract _ _) = Nothing
-      findCodeFor acc@(GI.ContractNoStorage _ _ (ExternallyOwned hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(GI.ContractNoStorage _ _ (SolidVMCode _ hsh)) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(GI.SolidVMContractWithStorage _ _ (ExternallyOwned hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-      findCodeFor acc@(GI.SolidVMContractWithStorage _ _ (SolidVMCode _ hsh) _) = (acc,) <$> Map.lookup hsh codeMap
-   in catMaybes $ map findCodeFor accounts
-
 genesisInfoToGenesisBlock ::
   ( MonadLogger m,
     HasCodeDB m,
@@ -154,15 +139,14 @@ genesisInfoToGenesisBlock ::
   ) =>
   [Validator] ->
   GenesisInfo ->
-  m ([(GI.AddressInfo, GI.CodeInfo)], Block)
+  m Block
 genesisInfoToGenesisBlock validators gi = do
   let codes = GI.codeInfo gi
   let accounts = GI.addressInfo gi
   initializeCodeDB "SolidVM" codes
   initializeStateDB accounts
   sr <- A.lookupWithDefault (Proxy @StateRoot) (Nothing :: Maybe Word256)
-  let sourceInfo = zipSourceInfo accounts codes
-      bData =
+  let bData =
         BlockHeaderV2
           { parentHash = GI.parentHash gi,
             stateRoot = sr,
@@ -179,10 +163,8 @@ genesisInfoToGenesisBlock validators gi = do
             signatures=[]
           }
   return
-    ( sourceInfo,
       Block
         { blockBlockData = bData,
           blockReceiptTransactions = [],
           blockBlockUncles = []
         }
-    )

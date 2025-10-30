@@ -14,11 +14,8 @@ module Blockchain.Stream.Action (
   blockHash,
   blockTimestamp,
   blockNumber,
-  transactionHash,
   transactionSender,
   actionData,
-  src,
-  name,
   newCodeCollections,
   events,
   delegatecalls,
@@ -41,7 +38,6 @@ module Blockchain.Stream.Action (
 
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
@@ -235,11 +231,8 @@ data Action = Action
   { _blockHash :: Keccak256,
     _blockTimestamp :: UTCTime,
     _blockNumber :: Integer,
-    _transactionHash :: Keccak256,
     _transactionSender :: Address,
     _actionData :: OMap.OMap Address ActionData,
-    _src :: Maybe Code,
-    _name :: Maybe Text,
     _newCodeCollections :: [(Text, CodeCollection)],
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
@@ -261,20 +254,11 @@ instance Format Action where
       ++ "actionBlockNumber: "
       ++ show _blockNumber
       ++ "\n"
-      ++ "actionTransactionHash: "
-      ++ format _transactionHash
-      ++ "\n"
       ++ "actionTransactionSender: "
       ++ format _transactionSender
       ++ "\n"
       ++ "actionData:\n"
       ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs _actionData)
-      ++ "\n"
-      ++ "src: "
-      ++ format _src
-      ++ "\n"
-      ++ "name: "
-      ++ format _name
       ++ "\n"
       ++ "actionEvents: "
       ++ unlines (map show $ toList _events)
@@ -305,11 +289,8 @@ instance ToJSON Action where
       [ "blockHash" .= _blockHash,
         "blockTimestamp" .= _blockTimestamp,
         "blockNumber" .= _blockNumber,
-        "transactionHash" .= _transactionHash,
         "sender" .= _transactionSender,
         "data" .= _actionData,
-        "src" .= _src,
-        "name" .= _name,
         "newCodeCollections" .= _newCodeCollections,
         "events" .= _events,
         "delegatecalls" .= _delegatecalls
@@ -321,11 +302,8 @@ instance FromJSON Action where
       <$> (o .: "blockHash")
       <*> (o .: "blockTimestamp")
       <*> (o .: "blockNumber")
-      <*> (o .: "transactionHash")
       <*> (o .: "sender")
       <*> (o .: "data")
-      <*> (o .: "src")
-      <*> (o .: "name")
       <*> (o .: "newCodeCollections")
       <*> (o .: "events")
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))

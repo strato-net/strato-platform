@@ -13,7 +13,6 @@
 module Blockchain.Slipstream.Data.Action where
 
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Stream.Action (Action)
@@ -36,8 +35,7 @@ data AggregateAction = AggregateAction
     actionBlockNumber :: Integer,
     actionTxSender :: Address,
     actionAddress :: Address,
-    actionStorage :: Action.DataDiff,
-    actionSrc :: Maybe Code
+    actionStorage :: Action.DataDiff
   }
   deriving (Show, Generic, NFData)
 
@@ -45,7 +43,6 @@ data AggregateEvent = AggregateEvent
   { eventBlockHash :: Keccak256,
     eventBlockTimestamp :: UTCTime,
     eventBlockNumber :: Integer,
-    eventTxHash :: Keccak256,
     eventTxSender :: Address,
     eventIndex :: Int,
     eventEvent :: Event
@@ -73,8 +70,7 @@ flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
             actionBlockNumber = _blockNumber,
             actionTxSender = _transactionSender,
             actionAddress = address,
-            actionStorage = _actionDataStorageDiffs,
-            actionSrc = _src
+            actionStorage = _actionDataStorageDiffs
           }
 
 formatAction :: AggregateAction -> Text
