@@ -442,9 +442,7 @@ addTransaction b remainingBlockGas t@OutputTx {otSigner = tAddr} proposer = do
   feeResult <- payFees b availableGas tAddr t proposer
   let combineA f x y = liftA2 f x y <|> x <|> y
       attachFeeResult er = er
-        { erAction = combineA (\era ->
-              (actionData %~ (O.unionWithL (const $ flip mergeActionDataStorageDiffs) $ _actionData era))
-            . (events %~ (_events era Seq.><))
+        { erAction = combineA (\era -> (events %~ (_events era Seq.><))
           ) (erAction feeResult) $ erAction er
         , erTrace = erTrace feeResult ++ erTrace er
         , erLogs = erLogs feeResult ++ erLogs er

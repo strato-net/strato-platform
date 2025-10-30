@@ -39,8 +39,6 @@ module Blockchain.SolidVM.SM
     getGasInfo,
     getVariableOfName,
     pushSender,
-    initializeAction,
-    markDiffForAction,
     getBlockHashWithNumber,
     getBSum,
     addEvent,
@@ -92,7 +90,6 @@ import Data.Either (isLeft)
 import Data.Foldable (for_)
 import qualified Data.List.NonEmpty as NE
 import Data.Map (Map)
-import qualified Data.Map.Ordered as OMap
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.NibbleString as N
@@ -511,7 +508,6 @@ startingAction env' =
       _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
       _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
       _transactionSender = Env.sender env',
-      _actionData = OMap.empty,
       _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty
@@ -881,19 +877,6 @@ getCurrentCodeCollection = do
   case cs of
     (currentCallInfo : _) -> return (collectionHash currentCallInfo, codeCollection currentCallInfo)
     _ -> internalError "getCurrentCodeCollection called with an empty stack" ()
-
-initializeAction :: MonadSM m =>
-                    Address -> m ()
-initializeAction acct = do
-  let newData = Action.ActionData (Action.SolidVMDiff M.empty)
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData %= Action.omapInsertWith Action.mergeActionData acct newData
-
-markDiffForAction :: Mod.Modifiable Action m => Address -> MS.StoragePath -> MS.BasicValue -> m ()
-markDiffForAction owner key' val' = do
-  let ins (Action.SolidVMDiff m) = Action.SolidVMDiff $ M.insert key' val' m
-  Mod.modifyStatefully_ (Mod.Proxy @Action) $
-    Action.actionData . Action.omapLens owner . mapped . Action.actionDataStorageDiffs %= ins
 
 addEvent :: Mod.Modifiable (Q.Seq Event) m => Event -> m ()
 addEvent newEvent = Mod.modify_ (Mod.Proxy @(Q.Seq Event)) $ pure . (Q.|> newEvent)

@@ -15,7 +15,6 @@ module Blockchain.Stream.Action (
   blockTimestamp,
   blockNumber,
   transactionSender,
-  actionData,
   newCodeCollections,
   events,
   delegatecalls,
@@ -65,7 +64,6 @@ import SolidVM.Model.CodeCollection (CodeCollection)
 import SolidVM.Model.Storable hiding (toList)
 import Test.QuickCheck.Instances ()
 import Text.Format
-import Text.Tools
 
 import Data.Binary.Instances.Time ()
 
@@ -232,7 +230,6 @@ data Action = Action
     _blockTimestamp :: UTCTime,
     _blockNumber :: Integer,
     _transactionSender :: Address,
-    _actionData :: OMap.OMap Address ActionData,
     _newCodeCollections :: [(Text, CodeCollection)],
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
@@ -256,9 +253,6 @@ instance Format Action where
       ++ "\n"
       ++ "actionTransactionSender: "
       ++ format _transactionSender
-      ++ "\n"
-      ++ "actionData:\n"
-      ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs _actionData)
       ++ "\n"
       ++ "actionEvents: "
       ++ unlines (map show $ toList _events)
@@ -290,7 +284,6 @@ instance ToJSON Action where
         "blockTimestamp" .= _blockTimestamp,
         "blockNumber" .= _blockNumber,
         "sender" .= _transactionSender,
-        "data" .= _actionData,
         "newCodeCollections" .= _newCodeCollections,
         "events" .= _events,
         "delegatecalls" .= _delegatecalls
@@ -303,7 +296,6 @@ instance FromJSON Action where
       <*> (o .: "blockTimestamp")
       <*> (o .: "blockNumber")
       <*> (o .: "sender")
-      <*> (o .: "data")
       <*> (o .: "newCodeCollections")
       <*> (o .: "events")
       <*> (fromMaybe S.empty <$> (o .:? "delegatecalls"))

@@ -119,9 +119,7 @@ setVal dst@(SReference (AddressPath addr path)) src = do
         _ -> toBasic src
   case basicSrc of
     Nothing -> typeError "non basic solidity type cannot be stored atomically" src
-    Just b -> do
-      markDiffForAction addr path b
-      putSolidStorageKeyVal' addr path b
+    Just b -> putSolidStorageKeyVal' addr path b
 setVal (SInteger dst) (SInteger _) = immutableError "Cannot assign immutable or constants after assigned ->" dst -- typeError "Cannot assign immutables after assigned" ("src = " ++ show src ++ ", dst = " ++ show dst)
 setVal (SNULL) _ = return ()
 setVal dst src = typeError "unknown case called in setVal (Probably tried to change the value of a constant):" ("src = " ++ show src ++ ", dst = " ++ show dst)
@@ -211,7 +209,6 @@ deleteVar :: MonadSM m => Variable -> m ()
 deleteVar (Constant (SReference (AddressPath addr path))) = do
   ro <- readOnly <$> getCurrentCallInfo
   when ro $ invalidWrite "Invalid delete during read-only access" $ "addr: " ++ show addr ++ ", path: " ++ show path
-  markDiffForAction addr path $ MS.BDefault
   putSolidStorageKeyVal' addr path $ MS.BDefault
 deleteVar v = todo "deleteVar not yet supported for local variables" $ show v
 

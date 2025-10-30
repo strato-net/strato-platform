@@ -241,8 +241,6 @@ create' creator newAddress ch cc contractName' valList = do
   -- $logInfoS "create': contract' " . T.pack $ show $ contract'
   -- $logInfoS "create': abstracts1' " . T.pack $ show $ abstracts'
 
-  initializeAction newAddress
-
   A.adjustWithDefault_ (A.Proxy @AddressState) newAddress $ \newAddressState ->
     pure
       newAddressState
@@ -405,8 +403,6 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
-
-  initializeAction storageAddress
 
   let functionsIncludingConstructor =
         case contract ^. CC.constructor of
@@ -2279,15 +2275,6 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     forM_ [(n, e) | (n, CC.VariableDecl _ _ (Just e) _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, e) -> do
       v <- expToVar e
       setVar (Constant (SReference (AddressPath to $ MS.StoragePath [MS.Field $ BC.pack $ labelToString n]))) =<< getVar v
-
-    forM_ [(n, theType) | (n, CC.VariableDecl theType _ Nothing _ _ _) <- M.toList $ contract' ^. CC.storageDefs] $ \(n, theType) -> do
-      case theType of
-        SVMType.Mapping _ _ _ -> return ()
-        SVMType.Array _ _ -> return ()
-        t -> do
-          defVal <- createDefaultValue cc contract' t
-          for_ (toBasic defVal) $ markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n])
-    -- SVMType.Bool -> markDiffForAction to (MS.StoragePath [MS.Field $ BC.pack $ labelToString n]) $ MS.BBool False
 
     forM_ (reverse $ contract' ^. CC.parents) $ \parent -> do
       for_ (M.lookup parent . CC._funcConstructorCalls =<< contract' ^. CC.constructor) $ \args'' -> do
