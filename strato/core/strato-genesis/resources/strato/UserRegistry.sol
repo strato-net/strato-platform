@@ -118,4 +118,8 @@ contract record User is Proxy, Authorizable {
         variadic result = address(contractToCall).call(functionName, args);
         return result;
     }
+
+    function authorize(address _target, address _account, uint _authorizations) public onlyOwner {
+        _authorize(_target, _account, _authorizations);
+    }
 }
