@@ -59,7 +59,6 @@ export interface ContractValidationResult {
 
 // Transaction Detail Interfaces
 export interface DepositTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   chainId?: number;
   from: string;
@@ -76,7 +75,6 @@ export interface DepositTransaction {
 }
 
 export interface WithdrawTransaction {
-  transaction_hash: string;
   block_timestamp: string;
   from: string;
   to: string;

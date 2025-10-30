@@ -19,7 +19,7 @@ export const activityFeedApi = {
     if (filters.limit) params.append('limit', filters.limit.toString());
     if (filters.offset) params.append('offset', filters.offset.toString());
     
-    if (filters.contract_name) params.append('contract_name', filters.contract_name);
+    if (filters.contract_name) params.append('storage.contract.contract_name', filters.contract_name);
     if (filters.event_name) params.append('event_name', filters.event_name);
     if (filters.transaction_sender) params.append('transaction_sender', filters.transaction_sender);
 
