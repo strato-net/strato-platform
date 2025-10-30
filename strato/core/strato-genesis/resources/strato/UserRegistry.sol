@@ -4,15 +4,14 @@ import "../contracts/concrete/Proxy/Proxy.sol";
 
 /*
 Why do we make UserRegistry and User inherit from Proxy, rather than use the normal Proxy pattern?
-Rationale: We want the UserRegistry and User contracts to adhere to certain laws, and we want
-to make it impossible to override these principles.
-Laws:
+Rationale: We want the UserRegistry and User contracts to adhere to certain requirements, and we want
+to make it impossible to override these requirements.
+Requirements:
 1. Every username must map to one and only one User contract address
-2. 
+2. User contracts must be able to operate as reverse proxies for end users
 */
 
 contract record UserRegistry is Proxy {
-    address internal canCreateUserDelegate;
     constructor(address _logicContract, address _initialOwner) Proxy(_logicContract, _initialOwner) { 
     }
         
@@ -33,7 +32,7 @@ contract record UserRegistry is Proxy {
         // the CREATE2 address only depends on the _username salt,
         // allowing anyone to derive the address for a given username
         User newUser = new User{salt: _username}(_username);
-        newUser.transferOwnership(_initialOwner);
+        initializeUser(_username, _initialOwner, address(newUser));
         return address(newUser);
     }
         
@@ -42,15 +41,19 @@ contract record UserRegistry is Proxy {
     }
 
     function canCreateUser(string _username, address _initialOwner) public returns (bool) {
-        if (canCreateUserDelegate != address(0)) {
-            return canCreateUserDelegate.delegatecall("canCreateUser", _username, _initialOwner);
+        if (logicContract != address(0)) {
+            return logicContract.delegatecall("canCreateUser", _username, _initialOwner);
         } else {
             return true; // By default we let anyone create a User
         }
     }
 
-    function setCanCreateUserDelegate(address _canCreateUserDelegate) public onlyOwner {
-        canCreateUserDelegate = _canCreateUserDelegate;
+    function initializeUser(string _username, address _initialOwner, address _newUser) internal {
+        if (logicContract != address(0)) {
+            logicContract.delegatecall("initializeUser", _username, _initialOwner, _newUser);
+        } else {
+            User(_newUser).transferOwnership(_initialOwner);
+        }
     }
 }
 
