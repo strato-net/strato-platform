@@ -1401,7 +1401,7 @@ expToVar' (CC.FunctionCall _ (CC.NewExpression _ (SVMType.UnknownLabel contractN
   (hsh, cc) <- getCurrentCodeCollection
   salt <- saltTextToValue saltExpressionText
   argVals <- argsToVals args
-  newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
+  newAddress <- getNewAddressWithSalt creator salt hsh (SString contractName' : argVals)
   $logDebugS "DEBUG" $ T.pack $ (show hsh) ++ "  " ++ show newAddress
   execResults <- create' creator newAddress hsh cc contractName' argVals
   onTraced $ do
@@ -1448,16 +1448,16 @@ expToVar' (CC.FunctionCall _ e args) = do
             (SAddress addr _, "derive") -> do
               (_, hsh, _) <- getCodeAndCollection addr
               let (salt, args'') = case argVals of
-                    (SString s:vs) -> (s,) $ case reverse vs of
+                    (SString s:SString n:vs) -> (s,) . (SString n:) $ case reverse vs of
                       SVariadic v : rest -> reverse rest ++ v
                       _ -> vs
-                    _ -> typeError "first arugment must be a string " args
+                    _ -> typeError "derive: first two arguments must be contract name and salt " args
                   newAddress =
                     getNewAddressWithSalt_unsafe
                       addr
                       salt
                       (keccak256ToByteString hsh)
-                      (show args'')
+                      args''
               onTraced $ do
                 liftIO $
                   putStrLn $
@@ -2122,7 +2122,7 @@ callBuiltin "int" args = return $ intBuiltin args
 callBuiltin "decimal" args = return $ decimalBuiltin args
 callBuiltin "identity" [v] = return v
 callBuiltin "log" args = SNULL <$ traverse (liftIO . putStrLn <=< showSM) args
-callBuiltin "keccak256" args = SString . keccak256ToHex . hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "keccak256" args = pure . SString . keccak256ToHex . hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pack h) of
   Left err -> invalidArguments err ("" :: String)
   Right bytestringHash -> do
@@ -2144,8 +2144,8 @@ callBuiltin "ecrecover" [SString h, SInteger v, r', s'] = case B16.decode (BC.pa
     case theSignerAddress of
       Nothing -> return . ((flip SAddress) False) $ fromIntegral theZero
       Just theAddress -> return . ((flip SAddress) False) $ theAddress
-callBuiltin "sha256" args = SString . BC.unpack . SHA256.hash . rlpSerialize <$> rlpEncodeValues args
-callBuiltin "ripemd160" args = SString . BC.unpack . RIPEMD160.hash . rlpSerialize <$> rlpEncodeValues args
+callBuiltin "sha256" args = pure . SString . BC.unpack . SHA256.hash . rlpSerialize $ rlpEncodeValues args
+callBuiltin "ripemd160" args = pure . SString . BC.unpack . RIPEMD160.hash . rlpSerialize $ rlpEncodeValues args
 callBuiltin "modExp" [SInteger b, SInteger e, SInteger m] = pure . SInteger $ Builtins.modExp b e m
 callBuiltin "ecAdd" [SInteger x1, SInteger y1, SInteger x2, SInteger y2] =
   let (x, y) = Builtins.ecAdd (x1, y1) (x2, y2)
@@ -2199,7 +2199,7 @@ callBuiltin "create" args@(SString contractName' : SString contractSrc : argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
     Nothing -> internalError "a call to create did not create an address" execResults
-callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc : argVals) = do
+callBuiltin "create2" args@(salt : n@(SString contractName') : SString contractSrc : argVals) = do
   when (contractName' == "" || contractSrc == "") $
     invalidArguments "The contract name and src arguments for the create2 function should not be empty" args
 
@@ -2213,7 +2213,7 @@ callBuiltin "create2" args@(salt : SString contractName' : SString contractSrc :
   -- testnet won't exist anymore and the stateroot mismatches will be fixed.
   isRunningTests <- Env.runningTests <$> getEnv
   (hsh, cc) <- codeCollectionFromSource isRunningTests True $ BC.pack contractSrc
-  newAddress <- getNewAddressWithSalt creator salt hsh $ show argVals
+  newAddress <- getNewAddressWithSalt creator salt hsh $ n:argVals
   execResults <- create' creator newAddress hsh cc contractName' argVals
   case erNewContractAddress execResults of
     Just nca -> pure $ ((flip SAddress) False) nca
@@ -2317,7 +2317,7 @@ runTheConstructors from to hsh cc contractName' argVals' = do
     --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
     let getUsername []     = pure "BlockApps" -- I'm cheating
         getUsername (x:xs) = do
-          userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "userName"]
+          userNameValue <- getSolidStorageKeyVal' x $ MS.StoragePath [MS.Field "username"]
           case userNameValue of
             MS.BString userNameString -> pure $ DT.decodeUtf8 userNameString
             _ -> getUsername xs

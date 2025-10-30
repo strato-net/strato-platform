@@ -29,7 +29,7 @@ import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResu
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
-import Blockchain.Strato.Model.Address (deriveAddressWithSalt)
+import Blockchain.Strato.Model.Address (getNewAddressWithSalt_unsafe)
 import Blockchain.Strato.Model.Secp256k1
 import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
@@ -377,7 +377,7 @@ walletInCirrus
     where
       cirrusSearchPath :: (MonadLogger m) => m String
       cirrusSearchPath = do
-        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just $ show [SString $ commonName])
+        let derivedAddr = getNewAddressWithSalt_unsafe userRegAddr commonName mHash [SString $ commonName]
             derivedAddr' = show derivedAddr
             path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
         $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'

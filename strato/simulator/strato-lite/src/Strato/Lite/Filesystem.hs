@@ -97,8 +97,10 @@ createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost val
     "helium" -> pure Helium.genesisBlock
     _ -> do
       let self = fromPrivateKey privKey
-      pure . insertMercataGovernanceContract self [Validator self] [self]
-           $ Helium.genesisBlock
+      pure $ Helium.genesisBlockTemplate Helium.heliumConfig
+        { Helium.hgbc_validators = [Validator self]
+        , Helium.hgbc_admins     = [self]
+        }
   B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo'
   genesisInfo <- getGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs

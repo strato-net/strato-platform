@@ -186,34 +186,29 @@ instance Ord Value where
   compare x y = todo "Value/Ord" (x, y)
 
 instance RLPSerializable Value where
-  rlpEncode (SInteger i) = RLPArray [RLPString "I", rlpEncode i]
-  rlpEncode (SString s) = RLPArray [RLPString "S", rlpEncode s]
-  rlpEncode x = todo "Value/rlpEncode" x
-
-  rlpDecode (RLPArray [RLPString "I", i]) = SInteger $ rlpDecode i
-  rlpDecode (RLPArray [RLPString "S", s]) = SString $ rlpDecode s
+  rlpEncode = rlpEncodeValue
   rlpDecode x = todo "Value/rlpDecode" x
 
-rlpEncodeVariable :: MonadIO m => Variable -> m RLPObject
-rlpEncodeVariable (Variable r) = rlpEncodeValue =<< liftIO (readIORef r)
+rlpEncodeVariable :: Variable -> RLPObject
+rlpEncodeVariable (Variable _) = rlpEncodeValue SNULL
 rlpEncodeVariable (Constant v) = rlpEncodeValue v
 
-rlpEncodeValue :: MonadIO m => Value -> m RLPObject
+rlpEncodeValue :: Value -> RLPObject
 rlpEncodeValue SNULL = rlpEncodeValue $ SInteger 0
 rlpEncodeValue SReference{} = rlpEncodeValue $ SInteger 0
-rlpEncodeValue (SInteger i) = pure $ rlpEncode i
-rlpEncodeValue (SString s) = pure $ rlpEncode s
-rlpEncodeValue (SDecimal decimal) = pure $ rlpEncode $ show decimal
-rlpEncodeValue (SBool b) = pure $ rlpEncode b
-rlpEncodeValue (SAddress a _) = pure $ rlpEncode a
-rlpEncodeValue (SEnumVal _ _ i) = pure $ rlpEncode i
-rlpEncodeValue (SStruct _ m) = RLPArray <$> traverse (rlpEncodeVariable . snd) (M.toList m)
-rlpEncodeValue (STuple v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
-rlpEncodeValue (SArray v) = RLPArray <$> traverse rlpEncodeVariable (V.toList v)
-rlpEncodeValue (SVariadic vs) = RLPArray <$> traverse rlpEncodeValue vs
-rlpEncodeValue _ = pure $ RLPArray []
+rlpEncodeValue (SInteger i) = rlpEncode i
+rlpEncodeValue (SString s) = rlpEncode s
+rlpEncodeValue (SDecimal decimal) = rlpEncode $ show decimal
+rlpEncodeValue (SBool b) = rlpEncode b
+rlpEncodeValue (SAddress a _) = rlpEncode a
+rlpEncodeValue (SEnumVal _ _ i) = rlpEncode i
+rlpEncodeValue (SStruct _ m) = RLPArray $ rlpEncodeVariable . snd <$> M.toList m
+rlpEncodeValue (STuple v) = RLPArray $ rlpEncodeVariable <$> V.toList v
+rlpEncodeValue (SArray v) = RLPArray $ rlpEncodeVariable <$> V.toList v
+rlpEncodeValue (SVariadic vs) = rlpEncodeValues vs
+rlpEncodeValue _ = RLPArray []
 
-rlpEncodeValues :: MonadIO m => [Value] -> m RLPObject
+rlpEncodeValues :: [Value] -> RLPObject
 rlpEncodeValues [x] = rlpEncodeValue x
 rlpEncodeValues xs = rlpEncodeValue $ STuple $ V.fromList $ Constant <$> xs
 
