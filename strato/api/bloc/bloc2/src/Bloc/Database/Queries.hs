@@ -95,7 +95,7 @@ getContractByAccountsFilterParams aParams = runMaybeT $ do
     -- Ideally, we wouldn't have to hardcode any of these names in 
     -- the API, but this should get us back up and running for the
     --  time being. 
-    Just "Proxy" -> do
+    Just name | name `elem` ["Proxy", "UserRegistry", "User"] -> MaybeT . fmap (maybe (Just []) Just) . runMaybeT $ do
       a <- MaybeT . pure $ aParams ^. qaAddress
       (StorageAddress _ v _) <- MaybeT
         . fmap listToMaybe
