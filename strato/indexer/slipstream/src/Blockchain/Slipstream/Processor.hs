@@ -46,7 +46,7 @@ import Data.Maybe
 import Data.Source
 import Data.Text (Text)
 import qualified Data.Text as T
-import SolidVM.Model.CodeCollection hiding (contractName)
+import SolidVM.Model.CodeCollection hiding (contractName, events)
 import qualified SolidVM.Model.Type as SVMType
 import Text.Tools (boringBox, multilineLog)
 import Prelude hiding (lookup)
@@ -128,22 +128,23 @@ parseActions events' =
   splitActions
     . filter matters
     . concatMap (flatten)
-    $ [a | VME.NewAction a <- events']
+    $ [blockData | blockData@VME.NewBlockData{} <- events']
 
 parseEvents :: [VME.VMEvent] -> [AggregateEvent]
 parseEvents = concatMap parseEvent
   where
-    parseEvent (VME.NewAction a) = zipWith (mkAggregateEvent a) [1..] (toList (Action._events a))
+    parseEvent blockData@VME.NewBlockData{..} = zipWith (mkAggregateEvent blockData) [1..] (toList events)
     parseEvent _ = []
-    mkAggregateEvent a idx e =
+    mkAggregateEvent VME.NewBlockData{..} idx e =
       AggregateEvent
-        { eventBlockHash = Action._blockHash a,
-          eventBlockTimestamp = Action._blockTimestamp a,
-          eventBlockNumber = Action._blockNumber a,
-          eventTxSender = Action._transactionSender a,
+        { eventBlockHash = blockHash,
+          eventBlockTimestamp = blockTimestamp,
+          eventBlockNumber = blockNumber,
+          eventTxSender = transactionSender,
           eventEvent = e, 
           eventIndex = idx
         }
+    mkAggregateEvent _ _ _ = error "internal error in parseEvents"
 
 getCollectionsFromContract :: ContractF () -> [(T.Text, [SVMType.Type], SVMType.Type)] -- (collection name, key type(s), value type)
 getCollectionsFromContract = mapMaybe (uncurry filterAndExtract) . Map.toList . _storageDefs
@@ -172,8 +173,8 @@ processTheMessages messages = do
       -- level like this
       creates =
         [(cc, cr) | VME.CodeCollectionAdded cc cr <- messages]
-      delegatecalls = concatMap toList
-        [Action._delegatecalls a | VME.NewAction a <- messages]
+      delegatecalls' = concatMap toList
+        [delegatecalls | VME.NewBlockData{..} <- messages]
       transactionResults = [tr | VME.NewTransactionResult tr <- messages]
 
   fkeys <- mapOutput Right . outputDataDedup . fmap concat . forM creates $ \(cc, cr) -> do
@@ -231,7 +232,7 @@ processTheMessages messages = do
       unless (null $ collectionInserts ins) $
         insertCollectionTable $ collectionInserts ins
 
-    forM_ delegatecalls insertDelegatecall
+    forM_ delegatecalls' insertDelegatecall
 
   let processedEventArrays = concatMap aggEventToCollectionRows events'
 

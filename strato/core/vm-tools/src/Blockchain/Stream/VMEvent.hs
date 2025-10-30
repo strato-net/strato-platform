@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Blockchain.Stream.VMEvent
   ( VMEvent(..),
@@ -15,19 +16,35 @@ import Blockchain.Data.TransactionResult
 import Blockchain.EthConf
 import Blockchain.KafkaTopics
 
-import Blockchain.Stream.Action (Action)
+import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Event
+import Blockchain.Strato.Model.Keccak256
+import Blockchain.Stream.Action (Delegatecall, ActionData)
 import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
 import Data.Binary
+import Data.Foldable
+import qualified Data.Map.Ordered as OMap
+import Data.Sequence (Seq)
 import Data.Text (Text)
+import Data.Time
 import GHC.Generics
-import SolidVM.Model.CodeCollection
+import SolidVM.Model.CodeCollection hiding (Event, events)
 import Text.Format
 import Text.Tools
 
 data VMEvent
-  = NewAction Action
+  = NewBlockData
+    { blockHash :: Keccak256,
+      blockTimestamp :: UTCTime,
+      blockNumber :: Integer,
+      transactionSender :: Address,
+      actionData :: OMap.OMap Address ActionData,
+      newCodeCollections :: [(Text, CodeCollection)],
+      events :: Seq Event,
+      delegatecalls :: Seq Delegatecall
+    }
   | CodeCollectionAdded
       { codeCollection :: CodeCollectionF (),
         creator :: Text
@@ -36,7 +53,15 @@ data VMEvent
   deriving (Show, Generic)
 
 instance Format VMEvent where
-  format (NewAction a) = "NewAction:\n" ++ tab (format a)
+  format NewBlockData{..} = "NewBlockData:\n" ++ tab (
+    "blockHash: " ++ format blockHash ++ "\n"
+      ++ "actionBlockTimestamp: " ++ show blockTimestamp ++ "\n"
+      ++ "actionBlockNumber: " ++ show blockNumber ++ "\n"
+      ++ "actionTransactionSender: " ++ format transactionSender ++ "\n"
+      ++ "actionData:\n" ++ unlines (map (\(k, v) -> tab $ format k ++ ":\n" ++ (tab $ format v)) $ OMap.assocs actionData) ++ "\n"
+      ++ "actionEvents: " ++ unlines (map show $ toList events) ++ "\n"
+      ++ "actionDelegatecalls: " ++ unlines (map show $ toList delegatecalls) ++ "\n"
+    )
   format (CodeCollectionAdded _ cr) =
     "CodeCollectionAdded: (" ++ show cr ++ ") "
   format (NewTransactionResult tr) = "NewTransactionResult:\n" ++ tab (format tr)

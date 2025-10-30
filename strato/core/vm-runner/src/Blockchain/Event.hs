@@ -93,8 +93,7 @@ data BlockVerificationFailure = BlockVerificationFailure
   } deriving (Eq, Show)
 
 data VmOutEvent
-  = OutVMEvents [VMEvent]
-  | OutBlock OutputBlock
+  = OutBlock OutputBlock
   | OutIndexEvent IndexEvent
   | OutStateDiff StateDiff
   | OutLog LogDB
@@ -141,7 +140,6 @@ newOutBatch =
 
 insertOutBatch :: VmOutEvent -> VmOutEventBatch -> VmOutEventBatch
 insertOutBatch e b = case e of
-  OutVMEvents a -> b {outVMEvents = outVMEvents b `DL.snoc` a}
   OutBlock a -> b {outBlocks = outBlocks b `DL.snoc` a}
   OutIndexEvent a -> b {outIndexEvents = outIndexEvents b `DL.snoc` a}
   OutStateDiff a -> b {outStateDiffs = outStateDiffs b `DL.snoc` a}

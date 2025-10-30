@@ -15,8 +15,8 @@ module Blockchain.Slipstream.Data.Action where
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action (Action (..), ActionData (..), DataDiff (..))
+import qualified Blockchain.Stream.Action as Action (ActionData (..), DataDiff (..))
+import qualified Blockchain.Stream.VMEvent as VME
 import Control.DeepSeq
 import Data.Aeson
 import qualified Data.Aeson as JSON
@@ -60,18 +60,19 @@ instance Binary AggregateEvent where
       Just val -> return val
       Nothing -> error "error decoding AggregateEvent"
 
-flatten :: Action -> [AggregateAction]
-flatten Action.Action {..} = flip map (OMap.assocs _actionData) $
+flatten :: VME.VMEvent -> [AggregateAction]
+flatten VME.NewBlockData{..} = flip map (OMap.assocs actionData) $
   \(address, Action.ActionData {..}) ->
     -- It's a Create because I said so
     AggregateAction
-          { actionBlockHash = _blockHash,
-            actionBlockTimestamp = _blockTimestamp,
-            actionBlockNumber = _blockNumber,
-            actionTxSender = _transactionSender,
+          { actionBlockHash = blockHash,
+            actionBlockTimestamp = blockTimestamp,
+            actionBlockNumber = blockNumber,
+            actionTxSender = transactionSender,
             actionAddress = address,
             actionStorage = _actionDataStorageDiffs
           }
+flatten _ = []
 
 formatAction :: AggregateAction -> Text
 formatAction AggregateAction {..} =

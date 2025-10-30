@@ -52,7 +52,8 @@ import qualified Blockchain.Strato.StateDiff as StateDiff (StateDiff (blockHash,
 import Blockchain.Strato.StateDiff.Database
 import Blockchain.Strato.StateDiff.Kafka (assertStateDiffTopicCreation)
 import qualified Blockchain.Stream.Action as A
-import Blockchain.Stream.VMEvent
+import Blockchain.Stream.VMEvent (VMEvent, produceVMEvents', runKafkaVMEvents)
+import qualified Blockchain.Stream.VMEvent as VMEVENT
 import Blockchain.SyncDB
 import Control.Monad
 import Control.Monad.Change.Alter (Alters, Selectable)
@@ -230,7 +231,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
   ccas <- fmap catMaybes . for (GI.codeInfo genesisInfo) $ \(GI.CodeInfo src mName) -> for mName $ \_ -> do
     let srcHash = hash $ T.encodeUtf8 src
     cc <- codeCollectionFromHash False True srcHash
-    pure $ CodeCollectionAdded (() <$ cc) "BlockApps"
+    pure $ VMEVENT.CodeCollectionAdded (() <$ cc) "BlockApps"
 
   pub Nothing ccas
 
@@ -276,18 +277,18 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
       -> AccountDiff 'Eventual
       -> m VMEvent
     toAction addressEvents delegatecalls a d = do
-      pure . NewAction $ A.Action
-            { A._blockHash = blockHeaderHash $ blockHeader genesisBlock,
-              A._blockTimestamp =
+      return VMEVENT.NewBlockData
+            { VMEVENT.blockHash = blockHeaderHash $ blockHeader genesisBlock,
+              VMEVENT.blockTimestamp =
                 blockHeaderTimestamp $ blockHeader genesisBlock,
-              A._blockNumber =
+              VMEVENT.blockNumber =
                 blockHeaderBlockNumber $ blockHeader genesisBlock,
-              A._transactionSender = Ad.Address 0,
-              A._actionData =
+              VMEVENT.transactionSender = Ad.Address 0,
+              VMEVENT.actionData =
                 OMap.singleton (a, A.ActionData storageDiff),
-              A._newCodeCollections = [],
-              A._events = addressEvents,
-              A._delegatecalls = delegatecalls
+              VMEVENT.newCodeCollections = [],
+              VMEVENT.events = addressEvents,
+              VMEVENT.delegatecalls = delegatecalls
             }
       where
 

@@ -61,7 +61,8 @@ import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
 import Blockchain.Stream.Action hiding (blockHash)
 import qualified Blockchain.Stream.Action as Action
-import Blockchain.Stream.VMEvent
+import Blockchain.Stream.VMEvent (VMEvent, produceVMEvents)
+import qualified Blockchain.Stream.VMEvent as VMEVENT
 import Blockchain.TheDAOFork
 import Blockchain.Timing
 import Blockchain.VM.SolidException (SolidException(PaymentError, TooMuchGas))
@@ -318,19 +319,19 @@ sendNewActionMessage b trrs = do
         | ((addr, path), val) <- M.toList theMap
         ]
 
-      action :: Action
-      action = Action {
-        _blockHash=blockHash b,
-        _blockTimestamp=blockHeaderTimestamp bd,
-        _blockNumber=blockHeaderBlockNumber bd,
-        _transactionSender=0x0,
-        _actionData=O.fromList $ M.toList recombined,
-        _newCodeCollections=[],
-        _events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
-        _delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
+      newBlockDataEvent :: VMEvent
+      newBlockDataEvent = VMEVENT.NewBlockData {
+        blockHash=blockHash b,
+        blockTimestamp=blockHeaderTimestamp bd,
+        blockNumber=blockHeaderBlockNumber bd,
+        transactionSender=0x0,
+        actionData=O.fromList $ M.toList recombined,
+        newCodeCollections=[],
+        events=Seq.fromList $ concat $ map (either (const []) erEvents . trrResult) trrs,
+        delegatecalls=mconcat $ map (either (const Seq.empty) (fromMaybe Seq.empty . fmap _delegatecalls . erAction) . trrResult) trrs
         }
 
-  _ <- produceVMEvents $ [NewAction action]
+  _ <- produceVMEvents $ [newBlockDataEvent]
 
   return ()
 
@@ -649,7 +650,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
 
   yieldMany $ OutLog . mkLogEntry ranBlockHash theHash <$> theLogs
   yield . OutEvent $ mkEventEntry <$> theEvents
-  let txr = NewTransactionResult $ TransactionResult
+  let txr = VMEVENT.NewTransactionResult $ TransactionResult
         { transactionResultBlockHash = ranBlockHash,
           transactionResultTransactionHash = theHash,
           transactionResultMessage = message,
@@ -665,16 +666,21 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultDeletedStorage = "",
           transactionResultStatus = Just txrStatus
         }
-  yield . OutVMEvents . (txr:) $ if not flags_diffPublish
-    then []
-    else case erAction <$> result of
-      Right (Just act) -> extractCodeCollectionAddedMessages act
-      _ -> []
+  let qq = (txr:) $ if not flags_diffPublish
+        then []
+        else case erAction <$> result of
+               Right (Just act) -> extractCodeCollectionAddedMessages act
+               _ -> []
+
+  _ <- produceVMEvents qq
+
+  return ()
+
 
 extractCodeCollectionAddedMessages :: Action.Action -> [VMEvent]
 extractCodeCollectionAddedMessages a =
   let mkCCAnouncement (userName, cc) =
-        CodeCollectionAdded
+        VMEVENT.CodeCollectionAdded
               { codeCollection = const () <$> cc,
                 creator = userName
               }
