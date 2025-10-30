@@ -95,8 +95,6 @@ exampleTxResult =
     "New Storage"
     "Deleted Storage"
     Nothing
-    "BlockApps"
-    "Sample App"
 
 instance ToSchema TransactionResult where
   declareNamedSchema _ =

@@ -625,14 +625,14 @@ outputTransactionResult ::
   ConduitT a VmOutEvent m ()
 outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHash} result deltaT beforeMap afterMap newAddresses) = do
   let t = otBaseTx ot
-      (txrStatus, message, gasRemaining, creator, appName) =
+      (txrStatus, message, gasRemaining) =
         case result of
-          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0, "", "") -- TODO Also include the trace
+          Left err -> let fmt = format err in (Failure "Execution" Nothing (ExecutionFailure fmt) Nothing Nothing (Just fmt), fmt, 0) -- TODO Also include the trace
           Right r -> case erException r of
-            Nothing -> (Success, "Success!", erRemainingTxGas r, erCreator r, erAppName r)
+            Nothing -> (Success, "Success!", erRemainingTxGas r)
             Just ex ->
               let fmt = either show show ex
-               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0, "", "")
+               in (Failure "Execution" Nothing (ExecutionFailure $ show ex) Nothing Nothing (Just fmt), fmt, 0)
       gasUsed = fromInteger $ transactionGasLimit t - gasRemaining
       etherUsed = gasUsed
 
@@ -663,9 +663,7 @@ outputTransactionResult b hashFunction (TxRunResult ot@OutputTx {otHash = theHas
           transactionResultTime = realToFrac deltaT,
           transactionResultNewStorage = "",
           transactionResultDeletedStorage = "",
-          transactionResultStatus = Just txrStatus,
-          transactionResultCreator = creator,
-          transactionResultAppName = appName
+          transactionResultStatus = Just txrStatus
         }
   yield . OutVMEvents . (txr:) $ if not flags_diffPublish
     then []

@@ -321,12 +321,8 @@ create' creator originAddress issuerAcct issuerName newAddress ch cc contractNam
         erAction = Just finalAct,
         erException = Nothing,
         erPragmas = CC._pragmas cc,
-        erCreator = issuerName,
-        erAppName = parentName',
         erNewValidators = newV,
-        erRemovedValidators = remV,
-        erNewCerts = [],
-        erRevokedCerts = []
+        erRemovedValidators = remV
       }
 
 call ::
@@ -392,9 +388,13 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
         !argExps = either (parseError "call arguments") id eArgExps
     argVals <- argsToVals argExps
 
-    ((creator, appName), returnVal) <-
-      traverse (fmap Just . maybe (return "()") encodeForReturn)
-        =<< call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
+    maybeVal <-
+      call' sender' codeAddress (fromMaybe CC.DefaultCall mFuncCallType) (textToLabel funcName) argVals
+
+    returnVal <-
+      case maybeVal of
+        Nothing -> return "()"
+        Just ret -> encodeForReturn ret
 
     finalAct <- Mod.get (Mod.Proxy @Action)
     finalEvs <- Mod.get (Mod.Proxy @(Q.Seq Event))
@@ -404,7 +404,7 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
       ExecResults
         { erRemainingTxGas = 0, --Just use up all the allocated gas for now....
           erRefund = 0,
-          erReturnVal = returnVal,
+          erReturnVal = Just returnVal,
           erTrace = [],
           erLogs = [],
           erEvents = toList finalEvs,
@@ -413,12 +413,8 @@ callReturnEnv blockData codeAddress sender' proposer' availableGas origin' txHas
           erAction = Just $ finalAct,
           erException = Nothing, -- tells me if theres an exception
           erPragmas = [],
-          erCreator = creator,
-          erAppName = appName,
           erNewValidators = newV,
-          erRemovedValidators = remV,
-          erNewCerts = [],
-          erRevokedCerts = []
+          erRemovedValidators = remV
         }
 
 call' ::
@@ -428,7 +424,7 @@ call' ::
   CC.FunctionCallType ->
   SolidString ->
   ValList ->
-  m ((SolidString, SolidString), Maybe Value)
+  m (Maybe Value)
 call' from to' fnCalltype functionName valList = do
   (isExternal, storageAddress, codeAddress) <- case fnCalltype of
     CC.DelegateCall -> return (True, from, to')
@@ -443,15 +439,6 @@ call' from to' fnCalltype functionName valList = do
         else pure to'
   let shouldPushSender = bool False (fnCalltype /= CC.DelegateCall) isExternal
   (contract, hsh, cc) <- getCodeAndCollection codeAddress
-  parentName <- do
-    ch <- addressStateCodeHash <$> A.lookupWithDefault (A.Proxy @AddressState) storageAddress
-    case ch of
-      SolidVMCode name _ -> pure $ stringToLabel name -- Name of the parent
-      _ -> pure ""
-
-  let parentName' = if parentName == (CC._contractName contract) then "" else parentName
-
-  (_, _, ctrName) <- getCreator codeAddress
 
   initializeAction storageAddress
 
@@ -600,7 +587,7 @@ call' from to' fnCalltype functionName valList = do
     -- TODO: THIS IS A HACK!! I've hardcoded the creator to "BlockApps" to get things working in the app,
     --       but this needs to be fixed ASAP so that Slipstream can use the real creator name
     addDelegatecall storageAddress codeAddress "BlockApps" (T.pack codeContractParentName) (T.pack codeContractName)
-  ((ctrName, parentName'),) <$> logFunctionCall valList storageAddress contract functionName f
+  logFunctionCall valList storageAddress contract functionName f
   where
     convertValueToStoragePathPiece :: Value -> Maybe MS.StoragePathPiece
     convertValueToStoragePathPiece v = 
@@ -612,7 +599,7 @@ call' from to' fnCalltype functionName valList = do
         _ -> Nothing
 
 callWithResult :: MonadSM m => Address -> Address -> CC.FunctionCallType -> SolidString -> ValList -> m (Maybe Value)
-callWithResult from to fnCalltype functionName valList = snd <$> call' from to fnCalltype functionName valList
+callWithResult from to fnCalltype functionName valList = call' from to fnCalltype functionName valList
 
 -- set the hidden ":creator" field
 setCreator :: MonadSM m => Address -> Address -> Address -> CC.Contract -> Integer -> m ()

@@ -111,8 +111,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    creator String
-    appName String
     deriving Eq Read Show Generic
 
 UserN json
