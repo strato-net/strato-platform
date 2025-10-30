@@ -11,10 +11,10 @@ import SolidVM.Solidity.SourceTools
 import Test.Hspec
 import Text.RawString.QQ
 
-runTheFuzzer :: String -> IO [FuzzerResult]
+runTheFuzzer :: String -> IO [FuzzerTestAndResult]
 runTheFuzzer c = fuzzer (defaultSourceTools Nothing) (SourceMap [("A.sol", T.pack c)])
 
-isSuccess :: FuzzerResult -> Bool
+isSuccess :: FuzzerResultF a -> Bool
 isSuccess (FuzzerSuccess _) = True
 isSuccess _ = False
 

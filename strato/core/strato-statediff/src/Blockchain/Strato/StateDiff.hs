@@ -27,17 +27,16 @@ import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia.Diff as Diff
-import Blockchain.Database.MerklePatricia.Internal
+import Blockchain.Database.MerklePatricia.Internal (Key, Val, StateRoot, unsafeGetAllKeyVals)
 import qualified Blockchain.Database.MerklePatricia.Internal as MP
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Conduit
 import Control.Monad (when)
-import Control.Monad.Change (Alters, Modifiable, Selectable)
+import Control.Monad.Change (Alters, Modifiable)
 import qualified Control.Monad.Change as A
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as B
 import Data.Function
 import Data.Kind (Type)
 import Data.Map (Map)
@@ -48,6 +47,7 @@ import Data.String
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics
+import SolidVM.Model.Storable
 import Text.Format
 
 -- | Describes all the changes that have occurred in the blockchain
@@ -67,7 +67,7 @@ data StateDiff = StateDiff
 
 data StorageDiff (v :: Detail)
   = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map B.ByteString (Diff B.ByteString v))
+  | SolidVMDiff (Map StoragePath (Diff BasicValue v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -81,10 +81,10 @@ instance StorableKey Word256 where
 instance StorableValue Word256 where
   decodeMPDBValue = retrieveMPDBValue
 
-instance StorableKey B.ByteString where
-  lookupStorageKey = fmap (fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
+instance StorableKey StoragePath where
+  lookupStorageKey = fmap (either (error . ("malformed storage path " ++)) id . parsePath . fromMaybe "") . lookupInMPDB "raw storage key" getRawStorageKeyFromHash
 
-instance StorableValue B.ByteString where
+instance StorableValue BasicValue where
   decodeMPDBValue = rlpDecode
 
 -- | Describes all the changes to a particular account.  The address is not
@@ -157,6 +157,10 @@ instance Detailed (Diff ByteString) where
   incrementalToEventual Delete {} = Value $ fromString ""
   incrementalToEventual x = Value $ newValue x
 
+instance Detailed (Diff BasicValue) where
+  incrementalToEventual Delete {} = Value $ fromString ""
+  incrementalToEventual x = Value $ newValue x
+
 instance Detailed (Diff Keccak256) where
   incrementalToEventual Delete {} = Value $ hash ""
   incrementalToEventual x = Value $ newValue x
@@ -170,8 +174,7 @@ stateDiff ::
     HasCodeDB m,
     HasHashDB m,
     HasStateDB m,
-    Modifiable BestBlockRoot m,
-    Selectable Address AddressState m
+    Modifiable BestBlockRoot m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -190,8 +193,7 @@ stateDiff' ::
   ( MonadLogger m,
     HasCodeDB m,
     HasHashDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   Maybe Word256 ->
   Integer ->
@@ -235,8 +237,7 @@ accountEnd ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   [N.Nibble] ->
   Val ->
@@ -244,7 +245,7 @@ accountEnd ::
 accountEnd k v = do
   address <- lookupAddress k
   let addrState = retrieveMPDBValue v
-  $logDebugS "accountEnd" . T.pack $ "End account state: " ++ show addrState
+  $logDebugS "accountEnd" . T.pack $ "End account state for " ++ formatAddressWithoutColor address ++ ": " ++ show addrState
   accountDiff <- eventualAccountState addrState
   return (address, accountDiff)
 
@@ -252,8 +253,7 @@ accountUpdate ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   [N.Nibble] ->
   Val ->
@@ -272,8 +272,7 @@ eventualAccountState ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   AddressState ->
   m (AccountDiff 'Eventual)
@@ -285,8 +284,8 @@ eventualAccountState
       addressStateCodeHash
     } =
     do
-      (kind, code) <- lookupCode addressStateCodeHash
-      storage <- eventualStorage kind addressStateContractRoot
+      code <- lookupCode addressStateCodeHash
+      storage <- eventualStorage addressStateContractRoot
       return
         AccountDiff
           { nonce = Just (Value addressStateNonce),
@@ -302,15 +301,13 @@ incrementalAccountState ::
   ( MonadLogger m,
     HasHashDB m,
     HasCodeDB m,
-    (MP.StateRoot `Alters` MP.NodeData) m,
-    Selectable Address AddressState m
+    (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
   AddressState ->
   AddressState ->
   m (AccountDiff 'Incremental)
 incrementalAccountState oldState newState = do
-  codeKind <- unsafeCodePtrToCodeKind (addressStateCodeHash newState)
-  storage <- (incrementalStorage codeKind `on` addressStateContractRoot) oldState newState
+  storage <- (incrementalStorage `on` addressStateContractRoot) oldState newState
   return
     AccountDiff
       { nonce = (diff `on` addressStateNonce) oldState newState,
@@ -331,17 +328,12 @@ eventualStorage ::
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
-  CodeKind ->
   StateRoot ->
   m (StorageDiff 'Eventual)
-eventualStorage kind storageRoot = do
+eventualStorage storageRoot = do
   allStorageKV <- unsafeGetAllKeyVals storageRoot
   let decodeAll = fmap (Map.map Value . Map.fromList) . (mapM (uncurry $ decodeStorageKV))
-  ( case kind of
-      EVM -> fmap EVMDiff . decodeAll
-      SolidVM -> fmap SolidVMDiff . decodeAll
-    )
-    allStorageKV
+  SolidVMDiff <$> decodeAll allStorageKV
 
 incrementalStorage ::
   ( MonadLogger m,
@@ -349,18 +341,13 @@ incrementalStorage ::
     HasCodeDB m,
     (MP.StateRoot `Alters` MP.NodeData) m
   ) =>
-  CodeKind ->
   StateRoot ->
   StateRoot ->
   m (StorageDiff 'Incremental)
-incrementalStorage kind oldRoot newRoot = do
+incrementalStorage oldRoot newRoot = do
   storageDiffs <- runConduit $ Diff.dbDiff oldRoot newRoot .| sinkList
   let decodeAll = fmap Map.fromList . mapM decodeDiffKV
-  ( case kind of
-      EVM -> fmap EVMDiff . decodeAll
-      SolidVM -> fmap SolidVMDiff . decodeAll
-    )
-    storageDiffs
+  SolidVMDiff <$> decodeAll storageDiffs
   where
     decodeDiffKV (Diff.Create k vNew) = do
       (key, newValue) <- decodeStorageKV (N.pack k) vNew
@@ -399,10 +386,9 @@ decodeStorageKV k v = do
 lookupAddress :: (MonadLogger m, HasHashDB m) => [N.Nibble] -> m Address
 lookupAddress (N.pack -> addrHash) = fromMaybe (Address 0) <$> lookupInMPDB "address" getAddressFromHash addrHash
 
-lookupCode :: (MonadLogger m, HasHashDB m, HasCodeDB m, Selectable Address AddressState m) => CodePtr -> m (CodeKind, ByteString)
-lookupCode (ExternallyOwned ch) = fromMaybe (EVM, "") <$> lookupInMPDB "contract code" getCode ch
-lookupCode (SolidVMCode _ ch) = fromMaybe (SolidVM, "") <$> lookupInMPDB "contract code" getCode ch
-lookupCode cp@(CodeAtAccount _ _) = maybe (pure (SolidVM, "")) lookupCode =<< unsafeResolveCodePtr cp
+lookupCode :: (MonadLogger m, HasCodeDB m) => CodePtr -> m ByteString
+lookupCode (ExternallyOwned ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
+lookupCode (SolidVMCode _ ch) = fromMaybe "" <$> lookupInMPDB "contract code" getCode ch
 
 lookupInMPDB ::
   (MonadLogger m, Format a) =>

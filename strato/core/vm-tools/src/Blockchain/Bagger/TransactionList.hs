@@ -11,7 +11,7 @@ module Blockchain.Bagger.TransactionList
 where
 
 import Blockchain.Data.TransactionDef
-import Blockchain.Sequencer.Event (OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Data.Foldable (foldl')
 import qualified Data.Map.Strict as M
 
@@ -19,9 +19,6 @@ type TransactionList = M.Map Integer OutputTx
 
 nonce :: OutputTx -> Integer
 nonce = transactionNonce . otBaseTx
-
-gasPrice :: OutputTx -> Integer
-gasPrice = transactionGasPrice . otBaseTx
 
 --emptyTransactionList :: TransactionList
 --emptyTransactionList = M.empty
@@ -34,13 +31,8 @@ singletonTransactionList t = M.singleton (transactionNonce $ otBaseTx t) t
 insertTransaction :: OutputTx -> TransactionList -> (Maybe OutputTx, OutputTx, TransactionList)
 insertTransaction t tl =
   let nonce' = nonce t
-      oldTx = M.lookup nonce' tl
-   in case oldTx of
-        Nothing -> (Nothing, t, M.insert nonce' t tl)
-        Just existing ->
-          if gasPrice existing <= gasPrice t
-            then (oldTx, t, M.insert nonce' t tl)
-            else (Just t, existing, tl)
+      (oldTx, newTL) = M.insertLookupWithKey (\_ a _ -> a) nonce' t tl
+   in (oldTx, t, newTL)
 
 trimBelowNonce :: Integer -> TransactionList -> ([OutputTx], TransactionList)
 trimBelowNonce nonce' tl = let (lt, gte) = M.partitionWithKey (\k _ -> k < nonce') tl in (M.elems lt, gte)

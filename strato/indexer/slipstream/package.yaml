@@ -17,6 +17,7 @@ dependencies:
   - common-log
   - evm-solidity
   - hflags
+  - monad-alter
   - raw-strings-qq
   - resourcet
 
@@ -35,16 +36,17 @@ library:
     - cross-monitoring
     - deepseq
     - extra
+    - filepath
     - format
     - lens
-    - lrucache
     - kafka-monad
-    - monad-alter
+    - network
     - persistent
-    - postgresql-typed
+    - postgresql-simple
     - prometheus-client
     - solid-vm-model
     - scientific
+    - source-tools
     - sql-monad
     - strato-conf
     - strato-model
@@ -68,10 +70,10 @@ executables:
       - kafka-monad
       - persistent-postgresql
       - process-monitor
-      - prometheus-client
-      - postgresql-typed
+      - postgresql-simple
       - slipstream
       - sql-monad
+      - text
       - transformers
       - wai-middleware-prometheus
       - warp
@@ -89,6 +91,7 @@ tests:
       - classy-prelude
       - conduit
       - containers
+      - data-default
       - hflags
       - hspec
       - hspec-expectations-lifted

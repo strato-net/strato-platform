@@ -21,6 +21,7 @@ where
 import Control.Lens
 import Control.Monad
 import Control.Monad.Change.Modify
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.State (StateT, evalStateT, execStateT)
 import Data.Default
 import qualified Data.IntMap as IM
@@ -415,3 +416,9 @@ class Removable k a f where
      This function is analogous to the `insert` function in `Alters`.
   -}
   remove :: Proxy a -> k -> f ()
+
+instance (Monad m, Selectable k v m, MonadTrans t) => Selectable k v (t m) where
+  select p = lift . select p
+
+instance (Monad m, Replaceable k v m, MonadTrans t) => Replaceable k v (t m) where
+  replace p k = lift . replace p k

@@ -213,96 +213,31 @@ exports[`BlockView: index render component with no recipient transactions 1`] = 
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        New Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Certificate Data
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        Revoked Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Address
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
@@ -512,96 +447,31 @@ exports[`BlockView: index render component with values 1`] = `
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        New Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Certificate Data
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        Revoked Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Address
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
@@ -722,96 +592,31 @@ exports[`BlockView: index render component without values 1`] = `
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         New Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>
   </div>
   <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
+    <div className=\\"col-sm-9\\">
       <div className=\\"h3\\">
         Removed Validators 
       </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Username
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        New Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Certificate Data
-              </h5>
-            </th>
-          </tr>
-        </thead>
-        <tbody />
-      </table>
-    </div>
-  </div>
-  <div className=\\"row\\">
-    <div className=\\"col-sm-12\\">
-      <div className=\\"h3\\">
-        Revoked Certificates 
-      </div>
-      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\" style={{...}}>
-        <thead>
-          <tr>
-            <th width=\\"60%\\">
-              <h5>
-                Address
-              </h5>
-            </th>
-          </tr>
-        </thead>
+      <table className=\\"pt-table pt-interactive pt-condensed pt-striped\\">
         <tbody />
       </table>
     </div>

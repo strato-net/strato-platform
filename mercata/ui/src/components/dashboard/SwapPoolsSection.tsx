@@ -1,0 +1,271 @@
+import { useEffect, useState, useRef } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CircleArrowDown, CircleArrowUp, Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { useUser } from '@/context/UserContext';
+import { useUserTokens } from '@/context/UserTokensContext';
+import { formatBalance } from '@/utils/numberUtils';
+import { useSwapContext } from '@/context/SwapContext';
+import { Pool } from '@/interface';
+import { rewardsEnabled } from '@/lib/constants';
+import LiquidityDepositModal from './LiquidityDepositModal';
+import LiquidityWithdrawModal from './LiquidityWithdrawModal';
+
+
+const SwapPoolsSection = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedPool, setSelectedPool] = useState<Pool | null>(null);
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
+  const [pools, setPools] = useState<Pool[]>([]);
+  const [loading, setLoading] = useState(false);
+  const poolPollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const operationInProgressRef = useRef(false);
+
+  const { fetchPools, getPoolByAddress } = useSwapContext();
+  const { fetchUsdstBalance, usdstBalance, voucherBalance } = useUserTokens();
+  const { userAddress } = useUser();
+
+  useEffect(() => {
+    fetchAndEnrichPools();
+  }, [fetchPools]);
+
+  useEffect(() => {
+    if (userAddress) {
+      fetchUsdstBalance(userAddress);
+    }
+  }, [userAddress, fetchUsdstBalance]);
+
+  useEffect(() => {
+    if (selectedPool && isDepositModalOpen) {
+      const pollPool = async () => {
+        try {
+          const updatedPool = await getPoolByAddress(selectedPool.address);
+          if (updatedPool) {
+            setSelectedPool(updatedPool);
+          }
+          await fetchUsdstBalance(userAddress);
+        } catch (error) {
+          console.error('Error polling pool:', error);
+        }
+      };
+
+      pollPool();
+      
+      poolPollIntervalRef.current = setInterval(pollPool, 10000);
+
+      return () => {
+        if (poolPollIntervalRef.current) {
+          clearInterval(poolPollIntervalRef.current);
+        }
+      };
+    }
+  }, [selectedPool?.address, isDepositModalOpen, getPoolByAddress, fetchUsdstBalance]);
+
+  const fetchAndEnrichPools = async () => {
+    if (operationInProgressRef.current) return;
+    
+    try {
+      setLoading(true);
+      const tempPools = await fetchPools();
+      setPools(tempPools);
+    } catch (err) {
+      console.error("Failed to fetch pools:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpenDepositModal = async (pool: Pool) => {
+    if (operationInProgressRef.current) return;
+    
+    setSelectedPool(pool);
+    setIsDepositModalOpen(true);
+  };
+
+  const handleOpenWithdrawModal = async (pool: Pool): Promise<void> => {
+    if (operationInProgressRef.current) return;
+
+    setSelectedPool(pool);
+    setIsWithdrawModalOpen(true);
+  };
+
+  const handleCloseWithdrawModal = () => {
+    setIsWithdrawModalOpen(false);
+    setSelectedPool(null);
+  };
+
+  const handleCloseDepositModal = () => {
+    setIsDepositModalOpen(false);
+    setSelectedPool(null);
+  };
+
+  const handleDepositSuccess = async () => {
+    // Refresh all data after successful deposit
+    await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
+  };
+
+  const handleWithdrawSuccess = async () => {
+    // Refresh all data after successful withdrawal
+    await fetchAndEnrichPools();
+    if (userAddress) {
+      await fetchUsdstBalance(userAddress);
+    }
+  };
+
+
+  const filteredPools = pools.filter(pool => 
+    pool.poolName?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  useEffect(() => {
+    return () => {
+      if (poolPollIntervalRef.current) {
+        clearInterval(poolPollIntervalRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div>
+      <div className="mb-4">
+        <div className="relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Search pairs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4">
+        {loading ? (
+          <div className="flex justify-center items-center h-12">
+            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        ) : !pools.length ? (
+          <div className="flex justify-center items-center h-12">
+            <div>No pools available</div>
+          </div>
+        ) : (
+          filteredPools.map((pool, id) => (
+            <Card key={id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+                  <div className="flex items-center">
+                    <div className="flex items-center -space-x-2 mr-3">
+                      {pool.tokenA?.images?.[0]?.value ? (
+                        <img
+                          src={pool.tokenA.images[0].value}
+                          alt={pool.tokenA._name || pool.poolName?.split('/')[0]}
+                          className="w-8 h-8 rounded-full z-10 border-2 border-white object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium z-10 border-2 border-white"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {pool.poolName?.slice(0, 2)}
+                        </div>
+                      )}
+                      {pool.tokenB?.images?.[0]?.value ? (
+                        <img
+                          src={pool.tokenB.images[0].value}
+                          alt={pool.tokenB._name || pool.poolName?.split('/')[1]}
+                          className="w-8 h-8 rounded-full border-2 border-white object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-xs text-white font-medium"
+                          style={{ backgroundColor: "red" }}
+                        >
+                          {pool.poolName?.split('/')[1].slice(0, 2)}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-medium">{pool.poolName}</h3>
+                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                        <span>Liquidity: {formatBalance(pool.lpToken._totalSupply, undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                      </div>
+                      <div className="flex items-center text-xs text-gray-500 mt-1">
+                        <span>Your Liquidity (Total): {formatBalance(pool.lpToken.totalBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                      </div>
+                      {rewardsEnabled && pool.lpToken.stakedBalance !== undefined && (
+                        <>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Staked: {formatBalance(pool.lpToken.stakedBalance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                          <div className="flex items-center text-xs text-gray-400 mt-1 ml-2">
+                            <span>• Unstaked: {formatBalance(pool.lpToken.balance || "0", undefined, 18, 1, 6)} {pool.lpToken._symbol}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end space-x-4">
+                    <div className="text-left sm:text-right">
+                      <div className="text-sm text-gray-500">APY</div>
+                      <div className="font-medium">{pool.apy ? `${pool.apy}%` : "N/A"}</div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Button
+                        size="sm"
+                        className="bg-strato-blue hover:bg-strato-blue/90"
+                        onClick={() => handleOpenDepositModal(pool)}
+                      >
+                        <CircleArrowDown className="mr-1 h-4 w-4" />
+                        <span className="hidden sm:inline">Deposit</span>
+                        <span className="sm:hidden">+</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-strato-blue text-strato-blue hover:bg-strato-blue/10"
+                        onClick={() => handleOpenWithdrawModal(pool)}
+                        disabled={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0)}
+                        title={BigInt(pool.lpToken.totalBalance || "0") === BigInt(0) ? "No LP tokens to withdraw" : "Withdraw"}
+                      >
+                        <CircleArrowUp className="mr-1 h-4 w-4" />
+                        <span className="hidden sm:inline">Withdraw</span>
+                        <span className="sm:hidden">-</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+
+      <LiquidityDepositModal
+        isOpen={isDepositModalOpen}
+        onClose={handleCloseDepositModal}
+        selectedPool={selectedPool}
+        onDepositSuccess={handleDepositSuccess}
+        operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
+      />
+
+      <LiquidityWithdrawModal
+        isOpen={isWithdrawModalOpen}
+        onClose={handleCloseWithdrawModal}
+        selectedPool={selectedPool}
+        onWithdrawSuccess={handleWithdrawSuccess}
+        operationInProgressRef={operationInProgressRef}
+        usdstBalance={usdstBalance}
+        voucherBalance={voucherBalance}
+      />
+    </div>
+  );
+};
+
+export default SwapPoolsSection;

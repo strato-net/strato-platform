@@ -17,33 +17,29 @@ module Bloc.Server.Utils
     emptyTxParams,
     waitFor,
     waitForWithTimeout,
-    getSigVals,
-    getBlockTimestamp,
+    getSigVals
   )
 where
 
 import Bloc.API.Users
 import Bloc.API.Utils
-import Blockchain.DB.SQLDB (sqlQuery)
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json (rtPrimeToRt)
+import Blockchain.Model.JsonBlock (rtPrimeToRt)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Concurrent (threadDelay)
 import Control.Monad (forM, when)
-import Control.Monad.Composable.SQL
+import qualified Control.Monad.Change.Alter as A
 import qualified Crypto.Secp256k1 as S
 import qualified Data.ByteString.Short as BSS
 import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
-import Data.Time (UTCTime)
 import Data.Traversable (for)
 import Data.Word
-import qualified Database.Esqueleto.Legacy as E
-import Handlers.BatchTransactionResult
 import Handlers.Transaction
+import Handlers.TransactionResult
 import qualified LabeledError
 import qualified MaybeNamed
 import SQLM
@@ -54,7 +50,9 @@ toMaybe :: Eq a => a -> a -> Maybe a
 toMaybe a b = if a == b then Nothing else Just b
 
 maybeTxBatchResult ::
-  HasSQL m =>
+  ( A.Selectable Keccak256 [TransactionResult] m
+  , A.Selectable TxsFilterParams [RawTransaction] m
+  ) =>
   [Keccak256] ->
   m [Maybe (RawTransaction, TransactionResult)]
 maybeTxBatchResult hashes = do
@@ -68,7 +66,9 @@ maybeTxBatchResult hashes = do
       _ -> Nothing
 
 getBatchBlocTxStatus ::
-  HasSQL m =>
+  ( A.Selectable Keccak256 [TransactionResult] m
+  , A.Selectable TxsFilterParams [RawTransaction] m
+  ) =>
   [Keccak256] ->
   m [(BlocTransactionStatus, Maybe (RawTransaction, TransactionResult))]
 getBatchBlocTxStatus hashes = do
@@ -152,13 +152,3 @@ getSigVals :: Signature -> (Word256, Word256, Word8)
 getSigVals (Signature (S.CompactRecSig r s v)) =
   let convert = bytesToWord256 . BSS.fromShort
    in (convert r, convert s, v + 0x1b)
-
-getBlockTimestamp :: HasSQL m => Integer -> m UTCTime
-getBlockTimestamp n = do
-  blk <- sqlQuery $ do
-    E.select . E.from $ \bref -> do
-      E.where_ (bref E.^. BlockDataRefNumber E.==. E.val n)
-      return bref
-  case blk of
-    (b : _) -> return . blockDataRefTimestamp . E.entityVal $ b
-    [] -> error "Could not find this contract's block. Did something terrible happen?"

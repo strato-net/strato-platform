@@ -99,7 +99,8 @@ const reducer = function (state = initialState, action) {
         isOpen: false,
         response: "Upload Success: " + action.response,
         isToasts: action.toasts,
-        toastsMessage: action.response && action.response.status ? 'Contract Created' : action.response
+        toastsMessage: action.toastsMessage,
+        contractAddress: action.contractAddress
       };
     case COMPILE_CONTRACT_REQUEST:
       return {

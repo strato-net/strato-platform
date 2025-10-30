@@ -1,0 +1,32 @@
+{
+    "name": "blockapps-contract-deployer",
+    "version": "1.0.0",
+    "description": "Modular tool for deploying contracts to BlockApps platform",
+    "main": "deploy/deploy.js",
+    "scripts": {
+        "deploy": "node deploy/deploy.js",
+        "upgrade": "node deploy/upgrade.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "dependencies": {
+        "@openzeppelin/contracts": "^5.4.0",
+        "@openzeppelin/contracts-upgradeable": "^5.4.0",
+        "blockapps-rest": "^8.4.0",
+        "dotenv": "^10.0.0",
+        "ethers": "^6.15.0",
+        "fs-extra": "^10.0.0",
+        "path": "^0.12.7"
+    },
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "keywords": [
+        "blockchain",
+        "blockapps",
+        "smart-contracts",
+        "solidity",
+        "deployment"
+    ],
+    "author": "",
+    "license": "MIT"
+}

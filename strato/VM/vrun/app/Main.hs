@@ -15,9 +15,8 @@ import qualified Blockchain.Data.BlockHeader as BlockHeader
 import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.Data.Transaction
 import qualified Blockchain.Database.MerklePatricia as MP
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
@@ -29,6 +28,7 @@ import Control.Monad.Trans.Except
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe
+import qualified Data.Text.Encoding as Text
 import Data.Time.Clock.POSIX
 import Executable.EVMFlags ()
 import HFlags
@@ -84,11 +84,11 @@ main = do
       t =
         createContractCreationTX
           0 --nonce
-          1 --gas price
           1000000000000000000 --gas limit
-          1 --value
-          (Code pushLarges)
-          Nothing
+          ""
+          []
+          (Code $ Text.decodeUtf8 pushLarges)
+          ""
           secretKey
 
   signedTransaction' <- liftIO t
@@ -97,7 +97,7 @@ main = do
         BlockHeader
           { BlockHeader.parentHash = unsafeCreateKeccak256FromWord256 0xabcd,
             BlockHeader.number = 1,
-            BlockHeader.beneficiary = CommonName "BlockApps" "Engineering" "James Hormuzdiar" True,
+            BlockHeader.beneficiary = 0x0,
             BlockHeader.difficulty = 1,
             BlockHeader.ommersHash = unsafeCreateKeccak256FromWord256 0xabcd,
             BlockHeader.stateRoot = MP.blankStateRoot,
@@ -131,7 +131,7 @@ main = do
             addressStateChainId = Nothing
           }
 
-      runExceptT $ addTransaction Nothing True blockData 10000000000000000000000000000 signedTransaction (Address 0)
+      runExceptT $ addTransaction blockData 10000000000000000000000000000 signedTransaction (Address 0)
 
   case result of
     Left e -> putStrLn $ show e

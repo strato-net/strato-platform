@@ -1,8 +1,8 @@
 import React, { Component } from 'react';
 import TransactionTable from './components/TransactionTable';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 import { reduxForm } from 'redux-form';
 import { selectChain } from '../Chains/chains.actions';
 import { connect } from 'react-redux';
@@ -26,10 +26,10 @@ const tourSteps = [
 
 class Transactions extends Component {
 
-  componentDidMount() {
-    mixpanelWrapper.track("transactions_loaded");
-    ReactGA.send({hitType: "pageview", page: "/transactions", title: "Transactions"});
-  }
+  // componentDidMount() {
+  //   mixpanelWrapper.track("transactions_loaded");
+  //   ReactGA.send({hitType: "pageview", page: "/transactions", title: "Transactions"});
+  // }
   
   render() {
     return (

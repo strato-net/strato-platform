@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+if [ "$1" == "" ]
+then
+	echo "You need to specify the node to wipe: ./wipe <node directory>"
+	exit;
+fi
+
+if [ ! -e "$1" -o ! -e "$1/.ethereumH" -o ! -e "$1/.ethereumH/ethconf.yaml" -o ! -e "$1/genesis.json" ]
+then
+	echo "There is no node at $1"
+	exit;
+fi
+
+echo 
+
+
+echo -n -e "Warning!  This script is about to delete everything in the \"$1\" directory, as well as all docker volumes related to STRATO (including postgresql, kafka, and redis data).\nClick "Y" to proceed. [y/N]: " | fold -s -w $(tput cols)
+
+read choice
+
+if [[ "$choice" == "Y" || "$choice" == "y" ]]; then
+    echo "You chose Yes. Continuing..."
+else
+    echo "Exiting script without wiping the node."
+    exit 1
+fi
+
+docker compose -p strato down -v -t 0 --remove-orphans
+
+rm -rf $1

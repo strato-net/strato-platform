@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -14,7 +15,8 @@ module Control.Monad.Change.Modify
     inputs,
     Outputs (..),
     genericOutputsStringIO,
-    Awaits (..),
+    Awaitable (..),
+    Awaits,
     Yields (..),
     module Data.Proxy,
   )
@@ -23,6 +25,7 @@ where
 import Control.Lens
 import Control.Monad (void)
 import Control.Monad.IO.Class
+import Control.Monad.Reader
 import Control.Monad.Trans.State (StateT, execStateT)
 import Data.Proxy
 
@@ -161,14 +164,14 @@ class Outputs f a where
 genericOutputsStringIO :: MonadIO m => String -> m ()
 genericOutputsStringIO = liftIO . putStrLn
 
-{- The Awaits Typeclass
-  (f `Awaits` a) is a typeclass used to generalize the `await` function from streaming
+{- The Awaitable Typeclass
+  Awaitable a f is a typeclass used to generalize the `await` function from streaming
   libraries like Pipes and Conduit to any monad f.
   The class has two type parameters:
-    f - the underlying monad, such as `ConduitT i o m r`
     a - the value type being awaited, like the `i` in `ConduitT i o m r`
+    f - the underlying monad, such as `ConduitT i o m r`
 -}
-class Awaits f a where
+class Awaitable a f where
   await :: f (Maybe a)
   {-# MINIMAL await #-}
 
@@ -177,6 +180,8 @@ class Awaits f a where
     await >>= \case
       Nothing -> return ()
       Just a -> f a >> awaitForever f
+
+type Awaits f a = Awaitable a f
 
 {- The Yields Typeclass
   (f `Yields` a) is a typeclass used to generalize the `yield` function from streaming
@@ -191,3 +196,15 @@ class Yields f a where
 
   yieldMany :: Monad f => [a] -> f ()
   yieldMany = mapM_ yield
+
+instance {-# OVERLAPPING #-} (Monad m) => Accessible a (ReaderT a m) where
+  access _ = ask
+
+instance (Monad m, Accessible a m, MonadTrans t) => Accessible a (t m) where
+  access p = lift (access p)
+
+instance (Monad m, Outputs m a, MonadTrans t) => Outputs (t m) a where
+  output = lift . output
+
+instance (Monad m, Awaitable a m, MonadTrans t) => Awaitable a (t m) where
+  await = lift await

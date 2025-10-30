@@ -1,0 +1,63 @@
+# Price Oracle Service
+
+Fetches asset prices from multiple sources and pushes them to the STRATO blockchain.
+
+## Features
+
+- **Batch Updates**: Multiple assets updated in single transaction
+- **Configurable Interval**: Update frequency via `UPDATE_INTERVAL_MINUTES` (1-60, default: 15)
+- **Parallel Processing**: All feeds run simultaneously
+- **Automatic Retry**: All API calls retry twice on failure
+- **Health Monitoring**: Service marks itself unhealthy on persistent failures
+- **Balance Checks**: Validates USDST balance before transactions
+
+## Environment Variables
+
+```env
+# STRATO Configuration
+STRATO_NODE_URL=https://node1.mercata-testnet.blockapps.net/
+PRICE_ORACLE_ADDRESS=0000000000000000000000000000000000001002
+
+# OAuth Configuration
+OAUTH_CLIENT_ID=your-client-id
+OAUTH_CLIENT_SECRET=your-client-secret
+OAUTH_DISCOVERY_URL=https://keycloak.blockapps.net/auth/realms/mercata/.well-known/openid_configuration
+
+# API Keys
+ALCHEMY_API_KEY=your-alchemy-key
+COINMARKETCAP_API_KEY=your-coinmarketcap-key
+METALS_DEV_API_KEY=your-metals-dev-key
+METALS_API_API_KEY=your-metals-api-key
+
+# Oracle Configuration
+UPDATE_INTERVAL_MINUTES=15  # Update interval in minutes (1-60, default: 15)
+
+# Token Configuration (Optional)
+USDST_ADDRESS=86a5ae535ded415203c3e27d654f9a1d454c553b  # USDST contract address
+GAS_FEE_USDST=1  # Gas fee in USDST (0.01 = 1, default: 1)
+```
+
+## Development
+
+```bash
+npm run build
+npm run dev
+```
+
+## Health Check
+
+```bash
+curl http://localhost:3000/health
+```
+
+**Response:**
+- **200 OK**: Service is healthy
+- **503 Service Unavailable**: Service is unhealthy (after retry failure)
+
+## Health Monitoring
+
+The service automatically marks itself as unhealthy when:
+- Any API source fails twice in a row
+- Transaction submission fails twice in a row  
+- USDST balance check fails twice in a row
+- USDST balance is below minimum threshold (10 USDST) 

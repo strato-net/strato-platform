@@ -12,7 +12,7 @@ import { Button, Dialog, Popover, PopoverInteractionKind, Position, AnchorButton
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { fetchChainIds, getLabelIds } from '../Chains/chains.actions';
@@ -98,7 +98,7 @@ class DeployDapp extends Component {
     });
 
     if (!Object.values(errors).length) {
-      mixpanelWrapper.track('create_chain_submit_click');
+      // mixpanelWrapper.track('create_chain_submit_click');
       let members = [];
       let integrations = {};
       let balances = [];
@@ -304,7 +304,7 @@ class DeployDapp extends Component {
   };
 
   componentDidMount() {
-    mixpanelWrapper.track("create_contract_loaded");
+    // mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
   }
 
@@ -357,29 +357,16 @@ class DeployDapp extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
         <AnchorButton 
           onClick={() => {
-            mixpanelWrapper.track("deploy_dapp_open_click");
+            // mixpanelWrapper.track("deploy_dapp_open_click");
             this.props.deployDappOpenModal();
           }}
           id="tour-deploy-dapp-button"
           className="pt-intent-primary pt-icon-add"
           text={"Deploy DApp"}
-          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract)}
           />
-        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -521,7 +508,7 @@ class DeployDapp extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("deploy_dapp_cancel");
+                  // mixpanelWrapper.track("deploy_dapp_cancel");
                   this.props.deployDappCloseModal()
                 }} />
                 <Button
@@ -578,7 +565,6 @@ export function mapStateToProps(state) {
     codeType: state.codeEditor.codeType,
     initialValues: {
     },
-    userCertificate: state.user.userCertificate,
   };
 }
 

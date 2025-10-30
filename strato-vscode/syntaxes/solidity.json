@@ -299,7 +299,7 @@
             ]
         },
         "type-primitive": {
-            "match": "\\b(address|string\\d*|bytes\\d*|int\\d*|uint\\d*|bool|hash\\d*)\\b",
+            "match": "\\b(address|string\\d*|bytes\\d*|int\\d*|uint\\d*|bool|variadic|hash\\d*)\\b",
             "name": "support.type.primitive.solidity"
         },
         "global": {
@@ -385,12 +385,15 @@
         "declaration-contract": {
             "patterns": [
                 {
-                    "match": "\\b(contract)(\\s+([A-Za-z_]\\w*))?\\b",
+                    "match": "\\b(contract)(\\s+(record))?(\\s+([A-Za-z_]\\w*))?\\b",
                     "captures": {
                         "1": {
                             "name": "storage.type.contract.solidity"
                         },
                         "3": {
+                            "name": "storage.type.record.solidity"
+                        },
+                        "5": {
                             "name": "entity.name.type.contract.solidity"
                         }
                     }
@@ -478,7 +481,7 @@
                     }
                 },
                 {
-                    "match": "\\b(private|public|internal|external|constant|immutable|pure|view|payable|nonpayable|inherited|indexed|storage|memory|virtual|calldata|override|abstract)\\b",
+                    "match": "\\b(private|public|internal|external|constant|immutable|pure|view|payable|nonpayable|inherited|indexed|storage|memory|virtual|calldata|override|abstract|record)\\b",
                     "name": "storage.type.mofifier.solidity"
                 }
             ]

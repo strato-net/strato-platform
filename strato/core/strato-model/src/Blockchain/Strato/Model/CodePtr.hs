@@ -5,23 +5,21 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Blockchain.Strato.Model.CodePtr
-  ( CodePtr (..),
-    CodeKind (..),
+  ( CodePtr (..)
   )
 where
 
 import Blockchain.Data.RLP
-import Blockchain.SolidVM.Model (CodeKind (..))
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens ((&), (?~))
 import qualified Data.Aeson as Ae
 import qualified Data.Aeson.Types as Ae
-import Data.Bifunctor (bimap, first)
+import Data.Bifunctor (bimap)
 import Data.Binary
 import Data.Data
 import Data.Hashable (Hashable)
@@ -38,7 +36,6 @@ import Text.Read (readEither)
 data CodePtr
   = ExternallyOwned Keccak256
   | SolidVMCode String Keccak256
-  | CodeAtAccount Address String
   deriving (Show, Read, Eq, Ord, Generic, NFData, Hashable, Data)
 
 instance S.ToSchema CodePtr where
@@ -47,10 +44,8 @@ instance S.ToSchema CodePtr where
 instance RLPSerializable CodePtr where
   rlpEncode (ExternallyOwned codeHash) = rlpEncode codeHash
   rlpEncode (SolidVMCode n ch) = RLPArray [RLPString "SolidVM", rlpEncode n, rlpEncode ch]
-  rlpEncode (CodeAtAccount a n) = RLPArray [RLPString "AtAccount", rlpEncode a, rlpEncode n]
 
   rlpDecode (RLPArray [RLPString "SolidVM", n, ch]) = SolidVMCode (rlpDecode n) (rlpDecode ch)
-  rlpDecode (RLPArray [RLPString "AtAccount", a, n]) = CodeAtAccount (rlpDecode a) (rlpDecode n)
   rlpDecode ch = ExternallyOwned $ rlpDecode ch
 
 instance Binary CodePtr
@@ -62,51 +57,39 @@ instance Show CodePtr where
 -}
 
 instance Ae.ToJSON CodePtr where
-  toJSON (ExternallyOwned hsh) = Ae.object [("kind", Ae.toJSON EVM), ("digest", Ae.toJSON hsh)]
+  toJSON (ExternallyOwned hsh) = Ae.object [("kind", Ae.toJSON $ T.pack "ExternallyOwned"), ("digest", Ae.toJSON hsh)]
   toJSON (SolidVMCode name hsh) =
     Ae.object
-      [ ("kind", Ae.toJSON SolidVM),
+      [ ("kind", Ae.toJSON $ T.pack "SolidVM"),
         ("name", Ae.toJSON name),
         ("digest", Ae.toJSON hsh)
-      ]
-  toJSON (CodeAtAccount acct name) =
-    Ae.object
-      [ ("account", Ae.toJSON acct),
-        ("name", Ae.toJSON name)
       ]
 
 instance Ae.FromJSON CodePtr where
   parseJSON (st@Ae.String {}) = ExternallyOwned <$> Ae.parseJSON st
   parseJSON (Ae.Object o) = do
-    kind <- o Ae..:? "kind"
+    kind :: Maybe T.Text <- o Ae..:? "kind"
     case kind of
-      Just EVM -> do
+      Just "ExternallyOwned" -> do
         hsh <- o Ae..: "digest"
         return $ ExternallyOwned hsh
-      Just SolidVM -> do
+      _ -> do
         hsh <- o Ae..: "digest"
         name <- o Ae..: "name"
         return $ SolidVMCode name hsh
-      Nothing -> do
-        acct <- o Ae..: "account"
-        name <- o Ae..: "name"
-        return $ CodeAtAccount acct name
   parseJSON x = Ae.typeMismatch "CodePtr" x
 
 instance Arbitrary CodePtr where
-  arbitrary = oneof [ExternallyOwned <$> arbitrary, SolidVMCode "Vehicle" <$> arbitrary, flip CodeAtAccount "Vehicle" <$> arbitrary]
+  arbitrary = oneof [ExternallyOwned <$> arbitrary, SolidVMCode "Vehicle" <$> arbitrary]
 
 instance PersistField CodePtr where
   toPersistValue cp@(ExternallyOwned _) = PersistText . T.pack $ show cp
   toPersistValue cp@(SolidVMCode _ _) = PersistText . T.pack $ show cp
-  toPersistValue (CodeAtAccount acct name) = PersistText . T.pack $ name ++ "@" ++ show acct
   fromPersistValue (PersistText t) =
     let s = T.unpack t
         !cp = case readEither s of
                 Right r -> Right r
-                Left _ -> case span (/= '@') s of
-                  (name, '@' : acct) -> first T.pack $ flip CodeAtAccount name <$> readEither acct
-                  (_, _) ->
+                Left _ -> 
                     bimap
                       T.pack
                       (ExternallyOwned . unsafeCreateKeccak256FromWord256)
@@ -120,21 +103,17 @@ instance PersistFieldSql CodePtr where
 instance Format CodePtr where
   format (ExternallyOwned ch) = format ch
   format (SolidVMCode n ch) = "<SolidVMCode: " ++ n ++ ", " ++ format ch ++ ">"
-  format (CodeAtAccount a n) = "<CodeAtAccount: " ++ format a ++ ", " ++ n ++ ">"
 
 instance ToHttpApiData CodePtr where
   toUrlPiece (ExternallyOwned hsh) = T.pack $ format hsh
   toUrlPiece (SolidVMCode name hsh) = T.pack $ name ++ ":" ++ format hsh
-  toUrlPiece (CodeAtAccount acct name) = T.pack $ name ++ "@" ++ show acct
 
 instance FromHttpApiData CodePtr where
   parseQueryParam x = case parseQueryParam x of
     Right hsh -> Right $ ExternallyOwned hsh
-    _ -> case T.split (== '@') x of
-      [acct, name] -> flip CodeAtAccount (T.unpack name) <$> parseQueryParam acct
-      _ -> case T.split (== ':') x of
-        [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
-        _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
+    _ -> case T.split (== ':') x of
+           [name, hsh] -> SolidVMCode (T.unpack name) <$> parseQueryParam hsh
+           _ -> Left $ "FromHttpApiData CodePtr: couldn't resolve CodePtr from " `T.append` x
 
 instance S.ToParamSchema CodePtr where
   toParamSchema _ =

@@ -1,0 +1,75 @@
+name:                blockDB
+
+dependencies:
+- base >= 4.7 && < 5
+
+ghc-options:
+- -Wall
+- -Wcompat
+- -Widentities
+- -Wincomplete-record-updates
+- -Wincomplete-uni-patterns
+- -Wmissing-export-lists
+- -Wmissing-home-modules
+- -Wpartial-fields
+- -Wredundant-constraints
+
+library:
+  source-dirs: src
+  ghc-options: -fconstraint-solver-iterations=8
+  dependencies:
+  - QuickCheck
+  - aeson
+  - binary
+  - blockapps-data
+  - blockapps-datadefs
+  - bytestring
+  - common-log
+  - containers
+  - data-default
+  - deepseq
+  - esqueleto
+  - ethereum-rlp
+  - format
+  - generic-arbitrary
+  - hedis
+  - labeled-error
+  - mtl
+  - persistent
+  - raw-strings-qq
+  - random
+  - sql-monad
+  - strato-model
+  - strato-redis-blockdb
+  - swagger2
+  - time
+  - text
+
+tests:
+  blockdb-test:
+    source-dirs: test
+    main: Main.hs
+    dependencies:
+      - QuickCheck
+      - aeson
+      - aeson-diff
+      - binary
+      - blockapps-data
+      - blockDB
+      - bytestring
+      - containers
+      - ethereum-rlp
+      - format
+      - hedis
+      - http-api-data
+      - HUnit
+      - hspec
+      - labeled-error
+      - lens-family
+      - blockapps-secp256k1-haskell
+      - strato-model
+      - strato-redis-blockdb
+      - text
+      - vector
+    # We use -O0 here, since GHC takes *very* long to compile so many constants
+    ghc-options: -O0 -Wall -rtsopts -fno-warn-unused-do-bind -dynamic

@@ -15,7 +15,6 @@ library:
   source-dirs: src/
   exposed-modules:
     - Blockchain.Strato.Discovery.Data.MemPeerDB
-    - Blockchain.Strato.Discovery.Data.Host
     - Blockchain.Strato.Discovery.Data.Peer
     - Blockchain.Strato.Discovery.Data.PeerIOWiring
     - Blockchain.Strato.Discovery.ContextLite
@@ -32,6 +31,7 @@ library:
     - blockapps-datadefs
     - blockapps-vault-wrapper-api #Will need to be changed
     - blockapps-vault-wrapper-client
+    - blockDB
     - bytestring
     - common-log
     - containers
@@ -42,6 +42,7 @@ library:
     - either
     - entropy
     - errors
+    - esqueleto
     - ethereum-encryption
     - ethereum-rlp
     - exceptions
@@ -71,7 +72,7 @@ library:
 
 executables:
   ethereum-discover:
-    source-dirs:       exec_src/
+    source-dirs:       exec_src/ethereumDiscovery/
     main:             Main.hs
     dependencies:
       - blockapps-init
@@ -79,12 +80,24 @@ executables:
       - ethereum-discovery
       - format
       - hflags
+      - monad-alter
       - mtl
       - process-monitor
       - resourcet
       - strato-conf
       - text
       - unliftio
+  strato-network-monitor:
+    source-dirs:       exec_src/networkMonitor/
+    main:             Main.hs
+    dependencies:
+      - common-log
+      - containers
+      - ethereum-discovery
+      - format
+      - hflags
+      - network-info
+      - text
 
 tests:
   ethereum-discover-test:
@@ -96,3 +109,4 @@ tests:
       - ethereum-rlp
       - format
       - hspec
+      - strato-model

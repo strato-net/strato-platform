@@ -18,7 +18,6 @@ import SolidVM.Solidity.StaticAnalysis.Types
 
 type SSS = State (M.Map SolidString (SourceAnnotation ()))
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -108,8 +107,7 @@ statementHelper (Break _) = pure []
 statementHelper (Return _ _) = pure []
 statementHelper (Throw _ _) = pure []
 statementHelper (EmitStatement _ _ _) = pure []
-statementHelper (RevertStatement _ (OrderedArgs _) _) = pure []
-statementHelper (RevertStatement _ (NamedArgs _) _) = pure []
+statementHelper (RevertStatement _ _ _) = pure []
 statementHelper (UncheckedStatement body _) =
   statementsHelper' body
 statementHelper (AssemblyStatement _ _) = pure []

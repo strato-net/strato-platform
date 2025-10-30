@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button, Text, Position, Tooltip } from '@blueprintjs/core';
@@ -14,7 +14,7 @@ class BlockView extends Component {
   }
 
   handleClick(hash) {
-    mixpanelWrapper.track('transactions_row_click');
+    // mixpanelWrapper.track('transactions_row_click');
     const history = this.props.history;
     history.push('/transactions/' + hash);
   }
@@ -54,7 +54,7 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
+                {v}
               </Text>
             </td>
           </tr>
@@ -68,7 +68,7 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
+                {v}
               </Text>
             </td>
           </tr>
@@ -82,34 +82,6 @@ class BlockView extends Component {
           <tr key={i}>
             <td width="60%">
               <Text classes="small smd-pad-4">
-                {v.commonName}
-              </Text>
-            </td>
-          </tr>
-        )
-      }
-    );
-    const newCerts = block && block.blockData && block.blockData.newCerts
-    let newCertRows = newCerts && newCerts.map(
-      function (v, i) {
-        return (
-          <tr key={i}>
-            <td width="60%">
-              <Text ellipsize={true} classes="small smd-pad-4">
-                {v}
-              </Text>
-            </td>
-          </tr>
-        )
-      }
-    );
-    const revokedCerts = block && block.blockData && block.blockData.revokedCerts
-    let revokedCertRows = revokedCerts && revokedCerts.map(
-      function (v, i) {
-        return (
-          <tr key={i}>
-            <td width="60%">
-              <Text ellipsize={true} classes="small smd-pad-4">
                 {v}
               </Text>
             </td>
@@ -158,7 +130,7 @@ class BlockView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => { mixpanelWrapper.track('block_view_go_back_click'); this.props.history.goBack() }}
+              onClick={(e) => { /*mixpanelWrapper.track('block_view_go_back_click'); this.props.history.goBack()*/ }}
               className="pt-icon-arrow-left"
               text="Back"
             />
@@ -267,98 +239,42 @@ class BlockView extends Component {
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Username</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {valRows && valRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : valRows}
-              </tbody>
-            </table>
+            {valRows && valRows.length === 0 
+                ? <p>—</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {valRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">New Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Username</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {newValRows && newValRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : newValRows}
-              </tbody>
-            </table>
+            {newValRows && newValRows.length === 0 
+                ? <p>-</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {newValRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">
-          <div className="col-sm-12">
+          <div className="col-sm-9">
             <div className="h3">Removed Validators </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Username</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {removedValRows && removedValRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : removedValRows}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="h3">New Certificates </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Certificate Data</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {newCertRows && newCertRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : newCertRows}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="row">
-          <div className="col-sm-12">
-            <div className="h3">Revoked Certificates </div>
-            <table className="pt-table pt-interactive pt-condensed pt-striped"
-              style={{ tableLayout: 'fixed', width: "100%" }}>
-              <thead>
-                <tr>
-                  <th width="60%"><h5>Address</h5></th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {revokedCertRows && revokedCertRows.length === 0 ? <tr>
-                  <td colSpan={5}>No Data</td>
-                </tr> : revokedCertRows}
-              </tbody>
-            </table>
+            {removedValRows && removedValRows.length === 0 
+                ? <p>-</p> 
+                : <table className="pt-table pt-interactive pt-condensed pt-striped">
+                    <tbody>
+                      {removedValRows}
+                    </tbody>
+                  </table>
+            }
           </div>
         </div>
         <div className="row">

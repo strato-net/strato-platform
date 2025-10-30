@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 import { withRouter, Link } from "react-router-dom";
 import { connect } from "react-redux";
-import mixpanelWrapper from "../../lib/mixpanelWrapper";
+// import mixpanelWrapper from "../../lib/mixpanelWrapper";
 import "./menubar.css";
 import logo from "./strato-mercata-beta-white.png";
 import { env } from "../../env";
@@ -17,7 +17,6 @@ import {
   PopoverInteractionKind,
 } from "@blueprintjs/core";
 import { searchQueryRequest } from "../SearchResults/searchresults.actions";
-import { getUserCertificateRequest } from "../User/user.actions";
 import HexText from "../HexText";
 import { subscribeRoom, unSubscribeRoom } from "../../sockets/socket.actions";
 import { changeHealthStatus } from "../Dashboard/dashboard.action";
@@ -59,12 +58,6 @@ class MenuBar extends Component {
     });
   }
 
-  componentWillReceiveProps(newProps) {
-    if (newProps.oauthUser && !newProps.userCertificate) {
-      this.props.getUserCertificateRequest(newProps.oauthUser.address);
-    }
-  }
-
   logout() {
     localStorage.removeItem("user");
     window.location.href = "/auth/logout";
@@ -74,49 +67,6 @@ class MenuBar extends Component {
     // Update local state instead
     this.props.searchQuerySuccess(searchQuery);
     this.setState({ searchQuery: searchQuery });
-  };
-
-  renderUserProfileInfo = () => {
-    const {
-      certificateString,
-      organization,
-      organizationalUnit,
-      commonName,
-      userAddress,
-      block_timestamp,
-    } = this.props.userCertificate;
-
-    const dateCreated = new Date(block_timestamp).toLocaleDateString("en-us", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-
-    return (
-      <div className="pt-dark">
-        <h3>Organization</h3>
-        <h4>
-          {organization} {organizationalUnit ? `| ${organizationalUnit}` : ""}
-        </h4>
-        <MenuDivider />
-
-        <h3>Name</h3>
-        <h4>{commonName}</h4>
-        <MenuDivider />
-
-        <h3>Address</h3>
-        <HexText value={"0x" + userAddress} />
-
-        <h3>Date Created</h3>
-        <h4>{dateCreated}</h4>
-        <MenuDivider />
-
-        <h3>
-          Certificate <span className="pt-monospace-text">.pem</span>
-        </h3>
-        <pre>{certificateString}</pre>
-      </div>
-    );
   };
 
   handleKeyDown = (e) => {
@@ -141,7 +91,7 @@ class MenuBar extends Component {
           target="_blank"
           rel="noopener noreferrer"
           iconName="user"
-          text={this.props.userCertificate ? "My Profile" : "More Info"}
+          text={"My Info"}
         />
         <MenuItem
           className="pt-button pt-minimal"
@@ -164,44 +114,19 @@ class MenuBar extends Component {
           title="My Profile"
         >
           <div className="pt-dialog-body">
-            {this.props.userCertificate ? (
-              <div>{this.renderUserProfileInfo()}</div>
-            ) : (
-              <div>
-                <h4>
-                  Your STRATO Mercata address: <br />
-                  <HexText
-                    value={
-                      this.props.oauthUser
-                        ? "0x" + this.props.oauthUser.address
-                        : null
-                    }
-                    shorten={false}
-                  />
-                </h4>
-                <br />
-                <h4>
-                  Your STRATO Mercata account is currently being verified. You
-                  should receive an e-mail confirmation when your account is
-                  ready. Welcome to the Block!
-                </h4>
-                <br />
-                <MenuDivider />
-                <h5>
-                  If your account still hasn't been verified,{" "}
-                  <a
-                    onClick={() => {
-                      mixpanelWrapper.track("contact_blockapps_support_click");
-                    }}
-                    href="https://support.blockapps.net"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    contact support here.
-                  </a>
-                </h5>
-              </div>
-            )}
+            <div>
+              <h4>
+                Your STRATO Mercata address: <br />
+                <HexText
+                  value={
+                    this.props.oauthUser
+                      ? "0x" + this.props.oauthUser.address
+                      : "0x" + this.props.address
+                  }
+                  shorten={false}
+                />
+              </h4>
+            </div>
           </div>
           <div className="pt-dialog-footer">
             <div className="pt-dialog-footer-actions">
@@ -219,20 +144,15 @@ class MenuBar extends Component {
           <Button
             className={
               "pt-large pt-minimal " +
-              (this.props.userCertificate
+              (this.props.oauthUser
                 ? "pt-intent-primary"
                 : "pt-intent-warning")
             }
             iconName={"user"}
             text={
-              this.props.userCertificate
-                ? this.props.userCertificate.commonName +
-                  ", " +
-                  this.props.userCertificate.organization +
-                  (this.props.userCertificate.organizationalUnit
-                    ? " | " + this.props.userCertificate.organizationalUnit
-                    : "")
-                : "Verification Pending"
+              this.props.oauthUser
+                ? (this.props.oauthUser.username ? this.props.oauthUser.username + ' | ' : '') + this.props.oauthUser.address
+                : this.props.address
             }
           />
         </Popover>
@@ -245,9 +165,9 @@ class MenuBar extends Component {
       <Menu>
         <MenuItem
           className="pt-button pt-minimal pt-small"
-          onClick={() => {
-            mixpanelWrapper.track("docs_blockapps_click");
-          }}
+          // onClick={() => {
+          //   mixpanelWrapper.track("docs_blockapps_click");
+          // }}
           href="https://docs.blockapps.net/"
           target="_blank"
           rel="noopener noreferrer"
@@ -256,9 +176,9 @@ class MenuBar extends Component {
         />
         <MenuItem
           className="pt-button pt-minimal pt-small"
-          onClick={() => {
-            mixpanelWrapper.track("contact_blockapps_support_click");
-          }}
+          // onClick={() => {
+          //   mixpanelWrapper.track("contact_blockapps_support_click");
+          // }}
           href="https://support.blockapps.net"
           target="_blank"
           rel="noopener noreferrer"
@@ -309,7 +229,7 @@ class MenuBar extends Component {
         {/* <div className="pt-navbar-group pt-align-left"> */}
         <div className="col-sm-5 smd-pad-4">
           <div className="pt-input-group pt-dark pt-large">
-            <span className="pt-icon pt-icon-search"></span>
+            {/* <span className="pt-icon pt-icon-search"></span>
             <input
               className="pt-input"
               type="search"
@@ -318,7 +238,7 @@ class MenuBar extends Component {
               placeholder="Search anything on Mercata"
               onKeyDown={this.handleKeyDown}
               dir="auto"
-            />
+            /> */}
             {/* <input type="submit"></input> */}
           </div>
         </div>
@@ -378,7 +298,7 @@ class MenuBar extends Component {
 export function mapStateToProps(state) {
   return {
     oauthUser: state.user.oauthUser,
-    userCertificate: state.user.userCertificate,
+    address: state.user.address || '',
     searchQuery: state.search.searchQuery,
     appMetadata: state.appMetadata,
     dashboard: state.dashboard,
@@ -387,7 +307,6 @@ export function mapStateToProps(state) {
 
 const connected = connect(mapStateToProps, {
   searchQueryRequest,
-  getUserCertificateRequest,
   subscribeRoom,
   unSubscribeRoom,
   changeHealthStatus,

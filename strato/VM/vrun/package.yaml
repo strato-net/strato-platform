@@ -21,13 +21,14 @@ dependencies:
 - blockapps-data
 - blockapps-datadefs
 - blockapps-mpdbs
+- blockDB
 - bytestring
 - common-log
 - hflags
 - merkle-patricia-db
 - prometheus-client
 - strato-model
-- seqevents
+- text
 - time
 - transformers
 - vm-runner

@@ -19,12 +19,12 @@ library:
     - ethereum-rlp
     - format
     - kafka-monad
-    - lens
     - merkle-patricia-db
     - monad-alter
     - nibblestring
     - persistent
     - persistent-postgresql
+    - solid-vm-model
     - strato-conf
     - strato-model
     - text

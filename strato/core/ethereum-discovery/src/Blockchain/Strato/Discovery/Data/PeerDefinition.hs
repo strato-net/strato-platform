@@ -1,15 +1,15 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE UndecidableInstances       #-}
 
 {-# OPTIONS -fno-warn-unused-top-binds #-}
 {-# OPTIONS -fno-warn-orphans #-}
@@ -17,19 +17,19 @@
 --This module has to be separated out because Template Haskell makes it hard to export the individual items created
 module Blockchain.Strato.Discovery.Data.PeerDefinition where
 
-import Blockchain.Data.PersistTypes ()
-import Blockchain.MiscJSON ()
-import Blockchain.Strato.Discovery.Data.Host
-import Blockchain.Strato.Model.Keccak256
-import Crypto.Types.PubKey.ECC
-import Data.IP
-import qualified Data.Text as T
-import Data.Time
-import qualified Database.Persist.Postgresql as SQL
-import Database.Persist.TH
+import           Blockchain.Data.PersistTypes      ()
+import           Blockchain.MiscJSON               ()
+import           Blockchain.Strato.Model.Host
+import           Blockchain.Strato.Model.Keccak256
+import           Crypto.Types.PubKey.ECC
+import           Data.IP
+import qualified Data.Text                         as T
+import           Data.Time
+import qualified Database.Persist.Postgresql       as SQL
+import           Database.Persist.TH
 
 derivePersistField "IP"
-  
+
 share
   [mkPersist sqlSettings, mkMigrate "migrateAll"]
   [persistLowerCase|
@@ -52,6 +52,6 @@ PPeer
     disableException T.Text
     nextDisableWindowSeconds Int default=5
     nextUdpDisableWindowSeconds Int default=5
-    disableExpiration UTCTime default=now()
+    disableExpiration UTCTime default=CURRENT_TIMESTAMP
     deriving Show Read Eq
 |]

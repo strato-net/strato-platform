@@ -11,8 +11,8 @@ import {
 } from './contractCard.actions';
 import ContractMethodCall from '../ContractMethodCall';
 import './contractCard.css';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
-import { Link } from 'react-router-dom';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import { Link } from 'react-router-dom';
 import HexText from '../../../HexText';
 import { Tooltip, Position } from '@blueprintjs/core';
 import ContractSource from './ContractSource';
@@ -20,7 +20,24 @@ import ContractSource from './ContractSource';
 class ContractCard extends Component {
   constructor(props) {
     super(props);
-    this.state = { isOpen: false };
+    // If search term exists and matches an instance, start open
+    const hasSearchMatch = this.props.contract.searchTerm && 
+      this.props.contract.contract && this.props.contract.contract.instances &&
+      this.props.contract.contract.instances.some(instance => 
+        instance.address.toLowerCase() === this.props.contract.searchTerm.toLowerCase()
+      );
+    this.state = { isOpen: hasSearchMatch };
+  }
+
+  componentWillMount(){
+    const name = this.props.contract.name;
+    const searchTerm = this.props.contract.searchTerm;
+    if(searchTerm){
+      this.props.fetchState(name, searchTerm, this.props.selectedChain);
+      this.props.fetchAccount(name, searchTerm);
+      this.props.fetchContractInfoRequest(`card-data-${searchTerm}-${this.props.selectedChain}`, name, searchTerm)
+      this.props.selectContractInstance(name, searchTerm);
+    }
   }
 
   render() {
@@ -28,20 +45,28 @@ class ContractCard extends Component {
     const name = this.props.contract.name;
     const contract = this.props.contract.contract;
     const instances = contract && contract.instances ? contract.instances : [];
+    const searchTerm = this.props.contract.searchTerm;
     const self = this;
     const re = /[0-9a-fA-F]{40}$/;
     const showQueryBuilder = instances.reduce((acc, instance) => {
       return acc || instance.fromCirrus;
     }, false);
 
-    instances
-      .filter((instance) => { return re.test(instance.address) })
+    // Filter instances based on search term if present
+    const filteredInstances = searchTerm ? 
+      instances.filter(instance => 
+        re.test(instance.address) && 
+        instance.address.toLowerCase() === searchTerm.toLowerCase()
+      ) :
+      instances.filter(instance => re.test(instance.address));
+
+    filteredInstances
       .forEach(function (instance, index) {
         cardData.push(
           <tr
             className={instance.selected ? 'selected' : ''}
             onClick={() => {
-              mixpanelWrapper.track("contract_state_clicked")
+              // mixpanelWrapper.track("contract_state_clicked")
               self.props.fetchState(name, instance.address, self.props.selectedChain);
               self.props.fetchAccount(name, instance.address);
               self.props.fetchContractInfoRequest(`card-data-${instance.address}-${self.props.selectedChain}`, name, instance.address, self.props.selectedChain)
@@ -188,7 +213,7 @@ class ContractCard extends Component {
                   <Button type="button"
                     className="pt-icon-double-caret-vertical btn-sm"
                     onClick={() => {
-                      mixpanelWrapper.track("contracts_toggle_collapse_click");
+                      // mixpanelWrapper.track("contracts_toggle_collapse_click");
                       if(this.state.isOpen) {
                         this.props.selectContractInstance(name, null);
                       }

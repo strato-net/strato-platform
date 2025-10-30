@@ -14,7 +14,6 @@ module Bloc.Server.Contracts where
 import Bloc.API.Contracts
 import Bloc.API.Utils
 import Bloc.Database.Queries
-import Bloc.Server.Utils (getBlockTimestamp)
 import Bloc.XabiHelper
 import BlockApps.Logging
 import BlockApps.SolidVMStorageDecoder
@@ -24,22 +23,17 @@ import BlockApps.Solidity.Xabi hiding (Func, Public, External)
 import BlockApps.Solidity.Xabi.Type (indexedTypeType)
 import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
-import BlockApps.Storage as S
 import BlockApps.XAbiConverter
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.AddressStateRef
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json hiding (Contract)
-import Blockchain.SolidVM.Model
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
-import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow ((&&&), (***))
 import Control.Monad ((<=<))
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
 import Data.Bifunctor (first)
 import Data.Foldable
 import qualified Data.Map.Strict as Map
@@ -47,21 +41,19 @@ import Data.Maybe
 import Data.Source.Map (SourceMap)
 import Data.Text (Text)
 import qualified Data.Text as Text
+import Data.Time
 import Data.Time.Clock.POSIX (utcTimeToPOSIXSeconds)
+import Data.List (sort)
 import Handlers.AccountInfo
 import Handlers.Storage
-import qualified MaybeNamed
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
 import SolidVM.Model.CodeCollection.Function
 import UnliftIO
 
-hexStorageToWord256 :: HexStorage -> Word256
-hexStorageToWord256 (HexStorage bs) = bytesToWord256 bs
-
 getContracts ::
-  ( MonadLogger m,
-    HasSQL m
+  ( MonadIO m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m -- ,
   ) =>
   Maybe Text ->
   Maybe Integer ->
@@ -72,28 +64,45 @@ getContracts mName mOffset mLimit chainId = do
   let addressToVal ts addr cid = AddressCreatedAt (round . utcTimeToPOSIXSeconds $ ts) addr cid
       addressesToMap =
         foldrM
-          ( \(AddressStateRef' AddressStateRef {..} _) m -> do
-              ts <- getBlockTimestamp addressStateRefLatestBlockDataRefNumber
-              case addressStateRefContractName of
-                Just n -> pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
-                Nothing -> pure m
+          ( \(AddressStateRef' AddressStateRef {..} _) m -> case addressStateRefContractName of
+              Nothing -> pure m
+              Just n -> do
+                ts <- liftIO getCurrentTime
+                pure $ Map.insertWith (++) (Text.pack n) [addressToVal ts addressStateRefAddress chainId] m
           )
           Map.empty
-  addrStateRefs <-
+  
+  -- Step 1: Get all unique contract names (without pagination)
+  let contractLimit = fromIntegral $ fromMaybe 10 mLimit
+      contractOffset = fromIntegral $ fromMaybe 0 mOffset
+  
+  -- Get all records to extract unique contract names
+  allAddrStateRefs <-
     getAccount'
       accountsFilterParams
-        { _qaChainId = maybeToList chainId,
-          _qaExternal = Just False,
-          _qaContractName = mName,
-          _qaOffset = fromIntegral <$> mOffset,
-          _qaLimit = fromIntegral <$> mLimit
+        { _qaExternal = Just False,
+          _qaSearch = mName,
+          _qaOffset = Nothing,  -- No offset - get all records
+          _qaLimit = Nothing    -- No limit - get all records
         }
-  reducedResponseMap <- addressesToMap addrStateRefs
-  return . GetContractsResponse $ reducedResponseMap
+  
+  -- Group by contract name to get unique contracts
+  allContractsMap <- addressesToMap allAddrStateRefs
+  let allContractNames = Map.keys allContractsMap
+      sortedContractNames = sort allContractNames
+      
+  -- Apply pagination to contract names (exactly 10 contracts per page)
+  let paginatedContractNames = take contractLimit $ drop contractOffset sortedContractNames
+  
+  -- Step 2: Get all instances for the paginated contract names
+  -- Filter the original map to only include the paginated contracts
+  let paginatedContractsMap = Map.filterWithKey (\k _ -> k `elem` paginatedContractNames) allContractsMap
+  
+  return . GetContractsResponse $ paginatedContractsMap
 
 getContractsData ::
   ( MonadLogger m,
-    HasSQL m
+    A.Selectable AccountsFilterParams [AddressStateRef] m
   ) =>
   ContractName ->
   m [Address]
@@ -107,10 +116,12 @@ getContractsData (ContractName cName) = do
   return $ (\(AddressStateRef' r _) -> addressStateRefAddress r) <$> svmRefs
 
 getContractsContract ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -127,38 +138,23 @@ getContractsContract name addr chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just addr,
+      aParams = accountsFilterParams
+          { _qaAddress = Just addr,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
-
--- Only for EVM, unimplemented for SolidVM
-translateStorageMap :: [StorageAddress] -> S.Storage
-translateStorageMap storage' =
-  let storageMap = Map.fromList $ map (\StorageAddress {..} -> (hexStorageToWord256 key, hexStorageToWord256 value)) storage'
-
-      storage k = fromMaybe 0 $ Map.lookup k storageMap
-   in storage
+    Just contract -> pure contract
 
 getContractsState ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable Address AddressState m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -169,6 +165,7 @@ getContractsState ::
   Bool ->
   m GetContractsStateResponses -- state-translation
 getContractsState _ address chainId mName mCount mOffset _ = do
+  $logInfoS "getContractsState" . Text.pack $ "Getting contract state for " ++ formatAddressWithoutColor address
   contract' <- getContractsDetails' address chainId
 
   storage' <- case mName of
@@ -176,12 +173,10 @@ getContractsState _ address chainId mName mCount mOffset _ = do
       getStorage'
         storageFilterParams
           { qsAddress = Just address,
-            qsChainId = MaybeNamed.Unnamed <$> chainId,
             qsOffset = fromInteger <$> mOffset,
             qsLimit = fromInteger <$> mCount
           }
     Just _ -> pure []
-  -- let storage = translateStorageMap storage'
 
   let contractFuncs Contract {..} = catMaybes . map (traverse getFunction) $ Map.toList _functions
       convertType = (either (const Nothing) Just . xabiTypeToType . indexedTypeType) <=< indexedTypeToEvmIndexedType
@@ -194,17 +189,17 @@ getContractsState _ address chainId mName mCount mOffset _ = do
           else Nothing
 
   ret <- case (storage', mName) of
-    (StorageAddress {kind = SolidVM} : _, Nothing) -> do
+    (StorageAddress {} : _, Nothing) -> do
       $logInfoS "getContractsState/SolidVM" $
         Text.unlines
           [ "Storage:",
-            Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (kind s, key s, value s)) $ storage',
+            Text.pack $ unlines $ map (\s -> ("  " ++) . show $ (key s, value s)) $ storage',
             "End of storage"
           ]
       return $
         (first Text.pack <$> contractFuncs contract')
           ++ (decodeSolidVMValues $ map (key &&& value) storage')
-    (StorageAddress {kind = SolidVM} : _, Just name) ->
+    (StorageAddress {} : _, Just name) ->
       error $ "unimplemented: range based solidVM queries" ++ Text.unpack name
     ([], Nothing) -> return $ (first Text.pack <$> contractFuncs contract')
     _ ->
@@ -212,27 +207,19 @@ getContractsState _ address chainId mName mCount mOffset _ = do
   $logDebugS "getContractsState/storage" $
     Text.unlines
       [ "Storage:",
-        Text.pack $ unlines $ map (\s -> ("  " ++) $ show (kind s, key s, value s)) $ storage',
+        Text.pack $ unlines $ map (\s -> ("  " ++) $ show (key s, value s)) $ storage',
         "End of storage"
       ]
   return $ Map.fromList ret
 
--- where
---   getStorageRange :: (MonadIO m, MonadLogger m) =>
---                      Address -> (Word256, Word256) -> m [StorageAddress]
---   getStorageRange a (o,c) = getStorage'
---       storageFilterParams{ qsAddress = Just a
---                          , qsMinKey = Just . word256ToHexStorage . fromInteger $ toInteger o
---                          , qsMaxKey = Just . word256ToHexStorage . fromInteger $ toInteger (o + c - 1)
---                          , qsChainId = MaybeNamed.Unnamed <$> chainId
---                          }
-
 postContractsBatchStates ::
-  ( MonadLogger m,
+  ( MonadIO m,
+    MonadLogger m,
     A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   [PostContractsBatchStatesRequest] ->
   m [GetContractsStateResponses]
@@ -249,10 +236,12 @@ postContractsBatchStates = traverse flattenRequest
         (fromMaybe False postcontractsbatchstatesrequestLength)
 
 getContractsDetails' ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
   Maybe ChainId ->
@@ -266,29 +255,22 @@ getContractsDetails' contractAddress chainId = do
               " on chain ",
               maybe "Main" (Text.pack . show) chainId
             ]
-  mAddrStateRef <-
-    listToMaybe
-      <$> getAccount'
-        accountsFilterParams
-          { _qaChainId = maybeToList chainId,
-            _qaAddress = Just contractAddress,
+      aParams = accountsFilterParams
+          { _qaAddress = Just contractAddress,
             _qaExternal = Just False,
             _qaLimit = Just 1
           }
-  case mAddrStateRef of
+  getContractByAccountsFilterParams aParams >>= \case
     Nothing -> throwIO err
-    Just (AddressStateRef' a@AddressStateRef {} _) -> case addressStateRefCodePtr a of
-      Nothing -> throwIO err
-      Just cp ->
-        getContractDetailsByCodeHash cp >>= \case
-          Left e -> throwIO $ UserError e
-          Right contract -> pure $ snd contract
+    Just contract -> pure contract
 
 getContractsDetails ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   Address ->
   Maybe ChainId ->
@@ -296,10 +278,12 @@ getContractsDetails ::
 getContractsDetails = getContractsDetails'
 
 getContractsFunctions ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -310,10 +294,12 @@ getContractsFunctions _ contractId chainId = do
   pure . map (FunctionName . Text.pack) . Map.keys $ _functions contract
 
 getContractsSymbols ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -324,10 +310,12 @@ getContractsSymbols _ contractId chainId = do
   pure . map (SymbolName . Text.pack) . Map.keys $ _storageDefs contract
 
 getContractsEnum ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
+    A.Selectable Address AddressState m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
     HasCodeDB m,
-    (Keccak256 `A.Selectable` SourceMap) m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m
   ) =>
   ContractName ->
   Address ->
@@ -341,7 +329,6 @@ getContractsEnum _ contractId (EnumName enumName) chainId = do
 getContractsStateMapping :: -- ( A.Selectable Account AddressState m
 -- , (Keccak256 `A.Selectable` SourceMap) m
 -- , MonadLogger m
--- , HasSQL m
 -- , HasBlocEnv m
 -- )
   Monad m =>
@@ -361,9 +348,7 @@ getContractsStateMapping _ _ _ _ _ =
 
   -- fetchLimit <- fromInteger <$> fmap stateFetchLimit getBlocEnv
 
-  -- let storageMap = Map.fromList $ map (\s -> case kind s of
-  --       EVM -> (hexStorageToWord256 $ key s, hexStorageToWord256 $ value s)
-  --       SolidVM -> error "unimplemented: getContractsStateMapping for SolidVM") storage'
+  -- let storageMap = Map.fromList $ map (\_ -> error "unimplemented: getContractsStateMapping for SolidVM") storage'
   --     storage k = fromMaybe 0 $ Map.lookup k storageMap
   --     ret = valueToSolidityValue <$> decodeMapValue fetchLimit (typeDefs contract') (mainStruct contract') storage mappingName keyName
 
@@ -420,21 +405,3 @@ completeXabi :: Text -> Xabi -> Either String Xabi
 completeXabi name xabi = do
   c <- xAbiToContract xabi
   return $ contractToXabi name c
-
-getSourceMapFromAddress :: 
-  ( MonadIO m,
-    (Keccak256 `A.Selectable` SourceMap) m, 
-    (Address `A.Selectable` AddressState) m
-  ) => Address -> m SourceMap
-getSourceMapFromAddress cptr = do
-  addressState <- A.select (A.Proxy @AddressState) cptr
-  mCodeHash <- case addressState of
-    Nothing -> throwIO $ UserError "Could not find code hash for contract"
-    Just as -> return $ addressStateCodeHash as
-  keccak <- case mCodeHash of
-    SolidVMCode _ k -> pure k
-    _ -> throwIO $ UserError "Could not find code hash for contract"
-  sourcy <- A.select (A.Proxy @SourceMap) keccak
-  case sourcy of
-    Nothing -> throwIO $ UserError "Could not find source map for contract"
-    Just sm -> pure sm

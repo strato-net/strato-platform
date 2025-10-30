@@ -6,15 +6,15 @@
 
 {-# OPTIONS -fno-warn-orphans      #-}
 
-import BlockApps.X509
 import Blockchain.Data.GenesisInfo
-import Blockchain.GenesisBlock
+import Blockchain.GenesisBlocks.Builder
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Validator
 import qualified Data.Aeson as Ae
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as C8
 import qualified Data.ByteString.Lazy as BL
+import Data.Default
 import Data.Foldable (foldlM)
 import System.Console.GetOpt
 import System.Environment
@@ -24,9 +24,8 @@ import System.Environment
 --------------------------------------------------------------------------------------------
 
 data Options = Options
-  { optCerts :: [X509Certificate],
-    optValidators :: [ChainMemberParsedSet],
-    optAdmins :: [ChainMemberParsedSet],
+  { optValidators :: [Validator],
+    optAdmins :: [Address],
     optFaucets :: [Address],
     optInput :: GenesisInfo,
     optOutputName :: String
@@ -36,8 +35,7 @@ data Options = Options
 defaultOptions :: Options
 defaultOptions =
   Options
-    { optCerts = [],
-      optValidators = [],
+    { optValidators = [],
       optAdmins = [],
       optFaucets = [],
       optInput = error "Uninitialized input genesis info",
@@ -47,26 +45,12 @@ defaultOptions =
 options :: [OptDescr (Options -> IO Options)]
 options =
   [ Option
-      ['c']
-      ["certs"]
-      ( ReqArg
-          ( \s opts -> do
-              certsStr <- readFile s
-              let eCerts = Ae.eitherDecodeStrict (C8.pack certsStr) :: Either String [X509Certificate]
-                  !certs = either error id eCerts
-              return opts {optCerts = certs}
-          )
-          "Certs"
-      )
-      "The .json filepath of the X509 certificate information. Must be a valid array of JSON object with \
-      \ commonName, country, organization, organizationUnit, and pubKey fields",
-    Option
       ['v']
       ["validators"]
       ( ReqArg
           ( \s opts -> do
               valsStr <- readFile s
-              let eVals = Ae.eitherDecodeStrict (C8.pack valsStr) :: Either String [ChainMemberParsedSet]
+              let eVals = Ae.eitherDecodeStrict (C8.pack valsStr) :: Either String [Validator]
                   !vals = either error id eVals
               return opts {optValidators = vals}
           )
@@ -80,7 +64,7 @@ options =
       ( ReqArg
           ( \s opts -> do
               adminsStr <- readFile s
-              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [ChainMemberParsedSet]
+              let eAdmins = Ae.eitherDecodeStrict (C8.pack adminsStr) :: Either String [Address]
                   !admins = either error id eAdmins
               return opts {optAdmins = admins}
           )
@@ -106,11 +90,7 @@ options =
       ['i']
       ["input"]
       ( ReqArg
-          ( \s opts -> do
-              inputStr <- readFile s
-              let eInput = Ae.eitherDecodeStrict (C8.pack inputStr) :: Either String GenesisInfo
-                  !input = either error id eInput
-              return opts {optInput = input}
+          ( \_ opts -> return opts
           )
           "Input Genesis Info"
       )
@@ -148,6 +128,6 @@ main = do
   --------------------------------- GENERATE GENESIS INFO ------------------------------------
   --------------------------------------------------------------------------------------------
 
-  let gi' = buildGenesisInfo optFaucets optCerts optValidators optAdmins optInput
+  let gi' = buildGenesisInfo optFaucets optValidators optAdmins def
   B.writeFile optOutputName . BL.toStrict $ Ae.encode gi'
   putStrLn $ "Done. Output genesis block info was written to " ++ optOutputName

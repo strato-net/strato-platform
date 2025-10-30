@@ -23,51 +23,29 @@ library:
       - common-log
       - containers
       - crypto-api
+      - data-default
       - directory
+      - file-embed
+      - filepath
       - format
       - json-stream
       - labeled-error
       - monad-alter
       - scientific
       - split
-      - strato-statediff
       - time
       - vector
-      - vm-tools
       - aeson
       - bytestring
       - merkle-patricia-db
       - strato-model
       - text
-      - raw-strings-qq
       - solid-vm-compiler
       - solid-vm-model
       - ethereum-rlp
       - lens
-      - ordered-containers
-
-
-executables:
-  generate-genesis:
-    source-dirs: exec_src/
-    main: Main.hs
-    other-modules: []
-    dependencies:
-      - aeson
-      - blockapps-data
-      - bytestring
-      - hflags
-      - strato-genesis
-      - strato-model
-      - text
-
-  genesis-setup:
-    source-dirs: exec_src/
-    main: GenesisSetup.hs
-    other-modules: []
-    dependencies:
-      - strato-genesis
-      - hflags
+      - template-haskell
+      - vm-tools
 
 tests:
   strato-genesis-test:
@@ -77,6 +55,7 @@ tests:
       - aeson
       - blockapps-data
       - bytestring
+      - containers
       - hspec
       - json-stream
       - labeled-error

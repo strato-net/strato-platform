@@ -21,8 +21,8 @@ local authenticate_opts = {
   token_endpoint_auth_method = "client_secret_post",
   ssl_verify = "<IS_SSL_PLACEHOLDER_YES_NO>",
   redirect_uri_scheme = "<REDIRECT_URI_SCHEME_PLACEHOLDER_HTTP_HTTPS>",
-  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token)
-  session_contents = {access_token=true}, -- comment out to keep everything; other options: user=true, id_token=true, enc_id_token=true
+  -- 'id_token' to get user data; 'access_token' for access and refresh tokens; 'user' to get additional user data (some providers include 'email' in user object instead of id_token), enc_id_token (required for https://openid.net/specs/openid-connect-rpinitiated-1_0.html, strictly followed by Keycloak 26.0.2+)
+  session_contents = {access_token=true, enc_id_token=true}, -- comment out to keep everything
   renew_access_token_on_expiry = true,
   access_token_expires_in = 300,
   access_token_expires_leeway = 3,
@@ -31,6 +31,9 @@ local authenticate_opts = {
   -- redirect_after_logout_uri = "/", -- URI to redirect after app and oauth provider logouts, otherwise show "Logged Out" text message on logout_path URI
   revoke_tokens_on_logout = true
 }
+
+-- Clear any x-user-access-token header coming from the client, for security reasons
+ngx.req.clear_header("X-USER-ACCESS-TOKEN")
 
 -- If it is a direct call to APIs (with access_token provided as Bearer token in Authorization header)
 if ngx.req.get_headers()["Authorization"] then
@@ -94,5 +97,24 @@ end
 if user_access_token ~= '' then
   ngx.req.set_header("X-USER-ACCESS-TOKEN", user_access_token)
 end
+
+-- Check if session was rotated during authentication and mark for CSRF token regeneration
+local old_session_id = ngx.var.cookie_strato_session
+local set_cookie_header = ngx.header["Set-Cookie"]
+
+if set_cookie_header then
+  local cookies = type(set_cookie_header) == "table" and set_cookie_header or {set_cookie_header}
+  for _, cookie in ipairs(cookies) do
+    local new_session_id = cookie:match("^strato_session=([^;]+)")
+    if new_session_id and new_session_id ~= old_session_id then
+      -- Session rotated, store info for CSRF handler in header_filter phase
+      ngx.ctx.session_rotated = true
+      ngx.ctx.new_session_id = new_session_id
+      ngx.ctx.old_session_id = old_session_id
+      break
+    end
+  end
+end
+
 -- removing the Authorization header FROM REQUEST to prevent upstream services from using it (e.g. PostgresT's built-in JWT-based access)
 ngx.req.clear_header("Authorization")

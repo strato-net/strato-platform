@@ -808,11 +808,8 @@ formatOp (PUSH x) = "PUSH " ++ show x
 formatOp x = show x
 
 printTrace :: EVMBase m => Operation -> Gas -> CodePointer -> VMState -> VMM m ()
---printDebugInfo env memBefore memAfter c op stateBefore stateAfter = do
 printTrace op gasBefore pcBefore stateAfter = do
   --CPP style trace
-  {-  logInfoN $ "EVM [ eth | " ++ show (callDepth stateBefore) ++ " | " ++ formatAddressWithoutColor (envOwner env) ++ " | #" ++ show c ++ " | " ++ map toUpper (showHex4 (pc stateBefore)) ++ " : " ++ formatOp op ++ " | " ++ show (vmGasRemaining stateBefore) ++ " | " ++ show (vmGasRemaining stateAfter - vmGasRemaining stateBefore) ++ " | " ++ show(fromIntegral memAfter - fromIntegral memBefore) ++ "x32 ]"
-    logInfoN $ "EVM [ eth ] "-}
 
   --GO style trace
   gasAfter <- liftIO $ readGasRemaining stateAfter
@@ -829,38 +826,7 @@ printTrace op gasBefore pcBefore stateAfter = do
   stackList <- liftIO . MS.toList . stack $ stateAfter
   $logInfoS "printTrace" . T.pack $ unlines (padZeros 64 <$> flip showHex "" <$> (reverse $ stackList))
 
---  $logInfoS "printTrace" . T.pack $ "    MEMORY\n" ++ showMem 0 (B.unpack $ memByteString)
-{-
-  $logInfoS "printTrace" "    STORAGE"
-  kvs <- getAllStorageKeyVals
-  $logInfoS "printTrace" . T.pack $ unlines (map (\(k, v) -> "0x" ++ showHexU (byteString2Integer $ nibbleString2ByteString k) ++ ": 0x" ++ showHexU (fromIntegral v)) kvs)
--}
 
-{-
-showHex4 :: Word256 -> String
-showHex4 i = replicate (4 - length rawOutput) '0' ++ rawOutput
-    where rawOutput = showHex i ""
-
-showHexU :: Integer -> String
-showHexU = map toUpper . flip showHex ""
-
-showWord8::Word8->Char
-showWord8 c | c >= 32 && c < 127 = w2c c
-showWord8 _ = '?'
-
-showMem::Int->[Word8]->String
-showMem _ x | length x > 1000 = " mem size greater than 1000 bytes"
-showMem _ [] = ""
-showMem p (v1:v2:v3:v4:v5:v6:v7:v8:rest) =
-    padZeros 4 (showHex p "") ++ " "
-             ++ [showWord8 v1] ++ [showWord8 v2] ++ [showWord8 v3] ++ [showWord8 v4]
-             ++ [showWord8 v5] ++ [showWord8 v6] ++ [showWord8 v7] ++ [showWord8 v8] ++ " "
-             ++ padZeros 2 (showHex v1 "") ++ " " ++ padZeros 2 (showHex v2 "") ++ " " ++ padZeros 2 (showHex v3 "") ++ " " ++ padZeros 2 (showHex v4 "") ++ " "
-             ++ padZeros 2 (showHex v5 "") ++ " " ++ padZeros 2 (showHex v6 "") ++ " " ++ padZeros 2 (showHex v7 "") ++ " " ++ padZeros 2 (showHex v8 "") ++ "\n"
-             ++ showMem (p+8) rest
-showMem p x = padZeros 4 (showHex p "") ++ " " ++ (showWord8 <$> x) ++ " " ++ unwords (padZeros 2 . flip showHex "" <$> x)
-
--}
 
 {-# INLINE runCode #-}
 runCode :: EVMBase m => VMM m ()
@@ -1035,7 +1001,6 @@ runVMM isRunningTests' isHomestead preExistingSuicideList cDepth env availableGa
               erSuicideList = suicideList vmState,
               erAction = Just $ _action vmState,
               erException = Just (Right e),
-              erKind = EVM,
               -- , erNewX509Certs       = M.empty
               erPragmas = [],
               erCreator = "",
@@ -1180,7 +1145,7 @@ create' = do
   where
     assignCode :: EVMBase m => B.ByteString -> Address -> VMM m ()
     assignCode codeBytes address = do
-      hsh <- addCode EVM codeBytes
+      hsh <- addCode codeBytes
       A.adjustWithDefault_ (A.Proxy @AddressState) address $ \newAddressState ->
         pure newAddressState {addressStateCodeHash = ExternallyOwned hsh}
     assignDetails = do
@@ -1191,7 +1156,7 @@ create' = do
           %~ (:) Action.Create
 
     -- insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-    -- insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    -- insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" "" (Action.EVMDiff M.empty) M.empty [] [] []
 
 call ::
   EVMBase m =>
@@ -1292,11 +1257,11 @@ call' noValueTransfer = do
   return (fromMaybe B.empty $ returnVal vmState)
   where
     insertFunc2 :: Keccak256 -> Maybe Action.ActionData -> Maybe Action.ActionData
-    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+    insertFunc2 ch _ = Just $ Action.ActionData (ExternallyOwned $ ch) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty []
 
 
 insertFunc :: Maybe Action.ActionData -> Maybe Action.ActionData
-insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" EVM (Action.EVMDiff M.empty) M.empty [] [] []
+insertFunc _ = Just $ Action.ActionData (ExternallyOwned $ unsafeCreateKeccak256FromWord256 0) mempty "" Nothing "" "" (Action.EVMDiff M.empty) M.empty []
 
 callPrecompiled' :: EVMBase m => Bool -> PrecompiledCode -> VMM m B.ByteString
 callPrecompiled' noValueTransfer precompiled = do
@@ -1468,7 +1433,6 @@ vmStateToExecResults vmState = do
         erSuicideList = suicideList vmState,
         erAction = Just $ _action vmState,
         erException = Nothing,
-        erKind = EVM,
         -- , erNewX509Certs       = M.empty
         erPragmas = [],
         erCreator = "",

@@ -3,11 +3,9 @@
 
 module Blockchain.Strato.Model.Class where
 
-import BlockApps.X509.Certificate
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -17,7 +15,6 @@ import Control.DeepSeq
 import Data.Aeson
 import qualified Data.ByteString as B
 import Data.Data
-import Data.Map.Strict (Map)
 import Data.Text (Text)
 import Data.Time
 import Data.Word
@@ -50,7 +47,7 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderBlockNumber :: h -> Integer
   blockHeaderParentHash :: h -> Keccak256
   blockHeaderOmmersHash :: h -> Keccak256
-  blockHeaderBeneficiary :: h -> ChainMemberParsedSet
+  blockHeaderBeneficiary :: h -> Address
   blockHeaderStateRoot :: h -> B.ByteString -- todo: "StateRoot" thats not the MPDB StateRoot
   blockHeaderTransactionsRoot :: h -> B.ByteString -- todo: ditto
   blockHeaderReceiptsRoot :: h -> B.ByteString -- todo: ditto
@@ -65,8 +62,6 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderValidators :: h -> [Validator]
   blockHeaderNewValidators :: h -> [Validator]
   blockHeaderRemovedValidators :: h -> [Validator]
-  blockHeaderNewCerts :: h -> [X509Certificate]
-  blockHeaderRevokedCerts :: h -> [DummyCertRevocation]
   blockHeaderProposal :: h -> Maybe Signature
   blockHeaderSignatures :: h -> [Signature]
   blockHeaderVersion :: h -> Int
@@ -92,8 +87,6 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
     blockHeaderValidators,
     blockHeaderNewValidators,
     blockHeaderRemovedValidators,
-    blockHeaderNewCerts,
-    blockHeaderRevokedCerts,
     blockHeaderProposal,
     blockHeaderSignatures,
     morphBlockHeader,
@@ -115,43 +108,41 @@ class (RLPSerializable h, HasIstanbulExtra h) => BlockHeaderLike h where
   blockHeaderOrdering :: h -> Integer
   blockHeaderOrdering = blockHeaderBlockNumber
 
-data TransactionType = ContractCreation | Message | PrivateHash deriving (Eq, Ord, Read, Show)
+data TransactionType = ContractCreation | Message deriving (Eq, Ord, Read, Show)
 
 -- todo: newtype all these vague Integers
 class (RLPSerializable t) => TransactionLike t where
   txHash :: t -> Keccak256
   txPartialHash :: t -> Keccak256
   txChainHash :: t -> Keccak256
+  txFuncName :: t -> Maybe Text
+  txContractName :: t -> Maybe Text
+  txArgs :: t -> [Text]
   txSigner :: t -> Maybe Address
   txNonce :: t -> Integer
+  txNetwork :: t -> Text
   txType :: t -> TransactionType
   txSignature :: t -> (Integer, Integer, Word8)
-  txValue :: t -> Integer
   txDestination :: t -> Maybe Address
-  txGasPrice :: t -> Integer
   txGasLimit :: t -> Integer
   txCode :: t -> Maybe Code
-  txData :: t -> Maybe B.ByteString -- todo make a `Code` newtype
-  txChainId :: t -> Maybe Word256
-  txMetadata :: t -> Maybe (Map Text Text)
 
   morphTx :: (TransactionLike t2) => t2 -> t
   {-# MINIMAL
     txHash,
     txPartialHash,
     txChainHash,
+    txFuncName,
+    txContractName,
+    txArgs,
     txSigner,
     txNonce,
+    txNetwork,
     txType,
     txSignature,
-    txValue,
     txDestination,
-    txGasPrice,
     txGasLimit,
     txCode,
-    txData,
-    txChainId,
-    txMetadata,
     morphTx
     #-}
 

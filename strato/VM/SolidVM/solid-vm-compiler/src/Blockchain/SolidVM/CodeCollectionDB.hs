@@ -44,8 +44,6 @@ import qualified Data.Aeson as Aeson
 import Data.Bifunctor (bimap, first)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
--- import           System.Clock
--- import qualified Data.Cache                          as DC
 import qualified Data.Cache.LRU as LRU
 import Data.Default
 import Data.Foldable (foldrM)
@@ -73,7 +71,7 @@ import Text.Parsec.Error
 
 data CompilationError
   = PEx ParseError
-  | IEx T.Text
+  | IEx (SourceAnnotation T.Text)
   | TCEx [SourceAnnotation T.Text]
   | SVMEx (Positioned ((,) SolidException))
   deriving (Show)
@@ -84,12 +82,12 @@ newtype MemCompilerT m a = MemCompilerT {unMemCompilerT :: MainChainT (MemAddres
 instance MonadTrans MemCompilerT where
   lift = MemCompilerT . MainChainT . MemAddressStateDB . lift . MemCodeDB . lift
 
-instance Monad m => (Address `A.Alters` AddressState) (MemCompilerT m) where
+instance {-# OVERLAPPING #-} Monad m => (Address `A.Alters` AddressState) (MemCompilerT m) where
   lookup p = MemCompilerT . MainChainT . A.lookup p
   insert p k = MemCompilerT . MainChainT . A.insert p k
   delete p = MemCompilerT . MainChainT . A.delete p
 
-instance Monad m => A.Selectable Address AddressState (MemCompilerT m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address AddressState (MemCompilerT m) where
   select = A.lookup
 
 instance Monad m => (Keccak256 `A.Alters` DBCode) (MemCompilerT m) where
@@ -111,7 +109,7 @@ withAnnotations :: Monad m => (a -> m (Either CompilationError b)) -> a -> m (Ei
 withAnnotations f = fmap (first unwind) . f
   where
     unwind (PEx pe) = [parseErrorToAnnotation pe]
-    unwind (IEx t) = [t <$ emptySourceAnnotation]
+    unwind (IEx t) = [t]
     unwind (SVMEx (e, x)) = [T.pack (show e) <$ x]
     unwind (TCEx errs) = errs
 
@@ -126,21 +124,20 @@ compileSourceNoInheritance ::
     A.Selectable Address AddressState m
   ) =>
   Bool ->
+  Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
+compileSourceNoInheritance isRunningTests typeCheck initCodeMap = runExceptT $ do
   let getNamedSUnits :: T.Text -> T.Text -> Either CompilationError (Positioned UnresolvedFileUnitsF)
       getNamedSUnits fileName src = do
         sourceUnits <- parseSource fileName src
-        foldrM (\u ufu -> maybe (pure ufu) (first IEx . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
+        foldrM (\u ufu -> maybe (pure ufu) (first (IEx . (<$ (def :: SourceAnnotation ()))) . mergeUnresolvedFileUnits ufu) =<< getNameAndUnit sourceUnits u) def sourceUnits
 
       userDefinedFromFile ss = M.fromList . catMaybes $ (\case (Alias _ alias typ) -> Just (alias, typ); _ -> Nothing) <$> ss
       getNameAndUnit ss = \case
-        NamedXabi name (xabi, parents') -> do
-          ctrct <-
-            first SVMEx $
-              xabiToContract (textToLabel name) (map textToLabel parents') (userDefinedFromFile ss) xabi
-          pure . Just $ def & ufuUnits . at (textToLabel name) ?~ FUContract ctrct
+        FLContract c -> do
+          let ctrct = c & userDefined .~ userDefinedFromFile ss
+          pure . Just $ def & ufuUnits . at (_contractName c) ?~ FUContract ctrct
         FLFunc name fdec ->
           pure . Just $ def & ufuUnits . at name ?~ FUFunction fdec
         FLConstant name cnst ->
@@ -159,7 +156,7 @@ compileSourceNoInheritance typeCheck initCodeMap = runExceptT $ do
         Import _ i -> pure . Just $ def & ufuImports .~ [i]
         _ -> pure Nothing
   ufuMap <- except . fmap M.fromList . traverse (\(n, s) -> (n,) <$> getNamedSUnits n s) $ M.toList initCodeMap
-  theCC <- withExceptT IEx $ resolveImports (codeCollectionFromHashNoCache False typeCheck) ufuMap
+  theCC <- withExceptT (\(x,t) -> IEx $ t <$ x) $ resolveImports (codeCollectionFromHashNoCache isRunningTests False typeCheck) (\f -> either (const Nothing) Just . getNamedSUnits f) ufuMap
   pure $ force theCC
 
 --- Don't typecheck in Slipstream!!!
@@ -168,10 +165,11 @@ compileSource ::
     A.Selectable Address AddressState m
   ) =>
   Bool ->
+  Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSource typeCheck mTT = do
-  eCC <- compileSource' typeCheck mTT
+compileSource isRunningTests typeCheck mTT = do
+  eCC <- compileSource' isRunningTests typeCheck mTT
   pure $ first SVMEx . applyInheritanceFunctions =<< eCC
 
 compileSource' ::
@@ -179,18 +177,19 @@ compileSource' ::
     A.Selectable Address AddressState m
   ) =>
   Bool ->
+  Bool ->
   Map T.Text T.Text ->
   m (Either CompilationError CodeCollection)
-compileSource' typeCheck mTT = do
+compileSource' isRunningTests typeCheck mTT = do
   let applyInheritanceE = first SVMEx . applyInheritanceNoFunctions
-  eCC <- compileSourceNoInheritance typeCheck mTT
+  eCC <- compileSourceNoInheritance isRunningTests typeCheck mTT
   pure $ case applyInheritanceE =<< eCC of
     Right cc -> O.detector <$> if typeCheck
           then typeCheckDetector cc
           else Right cc
     Left x -> Left x
   where
-    typeCheckDetector ecc = case TypeChecker.detector ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
+    typeCheckDetector ecc = case TypeChecker.detector' isRunningTests ecc <> ConstantFunctions.detector ecc <> MultipleDeclarations.detector ecc of
       [] -> Right ecc
       xs -> Left $ TCEx xs
 
@@ -199,13 +198,16 @@ compileSourceWithAnnotations ::
     A.Selectable Address AddressState m
   ) =>
   Bool ->
+  Bool ->
   Map T.Text T.Text ->
   m (Either [SourceAnnotation T.Text] CodeCollection)
-compileSourceWithAnnotations typeCheck = withAnnotations (compileSource typeCheck)
+compileSourceWithAnnotations isRunningTests typeCheck =
+  withAnnotations (compileSource isRunningTests typeCheck)
 
 compileSourceWithAnnotationsWithoutImports ::
-  Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
-compileSourceWithAnnotationsWithoutImports typeCheck = runIdentity . runMemCompilerT . withAnnotations (compileSource typeCheck)
+  Bool -> Bool -> Map T.Text T.Text -> Either [SourceAnnotation T.Text] CodeCollection
+compileSourceWithAnnotationsWithoutImports isRunningTests typeCheck =
+  runIdentity . runMemCompilerT . withAnnotations (compileSource isRunningTests typeCheck)
 
 codeCollectionFromSource ::
   ( MonadIO m,
@@ -214,9 +216,10 @@ codeCollectionFromSource ::
     -- , HasCodeCollectionDB m
   ) =>
   Bool ->
+  Bool ->
   B.ByteString ->
   m (Keccak256, CodeCollection)
-codeCollectionFromSource typeCheck initCode = do
+codeCollectionFromSource isRunningTests typeCheck initCode = do
   let initList = case Aeson.decode $ BL.fromStrict initCode of
         Just l -> l
         Nothing -> case Aeson.decode $ BL.fromStrict initCode of
@@ -235,8 +238,8 @@ codeCollectionFromSource typeCheck initCode = do
       return (hsh, cc)
     (_, Nothing) -> do
       recordCacheEvent StorageWrite
-      hsh' <- addCode SolidVM canonicalInitCode
-      ecc <- compileSource typeCheck initMap
+      hsh' <- addCode canonicalInitCode
+      ecc <- compileSource isRunningTests typeCheck initMap
       let cc = case ecc of
             Right a -> a
             Left (PEx p) -> parseError "codeCollectionFromSource" p
@@ -253,9 +256,10 @@ codeCollectionFromHash ::
     -- , HasCodeCollectionDB m
   ) =>
   Bool ->
+  Bool ->
   Keccak256 ->
   m CodeCollection
-codeCollectionFromHash typeCheck hsh = do
+codeCollectionFromHash isRunningTests typeCheck hsh = do
   codeCache <- liftIO $ readIORef unsafeCodeCacheLRUIORef
   case LRU.lookup hsh codeCache of
     (newCache, (Just cc)) -> do
@@ -264,7 +268,7 @@ codeCollectionFromHash typeCheck hsh = do
       return cc
     (_, Nothing) -> do
       recordCacheEvent CacheMiss
-      cc <- codeCollectionFromHashNoCache True typeCheck hsh
+      cc <- codeCollectionFromHashNoCache isRunningTests True typeCheck hsh
       liftIO $ modifyIORef' unsafeCodeCacheLRUIORef (LRU.insert hsh cc)
       return cc
 
@@ -274,16 +278,17 @@ codeCollectionFromHashNoCache ::
   ) =>
   Bool ->
   Bool ->
+  Bool ->
   Keccak256 ->
   m CodeCollection
-codeCollectionFromHashNoCache mergeFuncs typeCheck hsh =
+codeCollectionFromHashNoCache isRunningTests mergeFuncs typeCheck hsh =
   getCode hsh >>= \case
     Nothing -> internalError "unknown code hash" hsh
-    Just (_, initCode) -> do
+    Just initCode -> do
       let initMap = case Aeson.decode $ BL.fromStrict initCode of
             Just l -> M.fromList l
             Nothing -> M.singleton T.empty (decodeUtf8 initCode)
-      ecc <- (if mergeFuncs then compileSource else compileSource') typeCheck initMap
+      ecc <- (if mergeFuncs then compileSource else compileSource') isRunningTests typeCheck initMap
       case ecc of
         Right a -> pure a
         Left (PEx p) -> parseError "codeCollectionFromHash" p

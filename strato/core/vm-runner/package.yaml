@@ -23,6 +23,7 @@ library:
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
+  - blockDB
   - blockstanbul
   - bytestring
   - common-log
@@ -33,7 +34,8 @@ library:
   - debugger
   - dlist
   - ethereum-rlp
-  - ethereum-vm
+#  - ethereum-vm
+  - exceptions
   - extra
   - format
   - lens
@@ -46,7 +48,6 @@ library:
   - solid-vm-model
   - sql-monad
   - strato-conf
-  - strato-genesis
   - strato-index
   - strato-model
   - strato-redis-blockdb
@@ -62,6 +63,7 @@ executables:
   vm-runner:
     source-dirs: exec_src
     main: Main.hs
+    other-modules: []
     dependencies:
       - async
       - blockapps-init
@@ -89,7 +91,7 @@ tests:
       - bytestring
       - common-log
       - containers
-      - ethereum-vm
+      #- ethereum-vm
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -112,7 +114,7 @@ benchmarks:
       - containers
       - criterion
       - deepseq
-      - ethereum-vm
+      #- ethereum-vm
       - strato-model
       - vector
 
@@ -124,4 +126,4 @@ benchmarks:
     dependencies:
       - bytestring
       - criterion
-      - ethereum-vm
+      #- ethereum-vm

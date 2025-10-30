@@ -1,34 +1,35 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE BangPatterns          #-}
+{-# LANGUAGE ConstraintKinds       #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE LambdaCase            #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
+{-# LANGUAGE TypeOperators         #-}
 
 module Blockchain.Context
     ( MonadP2P
     , Inbound(..)
     , Outbound(..)
-    , IsValidator(..)
     , Context(..)
     , Config(..)
+    , P2pConduits(..)
     , peerSource
     , peerSink
     , seqSource
     , RunsClient(..)
     , RunsServer(..)
     , ActionTimestamp(..)
-    , MaxReturnedHeaders(..)
-    , ConnectionTimeout(..)
+    , emptyActionTimestamp
     , PeerAddress(..)
     , GenesisBlockHash(..)
     , PeerRunner
+    , RemainingBlockHeaders(..)
     , initConfig
     , initContext
     , runContextM
@@ -45,69 +46,69 @@ module Blockchain.Context
     , shouldSendToPeer
     , withActivePeer
     , withCertifiedPeer
-    , getPeerX509
-    , getMyX509
     ) where
 
 import           Conduit
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Exception                     hiding (bracket)
-import           Control.Lens                          hiding (Context)
-import qualified Control.Monad.Change.Alter            as A
-import qualified Control.Monad.Change.Modify           as Mod
+import           Control.Exception                       hiding (bracket, catch)
+import           Control.Lens                            hiding (Context)
+import qualified Control.Monad.Change.Alter              as A
+import qualified Control.Monad.Change.Modify             as Mod
 import           Control.Monad.Composable.Kafka
 import           Control.Monad.Reader
 import           Crypto.Types.PubKey.ECC
-import qualified Data.ByteString                       as B
-import qualified Data.ByteString.Char8                 as BC
+import qualified Data.ByteString                         as B
+import qualified Data.ByteString.Char8                   as BC
 import           Data.Conduit.Network
-import qualified Data.Kind                             as DK
-import           Data.Foldable                         (toList)
-import qualified Data.Map.Strict                       as M
+import           Data.Foldable                           (toList)
+import qualified Data.Kind                               as DK
+import qualified Data.Map.Strict                         as M
 import           Data.Maybe
 import           Data.Proxy
-import qualified Data.Set.Ordered as S
+import qualified Data.Set.Ordered                        as S
 import           Data.String
-import qualified Data.Text                             as T
+import qualified Data.Text                               as T
 import           Data.Time.Clock
-import           GHC.Exts                              (Constraint)
+import           GHC.Exts                                (Constraint)
 
 import           BlockApps.Logging
-import           BlockApps.X509.Certificate
 
-import           Blockchain.Blockstanbul               (WireMessage)
+import           Blockchain.BlockDB
+import           Blockchain.Blockstanbul                 (WireMessage)
 import           Blockchain.Data.Block
 import           Blockchain.Data.BlockHeader
-import           Blockchain.Data.PubKey
 import           Blockchain.DB.DetailsDB
 import           Blockchain.DB.SQLDB
 import           Blockchain.DBM
 import           Blockchain.EthConf
+import           Blockchain.Model.SyncState
+import qualified Blockchain.Model.SyncTask               as SYNCTASK
+import           Blockchain.Model.WrappedBlock
 import           Blockchain.Options
 import           Blockchain.P2PUtil
 import           Blockchain.Sequencer.Event
-import qualified Blockchain.Sequencer.Kafka            as SK
+import qualified Blockchain.Sequencer.Kafka              as SK
 
-import           Blockchain.Strato.Discovery.Data.Host
-import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Discovery.ContextLite ()
+import           Blockchain.Strato.Discovery.Data.Peer
 import           Blockchain.Strato.Model.Address
-import           Blockchain.Strato.Model.ChainMember
+import           Blockchain.Strato.Model.Host
 import           Blockchain.Strato.Model.Keccak256
 import           Blockchain.Strato.Model.Secp256k1
 
-import qualified Blockchain.Strato.RedisBlockDB        as RBDB
-import           Blockchain.Strato.RedisBlockDB.Models (RedisBestBlock(..))
-import           Control.Monad                         (void)
+import qualified Blockchain.Strato.RedisBlockDB          as RBDB
+import           Blockchain.SyncDB
+import           Control.Monad                           (void)
 import           Control.Monad.Composable.Base
-import qualified Database.Persist.Sql                  as SQL
-import qualified Database.Redis                        as Redis
-import           Network.HTTP.Client                    (newManager, defaultManagerSettings)
-import           Network.Wai.Handler.Warp.Internal     (setSocketCloseOnExec)
+import qualified Database.Persist.Sql                    as SQL
+import qualified Database.Redis                          as Redis
+import           Network.HTTP.Client                     (defaultManagerSettings,
+                                                          newManager)
+import           Network.Wai.Handler.Warp.Internal       (setSocketCloseOnExec)
 import           Servant.Client
-import qualified Strato.Strato23.API                   as VC
-import qualified Strato.Strato23.Client                as VC
+import qualified Strato.Strato23.API                     as VC
+import qualified Strato.Strato23.Client                  as VC
 
 import           UnliftIO
 
@@ -133,17 +134,13 @@ newtype Inbound a = Inbound {unInbound :: a}
 
 newtype Outbound a = Outbound {unOutbound :: a}
 
-newtype IsValidator = IsValidator {unIsValidator :: Bool}
-
 data Config = Config
-  { configSQLDB :: SQLDB,
-    configRedisBlockDB :: RBDB.RedisConnection,
-    configConnectionTimeout :: ConnectionTimeout,
-    configMaxReturnedHeaders :: MaxReturnedHeaders,
-    configVaultClient :: ClientEnv,
-    configContext :: IORef Context,
+  { configSQLDB                    :: SQLDB,
+    configRedisBlockDB             :: RBDB.RedisConnection,
+    configVaultClient              :: ClientEnv,
+    configContext                  :: IORef Context,
     configBlockstanbulWireMessages :: IORef (S.OSet Keccak256),
-    configPubKey :: PublicKey
+    configPubKey                   :: PublicKey
   }
 
 newtype ActionTimestamp = ActionTimestamp {unActionTimestamp :: Maybe UTCTime}
@@ -153,21 +150,17 @@ emptyActionTimestamp = ActionTimestamp Nothing
 
 newtype RemainingBlockHeaders = RemainingBlockHeaders {unRemainingBlockHeaders :: [BlockHeader]}
 
-newtype MaxReturnedHeaders = MaxReturnedHeaders {unMaxReturnedHeaders :: Int}
+newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe Address}
 
-newtype ConnectionTimeout = ConnectionTimeout {unConnectionTimeout :: Int}
-
-newtype PeerAddress = PeerAddress {unPeerAddress :: Maybe ChainMemberParsedSet}
-
-withPeerAddress :: (Maybe ChainMemberParsedSet -> Maybe ChainMemberParsedSet) -> PeerAddress -> PeerAddress
+withPeerAddress :: (Maybe Address -> Maybe Address) -> PeerAddress -> PeerAddress
 withPeerAddress f = PeerAddress . f . unPeerAddress
 
 data Context = Context
-  { contextKafkaState        :: KafkaEnv
-  , blockHeaders             :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
-  , remainingBlockHeaders    :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
-  , actionTimestamp          :: ActionTimestamp
-  , _blockstanbulPeerAddr    :: PeerAddress
+  { contextKafkaState     :: KafkaEnv
+  , blockHeaders          :: ([BlockHeader], UTCTime) -- keep track when last updated global headers cache
+  , remainingBlockHeaders :: (RemainingBlockHeaders, UTCTime) -- keep track when last updated global headers cache
+  , actionTimestamp       :: ActionTimestamp
+  , _blockstanbulPeerAddr :: PeerAddress
   , _outboundWireMessages :: S.OSet (Host, Keccak256)
   }
 
@@ -179,8 +172,8 @@ type ContextM = ReaderT Config (ResourceT (LoggingT IO))
 
 data P2pConduits m = P2pConduits
   { _peerSource :: ConduitM () B.ByteString m (),
-    _peerSink :: ConduitM B.ByteString Void m (),
-    _seqSource :: ConduitM () P2pEvent m ()
+    _peerSink   :: ConduitM B.ByteString Void m (),
+    _seqSource  :: ConduitM () P2pEvent m ()
   }
 
 makeLenses ''P2pConduits
@@ -193,8 +186,8 @@ class RunsClient m where
     (P2pConduits m -> m ()) ->
     m ()
 
-class RunsServer n m where
-  runServer :: TCPPort -> PeerRunner n m () -> (P2pConduits n -> Host -> n ()) -> m ()
+class RunsServer m where
+  runServer :: TCPPort -> PeerRunner m () -> (P2pConduits m -> Host -> m ()) -> IO ()
 
 instance RunsClient ContextM where
   runClientConnection host' (TCPPort p) sSource handler = do
@@ -203,11 +196,11 @@ instance RunsClient ContextM where
       let pSource = appSource app
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
-      handler conduits
+      catch
+        (handler conduits)
+        (\(e :: SomeException) -> $logErrorS "runClientConnection/Exception" . T.pack $ show e)
 
-
-
-instance RunsServer ContextM (LoggingT IO) where
+instance RunsServer ContextM where
   runServer (TCPPort listenPort) runner handler = do
     let settings = setAfterBind setSocketCloseOnExec $ serverSettings listenPort "*"
     runGeneralTCPServer settings $ \app -> runner $ \sSource -> do
@@ -215,74 +208,72 @@ instance RunsServer ContextM (LoggingT IO) where
           pSink = appSink app
           conduits = P2pConduits pSource pSink sSource
           ip = fromString . sockAddrToIP $ appSockAddr app
-      handler conduits ip
+      catch
+        (handler conduits ip)
+        (\(e :: SomeException) -> $logErrorS "runServer/Exception" . T.pack $ show e)
 
-instance MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PublicKey (ReaderT Config m) where
   access _ = asks configPubKey
 
 instance MonadIO m => (Keccak256 `A.Alters` BlockHeader) (ReaderT Config m) where
-  lookup _ = RBDB.withRedisBlockDB . RBDB.getHeader
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertHeader k v
-  delete _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeader
+  lookup _ = RBDB.withRedisBlockDB . getHeader
+  insert _ k v = void . RBDB.withRedisBlockDB $ insertHeader k v
+  delete _ = void . RBDB.withRedisBlockDB . deleteHeader
   lookupMany _ =
-    fmap (M.fromList . catMaybes . map sequenceA)
+    fmap (M.fromList . mapMaybe sequenceA)
       . RBDB.withRedisBlockDB
-      . RBDB.getHeaders
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertHeaders
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteHeaders
+      . getHeaders
+  insertMany _ = void . RBDB.withRedisBlockDB . insertHeaders
+  deleteMany _ = void . RBDB.withRedisBlockDB . deleteHeaders
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable WorldBestBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo <&> \case
+    RBDB.withRedisBlockDB getWorldBestBlockInfo <&> \case
       Nothing -> WorldBestBlock $ BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RedisBestBlock s n) -> WorldBestBlock $ BestBlock s n
+      Just (BestBlock s n) -> WorldBestBlock $ BestBlock s n
   put _ (WorldBestBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.updateWorldBestBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB (updateWorldBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "Failed to update WorldBestBlockInfo"
       Right False -> $logInfoS "ContextM.put WorldBestBlock" $ T.pack "NewBlock is not better than existing WorldBestBlock"
       Right True -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestBlockInfo <&> \case
+    RBDB.withRedisBlockDB getBestBlockInfo <&> \case
       Nothing -> BestBlock (unsafeCreateKeccak256FromWord256 0) (-1)
-      Just (RedisBestBlock s n) -> BestBlock s n
+      Just (BestBlock s n) -> BestBlock s n
   put _ (BestBlock s n) =
-    RBDB.withRedisBlockDB (RBDB.putBestBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB (putBestBlockInfo s n) >>= \case
       Left _ -> $logInfoS "ContextM.put BestBlock" $ T.pack "Failed to update BestBlock"
       Right _ -> return ()
 
 instance (MonadIO m, MonadLogger m) => Mod.Modifiable BestSequencedBlock (ReaderT Config m) where
   get _ =
-    RBDB.withRedisBlockDB RBDB.getBestSequencedBlockInfo >>= \case
-      Nothing -> BestSequencedBlock <$> Mod.get (Mod.Proxy @BestBlock)
-      Just (RedisBestBlock s n) -> pure . BestSequencedBlock $ BestBlock s n
-  put _ (BestSequencedBlock (BestBlock s n)) =
-    RBDB.withRedisBlockDB (RBDB.putBestSequencedBlockInfo s n) >>= \case
+    RBDB.withRedisBlockDB getBestSequencedBlockInfo >>= \case
+      Nothing -> do
+        BestBlock s n <- Mod.get (Mod.Proxy @BestBlock)
+        return $ BestSequencedBlock s n []
+      Just bestSequencedBlock -> return bestSequencedBlock
+  put _ bestSequencedBlock =
+    RBDB.withRedisBlockDB (putBestSequencedBlockInfo bestSequencedBlock) >>= \case
       Left _ -> $logInfoS "ContextM.put BestSequencedBlock" $ T.pack "Failed to update BestSequencedBlock"
       Right _ -> return ()
 
-instance MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
-  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ RBDB.getCanonicalHeader i
-
-instance MonadIO m => A.Selectable Address X509CertInfoState (ReaderT Config m) where
-  select _ = RBDB.withRedisBlockDB . RBDB.getCertificate
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable Integer (Canonical BlockHeader) (ReaderT Config m) where
+  select _ i = fmap (fmap Canonical) . RBDB.withRedisBlockDB $ getCanonicalHeader i
 
 instance MonadIO m => (Keccak256 `A.Alters` OutputBlock) (ReaderT Config m) where
-  lookup _ = RBDB.withRedisBlockDB . RBDB.getBlock
-  insert _ k v = void . RBDB.withRedisBlockDB $ RBDB.insertBlock k v
-  delete _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlock
+  lookup _ = RBDB.withRedisBlockDB . getBlock
+  insert _ k v = void . RBDB.withRedisBlockDB $ insertBlock k v
+  delete _ = void . RBDB.withRedisBlockDB . deleteBlock
   lookupMany _ =
-    fmap (M.fromList . catMaybes . map sequenceA)
+    fmap (M.fromList . mapMaybe sequenceA)
       . RBDB.withRedisBlockDB
-      . RBDB.getBlocks
-  insertMany _ = void . RBDB.withRedisBlockDB . RBDB.insertBlocks
-  deleteMany _ = void . RBDB.withRedisBlockDB . RBDB.deleteBlocks
-  
-instance MonadIO m => A.Selectable ChainMemberParsedSet IsValidator (ReaderT Config m) where
-  select _ = fmap (Just . IsValidator) . RBDB.withRedisBlockDB . RBDB.isValidator
+      . getBlocks
+  insertMany _ = void . RBDB.withRedisBlockDB . insertBlocks
+  deleteMany _ = void . RBDB.withRedisBlockDB . deleteBlocks
 
-instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (ReaderT Config m) where
+instance MonadIO m => (Keccak256 `A.Alters` Proxy (Inbound WireMessage)) (ReaderT Config m) where
   lookup _ k = do
     wms <- readIORef =<< asks configBlockstanbulWireMessages
     let b = S.member k wms
@@ -293,7 +284,11 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
         atomicModifyIORef'
         ( \wms ->
             let s = S.size wms
-                wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+                wms' = if s >= 2000
+                         then case toList wms of
+                                (x:_) -> S.delete x wms
+                                _ -> wms
+                         else wms
                 !wms'' = wms' S.>| k
              in (wms'', ())
         )
@@ -306,7 +301,7 @@ instance MonadIO m => (Keccak256 `A.Alters` (Proxy (Inbound WireMessage))) (Read
              in (wms', ())
         )
 
-instance MonadIO m => ((Host, Keccak256) `A.Alters` (Proxy (Outbound WireMessage))) (ReaderT Config m) where
+instance MonadIO m => ((Host, Keccak256) `A.Alters` Proxy (Outbound WireMessage)) (ReaderT Config m) where
   lookup _ k = do
     wms <- _outboundWireMessages <$> Mod.get (Mod.Proxy @Context)
     let b = S.member k wms
@@ -314,14 +309,18 @@ instance MonadIO m => ((Host, Keccak256) `A.Alters` (Proxy (Outbound WireMessage
   insert _ k _ = Mod.modifyStatefully_ (Mod.Proxy @Context) $ do
     wms <- use outboundWireMessages
     let s = S.size wms
-        wms' = if s >= 2000 then S.delete (head $ toList wms) wms else wms
+        wms' = if s >= 2000
+                 then case toList wms of
+                        (x:_) -> S.delete x wms
+                        _ -> wms -- should never happen
+                 else wms
         !wms'' = wms' S.>| k
     assign outboundWireMessages wms''
   delete _ k =
     Mod.modifyStatefully_ (Mod.Proxy @Context) $
       outboundWireMessages %= S.delete k
 
-instance
+instance {-# OVERLAPPING #-}
   ( MonadUnliftIO m
   ) =>
   Mod.Accessible GenesisBlockHash (ReaderT Config m)
@@ -331,12 +330,12 @@ instance
 instance MonadIO m => Mod.Modifiable Context (ReaderT Config m) where
   get _ = readIORef =<< asks configContext
   put _ c = asks configContext >>= flip atomicModifyIORef' (const (c, ()))
-  
+
 instance MonadIO m => Mod.Modifiable ActionTimestamp (ReaderT Config m) where
   get _ = actionTimestamp <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {actionTimestamp = k}, ()))
 
-instance MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ActionTimestamp (ReaderT Config m) where
   access _ = Mod.get (Proxy @ActionTimestamp)
 
 instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
@@ -344,8 +343,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     (bHeaders, lastUpdateTS) <- blockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromIntegral flags_connectionTimeout
       then do
         -- stale cache; override it
         Mod.put (Proxy @[BlockHeader]) []
@@ -355,7 +353,7 @@ instance MonadIO m => Mod.Modifiable [BlockHeader] (ReaderT Config m) where
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {blockHeaders = (k, now)}, ()))
 
-instance MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible [BlockHeader] (ReaderT Config m) where
   access _ = Mod.get (Proxy @[BlockHeader])
 
 instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) where
@@ -363,8 +361,7 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     (remBHeaders, lastUpdateTS) <- remainingBlockHeaders <$> Mod.get (Proxy @Context)
     now <- liftIO getCurrentTime
     let diffTime = now `diffUTCTime` lastUpdateTS
-    maxTime <- fromIntegral . unConnectionTimeout <$> Mod.access (Proxy @ConnectionTimeout)
-    if diffTime > maxTime
+    if diffTime > fromIntegral flags_connectionTimeout
       then do
         -- stale cache; override it
         let emptyRBH = RemainingBlockHeaders []
@@ -375,45 +372,39 @@ instance MonadIO m => Mod.Modifiable RemainingBlockHeaders (ReaderT Config m) wh
     now <- liftIO getCurrentTime
     asks configContext >>= flip atomicModifyIORef' (\c -> (c {remainingBlockHeaders = (k, now)}, ()))
 
-instance MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RemainingBlockHeaders (ReaderT Config m) where
   access _ = Mod.get (Proxy @RemainingBlockHeaders)
-
-instance MonadIO m => Mod.Accessible MaxReturnedHeaders (ReaderT Config m) where
-  access _ = asks configMaxReturnedHeaders
 
 instance MonadIO m => Mod.Modifiable PeerAddress (ReaderT Config m) where
   get _ = _blockstanbulPeerAddr <$> Mod.get (Proxy @Context)
   put _ k = asks configContext >>= flip atomicModifyIORef' (\c -> (c {_blockstanbulPeerAddr = k}, ()))
 
-instance MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible PeerAddress (ReaderT Config m) where
   access _ = Mod.get (Proxy @PeerAddress)
 
-instance MonadIO m => Mod.Accessible ConnectionTimeout (ReaderT Config m) where
-  access _ = asks configConnectionTimeout
-
-instance MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Config m) where
   access _ = asks configRedisBlockDB
 
 instance {-# OVERLAPPING #-} MonadIO m => AccessibleEnv SQLDB (ReaderT Config m) where
   accessEnv = asks configSQLDB
 
-instance MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Host PPeer (ReaderT Config m) where
   select _ host' =
     sqlQuery actions >>= \case
       [] -> return Nothing
-      lst -> return . Just . SQL.entityVal $ head lst
+      (x:_) -> return . Just $ SQL.entityVal x
     where
       actions = SQL.selectList [PPeerHost SQL.==. host'] []
 
-instance MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => A.Selectable Point PPeer (ReaderT Config m) where
   select _ pk =
     sqlQuery actions >>= \case
       [] -> return Nothing
-      lst -> return . Just . SQL.entityVal $ head lst
+      (x:_) -> return . Just $ SQL.entityVal x
     where
-      actions = SQL.selectList [PPeerPubkey SQL.==. (Just pk)] []
+      actions = SQL.selectList [PPeerPubkey SQL.==. Just pk] []
 
-instance MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Outputs (ReaderT Config m) [IngestEvent] where
   output = void . runKafkaMConfigured "strato-p2p" . SK.writeUnseqEvents
 
 instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
@@ -427,9 +418,9 @@ instance (MonadIO m, MonadLogger m) => HasVault (ReaderT Config m) where
   getShared pub = do
     vc <- asks configVaultClient
     $logInfoS "HasVault" "Calling vault-wrapper to get a shared key"
-    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing pub) vc
+    waitOnVault $ liftIO $ runClientM (VC.getSharedKey Nothing True pub) vc
 
-instance MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
+instance {-# OVERLAPPING #-} MonadIO m => A.Selectable (Host, UDPPort, B.ByteString) Point (ReaderT Config m) where
   select p = liftIO . A.select p
 
 waitOnVault :: (MonadLogger m, MonadIO m, Show a) => m (Either a b) -> m b
@@ -448,6 +439,8 @@ type MonadP2P m =
     MonadResource m,
     MonadUnliftIO m,
     HasVault m,
+    HasSyncDB m,
+    HasPeerDB m,
     m `Mod.Outputs` [IngestEvent],
     All
       '[Mod.Accessible, Mod.Modifiable]
@@ -459,11 +452,7 @@ type MonadP2P m =
       m,
     All
       '[Mod.Accessible]
-      '[ MaxReturnedHeaders,
-         ConnectionTimeout,
-         GenesisBlockHash,
-         AvailablePeers,
-         BondedPeers,
+      '[ GenesisBlockHash,
          PublicKey
        ]
       m,
@@ -477,20 +466,8 @@ type MonadP2P m =
     All2
       '[A.Selectable]
       '[ '(Integer, Canonical BlockHeader),
-         '(Address, X509CertInfoState),
          '((Host, UDPPort, B.ByteString), Point),
-         '(Host, PPeer),
-         '(Point, PPeer),
-         '(ChainMemberParsedSet, IsValidator)
-       ]
-      m,
-    All2
-      '[A.Replaceable]
-      '[ '(PPeer, TcpEnableTime),
-         '(PPeer, UdpEnableTime),
-         '(PPeer, PeerDisable),
-         '(PPeer, T.Text),
-         '((Host, Point), PeerBondingState)
+         '(Host, PPeer)
        ]
       m,
     All2
@@ -498,13 +475,12 @@ type MonadP2P m =
       '[ '(Keccak256, BlockHeader),
          '(Keccak256, OutputBlock),
          '(Keccak256, Proxy (Inbound WireMessage)),
-         '((Host, Keccak256), Proxy (Outbound WireMessage)),
-         '((Host, TCPPort), ActivityState)
+         '((Host, Keccak256), Proxy (Outbound WireMessage))
        ]
       m
   )
 
-type PeerRunner n m a = (ConduitM () P2pEvent n a -> n a) -> m a
+type PeerRunner m a = (ConduitM () P2pEvent m a -> m a) -> IO a
 
 getBlockHeaders :: Mod.Accessible [BlockHeader] m => m [BlockHeader]
 getBlockHeaders = Mod.access (Proxy @[BlockHeader])
@@ -536,9 +512,13 @@ runContextM ::
   m ()
 runContextM r = void . runResourceT . flip runReaderT r
 
-initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> Int -> m Config
-initConfig wireMessagesRef maxHeaders = do
+initConfig :: (MonadLogger m, MonadUnliftIO m) => IORef (S.OSet Keccak256) -> m Config
+initConfig wireMessagesRef = do
   dbs <- openDBs
+
+  runSqlPool (SQL.rawExecute "CREATE SEQUENCE IF NOT EXISTS chiliad MINVALUE 0 START 0;" []) $ sqlDB' dbs
+  runSqlPool (SQL.runMigration SYNCTASK.migrateAll) $ sqlDB' dbs
+
   redisBDBPool <- liftIO (Redis.checkedConnect lookupRedisBlockDBConfig)
   vaultClient <- do
     mgr <- liftIO $ newManager defaultManagerSettings
@@ -553,8 +533,6 @@ initConfig wireMessagesRef maxHeaders = do
   return $ Config
     { configSQLDB = sqlDB' dbs
     , configRedisBlockDB = RBDB.RedisConnection redisBDBPool
-    , configConnectionTimeout = ConnectionTimeout flags_connectionTimeout
-    , configMaxReturnedHeaders = MaxReturnedHeaders maxHeaders
     , configVaultClient = vaultClient
     , configContext = initStateF
     , configBlockstanbulWireMessages = wireMessagesRef
@@ -581,39 +559,26 @@ getPeerByIP ::
   m (Maybe PPeer)
 getPeerByIP = A.select (Proxy @PPeer)
 
-getPeerX509 ::
-  A.Selectable Address X509CertInfoState m =>
-  PPeer ->
-  m (Maybe X509CertInfoState)
-getPeerX509 peer = case pPeerPubkey peer of
-  Nothing -> pure Nothing
-  Just pk -> A.select (Proxy @X509CertInfoState) . fromPublicKey . pointToSecPubKey $ pk
-
-getMyX509 ::
-  (A.Selectable Address X509CertInfoState m, Mod.Accessible PublicKey m) =>
-  m (Maybe X509CertInfoState)
-getMyX509 = Mod.access (Mod.Proxy @PublicKey) >>= A.select (Proxy @X509CertInfoState) . fromPublicKey
-
-setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => ChainMemberParsedSet -> m ()
+setPeerAddrIfUnset :: Mod.Modifiable PeerAddress m => Address -> m ()
 setPeerAddrIfUnset addr = Mod.modify_ (Proxy @PeerAddress) $ pure . withPeerAddress (<|> Just addr)
 
-shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => ChainMemberParsedSet -> m Bool
+shouldSendToPeer :: (Functor m, Mod.Accessible PeerAddress m) => Address -> m Bool
 shouldSendToPeer addr = maybe True zeroOrArg . unPeerAddress <$> Mod.access (Proxy @PeerAddress)
   where
     -- 0x0 is for a broadcast sync message.
-    zeroOrArg addr' = addr' == emptyChainMember || addr' == addr
+    zeroOrArg addr' = addr' == 0x0 || addr' == addr
 
 withActivePeer ::
   ( MonadUnliftIO m,
-    ((Host, TCPPort) `A.Alters` ActivityState) m
+    HasPeerDB m
   ) =>
   PPeer ->
   m a ->
   m a
 withActivePeer p = bracket a b . const
   where
-    a = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Active
-    b _ = A.insert (Proxy @ActivityState) (pPeerHost p, TCPPort $ pPeerTcpPort p) Inactive
+    a = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Active
+    b _ = setPeerActiveState (pPeerHost p) (pPeerTcpPort p) Inactive
 
 withCertifiedPeer :: PPeer -> m (Maybe SomeException) -> m (Maybe SomeException)
 withCertifiedPeer = flip const

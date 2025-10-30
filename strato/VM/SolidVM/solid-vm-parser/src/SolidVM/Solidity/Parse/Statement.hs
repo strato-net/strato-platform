@@ -2,11 +2,12 @@
 
 module SolidVM.Solidity.Parse.Statement where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 import Control.Monad
 import Data.Decimal
 import Data.Foldable (asum, foldl')
 import Data.Functor.Identity
+import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Source
@@ -18,7 +19,7 @@ import qualified SolidVM.Model.Type as SVMType
 import SolidVM.Solidity.Parse.Lexer
 import SolidVM.Solidity.Parse.ParserTypes
 import SolidVM.Solidity.Parse.Types
-import Text.Parsec
+import Text.Parsec hiding (uncons)
 import Text.Parsec.Expr
 import Text.Read (readMaybe)
 
@@ -61,9 +62,9 @@ statement =
     <|> (Break <$> (position (reserved "break") <* semi))
     <|> (reserved "assembly" >> inlineAssembly)
     <|> (ModifierExecutor <$> (position (reserved "_") <* semi)) -- This parses the "_;" statement, which is used to signify when in a modifier the function should run
-    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
     <|> revertStatement
     <|> uncheckedStatement
+    <|> ((\(a, e) -> SimpleStatement (ExpressionStatement e) a) <$> ((withPosition expression) <* semi))
 
 {-
 Statement = IfStatement | WhileStatement | ForStatement | Block | InlineAssemblyStatement |
@@ -138,7 +139,7 @@ ifStatement = do
   pure $ IfStatement i t e a
 
 uncheckedStatement :: SolidityParser Statement
-uncheckedStatement = do
+uncheckedStatement = try $ do
   ~(a, s) <- withPosition $ do
     reserved "unchecked"
     statements
@@ -197,13 +198,13 @@ revertStatement = try $ do
     e <-
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- lol
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
     pure (i, e)
   _ <- semi
@@ -278,13 +279,13 @@ functionCall = do
     withPosition $
       parens $
         choice
-          [ fmap NamedArgs . braces $
+          [ braces $
               commaSep $ do
-                fieldName <- fmap stringToLabel identifier
+                _ <- fmap stringToLabel identifier
                 void colon -- haha
                 fieldExpr <- expression
-                return (fieldName, fieldExpr),
-            OrderedArgs <$> commaSep expression
+                return fieldExpr,
+            commaSep expression
           ]
   return $ flip (FunctionCall a) args
 
@@ -340,7 +341,7 @@ objectE = do
       k <- many1 (noneOf ":")
       void colon
       v <- expression
-      return (stringToLabel $ init . tail $ show k, v) -- get rid of the surrounding quotes
+      return (stringToLabel $ init . maybe "" snd . uncons $ show k, v) -- get rid of the surrounding quotes
       {-
       // Precedence by order (see github.com/ethereum/solidity/pull/732)
       Expression
@@ -409,7 +410,7 @@ primaryExpression = do
             pure $ NumberLiteral a val nu
         )
     <|> (uncurry StringLiteral <$> withPosition stringLiteral)
-    <|> (uncurry AccountLiteral <$> withPosition accountLiteral)
+    <|> (uncurry AddressLiteral <$> withPosition accountLiteral)
 
 myHexParser :: SolidityParser Expression
 myHexParser = try $ do
@@ -437,6 +438,9 @@ numberUnit = do
     <|> (reserved "szabo" >> return Szabo)
     <|> (reserved "finney" >> return Finney)
     <|> (reserved "ether" >> return Ether)
+
+parseArg :: SolidityParser Expression
+parseArg = literal >>= (<$ eof)
 
 parseArgs :: SolidityParser [Expression]
 parseArgs = (try $ parens $ commaSep literal) <|> parseCreateArgs
@@ -477,7 +481,7 @@ parseExternalCallArgs = do
     return (name, args)
   return (fname, args)
 
-accountLiteral :: SolidityParser NamedAccount
+accountLiteral :: SolidityParser Address
 accountLiteral = do
   void $ char '<'
   addr <- many1 hexDigit
@@ -507,8 +511,12 @@ literal =
       do
         ~(a, (n, u)) <- withPosition $ (,) <$> integer <*> optionMaybe numberUnit
         pure $ NumberLiteral a n u,
-      uncurry StringLiteral <$> withPosition stringLiteral,
-      uncurry AccountLiteral <$> withPosition accountLiteral,
+      do
+        (a, str) <- withPosition stringLiteral
+        pure $ case readMaybe str of
+          Just addr -> AddressLiteral a addr
+          _ -> StringLiteral a str,
+      uncurry AddressLiteral <$> withPosition accountLiteral,
       uncurry BoolLiteral <$> withPosition (False <$ reserved "false"),
       uncurry BoolLiteral <$> withPosition (True <$ reserved "true"),
       uncurry ArrayExpression <$> withPosition (brackets $ commaSep literal),

@@ -6,6 +6,7 @@ module Blockchain.VM.SolidException
     showSolidException,
     typeError,
     todo,
+    arithmeticException,
     indexOutOfBounds,
     checkArity,
     arityMismatch,
@@ -29,7 +30,6 @@ module Blockchain.VM.SolidException
     inaccessibleChain,
     invalidChain,
     invalidWrite,
-    invalidCertificate,
     malformedData,
     tooMuchGas,
     paymentError,
@@ -41,8 +41,7 @@ module Blockchain.VM.SolidException
     tooManyCooks,
     generalMetaProgrammingError,
     oldForeignPragmaError,
-    userDefinedError,
-    missingCertificate,
+    userDefinedError
   )
 where
 
@@ -57,6 +56,7 @@ import Text.Printf (printf)
 data SolidException
   = TypeError String String
   | InternalError String String
+  | ArithmeticException String String
   | InvalidArguments String String
   | IndexOutOfBounds String String
   | TODO String String
@@ -80,10 +80,9 @@ data SolidException
   | InaccessibleChain String String
   | InvalidChain String String
   | InvalidWrite String String
-  | InvalidCertificate String String
   | MalformedData String String
   | TooMuchGas Integer Integer
-  | PaymentError String String
+  | PaymentError Integer (String, Integer)
   | ReservedWordError String String
   | ImmutableError String String
   | FailedToAttainRunTimCode String String
@@ -92,7 +91,6 @@ data SolidException
   | GeneralMetaProgrammingError String String
   | OldForeignPragmaError String String
   | UserDefinedError String String
-  | MissingCertificate String String
   deriving (Eq, Exception, Generic, NFData)
 
 instance Show SolidException where
@@ -101,6 +99,7 @@ instance Show SolidException where
 showSolidException :: SolidException -> String
 showSolidException (ArityMismatch m got want) = printf "arity mismatch: %s: got %d, want %d" m got want
 showSolidException (InternalError m v) = printf "internal error: %s: %s" m v
+showSolidException (ArithmeticException a b) = printf "integer out of bounds: %s: %s" a b
 showSolidException (InvalidArguments m v) = printf "invalid arguments: %s: %s" m v
 showSolidException (IndexOutOfBounds a b) = printf "index out of bounds: %s: %s" a b
 showSolidException (MissingField m v) = printf "missing field: %s: %s" m v
@@ -125,10 +124,9 @@ showSolidException (MissingCodeCollection a b) = printf "missing code collection
 showSolidException (InvalidChain a b) = printf "Chain is invalid for address: %s, likely problem with %s metaprogramming" a b
 showSolidException (InaccessibleChain a b) = printf "inaccessible chain: %s: %s" a b
 showSolidException (InvalidWrite a b) = printf "invalid write: %s: %s" a b
-showSolidException (InvalidCertificate a b) = printf "invalid certificate: %s: %s" a b
 showSolidException (MalformedData a b) = printf "Malformed data: %s: %s" a b
 showSolidException (TooMuchGas a b) = printf "You've run out of gas, the original alotment was %d, but the current gasInfo was: %d" a b
-showSolidException (PaymentError a b) = printf "There was an error sending %s wei to the following address: %s" a b
+showSolidException (PaymentError a (addr, b)) = printf "There was an error sending %d wei to the following address with a balance of %d: %s" a b addr
 showSolidException (ReservedWordError a b) = printf "%s is a reserved word in version %s and up." b a
 showSolidException (ImmutableError a b) = printf "%s is an immutable variable in line '%s'" a b
 showSolidException (FailedToAttainRunTimCode a b) = printf "%s failed to aquire run time code '%s'" a b
@@ -137,7 +135,6 @@ showSolidException (TooManyCooks a b) = printf "Too many arguments were given, e
 showSolidException (GeneralMetaProgrammingError a b) = printf "There was a problem with the use of '%s', and the given term/s %s" a b
 showSolidException (OldForeignPragmaError a b) = printf "The foreign contract (%s) being called needs an newer pragma in order to use metaprogramming. Foreign contract running: %s" a b
 showSolidException (UserDefinedError a b) = printf "%s is an user defined error in line '%s'" a b
-showSolidException (MissingCertificate a b) = printf "Sender does not have a registered certificate: %s %s" a b
 
 toThrower :: (Show v) => (String -> String -> SolidException) -> String -> v -> a
 toThrower cont msg = throw . cont msg . show
@@ -150,6 +147,9 @@ todo = toThrower TODO
 
 internalError :: (Show v) => String -> v -> a
 internalError = toThrower InternalError
+
+arithmeticException :: (Show v) => String -> v -> a
+arithmeticException = toThrower ArithmeticException
 
 invalidArguments :: (Show v) => String -> v -> a
 invalidArguments = toThrower InvalidArguments
@@ -220,17 +220,14 @@ invalidChain = toThrower InvalidChain
 invalidWrite :: (Show v) => String -> v -> a
 invalidWrite = toThrower InvalidWrite
 
-invalidCertificate :: (Show v) => String -> v -> a
-invalidCertificate = toThrower InvalidCertificate
-
 malformedData :: (Show v) => String -> v -> a
 malformedData = toThrower MalformedData
 
 tooMuchGas :: Integer -> Integer -> a
 tooMuchGas limit actual = throw $ TooMuchGas limit actual
 
-paymentError :: (Show v) => String -> v -> a
-paymentError = toThrower PaymentError
+paymentError :: Integer -> (String, Integer) -> a
+paymentError limit actual = throw $ PaymentError limit actual
 
 reservedWordError :: (Show v) => String -> v -> a
 reservedWordError = toThrower ReservedWordError
@@ -255,6 +252,3 @@ oldForeignPragmaError = toThrower OldForeignPragmaError
 
 userDefinedError :: (Show v) => String -> v -> a
 userDefinedError = toThrower UserDefinedError
-
-missingCertificate :: (Show v) => String -> v -> a
-missingCertificate = toThrower MissingCertificate

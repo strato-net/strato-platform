@@ -1,0 +1,41 @@
+#oracle-version:<VERSION>
+#strato-getting-started-min-version:4.5.0
+version: '3'
+volumes:
+  oracleconfig:
+    driver: local
+services:
+  oracle:
+    environment:
+    - SERVER_HOST=${SERVER_HOST}
+    - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+    - STRATO_HOST=${STRATO_HOST}
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID}
+    - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET}
+    - BASE_CODE_COLLECTION=${BASE_CODE_COLLECTION}
+    - ORACLE_MODE=true
+    - METALS_API_KEY=${METALS_API_KEY}
+    - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
+    - UPGRADE_ORACLE_CONTRACTS=${UPGRADE_ORACLE_CONTRACTS}
+    - SKIP_ORACLE_DEPLOYMENT=${SKIP_ORACLE_DEPLOYMENT}
+    - SALE_UPDATE=${SALE_UPDATE}
+    - METALS_USERNAME=${METALS_USERNAME}
+    - METALS_PASSWORD=${METALS_PASSWORD}
+    - TOKENS_USERNAME=${TOKENS_USERNAME}
+    - TOKENS_PASSWORD=${TOKENS_PASSWORD}
+    build: .
+    image: ${PAYMENT_SERVER_IMAGE:-<REPO_URL>payment-server:<VERSION>}
+    ports:
+      - 8080:8018 # healthcheck ping only
+    volumes:
+      - oracleconfig:/config:rw
+      - ./oracle.json:/mnt/oracle.json:ro
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

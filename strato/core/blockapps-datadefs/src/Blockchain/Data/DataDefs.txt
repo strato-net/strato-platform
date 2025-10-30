@@ -1,14 +1,8 @@
 
-ValidatorRef
-    org Text
-    orgUnit Text
-    commonName Text
-    deriving Eq Read Show
-
 BlockDataRef
     parentHash Keccak256
     unclesHash Keccak256
-    coinbase Text
+    coinbase Address
     stateRoot StateRoot
     transactionsRoot StateRoot
     receiptsRoot StateRoot
@@ -29,25 +23,13 @@ BlockDataRef
 
 BlockValidatorRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     deriving Eq Read Show
 
 ValidatorDeltaRef
     blockDataRefId BlockDataRefId
-    commonName Text
+    validator Validator
     direction Bool
-    deriving Eq Read Show
-
-CertificateAddedRef
-    blockDataRefId BlockDataRefId
-    commonName Text
-    userAddress Address
-    certString Text
-    deriving Eq Read Show
-
-CertificateRevokedRef
-    blockDataRefId BlockDataRefId
-    userAddress Address
     deriving Eq Read Show
 
 ProposalSignatureRef
@@ -78,14 +60,13 @@ AddressStateRef
     contractRoot StateRoot
     codeHash Keccak256 Maybe
     contractName String Maybe
-    codePtrAddress Address Maybe
     latestBlockDataRefNumber Integer
     UniqueAddress address
     deriving Eq Read Show
 
 CodeRef
     codeHash Keccak256
-    code BS.ByteString
+    code Text
     UniqueCodeHash codeHash
     deriving Eq Read Show
 
@@ -93,29 +74,26 @@ RawTransaction
     timestamp UTCTime
     fromAddress Address
     nonce Integer sqltype=numeric(1000,0)
-    gasPrice Integer sqltype=numeric(1000,0)
     gasLimit Integer sqltype=numeric(1000,0)
     toAddress Address Maybe
-    value Integer sqltype=numeric(1000,0)
-    codeOrData BS.ByteString Maybe
-    contractName String Maybe
-    codePtrAddress Address Maybe
-    chainId Word256
+    funcName Text Maybe
+    contractName Text Maybe
+    args [Text]
+    network Text
+    code Code Maybe
     r Integer
     s Integer
     v Word8
-    metadata [TextPair] Maybe
     blockNumber Int
     txHash Keccak256
     origin TXOrigin
-    UniqueTXHash txHash chainId
+    UniqueTXHash txHash
     deriving Eq Generic Read Show
 
 Storage json
     addressStateRefId AddressStateRefId
-    kind CodeKind default='EVM'
-    key HexStorage
-    value HexStorage
+    key StoragePath
+    value BasicValue
     deriving Eq Read Show
 
 TransactionResult json
@@ -133,9 +111,6 @@ TransactionResult json
     newStorage String
     deletedStorage String
     status TransactionResultStatus Maybe
-    kind CodeKind Maybe
-    creator String
-    appName String
     deriving Eq Read Show Generic
 
 UserN json

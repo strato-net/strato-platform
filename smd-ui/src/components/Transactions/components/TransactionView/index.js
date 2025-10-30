@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import { Button } from '@blueprintjs/core';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import HexText from '../../../HexText';
 import { parseDateFromString } from '../../../../lib/dateUtils';
 import { executeQuery, getTransactionResultRequest} from '../../../QueryEngine/queryEngine.actions';
@@ -33,11 +33,7 @@ class TransactionView extends Component {
       default:
           break
     }
-    const parseArgs = (args) => {
-      const cleaned = args.substring(1, args.length - 1)
-      return cleaned.split(',')
-    }
-    const parsedArgs = tx.metadata && tx.metadata.args ? parseArgs(tx.metadata.args) : [] 
+    const parsedArgs = tx.args || [] 
     return (
       <div className="container-fluid pt-dark ">
         
@@ -49,7 +45,7 @@ class TransactionView extends Component {
           </div>
           <div className="col-sm-3 smd-pad-16 text-right">
             <Button
-              onClick={(e) => { mixpanelWrapper.track("transactions_view_go_back_click"); this.props.history.goBack() }}
+              onClick={(e) => { /*mixpanelWrapper.track("transactions_view_go_back_click");*/ this.props.history.goBack() }}
               className="pt-icon-arrow-left"
               text="Back"
             />
@@ -95,25 +91,25 @@ class TransactionView extends Component {
                     <td><HexText value={tx.to} classes="smd-pad-2" /></td>
                   </tr>}
                   {
-                    tx.metadata && tx.metadata.funcName &&
+                    tx.funcName &&
                     <tr>
                       <td><strong>Function Name</strong></td>
                       <td>
-                        {tx.metadata.funcName}
+                        {tx.funcName}
                       </td>
                     </tr>
                   }
                   {
-                    tx.metadata && tx.metadata.name &&
+                    tx.cName &&
                     <tr>
                       <td><strong>Contract Name</strong></td>
                       <td>
-                        {tx.metadata.name}
+                        {tx.cName}
                       </td>
                     </tr>
                   }
                   {
-                    tx.metadata && tx.metadata.args &&
+                    tx.args &&
                     <tr>
                       <td><strong>Arguments</strong></td>
                       <td>
@@ -124,11 +120,10 @@ class TransactionView extends Component {
                     </tr>
                   }
                   {
-                    tx.metadata && tx.metadata.VM &&
                     <tr>
                       <td><strong>VM</strong></td>
                       <td>
-                        {tx.metadata.VM}
+                        SolidVM
                       </td>
                     </tr>
                   }

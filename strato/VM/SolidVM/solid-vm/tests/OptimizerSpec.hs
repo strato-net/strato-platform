@@ -26,7 +26,7 @@ import qualified Control.Monad.Change.Alter as A
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Class
 import qualified Data.Map.Strict as M
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, maybeToList)
 import Data.Source.Annotation
 import qualified Data.Text as T
 import SolidVM.Model.CodeCollection
@@ -53,7 +53,7 @@ instance {-# OVERLAPPING #-} (Keccak256 `A.Alters` DBCode) m => (Keccak256 `A.Al
 
 runOptimizer :: String -> IO CodeCollection
 runOptimizer c = runNewMemCodeDB . runNewMemAddressStateDB . runMainChainT $ do
-  eCC <- compileSourceWithAnnotations True (M.fromList [("", T.pack c)])
+  eCC <- compileSourceWithAnnotations True True (M.fromList [("", T.pack c)])
   case eCC of
     Left _ -> internalError "Compilation Error" ()
     Right cc -> pure cc
@@ -78,9 +78,7 @@ getFuncs :: CodeCollection -> [M.Map SolidVM.Model.SolidString.SolidString (Func
 getFuncs cc = (cc ^.. contracts . folded . functions)
 
 getFuncByName :: SolidString -> CodeCollection -> [FuncF (SourceAnnotation ())]
-getFuncByName funName cc = case M.lookup funName $ head (getFuncs cc) of --replace head with a foreach function
-  Just x -> [x]
-  Nothing -> []
+getFuncByName funName cc = getFuncs cc >>= maybeToList . M.lookup funName
 
 getStringContracts :: [CodeCollection] -> [(String, String)]
 getStringContracts arrCC = do

@@ -17,7 +17,7 @@ import Dropzone from 'react-dropzone'
 import { Field, reduxForm } from 'redux-form';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { required } from '../../lib/reduxFormsValidations'
 import { toasts } from "../Toasts";
 import { isOauthEnabled } from '../../lib/checkMode';
@@ -26,6 +26,7 @@ import SampleContracts from './contracts/SampleContracts';
 import './createContract.css';
 import HexText from '../HexText';
 import { useEffect, useState } from 'react';
+import { changeContractFilter } from '../Contracts/contracts.actions';
 
 // TODO: use solc instead of /contracts/xabi for compile
 
@@ -38,7 +39,41 @@ class CreateContract extends Component {
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.isToasts) {
+    if (nextProps.isToasts && nextProps.contractAddress) {
+      // Show custom toast with clickable contract address
+      const toastContent = (
+        <div>
+          <span>Contract Deployed: </span>
+          <a 
+            href="#"
+            onClick={(e) => {
+              e.preventDefault();
+              // Navigate to contracts page and search for this address
+              this.props.history.push('/contracts');
+              // Add a small delay to ensure the Contracts component is mounted before setting the filter
+              setTimeout(() => {
+                this.props.changeContractFilter(nextProps.contractAddress);
+                // Also trigger the search by fetching contracts with the filter
+                this.props.fetchContracts(this.props.selectedChain, 10, 0, nextProps.contractAddress);
+              }, 100);
+              // Dismiss the toast
+              toasts.dismiss();
+            }}
+            style={{ color: '#48aff0', textDecoration: 'underline', cursor: 'pointer' }}
+          >
+            {nextProps.contractAddress}
+          </a>
+        </div>
+      );
+      
+      toasts.show({ 
+        message: toastContent,
+        timeout: 8000, // Give users more time to click the link
+        intent: 'success'
+      });
+      this.props.resetError();
+    } else if (nextProps.isToasts && nextProps.toastsMessage) {
+      // Show regular toast for non-deployment messages
       toasts.show({ message: nextProps.toastsMessage });
       this.props.resetError();
     }
@@ -91,7 +126,7 @@ class CreateContract extends Component {
     const self = this;
     reader.onload = function (event) {
       const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-      mixpanelWrapper.track("create_contract_file_upload");
+      // mixpanelWrapper.track("create_contract_file_upload");
       self.props.contractFormChange(
         fileContents
       );
@@ -111,7 +146,7 @@ class CreateContract extends Component {
     this.props.touch('contract');
     let contractSrc = SampleContracts[contractName];
     const self = this;
-    mixpanelWrapper.track("sample_contract_select");
+    // mixpanelWrapper.track("sample_contract_select");
     self.props.contractFormChange(contractSrc);
     self.props.compileContract(
       contractName,
@@ -189,7 +224,7 @@ class CreateContract extends Component {
       useWallet: this.state.useWallet
     };
 
-    mixpanelWrapper.track('create_contract_submit_click_successful');
+    // mixpanelWrapper.track('create_contract_submit_click_successful');
     this.props.createContract(payload);
     this.props.reset();
   };
@@ -204,8 +239,8 @@ class CreateContract extends Component {
         onChange={this.handleUsernameChange}
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.commonName : null}>
-          {isModeOauth && this.props.initialValues.commonName}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
         </option>
         {
           users.map((user, i) => {
@@ -231,8 +266,8 @@ class CreateContract extends Component {
         required
         disabled={isModeOauth}
       >
-        <option value={isModeOauth ? this.props.initialValues.address : null}>
-          {isModeOauth && this.props.initialValues.address}
+        <option value={this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -246,7 +281,7 @@ class CreateContract extends Component {
   };
 
   componentDidMount() {
-    mixpanelWrapper.track("create_contract_loaded");
+    // mixpanelWrapper.track("create_contract_loaded");
     this.props.reset();
     !isOauthEnabled() && this.props.fetchAccounts(true, false);
   }
@@ -301,20 +336,8 @@ class CreateContract extends Component {
 
     return (
       <div className="smd-pad-16" style={{ display: 'inline-block' }}>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
         <AnchorButton onClick={() => {
-          mixpanelWrapper.track("create_contract_open_click");
+          // mixpanelWrapper.track("create_contract_open_click");
           this.props.contractOpenModal();
           this.props.initialize(this.props.initialValues);
           this.props.getLabelIds(this.props.initialValues.chainLabel)
@@ -322,9 +345,8 @@ class CreateContract extends Component {
           id="tour-create-contract-button"
           className="pt-intent-primary pt-icon-add"
           text={"Create Contract"}
-          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract) || !this.props.userCertificate}
+          disabled={ (this.props.enableCreateContract !== undefined && !this.props.enableCreateContract)}
         />
-        </Popover>
         <form>
           <Dialog
             iconName="inbox"
@@ -512,17 +534,33 @@ class CreateContract extends Component {
                   </pre>
                 </div>
               </div>}
+              {this.props.contractAddress && <div className="row">
+                <div className="col-sm-12">
+                  <hr />
+                  <h5>Contract Deployed Successfully!</h5>
+                  <div className="row">
+                    <div className="col-sm-3 text-right">
+                      <label className="pt-label smd-pad-4">
+                        Contract Address:
+                      </label>
+                    </div>
+                    <div className="col-sm-9 smd-pad-4">
+                      <HexText value={this.props.contractAddress} classes="small" />
+                    </div>
+                  </div>
+                </div>
+              </div>}
             </div>
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track("create_contract_cancel");
+                  // mixpanelWrapper.track("create_contract_cancel");
                   this.props.contractCloseModal()
                 }} />
                 <Button
                   type="submit"
                   onClick={handleSubmit(this.submit)}
-                  disabled={pristine || submitting || !valid}
+                  disabled={submitting || !valid}
                   text="Create Contract"
                 />
 
@@ -575,16 +613,16 @@ export function mapStateToProps(state) {
     toastsError: state.createContract.error,
     usingSampleContract: state.createContract.usingSampleContract,
     codeType: state.codeEditor.codeType,
+    contractAddress: state.createContract.contractAddress,
     initialValues: {
-      commonName: state.user.userCertificate ? state.user.userCertificate.commonName : 'Verification Pending',
-      address: state.user.userCertificate ? state.user.userCertificate.userAddress : 'Verification Pending',
+      address: state.user.oauthUser ? state.user.oauthUser.address : state.user.address || '',
       chainLabel: state.chains.selectedChain ? selectedChainData.label || '' : '',
       chainId: state.chains.selectedChain ? state.chains.selectedChain : ''
     },
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
+    oAuthUser: state.user.oauthUser,
     selectedChain: state.chains.selectedChain,
-    userCertificate: state.user.userCertificate,
   };
 }
 
@@ -603,7 +641,8 @@ const connected = connect(mapStateToProps, {
   resetError,
   fetchChainIds,
   getLabelIds,
-  updateUsingSampleContract
+  updateUsingSampleContract,
+  changeContractFilter
 })(formed);
 
 export default withRouter(connected);

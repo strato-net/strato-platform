@@ -14,11 +14,8 @@ import qualified Data.ByteString.Char8 as BC
 import Data.Default
 import qualified Database.LevelDB as DB
 import qualified LabeledError
-import System.FilePath
 import Text.Colors
 import Text.Format
-
---import Debug.Trace
 
 showAllKeyVal :: DB.DB -> (B.ByteString -> String) -> ResourceT IO ()
 showAllKeyVal db f = do
@@ -43,7 +40,7 @@ showAllKeyVal db f = do
 showKeyVal :: (B.ByteString -> String) -> String -> Maybe String -> IO ()
 showKeyVal f dbName maybeKey = do
   runResourceT $ do
-    db <- DB.open ("/tmp/.ethereumH" </> dbName) def
+    db <- DB.open dbName def
     case maybeKey of
       Nothing -> showAllKeyVal db f
       Just key -> do

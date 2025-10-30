@@ -25,17 +25,19 @@ library:
   - debugger
   - Decimal
   - deepseq
+  - elliptic-curve
   - ethereum-rlp
   - exceptions
   - extra
   - format
+  - galois-field
   - labeled-error
   - lens
   - merkle-patricia-db
-  - mtl
   - monad-alter
   - nibblestring
   - ordered-containers
+  - pairing
   - parsec
   - solid-vm-compiler
   - solid-vm-model
@@ -79,12 +81,14 @@ tests:
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
+      - blockDB
       - bytestring
       - common-log
       - composable-monads-base
       - containers
       - crypto-api
       - ethereum-rlp
+      - extra
       - hflags
       - hspec
       - hspec-expectations-lifted
@@ -103,9 +107,11 @@ tests:
       - strato-genesis
       - strato-init
       - strato-model
+      - strato-redis-blockdb
       - text
       - time
       - transformers
+      - unliftio
       - utf8-string
       - vm-tools
       - ordered-containers

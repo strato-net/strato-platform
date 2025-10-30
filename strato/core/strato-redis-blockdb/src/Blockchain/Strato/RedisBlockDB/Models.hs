@@ -3,12 +3,12 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Blockchain.Strato.RedisBlockDB.Models (
   RedisDBValuable(..),
-  RedisBestBlock(..),
   RedisHeader(..),
   RedisUncles(..),
   RedisTx,
@@ -147,17 +147,6 @@ instance RLPSerializable RedisOrgUnitMembers where
 instance RLPSerializable RedisValidator where
   rlpEncode (RedisValidator s) = rlpEncode s
   rlpDecode = RedisValidator . rlpDecode
-
-data RedisBestBlock = RedisBestBlock
-  { bestBlockHash :: Keccak256,
-    bestBlockNumber :: Integer -- todo: BlockNumber
-  }
-  deriving (Eq, Read, Show)
-
-instance RLPSerializable RedisBestBlock where
-  rlpEncode (RedisBestBlock sha num) = RLPArray [rlpEncode sha, rlpEncode num]
-  rlpDecode (RLPArray [sha, num]) = RedisBestBlock (rlpDecode sha) (rlpDecode num)
-  rlpDecode _ = error "data in wrong format when trying to rlpDecode a RedisBestBlock"
 
 displayForNamespace :: BlockDBNamespace -> S8.ByteString -> String
 displayForNamespace ns input = case ns of

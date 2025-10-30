@@ -964,12 +964,12 @@ instance
     MonadLogger m,
     MonadReader P2PPeer m
   ) =>
-  A.Selectable () (B.ByteString, SockAddr) (MonadP2PTest m)
+  Mod.Awaitable UDPPacket (MonadP2PTest m)
   where
-  select _ _ = do
+  await = do
     s <- lift $ asks _p2pMyUDPSocket
     mMsg <- timeout 10000000 . atomically $ readTQueue s
-    pure mMsg
+    pure $ UDPPacket <$> mMsg
 
 instance
   ( MonadUnliftIO m,

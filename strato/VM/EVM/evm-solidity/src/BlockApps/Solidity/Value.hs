@@ -7,7 +7,6 @@ module BlockApps.Solidity.Value where
 
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.TypeDefs
-import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ExtendedWord
 import Control.DeepSeq
@@ -20,6 +19,7 @@ import qualified Data.ByteString.Base16 as Base16
 import qualified Data.ByteString.Lazy as ByteString.Lazy
 import Data.Hashable
 import qualified Data.IntMap as I
+import Data.List (uncons)
 import qualified Data.Map.Strict as Map
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
@@ -51,7 +51,7 @@ data Value
   = SimpleValue SimpleValue
   | ValueArrayDynamic (I.IntMap Value) -- A sparse representation makes updates more efficient than O(n)
   | ValueArrayFixed Word [Value]
-  | ValueContract NamedAccount
+  | ValueContract Address
   | ValueEnum Text Text Word256
   | ValueFunction ByteString [(Text, Type)] [(Maybe Text, Type)]
   | ValueMapping (Map.Map SimpleValue Value)
@@ -63,7 +63,6 @@ data Value
 data SimpleValue
   = ValueBool Bool
   | ValueAddress Address
-  | ValueAccount NamedAccount
   | ValueString Text
   | ValueInt
       { intSigned :: Bool,
@@ -82,12 +81,11 @@ zeroOf = \case
   SimpleValue sv -> SimpleValue $ case sv of
     ValueBool {} -> ValueBool False
     ValueAddress {} -> ValueAddress 0x0
-    ValueAccount {} -> ValueAccount $ unspecifiedChain 0x0
     ValueString {} -> ValueString ""
     ValueInt sign size _ -> ValueInt sign size 0
     ValueDecimal _ -> ValueDecimal "0"
     ValueBytes size _ -> ValueBytes size ""
-  ValueContract {} -> ValueContract $ unspecifiedChain 0x0
+  ValueContract {} -> ValueContract 0x0
   ValueArrayDynamic {} -> ValueArrayDynamic I.empty
   ValueMapping {} -> ValueMapping Map.empty
   ValueStruct fs -> ValueStruct $ fmap zeroOf fs
@@ -104,7 +102,6 @@ bytesToSimpleValue bs = \case
       then Just $ ValueBool True
       else Just $ ValueBool False
   TypeAddress -> ValueAddress <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
-  TypeAccount -> ValueAccount . unspecifiedChain <$> stringAddress (Text.unpack . Text.decodeUtf8 $ Base16.encode bs)
   TypeString -> Just $ ValueString (Text.decodeUtf8 bs)
   TypeInt s b -> Just . ValueInt s b $ bytesToNum s b
   TypeBytes b -> Just $ ValueBytes b bs
@@ -116,7 +113,9 @@ bytesToSimpleValue bs = \case
         then 0
         else
           let bs' = ByteString.unpack bs
-              h = head bs'
+              h = case bs' of
+                    [] -> error "bytesToNum: Empty bytestring"
+                    h':_ -> h'
               neg =
                 if signed'
                   then h >= 0x80
@@ -171,8 +170,7 @@ bytesToBytesTypePair totalBytes typesArr = toBytesTypePair totalBytes typesArr
     toBytesTypePair _ [] = Just []
     toBytesTypePair b (_ : _) | ByteString.null b = Nothing
     toBytesTypePair b types =
-      let headType = head types
-          tailTypes = tail types
+      let (headType, tailTypes) = fromMaybe (error "toBytesTypePair: Empty list") $ uncons types
        in case headType of
             TypeMapping {} -> Nothing
             TypeFunction {} -> Nothing
@@ -240,6 +238,11 @@ unsparse imap =
 tosparse :: [Value] -> I.IntMap Value
 tosparse = I.fromList . zip [0 ..]
 
+valueToTexts :: Value -> [Text]
+valueToTexts = \case
+  ValueVariadic vals -> valueToText <$> vals
+  v -> pure $ valueToText v
+
 valueToText :: Value -> Text
 valueToText = \case
   SimpleValue sv -> simpleValueToText sv
@@ -266,8 +269,7 @@ escapeStringValue = Text.replace "\"" "\\\""
 simpleValueToText :: SimpleValue -> Text
 simpleValueToText sv = case sv of
   ValueBool tf -> if tf then "true" else "false"
-  ValueAddress addr -> Text.pack $ "0x" ++ formatAddressWithoutColor addr
-  ValueAccount acct -> Text.pack $ "0x" ++ show acct
+  ValueAddress addr -> Text.pack $ "\"" ++ formatAddressWithoutColor addr ++ "\""
   ValueString tx -> '"' `Text.cons` escapeStringValue tx `Text.snoc` '"'
   ValueInt _ _ v -> Text.pack $ show v
   ValueBytes _ b -> Text.pack $ show . Base16.encode $ b
@@ -317,10 +319,6 @@ textToSimpleValue str = \case
   TypeAddress ->
     ValueAddress <$> case stringAddress (Text.unpack str) of
       Nothing -> Left $ "textToSimpleValue: could not decode as address: " <> str
-      Just x -> return x
-  TypeAccount ->
-    ValueAccount <$> case readMaybe (Text.unpack str) of
-      Nothing -> Left $ "textToSimpleValue: could not decode as account: " <> str
       Just x -> return x
   TypeString -> return $ ValueString $ unEscapeStringValue str
   TypeInt s b -> ValueInt s b <$> readNum

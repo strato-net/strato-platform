@@ -10,7 +10,7 @@ sslCertFileType=${sslCertFileType:-pem}
 OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-NULL}
 OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-NULL}
 OAUTH_SCOPE=${OAUTH_SCOPE:-openid email profile}
-VM_DEBUG=${VM_DEBUGGER:-false}
+VM_DEBUGGER=${VM_DEBUGGER:-false}
 debugPort=${debugPort:-8051}
 debugWSHost=${debugWSHost:-strato}
 debugWSPort=${debugWSPort:-8052}
@@ -19,8 +19,6 @@ SMD_DEV_MODE=${SMD_DEV_MODE:-false}
 SMD_DEV_MODE_HOST_IP=${SMD_DEV_MODE_HOST_IP:-172.17.0.1}
 APEX_HOST=${APEX_HOST:-apex:3009}
 DOCS_HOST=${DOCS_HOST:-docs:8080}
-MARKETPLACE_BACKEND_HOST=${MARKETPLACE_BACKEND_HOST:-marketplace-backend:3030}
-MARKETPLACE_UI_HOST=${MARKETPLACE_UI_HOST:-marketplace-ui:3003}
 POSTGREST_HOST=${POSTGREST_HOST:-postgrest:3001}
 PROMETHEUS_HOST=${PROMETHEUS_HOST:-prometheus:9090}
 SMD_HOST=${SMD_HOST:-smd:3002}
@@ -64,7 +62,7 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   ########
   cp /tmp/nginx.tpl.conf /tmp/nginx.conf
 
-  if [ "$VM_DEBUG" != true ]; then
+  if [ "$VM_DEBUGGER" != true ]; then
     sed -i '/#TEMPLATE_MARK_DEBUG/d' /tmp/nginx.conf
   fi
   sed -i 's/<DEBUG_PORT_PLACEHOLDER>/'"$debugPort"'/g' /tmp/nginx.conf
@@ -92,10 +90,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
     sed -i '/#TEMPLATE_MARK_STATS_ENABLED/d' /tmp/nginx.conf
   fi
 
-  if [ "$blockstanbul" != true ]; then
-    sed -i '/#TEMPLATE_MARK_BLOCKSTANBUL/d' /tmp/nginx.conf
-  fi
-
   if [ "$SERVE_LOGS" != true ]; then
     sed -i '/#TEMPLATE_MARK_LOGS/d' /tmp/nginx.conf
   fi
@@ -111,8 +105,6 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   # Replacing HOST NAME PLACEHOLDERS
   sed -i "s/__APEX_HOST__/$APEX_HOST/g" /tmp/nginx.conf
   sed -i "s/__DOCS_HOST__/$DOCS_HOST/g" /tmp/nginx.conf
-  sed -i "s/__MARKETPLACE_BACKEND_HOST__/$MARKETPLACE_BACKEND_HOST/g" /tmp/nginx.conf
-  sed -i "s/__MARKETPLACE_UI_HOST__/$MARKETPLACE_UI_HOST/g" /tmp/nginx.conf
   sed -i "s/__POSTGREST_HOST__/$POSTGREST_HOST/g" /tmp/nginx.conf
   sed -i "s/__PROMETHEUS_HOST__/$PROMETHEUS_HOST/g" /tmp/nginx.conf
   sed -i "s/__SMD_HOST__/$SMD_HOST/g" /tmp/nginx.conf
@@ -148,6 +140,8 @@ if [ ! -f /usr/local/openresty/nginx/conf/nginx.conf ]; then
   mv /tmp/nginx.conf /usr/local/openresty/nginx/conf/nginx.conf
 
   mv /tmp/openid.lua /usr/local/openresty/nginx/lua/openid.lua
+  
+  mv /tmp/csrf.lua /usr/local/openresty/nginx/lua/csrf.lua
 
   if [ "$ssl" = true ] ; then
     cp -r /tmp/ssl/* /etc/ssl/

@@ -39,14 +39,22 @@ ShallowWrapper {
           <div
             className="h2 text-right"
           >
-            <strong>
-              HEALTH
-            </strong>
+            <Text
+              ellipsize={true}
+            >
+              <strong>
+                HEALTH
+              </strong>
+            </Text>
           </div>
           <div
             className="h4 text-right desc"
           >
-            Network
+            <Text
+              ellipsize={true}
+            >
+              Network
+            </Text>
           </div>
         </div>
       </div>,
@@ -73,14 +81,22 @@ ShallowWrapper {
             <div
               className="h2 text-right"
             >
-              <strong>
-                HEALTH
-              </strong>
+              <Text
+                ellipsize={true}
+              >
+                <strong>
+                  HEALTH
+                </strong>
+              </Text>
             </div>
             <div
               className="h4 text-right desc"
             >
-              Network
+              <Text
+                ellipsize={true}
+              >
+                Network
+              </Text>
             </div>
           </div>,
         ],
@@ -123,14 +139,22 @@ ShallowWrapper {
               <div
                 className="h2 text-right"
               >
-                <strong>
-                  HEALTH
-                </strong>
+                <Text
+                  ellipsize={true}
+                >
+                  <strong>
+                    HEALTH
+                  </strong>
+                </Text>
               </div>,
               <div
                 className="h4 text-right desc"
               >
-                Network
+                <Text
+                  ellipsize={true}
+                >
+                  Network
+                </Text>
               </div>,
             ],
             "className": "col-xs-8",
@@ -142,22 +166,39 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <strong>
-                  HEALTH
-                </strong>,
+                "children": <Text
+                  ellipsize={true}
+                >
+                  <strong>
+                    HEALTH
+                  </strong>
+                </Text>,
                 "className": "h2 text-right",
               },
               "ref": null,
               "rendered": Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": "HEALTH",
+                  "children": <strong>
+                    HEALTH
+                  </strong>,
+                  "ellipsize": true,
                 },
                 "ref": null,
-                "rendered": "HEALTH",
-                "type": "strong",
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": "HEALTH",
+                  },
+                  "ref": null,
+                  "rendered": "HEALTH",
+                  "type": "strong",
+                },
+                "type": [Function],
               },
               "type": "div",
             },
@@ -166,11 +207,26 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": "Network",
+                "children": <Text
+                  ellipsize={true}
+                >
+                  Network
+                </Text>,
                 "className": "h4 text-right desc",
               },
               "ref": null,
-              "rendered": "Network",
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "children": "Network",
+                  "ellipsize": true,
+                },
+                "ref": null,
+                "rendered": "Network",
+                "type": [Function],
+              },
               "type": "div",
             },
           ],
@@ -204,14 +260,22 @@ ShallowWrapper {
             <div
               className="h2 text-right"
             >
-              <strong>
-                HEALTH
-              </strong>
+              <Text
+                ellipsize={true}
+              >
+                <strong>
+                  HEALTH
+                </strong>
+              </Text>
             </div>
             <div
               className="h4 text-right desc"
             >
-              Network
+              <Text
+                ellipsize={true}
+              >
+                Network
+              </Text>
             </div>
           </div>
         </div>,
@@ -238,14 +302,22 @@ ShallowWrapper {
               <div
                 className="h2 text-right"
               >
-                <strong>
-                  HEALTH
-                </strong>
+                <Text
+                  ellipsize={true}
+                >
+                  <strong>
+                    HEALTH
+                  </strong>
+                </Text>
               </div>
               <div
                 className="h4 text-right desc"
               >
-                Network
+                <Text
+                  ellipsize={true}
+                >
+                  Network
+                </Text>
               </div>
             </div>,
           ],
@@ -288,14 +360,22 @@ ShallowWrapper {
                 <div
                   className="h2 text-right"
                 >
-                  <strong>
-                    HEALTH
-                  </strong>
+                  <Text
+                    ellipsize={true}
+                  >
+                    <strong>
+                      HEALTH
+                    </strong>
+                  </Text>
                 </div>,
                 <div
                   className="h4 text-right desc"
                 >
-                  Network
+                  <Text
+                    ellipsize={true}
+                  >
+                    Network
+                  </Text>
                 </div>,
               ],
               "className": "col-xs-8",
@@ -307,22 +387,39 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <strong>
-                    HEALTH
-                  </strong>,
+                  "children": <Text
+                    ellipsize={true}
+                  >
+                    <strong>
+                      HEALTH
+                    </strong>
+                  </Text>,
                   "className": "h2 text-right",
                 },
                 "ref": null,
                 "rendered": Object {
                   "instance": null,
                   "key": undefined,
-                  "nodeType": "host",
+                  "nodeType": "class",
                   "props": Object {
-                    "children": "HEALTH",
+                    "children": <strong>
+                      HEALTH
+                    </strong>,
+                    "ellipsize": true,
                   },
                   "ref": null,
-                  "rendered": "HEALTH",
-                  "type": "strong",
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": "HEALTH",
+                    },
+                    "ref": null,
+                    "rendered": "HEALTH",
+                    "type": "strong",
+                  },
+                  "type": [Function],
                 },
                 "type": "div",
               },
@@ -331,11 +428,26 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": "Network",
+                  "children": <Text
+                    ellipsize={true}
+                  >
+                    Network
+                  </Text>,
                   "className": "h4 text-right desc",
                 },
                 "ref": null,
-                "rendered": "Network",
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": "Network",
+                    "ellipsize": true,
+                  },
+                  "ref": null,
+                  "rendered": "Network",
+                  "type": [Function],
+                },
                 "type": "div",
               },
             ],
@@ -391,11 +503,19 @@ ShallowWrapper {
           <div
             className="h2 text-right"
           >
-            <strong />
+            <Text
+              ellipsize={true}
+            >
+              <strong />
+            </Text>
           </div>
           <div
             className="h4 text-right desc"
-          />
+          >
+            <Text
+              ellipsize={true}
+            />
+          </div>
         </div>
       </div>,
       "className": "pt-card pt-dark pt-elevation-2 neutral",
@@ -421,11 +541,19 @@ ShallowWrapper {
             <div
               className="h2 text-right"
             >
-              <strong />
+              <Text
+                ellipsize={true}
+              >
+                <strong />
+              </Text>
             </div>
             <div
               className="h4 text-right desc"
-            />
+            >
+              <Text
+                ellipsize={true}
+              />
+            </div>
           </div>,
         ],
         "className": "row",
@@ -467,11 +595,19 @@ ShallowWrapper {
               <div
                 className="h2 text-right"
               >
-                <strong />
+                <Text
+                  ellipsize={true}
+                >
+                  <strong />
+                </Text>
               </div>,
               <div
                 className="h4 text-right desc"
-              />,
+              >
+                <Text
+                  ellipsize={true}
+                />
+              </div>,
             ],
             "className": "col-xs-8",
           },
@@ -482,20 +618,35 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": <strong />,
+                "children": <Text
+                  ellipsize={true}
+                >
+                  <strong />
+                </Text>,
                 "className": "h2 text-right",
               },
               "ref": null,
               "rendered": Object {
                 "instance": null,
                 "key": undefined,
-                "nodeType": "host",
+                "nodeType": "class",
                 "props": Object {
-                  "children": undefined,
+                  "children": <strong />,
+                  "ellipsize": true,
                 },
                 "ref": null,
-                "rendered": null,
-                "type": "strong",
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "host",
+                  "props": Object {
+                    "children": undefined,
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": "strong",
+                },
+                "type": [Function],
               },
               "type": "div",
             },
@@ -504,11 +655,24 @@ ShallowWrapper {
               "key": undefined,
               "nodeType": "host",
               "props": Object {
-                "children": undefined,
+                "children": <Text
+                  ellipsize={true}
+                />,
                 "className": "h4 text-right desc",
               },
               "ref": null,
-              "rendered": null,
+              "rendered": Object {
+                "instance": null,
+                "key": undefined,
+                "nodeType": "class",
+                "props": Object {
+                  "children": undefined,
+                  "ellipsize": true,
+                },
+                "ref": null,
+                "rendered": null,
+                "type": [Function],
+              },
               "type": "div",
             },
           ],
@@ -542,11 +706,19 @@ ShallowWrapper {
             <div
               className="h2 text-right"
             >
-              <strong />
+              <Text
+                ellipsize={true}
+              >
+                <strong />
+              </Text>
             </div>
             <div
               className="h4 text-right desc"
-            />
+            >
+              <Text
+                ellipsize={true}
+              />
+            </div>
           </div>
         </div>,
         "className": "pt-card pt-dark pt-elevation-2 neutral",
@@ -572,11 +744,19 @@ ShallowWrapper {
               <div
                 className="h2 text-right"
               >
-                <strong />
+                <Text
+                  ellipsize={true}
+                >
+                  <strong />
+                </Text>
               </div>
               <div
                 className="h4 text-right desc"
-              />
+              >
+                <Text
+                  ellipsize={true}
+                />
+              </div>
             </div>,
           ],
           "className": "row",
@@ -618,11 +798,19 @@ ShallowWrapper {
                 <div
                   className="h2 text-right"
                 >
-                  <strong />
+                  <Text
+                    ellipsize={true}
+                  >
+                    <strong />
+                  </Text>
                 </div>,
                 <div
                   className="h4 text-right desc"
-                />,
+                >
+                  <Text
+                    ellipsize={true}
+                  />
+                </div>,
               ],
               "className": "col-xs-8",
             },
@@ -633,20 +821,35 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": <strong />,
+                  "children": <Text
+                    ellipsize={true}
+                  >
+                    <strong />
+                  </Text>,
                   "className": "h2 text-right",
                 },
                 "ref": null,
                 "rendered": Object {
                   "instance": null,
                   "key": undefined,
-                  "nodeType": "host",
+                  "nodeType": "class",
                   "props": Object {
-                    "children": undefined,
+                    "children": <strong />,
+                    "ellipsize": true,
                   },
                   "ref": null,
-                  "rendered": null,
-                  "type": "strong",
+                  "rendered": Object {
+                    "instance": null,
+                    "key": undefined,
+                    "nodeType": "host",
+                    "props": Object {
+                      "children": undefined,
+                    },
+                    "ref": null,
+                    "rendered": null,
+                    "type": "strong",
+                  },
+                  "type": [Function],
                 },
                 "type": "div",
               },
@@ -655,11 +858,24 @@ ShallowWrapper {
                 "key": undefined,
                 "nodeType": "host",
                 "props": Object {
-                  "children": undefined,
+                  "children": <Text
+                    ellipsize={true}
+                  />,
                   "className": "h4 text-right desc",
                 },
                 "ref": null,
-                "rendered": null,
+                "rendered": Object {
+                  "instance": null,
+                  "key": undefined,
+                  "nodeType": "class",
+                  "props": Object {
+                    "children": undefined,
+                    "ellipsize": true,
+                  },
+                  "ref": null,
+                  "rendered": null,
+                  "type": [Function],
+                },
                 "type": "div",
               },
             ],

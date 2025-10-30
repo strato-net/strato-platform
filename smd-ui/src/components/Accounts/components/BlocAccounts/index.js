@@ -7,7 +7,7 @@ import {
   resetUserAddress,
   fetchOauthAccounts,
 } from '../../accounts.actions';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { connect } from 'react-redux';
 import { withRouter } from 'react-router-dom';
 import SendTokens from '../SendTokens';
@@ -33,7 +33,7 @@ class BlocAccounts extends Component {
       this.props.resetUserAddress(user);
       this.setState({ selected: null });
     } else {
-      mixpanelWrapper.track('accounts_row_click');
+      // mixpanelWrapper.track('accounts_row_click');
       this.props.fetchUserAddresses(user, true, this.props.selectedChain)
     }
   }

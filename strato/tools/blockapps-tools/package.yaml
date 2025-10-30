@@ -17,15 +17,14 @@ library:
   source-dirs: src/
   dependencies:
     - aeson
-    - base16-bytestring
     - binary
     - blockapps-data
     - blockapps-datadefs
     - blockapps-mpdbs
+    - blockDB
     - blockstanbul
     - bytestring
     - common-log
-    - conduit
     - data-default
     - ethereum-discovery
     - ethereum-rlp
@@ -35,28 +34,21 @@ library:
     - hflags
     - kafka-monad
     - labeled-error
-    - lens
     - leveldb-haskell
-    - memory
     - merkle-patricia-db
-    - monad-alter
     - monad-logger
     - monad-loops
     - nibblestring
     - persistent-postgresql
     - resourcet
     - seqevents
+    - solid-vm-model
     - strato-conf
-    - strato-index
     - strato-model
     - strato-redis-blockdb
-    - strato-sequencer
-    - strato-statediff
     - text
     - time
     - transformers
-    - type-lits
-    - unliftio
     - vm-tools
 
 executables:

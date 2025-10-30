@@ -27,7 +27,6 @@ module Blockchain.Strato.Model.Secp256k1
   )
 where
 
--- import qualified Data.ByteString.Conversion       as BSC
 
 import Blockchain.Data.RLP
 import Control.DeepSeq
@@ -136,7 +135,6 @@ instance ASN1Object PrivateKey where
         : Start (Container Context 0)
         : OID [1, 3, 132, 0, 10]
         : End (Container Context 0)
-        : End Sequence
         : xs
       ) = case (importPrivateKey str) of
       Nothing -> Left "could not asn1decode privkey"
@@ -190,6 +188,7 @@ exportPublicKey compress (PublicKey pk) = S.exportPubKey compress pk
 importPublicKey :: B.ByteString -> Maybe PublicKey
 importPublicKey bs = PublicKey <$> S.importPubKey bs
 
+-- We're making hashed be the default, but allow Vault to still call unhashed for backwards compatibility
 -- the shared Diffie-Hellman (ECDH) secret for ethereum-encryption
 deriveSharedKey :: PrivateKey -> PublicKey -> SharedKey
 deriveSharedKey (PrivateKey prv) (PublicKey pub) = SharedKey $ S.ecdh pub prv

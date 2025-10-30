@@ -43,7 +43,6 @@ data Type
 data SimpleType
   = TypeBool
   | TypeAddress
-  | TypeAccount
   | TypeString
   | TypeInt
       { intSigned :: Bool,
@@ -64,7 +63,7 @@ getTypeByteLength = \case
   TypeFunction {} -> Nothing
   TypeStruct {} -> Nothing
   TypeEnum {} -> Nothing
-  TypeContract {} -> getSimpleTypeByteLength TypeAccount
+  TypeContract {} -> getSimpleTypeByteLength TypeAddress
   TypeVariadic {} -> Nothing
 
 getSimpleTypeByteLength :: SimpleType -> Maybe Int
@@ -81,7 +80,6 @@ formatSimpleType (TypeBytes Nothing) = "bytes"
 formatSimpleType (TypeBytes (Just b)) = "bytes" ++ show b
 formatSimpleType TypeBool = "bool"
 formatSimpleType TypeAddress = "address"
-formatSimpleType TypeAccount = "account"
 formatSimpleType TypeString = "string"
 formatSimpleType TypeDecimal = "decimal"
 

@@ -20,6 +20,7 @@ module Bloc.API.Users
     BlocTransactionStatus (..),
     GetBlocTransactionResult,
     PostBlocTransactionResults,
+    PostBlocTransactionResultsExternal,
     TransferParameters (..),
     ContractParameters (..),
     UploadListContract (..),
@@ -31,10 +32,7 @@ module Bloc.API.Users
     MethodCall (..),
     BlocTransactionData (..),
     UploadContractDetails (..),
-    uploadlistcontractChainid,
     uploadlistcontractTxParams,
-    sendtransactionChainid,
-    methodcallChainid,
     methodcallTxParams,
     sendtransactionTxParams,
   )
@@ -46,15 +44,13 @@ import Bloc.API.TypeWrappers
 import Bloc.API.Utils
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.SolidityValue
-import Blockchain.Data.Json (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Data.TransactionResult
+import Blockchain.Model.JsonBlock (RawTransaction', UnsignedRawTransaction')
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Blockchain.Strato.Model.Wei
-import Blockchain.Strato.Model.Code (Code)
 import Control.Lens (mapped)
 import Control.Lens.Operators hiding ((.=))
 import Control.Lens.TH
@@ -67,7 +63,6 @@ import Data.Source.Map
 import Data.Text (Text)
 import GHC.Generics
 import qualified Generic.Random as GR
-import Numeric.Natural
 import Servant.API
 import Servant.Docs
 import Test.QuickCheck hiding (Failure, Success)
@@ -139,8 +134,6 @@ instance ToSchema UploadContractDetails where
             contractAddress = Just $ Address 0xdeadbeef
           }
 
-instance Arbitrary BlocTransactionData where
-  arbitrary = GR.genericArbitrary GR.uniform
 
 instance ToJSON BlocTransactionData where
   toJSON btd = case btd of
@@ -176,16 +169,12 @@ instance ToSample BlocTransactionData where
             { Deprecated.posttransactionHash = hash "foo",
               Deprecated.posttransactionGasLimit = 100000,
               Deprecated.posttransactionCodeOrData = "Code or Data",
-              Deprecated.posttransactionGasPrice = 1,
               Deprecated.posttransactionTo = Just $ Address 0xdeadbeef,
               Deprecated.posttransactionFrom = Address 0x12345678,
-              Deprecated.posttransactionValue = Strung 0,
               Deprecated.posttransactionR = Hex 0xdeadbeef,
               Deprecated.posttransactionS = Hex 0xdeadbeef,
               Deprecated.posttransactionV = Hex 0x1c,
-              Deprecated.posttransactionNonce = 9876,
-              Deprecated.posttransactionChainId = Nothing,
-              Deprecated.posttransactionMetadata = Nothing
+              Deprecated.posttransactionNonce = 9876
             },
         Upload
           UploadContractDetails
@@ -225,8 +214,6 @@ data BlocTransactionResult = BlocTransactionResult
   }
   deriving (Eq, Show, Generic)
 
-instance Arbitrary BlocTransactionResult where
-  arbitrary = BlocTransactionResult <$> arbitrary <*> arbitrary <*> pure Nothing <*> arbitrary
 
 instance ToJSON BlocTransactionResult where
   toJSON = genericToJSON (aesonDrop 15 camelCase)
@@ -315,10 +302,12 @@ type GetBlocTransactionResult =
 type PostBlocTransactionResults =
   "transactions"
     :> "results"
-    :> Header "Authorization" Text
     :> QueryFlag "resolve"
     :> ReqBody '[JSON] [Keccak256]
     :> Post '[JSON] [BlocTransactionResult]
+
+type PostBlocTransactionResultsExternal =
+  Header "Authorization" Text :> PostBlocTransactionResults
 
 instance ToParam (QueryFlag "resolve") where
   toParam _ =
@@ -333,10 +322,8 @@ instance ToParam (QueryParam "use_wallet" Bool) where
 data TransferParameters = TransferParameters
   { fromAddress :: Address,
     toAddress :: Address,
-    value :: Strung Natural,
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -347,12 +334,9 @@ data ContractParameters = ContractParameters
     src :: SourceMap,
     contract :: Maybe Text,
     args :: Maybe (Map Text ArgValue),
-    value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
-    resolve :: Bool,
-    ptr2Code :: Maybe Code
+    resolve :: Bool
   }
 
 --------------------------------------------------------------------------------
@@ -361,10 +345,7 @@ data UploadListContract = UploadListContract
     uploadlistcontractSrc :: SourceMap,
     uploadlistcontractArgs :: Map Text ArgValue,
     _uploadlistcontractTxParams :: Maybe TxParams,
-    uploadlistcontractValue :: Maybe (Strung Natural),
-    _uploadlistcontractChainid :: Maybe ChainId,
-    uploadlistcontractMetadata :: Maybe (Map Text Text),
-    uploadlistcontractPtr2Code :: Maybe Code
+    uploadlistcontractMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
 
@@ -379,10 +360,7 @@ instance ToJSON UploadListContract where
         "src" .= uploadlistcontractSrc,
         "args" .= uploadlistcontractArgs,
         "txParams" .= _uploadlistcontractTxParams,
-        "value" .= uploadlistcontractValue,
-        "chainid" .= _uploadlistcontractChainid,
-        "metadata" .= uploadlistcontractMetadata,
-        "ptr2code" .= uploadlistcontractPtr2Code
+        "metadata" .= uploadlistcontractMetadata
       ]
 
 instance FromJSON UploadListContract where
@@ -392,10 +370,7 @@ instance FromJSON UploadListContract where
       <*> (fromMaybe mempty <$> o .:? "src")
       <*> (o .: "args")
       <*> (o .:? "txParams")
-      <*> (o .:? "value")
-      <*> (o .:? "chainid")
       <*> (o .:? "metadata")
-      <*> (o .:? "ptr2Code")
   parseJSON o = fail $ "parseJSON UploadListContract: Expected Object, got " ++ show o
 
 instance ToSchema UploadListContract where
@@ -411,16 +386,12 @@ instance ToSchema UploadListContract where
             uploadlistcontractSrc = mempty,
             uploadlistcontractArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 1)],
             _uploadlistcontractTxParams = Just $ TxParams (Just $ Gas 123) (Just $ Wei 345) Nothing,
-            uploadlistcontractValue = Nothing,
-            _uploadlistcontractChainid = Nothing,
-            uploadlistcontractMetadata = Nothing,
-            uploadlistcontractPtr2Code = Nothing
+            uploadlistcontractMetadata = Nothing
           }
 
 data ContractListParameters = ContractListParameters
   { fromAddr :: Address,
     contracts :: [UploadListContract],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Eq, Show, Generic)
@@ -431,19 +402,15 @@ data FunctionParameters = FunctionParameters
     contractAddr :: Address,
     funcName :: Text,
     args :: Map Text ArgValue,
-    value :: Maybe (Strung Natural),
     txParams :: Maybe TxParams,
     metadata :: Maybe (Map Text Text),
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
 
 --------------------------------------------------------------------------------
 data SendTransaction = SendTransaction
   { sendtransactionToAddress :: Address,
-    sendtransactionValue :: Strung Natural,
     _sendtransactionTxParams :: Maybe TxParams,
-    _sendtransactionChainid :: Maybe ChainId,
     sendtransactionMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)
@@ -499,7 +466,6 @@ instance ToSchema SendTransaction where
       ex =
         SendTransaction
           { sendtransactionToAddress = Address 0xdeadbeef,
-            sendtransactionValue = Strung 100000000000000,
             _sendtransactionTxParams =
               Just
                 ( TxParams
@@ -507,14 +473,12 @@ instance ToSchema SendTransaction where
                     (Just $ Wei 345)
                     (Just $ Nonce 9876)
                 ),
-            _sendtransactionChainid = Nothing,
             sendtransactionMetadata = (Just $ Map.fromList [("purpose", "groceries")])
           }
 
 data TransferListParameters = TransferListParameters
   { fromAddr :: Address,
     txs :: [SendTransaction],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Show, Eq)
@@ -609,18 +573,15 @@ instance ToSchema MethodCall where
       ex =
         MethodCall
           { _methodcallTxParams = Nothing,
-            methodcallValue = Strung 1000000000,
             methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
             methodcallMethodName = "getHoroscope",
             methodcallContractAddress = Address 0xdeadbeef,
-            _methodcallChainid = Nothing,
             methodcallMetadata = Nothing
           }
 
 data FunctionListParameters = FunctionListParameters
   { fromAddr :: Address,
     txs :: [MethodCall],
-    chainId :: Maybe ChainId,
     resolve :: Bool
   }
   deriving (Show, Eq)
@@ -652,11 +613,9 @@ methodErroredExample =
     exMethodCall =
       MethodCall
         { _methodcallTxParams = Nothing,
-          methodcallValue = Strung 1000000000,
           methodcallArgs = Map.fromList [("user", ArgString "Bob"), ("age", ArgInt 52)],
           methodcallMethodName = "getHoroscope",
           methodcallContractAddress = Address 0xdeadbeef,
-          _methodcallChainid = Nothing,
           methodcallMetadata = Nothing
         }
 
@@ -674,9 +633,7 @@ data MethodCall = MethodCall
   { methodcallContractAddress :: Address,
     methodcallMethodName :: Text,
     methodcallArgs :: Map Text ArgValue,
-    methodcallValue :: Strung Natural,
     _methodcallTxParams :: Maybe TxParams,
-    _methodcallChainid :: Maybe ChainId,
     methodcallMetadata :: Maybe (Map Text Text)
   }
   deriving (Eq, Show, Generic)

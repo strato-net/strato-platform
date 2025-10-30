@@ -25,8 +25,6 @@ module Blockchain.Data.BlockHeader
     getBlockValidators,
     getBlockNewValidators,
     getBlockRemovedValidators,
-    getBlockNewCerts,
-    getBlockRevokedCerts,
     getBlockProposal,
     getBlockSignatures,
     clearBlockProposal,
@@ -34,11 +32,10 @@ module Blockchain.Data.BlockHeader
   )
 where
 
-import BlockApps.X509.Certificate
 import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Blockstanbul.Model.Authentication
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -52,7 +49,6 @@ import Data.Binary
 import Data.Bits (shiftL, shiftR)
 import qualified Data.ByteString as B
 import Data.ByteString.Arbitrary
-import qualified Data.Set as S
 import Data.Time
 import Data.Time.Clock.POSIX
 import GHC.Generics
@@ -66,7 +62,7 @@ data BlockHeader =
   BlockHeader {
     parentHash :: Keccak256,
     ommersHash :: Keccak256,
-    beneficiary :: ChainMemberParsedSet,
+    beneficiary :: Address,
     stateRoot :: MP.StateRoot,
     transactionsRoot :: MP.StateRoot,
     receiptsRoot :: MP.StateRoot,
@@ -92,8 +88,6 @@ data BlockHeader =
     currentValidators :: [Validator],
     newValidators :: [Validator],
     removedValidators :: [Validator],
-    newCerts :: [X509Certificate],
-    revokedCerts :: [DummyCertRevocation],
     proposalSignature :: Maybe Signature,
     signatures :: [Signature]
   }
@@ -128,9 +122,9 @@ getBlockOmmersHash :: BlockHeader -> Keccak256
 getBlockOmmersHash BlockHeader { ommersHash } = ommersHash
 getBlockOmmersHash BlockHeaderV2 {} = (hash . rlpSerialize . RLPArray) []
 
-getBlockBeneficiary :: BlockHeader -> ChainMemberParsedSet
+getBlockBeneficiary :: BlockHeader -> Address
 getBlockBeneficiary BlockHeader { beneficiary } = beneficiary
-getBlockBeneficiary BlockHeaderV2 {} = Everyone False
+getBlockBeneficiary BlockHeaderV2 {} = 0x0
 
 getBlockMixHash :: BlockHeader -> Keccak256
 getBlockMixHash BlockHeader { mixHash } = mixHash
@@ -151,14 +145,6 @@ getBlockNewValidators BlockHeaderV2 { newValidators } = newValidators
 getBlockRemovedValidators :: BlockHeader -> [Validator]
 getBlockRemovedValidators BlockHeader {} = []
 getBlockRemovedValidators BlockHeaderV2 { removedValidators } = removedValidators
-
-getBlockNewCerts :: BlockHeader -> [X509Certificate]
-getBlockNewCerts BlockHeader {} = []
-getBlockNewCerts BlockHeaderV2 { newCerts } = newCerts
-
-getBlockRevokedCerts :: BlockHeader -> [DummyCertRevocation]
-getBlockRevokedCerts BlockHeader {} = []
-getBlockRevokedCerts BlockHeaderV2 { revokedCerts } = revokedCerts
 
 getBlockProposal :: BlockHeader -> Maybe Signature
 getBlockProposal BlockHeader {} = Nothing
@@ -207,8 +193,6 @@ instance Format BlockHeader where
             ++ "currentValidators: " ++ show currentValidators ++ "\n"
             ++ "newValidators: " ++ show newValidators ++ "\n"
             ++ "removedValidators: " ++ show removedValidators ++ "\n"
-            ++ "newCerts: " ++ show newCerts ++ "\n"
-            ++ "revokedCerts: " ++ show revokedCerts ++ "\n"
             ++ "proposalSignature: " ++ show proposalSignature ++ "\n"
             ++ "signatures: " ++ show signatures ++ "\n"
         )
@@ -246,8 +230,6 @@ instance RLPSerializable BlockHeader where
         rlpEncode currentValidators,
         rlpEncode newValidators,
         rlpEncode removedValidators,
-        rlpEncode newCerts,
-        rlpEncode revokedCerts,
         rlpEncode proposalSignature,
         rlpEncode signatures
       ]
@@ -269,7 +251,7 @@ instance RLPSerializable BlockHeader where
           mixHash = rlpDecode mh,
           nonce = bytesToWord64 $ B.unpack $ rlpDecode nonce'
         }
-  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, vs, nv, rv, nc, rc, p, ss])
+  rlpDecode (RLPArray [v, ph, sr, tr, rr, lb, number', ts, ed, vs, nv, rv, p, ss])
     | rlpDecode v == (2 :: Integer) =
           BlockHeaderV2
           { parentHash = rlpDecode ph,
@@ -283,8 +265,6 @@ instance RLPSerializable BlockHeader where
             currentValidators = rlpDecode vs,
             newValidators = rlpDecode nv,
             removedValidators = rlpDecode rv,
-            newCerts = rlpDecode nc,
-            revokedCerts = rlpDecode rc,
             proposalSignature = rlpDecode p,
             signatures = rlpDecode ss
           }
@@ -293,11 +273,11 @@ instance RLPSerializable BlockHeader where
 instance HasIstanbulExtra BlockHeader where
   getIstanbulExtra bh = case bh of
     BlockHeader{..} -> _istanbul $ cookRawExtra extraData
-    BlockHeaderV2{..} -> Just $ IstanbulExtra (ChainMembers . S.fromList $ validatorToChainMemberParsedSet <$> currentValidators) proposalSignature signatures
+    BlockHeaderV2{..} -> Just $ IstanbulExtra currentValidators proposalSignature signatures
   putIstanbulExtra mIst bh = case bh of
     BlockHeader{..} -> bh{extraData = uncookRawExtra . set istanbul mIst $ cookRawExtra extraData}
     BlockHeaderV2{} -> bh
-      { currentValidators = maybe [] (map chainMemberParsedSetToValidator . S.toList . unChainMembers . _validatorList) mIst
+      { currentValidators = maybe [] _validatorList mIst
       , proposalSignature = maybe Nothing _proposedSig mIst
       , signatures = maybe [] _commitment mIst
       }
@@ -321,8 +301,6 @@ instance BlockHeaderLike BlockHeader where
   blockHeaderValidators = getBlockValidators
   blockHeaderNewValidators = getBlockNewValidators
   blockHeaderRemovedValidators = getBlockRemovedValidators
-  blockHeaderNewCerts = getBlockNewCerts
-  blockHeaderRevokedCerts = getBlockRevokedCerts
   blockHeaderProposal = getBlockProposal
   blockHeaderSignatures = getBlockSignatures
   blockHeaderVersion = bh where
@@ -361,8 +339,6 @@ instance BlockHeaderLike BlockHeader where
         currentValidators = blockHeaderValidators b,
         newValidators = blockHeaderNewValidators b,
         removedValidators = blockHeaderRemovedValidators b,
-        newCerts = blockHeaderNewCerts b,
-        revokedCerts = blockHeaderRevokedCerts b,
         proposalSignature = blockHeaderProposal b,
         signatures = blockHeaderSignatures b
       }

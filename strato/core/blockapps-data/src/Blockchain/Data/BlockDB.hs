@@ -12,7 +12,6 @@ module Blockchain.Data.BlockDB
   )
 where
 
-import BlockApps.X509
 import Blockchain.Blockstanbul.Model.Authentication
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
@@ -21,17 +20,14 @@ import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Secp256k1
 import Blockchain.Strato.Model.Validator
 import Control.Monad (forM, forM_)
-import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString.Short as BSS
 import Data.Maybe
-import qualified Data.Text as T
 import qualified Database.Esqueleto.Legacy as E
 import Database.Persist hiding (get)
 import qualified Database.Persist.Postgresql as SQL
@@ -41,15 +37,13 @@ blk2BlkDataRef ::
   Block ->
   Keccak256 ->
   Bool ->
-  (BlockDataRef, [Validator], [Validator], [Validator], [X509Certificate], [DummyCertRevocation], Maybe Signature, [Signature])
+  (BlockDataRef, [Validator], [Validator], [Validator], Maybe Signature, [Signature])
 blk2BlkDataRef b hash' makeHashOne =
   let bdr = BlockDataRef pH uH cC sR tR rR lB d n gL gU t eD nc mH hash'' True True v --- Horrible! Apparently I need to learn the Lens library, yesterday
-   in (bdr, vs, va, vr, ca, cr, ps, sigs)
+   in (bdr, vs, va, vr, ps, sigs)
   where
     hash'' = if makeHashOne then unsafeCreateKeccak256FromWord256 1 else hash'
-    cC = case cB of
-      CommonName _ _ c _ -> c
-      _ -> ""
+    cC = getBlockBeneficiary bd
     bd = blockBlockData b
     pH = parentHash bd
     sR = stateRoot bd
@@ -64,14 +58,11 @@ blk2BlkDataRef b hash' makeHashOne =
     gL = getBlockGasLimit bd
     gU = getBlockGasUsed bd
     uH = getBlockOmmersHash bd
-    cB = getBlockBeneficiary bd
     mH = getBlockMixHash bd
     v = blockHeaderVersion bd
     vs = blockHeaderValidators bd
     va = blockHeaderNewValidators bd
     vr = blockHeaderRemovedValidators bd
-    ca = blockHeaderNewCerts bd
-    cr = blockHeaderRevokedCerts bd
     ps = blockHeaderProposal bd
     sigs = blockHeaderSignatures bd
 
@@ -84,7 +75,7 @@ getBlock h = do
 
   case entBlkL of
     [] -> return Nothing
-    lst -> return $ Just . entityVal . head $ lst
+    (x:_) -> return . Just $ entityVal x
   where
     actions = E.select $
       E.from $ \bdRef -> do
@@ -106,19 +97,14 @@ putBlocks blockList makeHashOne = do
 
       case existingBlockData of
         [] -> do
-          let (toInsert, vs, va, vr, ca, cr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
+          let (toInsert, vs, va, vr, ps, sigs) = blk2BlkDataRef b hash' makeHashOne
           blkDataRefId <- SQL.insert toInsert
           forM_ (blockReceiptTransactions b) $ \tx -> do
-            txID <- updateBlockNumber b (transactionHash tx) (txChainId tx)
+            txID <- updateBlockNumber b (transactionHash tx)
             SQL.insert $ BlockTransaction blkDataRefId txID
-          forM_ vs $ \(Validator v) -> SQL.insert $ BlockValidatorRef blkDataRefId v
-          forM_ va $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
-          forM_ vr $ \(Validator v) -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
-          forM_ ca $ \c -> do
-            let c' = x509CertToCertInfoState c 
-            SQL.insert $ CertificateAddedRef blkDataRefId (T.pack $ commonName c') (userAddress c') (T.pack . BC.unpack . certToBytes $ certificate c')
-          forM_ cr $ \(DummyCertRevocation ua) -> do
-            SQL.insert $ CertificateRevokedRef blkDataRefId ua
+          forM_ vs $ \v -> SQL.insert $ BlockValidatorRef blkDataRefId v
+          forM_ va $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v True
+          forM_ vr $ \v -> SQL.insert $ ValidatorDeltaRef blkDataRefId v False
           forM_ ps $ \(Signature sig) -> do
             let r = bytesToWord256 . BSS.fromShort $ getCompactRecSigR sig
                 s = bytesToWord256 . BSS.fromShort $ getCompactRecSigS sig
@@ -136,8 +122,8 @@ putBlocks blockList makeHashOne = do
         [bd] -> return $ SQL.entityKey bd
         _ -> error "DB has multiple blocks with the same hash"
   where
-    updateBlockNumber b txHash' cid = do
-      ret <- SQL.getBy (UniqueTXHash txHash' $ fromMaybe 0 cid)
+    updateBlockNumber b txHash' = do
+      ret <- SQL.getBy (UniqueTXHash txHash')
       key <-
         case ret of
           Just x -> return $ entityKey x

@@ -56,7 +56,6 @@ Object {
   "isOpen": true,
   "isSpinning": true,
   "publicKey": "undefined",
-  "userCertificate": undefined,
 }
 `;
 
@@ -75,9 +74,7 @@ exports[`CreateChain: index remove members 2`] = `Array []`;
 
 exports[`CreateChain: index render component with empty values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" disabled={true} text=\\"Create Shard\\" />
-  </Blueprint.Popover>
+  <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Shard\\" />
   <Blueprint.Dialog iconName=\\"flows\\" isOpen={false} onClose={[undefined]} title=\\"Create New Shard\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body create-chain-form\\">
@@ -228,9 +225,7 @@ exports[`CreateChain: index render component with empty values 1`] = `
 
 exports[`CreateChain: index render component with values 1`] = `
 "<div className=\\"smd-pad-16\\">
-  <Blueprint.Popover isDisabled={false} interactionKind={2} position={10} content={{...}} arrowSize={30} className=\\"\\" defaultIsOpen={false} hoverCloseDelay={300} hoverOpenDelay={150} inheritDarkTheme={true} inline={false} isModal={false} openOnTargetFocus={true} popoverClassName=\\"\\" rootElementTag=\\"span\\" transitionDuration={300} useSmartArrowPositioning={true} useSmartPositioning={false}>
-    <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" disabled={true} text=\\"Create Shard\\" />
-  </Blueprint.Popover>
+  <Blueprint.AnchorButton onClick={[Function: onClick]} className=\\"pt-intent-primary pt-icon-add\\" id=\\"chains-create-chain-button\\" text=\\"Create Shard\\" />
   <Blueprint.Dialog iconName=\\"flows\\" isOpen={true} onClose={[undefined]} title=\\"Create New Shard\\" className=\\"pt-dark\\" canOutsideClickClose={true}>
     <form>
       <div className=\\"pt-dialog-body create-chain-form\\">

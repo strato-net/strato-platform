@@ -73,7 +73,7 @@ ShallowWrapper {
     "props": Object {
       "children": Array [
         <h4>
-          Recent Transactions (Main Chain)
+          Recent Transactions
         </h4>,
         <table
           className="pt-table pt-interactive pt-condensed pt-striped"
@@ -206,10 +206,10 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": "Recent Transactions (Main Chain)",
+          "children": "Recent Transactions",
         },
         "ref": null,
-        "rendered": "Recent Transactions (Main Chain)",
+        "rendered": "Recent Transactions",
         "type": "h4",
       },
       Object {
@@ -948,7 +948,7 @@ ShallowWrapper {
       "props": Object {
         "children": Array [
           <h4>
-            Recent Transactions (Main Chain)
+            Recent Transactions
           </h4>,
           <table
             className="pt-table pt-interactive pt-condensed pt-striped"
@@ -1081,10 +1081,10 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": "Recent Transactions (Main Chain)",
+            "children": "Recent Transactions",
           },
           "ref": null,
-          "rendered": "Recent Transactions (Main Chain)",
+          "rendered": "Recent Transactions",
           "type": "h4",
         },
         Object {
@@ -1888,7 +1888,7 @@ ShallowWrapper {
     "props": Object {
       "children": Array [
         <h4>
-          Recent Transactions (Main Chain)
+          Recent Transactions
         </h4>,
         <table
           className="pt-table pt-interactive pt-condensed pt-striped"
@@ -2021,10 +2021,10 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": "Recent Transactions (Main Chain)",
+          "children": "Recent Transactions",
         },
         "ref": null,
-        "rendered": "Recent Transactions (Main Chain)",
+        "rendered": "Recent Transactions",
         "type": "h4",
       },
       Object {
@@ -2763,7 +2763,7 @@ ShallowWrapper {
       "props": Object {
         "children": Array [
           <h4>
-            Recent Transactions (Main Chain)
+            Recent Transactions
           </h4>,
           <table
             className="pt-table pt-interactive pt-condensed pt-striped"
@@ -2896,10 +2896,10 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": "Recent Transactions (Main Chain)",
+            "children": "Recent Transactions",
           },
           "ref": null,
-          "rendered": "Recent Transactions (Main Chain)",
+          "rendered": "Recent Transactions",
           "type": "h4",
         },
         Object {
@@ -3663,7 +3663,7 @@ ShallowWrapper {
     "props": Object {
       "children": Array [
         <h4>
-          Recent Transactions (Main Chain)
+          Recent Transactions
         </h4>,
         <table
           className="pt-table pt-interactive pt-condensed pt-striped"
@@ -3727,10 +3727,10 @@ ShallowWrapper {
         "key": undefined,
         "nodeType": "host",
         "props": Object {
-          "children": "Recent Transactions (Main Chain)",
+          "children": "Recent Transactions",
         },
         "ref": null,
-        "rendered": "Recent Transactions (Main Chain)",
+        "rendered": "Recent Transactions",
         "type": "h4",
       },
       Object {
@@ -4025,7 +4025,7 @@ ShallowWrapper {
       "props": Object {
         "children": Array [
           <h4>
-            Recent Transactions (Main Chain)
+            Recent Transactions
           </h4>,
           <table
             className="pt-table pt-interactive pt-condensed pt-striped"
@@ -4089,10 +4089,10 @@ ShallowWrapper {
           "key": undefined,
           "nodeType": "host",
           "props": Object {
-            "children": "Recent Transactions (Main Chain)",
+            "children": "Recent Transactions",
           },
           "ref": null,
-          "rendered": "Recent Transactions (Main Chain)",
+          "rendered": "Recent Transactions",
           "type": "h4",
         },
         Object {

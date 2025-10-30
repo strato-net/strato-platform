@@ -5,9 +5,7 @@
 
 module Blockchain.Strato.RedisBlockDB.Test.Chain where
 
--- import qualified Text.PrettyPrint.ANSI.Leijen as L
 
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Keccak256
@@ -22,15 +20,17 @@ import Test.QuickCheck
 makeGenesisBlock :: IO BlockHeader
 makeGenesisBlock = do
   arbitraryBlock <- generate arbitrary
-  return $ arbitraryBlock {
-    parentHash=unsafeCreateKeccak256FromWord256 0,
-    --                   ommersHash=ommersVerificationValue [],
-    number=0,
-    gasUsed=0,
-    nonce=42 -- this is ethereum spec!
-    --                 receiptTransactions=[],
-    --                 blockDataUncles=[]
-    }
+  case arbitraryBlock of
+    BlockHeader{} -> return $ arbitraryBlock {
+      parentHash=unsafeCreateKeccak256FromWord256 0,
+      --                   ommersHash=ommersVerificationValue [],
+      number=0,
+      gasUsed=0,
+      nonce=42 -- this is ethereum spec!
+      --                 receiptTransactions=[],
+      --                 blockDataUncles=[]
+      }
+    BlockHeaderV2{} -> error "makeGenesisBlock: encountered BlockHeaderV2"
 
 buildChain :: BlockHeader -> Int -> Int -> IO [BlockHeader]
 buildChain seed depth maxSiblings = do
@@ -43,11 +43,13 @@ makeNextBlock block = do
       nextNumber = (number block) + 1
   diff <- return 1 --((blockDataDifficulty block) +) <$> (generate $ choose (1,1000))
   child <- generate arbitrary :: IO BlockHeader
-  return child{
-    parentHash=parent,
-    difficulty=diff,
-    number=nextNumber
-    }
+  case child of
+    BlockHeader{} -> return $ child {
+      parentHash=parent,
+      difficulty=diff,
+      number=nextNumber
+      }
+    BlockHeaderV2{} -> error "makeNextBlockIncorrectly: BlockHeaderV2 encountered"
 
 makeNextBlockIncorrectly :: BlockHeader -> IO BlockHeader
 makeNextBlockIncorrectly block = do
@@ -55,11 +57,13 @@ makeNextBlockIncorrectly block = do
       nextNumber = (number block) + 2
   diff <- ((difficulty block) +) <$> (generate $ choose (1, 1000))
   child <- generate arbitrary :: IO BlockHeader
-  return $ child {
-    parentHash=parent,
-    difficulty=diff,
-    number=nextNumber
-    }
+  case child of
+    BlockHeader{} -> return $ child {
+      parentHash=parent,
+      difficulty=diff,
+      number=nextNumber
+      }
+    BlockHeaderV2{} -> error "makeNextBlockIncorrectly: BlockHeaderV2 encountered"
 
 extendChain :: Int -> [BlockHeader] -> IO [BlockHeader]
 extendChain n blocks | n <= 0 = return blocks
@@ -88,7 +92,7 @@ validateLink parent child =
 validateChain :: [BlockHeader] -> Bool
 validateChain [] = True
 validateChain [_] = True
-validateChain (x : xs) = (validateLink x $ head xs) && (validateChain xs)
+validateChain (x0 : x1 : xs) = (validateLink x0 x1) && (validateChain $ x1:xs)
 
 --------------------
 --                /o
@@ -103,13 +107,14 @@ buildY seed depth maxSiblings = do
   nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf spread arbitrary :: IO [BlockHeader]
   withUpdates <-
-    return $ fmap 
-      (\sibling -> sibling{
-          parentHash=blockHeaderHash seed,
-          difficulty=nextDifficulty',
-          number=nextNumber
-          }
-      ) siblings
+    return $ fmap (\sibling -> case sibling of
+      BlockHeader{} -> sibling{
+        parentHash=blockHeaderHash seed,
+        difficulty=nextDifficulty',
+        number=nextNumber
+        }
+      BlockHeaderV2{} -> error "buildTree: BlockHeaderV2 encountered"
+    ) siblings
   expanded <- forM withUpdates $ \sibling -> do
     grandchildren <- buildY sibling (depth - 1) maxSiblings
     return $ grandchildren
@@ -124,12 +129,14 @@ buildTree seed depth maxSiblings = do
   nextNumber <- return $ (number seed) + 1
   siblings <- generate $ vectorOf siblingCount arbitrary :: IO [BlockHeader]
   withUpdates <-
-    return $ fmap (\sibling ->
-      sibling{
+    return $ fmap (\sibling -> case sibling of
+      BlockHeader{} -> sibling{
         parentHash=blockHeaderHash seed,
         difficulty=nextDifficulty',
         number=nextNumber
-        }) siblings
+        }
+      BlockHeaderV2{} -> error "buildTree: BlockHeaderV2 encountered"
+    ) siblings
 
   expanded <- forM (zip withUpdates ([1 ..] :: [Int])) $ \(sibling, i) -> do
     deathRate <- case i == 1 of

@@ -11,11 +11,10 @@
 module Blockchain.Blockstanbul.Messages where
 
 import BlockApps.Logging
-import Blockchain.Data.ArbitraryInstances ()
 import Blockchain.Data.Block
 import Blockchain.Data.BlockHeader
 import Blockchain.Data.RLP
-import Blockchain.Strato.Model.ChainMember
+import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class (blockHash)
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
@@ -62,7 +61,7 @@ instance Format View where
   format (View r s) = printf "View (round = %d, sequence = %d)" r s
 
 data MsgAuth = MsgAuth
-  { sender :: ChainMemberParsedSet,
+  { sender :: Address,
     signature :: Signature
   }
   deriving (Eq, Show, Generic, Binary, NFData, Data)
@@ -118,7 +117,7 @@ instance Format PreprepareDecision where
   format (AcceptPreprepare h) = "AcceptPreprepare " <> format h
   format dec = show dec
 
-blockstanbulSender :: WireMessage -> ChainMemberParsedSet
+blockstanbulSender :: WireMessage -> Address
 blockstanbulSender (WireMessage a _) = sender a
 
 instance Arbitrary MsgAuth where
@@ -181,9 +180,8 @@ data OutEvent
   | -- Announce that the global consensus is ahead of us by
     -- some number of blocks, and hope that a higher power
     -- will erase the gap with PreviousBlocks.
-    GapFound {have :: Integer, require :: Integer, peer :: ChainMemberParsedSet}
-  | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: ChainMemberParsedSet}
-  | NewCheckpoint Checkpoint
+    GapFound {have :: Integer, require :: Integer, peer :: Address}
+  | LeadFound {weHave :: Integer, theyHave :: Integer, peer :: Address}
   | RunPreprepare Block
   deriving (Eq, Show, Generic)
 
@@ -200,7 +198,6 @@ instance Format OutEvent where
   format (ResetTimer rn) = "ResetTimer " ++ format rn
   format (GapFound we they p) = "GapFound " ++ show (we, they, p)
   format (LeadFound we they p) = "LeadFound " ++ show (we, they, p)
-  format (NewCheckpoint ckpt) = "NewCheckpoint " ++ show ckpt
   format (RunPreprepare blk) = "RunPreprepare " ++ format (blockHash blk)
 
 blkNum :: Block -> String
@@ -235,7 +232,6 @@ outShortLog loc eoev = do
       ResetTimer rn -> prefix ++ CL.blue "RESET_TIMER " ++ show rn
       GapFound h r p -> prefix ++ CL.blue "GAP_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
       LeadFound h r p -> prefix ++ CL.blue "LEAD_FOUND " ++ format p ++ " " ++ show h ++ " " ++ show r
-      NewCheckpoint ckpt -> prefix ++ CL.blue "NEW_CHECKPOINT " ++ show ckpt
       RunPreprepare blk -> prefix ++ CL.blue "RUN_PRE_PREPARE " ++ format (blockHash blk)
 
 instance NFData OutEvent

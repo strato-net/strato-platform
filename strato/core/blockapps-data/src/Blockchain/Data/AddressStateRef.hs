@@ -18,9 +18,7 @@ import qualified Database.Persist.Postgresql as SQL hiding (Update, get)
 
 addressStateRefCodePtr :: AddressStateRef -> Maybe CodePtr
 addressStateRefCodePtr AddressStateRef {..} = case addressStateRefContractName of
-  Just name -> case addressStateRefCodePtrAddress of
-    Just a -> Just $ CodeAtAccount a name
-    Nothing -> SolidVMCode name <$> addressStateRefCodeHash
+  Just name -> SolidVMCode name <$> addressStateRefCodeHash
   Nothing -> Nothing
 
 updateSQLBalanceAndNonce ::
@@ -40,7 +38,6 @@ updateSQLBalanceAndNonce vals = do
                 -- addressStateRefCode = "",
                 addressStateRefCodeHash = Just $ hash "",
                 addressStateRefContractName = Nothing,
-                addressStateRefCodePtrAddress = Nothing,
                 addressStateRefLatestBlockDataRefNumber = 0
               }
       SQL.upsert

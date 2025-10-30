@@ -1,0 +1,255 @@
+import React, { useState, useMemo } from 'react';
+import { Button } from 'antd';
+import {
+  RiseOutlined,
+  LogoutOutlined,
+  BankOutlined,
+  SolutionOutlined,
+} from '@ant-design/icons';
+import { ASSET_STATUS } from '../../helpers/constants';
+import StakeModal from './StakeModal';
+import BorrowModal from './BorrowModal';
+import RepayModal from './RepayModal';
+
+const StakeItemActions = ({
+  inventory,
+  limit,
+  offset,
+  debouncedSearchTerm,
+  category,
+  reserves,
+}) => {
+  const [stakeType, setStakeType] = useState('Stake');
+  const [stakeModalOpen, setStakeModalOpen] = useState(false);
+  const [borrowModalOpen, setBorrowModalOpen] = useState(false);
+  const [repayModalOpen, setRepayModalOpen] = useState(false);
+
+  // Calculate collateralQuantity
+  const uniqueEscrows = new Set();
+  let collateralQuantity = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateral = item?.escrow?.collateralQuantity || 0;
+        if (escrowAddress && !uniqueEscrows.has(escrowAddress)) {
+          uniqueEscrows.add(escrowAddress);
+          return sum + escrowCollateral;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralQuantity > inventory?.quantity
+    ? inventory?.quantity
+    : inventory?.escrow?.collateralQuantity || 0;
+
+  // Calculate quantityNotAvailable
+  let quantityNotAvailable = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const status = Number(item.status);
+        if (status && status !== ASSET_STATUS.ACTIVE) {
+          return sum + (item.quantity || 0);
+        }
+        return sum;
+      }, 0) + (inventory.totalSaleQuantity || 0)
+    : inventory?.status && Number(inventory?.status) !== ASSET_STATUS.ACTIVE
+    ? (inventory?.quantity || 0) + (inventory?.saleQuantity || 0)
+    : 0;
+
+  // Calculate quantity
+  let quantity = inventory?.quantity / 1e18;
+
+  // Calculate collateralValue
+  const uniqueEscrowsPrime = new Set();
+  let collateralValue = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const escrowCollateralValue = item?.escrow?.collateralValue || 0;
+        if (escrowAddress && !uniqueEscrowsPrime.has(escrowAddress)) {
+          uniqueEscrowsPrime.add(escrowAddress);
+          return sum + escrowCollateralValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.collateralValue || 0;
+
+  // Calculate borrowedAmount
+  const uniqueBorrowedAddresses = new Set();
+  let borrowAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const borrowedValue = item?.escrow?.borrowedAmount || 0;
+        if (escrowAddress && !uniqueBorrowedAddresses.has(escrowAddress)) {
+          uniqueBorrowedAddresses.add(escrowAddress);
+          return sum + borrowedValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.borrowedAmount || 0;
+
+  // Calculate maxLoanAmount
+  const uniqueEscrowsThree = new Set();
+  let maxLoanAmount = inventory?.inventories
+    ? inventory.inventories.reduce((sum, item) => {
+        const escrowAddress = item?.escrow?.address;
+        const maxLoanValue = item?.escrow?.maxLoanAmount || 0;
+        if (escrowAddress && !uniqueEscrowsThree.has(escrowAddress)) {
+          uniqueEscrowsThree.add(escrowAddress);
+          return sum + maxLoanValue;
+        }
+        return sum;
+      }, 0)
+    : inventory?.escrow?.maxLoanAmount || 0;
+
+  const matchedReserve = useMemo(() => {
+    if (reserves?.length && inventory?.root) {
+      return reserves.find(
+        (reserve) => reserve.assetRootAddress === inventory.root
+      );
+    }
+    return null;
+  }, [reserves, inventory?.root]);
+
+  const LTV =
+    matchedReserve?.name.toLowerCase().includes('ethst') ||
+    matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+    matchedReserve?.name.toLowerCase().includes('usdtst') ||
+    matchedReserve?.name.toLowerCase().includes('usdcst') ||
+    matchedReserve?.name.toLowerCase().includes('paxgst')
+      ? 0.3
+      : 0.5;
+  const newMaxLoanAmount = useMemo(() => {
+    if (
+      matchedReserve?.name.toLowerCase().includes('ethst') ||
+      matchedReserve?.name.toLowerCase().includes('wbtcst') ||
+      matchedReserve?.name.toLowerCase().includes('usdtst') ||
+      matchedReserve?.name.toLowerCase().includes('usdcst') ||
+      matchedReserve?.name.toLowerCase().includes('paxgst')
+    ) {
+      return collateralValue ? collateralValue * LTV : 0;
+    } else {
+      return maxLoanAmount;
+    }
+  }, [inventory, collateralValue, maxLoanAmount]);
+  const roundedMaxLoanAmount = (
+    Math.floor((newMaxLoanAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
+  const roundedBorrowedAmount = (
+    Math.floor((borrowAmount / Math.pow(10, 18)) * 100) / 100
+  ).toFixed(2);
+
+  const decimals = 18;
+
+  if (decimals > 0) {
+    collateralQuantity /= Math.pow(10, decimals);
+    quantityNotAvailable /= Math.pow(10, decimals);
+  }
+
+  // Recompute stakeQuantity after possible scaling
+  const stakeQuantity = quantity - collateralQuantity - quantityNotAvailable;
+
+  const showStakeModal = (type) => {
+    setStakeModalOpen(true);
+    setStakeType(type);
+  };
+
+  const handleStakeModalClose = () => {
+    setStakeModalOpen(false);
+  };
+
+  const showBorrowModal = () => {
+    setBorrowModalOpen(true);
+  };
+
+  const handleBorrowModalClose = () => {
+    setBorrowModalOpen(false);
+  };
+
+  const showRepayModal = () => {
+    setRepayModalOpen(true);
+  };
+
+  const handleRepayModalClose = () => {
+    setRepayModalOpen(false);
+  };
+
+  return (
+    <div className="flex justify-center w-full">
+      <div className="flex justify-center gap-3">
+        <Button
+          type="primary"
+          className="font-semibold flex items-center justify-center"
+          onClick={() => showStakeModal('Stake')}
+          disabled={stakeQuantity <= 0}
+        >
+          <RiseOutlined /> Stake
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showStakeModal('Unstake')}
+          disabled={borrowAmount > 0 || collateralQuantity <= 0}
+        >
+          <LogoutOutlined /> Unstake
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showBorrowModal()}
+          disabled={
+            parseFloat(roundedBorrowedAmount) >=
+              parseFloat(roundedMaxLoanAmount) || collateralQuantity <= 0
+          }
+        >
+          <BankOutlined /> Borrow
+        </Button>
+        <Button
+          type="link"
+          className="text-[#13188A] font-semibold"
+          onClick={() => showRepayModal()}
+          disabled={borrowAmount <= 0}
+        >
+          <SolutionOutlined />
+          Repay
+        </Button>
+      </div>
+      {stakeModalOpen && (
+        <StakeModal
+          open={stakeModalOpen}
+          type={stakeType}
+          handleCancel={handleStakeModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {borrowModalOpen && (
+        <BorrowModal
+          open={borrowModalOpen}
+          handleCancel={handleBorrowModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+        />
+      )}
+      {repayModalOpen && (
+        <RepayModal
+          open={repayModalOpen}
+          handleCancel={handleRepayModalClose}
+          limit={limit}
+          offset={offset}
+          inventory={inventory}
+          debouncedSearchTerm={debouncedSearchTerm}
+          saleAddress={inventory.saleAddress}
+          category={category}
+          reserves={reserves}
+        />
+      )}
+    </div>
+  );
+};
+
+export default StakeItemActions;

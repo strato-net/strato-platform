@@ -13,6 +13,7 @@ import { env } from '../../../../env.js'
 import { handleErrors } from '../../../../lib/handleErrors';
 import { createUrl } from '../../../../lib/url';
 import { isOauthEnabled } from '../../../../lib/checkMode';
+import { secureFetch } from '../../../../lib/csrf';
 
 export function postMethodCall(payload) {
   const isModeOauth = isOauthEnabled();
@@ -54,7 +55,7 @@ export function postMethodCall(payload) {
 
   const body = isModeOauth ? oauthBody : blocBody;
 
-  return fetch(
+  return secureFetch(
     url,
     {
       method: 'POST',

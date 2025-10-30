@@ -2,6 +2,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds    #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PatternGuards #-}
@@ -41,7 +42,6 @@ import           Control.Concurrent hiding (yield)
 import           Control.Exception.Base (ErrorCall (..))
 import           Control.Lens ((^.))
 import           Control.Monad (forever, forM_, when, void)
-import qualified Control.Monad.Change.Alter as A
 import           Control.Monad.IO.Class
 import           Control.Monad.IO.Unlift
 import           Control.Monad.Trans.Resource
@@ -170,7 +170,7 @@ runPeerInList thePeer sSource = do
     Right () -> pure ()
   runPeer thePeer sSource
 
-stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m (LoggingT IO) () -> LoggingT IO ()
+stratoP2PClient :: (MonadP2P m, RunsClient m) => PeerRunner m () -> IO ()
 stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main loop" $ do
   $logInfoS "stratoP2PClient" $ T.pack $ "maxConn: " ++ show flags_maxConn
   forever $ do
@@ -183,8 +183,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
       Right peers -> do
         numActivePeers <- liftIO $ fmap length getPeersByThreads
         forM_ (take (flags_maxConn - numActivePeers) $ filter ((== 0) . pPeerActiveState) peers) $ \peer -> do
-          _ <- liftIO . forkIO . runLoggingT . runner $ \_ -> do
-              result <- try . liftIO . runLoggingT . runner $ runPeerInList peer
+          _ <- liftIO . forkIO . runner $ \_ -> do
+              result <- try . liftIO . runner $ runPeerInList peer
               handleRunPeerResult peer result
           return ()
         $logInfoS "stratoP2PClient" "Waiting 5 seconds before looping over peers again"
@@ -204,14 +204,20 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
           e' | Just WrongGenesisBlock <- fromException e' -> do
             disableException thePeer "WrongGenesisBlock" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> do
+                _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
+                return ()
               Nothing -> return ()
           e' | Just HeadMacIncorrect <- fromException e' -> do
             disableException thePeer "HeadMacIncorrect" (Just . fromIntegral $ 2 * flags_connectionTimeout) False
+          e' | Just (EventBeforeHandshake _) <- fromException e' -> do
+            disableException thePeer "EventBeforeHandshake" Nothing False
           e' | Just NetworkIDMismatch <- fromException e' -> do
             disableException thePeer "NetworkIDMismatch" Nothing True
             case pPeerPubkey thePeer of 
-              Just pubkey -> A.replace (A.Proxy @PeerBondingState) (pPeerHost thePeer, pubkey) (PeerBondingState 3) -- 3 indicates wrong genesis block/networkID
+              Just pubkey -> do
+                _ <- setPeerBondingState (pPeerHost thePeer) pubkey 3 -- 3 indicates wrong genesis block/networkID
+                return ()
               Nothing -> return ()
           e' | Just PeerDisconnected <- fromException e' -> do
             disableException thePeer "PeerDisconnected" (Just . fromIntegral $ 2 * flags_connectionTimeout) True
@@ -223,6 +229,8 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
             case ioErrType of
               NoSuchThing -> disableException thePeer "ioErrType: NoSuchThing" (Just . fromIntegral $ 2 * flags_connectionTimeout) True
               i -> disableException thePeer ("ioErrType: " <> show i) Nothing True
+          e' | Just HeadCipherTooShort <- fromException e' -> do  -- this is what we get when the remote machine crashes (obviously, it isn't sending us any reason for hangup)
+            disableException thePeer "HeadCipherTooShort" Nothing True
           _ -> return ()
       Right _ -> return ()
 
@@ -232,9 +240,15 @@ stratoP2PClient runner = runner $ \_ -> labelTheThread "strato P2P Client main l
       disErr <- storeDisableException p (T.pack exception)
       whenLeft disErr $ \err2 -> $logErrorS "stratoP2PClient/handleRunPeerResult" . T.pack $ "Unable to store disable exception: " ++ show err2
       _ <- case disableBy of 
-        Just secs -> lengthenPeerDisableBy secs p
-        Nothing -> lengthenPeerDisable p
+        Just secs -> logAndLengthenPeerDisableBy secs p
+        Nothing -> logAndLengthenPeerDisableBy (24 * 60 * 60) p
       when disableUDP $ do 
         udpErr <- disableUDPPeerForSeconds p 86400
         whenLeft udpErr $ \theUDPErr -> do
           $logErrorLS "stratoP2PClient/handleRunPeerResult" theUDPErr
+
+
+logAndLengthenPeerDisableBy :: MonadP2P m => NominalDiffTime -> PPeer -> m (Either SomeException ())
+logAndLengthenPeerDisableBy disableBy peer = do
+  $logInfoS "logAndLengthenPeerDisableBy" $ T.pack $ "Disabling Peer " ++ show (pPeerHost peer) ++ ", exponential reset will occur in " ++ show disableBy ++ " seconds"
+  lengthenPeerDisableBy disableBy peer

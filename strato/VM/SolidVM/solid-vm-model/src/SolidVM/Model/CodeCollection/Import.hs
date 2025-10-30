@@ -14,6 +14,8 @@ module SolidVM.Model.CodeCollection.Import
     ItemImport,
     FileImportF (..),
     FileImport,
+    extractItemImport,
+    extractFileImport,
   )
 where
 
@@ -52,6 +54,10 @@ data ItemImportF a
 
 makeLenses ''ItemImportF
 
+extractItemImport :: ItemImportF a -> a
+extractItemImport (Named _ x) = x
+extractItemImport (Aliased _ _ x) = x
+
 instance Binary a => Binary (ItemImportF a)
 
 instance ToJSON a => ToJSON (ItemImportF a)
@@ -82,6 +88,11 @@ data FileImportF a
 
 makeLenses ''FileImportF
 
+extractFileImport :: FileImportF a -> a
+extractFileImport (Simple _ x) = x
+extractFileImport (Qualified _ _ x) = x
+extractFileImport (Braced _ _ x) = x
+
 instance Binary a => Binary (FileImportF a)
 
 instance ToJSON a => ToJSON (FileImportF a)
@@ -92,11 +103,3 @@ instance Arbitrary a => Arbitrary (FileImportF a) where
   arbitrary = GR.genericArbitrary GR.uniform
 
 type FileImport = Positioned FileImportF
-
--- instance ToSchema FileImport where
---   declareNamedSchema proxy = genericDeclareNamedSchema soliditySchemaOptions proxy
---      & mapped.name ?~ "FileImport schema"
---      & mapped.schema.description ?~ "Xabi of an file import declaration"
---      & mapped.schema.example ?~ toJSON sampleFileImport
---      where sampleFileImport :: FileImportF ()
---            sampleFileImport = Qualified (StringLiteral () "./Foo.sol") "F" ()

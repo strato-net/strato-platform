@@ -36,17 +36,17 @@ import Blockchain.Data.RLP
 import qualified Blockchain.Data.TXOrigin as TXO
 import Blockchain.Database.MerklePatricia as MP
 import Blockchain.DB.SQLDB
-import Blockchain.GenesisBlock
-import Blockchain.Sequencer.Event
+import Blockchain.GenesisBlocks.Builder
+import Blockchain.Model.WrappedBlock
 import qualified Blockchain.SolidVM as SVM
 import Blockchain.SolidVM.Exception
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address as MA
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
+import Blockchain.Strato.Model.Validator
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.VMContext
 import Blockchain.VMOptions ()
@@ -215,7 +215,7 @@ rootAcc :: Address
 rootAcc = fromPublicKey X509.rootPubKey
 
 getCert :: X509Certificate
-getCert = fromMaybe (error $ "no idea what's happening") $ either (const Nothing) Just . bsToCert . BC.pack $ myCertString
+getCert = either (error $ "no idea what's happening") id . bytesToCert . BC.pack $ myCertString
 
 myCertString :: String
 myCertString =
@@ -269,7 +269,7 @@ generateGBlock gi = do
         BlockHeader
           { parentHash = genesisInfoParentHash gi,
             ommersHash = genesisInfoUnclesHash gi,
-            beneficiary = genesisInfoCoinbase gi,
+            beneficiary = 0x0,
             stateRoot = sr,
             transactionsRoot = genesisInfoTransactionRoot gi,
             receiptsRoot = genesisInfoReceiptsRoot gi,
@@ -311,15 +311,14 @@ runTestWithTimeout :: Int -> ContextM a -> IO ()
 runTestWithTimeout timeout f = do
   result <- race (threadDelay timeout) $
     runLoggingT . runTestContextM $ do
-      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [ChainMemberParsedSet]
+      let eAdmins = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonName\":\"Blockstanbul Admin\"}]") :: Either String [Address]
           !admins = either error id eAdmins
-          eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [ChainMemberParsedSet]
+          eVals = Ae.eitherDecodeStrict (BC.pack "[{\"orgName\":\"BlockApps\",\"orgUnit\":\"Engineering\",\"commonNames\":\"Test\"}]") :: Either String [Validator]
           !vals = either error id eVals
           gi = "{ \"logBloom\":\"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\", \"accountInfo\":[ [\"e1fd0d4a52b75a694de8b55528ad48e2e2cf7859\",1809251394333065553493296640760748560207343510400633813116524750123642650624] ], \"transactionRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"extraData\":0, \"gasUsed\":0, \"gasLimit\":22517998136852480000000000000000, \"unclesHash\":\"1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347\", \"mixHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"receiptsRoot\":\"56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421\", \"number\":0, \"difficulty\":8192, \"timestamp\":\"1970-01-01T00:00:00.000Z\", \"coinbase\":\"00000000000000000000\", \"parentHash\":\"0000000000000000000000000000000000000000000000000000000000000000\", \"nonce\":42 }"
           eInput = Ae.eitherDecodeStrict (BC.pack gi)
           !input = either error id eInput
-          cert = getCert
-          gi' = buildGenesisInfo [] [cert] vals admins input
+          gi' = buildGenesisInfo [] vals admins input
 
       (blockCreated, outputBlock) <- generateGBlock gi'
       MP.initializeBlank
@@ -347,7 +346,6 @@ runTestWithTimeout timeout f = do
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".group") (rlpWrap . BString . BC.pack . fromJust . subUnit $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".publicKey") (rlpWrap . BString . pubToBytes . subPub $ certsub)
         insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".isValid") (rlpWrap (BBool True))
-        insert (Proxy @RawStorageValue) (certKey (Address 0xdeadbeef) ".parent") ((rlpWrap $ BAccount $ NamedAccount (fromMaybe (Address 0x0) $ getParentUserAddress cert) MainChain))
         f
   case result of
     Left {} -> expectationFailure $ printf "test case timed out after %ds" (timeout `div` 1000000)
@@ -356,7 +354,7 @@ runTestWithTimeout timeout f = do
 runFile :: FilePath -> ContextM ()
 runFile fp = void $ runBS =<< liftIO (readFile fp)
 
-runFileArgs :: T.Text -> FilePath -> ContextM ()
+runFileArgs :: [T.Text] -> FilePath -> ContextM ()
 runFileArgs args fp = void $ runArgs args =<< liftIO (readFile fp)
 
 runBS :: String -> ContextM ()
@@ -366,27 +364,24 @@ runBSBeef :: String -> ContextM ()
 runBSBeef = void . runBSBeef'
 
 runBS' :: String -> ContextM ExecResults
-runBS' = runArgs "()"
+runBS' = runArgs []
 
 runBSBeef' :: String -> ContextM ExecResults
-runBSBeef' = runArgs "()"
+runBSBeef' = runArgs []
 
 rethrowEx :: ExecResults -> ContextM ()
 rethrowEx ExecResults {erException = Just ex} = either (liftIO . throwIO . HE) (void . return) ex
 rethrowEx _ = return ()
 
 --Adds a contract to the 0xfeedbeef chain
-runArgsWithSenderBeef :: Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithSenderBeef :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSenderBeef acc args bs = do
-  let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -400,46 +395,34 @@ runArgsWithSenderBeef acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
 --Adds contract to the "main chain"
-runArgsWithSender :: Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithSender :: Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithSender acc args bs = do
-  let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -453,47 +436,35 @@ runArgsWithSender acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
   
   insert (Proxy @BlockSummary) (unsafeCreateKeccak256FromWord256 0x0) (blockHeaderToBSum blockData 1)
 
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
-runArgsWithOrigin :: Address -> Address -> T.Text -> String -> ContextM ExecResults
+runArgsWithOrigin :: Address -> Address -> [T.Text] -> String -> ContextM ExecResults
 runArgsWithOrigin orig acc args bs = do
-  let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      suicides = error "TODO: suicides"
+  let code = Code $ T.pack bs
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -507,37 +478,28 @@ runArgsWithOrigin orig acc args bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x776622233444
-      metadata = Just $ M.fromList [("name", "qq"), ("args", args)]
 
   newAddress <- getNewAddress acc
   er <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       orig
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
       txHash
-      metadata
+      "qq"
+      args
   rethrowEx er
   return er
 
 runArgsWithCertificateRegistry :: String -> ContextM ExecResults
 runArgsWithCertificateRegistry rawString =
-  runArgsWithOrigin rootAcc sender "()" $
+  runArgsWithOrigin rootAcc sender [] $
     [r|
 
 contract CertificateRegistry {
@@ -595,24 +557,21 @@ contract CertificateRegistry {
 }|]
       ++ rawString
 
-runArgs :: T.Text -> String -> ContextM ExecResults
+runArgs :: [T.Text] -> String -> ContextM ExecResults
 runArgs = runArgsWithSender sender
 
-runArgsBeef :: T.Text -> String -> ContextM ExecResults
+runArgsBeef :: [T.Text] -> String -> ContextM ExecResults
 runArgsBeef = runArgsWithSenderBeef sender
 
-runCall :: T.Text -> T.Text -> String -> ContextM (Maybe String)
+runCall :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
+  let code = Code $ T.pack bs
       isRCC = False
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -626,76 +585,53 @@ runCall funcName callArgs bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
       txHash
-      createMetadata
+      "qq"
+      []
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
   $logErrorS "runCall" "Beginning call"
   er2 <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       newAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
+      Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
 
 -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the function runCall
 -- compare the returned value (but got) with expected value (expected) in the test case
-runCall' :: T.Text -> T.Text -> String -> ContextM (Maybe String)
+runCall' :: T.Text -> [T.Text] -> String -> ContextM (Maybe String)
 runCall' funcName callArgs bs = do
-  let code = Code $ UTF8.fromString bs
-      isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
+  let code = Code $ T.pack bs
       isRCC = False
-      suicides = error "TODO: suicides"
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -709,58 +645,38 @@ runCall' funcName callArgs bs = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0x234962
-      createMetadata = Just $ M.fromList [("name", "qq"), ("args", "()")]
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   newAddress <- getNewAddress sender
   $logErrorS "runCall" "Beginning create"
   er1 <-
     SVM.create
-      isTest
-      isHomestead
-      suicides
       blockData
-      callDepth
       sender
       origin
       proposer
-      value
-      gasPrice
       availableGas
       newAddress
       code
       txHash
-      createMetadata
+      "qq"
+      []
   $logErrorS "runCall" "Returned from create"
   rethrowEx er1
   $logErrorS "runCall" "Beginning call"
   er2 <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       newAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
+      Nothing
   $logErrorS "runCall" "Returned from call"
   rethrowEx er2
   return $ erReturnVal er2
@@ -770,17 +686,14 @@ runCall' funcName callArgs bs = do
 lastN' :: Int -> [a] -> [a]
 lastN' n xs = L.foldl' (const . drop 1) xs (drop n xs)
 
-call2 :: T.Text -> T.Text -> Address -> ContextM (Maybe String)
+call2 :: T.Text -> [T.Text] -> Address -> ContextM (Maybe String)
 call2 funcName callArgs contractAddress = do
-  let isTest = error "TODO: isTest"
-      isHomestead = error "TODO: isHomestead"
-      isRCC = False
-      suicides = error "TODO: suicides"
+  let isRCC = False
       blockData =
         BlockHeader
           { parentHash = unsafeCreateKeccak256FromWord256 0x0,
             ommersHash = unsafeCreateKeccak256FromWord256 0x0,
-            beneficiary = emptyChainMember,
+            beneficiary = 0x0,
             stateRoot = "",
             transactionsRoot = "",
             receiptsRoot = "",
@@ -794,35 +707,21 @@ call2 funcName callArgs contractAddress = do
             mixHash = unsafeCreateKeccak256FromWord256 0x0,
             timestamp = posixSecondsToUTCTime 0x4000
           }
-      callDepth = 0
-      value = error "TODO: value"
-      gasPrice = error "TODO: gasPrice"
       availableGas = Gas 99969480
       txHash = unsafeCreateKeccak256FromWord256 0xddba11
-      noValueTransfer = error "TODO: noValueTransfer"
-      receiveAddress = error "TODO: receiveAddress"
-      theData = error "TODO: theData"
-      callMetadata = Just $ M.fromList [("funcName", funcName), ("args", callArgs)]
   er <-
     SVM.call
-      isTest
-      isHomestead
-      noValueTransfer
       isRCC
-      suicides
       blockData
-      callDepth
-      receiveAddress
       contractAddress
       sender
       proposer
-      value
-      gasPrice
-      theData
       availableGas
       origin
       txHash
-      callMetadata
+      funcName
+      callArgs
+      Nothing
   rethrowEx er
   return $ erReturnVal er
 
@@ -866,7 +765,7 @@ spec :: Spec
 spec = do
   xdescribe "Ballot" $ do
     it "can be created" . runTest $ do
-      runFileArgs [r|(["a","b","c"])|] "testdata/Ballot.sol"
+      runFileArgs ["\"a\"","\"b\"","\"c\""] "testdata/Ballot.sol"
 
   xdescribe "Create" $ do
     it "should be able to run an empty contract" . runTest $ do
@@ -926,7 +825,6 @@ spec = do
                        ]
 
     it "should be able to insert into a mapping" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingSet.sol"
       st <- checkStorage
       st `shouldSatisfy` (== 3) . length
@@ -936,10 +834,9 @@ spec = do
           [Field "us", MapIndex (INum 999999)],
           [Field "us", MapIndex (INum 10)]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 4, BInteger 21, BDefault]
+        `shouldReturn` [BDefault, BInteger 4, BInteger 21, BDefault]
 
     it "should be able to read from a map" . runTest $ do
-      liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
       runFile "testdata/MappingRead.sol"
       st <- checkStorage
       -- The z assignment doesn't count, as at is set to the empty string
@@ -950,7 +847,7 @@ spec = do
           [Field "y"],
           [Field "z"]
         ]
-        `shouldReturn` [BMappingSentinel, BInteger 343, BInteger 343, BDefault]
+        `shouldReturn` [BDefault, BInteger 343, BInteger 343, BDefault]
 
     it "should be able to set array length" . runTest $ do
       runFile "testdata/Length.sol"
@@ -1723,7 +1620,7 @@ contract qq is Parent {
   it "will pass arguments to constructors" . runTest $ do
     void $
       runArgs
-        "(0x6662346)"
+        ["0x6662346"]
         [r|
 contract qq {
   address target;
@@ -1971,7 +1868,7 @@ contract qq is Parent {
   it "can call functions" . runTest $ do
     runCall'
       "inc"
-      "()"
+      []
       [r|
 contract qq {
   uint x = 99;
@@ -2134,7 +2031,7 @@ contract qq {
   it "can accept remote arrays" . runTest $ do
     runCall'
       "addHead"
-      "([10, 17])"
+      ["[10, 17]"]
       [r|
 contract qq {
   uint x;
@@ -2148,7 +2045,7 @@ contract qq {
   it "can push to memory arrays" . runTest $ do
     runCall'
       "pushMem"
-      "([3, 5])"
+      ["[3, 5]"]
       [r|
 contract qq {
   uint x;
@@ -2276,8 +2173,8 @@ contract qq {
     x = _x;
   }
 }|]
-    void $ runArgs "(1234)" qq
-    void $ runArgs "(887324)" qq
+    void $ runArgs ["1234"] qq
+    void $ runArgs ["887324"] qq
     getFields ["x"] `shouldReturn` [BInteger 1234]
     getFields2 ["x"] `shouldReturn` [BInteger 887324]
 
@@ -2298,13 +2195,13 @@ contract qq {
     return num + 1;
   }
 }|]
-    void $ runArgs "(0x0,99)" qq
+    void $ runArgs ["0x0","99"] qq
     getFields ["x", "num"] `shouldReturn` [bContract "qq" 0x0, BInteger 99]
 
-    void $ runArgs (T.pack $ printf "(0x%s,400)" $ show uploadAddress) qq
+    void $ runArgs [T.pack $ printf "0x%s" $ show uploadAddress, "400"] qq
     getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 400]
 
-    call2 "a" "()" secondAddress `shouldReturn` Just "()"
+    call2 "a" [] secondAddress `shouldReturn` Just "()"
     getFields2 ["x", "num"] `shouldReturn` [bContract "qq" uploadAddress, BInteger 100]
 
   it "can locally return locals" . runTest $ do
@@ -2345,7 +2242,7 @@ contract qq {
   it "can externally return locals" . runTest $ do
     runCall'
       "f"
-      "()"
+      []
       [r|
 contract qq {
   function f() returns (uint) {
@@ -2359,7 +2256,7 @@ contract qq {
     er <-
       runCall'
         "f"
-        "()"
+        []
         [r|
 contract qq {
   function f() returns (uint, uint) {
@@ -2484,15 +2381,15 @@ contract qq is BaseContainer {
   }
 }|]
     -- SolidVM returns String instead of ByteString, test it by using the new function runCall' instead of the decprecated function runCall
-    runCall' "contains" "(10)" ctract
+    runCall' "contains" ["10"] ctract
       `shouldReturn` Just "(false)"
-    runCall' "contains" "(4)" ctract
+    runCall' "contains" ["4"] ctract
       `shouldReturn` Just "(true)"
 
   it "selects the correct super with multiple parents" . runTest $ do
     runCall'
       "value"
-      "()"
+      []
       [r|
 contract A {
     function value() public virtual returns (uint) {
@@ -2514,7 +2411,7 @@ contract qq is A, B {
   it "selects the correct super when parents are missing methods" . runTest $ do
     runCall'
       "value"
-      "()"
+      []
       [r|
 contract A {
   function value() public virtual returns (uint) {
@@ -2589,7 +2486,7 @@ contract qq {
       ( do
           runCall'
             "func"
-            "()"
+            []
             [r|
 contract qq {
   string x;
@@ -2746,7 +2643,7 @@ contract qq {
         want = replicate (40 - length want') '0' ++ want' --etherum address has 40 bytes followed by 0x, short byte string has 32 bytes
     runCall'
       "a"
-      "()"
+      []
       [r|
 contract qq {
   function a() public returns (address) {
@@ -2758,7 +2655,7 @@ contract qq {
   it "can return an enum" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 contract qq {
   enum Letter { a, b, c }
@@ -2799,13 +2696,12 @@ contract qq {
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "s") `shouldReturn` BDefault
 
   it "will create a sentinel for mappings" . runTest $ do
-    liftIO $ pendingWith "deal with BMappingSentinel" --TODO- Jim
     runBS
       [r|
 contract qq {
   mapping(string => uint) assoc;
 }|]
-    getFields ["assoc"] `shouldReturn` [BMappingSentinel]
+    getFields ["assoc"] `shouldReturn` [BDefault]
 
   it "can compare contracts to int literals" . runTest $ do
     runBS
@@ -2827,7 +2723,7 @@ contract qq {
         want = replicate (40 - length want') '0' ++ want'
     runCall'
       "self"
-      "()"
+      []
       [r|
 contract qq {
   function self() public returns (qq) {
@@ -2889,7 +2785,7 @@ contract qq {
   it "can cast ints to enums" . runTest $ do
     runCall'
       "f"
-      "(1)"
+      ["1"]
       [r|
 contract qq {
   enum E {A, B, C, D}
@@ -2904,7 +2800,7 @@ contract qq {
   it "can compare ints to enums" . runTest $ do
     runCall'
       "f"
-      "(1)"
+      ["1"]
       [r|
 contract qq {
   enum E {A, B, C, D}
@@ -2926,7 +2822,7 @@ contract qq {
   it "can return single strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string) {
@@ -2939,7 +2835,7 @@ contract qq {
   it "can return tuples of strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string, string, string) {
@@ -2951,7 +2847,7 @@ contract qq {
   it "can return tuples of mixed simple types and strings" . runTest $ do
     runCall'
       "txt"
-      "()"
+      []
       [r|
 contract qq {
   function txt() public returns (string, uint, string, uint) {
@@ -2963,7 +2859,7 @@ contract qq {
   xit "can return numeric bytes32" . runTest $ do
     runCall'
       "num"
-      "()"
+      []
       [r|
 contract qq {
   function num() public returns (bytes32) {
@@ -2976,7 +2872,7 @@ contract qq {
   it "can return state variables" . runTest $ do
     runCall'
       "getS"
-      "()"
+      []
       [r|
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
@@ -2989,7 +2885,7 @@ contract qq {
   it "can return state variables in tuples" . runTest $ do
     runCall'
       "getSAndB"
-      "()"
+      []
       [r|
 contract qq {
   string s = "The mitochondria is the powerhouse of the cell";
@@ -3002,7 +2898,7 @@ contract qq {
   it "can accept string arguments" . runTest $ do
     runCall
       "set"
-      "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")"
+      ["\"deadbeef00000000000000000000000000000000000000000000000000000000\""]
       [r|
 contract qq {
   string st;
@@ -3016,7 +2912,7 @@ contract qq {
   it "can accept Unicode string arguments" . runTest $ do
     runCall
       "set"
-      "(\"4.11 g CO₂ / t · nm\")"
+      ["\"4.11 g CO₂ / t · nm\""]
       [r|
 contract qq {
   string st;
@@ -3038,7 +2934,7 @@ contract qq {
   it "can accept bytes32 arguments" . runTest $ do
     runCall
       "set"
-      "(\"deadbeef00000000000000000000000000000000000000000000000000000000\")"
+      ["\"\xde\xad\xbe\xef\""]
       [r|
 contract qq {
   bytes32 bs;
@@ -3049,12 +2945,12 @@ contract qq {
       `shouldReturn` Just "()"
     getFields ["bs"] `shouldReturn` [BString "\xde\xad\xbe\xef"]
 
-  it "should not compute remote arguments" $
+  it "should not compute remote arguments" $ do
     runTest
       ( do
           runCall
             "set"
-            "(3 + block.timestamp)"
+            ["3 + block.timestamp"]
             [r|
 contract qq {
   uint n;
@@ -3068,7 +2964,7 @@ contract qq {
   it "can call boolean arguments" . runTest $ do
     runCall
       "set"
-      "(true,false)"
+      ["true","false"]
       [r|
 contract qq {
   bool a;
@@ -3208,7 +3104,7 @@ contract qq {
     ( runTest $ do
         runCall
           "f"
-          "("
+          ["1q"]
           [r|
 contract qq {
   function f() public {}
@@ -3251,7 +3147,7 @@ contract A {
       `shouldThrow` anyMissingTypeError
 
   it "catches missing function errors" $
-    (runTest $ runCall "f" "()" [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
+    (runTest $ runCall "f" [] [r|contract qq {}|]) `shouldThrow` anyUnknownFunc
 
   it "can cast to int" . runTest $ do
     runBS
@@ -3518,7 +3414,7 @@ contract qq {
   xit "can resolve variables for named arguments" . runTest $ do
     void $
       runArgs
-        "(\"stref\")"
+        ["\"stref\""]
         [r|
 contract qq {
   struct X {
@@ -4048,7 +3944,7 @@ contract qq {
   it "can concatenate strings" . runTest $ do
     runCall'
       "concat"
-      "(\"Hello\",\" World!\")"
+      ["\"Hello\"","\" World!\""]
       [r|
 contract qq {
   string c;
@@ -4062,7 +3958,7 @@ contract qq {
   it "can append to a string" . runTest $ do
     runCall'
       "append"
-      "(\" World!\")"
+      ["\" World!\""]
       [r|
 contract qq {
   string a = "Hello";
@@ -4214,7 +4110,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
+    void $ call2 "myTransfer" [] (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
 
   it "will not over send (send when there is not enough gas)" . runTest $ do
@@ -4241,7 +4137,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 7})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BInteger 7]
 
   it "will allow for sending to self" . runTest $ do
@@ -4268,7 +4164,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BBool True, BInteger 13]
 
   it "will not send when there is not anything to send between account" . runTest $ do
@@ -4295,7 +4191,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 0})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bal"] `shouldReturn` [BDefault, BDefault]
 
   it "cannot send to a non account payable type" $
@@ -4322,7 +4218,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "mySend" "()" (a^.namedAccountAddress))
+          (void $ call2 "mySend" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4350,7 +4246,7 @@ contract qq{
           -- Set the balance
           adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 26})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
+          (void $ call2 "myTransfer" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyTypeError
 
@@ -4395,7 +4291,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myTransfer" "()" (a^.namedAccountAddress)
+    void $ call2 "myTransfer" [] (a^.namedAccountAddress)
     getFields ["bala", "balb", "balc"]
       `shouldReturn` [ BInteger 1,
                        BInteger 26,
@@ -4444,7 +4340,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"] `shouldReturn` [BBool True, BInteger 1, BInteger 26, BInteger 13]
 
   it "cannot over transfer from an account." $
@@ -4490,7 +4386,7 @@ contract qq{
           adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
           adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
           -- Check return of balance
-          (void $ call2 "myTransfer" "()" (a^.namedAccountAddress))
+          (void $ call2 "myTransfer" [] (a^.namedAccountAddress))
       )
       `shouldThrow` anyPaymentError
 
@@ -4536,7 +4432,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (c^.namedAccountAddress) (\cs -> pure $ cs {addressStateBalance = 13})
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "mySend" "()" (a^.namedAccountAddress)
+    void $ call2 "mySend" [] (a^.namedAccountAddress)
     getFields ["success", "bala", "balb", "balc"]
       `shouldReturn` [ BDefault,
                        BInteger 14,
@@ -4563,7 +4459,7 @@ contract qq{
     -- Set the balance
     adjust_ (Proxy @AddressState) (a^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 13})
     -- Check return of balance
-    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
+    void $ call2 "myBalance" [] (a^.namedAccountAddress)
     getFields ["bal"] `shouldReturn` [BInteger 13]
   it "can get the codehash from an address" . runTest $ do
     let contract =
@@ -4970,7 +4866,6 @@ contract qq{
         myContract =
           [r|contract Test {
   uint sixtyNine = 69;
-  // no constructor found
 }
 |]
         contract :: String
@@ -5236,7 +5131,7 @@ contract qq{
     adjust_ (Proxy @AddressState) (b^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 0})
 
     -- Check return of balance
-    void $ call2 "myBalance" "()" (a^.namedAccountAddress)
+    void $ call2 "myBalance" [] (a^.namedAccountAddress)
     getFields ["bala", "balb"] `shouldReturn` [BInteger 1, BInteger 13]
 
   it "can't assign a value to an unallocated index in an array" $
@@ -5947,7 +5842,7 @@ contract qq{
   it "can set values in a mapping that's a member of a struct" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5965,7 +5860,7 @@ contract qq {
   it "can set values in a mapping that's a local variable" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5980,7 +5875,7 @@ contract qq {
   it "can set values in a mapping that's a contract variable" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -5995,7 +5890,7 @@ contract qq {
   it "can use string.concat(x,y) to concatenate any amount of strings" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -6013,7 +5908,7 @@ contract qq {
   it "can use the builtin keccak256 function with any amount of string arguments" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -6021,12 +5916,12 @@ contract qq {
     return keccak256("hello", "world");
   }
 }|]
-      `shouldReturn` Just "(\"fa26db7ca85ead399216e7c6316bc50ed24393c3122b582735e7f3b0f91b93f0\")"
+      `shouldReturn` Just "(\"2a4aec41b4652949f203748247b8b6f20f70f24b5a2a94c77eaa5167635186cd\")"
 
   it "cant use  a commented pragma" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 //
 contract qq {
@@ -6059,7 +5954,6 @@ contract qq {
     ( runTest $ do
         ( runBS
             [r|
-pragma solidvm 11.4;
 contract qq {
   modifier myModifier() {  // line 4
     return 7;
@@ -6079,7 +5973,7 @@ contract qq {
   it "can use a modifier as part of a function" . runTest $ do
     runCall'
       "decrement"
-      "(1)"
+      ["1"]
       [r|
 
 contract qq {
@@ -6181,7 +6075,7 @@ contract qq {
   it "can use a modifier that takes arguments as part of a function" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 contract qq {
@@ -6345,7 +6239,7 @@ contract qq {
     adjust_ (Proxy @AddressState) (contract'^.namedAccountAddress) (\as -> pure $ as {addressStateBalance = 14})
     adjust_ (Proxy @AddressState) (owner^.namedAccountAddress) (\bs -> pure $ bs {addressStateBalance = 10})
     -- Check return of balance
-    void $ call2 "selfDestructThis" "()" (contract'^.namedAccountAddress)
+    void $ call2 "selfDestructThis" [] (contract'^.namedAccountAddress)
     getFields ["contract'", "contractPay", "owner", "ownerPay"]
       `shouldReturn` [ BDefault,
                        BDefault,
@@ -6515,8 +6409,8 @@ contract qq {
 }|]
     runBS src
     getFields ["x", "y"]
-      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"xNum\"]"),
-                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "OrderedVals [SInteger 100]")
+      `shouldReturn` [ bContract "X" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SString \"xNum\"]"),
+                       bContract "Y" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack src) (Just "[SInteger 100]")
                      ]
     [BContract "X" x] <- getFields ["x"]
     [BContract "Y" y] <- getFields ["y"]
@@ -6542,7 +6436,7 @@ contract qq {
   }
 }|]
     runBS src
-    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "OrderedVals [SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
+    getFields ["x"] `shouldReturn` [bContract "User" $ deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "Dustin Norwood" (Just . hash $ BC.pack src) (Just "[SString \"Dustin Norwood\",SString \"Thebestcertyoucangetfor$99.99\"]")]
     [BContract "User" x] <- getFields ["x"]
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "commonName") `shouldReturn` BString "Dustin Norwood"
     getSolidStorageKeyVal' (x^.namedAccountAddress) (singleton "cert") `shouldReturn` BString "Thebestcertyoucangetfor$99.99"
@@ -6690,7 +6584,7 @@ contract qq {
   it "can use a try catch statment to catch a divide by zero error the Solidity Way (trademark very much in effect) in a function" . runTest $ do
     runCall'
       "tryTheDivide"
-      "()"
+      []
       [r|
 
 contract Divisor {
@@ -6906,7 +6800,7 @@ contract qq{
       ( do
           runCall'
             "changeHost"
-            "(0)"
+            ["0"]
             [r|
 
 contract qq {
@@ -7166,7 +7060,7 @@ contract qq{
   it "can declare enums at the file level" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 enum Color { red, green, blue }
@@ -7194,7 +7088,7 @@ contract qq {
   it "can declare structs at the file level" . runTest $ do
     runCall'
       "a"
-      "()"
+      []
       [r|
 
 
@@ -7526,7 +7420,7 @@ contract qq {
   function randomFunction(uint checker)
   {
     if(a==checker)
-      revert f({x:'a',y:'b'});
+      revert f({x:"a",y:"b"});
   }
 }|]
       )
@@ -8219,19 +8113,18 @@ contract qq {
   it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
-pragma builtinCreates;
 
 contract qq {
   account a;
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
@@ -8246,7 +8139,7 @@ contract qq {
   account a;
 
   constructor() {
-    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
+    a = create("contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
   }
 }|]
       )
@@ -8557,7 +8450,7 @@ contract qq {
                       BDecimal "3.123123",
                       BDecimal "-0.876877",
                       BDecimal "2.246246",
-                      BDecimal "0.5615615",
+                      BDecimal "0.561562",
                       BDecimal "-2"
                      ])
 
@@ -8583,7 +8476,7 @@ contract qq {
                       BDecimal "5.3",
                       BDecimal "1.3",
                       BDecimal "6.6",
-                      BDecimal "1.65"
+                      BDecimal "1.6"
                      ])
 
   it "can use decimal literals in expressions" $ runTest ( do
@@ -8623,9 +8516,9 @@ contract qq {
                       BDecimal "0.8",
                       BDecimal "2.1",
                       BDecimal "6.4",
-                      BDecimal "-2.76",
-                      BDecimal "0.869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913043478260869565217391304347826086956521739130434782608695652173913",
-                      BDecimal "2",
+                      BDecimal "-2.8",
+                      BDecimal "0.9",
+                      BDecimal "2.0",
                       BDecimal "6.25"
                      ])
 
@@ -8742,7 +8635,7 @@ contract qq {
   it "can externally return decimals" . runTest $ do
     runCall'
       "f"
-      "()"
+      []
       [r|
 contract qq {
   function f() returns (decimal) {
@@ -8848,7 +8741,6 @@ contract qq {
 
   it "respects the number of decimal places during arithmetic operations" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 contract qq {
   decimal a;
   decimal b;
@@ -8889,7 +8781,6 @@ contract qq {
 
   it "can use built-in truncate functions on decimals" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 contract qq {
   decimal a = 5.2825;
   decimal b = 5.2825;
@@ -8922,7 +8813,6 @@ contract qq {
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
-pragma safeExternalCalls;
 contract qq {
     bool public myVal;
 
@@ -8933,7 +8823,7 @@ contract qq {
 
     case getAddressFromResult res of
       Nothing -> error "No address returned"
-      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+      Just address -> runCall' "changeMyValOfTest" (map T.pack ["0x"++ formatAddressWithoutColor address, "3"] ) [r|
 contract Test {
     int public myVal;
 
@@ -8948,9 +8838,8 @@ contract qq {
     }
 }|]) `shouldThrow` anyTypeError
 
-  it "can use es6 imports with solidvm 11.4 pragma" $ runTest ( do
+  it "can use es6 imports" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 import { someFunc } from <123>;
 
 contract qq {
@@ -8962,9 +8851,8 @@ contract qq {
 }
 |]) `shouldThrow` specificTypeError "\"Could not find file <0000000000000000000000000000000000000123>\""
 
-  it "can use strict modifiers with solidvm 11.4 pragma" $ runTest ( do
+  it "can use strict modifiers" $ runTest ( do
     runBS [r|
-pragma solidvm 11.4;
 
 contract A {
   int y = 5;
@@ -8982,36 +8870,34 @@ contract qq is A {
     x = a.getY();
   }
 }
-|]) `shouldThrow` specificTypeError "\" (line 17, column 9) - (line 17, column 10): \\\"Missing label: ABottom ( (line 17, column 9) - (line 17, column 10): \\\\\\\"cannot access function getY because it is marked as private\\\\\\\"  :| []) is not a known enum, struct, or contract.\\\" \""
+|]) `shouldThrow` specificTypeError "\" (line 16, column 9) - (line 16, column 10): \\\"Missing label A  (line 16, column 9) - (line 16, column 10):  cannot access function getY because it is marked as private\\\" \""
 
-  it "can use create and create2 built-in function calls with solidvm 11.4 pragma" . runTest $ do
+  it "can use create and create2 built-in function calls" . runTest $ do
     runBS
       [r|
-pragma solidvm 11.4;
 
 contract qq {
   account a;
   account b;
 
   constructor() {
-    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", "(3, 'hi')");
-    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", "(4)");
+    a = create("A", "contract A {\n uint x = 1;\n string y;\n constructor (uint _x, string _y) {\n  x = _x;\n  y = _y;\n }\n}", 3, "hi");
+    b = create2("salt", "B", "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}", 4);
   }
 }|]
     getFields ["b"]
-      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "OrderedVals [SInteger 4]")) UnspecifiedChain]
+      `shouldReturn` [BAccount $ NamedAccount (deriveAddressWithSalt (stringAddress "e8279be14e9fe2ad2d8e52e42ca96fb33a813bbe") "salt" (Just . hash $ BC.pack "contract B {\n uint x = 2;\n constructor (uint _x) {\n  x = _x;\n }\n}") (Just "[SInteger 4]")) UnspecifiedChain]
     [BAccount a] <- getFields ["a"]
     [BAccount b] <- getFields ["b"]
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 3
     getSolidStorageKeyVal' (a^.namedAccountAddress) (singleton "y") `shouldReturn` BString "hi"
     getSolidStorageKeyVal' (b^.namedAccountAddress) (singleton "x") `shouldReturn` BInteger 4
 
-  it "can error handle improperly referenced overloaded contracts using solidvm 11.4 pragma" $ runTest ( do 
+  it "can error handle improperly referenced overloaded contracts" $ runTest ( do 
     let getAddressFromResult :: ExecResults -> Maybe Address 
         getAddressFromResult res = erNewContractAddress res
 
     res <- runBS' [r|
-pragma solidvm 11.4;
 contract qq {
     bool public myVal;
 
@@ -9022,7 +8908,7 @@ contract qq {
 
     case getAddressFromResult res of
       Nothing -> error "No address returned"
-      Just address -> runCall' "changeMyValOfTest" (T.pack $ "(0x"++ formatAddressWithoutColor address ++", 3 )" ) [r|
+      Just address -> runCall' "changeMyValOfTest" (map T.pack ["0x"++ formatAddressWithoutColor address, "3"] ) [r|
 contract Test {
     int public myVal;
 

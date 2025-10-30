@@ -14,18 +14,21 @@ module Handlers.Block
     blocksFilterParams,
     getBlocksFilter,
     server,
+    getBlockInfo,
+    getBlockInfo'
   )
 where
 
 import Blockchain.DB.SQLDB
 import Blockchain.Data.Block
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
 import Blockchain.Data.Transaction
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
 import Control.Arrow ((&&&), (***))
+import Control.Monad (unless)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
 import Data.List
@@ -45,7 +48,7 @@ import UnliftIO
 
 type API =
   "block" :> QueryParam "txaddress" Address
-    :> QueryParam "coinbase" Text
+    :> QueryParam "coinbase" Address
     :> QueryParam "address" Address
     :> QueryParam "blockid" Text
     :> QueryParam "hash" Keccak256
@@ -68,7 +71,7 @@ type API =
 
 data BlocksFilterParams = BlocksFilterParams
   { qbTxAddress :: Maybe Address,
-    qbCoinbase :: Maybe Text,
+    qbCoinbase :: Maybe Address,
     qbAddress :: Maybe Address,
     qbBlockId :: Maybe Text,
     qbHash :: Maybe Keccak256,
@@ -141,12 +144,12 @@ getBlocksFilter = uncurryBlocksFilterParams getBlocksFilter'
         qbChainId
         qbSortby
 
-server :: HasSQL m => ServerT API m
+server :: Selectable BlocksFilterParams [Block] m => ServerT API m
 server = getBlockInfo
 
 ---------------------
 
-instance HasSQL m => Selectable BlocksFilterParams [Block] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable BlocksFilterParams [Block] (SQLM m) where
   select _ b@BlocksFilterParams {..}
     | b == blocksFilterParams {qbSortby = qbSortby} =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " (map T.unpack blockQueryParams)
@@ -184,8 +187,9 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
                       fmap (\v -> bdRef E.^. BlockDataRefId E.==. E.val (toBlockDataRefId v)) qbBlockId,
                       fmap (\v -> bdRef E.^. BlockDataRefHash E.==. E.val v) qbHash
                     ]
-
-            E.where_ (foldl1 (E.&&.) criteria)
+            
+            unless (null criteria) $
+              E.where_ (foldl1 (E.&&.) criteria)
 
             E.limit $ appFetchLimit
 
@@ -201,12 +205,6 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
       vd <- fmap (buildList validatorDeltaRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
         E.where_ $ v E.^. ValidatorDeltaRefBlockDataRefId `E.in_` E.valList blockIds
         pure v
-      ca <- fmap (buildList certificateAddedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
-        E.where_ $ v E.^. CertificateAddedRefBlockDataRefId `E.in_` E.valList blockIds
-        pure v
-      cr <- fmap (buildList certificateRevokedRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
-        E.where_ $ v E.^. CertificateRevokedRefBlockDataRefId `E.in_` E.valList blockIds
-        pure v
       ps <- fmap (buildList proposalSignatureRefBlockDataRefId) . sqlQuery $ E.select $ E.from $ \v -> do
         E.where_ $ v E.^. ProposalSignatureRefBlockDataRefId `E.in_` E.valList blockIds
         pure v
@@ -220,12 +218,12 @@ instance HasSQL m => Selectable BlocksFilterParams [Block] m where
           E.orderBy [E.asc (btx E.^. BlockTransactionId)]
           return (btx, rawTX)
 
-      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ca) (get' k  cr) (get' k  ps) (get' k  ss) (get' k txs)) blks
+      return . Just $ map (\(k,v) -> blockDataRefToBlock v (get' k vs) (get' k  vd) (get' k  ps) (get' k  ss) (get' k txs)) blks
 
 getBlockInfo ::
   Selectable BlocksFilterParams [Block] m =>
   Maybe Address ->
-  Maybe Text ->
+  Maybe Address ->
   Maybe Address ->
   Maybe Text ->
   Maybe Keccak256 ->

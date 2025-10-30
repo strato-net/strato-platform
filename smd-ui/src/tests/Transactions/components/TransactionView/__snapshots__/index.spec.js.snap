@@ -196,6 +196,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -464,6 +474,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -610,6 +630,16 @@ ShallowWrapper {
                         classes="smd-pad-2"
                         value="26acb720a5029f6e50b94e096e7df1d03340879f"
                       />
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
                     </td>
                   </tr>
                   <tr>
@@ -762,6 +792,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -901,6 +941,16 @@ ShallowWrapper {
                           classes="smd-pad-2"
                           value="26acb720a5029f6e50b94e096e7df1d03340879f"
                         />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
                       </td>
                     </tr>
                     <tr>
@@ -1099,7 +1149,16 @@ ShallowWrapper {
                       undefined,
                       undefined,
                       undefined,
-                      undefined,
+                      <tr>
+                        <td>
+                          <strong>
+                            VM
+                          </strong>
+                        </td>
+                        <td>
+                          SolidVM
+                        </td>
+                      </tr>,
                       <tr>
                         <td>
                           <strong>
@@ -1438,7 +1497,61 @@ ShallowWrapper {
                     undefined,
                     undefined,
                     undefined,
-                    undefined,
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            <strong>
+                              VM
+                            </strong>
+                          </td>,
+                          <td>
+                            SolidVM
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <strong>
+                              VM
+                            </strong>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "VM",
+                            },
+                            "ref": null,
+                            "rendered": "VM",
+                            "type": "strong",
+                          },
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "SolidVM",
+                          },
+                          "ref": null,
+                          "rendered": "SolidVM",
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
                     Object {
                       "instance": null,
                       "key": undefined,
@@ -1978,6 +2091,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -2246,6 +2369,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -2392,6 +2525,16 @@ ShallowWrapper {
                           classes="smd-pad-2"
                           value="26acb720a5029f6e50b94e096e7df1d03340879f"
                         />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
                       </td>
                     </tr>
                     <tr>
@@ -2544,6 +2687,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -2683,6 +2836,16 @@ ShallowWrapper {
                             classes="smd-pad-2"
                             value="26acb720a5029f6e50b94e096e7df1d03340879f"
                           />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>
+                            VM
+                          </strong>
+                        </td>
+                        <td>
+                          SolidVM
                         </td>
                       </tr>
                       <tr>
@@ -2881,7 +3044,16 @@ ShallowWrapper {
                         undefined,
                         undefined,
                         undefined,
-                        undefined,
+                        <tr>
+                          <td>
+                            <strong>
+                              VM
+                            </strong>
+                          </td>
+                          <td>
+                            SolidVM
+                          </td>
+                        </tr>,
                         <tr>
                           <td>
                             <strong>
@@ -3220,7 +3392,61 @@ ShallowWrapper {
                       undefined,
                       undefined,
                       undefined,
-                      undefined,
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              <strong>
+                                VM
+                              </strong>
+                            </td>,
+                            <td>
+                              SolidVM
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <strong>
+                                VM
+                              </strong>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "VM",
+                              },
+                              "ref": null,
+                              "rendered": "VM",
+                              "type": "strong",
+                            },
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "SolidVM",
+                            },
+                            "ref": null,
+                            "rendered": "SolidVM",
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
                       Object {
                         "instance": null,
                         "key": undefined,
@@ -3791,6 +4017,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -4037,6 +4273,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -4161,6 +4407,16 @@ ShallowWrapper {
                     </td>
                     <td>
                       
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
                     </td>
                   </tr>
                   <tr>
@@ -4291,6 +4547,16 @@ ShallowWrapper {
                   <tr>
                     <td>
                       <strong>
+                        VM
+                      </strong>
+                    </td>
+                    <td>
+                      SolidVM
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <strong>
                         Value
                       </strong>
                     </td>
@@ -4408,6 +4674,16 @@ ShallowWrapper {
                       </td>
                       <td>
                         
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
                       </td>
                     </tr>
                     <tr>
@@ -4585,7 +4861,16 @@ ShallowWrapper {
                       undefined,
                       undefined,
                       undefined,
-                      undefined,
+                      <tr>
+                        <td>
+                          <strong>
+                            VM
+                          </strong>
+                        </td>
+                        <td>
+                          SolidVM
+                        </td>
+                      </tr>,
                       <tr>
                         <td>
                           <strong>
@@ -4830,7 +5115,61 @@ ShallowWrapper {
                     undefined,
                     undefined,
                     undefined,
-                    undefined,
+                    Object {
+                      "instance": null,
+                      "key": undefined,
+                      "nodeType": "host",
+                      "props": Object {
+                        "children": Array [
+                          <td>
+                            <strong>
+                              VM
+                            </strong>
+                          </td>,
+                          <td>
+                            SolidVM
+                          </td>,
+                        ],
+                      },
+                      "ref": null,
+                      "rendered": Array [
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": <strong>
+                              VM
+                            </strong>,
+                          },
+                          "ref": null,
+                          "rendered": Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "VM",
+                            },
+                            "ref": null,
+                            "rendered": "VM",
+                            "type": "strong",
+                          },
+                          "type": "td",
+                        },
+                        Object {
+                          "instance": null,
+                          "key": undefined,
+                          "nodeType": "host",
+                          "props": Object {
+                            "children": "SolidVM",
+                          },
+                          "ref": null,
+                          "rendered": "SolidVM",
+                          "type": "td",
+                        },
+                      ],
+                      "type": "tr",
+                    },
                     Object {
                       "instance": null,
                       "key": undefined,
@@ -5348,6 +5687,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -5594,6 +5943,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -5718,6 +6077,16 @@ ShallowWrapper {
                       </td>
                       <td>
                         
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
                       </td>
                     </tr>
                     <tr>
@@ -5848,6 +6217,16 @@ ShallowWrapper {
                     <tr>
                       <td>
                         <strong>
+                          VM
+                        </strong>
+                      </td>
+                      <td>
+                        SolidVM
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>
+                        <strong>
                           Value
                         </strong>
                       </td>
@@ -5965,6 +6344,16 @@ ShallowWrapper {
                         </td>
                         <td>
                           
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <strong>
+                            VM
+                          </strong>
+                        </td>
+                        <td>
+                          SolidVM
                         </td>
                       </tr>
                       <tr>
@@ -6142,7 +6531,16 @@ ShallowWrapper {
                         undefined,
                         undefined,
                         undefined,
-                        undefined,
+                        <tr>
+                          <td>
+                            <strong>
+                              VM
+                            </strong>
+                          </td>
+                          <td>
+                            SolidVM
+                          </td>
+                        </tr>,
                         <tr>
                           <td>
                             <strong>
@@ -6387,7 +6785,61 @@ ShallowWrapper {
                       undefined,
                       undefined,
                       undefined,
-                      undefined,
+                      Object {
+                        "instance": null,
+                        "key": undefined,
+                        "nodeType": "host",
+                        "props": Object {
+                          "children": Array [
+                            <td>
+                              <strong>
+                                VM
+                              </strong>
+                            </td>,
+                            <td>
+                              SolidVM
+                            </td>,
+                          ],
+                        },
+                        "ref": null,
+                        "rendered": Array [
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": <strong>
+                                VM
+                              </strong>,
+                            },
+                            "ref": null,
+                            "rendered": Object {
+                              "instance": null,
+                              "key": undefined,
+                              "nodeType": "host",
+                              "props": Object {
+                                "children": "VM",
+                              },
+                              "ref": null,
+                              "rendered": "VM",
+                              "type": "strong",
+                            },
+                            "type": "td",
+                          },
+                          Object {
+                            "instance": null,
+                            "key": undefined,
+                            "nodeType": "host",
+                            "props": Object {
+                              "children": "SolidVM",
+                            },
+                            "ref": null,
+                            "rendered": "SolidVM",
+                            "type": "td",
+                          },
+                        ],
+                        "type": "tr",
+                      },
                       Object {
                         "instance": null,
                         "key": undefined,

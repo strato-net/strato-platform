@@ -47,12 +47,12 @@ library:
     - fast-keccak256
     - format
     - generic-arbitrary
-    - generic-deriving
     - hashable
     - hflags
     - hourglass
     - http-api-data
     - integer-gmp
+    - iproute
     - labeled-error
     - lens
     - memory
@@ -62,10 +62,10 @@ library:
     - quickcheck-instances
     - path-pieces
     - persistent
+    - persistent-postgresql
     - pem
     - primitive
-    - raw-strings-qq
-    - secp256k1-haskell
+    - blockapps-secp256k1-haskell
     - servant
     - servant-docs
     - servant-server

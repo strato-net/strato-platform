@@ -22,7 +22,7 @@ module SolidVM.Model.CodeCollection.Statement
     ExpressionF (..),
     extractExpression,
     Expression,
-    ArgListF (..),
+    ArgListF,
     ArgList,
     NumberUnit (..),
     numLitGen,
@@ -30,7 +30,7 @@ module SolidVM.Model.CodeCollection.Statement
   )
 where
 
-import Blockchain.Strato.Model.Account
+import Blockchain.Strato.Model.Address
 --import Data.Swagger
 
 import Control.DeepSeq
@@ -175,12 +175,16 @@ data ExpressionF a
   | NumberLiteral a Integer (Maybe NumberUnit)
   | DecimalLiteral a WrappedDecimal
   | StringLiteral a String
-  | AccountLiteral a NamedAccount
+  | AddressLiteral a Address
   | TupleExpression a [Maybe (ExpressionF a)]
   | ArrayExpression a [(ExpressionF a)]
   | Variable a SolidString
   | ObjectLiteral a (Map.Map SolidString (ExpressionF a))
   | HexaLiteral a SolidString -- if type clash remove ie hex"0F3A"
+    -- I wanted to make this a generic InlineAssert, but that would require either adding redundant
+    -- expressions to the AST, introducing partially-applied expressions, or some other phantom
+    -- expressions that I want to avoid. Instead, I give you InlineBoundsCheck as a compromise
+  | InlineBoundsCheck a (Maybe Integer) (Maybe Integer) (ExpressionF a)
   deriving (Show, Eq, Generic, Generic1, NFData, Functor, Foldable, Traversable)
 
 extractExpression :: ExpressionF a -> a
@@ -197,11 +201,12 @@ extractExpression (BoolLiteral a _) = a
 extractExpression (NumberLiteral a _ _) = a
 extractExpression (DecimalLiteral a _) = a
 extractExpression (StringLiteral a _) = a
-extractExpression (AccountLiteral a _) = a
+extractExpression (AddressLiteral a _) = a
 extractExpression (TupleExpression a _) = a
 extractExpression (ArrayExpression a _) = a
 extractExpression (Variable a _) = a
 extractExpression (HexaLiteral a _) = a
+extractExpression (InlineBoundsCheck a _ _ _) = a
 extractExpression (ObjectLiteral a _) = a
 
 type Expression = Positioned ExpressionF
@@ -212,8 +217,7 @@ instance ToJSON a => ToJSON (ExpressionF a)
 
 instance FromJSON a => FromJSON (ExpressionF a)
 
-data ArgListF a = OrderedArgs [ExpressionF a] | NamedArgs [(SolidString, (ExpressionF a))]
-  deriving (Show, Eq, Generic, NFData, Functor, Foldable, Traversable) --Or String
+type ArgListF a = [ExpressionF a]
 
 genPos :: Gen Integer
 genPos = abs `fmap` (arbitrary :: Gen Integer) `suchThat` (> 0)
@@ -238,16 +242,7 @@ stringLitGen =
 instance Arbitrary a => Arbitrary (ExpressionF a) where
   arbitrary = oneof [numLitGen, stringLitGen]
 
-instance Arbitrary a => Arbitrary (ArgListF a) where
-  arbitrary = GR.genericArbitrary GR.uniform
-
-type ArgList = Positioned ArgListF
-
-instance Binary a => Binary (ArgListF a)
-
-instance ToJSON a => ToJSON (ArgListF a)
-
-instance FromJSON a => FromJSON (ArgListF a)
+type ArgList = ArgListF (SourceAnnotation ())
 
 data NumberUnit = Wei | Szabo | Finney | Ether deriving (Show, Eq, Generic, NFData)
 

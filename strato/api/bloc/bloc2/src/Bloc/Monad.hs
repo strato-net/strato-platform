@@ -27,10 +27,8 @@ module Bloc.Monad
   )
 where
 
-import Bloc.API.Transaction
 import BlockApps.Logging
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Nonce
 import Control.Monad.Change.Modify hiding (modify)
@@ -41,6 +39,7 @@ import Data.Text (Text)
 import GHC.Stack
 import SQLM
 import Servant.Client
+import qualified Strato.Strato23.API.Types         as V
 import UnliftIO hiding (Handler (..))
 
 data Should a = Don't a | Do a
@@ -54,19 +53,18 @@ type HasBlocEnv m = Accessible BlocEnv m
 data BlocEnv = BlocEnv
   { stateFetchLimit :: Integer,
     txSizeLimit :: Int,
-    accountNonceLimit :: Integer,
     gasLimit :: Integer,
     globalNonceCounter :: Cache Address Nonce,
-    txTBQueue :: TBQueue (Maybe Text, Maybe ChainId, Maybe Bool, Bool, PostBlocTransactionRequest),
     userRegistryAddress :: Address,
     userRegistryCodeHash :: Maybe Keccak256,
-    useWalletsByDefault :: Bool
+    useWalletsByDefault :: Bool,
+    nodePubKey :: V.PublicKey
   }
 
 --------------------------------------------------------------------------------
 
 blocVaultWrapper ::
-  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
+  (MonadIO m, MonadLogger m, Accessible VaultData m, HasCallStack) =>
   ClientM x ->
   m x
 blocVaultWrapper client' = do

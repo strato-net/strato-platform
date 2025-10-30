@@ -7,8 +7,6 @@ module BlockApps.SolidVMStorageDecoderSpec where
 import BlockApps.SolidVMStorageDecoder
 import BlockApps.Solidity.SolidityValue
 import BlockApps.Solidity.Value as V
-import BlockApps.Strato.DeprecatedStorage (Storage (..), StorageKV (..))
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Account
 import Blockchain.Strato.Model.Address
 import Data.Aeson as Ae
@@ -28,14 +26,11 @@ import Text.RawString.QQ
 forceParse :: B.ByteString -> StoragePath
 forceParse = either error id . parsePath
 
-toInput :: (StoragePath, BasicValue) -> (HexStorage, HexStorage)
-toInput = bimap pathToHexStorage basicToHexStorage
+toInput :: (StoragePath, BasicValue) -> (Text, Text)
+toInput = bimap pathToStorageKey basicToStorageValue
 
-unHS :: HexStorage -> B.ByteString
-unHS (HexStorage hs) = hs
-
-toInputMap :: [(StoragePath, BasicValue)] -> M.Map B.ByteString B.ByteString
-toInputMap = M.fromList . map (bimap unHS unHS) . map toInput
+toInputMap :: [(StoragePath, BasicValue)] -> M.Map Text Text
+toInputMap = M.fromList . map toInput
 
 int :: Integer -> V.Value
 int = SimpleValue . valueInt
@@ -252,7 +247,6 @@ spec = do
                 (fromList [Field "array_of_nums", ArrayIndex 3], BInteger 77),
                 (fromList [Field "strukt", Field "first_field"], BInteger 887),
                 (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES"),
-                (fromList [Field "set"], BMappingSentinel),
                 (fromList [Field "set", MapIndex (INum 22)], BBool True),
                 (fromList [Field "set", MapIndex (INum 23)], BBool True),
                 (fromList [Field "set", MapIndex (INum 46)], BBool True)
@@ -286,8 +280,7 @@ spec = do
       let input =
             map
               toInput
-              [ (singleton "strMap", BMappingSentinel),
-                (fromList [Field "strMap", MapIndex (IText "ok")], BInteger 17),
+              [ (fromList [Field "strMap", MapIndex (IText "ok")], BInteger 17),
                 (fromList [Field "strMap", MapIndex (IText "\x76\x90\x00\x90")], BInteger 81)
               ]
           got = decodeSolidVMValues input
@@ -332,10 +325,6 @@ spec = do
       got
         `shouldBe` [("owner", SimpleValue $ ValueAccount $ unspecifiedChain 0xdeadbeef)]
 
-    it "can decode an empty mapping" $ do
-      let input = toInputMap [(singleton "mp", BMappingSentinel)]
-      decodeCacheValues input [] `shouldBe` [("mp", ValueMapping M.empty)]
-
     it "can decode everything (with empty cache)" $ do
       let input =
             toInputMap
@@ -354,7 +343,6 @@ spec = do
                 --                , (fromList [Field "array_of_nums", Field "length"], BInteger 4)
                 --                , (fromList [Field "strukt", Field "first_field"], BInteger 887)
                 --                , (fromList [Field "strukt", Field "second_field"], BString "CLOROX DISINFECTING WIPES")
-                --                , (fromList [Field "set"], BMappingSentinel)
                 --                , (fromList [Field "set", MapIndex (INum 22)], BBool True)
                 --                , (fromList [Field "set", MapIndex (INum 23)], BBool True)
                 --                , (fromList [Field "set", MapIndex (INum 46)], BBool True)
@@ -380,28 +368,6 @@ spec = do
             --              ])
             ("str", SimpleValue $ ValueBytes Nothing "Hello, World!")
           ]
-    {-
-        it "can deal with array lengths (with empty cache)" $ do
-          let Success input' = rawInput
-              input = M.fromList $ map (\Storage{storageKV=SolidVMEntry (HexStorage k) (HexStorage v)} -> (k, v)) input'
-              got = decodeCacheValues input []
-          got `shouldBe` [("fields", ValueArrayDynamic $ tosparse
-                  [ bytes "3032415547323000000000000000000000000000000000000000000000000000"
-                  , bytes "3731313532383138373337333436393330300000000000000000000000000000"
-                  , bytes "3339393034313432000000000000000000000000000000000000000000000000"
-                  , bytes "3330534550313900000000000000000000000000000000000000000000000000"
-                  , bytes "5900000000000000000000000000000000000000000000000000000000000000"
-                  , bytes "3530383038313731303039313400000000000000000000000000000000000000"
-                  , bytes "544b545400000000000000000000000000000000000000000000000000000000"
-                  , bytes "3538383020202020202020202020203000000000000000000000000000000000"
-                  , bytes "3433320000000000000000000000000000000000000000000000000000000000"
-                  , bytes "4745483156325a384d0000000000000000000000000000000000000000000000"
-                  , bytes "2f00000000000000000000000000000000000000000000000000000000000000"
-                  , bytes "3431363739343236303536000000000000000000000000000000000000000000"
-                  , bytes "5553443200000000000000000000000000000000000000000000000000000000"
-                  , bytes "4f4c440000000000000000000000000000000000000000000000000000000000"
-                  , ValueArraySentinel 14])]
-    -}
     describe "Simple field updates" $ do
       it "can update ints" $ do
         let input = toInputMap [(singleton "number", BInteger 100)]

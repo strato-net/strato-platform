@@ -9,6 +9,7 @@ import Blockchain.Strato.Model.Address (Address(..))
 import Blockchain.Strato.Model.Keccak256 (Keccak256)
 import Control.Monad.IO.Class
 import Data.Aeson
+import Data.Base64.Types (extractBase64)
 import Data.ByteString.Base64
 import qualified Data.ByteString.UTF8 as B (fromString)
 import Data.Cache.LRU hiding (fromList)
@@ -115,7 +116,7 @@ data AccessToken = AccessToken
 getAccessToken :: MonadIO m => String -> String -> String -> m (Maybe AccessToken)
 getAccessToken id' sec tokenEndpoint = do
   manager <- liftIO $ newManager tlsManagerSettings
-  let creds64 = encodeBase64' . B.fromString $ id' <> ":" <> sec
+  let creds64 = extractBase64 . encodeBase64' . B.fromString $ id' <> ":" <> sec
   templateRequest <- liftIO $ parseRequest tokenEndpoint
   let rBody = RequestBodyLBS "grant_type=client_credentials"
       rHead = [(hContentType, "application/x-www-form-urlencoded"), (hAuthorization, "Basic " <> creds64)]
@@ -123,24 +124,3 @@ getAccessToken id' sec tokenEndpoint = do
   response <- liftIO $ httpLbs request manager
   return $ decode $ responseBody response
 
--- data OAuthUser =
---     OAuthUser {
---         id          :: Text,
---         firstName   ::  Text, --maybe
---         lastName    ::  Text, --maybe
---         attributes  :: Maybe OAuthUserAttributes
---     } deriving (Show, Generic, FromJSON, ToJSON)
-
--- newtype OAuthUserAttributes = OAuthUserAttributes {companyName :: Maybe [Text]}
---     deriving (Show, Generic, FromJSON, ToJSON)
-
--- getUserByUUID :: ( MonadIO m
---                  ) => AccessToken -> String -> String -> m (Either String OAuthUser)
--- getUserByUUID token uuid realm = do
---     manager <- liftIO $ newManager tlsManagerSettings
---     let url = "https://keycloak.blockapps.net/auth/admin/realms/" <> realm <> "/users/" <> uuid
---     templateRequest <- liftIO $ parseRequest url
---     let rHead = [(hContentType, "application/json"), (hAuthorization, encodeUtf8 $ "Bearer " <> access_token token)]
---         request = templateRequest{requestHeaders=rHead}
---     response <- liftIO $ httpLbs request manager
---     return $ eitherDecode $ responseBody response

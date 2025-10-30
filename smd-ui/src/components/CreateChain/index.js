@@ -7,7 +7,7 @@ import { withRouter } from 'react-router-dom';
 import AddMember from './components/AddMember';
 import AddIntegration from './components/AddIntegration';
 import './createChain.css';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import { validate } from './validate';
 import { toasts } from '../Toasts';
 import Dropzone from 'react-dropzone';
@@ -36,7 +36,7 @@ class CreateChain extends Component {
   }
 
   componentDidMount() {
-    mixpanelWrapper.track("create_chain_loaded");
+    // mixpanelWrapper.track("create_chain_loaded");
     this.props.fetchUserPubkey();
   }
 
@@ -56,7 +56,7 @@ class CreateChain extends Component {
     this.setState({ errors });
 
     if (!Object.values(errors).length) {
-      mixpanelWrapper.track('create_chain_submit_click');
+      // mixpanelWrapper.track('create_chain_submit_click');
       let members = [];
       let integrations = {};
       let balances = [];
@@ -293,7 +293,7 @@ class CreateChain extends Component {
       reader.onload = function (event) {
         const fileName = file.name.substring(0, file.name.indexOf('.'));
         const fileContents = event.target.result;//.replace(/\r?\n|\r/g, " ");
-        mixpanelWrapper.track("create_contract_file_upload");
+        // mixpanelWrapper.track("create_contract_file_upload");
         self.updateGovernanceContract(fileName, fileContents);
       };
       reader.readAsText(file);
@@ -390,27 +390,13 @@ class CreateChain extends Component {
 
     return (
       <div className="smd-pad-16">
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-
-          <AnchorButton onClick={() => {
-            mixpanelWrapper.track('create_chain_open_click');
-            this.props.reset();
-            this.props.openCreateChainOverlay();
-          }} className="pt-intent-primary pt-icon-add"
-          id="chains-create-chain-button"
-          disabled={!this.props.userCertificate}
-          text={"Create Shard"} />
-        </Popover>
+        <AnchorButton onClick={() => {
+          // mixpanelWrapper.track('create_chain_open_click');
+          this.props.reset();
+          this.props.openCreateChainOverlay();
+        }} className="pt-intent-primary pt-icon-add"
+        id="chains-create-chain-button"
+        text={"Create Shard"} />
 
         <Dialog
           iconName="flows"
@@ -668,7 +654,7 @@ class CreateChain extends Component {
             <div className="pt-dialog-footer">
               <div className="pt-dialog-footer-actions">
                 <Button text="Cancel" onClick={() => {
-                  mixpanelWrapper.track('create_chain_close_click');
+                  // mixpanelWrapper.track('create_chain_close_click');
                   this.props.reset();
                   this.setState({
                     members: [],
@@ -699,7 +685,6 @@ export function mapStateToProps(state) {
     abi: state.createChain.abi,
     contractName: state.createChain.contractName,
     publicKey: state.user.publicKey,
-    userCertificate: state.user.userCertificate,
   };
 }
 

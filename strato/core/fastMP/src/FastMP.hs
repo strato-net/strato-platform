@@ -179,7 +179,7 @@ addToPartial partialNode (KV [] (Right val)) =
   return $ partialNode {value = Just val}
 addToPartial partialNode (KV [x] (Left nodePtr)) = do
   return $ partialNode {branches = (x, nodePtr) : branches partialNode}
-addToPartial partialNode (KV x@(_ : rest) val) = do
+addToPartial partialNode (KV (x : rest) val) = do
   let node = MP.ShortcutNodeData (N.pack rest) val
   nodePtr <- nodeData2NodeRef node
   when debug $
@@ -191,7 +191,7 @@ addToPartial partialNode (KV x@(_ : rest) val) = do
           format node
         ]
 
-  return $ partialNode {branches = (head x, nodePtr) : branches partialNode}
+  return $ partialNode {branches = (x, nodePtr) : branches partialNode}
 addToPartial _ (KV [] (Left _)) =
   error "addToPartial should never be called with a NodePtrValue for the default value"
 

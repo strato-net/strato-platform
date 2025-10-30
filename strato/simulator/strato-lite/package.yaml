@@ -10,6 +10,7 @@ description:
 
 dependencies:
   - base
+  - strato-networks
   - vm-tools
 
 executables:
@@ -22,31 +23,39 @@ executables:
       - bytestring
       - hflags
       - strato-lite
+      - strato-model
       - strato-p2p
       - vm-tools
 
 library:
   source-dirs: src/
-  exposed-modules:
-    - Strato.Lite
-    - Strato.Lite.Options
   ghc-options: -Wall -O2 
   dependencies:
   - aeson
+  - bloc2
+  - bloc2api
+  - cache
+  - clock
+  - core-api2
+  - conduit-extra
   - containers
   - crypto-pubkey-types
+  - evm-solidity
   - extra
+  - filepath
   - hflags
   - monad-alter
+  - servant-client
   - servant-server
   - text
   - unliftio
   - warp
   - base16-bytestring
+  - binary
+  - blockDB
   - blockapps-data
   - blockapps-datadefs
   - blockapps-mpdbs
-  - blockapps-privacy
   - blockstanbul
   - bytestring
   - common-log
@@ -54,32 +63,52 @@ library:
   - conduit
   - containers
   - data-default
+  - directory
   - debugger
   - ethereum-discovery
   - ethereum-encryption
   - ethereum-rlp
+  - exceptions
+  - format
   - hflags
+  - identity-monad
   - lens
+  - leveldb-haskell
   - merkle-patricia-db
   - monad-alter
+  - monad-logger
   - monadIO
   - mtl
   - network
   - nibblestring
   - ordered-containers
+  - pem
+  - persistent
+  - persistent-sqlite
+  - prometheus-client
   - Ranged-sets
+  - resourcet
+  - resource-pool
   - seqevents
+  - slipstream
+  - solid-vm-compiler
+  - solid-vm-model
+  - sqlite-simple
   - stm-chans
   - stm-conduit
   - strato-genesis
   - strato-index
+  - strato-init
   - strato-model
   - strato-p2p
   - strato-sequencer
+  - strato-statediff
   - text
   - time
   - transformers
   - unliftio
+  - vault-monad
+  - vector
   - vm-runner
   - vm-tools
 
@@ -90,6 +119,7 @@ tests:
     ghc-options: -Wall -Werror -dynamic
     dependencies:
       - QuickCheck
+      - blockDB
       - blockapps-data
       - blockapps-datadefs
       - blockapps-mpdbs
@@ -110,6 +140,7 @@ tests:
       - seqevents
       - solid-vm-model
       - stm-chans
+      - stm-conduit
       - strato-lite
       - strato-model
       - strato-p2p

@@ -19,23 +19,22 @@ module Handlers.AccountInfo where
 import Blockchain.DB.SQLDB
 import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
-import Blockchain.Data.Json
+import Blockchain.Model.JsonBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Lens
+import Control.Monad (unless)
 import Control.Monad.Change.Alter
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString as B
 import Data.List
 import Data.Maybe
 import Data.Source.Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Text.Encoding (decodeUtf8)
+import qualified Database.Esqueleto.Internal.Internal as E
 import qualified Database.Esqueleto.Legacy as E
 import Numeric.Natural
--- import qualified LabeledError
 
 import SQLM
 import Servant
@@ -62,13 +61,11 @@ type API =
     -- :> QueryParam "code" Text
     :> QueryParam "codeHash" Keccak256
     :> QueryParam "contractName" Text
-    :> QueryParam "codePtrAddress" Address
-    :> QueryParam "codePtrChainId" ChainId
-    :> QueryParams "chainid" ChainId
     :> QueryParam "external" Bool
     :> QueryParam "limit" Natural
     :> QueryParam "offset" Natural
     :> QueryParam "ignoreChain" Bool
+    :> QueryParam "search" Text
     :> Get '[JSON] [AddressStateRef']
 
 data AccountsFilterParams = AccountsFilterParams
@@ -83,13 +80,11 @@ data AccountsFilterParams = AccountsFilterParams
     -- , _qaCode           :: Maybe Text
     _qaCodeHash :: Maybe Keccak256,
     _qaContractName :: Maybe Text,
-    _qaCodePtrAddress :: Maybe Address,
-    _qaCodePtrChainId :: Maybe ChainId,
-    _qaChainId :: [ChainId],
     _qaExternal :: Maybe Bool,
     _qaLimit :: Maybe Natural,
     _qaOffset :: Maybe Natural,
-    _qaIgnoreChain :: Maybe Bool
+    _qaIgnoreChain :: Maybe Bool,
+    _qaSearch :: Maybe Text
   }
   deriving (Eq, Ord, Show)
 
@@ -110,8 +105,6 @@ accountsFilterParams =
     Nothing
     Nothing
     Nothing
-    []
-    Nothing
     Nothing
     Nothing
     Nothing
@@ -131,13 +124,11 @@ uncurryAccountsFilterParams ::
     -- -> Maybe Text
     Maybe Keccak256 ->
     Maybe Text ->
-    Maybe Address ->
-    Maybe ChainId ->
-    [ChainId] ->
     Maybe Bool ->
     Maybe Natural ->
     Maybe Natural ->
     Maybe Bool ->
+    Maybe Text ->
     r
   ) ->
   AccountsFilterParams ->
@@ -154,15 +145,13 @@ uncurryAccountsFilterParams f AccountsFilterParams {..} =
     _qaMaxNumber
     _qaCodeHash
     _qaContractName
-    _qaCodePtrAddress
-    _qaCodePtrChainId
-    _qaChainId
     _qaExternal
     _qaLimit
     _qaOffset
     _qaIgnoreChain
+    _qaSearch
 
-server :: HasSQL m => ServerT API m
+server :: Selectable AccountsFilterParams [AddressStateRef] m => ServerT API m
 server = getAccount
 
 ---------------------------
@@ -171,7 +160,7 @@ data NamedChainId
   = UnnamedChainIdsA [ChainId]
   | MainChainA
 
-instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
+instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable AccountsFilterParams [AddressStateRef] (SQLM m) where
   select _ a@AccountsFilterParams {..}
     | a == accountsFilterParams =
       throwIO . NoFilterError $ "Need one of: " ++ intercalate ", " accountQueryParams
@@ -201,10 +190,17 @@ instance HasSQL m => Selectable AccountsFilterParams [AddressStateRef] m where
                       -- fmap (\v -> accStateRef E.^. AddressStateRefCode E.==. E.val (toCode v)) _qaCode,
                       fmap (\v -> accStateRef E.^. AddressStateRefCodeHash E.==. E.val (Just v)) _qaCodeHash,
                       fmap (\v -> accStateRef E.^. AddressStateRefContractName E.==. E.val (Just $ T.unpack v)) _qaContractName,
-                      fmap (\v -> accStateRef E.^. AddressStateRefCodePtrAddress E.==. E.val (Just v)) _qaCodePtrAddress
+                      fmap (\search ->
+                          let isWhiteSpace c = c `elem` [' ', '\n', '\t']
+                              searches = filter (not . T.null) $ T.dropAround isWhiteSpace <$> T.split (==',') search
+                              queries = (\v -> (E.unsafeSqlCastAs "TEXT" (accStateRef E.^. AddressStateRefAddress) `E.ilike` E.val (T.unpack $ "%" <> v <> "%"))
+                                         E.||. (accStateRef E.^. AddressStateRefContractName `E.ilike` E.val (Just . T.unpack $ "%" <> v <> "%"))) <$> searches
+                           in foldr (E.||.) (E.val False) queries
+                        ) _qaSearch
                     ]
 
-            E.where_ (foldl1 (E.&&.) criteria)
+            unless (null criteria) $
+              E.where_ (foldl1 (E.&&.) criteria)
 
             E.offset . fromIntegral $ fromMaybe 0 _qaOffset
             E.limit $ maybe appFetchLimit (min appFetchLimit . fromIntegral) _qaLimit
@@ -224,16 +220,14 @@ getAccount ::
   Maybe Natural ->
   Maybe Keccak256 ->
   Maybe Text ->
-  Maybe Address ->
-  Maybe ChainId ->
-  [ChainId] ->
   Maybe Bool ->
   Maybe Natural ->
   Maybe Natural ->
   Maybe Bool ->
+  Maybe Text ->
   m [AddressStateRef']
-getAccount a b c d e f g h i j k l m n o p q =
-  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o p q)
+getAccount a b c d e f g h i j k l m n o =
+  getAccount' (AccountsFilterParams a b c d e f g h i j k l m n o)
 
 getAccount' :: Selectable AccountsFilterParams [AddressStateRef] m => AccountsFilterParams -> m [AddressStateRef']
 getAccount' a = do
@@ -255,16 +249,13 @@ accountQueryParams =
     "codeHash",
     "contractName",
     "codePtrAddress",
-    "codePtrChainId",
-    "chainid",
     "external",
     "limit",
     "offset",
-    "ignoreChain"
+    "ignoreChain",
+    "search"
   ]
 
--- toCode :: Text -> BC.ByteString
--- toCode v = LabeledError.b16Decode "toCode" $ BC.pack $ (T.unpack v)
 
 type CodeAPI =
   "code" :> Capture "codeHash" Keccak256
@@ -278,11 +269,11 @@ codeServer cHash =
 
 getCodeFromPostgres :: HasSQL m => Keccak256 -> m (Maybe SourceMap)
 getCodeFromPostgres cHash =
-  let getSourceMap = deserializeSourceMap . decodeUtf8
-   in fmap getSourceMap <$> getCodeByteStringFromPostgres cHash
+  let getSourceMap = deserializeSourceMap
+   in fmap getSourceMap <$> getCodeFromPostgres' cHash
 
-getCodeByteStringFromPostgres :: HasSQL m => Keccak256 -> m (Maybe B.ByteString)
-getCodeByteStringFromPostgres cHash =
+getCodeFromPostgres' :: HasSQL m => Keccak256 -> m (Maybe Text)
+getCodeFromPostgres' cHash =
   let getBS = codeRefCode . E.entityVal
    in fmap (listToMaybe . map getBS) . sqlQuery . E.select $
         E.from $ \(codeRef) -> do

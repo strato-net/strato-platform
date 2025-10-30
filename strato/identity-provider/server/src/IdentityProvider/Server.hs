@@ -25,12 +25,12 @@ module IdentityProvider.Server (identityProviderApp) where
 
 import Bloc.API.Transaction
 import Bloc.API.Users
-import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResults)
+import Bloc.Client (postBlocTransactionParallelExternal, postBlocTransactionResultsExternal)
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.X509 hiding (isValid)
-import Blockchain.Strato.Model.Address (deriveAddressWithSalt)
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault)
+import Blockchain.Strato.Model.Address (getNewAddressWithSalt_unsafe)
+import Blockchain.Strato.Model.Secp256k1
 import Control.Monad (void, when)
 import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Change.Modify
@@ -58,7 +58,7 @@ import Network.HTTP.Types.Header (hAuthorization, hContentType)
 import Network.HTTP.Types.Status
 import Servant
 import Servant.Client hiding (manager, responseBody)
-import SolidVM.Model.Value (ValList (..), Value (..))
+import SolidVM.Model.Value (Value (..))
 import Strato.Strato23.API
 import Strato.Strato23.Client
 import UnliftIO hiding (Handler)
@@ -96,22 +96,22 @@ data IdentityServerData = IdentityServerData
     sendgridAPIKey :: Maybe SendgridAPIKey
   }
 
-instance Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible Issuer (ReaderT IdentityServerData m) where
   access _ = asks issuer
 
-instance Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible X509Certificate (ReaderT IdentityServerData m) where
   access _ = asks issuerCert
 
-instance Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible PrivateKey (ReaderT IdentityServerData m) where
   access _ = asks issuerPrivKey
 
-instance Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible RealmMap (ReaderT IdentityServerData m) where
   access _ = asks realmNameToDetails
 
-instance Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible (Maybe SendgridAPIKey) (ReaderT IdentityServerData m) where
   access _ = asks sendgridAPIKey
 
-instance MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} MonadIO m => (String `A.Selectable` AccessToken) (ReaderT IdentityServerData m) where
   select _ realm = do
     realmMap <- asks realmNameToDetails
     case M.lookup realm realmMap of
@@ -155,13 +155,13 @@ instance MonadIO m => ((String, String) `A.Alters` Address) (ReaderT IdentitySer
       Just RealmDetails {cacheRef = ref} -> void $ atomicModifyIORef' ref (\lru -> LRU.delete k lru)
       Nothing -> return ()
 
-instance Monad m => Accessible VaultData (VaultM m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible VaultData (VaultM m) where
   access _ = ask
 
-instance (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
+instance {-# OVERLAPPING #-} (Monad m, Accessible VaultData m) => Accessible VaultData (ReaderT IdentityServerData m) where
   access = lift . access
 
-instance Monad m => Accessible NotificationData (NotificationM m) where
+instance {-# OVERLAPPING #-} Monad m => Accessible NotificationData (NotificationM m) where
   access _ = ask
 
 getPingIdentity :: (MonadIO m) => m Int
@@ -170,7 +170,7 @@ getPingIdentity = return 1
 putIdentity ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
@@ -264,7 +264,7 @@ putIdentity accessToken uuid idProv name mEmail mCo mSub = do
 putIdentityExternal ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,
@@ -377,7 +377,7 @@ walletInCirrus
     where
       cirrusSearchPath :: (MonadLogger m) => m String
       cirrusSearchPath = do
-        let derivedAddr = deriveAddressWithSalt (Just userRegAddr) commonName mHash (Just . show $ OrderedVals [SString $ commonName])
+        let derivedAddr = getNewAddressWithSalt_unsafe userRegAddr commonName mHash [SString $ commonName]
             derivedAddr' = show derivedAddr
             path = "/cirrus/search/" <> userTableName <> "?address=eq." <> derivedAddr' 
         $logDebugS "walletInCirrus/cirrusSearchPath" $ "Derived address is " <> T.pack derivedAddr'
@@ -456,23 +456,21 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
             { functionpayloadContractAddress = 0x509,
               functionpayloadMethod = "registerCertificate",
               functionpayloadArgs = M.singleton "newCertificateString" (ArgString . decodeUtf8 $ certToBytes cert),
-              functionpayloadValue = Nothing,
               functionpayloadTxParams = Nothing,
-              functionpayloadChainid = Nothing,
               functionpayloadMetadata = Nothing
             }
       txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+      postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest)
   eresponse <- liftIO $ postBlocTx clientEnv
   case eresponse of
     Right response ->
       if all txSuccess response
         then $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response
         else do -- got a pending or failure
-          let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+          let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
           if (not $ null pending) 
             then do 
-              eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+              eresponse2 <- liftIO $ runClientM (postBlocTransactionResultsExternal (Just $ "Bearer " <> access_token token) True pending) clientEnv
               case eresponse2 of 
                 Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> $logInfoS "registerCert" $ T.pack $ "Response after registering cert was: " ++ show response2
                 err -> do 
@@ -499,9 +497,9 @@ registerCert cert token RealmDetails {associatedNodeUrl = nurl, associatedFallba
               "Received following error when trying to register cert on fallback node: " ++ show err
           throwIO $ IdentityError "Failed to register cert"
 
-txSuccess :: BlocChainOrTransactionResult -> Bool
+txSuccess :: BlocTransactionResult -> Bool
 -- txSuccess (BlocTxResult (BlocTransactionResult{blocTransactionStatus = stat})) | stat /= Failure = True
-txSuccess (BlocTxResult BlocTransactionResult {blocTransactionStatus = Success}) = True
+txSuccess (BlocTransactionResult {blocTransactionStatus = Success}) = True
 txSuccess _ = False
 
 registerUserWalletAsync ::
@@ -544,13 +542,11 @@ registerUserWallet
               { functionpayloadContractAddress = userRegAddr,
                 functionpayloadMethod = "createUser",
                 functionpayloadArgs = M.singleton "_commonName" (ArgString $ T.pack commonName),
-                functionpayloadValue = Nothing,
                 functionpayloadTxParams = Nothing,
-                functionpayloadChainid = Nothing,
                 functionpayloadMetadata = Nothing
               }
         txRequest = PostBlocTransactionRequest Nothing [txPayload] Nothing Nothing
-        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing Nothing True False txRequest)
+        postBlocTx = runClientM (postBlocTransactionParallelExternal (Just $ "Bearer " <> access_token token) Nothing True txRequest)
     eresponse <- liftIO $ postBlocTx clientEnv
     case eresponse of
       Right response ->
@@ -561,10 +557,10 @@ registerUserWallet
               $ "Response after registering user wallet was: " ++ show response
             return True
           else do -- got a pending or failure
-            let pending = [hash | BlocTxResult (BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash}) <- response]
+            let pending = [hash | BlocTransactionResult {blocTransactionStatus = Pending, blocTransactionHash = hash} <- response]
             if (not $ null pending) 
               then do 
-                eresponse2 <- liftIO $ runClientM (postBlocTransactionResults (Just $ "Bearer " <> access_token token) True pending) clientEnv
+                eresponse2 <- liftIO $ runClientM (postBlocTransactionResultsExternal (Just $ "Bearer " <> access_token token) True pending) clientEnv
                 case eresponse2 of
                   Right response2 | all (\r -> blocTransactionStatus r == Success) response2 -> do
                     $logInfoS "registerUserWallet" $ T.pack $ "Response after registering user wallet was: " ++ show response2
@@ -595,7 +591,7 @@ registerUserWallet
               $ "Failed to register user wallet; response was: " ++ show err
             return False
 
-getVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m (Maybe AddressAndKey)
+getVaultKey :: (MonadIO m, MonadLogger m, Accessible VaultData m) => Text -> m (Maybe AddressAndKey)
 getVaultKey accessToken = do
   VaultData url mgr <- access Proxy
   eAddressNKey <- liftIO $ runClientM (getKey (Just accessToken) Nothing) (mkClientEnv mgr url)
@@ -612,7 +608,7 @@ getVaultKey accessToken = do
       $logInfoS "getVaultKey" $ T.pack $ "Vault error when trying to get user's key: " <> show err
       throwIO $ IdentityError $ T.pack $ "Vault error when trying to get user's key: " <> show err
 
-postVaultKey :: (MonadIO m, MonadLogger m, HasVault m) => Text -> m AddressAndKey
+postVaultKey :: (MonadIO m, MonadLogger m, Accessible VaultData m) => Text -> m AddressAndKey
 postVaultKey accessToken = do
   VaultData url mgr <- access Proxy
   eAddressNKey <- liftIO $ runClientM (postKey (Just accessToken)) (mkClientEnv mgr url)
@@ -627,7 +623,7 @@ postVaultKey accessToken = do
 server ::
   ( MonadUnliftIO m,
     MonadLogger m,
-    HasVault m,
+    Accessible VaultData m,
     Accessible Issuer m,
     Accessible X509Certificate m,
     Accessible PrivateKey m,

@@ -5,13 +5,6 @@
 
 module Tests (tests) where
 
--- import qualified Data.Aeson.KeyMap as KM
--- import qualified Data.Aeson.Key    as DAK
-
--- import Data.Maybe (fromJust)
-
--- import Data.Scientific (Scientific)
--- import qualified Data.Vector as V
 
 import Control.Applicative (empty, (<|>))
 import Control.Monad (when)
@@ -194,18 +187,6 @@ subtractWithConstServer response = toFunction server subtractSig 1 2
   where
     server = constServer $ A.encode response
 
--- fix later
--- idModifyingServer :: (Scientific -> Scientific) -> Connection RequestCount
--- idModifyingServer f = responseModifyingServer modifyIds
---     where modifyIds (A.Array rs) = A.Array $ V.map modifyIds rs
---           modifyIds (A.Object r) = A.Object $ KM.alterF modifyId (DAK.fromString "id") r
---               where modifyId (A.Number i) = A.Number $ f i
---                     modifyId x = x
---           modifyIds x = x
-
--- responseModifyingServer :: (A.Value -> A.Value) -> Connection RequestCount
--- responseModifyingServer f rq = modifyResponse <$> myServer rq
---     where modifyResponse rsp = A.encode . f . fromJust . A.decode <$> rsp
 
 constServer :: B.ByteString -> Connection RequestCount
 constServer = const . return . Just

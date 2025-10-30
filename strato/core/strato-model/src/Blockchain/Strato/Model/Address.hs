@@ -18,7 +18,6 @@ module Blockchain.Strato.Model.Address
     stringAddress,
     getNewAddress_unsafe,
     getNewAddressWithSalt_unsafe,
-    deriveAddressWithSalt,
     addressAsNibbleString,
     addressFromNibbleString,
     addressToHex,
@@ -30,9 +29,8 @@ where
 
 import Blockchain.Data.RLP
 import Blockchain.Strato.Model.ExtendedWord (Word160, word160ToBytes)
-import qualified Blockchain.Strato.Model.Keccak256 as SHA (Keccak256, hash, keccak256ToByteString, keccak256ToWord256)
+import qualified Blockchain.Strato.Model.Keccak256 as SHA (hash, keccak256ToWord256)
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.UserRegistry
 import Blockchain.Strato.Model.Util
 import Control.DeepSeq
 import Control.Lens.Operators
@@ -45,14 +43,13 @@ import Data.Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Lazy as BL
+import Data.Char
 import Data.Data
 import Data.Hashable
-import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import Data.Swagger hiding (Format, format, get, put)
 import qualified Data.Swagger as Sw
 import qualified Data.Text as T
-import Data.Text.Encoding (encodeUtf8)
 import Database.Persist.Sql hiding (get)
 -- import Debug.Trace
 import GHC.Generics
@@ -85,7 +82,10 @@ instance Show Address where
 
 instance Read Address where
   readsPrec _ input =
-    let (hexPart, rest) = splitAt 40 input
+    let trimmed = dropWhile isSpace input
+        (hexPart, rest) = splitAt 40 $ case trimmed of
+          '0':'x':rest' -> rest'
+          _ -> trimmed
     in case readHex hexPart of
          [(num, "")] -> [(Address num, rest)]
          _           -> []
@@ -124,7 +124,9 @@ instance AS.ToJSONKey Address where
       t = T.pack . formatAddressWithoutColor
 
 instance AS.FromJSON Address where
-  parseJSON (String s) = pure $ Address $ fst $ head $ readHex $ drop0x $ T.unpack s
+  parseJSON (String s) = case readHex . drop0x $ T.unpack s of
+    [] -> fail $ "Could not parse Address from string " ++ T.unpack s
+    (x:_) -> pure . Address $ fst x
     where
       drop0x ('0' : 'x' : cs) = cs
       drop0x ('0' : 'X' : cs) = cs
@@ -165,8 +167,27 @@ instance PersistFieldSql Address where
 
 --  sqlType _ = SqlOther "varchar(64)"
 
+-- | Parse a hexadecimal string into an 'Address'.
+--
+-- The input string can be either:
+--
+-- * A 40-character hexadecimal string without "0x" prefix (e.g., "deadbeef00000000000000000000000000000000")
+-- * A 42-character hexadecimal string with "0x" prefix (e.g., "0xdeadbeef00000000000000000000000000000000")
+--
+-- Returns 'Nothing' if the string is not valid hexadecimal or has incorrect length.
+--
+-- >>> stringAddress "deadbeef00000000000000000000000000000000"
+-- Just (Address 0xdeadbeef00000000000000000000000000000000)
+--
+-- >>> stringAddress "0xdeadbeef00000000000000000000000000000000"
+-- Just (Address 0xdeadbeef00000000000000000000000000000000)
+--
+-- >>> stringAddress "invalid"
+-- Nothing
 stringAddress :: String -> Maybe Address
-stringAddress string = Address . fromInteger <$> readMaybe ("0x" ++ string)
+stringAddress string =
+  let prefixedString = if take 2 string == "0x" then string else "0x" ++ string
+  in Address . fromInteger <$> readMaybe prefixedString
 
 ------------------------------------
 
@@ -230,27 +251,12 @@ getNewAddress_unsafe a n =
 -- Construct salted contract addresses using a version of the solidity CREATE2 method:
 -- Original -> new_address = hash(0xFF, sender, salt, bytecode)[12::]
 -- Current  -> new_address = hash(0xFF, sender, salt, codecollection_hash, args)[12::]
-getNewAddressWithSalt_unsafe :: Address -> String -> B.ByteString -> String -> Address
+getNewAddressWithSalt_unsafe :: RLPSerializable a => Address -> String -> B.ByteString -> [a] -> Address
 getNewAddressWithSalt_unsafe creator salt codeHash args =
-  let theHash = SHA.hash $ rlpSerialize $ RLPArray [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash, rlpEncode args]
+  let theHash = SHA.hash $ rlpSerialize $ RLPArray $
+        [rlpEncode (0xFF :: Integer), rlpEncode creator, rlpEncode salt, rlpEncode codeHash]
+        ++ (rlpEncode <$> args)
    in decode $ BL.drop 12 $ encode theHash
-
--- Default values are for the UserRegistry/User contract. Salt should be the userAddress.
-deriveAddressWithSalt :: Maybe Address -> String -> Maybe SHA.Keccak256 -> Maybe String -> Address
-deriveAddressWithSalt sender salt srcHash args = do
-  let theAddress = fromMaybe (Address 0x720) sender -- UserRegistry address
-      theHash =
-        SHA.hash $
-          rlpSerialize $
-            RLPArray
-              [ rlpEncode (0xFF :: Integer),
-                rlpEncode theAddress,
-                rlpEncode salt,
-                rlpEncode $ SHA.keccak256ToByteString $ fromMaybe (SHA.hash $ encodeUtf8 userRegistryContract) srcHash,
-                rlpEncode $ fromMaybe "OrderedVals []" args
-              ]
-  -- trace ((show theAddress) ++ " " ++ salt ++ " " ++ (show srcHash) ++ " " ++ show args) $
-  (decode $ BL.drop 12 $ encode theHash)
 
 addressAsNibbleString :: Address -> N.NibbleString
 addressAsNibbleString (Address s) =

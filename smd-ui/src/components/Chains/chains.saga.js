@@ -141,8 +141,8 @@ export function* getChainDetailSelect(action) {
 
 export default function* watchFetchChains() {
   yield [
-    takeLatest(FETCH_CHAINS_REQUEST, getChains),
-    takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
+    // takeLatest(FETCH_CHAINS_REQUEST, getChains),
+    // takeLatest(FETCH_CHAIN_IDS_REQUEST, getChainsIds),
     takeEvery(FETCH_CHAIN_DETAIL_REQUEST, getChainDetail),
     takeEvery(FETCH_SELECT_CHAIN_DETAIL_REQUEST, getChainDetailSelect)
   ];

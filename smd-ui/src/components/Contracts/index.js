@@ -3,10 +3,10 @@ import { fetchContracts, changeContractFilter } from './contracts.actions';
 import { connect } from 'react-redux';
 import CreateContract from '../CreateContract';
 import ContractCard from './components/ContractCard';
-import mixpanelWrapper from '../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../lib/mixpanelWrapper';
 import Tour from '../Tour';
 import { Button, Popover, PopoverInteractionKind, Position, Switch, Tooltip} from '@blueprintjs/core';
-import ReactGA from 'react-ga4';
+// import ReactGA from 'react-ga4';
 import { Field, reduxForm } from 'redux-form';
 import { selectChain, fetchChainIds, fetchChainDetailSelect } from '../Chains/chains.actions';
 import { withRouter } from 'react-router-dom';
@@ -29,6 +29,11 @@ const tourSteps = [
   },
 ];
 
+function isValidContractAddress(address) {
+  const regex = /\b[a-fA-F0-9]{40}\b/;
+  return regex.test(address);
+}
+
 class Contracts extends Component {
   constructor(props) {
     super(props);
@@ -44,15 +49,15 @@ class Contracts extends Component {
   }
 
   componentWillMount() {
-    mixpanelWrapper.track("contracts_loaded");
+    // mixpanelWrapper.track("contracts_loaded");
     this.props.changeContractFilter('');
     this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset);
     this.props.fetchChainIds(this.chainLimit, this.chainOffset);
   }
 
-  componentDidMount() {
-    ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
-  }
+  // componentDidMount() {
+  //   ReactGA.send({hitType: "pageview", page: "/contracts", title: "Contracts"});
+  // }
 
   componentWillReceiveProps(nextProps) {
     if (nextProps.selectedChain !== this.props.selectedChain) {
@@ -62,7 +67,9 @@ class Contracts extends Component {
 
   updateFilter = (filter) => {
     this.props.changeContractFilter(filter);
-    this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+    this.setState({ offset: 0 }, () => {
+      this.props.fetchContracts(this.props.selectedChain, this.state.limit, this.state.offset, filter);
+    });
   }
 
   onChainSearch = () => {
@@ -114,6 +121,7 @@ class Contracts extends Component {
   render() {
     const contracts = this.props.contracts;
     const contractNames = Object.getOwnPropertyNames(this.props.contracts);
+    console.log("this.props.filter", this.props.filter, this.props)
 
     const returnedInstances = contracts && contractNames.length > 0 ? Object.values(contracts).reduce((prev, cur) => {
       return prev + cur.instances.length
@@ -124,7 +132,7 @@ class Contracts extends Component {
         return (
           <div className="row pt-dark" key={'contract-card-' + i}>
             <div className="col-sm-12">
-              {value && <ContractCard contract={{ name: value, contract: contracts[value] }} />}
+              {value && <ContractCard contract={{ name: value, contract: contracts[value], searchTerm: isValidContractAddress(this.props.filter) ? this.props.filter : null }} />}
               <br />
             </div>
           </div>
@@ -138,7 +146,7 @@ class Contracts extends Component {
           <div className="col-sm-2 text-left">
             <h3>Contracts</h3>
           </div>
-        <div className="col-sm-6 smd-pad-16">
+          <div className="col-sm-6 smd-pad-16">
             <div className="pt-input-group pt-dark pt-large">
               <span className="pt-icon pt-icon-search"></span>
               <input
@@ -149,12 +157,12 @@ class Contracts extends Component {
                 dir="auto" />
             </div>
           </div>
-    
-        </div>
-        <div className='row pt-dark' style={{ display: 'flex', alignItems: 'center'}}>
-            <div className="col-sm-2 text-right smd-pad-8">
-              <CreateContract />
-            </div>
+          <div className="col-sm-2">
+            {/* Me know CSS real good */}
+          </div>
+          <div className="col-sm-2 text-right smd-pad-8">
+            <CreateContract />
+          </div>
         </div>
         {!cards.length && !this.props.isLoading &&
           <div className="row pt-dark" key={'contract-card-'}>
@@ -191,14 +199,14 @@ class Contracts extends Component {
               />
             </div>
             <div className="col-sm-2 text-center" style={{ marginTop: '22px' }}>
-              {`Rows ${this.state.offset + 1}-${this.state.offset + Math.min(cards.length, this.state.limit)} (${returnedInstances} Contract Instances)`}
+              {`Contracts ${this.state.offset + 1}-${this.state.offset + contractNames.length} (${returnedInstances} Total Instances)`}
             </div>
             <div className="col-sm-2 smd-pad-16 text-right">
               <Button
                 onClick={this.onNextClick}
                 className="pt-icon-arrow-right"
                 text="Next"
-                disabled={returnedInstances < this.state.limit}
+                disabled={contractNames.length < this.state.limit}
               />
             </div>
           </div>

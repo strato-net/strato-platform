@@ -16,8 +16,9 @@ benchString (name, f) str =
     $ RLPString str
 
 benchOneLevel :: (String, (RLPObject -> BS.ByteString)) -> [BS.ByteString] -> Benchmark
-benchOneLevel (name, f) arr =
-  bench (printf "%s based one-level array serialization; size=1024x%d" name (BS.length (head arr)))
+benchOneLevel (name, f) [] = error "benchOneLevel: Empty list"
+benchOneLevel (name, f) arr(a:_) =
+  bench (printf "%s based one-level array serialization; size=1024x%d" name (BS.length a))
     . nf f
     . RLPArray
     . map RLPString

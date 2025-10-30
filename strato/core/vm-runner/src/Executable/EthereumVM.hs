@@ -21,7 +21,9 @@ where
 
 import BlockApps.Logging
 import qualified Blockchain.Bagger as Bagger
-import Blockchain.BlockChain
+import qualified Blockchain.Bagger.Transactions as Flush
+--import Blockchain.BlockChain
+import Blockchain.BlockDB
 import Blockchain.DB.ChainDB
 import qualified Blockchain.DB.MemAddressStateDB as Mem
 import Blockchain.Data.AddressStateDB
@@ -31,53 +33,45 @@ import qualified Blockchain.Data.TXOrigin as TO
 import Blockchain.EthConf
 import Blockchain.Event
 import Blockchain.JsonRpcCommand
+import Blockchain.Model.SyncState
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.Event
 import Blockchain.Sequencer.Kafka
 import Blockchain.StateRootMismatch
 import Blockchain.Strato.Indexer.Kafka (produceIndexEvents)
 import Blockchain.Strato.Indexer.Model (IndexEvent (..))
 import Blockchain.Strato.Model.Class
-import qualified Blockchain.Strato.Model.Keccak256 as Keccak256
 import Blockchain.Strato.RedisBlockDB
-import Blockchain.Strato.RedisBlockDB.Models
 import Blockchain.Strato.StateDiff          (stateDiff')
 import Blockchain.Strato.StateDiff.Database (commitSqlDiffs)
-import Blockchain.Stream.Action (Action)
-import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent
+import Blockchain.SyncDB
 import Blockchain.Timing
 import Blockchain.VMContext
 import Blockchain.VMMetrics
 import Blockchain.VMOptions
 import Blockchain.Wiring
 import Conduit hiding (Flush)
-import Control.Lens hiding (Context)
 import Control.Monad
+import qualified Control.Monad.Change.Modify as Mod
 import Control.Monad.Composable.Kafka
 import Control.Monad.Composable.SQL
-import qualified Data.ByteString.Char8 as BC
 import Data.Conduit.List (mapMaybeM)
 import Data.Foldable hiding (fold)
 import Data.List
 import qualified Data.Map as M
-import qualified Data.Map.Ordered as OMap
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as UTF8
 import Debugger
 import Executable.EthereumVM2
-import SolidVM.Model.CodeCollection
 import Text.Format (format)
 
--- newtype CertRoot = CertRoot { unCertRoot :: MP.StateRoot }
---   deriving (Eq, Ord, Show)
 
 ethereumVM :: Maybe DebugSettings -> LoggingT IO ()
 ethereumVM d = runResourceT $ do
   ctx <- initContext d
   void . runSQLM . runKafkaMConfigured "ethereum-vm" $ execContextM' ctx $ do
-    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
+--    Bagger.setCalculateIntrinsicGas $ \i otx -> toInteger (calculateIntrinsicGas' i otx)
 
     initializeBestBlock
 
@@ -88,6 +82,12 @@ ethereumVM d = runResourceT $ do
         case maybeSelfAddress of
           Just x -> contextModify' $ \cs@(ContextState{}) -> cs{_selfAddress = x}
           Nothing -> pure ()
+
+        -- Handle flush mempool events immediately
+        forM_ seqEvents $ \event -> case event of
+          VmFlushMempool req -> handleVmFlushMempool req
+          _ -> return ()
+
         recordBaggerMetrics =<< contextGets _baggerState
         logEventSummaries seqEvents
 
@@ -115,12 +115,6 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "New validators found from running block:     " ++ show (fst _derived) 
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found in block header:    " ++ show (snd _inBlock) 
         $logErrorS "ethereumVM/ValidatorMismatch" . T.pack $ "Removed validators found from running block: " ++ show (snd _derived) 
-      CertRegistrationMismatch BlockDelta{..} -> do
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "There was a cert mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found in block header:        " ++ show (fst _inBlock) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "New certs found from running block:     " ++ show (fst _derived) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found in block header:    " ++ show (snd _inBlock) 
-        $logErrorS "ethereumVM/CertRegistrationMismatch" . T.pack $ "Removed certs found from running block: " ++ show (snd _derived) 
       VersionMismatch BlockDelta{..} -> do
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "There was a block header version mismatch in block #" ++ show bNum ++ ", hash " ++ format bHash 
         $logErrorS "ethereumVM/InvalidVersion" . T.pack $ "Block header version found in block header:      " ++ show _inBlock
@@ -134,7 +128,7 @@ ethereumVM d = runResourceT $ do
         $logErrorS "ethereumVM/UnexpectedBlockNumber" . T.pack $ "But actually received: " ++ show _inBlock
     error "STRATO vm-runner encountered errors while verifying a block in the chain. Please review the logs above for more information."
 
-initializeBestBlock :: (HasContext m, Bagger.MonadBagger m) => m ()
+initializeBestBlock :: (HasContext m, Mod.Accessible RedisConnection m, Bagger.MonadBagger m) => m ()
 initializeBestBlock = do
   maybeRedisBestBlockHash <- fmap (fmap bestBlockHash) (withRedisBlockDB getBestBlockInfo)
   maybeRedisBestBlock <-
@@ -162,7 +156,7 @@ outputBlockToContextBestBlockInfo block =
 logEventSummaries :: MonadLogger m => [VmEvent] -> m ()
 logEventSummaries evs = do
   let names = map getNames evs
-      numberedNames = map (\x -> numberIt (length x) (head x)) $ group $ sort names
+      numberedNames = map (\case [] -> []; x@(x0:_) -> numberIt (length x) x0) $ group $ sort names
 
   $logInfoS "logEventSummaries" . T.pack $
     "#### Got: " ++ intercalate ", " numberedNames -- show numTXs ++ "TXs, " ++ show numBlocks ++ " blocks"
@@ -176,6 +170,7 @@ logEventSummaries evs = do
     getNames (VmMPNodesReceived _) = "MPNodesReceived"
     getNames (VmRunPreprepare _) = "VmRunPreprepare"
     getNames (VmSelfAddress _) = "VmSelfAddress"
+    getNames (VmFlushMempool _) = "FlushMempool"
 
     numberIt :: Int -> String -> String
     numberIt 1 x = "1 " ++ x
@@ -188,60 +183,11 @@ routeOutEvent (OutBlockVerificationFailure bvf) = pure $ Just bvf
 routeOutEvent oev = Nothing <$ sendOutEvent oev
 
 sendOutEvent :: (MonadLogger m, HasKafka m, HasSQL m, HasContext m) => VmOutEvent -> m ()
-sendOutEvent (OutAction act) = do
-  let extractCodeCollectionAddedMessages :: Action -> Maybe VMEvent
-      extractCodeCollectionAddedMessages a =
-        case ( join $ fmap (M.lookup "src") $ a ^. Action.metadata,
-               join $ fmap (M.lookup "name") $ a ^. Action.metadata,
-               OMap.assocs $ a ^. Action.actionData
-             ) of
-          (Just c, Just n, actionDatas) ->
-            let cp = case join $ fmap (M.lookup "VM") $ a ^. Action.metadata of
-                  Just "SolidVM" -> SolidVMCode (T.unpack n) $ Keccak256.hash $ UTF8.encodeUtf8 c
-                  Just "EVM" -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                  Just v -> error $ "Unknown VM: " ++ show v
-                  Nothing -> ExternallyOwned $ Keccak256.hash $ BC.pack $ T.unpack c
-                cn = fromMaybe "" . listToMaybe . catMaybes . flip map actionDatas $ \(_, Action.ActionData {..}) ->
-                  if _actionDataCodeHash == cp
-                    then Just _actionDataCreator
-                    else Nothing
-                cc = foldr (\ad b -> Action._actionDataCodeCollection ad <> b) mempty $ snd <$> actionDatas
-                abstracts' = foldr (\ad b -> Action._actionDataAbstracts ad <> b) mempty $ snd <$> actionDatas
-                contracts' = (cc ^. contracts) <&> ( (functions .~ M.empty)
-                                                  --  . (constructor .~ Nothing)
-                                                   . (modifiers .~ M.empty)
-                                                   )
-                -- If there are no abstract contracts, emit normal contracts. Else, only emit abstract contracts
-                abstractNames = S.fromList . M.keys $ getTopLevelAbstracts cc
-                contracts'' = if S.null abstractNames
-                                then M.filter (isNothing . _importedFrom) contracts'
-                                else M.filterWithKey (\k v -> (isNothing $ _importedFrom v) && (k `S.member` abstractNames)) contracts'
-                cc' = emptyCodeCollection & contracts .~ contracts''
-             in Just $
-                  CodeCollectionAdded
-                    { codeCollection = const () <$> cc',
-                      codePtr = cp,
-                      creator = cn,
-                      application = n,
-                      historyList =
-                        case join $ fmap (M.lookup "history") (a ^. Action.metadata) of
-                          Nothing -> []
-                          Just v -> T.splitOn "," v,
-                      abstracts = abstracts',
-                      recordMappings = []
-                    }
-          _ -> Nothing
-      ccEvents = maybeToList $ extractCodeCollectionAddedMessages act
-      dcEvents = DelegatecallMade <$> toList (act ^. Action.delegatecalls)
-      act' = act { Action._actionData = Action.omapMap (Action.actionDataCodeCollection .~ mempty) (Action._actionData act) }
-      actionEvents = [NewAction act']
-      vmes = ccEvents ++ dcEvents ++ actionEvents
-  void . produceVMEvents $ toList vmes
+sendOutEvent (OutVMEvents vmes) = void $ produceVMEvents vmes
 sendOutEvent (OutIndexEvent e) = void $ produceIndexEvents [e]
 sendOutEvent (OutStateDiff diff) = commitSqlDiffs diff
 sendOutEvent (OutLog l) = loopTimeit "flushLogEntries" $ void $ produceIndexEvents [LogDBEntry l]
 sendOutEvent (OutEvent e) = loopTimeit "flushEventEntries" $ void $ produceIndexEvents (EventDBEntry <$> e)
-sendOutEvent (OutTXR tr) = void . produceVMEvents $ [NewTransactionResult tr]
 sendOutEvent (OutASM asm) =
   when (not flags_sqlDiff) $
     timeit "updateSQLBalanceAndNonce" (Just vmBlockInsertionMined) $
@@ -261,3 +207,17 @@ sendOutEvent (OutPreprepareResponse dec) = void $ writeUnseqEvents [IEPreprepare
 consumerGroup :: ConsumerGroup
 consumerGroup = "ethereum-vm"
 
+-- | Handle flush mempool event by converting scope and calling Bagger.flush
+handleVmFlushMempool :: Bagger.MonadBagger m => FlushMempoolRequest -> m ()
+handleVmFlushMempool (FlushMempoolRequest scope reqId) = do
+  $logInfoS "EthereumVM.flush" $ T.pack $
+    "Processing flush request " ++ reqId ++ " with scope " ++ show scope
+  flushedTxs <- Bagger.flush (convertFlushScope scope)
+  $logInfoS "EthereumVM.flush" $ T.pack $
+    "Flushed " ++ show (length flushedTxs) ++ " transactions for request " ++ reqId
+  where
+    -- Convert event scope to Bagger scope
+    convertFlushScope :: FlushMempoolScope -> Flush.FlushScope
+    convertFlushScope FlushPending = Flush.FlushPending
+    convertFlushScope FlushQueued = Flush.FlushQueued
+    convertFlushScope FlushAll = Flush.FlushAll

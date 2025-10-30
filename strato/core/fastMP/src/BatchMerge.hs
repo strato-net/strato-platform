@@ -52,7 +52,9 @@ splitKeysByPrefix [] _ = error "in call to splitKeysByPrefix, keys are out of or
 splitKeysByPrefix (firstChar : remainingPrefix) kvs =
   let (matched, remaining) = span ((== firstChar) . listToMaybe . theKey) kvs
    in case firstChar of
-        Just _ -> map (\(KV k v) -> (KV (tail k) v)) matched : splitKeysByPrefix remainingPrefix remaining
+        Just _ -> let unsafeTail []     = error "splitKeysByPrefix: empty key"
+                      unsafeTail (_:xs) = xs
+                   in map (\(KV k v) -> (KV (unsafeTail k) v)) matched : splitKeysByPrefix remainingPrefix remaining
         Nothing -> matched : splitKeysByPrefix remainingPrefix remaining
 
 putManyKeyVal_nodeData ::

@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Blockchain.Bagger.BaggerState where
 
@@ -9,12 +10,12 @@ import Blockchain.Bagger.Transactions
 import Blockchain.Data.BlockHeader
 import qualified Blockchain.Data.TransactionDef as TD
 import Blockchain.Database.MerklePatricia (StateRoot (..), blankStateRoot)
-import Blockchain.Sequencer.Event (OutputTx (..))
+import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Keccak256
 import Control.Applicative (Alternative, empty)
 import Control.DeepSeq
+import Control.Monad.State (runState, state)
 import qualified Data.DList as DL
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
@@ -89,7 +90,7 @@ defaultMiningCache =
         ( BlockHeader
             (unsafeCreateKeccak256FromWord256 0)
             (unsafeCreateKeccak256FromWord256 0)
-            (Everyone False)
+            0x0
             blankStateRoot
             blankStateRoot
             blankStateRoot
@@ -137,8 +138,8 @@ purgeFromATL address nonce' atl = case M.lookup address atl of
   Just tl -> let newTL = M.delete nonce' tl in M.insert address newTL atl
 
 calculateIntrinsicTxFee :: BaggerState -> (OutputTx -> Integer)
-calculateIntrinsicTxFee bs t@OutputTx {otBaseTx = bt} =
-  TD.transactionGasPrice bt * calculateIntrinsicGasAtNextBlock bs t
+calculateIntrinsicTxFee bs t@OutputTx {} =
+  calculateIntrinsicGasAtNextBlock bs t
 
 calculateIntrinsicGasAtNextBlock :: BaggerState -> OutputTx -> Integer
 calculateIntrinsicGasAtNextBlock BaggerState {miningCache = MiningCache {bestBlockHeader = bh}, calculateIntrinsicGas = cig} =
@@ -187,11 +188,6 @@ popAllPending s@BaggerState {pending = p} = (popped, s {pending = M.empty})
   where
     popped = concatMap toList $ M.elems p
 
-purgeFromQueued :: OutputTx -> BaggerState -> BaggerState
-purgeFromQueued OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {queued = q} = s {queued = newATL}
-  where
-    newATL = purgeFromATL sender (TD.transactionNonce tx) q
-
 purgeFromPending :: OutputTx -> BaggerState -> BaggerState
 purgeFromPending OutputTx {otSigner = sender, otBaseTx = tx} s@BaggerState {pending = p} = s {pending = newATL}
   where
@@ -207,3 +203,19 @@ upsertPT tx@OutputTx {otSigner = addr, otBaseTx = bt} pt = ret
     filtered = filter (not . (\t -> otSigner t == addr && nonce' (otBaseTx t) <= nonce' bt)) pt
     nonce' = TD.transactionNonce
     !ret = tx : filtered
+
+flushPendingOnly :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushPendingOnly s@BaggerState {pending = p} =
+  (map (, Pending) $ concatMap toList $ M.elems p, s {pending = M.empty})
+
+flushQueuedOnly :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushQueuedOnly s@BaggerState {queued = q} =
+  (map (, Queued) $ concatMap toList $ M.elems q, s {queued = M.empty})
+
+flushBoth :: BaggerState -> ([(OutputTx, BaggerTxQueue)], BaggerState)
+flushBoth s = runState flushBothState s
+  where
+    flushBothState = do
+      pendingTxs <- state flushPendingOnly
+      queuedTxs <- state flushQueuedOnly
+      return (pendingTxs ++ queuedTxs)

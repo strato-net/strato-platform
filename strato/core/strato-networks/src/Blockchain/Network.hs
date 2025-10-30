@@ -12,7 +12,7 @@ data PeerParams = NetworkParams
   }
 
 blockAppsIdentity :: ChainMemberParsedSet
-blockAppsIdentity = CommonName "BlockApps" "Engineering" "Admin" True
+blockAppsIdentity = CommonName 0x0
 
 getParams :: String -> IO (Maybe [PeerParams])
 getParams "oldblockappsnet" =
@@ -55,6 +55,61 @@ getParams "mercata-hydrogen" =
             identity = blockAppsIdentity
           }
       ]
+getParams "helium" =
+  return $
+    Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10
+      [ NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "44.198.225.165",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "34.197.19.103",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "44.206.83.54",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "34.194.64.79",
+            identity = blockAppsIdentity
+          }
+      ]
+
+getParams "upquark" =
+  return $
+    Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10
+      [ NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "13.219.185.85",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "3.208.147.58",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "44.221.199.15",
+            identity = blockAppsIdentity
+          },
+        NetworkParams
+          { ethAddress = Address 0x100, -- not important
+            webAddress = "54.83.139.46",
+            identity = blockAppsIdentity
+          }
+      ]
+
+
+
+
+
+
 getParams "mercata" =
   return $
     Just -- to make network id: mercata-hydrogen -> ascii to hex -> convert # to base10

@@ -414,14 +414,14 @@ foreign import ccall "secp256k1.h secp256k1_ec_pubkey_create"
     Ptr SecKey32 ->
     IO Ret
 
-foreign import ccall "secp256k1.h secp256k1_ec_privkey_tweak_add"
+foreign import ccall "secp256k1.h secp256k1_ec_seckey_tweak_add"
   ecSecKeyTweakAdd ::
     Ptr Ctx ->
     Ptr SecKey32 ->
     Ptr Tweak32 ->
     IO Ret
 
-foreign import ccall "secp256k1.h secp256k1_ec_privkey_negate"
+foreign import ccall "secp256k1.h secp256k1_ec_seckey_negate"
   ecTweakNegate ::
     Ptr Ctx ->
     Ptr Tweak32 ->
@@ -434,7 +434,7 @@ foreign import ccall "secp256k1.h secp256k1_ec_pubkey_tweak_add"
     Ptr Tweak32 ->
     IO Ret
 
-foreign import ccall "secp256k1.h secp256k1_ec_privkey_tweak_mul"
+foreign import ccall "secp256k1.h secp256k1_ec_seckey_tweak_mul"
   ecSecKeyTweakMul ::
     Ptr Ctx ->
     Ptr SecKey32 ->

@@ -4,34 +4,30 @@
 module Blockchain.Sequencer.Bootstrap (bootstrapSequencer) where
 
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Constants
 import Blockchain.Data.Block
 import qualified Blockchain.Data.TXOrigin as TO
 import qualified Blockchain.Data.Transaction as TX
 import Blockchain.EthConf as EC
+import Blockchain.Model.WrappedBlock
 import Blockchain.Sequencer.CablePackage
 import Blockchain.Sequencer.Constants
 import Blockchain.Sequencer.DB.DependentBlockDB
 import Blockchain.Sequencer.Event
-import Blockchain.Sequencer.ExtraCertsHack
 import Blockchain.Sequencer.Kafka (writeSeqVmEvents, writeSeqP2pEvents, assertSequencerTopicsCreation)
 import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Class
 import ClassyPrelude (atomically, fromMaybe, newTMChan)
-import qualified Control.Monad.Change.Alter as A
 import Control.Monad.Composable.Kafka
 import qualified Data.ByteString.Char8 as C8
-import Data.Foldable (for_)
 import Network.HTTP.Client (defaultManagerSettings, newManager)
 import Servant.Client
 
 -- bootstrap genesis block into leveldb if needed
 --
-bootstrapSequencer :: [(Address, X509CertInfoState)] -> Block -> IO OutputBlock
+bootstrapSequencer :: Block -> IO OutputBlock
 bootstrapSequencer
-  extraCerts
   Block
     { blockBlockData = bd,
       blockReceiptTransactions = txs,
@@ -58,8 +54,7 @@ bootstrapSequencer
               { otOrigin = TO.BlockHash hash,
                 otSigner = Address 0,
                 otBaseTx = t,
-                otHash = TX.transactionHash t,
-                otPrivatePayload = Nothing
+                otHash = TX.transactionHash t
               }
       initLevelDB :: CablePackage -> IO ()
       initLevelDB pkg = do
@@ -72,7 +67,8 @@ bootstrapSequencer
 
             dummySequencerCfg =
               SequencerConfig
-                { depBlockDBCacheSize = 0,
+                { dependentBlockDB = error "Dependent Block DB not initialized",
+                  depBlockDBCacheSize = 0,
                   depBlockDBPath = dbDir "h" ++ sequencerDependentBlockDBPath,
                   seenTransactionDBSize = 10,
                   blockstanbulBlockPeriod = BlockPeriod 0,
@@ -87,7 +83,6 @@ bootstrapSequencer
                 }
         runLoggingT . runSequencerM dummySequencerCfg Nothing $ do
           bootstrapGenesisBlock hash
-          for_ (extraCerts ++ extraCertsHack) . uncurry $ A.insert (A.Proxy @X509CertInfoState)
       initKafka :: CablePackage -> IO ()
       initKafka _ = do
         runKafkaMConfigured (KString $ C8.pack defaultKafkaClientId') $ do

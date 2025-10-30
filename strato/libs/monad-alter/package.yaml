@@ -29,4 +29,5 @@ library:
     - containers
     - data-default
     - lens
+    - mtl
     - transformers

@@ -51,7 +51,7 @@ import { watchCompileSourceFromEditor } from './components/CodeEditor/codeEditor
 import watchFetchAccounts from './components/Accounts/accounts.saga';
 import { watchCompileContract } from './components/CreateContract/createContract.saga';
 import watchFetchContracts from './components/Contracts/contracts.saga';
-import {watchFetchUser, watchFetchPubKey, watchuserCert} from './components/User/user.saga';
+import {watchFetchUser, watchFetchPubKey} from './components/User/user.saga';
 import {
   watchFetchState,
   watchFetchCirrusContracts,
@@ -76,6 +76,7 @@ import watchAppMetadata from './App/app.saga'
 import watchGetPeerIdentity from './components/PeersCard/peers.saga';
 
 import { CREATE_BLOC_USER_SUCCESS } from './components/CreateBlocUser/createBlocUser.actions';
+import { initializeCsrfToken } from './lib/csrf';
 
 const rootReducer = combineReducers({
   form: formReducer.plugin({
@@ -144,7 +145,6 @@ const rootSaga = function* startForeman() {
     fork(watchCommunicateOverSocket),
     fork(watchFetchUser),
     fork(watchFetchPubKey),
-    fork(watchuserCert),
     // fork(watchCreateBlocUser),
     // fork(watchUploadFile),
     // fork(watchFetchUpload),
@@ -173,6 +173,9 @@ const store = createStore(rootReducer, process.env.NODE_ENV !== 'production'
 
 // then run the saga
 sagaMiddleware.run(rootSaga);
+
+// Initialize CSRF token on app startup
+initializeCsrfToken();
 
 ReactDOM.render(
   <Provider store={store}>

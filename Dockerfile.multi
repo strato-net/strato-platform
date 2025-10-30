@@ -1,6 +1,6 @@
-FROM ubuntu:22.04 as base
+FROM ubuntu:24.04 as base
 
-RUN apt-get -y update && apt-get install -y \
+RUN apt -y update && apt install -y \
       autoconf \
       curl \
       jq \
@@ -11,6 +11,7 @@ RUN apt-get -y update && apt-get install -y \
       libpcre3-dev \
       libpq-dev \
       libsodium-dev \
+      libsecp256k1-dev \
       libstdc++6 \
       libtool \
       locales \
@@ -19,18 +20,12 @@ RUN apt-get -y update && apt-get install -y \
       postgresql-client \
       git \
       make \
-  && apt-get autoremove \
+  && apt autoremove \
   && rm -rf /var/lib/apt/lists/* \
-  && apt-get clean \
+  && apt clean \
+  && ln -s /lib/x86_64-linux-gnu/libleveldb.so.1.23.0 /lib/x86_64-linux-gnu/libleveldb.so.1 \
   && locale-gen en_US.UTF-8 \
-  && git clone https://github.com/blockapps/secp256k1 \
-  && cd secp256k1/ \
-  && ./autogen.sh \
-  && ./configure --enable-experimental --enable-module-ecdh --enable-module-recovery --prefix=/usr/ \
-  && make \
-  && make install \
-  && cd .. \
-  && rm -rf secp256k1
+  && ldconfig
 
 ENV LANG="en_US.UTF-8" \
     LANGUAGE="en_US:en" \
@@ -43,7 +38,7 @@ COPY \
   ./usr/local/bin/forced-config-change \
   ./usr/local/bin/ghc-debug \
   ./usr/local/bin/strato-barometer \
-  ./usr/local/bin/modifyDate \ 
+  ./usr/local/bin/modifyDate \
   ./usr/local/bin/process-monitor-exe \
   ./usr/local/bin/slipstream \
   ./usr/local/bin/strato-api \
@@ -53,9 +48,7 @@ COPY \
   ./usr/local/bin/strato-sequencer \
   ./usr/local/bin/strato-setup \
   ./usr/local/bin/vm-runner \
-  ./usr/local/bin/x509-generator \
-  ./usr/local/bin/x509-keygen \
-    /usr/local/bin/
+  /usr/local/bin/
 COPY ./strato /
 RUN ln -s /usr/local/bin/strato-barometer /usr/local/bin/queryStrato
 EXPOSE 30303 30303/udp 3000 3001 7065 8013 8050 8051 8052
@@ -86,10 +79,10 @@ COPY \
   usr/local/bin/identity-provider-server \
   usr/local/bin/blockapps-vault-proxy-server \
     /usr/local/bin/
-RUN apt-get -y update \
-  && apt-get install -y wget \
-  && apt-get autoremove \
-  && apt-get clean \
+RUN apt -y update \
+  && apt install -y wget \
+  && apt autoremove \
+  && apt clean \
   && wget https://github.com/mikefarah/yq/releases/download/v4.35.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq 
 COPY ./identity-provider /identity-provider
 EXPOSE 8014

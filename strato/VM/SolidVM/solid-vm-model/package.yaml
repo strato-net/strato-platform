@@ -11,7 +11,7 @@ default-extensions:
 library:
   source-dirs: src/
   dependencies:
-  - aeson ==2.1.1.0
+  - aeson >=2.1.1.0 && <2.3
   - aeson-casing
   - attoparsec
   - base16-bytestring
@@ -22,15 +22,19 @@ library:
   - data-default
   - Decimal
   - deepseq
+  - esqueleto
   - ethereum-rlp
   - format
   - generic-random
   - hashable
   - labeled-error
   - lens
+  - persistent
   - QuickCheck
   - quickcheck-instances
+  - regex-tdfa
   - scientific
+  - servant-server
   - source-tools
   - strato-model
   - swagger2

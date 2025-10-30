@@ -17,6 +17,7 @@ module Bloc.Client
     postContractsXabi,
     getBlocTransactionResult,
     postBlocTransactionResults,
+    postBlocTransactionResultsExternal,
     postBlocTransaction,
     postBlocTransactionParallelExternal,
     postBlocTransactionParallel,
@@ -119,49 +120,41 @@ postContractsXabi = client (Proxy @PostContractsXabi)
 getBlocTransactionResult :: Keccak256 -> Bool -> ClientM BlocTransactionResult
 getBlocTransactionResult = client (Proxy @GetBlocTransactionResult)
 
-postBlocTransactionResults :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResults :: Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
 postBlocTransactionResults = client (Proxy @PostBlocTransactionResults)
+
+postBlocTransactionResultsExternal :: Maybe Text -> Bool -> [Keccak256] -> ClientM [BlocTransactionResult]
+postBlocTransactionResultsExternal = client (Proxy @PostBlocTransactionResultsExternal)
 
 ------------- /transaction endpoints -------------
 postBlocTransactionParallel ::
-  Maybe Text ->
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
-  Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransactionParallel = client (Proxy @PostBlocTransactionParallel)
 
 postBlocTransactionParallelExternal ::
   Maybe Text ->
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
-  Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransactionParallelExternal = client (Proxy @PostBlocTransactionParallelExternal)
 
 postBlocTransactionBody ::
-  Maybe Text ->
-  Maybe ChainId ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionBodyResult]
 postBlocTransactionBody = client (Proxy @PostBlocTransactionBody)
 
 postBlocTransactionUnsigned ::
-  Maybe Text ->
-  Maybe ChainId ->
   PostBlocTransactionRequest ->
   ClientM [BlocTransactionUnsignedResult]
 postBlocTransactionUnsigned = client (Proxy @PostBlocTransactionUnsigned)
 
 postBlocTransaction ::
-  Maybe Text ->
-  Maybe ChainId ->
   Maybe Bool ->
   Bool ->
   PostBlocTransactionRequest ->
-  ClientM [BlocChainOrTransactionResult]
+  ClientM [BlocTransactionResult]
 postBlocTransaction = client (Proxy @PostBlocTransaction)

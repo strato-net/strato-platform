@@ -27,12 +27,13 @@ import Blockchain.Data.PersistTypes ()
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.TransactionResultStatus
 import Blockchain.MiscJSON ()
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.CodePtr
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Validator
 import Control.DeepSeq  
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Binary as BIN
@@ -45,6 +46,7 @@ import Database.Persist.Quasi
 import Database.Persist.Sql
 import Database.Persist.TH
 import GHC.Generics
+import SolidVM.Model.Storable
 
 share
   [mkPersist sqlSettings, mkMigrate "migrateAuto"] -- annoying: postgres doesn't like tables called user

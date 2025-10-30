@@ -2,7 +2,7 @@ import React, { Component } from 'react';
 import { Button, Dialog, PopoverInteractionKind, Position, AnchorButton, Popover, Collapse, Switch } from '@blueprintjs/core';
 import { connect } from 'react-redux';
 import { Link, withRouter } from 'react-router-dom';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { Field, reduxForm, formValueSelector } from 'redux-form';
 import {
   methodCall,
@@ -25,7 +25,7 @@ class ContractMethodCall extends Component {
   }
 
   handleOpenModal = () => {
-    mixpanelWrapper.track("method_call_button_click");
+    // mixpanelWrapper.track("method_call_button_click");
     this.setState({isOpen : true})
   }
 
@@ -33,7 +33,7 @@ class ContractMethodCall extends Component {
     e.stopPropagation();
     e.preventDefault();
     this.props.reset();
-    mixpanelWrapper.track("method_call_cancel");
+    // mixpanelWrapper.track("method_call_cancel");
     this.setState({isOpen : false})
   }
 
@@ -70,7 +70,7 @@ class ContractMethodCall extends Component {
           chainId: this.props.selectedChain ? this.props.selectedChain : undefined,
           useWallet: this.state.useWallet
         }
-        mixpanelWrapper.track("method_call_submit");
+        // mixpanelWrapper.track("method_call_submit");
         this.props.methodCall(this.props.methodKey, payload);
       } catch (e) {
         return
@@ -87,8 +87,8 @@ class ContractMethodCall extends Component {
         disabled={isModeOauth}
         required
       >
-        <option value={isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}>
-          {isModeOauth && this.props.userCertificate ? this.props.userCertificate.commonName : "Verification Pending"}
+        <option value={isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}>
+          {isModeOauth && this.props.oAuthUser ? this.props.oAuthUser.username : "STRATO Mercata User"}
         </option>
         {
           users.map((user, i) => {
@@ -113,8 +113,8 @@ class ContractMethodCall extends Component {
         disabled={true}
         required
       >
-        <option value={this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}>
-          {this.props.userCertificate ? this.props.userCertificate.userAddress : "Verification Pending"}
+        <option value={this.props.address}>
+          {this.props.oAuthUser ? this.props.oAuthUser.address : this.props.address}
         </option>
         {
           userAddresses.map((address, i) => {
@@ -235,28 +235,15 @@ class ContractMethodCall extends Component {
     console.log('HERE')
     return (
       <div>
-        <Popover 
-          isDisabled={!!this.props.userCertificate}
-          interactionKind={PopoverInteractionKind.HOVER}
-          position={Position.LEFT}
-          content={
-            <div className='pt-dark pt-callout smd-pad-8 pt-icon-info-sign pt-intent-warning'>
-              <h5 className="pt-callout-title">Verification Required</h5>
-                Your identity must be verified before you can do this action.
-            </div>
-          }
-        >
-          <AnchorButton
-            className="pt-intent-primary pt-icon-send-to-graph"
-            onClick={(e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              this.handleOpenModal();
-            }}
-            disabled={!this.props.userCertificate}
-            text={this.props.symbolName}
-          />
-        </Popover>
+        <AnchorButton
+          className="pt-intent-primary pt-icon-send-to-graph"
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.handleOpenModal();
+          }}
+          text={this.props.symbolName}
+        />
         <form>
           <Dialog
             iconName="exchange"
@@ -274,16 +261,6 @@ class ContractMethodCall extends Component {
                 </div>
                 <div className="col-sm-9 smd-pad-4">
                   {this.props.contractAddress}
-                </div>
-              </div>
-              <div className='row'>
-                <div className="col-sm-3 text-right">
-                  <label className="pt-label smd-pad-4">
-                    Shard
-                  </label>
-                </div>
-                <div className="col-sm-9 smd-pad-4">
-                  {this.props.selectedChain ? <HexText value={this.props.selectedChain}/> : "Main Chain"}
                 </div>
               </div>
               <div className="row">
@@ -506,7 +483,7 @@ export function mapStateToProps(state, ownProps) {
     chainLabel: state.chains.listChain,
     chainLabelIds: state.chains.listLabelIds,
     oAuthUser: state.user.oauthUser,
-    userCertificate: state.user.userCertificate,
+    address: state.user.address || '',
     selectedChain: state.chains.selectedChain,
   };
 }

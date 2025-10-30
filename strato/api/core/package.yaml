@@ -17,6 +17,7 @@ library:
   - binary
   - blockapps-data
   - blockapps-datadefs
+  - blockDB
   - bytestring
   - clock
   - common-log
@@ -31,7 +32,6 @@ library:
   - format
   - hflags
   - http-types
-  - kafka-monad
   - labeled-error
   - lens
   - monad-alter
@@ -43,6 +43,7 @@ library:
   - servant-multipart
   - servant-multipart-client  
 #  - servant-swagger-tags
+  - solid-vm-model
   - source-tools
   - sql-monad
   - strato-model
@@ -50,7 +51,6 @@ library:
   - template-haskell
   - text
   - transformers
-  - type-lits
   - unliftio
   - unordered-containers
   - blockapps-vault-wrapper-api

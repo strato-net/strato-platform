@@ -19,14 +19,7 @@ module Blockchain.Data.AddressStateDB
     MainChainT (..),
     CodePtr (..),
     blankAddressState,
-    resolveCodePtr,
-    unsafeResolveCodePtr,
-    resolveCodePtrParent,
-    codePtrToSHA,
-    resolvedCodePtrToSHA,
-    codePtrToCodeKind,
-    unsafeCodePtrToCodeKind,
-    getAppAccount,
+    codePtrToSHA
   )
 where
 
@@ -45,7 +38,6 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Logger
 import Data.Default
 import Data.Maybe (maybeToList)
-import qualified Data.Set as Set
 import GHC.Generics
 import Numeric
 import qualified Text.Colors as CL
@@ -76,7 +68,7 @@ instance (Address `Alters` AddressState) m => (Address `Alters` AddressState) (M
   insert p k = lift . insert p k
   delete p = lift . delete p
 
-instance Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
+instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (MainChainT m) where
   select p = lift . select p
 
 instance MonadUnliftIO m => MonadUnliftIO (MainChainT m) where
@@ -138,101 +130,6 @@ instance RLPSerializable AddressState where
       }
   rlpDecode x = error $ "Missing case in rlpDecode for AddressState: " ++ format x
 
-{-- TODO:
-    resolveCodePtr fails when there is a circular reference of code pointers on the same chain
-    possible solution is to have a helper function that keeps track of all previously visited codepointers and termiantes if it visits the same one twice (aka cycle detection)
---}
-resolveCodePtr' ::
-  ( Selectable Address AddressState m
-  ) =>
-  Set.Set CodePtr ->
-  CodePtr ->
-  m (Maybe CodePtr)
-resolveCodePtr' visited (CodeAtAccount address name) = do
-  select Proxy address >>= \case
-    Nothing -> pure Nothing
-    Just AddressState {..} -> do
-      if Set.notMember addressStateCodeHash visited
-        then
-          resolveCodePtr' (Set.insert addressStateCodeHash visited) addressStateCodeHash >>= \case
-            Just e@(ExternallyOwned _) -> pure $ Just e
-            Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
-            _ -> pure Nothing
-        else pure Nothing
-resolveCodePtr' _ cp = resolveCodePtr cp
-
-resolveCodePtr ::
-  ( Selectable Address AddressState m
-  ) =>
-  CodePtr ->
-  m (Maybe CodePtr)
-resolveCodePtr coa@(CodeAtAccount _ _) = resolveCodePtr' Set.empty coa
--- for solidVM/EVM code
-resolveCodePtr cp = pure $ Just cp
-
-unsafeResolveCodePtr :: Selectable Address AddressState m => CodePtr -> m (Maybe CodePtr)
-unsafeResolveCodePtr (CodeAtAccount address name) =
-  select Proxy address >>= \case
-    Nothing -> pure Nothing
-    Just AddressState {..} ->
-      unsafeResolveCodePtr addressStateCodeHash >>= \case
-        Just e@(ExternallyOwned _) -> pure $ Just e
-        Just (SolidVMCode _ d) -> pure . Just $ SolidVMCode name d
-        _ -> pure Nothing
-unsafeResolveCodePtr codePtr = pure $ Just codePtr
-
-resolveCodePtrParent :: Selectable Address AddressState m => CodePtr -> m (Maybe CodePtr)
-resolveCodePtrParent (CodeAtAccount address _) =
-  select Proxy address >>= \case
-    Nothing -> pure Nothing
-    Just AddressState {..} ->
-      resolveCodePtrParent addressStateCodeHash >>= \case
-        Just e@(ExternallyOwned _) -> pure $ Just e
-        Just (SolidVMCode name' d) -> pure . Just $ SolidVMCode name' d
-        _ -> pure Nothing
-resolveCodePtrParent codePtr = pure $ Just codePtr
-
-codePtrToSHA ::
-  ( Selectable Address AddressState m
-  ) =>
-  CodePtr ->
-  m (Maybe Keccak256)
-codePtrToSHA =
-  resolveCodePtr >=> \case
-    Just (ExternallyOwned hsh) -> pure $ Just hsh
-    Just (SolidVMCode _ hsh) -> pure $ Just hsh
-    _ -> pure Nothing -- CodeAtAccount cannot happen here
-
-resolvedCodePtrToSHA :: CodePtr -> Keccak256
-resolvedCodePtrToSHA (ExternallyOwned hsh) = hsh
-resolvedCodePtrToSHA (SolidVMCode _ hsh) = hsh
-resolvedCodePtrToSHA _ = emptyHash
-
-codePtrToCodeKind ::
-  ( Selectable Address AddressState m
-  ) =>
-  CodePtr ->
-  m CodeKind
-codePtrToCodeKind =
-  resolveCodePtr >=> \case
-    Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
-
-unsafeCodePtrToCodeKind :: Selectable Address AddressState m => CodePtr -> m CodeKind
-unsafeCodePtrToCodeKind =
-  unsafeResolveCodePtr >=> \case
-    Just (SolidVMCode _ _) -> pure SolidVM
-    _ -> pure SolidVM -- TODO: should this return (Maybe CodeKind)?
-
-getAppAccount ::
-  ( Selectable Address AddressState m
-  ) =>
-  Address ->
-  m (Maybe Address)
-getAppAccount address = do
-  select Proxy address >>= \case
-    Nothing -> pure Nothing
-    Just AddressState {..} -> do
-      case addressStateCodeHash of
-        (CodeAtAccount pAcct _) -> getAppAccount pAcct
-        _ -> pure $ Just address
+codePtrToSHA :: CodePtr -> Keccak256
+codePtrToSHA (ExternallyOwned hsh) = hsh
+codePtrToSHA (SolidVMCode _ hsh) = hsh

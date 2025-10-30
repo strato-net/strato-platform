@@ -7,27 +7,29 @@ module Blockchain.Data.PersistTypes where
 
 import BlockApps.Solidity.Xabi
 import Blockchain.Data.PubKey
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.StateRoot
+import Blockchain.Strato.Model.Validator
 import Crypto.Types.PubKey.ECC
 import Data.Bifunctor (bimap)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base16 as B16
 import qualified Data.ByteString.Short as BSS
+import Data.Ratio
 import qualified Data.Text as T
 import Data.Text.Encoding
+import Data.Word (Word32)
 import Database.Persist
 import Database.Persist.Sql
 import Database.Persist.TH
 import qualified LabeledError
 import Numeric
+import Text.Read (readMaybe)
 
-derivePersistField "Integer"
 -- derivePersistField "Point"
 derivePersistFieldJSON "Xabi"
 
-integerCap :: Integer
+integerCap :: Word32
 integerCap = 1000
 
 showHexFixed :: (Integral a) => Int -> a -> String
@@ -35,37 +37,29 @@ showHexFixed len val = pad $ showHex val ""
   where
     pad s = if length s >= len then s else pad ('0' : s)
 
-{-
-instance PersistField Integer where
-  toPersistValue i = PersistText . T.pack $ show i
-  fromPersistValue (PersistText s) = Right $ read $ T.unpack s --
-  fromPersistValue x = Left $ T.pack $ "PersistField Integer: expected PersistText: " ++ (show x)
-
 instance PersistFieldSql Integer where
-  sqlType _ = SqlNumeric integerCap 0
--}
+  sqlType _ = SqlString
 
-instance PersistField CodeKind where
+instance PersistField Integer where
   toPersistValue = PersistText . T.pack . show
-  fromPersistValue (PersistText t) = Right . LabeledError.read "PersistField/CodeKind" . T.unpack $ t
-  fromPersistValue x = Left . T.pack $ "PersistField CodeKind: expected int: " ++ show x
-
-instance PersistFieldSql CodeKind where
-  sqlType _ = SqlString
-
-instance PersistField HexStorage where
-  toPersistValue (HexStorage hs) = PersistText . decodeUtf8 . B16.encode $ hs
-  fromPersistValue (PersistText t) = case B16.decode (encodeUtf8 t) of
-    Right h -> Right $ HexStorage h
-    _ -> Left $ T.pack $ "Invalid hex text: " ++ show t
-  fromPersistValue x = Left $ T.pack $ "PersistField HexStorage: expected varchar: " ++ (show x)
-
-instance PersistFieldSql HexStorage where
-  sqlType _ = SqlString
+  fromPersistValue (PersistRational r) = case denominator r of
+    1 -> Right $ fromIntegral $ numerator r
+    _ -> Left $ "Invalid Integer: " <> T.pack (show r)
+  fromPersistValue v = case fromPersistValue v of
+    Left e -> Left e
+    Right t ->
+      let s = T.unpack t
+       in case readMaybe s of
+            Just i -> Right i
+            Nothing -> case readMaybe s :: Maybe Double of
+              Just d -> Right $ round d
+              Nothing -> Left $ "Invalid Integer: " <> t
 
 instance PersistField Word256 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 64 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word256)
+  fromPersistValue (PersistText s) = case readHex $ T.unpack s of
+    [] -> Left $ "PersistField Word256: Could not read hex from string " <> s
+    (x:_) -> Right $ (fromIntegral $ ((fst x) :: Integer) :: Word256)
   fromPersistValue x = Left $ T.pack $ "PersistField Word256: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word256 where
@@ -73,7 +67,9 @@ instance PersistFieldSql Word256 where
 
 instance PersistField Word512 where
   toPersistValue i = PersistText . T.pack $ showHexFixed 128 (fromIntegral i :: Integer)
-  fromPersistValue (PersistText s) = Right $ (fromIntegral $ ((fst . head . readHex $ T.unpack s) :: Integer) :: Word512)
+  fromPersistValue (PersistText s) = case readHex $ T.unpack s of
+    [] -> Left $ "PersistField Word512: Could not read hex from string " <> s
+    (x:_) -> Right $ (fromIntegral $ ((fst x) :: Integer) :: Word512)
   fromPersistValue x = Left $ T.pack $ "PersistField Word512: expected integer: " ++ (show x)
 
 instance PersistFieldSql Word512 where
@@ -101,3 +97,10 @@ instance PersistField BSS.ShortByteString where
 
 instance PersistFieldSql BSS.ShortByteString where
   sqlType _ = SqlBlob
+
+instance PersistField Validator where
+  toPersistValue (Validator v) = toPersistValue v
+  fromPersistValue v = fmap Validator $ fromPersistValue v
+
+instance PersistFieldSql Validator where
+  sqlType _ = SqlOther "text"

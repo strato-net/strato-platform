@@ -9,10 +9,10 @@ where
 import qualified Data.Map.Strict as M
 import Data.Source
 import Data.Text (Text)
+import qualified Data.Text as T
 import SolidVM.Model.CodeCollection
 import SolidVM.Solidity.StaticAnalysis.Types
 
--- type CompilerDetector = CodeCollection -> [SourceAnnotation T.Text]
 detector :: CompilerDetector
 detector CodeCollection {..} = concat $ contractHelper <$> M.elems _contracts
 
@@ -65,9 +65,10 @@ simpleStatementHelper ::
   [SourceAnnotation Text]
 simpleStatementHelper a (VariableDefinition xs Nothing) =
   let getAnn BlankEntry x = x
-      getAnn VarDefEntry {..} Nothing = Just vardefContext
-      getAnn VarDefEntry {..} (Just w) = Just $ vardefContext <> w
+      getAnn VarDefEntry {..} Nothing = Just ([vardefName], vardefContext)
+      getAnn VarDefEntry {..} (Just (ns, w)) = Just (vardefName : ns, vardefContext <> w)
    in case foldr getAnn Nothing xs of
         Nothing -> [const "Redundant statement." <$> a]
-        Just ann -> [const "Uninitialized local variable." <$> ann]
+        Just ([n], ann) -> [const ("Uninitialized local variable " <> T.pack n <> ".") <$> ann]
+        Just (ns, ann) -> [const ("Uninitialized local variables " <> T.intercalate ", " (T.pack <$> ns) <> ".") <$> ann]
 simpleStatementHelper _ _ = []

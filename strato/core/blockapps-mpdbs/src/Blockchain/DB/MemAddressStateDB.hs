@@ -6,6 +6,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeOperators #-}
 
 module Blockchain.DB.MemAddressStateDB
@@ -15,9 +16,11 @@ module Blockchain.DB.MemAddressStateDB
     AddressStateModification (..),
     getAddressStateMaybe,
     putAddressState,
+    putAddressStates,
     flushMemAddressStateTxToBlockDB,
     flushMemAddressStateDB,
-    deleteAddressState
+    deleteAddressState,
+    deleteAddressStates,
   )
 where
 
@@ -47,7 +50,7 @@ instance Monad m => (Address `A.Alters` AddressState) (MemAddressStateDB m) wher
   insert _ k = MemAddressStateDB . modify' . M.insert k
   delete _ = MemAddressStateDB . modify' . M.delete
 
-instance Monad m => A.Selectable Address AddressState (MemAddressStateDB m) where
+instance {-# OVERLAPPING #-} Monad m => A.Selectable Address AddressState (MemAddressStateDB m) where
   select = A.lookup
 
 runMemAddressStateDB :: Monad m => MemAddressStateDB m a -> M.Map Address AddressState -> m a
@@ -95,6 +98,14 @@ putAddressState address newState = do
   theMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap (M.insert address (ASModification newState) theMap)
 
+putAddressStates ::
+  (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
+  M.Map Address AddressStateModification ->
+  m ()
+putAddressStates localMap = do
+  txMap <- getAddressStateTxDBMap
+  putAddressStateTxDBMap $ localMap `M.union` txMap
+
 flushMemAddressStateTxToBlockDB ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   m ()
@@ -108,7 +119,6 @@ flushMemAddressStateDB ::
   (HasMemAddressStateDB m, HasStateDB m, HasHashDB m) =>
   m ()
 flushMemAddressStateDB = do
-  flushMemAddressStateTxToBlockDB
   theMap <- getAddressStateBlockDBMap
   forM_ (M.toList theMap) $ \(address, modification) -> do
     case modification of
@@ -123,3 +133,11 @@ deleteAddressState ::
 deleteAddressState address = do
   theMap <- getAddressStateTxDBMap
   putAddressStateTxDBMap (M.insert address ASDeleted theMap)
+
+deleteAddressStates ::
+  (HasMemAddressStateDB m, HasStateDB m) =>
+  [Address] ->
+  m ()
+deleteAddressStates addresses = do
+  theMap <- getAddressStateTxDBMap
+  putAddressStateTxDBMap . M.difference theMap . M.fromList $ (,ASDeleted) <$> addresses

@@ -259,7 +259,9 @@ isBreakpoint eval pos = do
           matchedBP <- or <$> traverse (breakpointMatches eval pos) bPoints
           if matchedBP
             then pure True
-            else pure False
+            else atomically (tryReadTChan operation) >>= \case
+              Just Pause -> pure True
+              _ -> pure False
         else pure True
 
 handleBreakpoint ::
@@ -283,7 +285,9 @@ handleBreakpoint eval pos = do
         _ -> do
           eCmd <- doPause >> race evalLoop (atomically $ readTChan operation)
           case eCmd of
-            Right Run -> void . atomically $ writeTVar current Running
+            Right Run -> void . atomically $ do
+              writeTVar current Running
+              tryPutTMVar ping ()
             Right StepIn -> step 2
             Right StepOver -> step 1
             Right StepOut -> step 0

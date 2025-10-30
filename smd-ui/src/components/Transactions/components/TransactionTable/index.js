@@ -6,7 +6,7 @@ import { updateQuery, clearQuery, executeQuery, removeQuery} from '../../../Quer
 import { withRouter } from 'react-router-dom';
 import { Text, Position, Tooltip, Button } from '@blueprintjs/core';
 import { parseDateFromString } from '../../../../lib/dateUtils';
-import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
+// import mixpanelWrapper from '../../../../lib/mixpanelWrapper';
 import { fetchTx } from '../../../TransactionList/transactionList.actions';
 import HexText from '../../../HexText';
 
@@ -45,7 +45,7 @@ class TransactionTable extends Component {
   render() {
     const { handleSubmit, history} = this.props; 
     const handleClick = function(hash) {
-      mixpanelWrapper.track('transactions_row_click');
+      // mixpanelWrapper.track('transactions_row_click');
       history.push(`/transactions/${hash}`);
     }
     let txRows = this.props.queryResults.length && this.props.queryResults[0]['transactionType'] && this.props.queryResults.map(
@@ -119,17 +119,17 @@ class TransactionTable extends Component {
                   validate={required}
                   onKeyPress={
                     (e) => {
-                      if (e.key === 'Enter') {
-                        //this.dispatchSubmit();
-                        mixpanelWrapper.track('transactions_query_submit');
-                      }
+                      // if (e.key === 'Enter') {
+                      //   //this.dispatchSubmit();
+                      //   mixpanelWrapper.track('transactions_query_submit');
+                      // }
                     }
                   }
                   dir="auto" />
               </div>
               <Button type="submit" onClick={() => {
                 //this.dispatchSubmit();
-                mixpanelWrapper.track('transactions_query_submit');
+                // mixpanelWrapper.track('transactions_query_submit');
               }}
                 className="pt-intent-primary pt-icon-arrow-right" />
             </div>
@@ -146,7 +146,7 @@ class TransactionTable extends Component {
           {queryType + ': ' + queryValue}
           <button onClick={() => {
             removeQuery(queryType);
-            mixpanelWrapper.track('transactions_query_remove_tag');
+            // mixpanelWrapper.track('transactions_query_remove_tag');
           }} className="pt-tag-remove" />
         </span>
       )

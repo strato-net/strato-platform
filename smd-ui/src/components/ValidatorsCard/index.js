@@ -21,46 +21,11 @@ class ValidatorsCard extends Component {
                 </div>
                 <div className='col-xs-10'>
                   <div className='row'>
-                    <div className="col-xs-6">
-                      <small>
-                        Common Name:
-                      </small>
-                    </div>
-                    <div className="col-xs-6">
+                    <div className="col-xs-12">
                       <Text ellipsize={true}>
-                        <small>
-                          {validator.commonName}
-                        </small>
+                        <small>{validator}</small>
                       </Text>
                     </div>
-                  </div>
-                  <div className='row'>
-                    <div className="col-xs-6">
-                      <small>
-                        Organization:
-                      </small>
-                    </div>
-                    <div className="col-xs-6">
-                      <Text ellipsize={true}>
-                        <small>
-                          {validator.orgName}
-                        </small>
-                      </Text>
-                    </div>
-                  </div>
-                  <div className='row'>
-                    <div className="col-xs-6">
-                      <small>
-                        Org. Unit:
-                      </small>
-                    </div>
-                    <div className="col-xs-6">
-                      <Text ellipsize={true}>
-                        <small>
-                          {validator.orgUnit}
-                        </small>
-                      </Text>
-                    </div>        
                   </div>
                 </div>
               </div>

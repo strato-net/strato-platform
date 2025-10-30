@@ -16,6 +16,7 @@ module Control.Monad.Composable.Kafka (
   KafkaEnv(..),
   TopicName,
   kafkaStateToKafkaEnv,
+  getKafkaEnv,
   runKafkaM,
   runKafkaMUsingEnv,
   execKafka,
@@ -44,7 +45,6 @@ module Control.Monad.Composable.Kafka (
   createTopic
   ) where
 
-import BlockApps.Logging
 import Blockchain.MilenaTools
 import Conduit
 import Control.Lens
@@ -63,7 +63,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.IORef
 import Data.List
 import Data.Text (Text)
-import qualified Data.Text as T
 import Network.Kafka hiding (createTopic)
 import qualified Network.Kafka as Milena
 import Network.Kafka.Consumer
@@ -101,6 +100,9 @@ kafkaStateToKafkaEnv kafkaState = do
   ksIORef <- liftIO $ newIORef kafkaState
   return $ KafkaEnv ksIORef
 
+getKafkaEnv :: HasKafka m => m KafkaEnv
+getKafkaEnv = KafkaEnv <$> accessEnv
+
 runKafkaMUsingEnv :: KafkaEnv -> KafkaM m a -> m a
 runKafkaMUsingEnv env f =
   runReaderT f $ kafkaStateIORef env
@@ -135,7 +137,7 @@ packMetadata = Metadata . KString . B16.encode . BL.toStrict . encode
 --   Checkpoints    --
 ----------------------
 
-getKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
+getKafkaCheckpoint :: HasKafka m =>
                       ConsumerGroup -> TopicName -> m (Offset, Metadata)
 getKafkaCheckpoint consumerGroup topicName =
   execKafka (fetchSingleOffset consumerGroup topicName 0) >>= \case
@@ -147,10 +149,9 @@ getKafkaCheckpoint consumerGroup topicName =
     Left err -> error $ "Unexpected response when fetching offset for " ++ show consumerGroup ++ ": " ++ show err
     Right (o, md) -> return (o, md)
 
-setKafkaCheckpoint :: (MonadLogger m, HasKafka m) =>
+setKafkaCheckpoint :: HasKafka m =>
                       ConsumerGroup -> TopicName -> Offset -> Metadata -> m ()
 setKafkaCheckpoint consumerGroup topicName ofs md = do
-  $logInfoS "setKafkaCheckpoint" . T.pack $ "Setting checkpoint to " ++ show ofs
   op' <- execKafka $ setKafkaCheckpoint' consumerGroup topicName ofs md
   case op' of
     Left err -> error $ "Client error: " ++ show err
@@ -184,19 +185,17 @@ produceItemsAsJSON topicName events = do
 --Consuming/Fetching--
 ----------------------
 
-consume :: (Binary a, Binary md, MonadLogger m, HasKafka m) =>
+consume :: (Binary a, Binary md, HasKafka m) =>
            Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m md) -> m ()
 consume name consumerGroup topicName f = void $ runConsume name consumerGroup topicName (\md a -> (Nothing :: Maybe Void,) <$> f md a)
 
-runConsume :: (Binary a, Binary md, MonadLogger m, HasKafka m) =>
+runConsume :: (Binary a, Binary md, HasKafka m) =>
               Text -> ConsumerGroup -> TopicName -> (md -> [a] -> m (Maybe b, md)) -> m b
-runConsume name consumerGroup topicName f = consumeOnce
+runConsume _ consumerGroup topicName f = consumeOnce
   where
     consumeOnce = do
-      $logInfoS name "About to fetch blocks"
       (offset, md) <- getKafkaCheckpoint consumerGroup topicName
       items <- fetchItems topicName offset
-      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       (mReturnVal, md') <- f (unpackMetadata md) items
       let nextOffset' = offset + fromIntegral (length items)
       setKafkaCheckpoint consumerGroup topicName nextOffset' $ packMetadata md'
@@ -222,41 +221,37 @@ fetchBytes topic offset = do
 
   return $ fetchResponseToPayload [offset] fetched
 
-conduitSource :: (MonadLogger m, MonadIO m, Binary a) =>
-                 LogSource -> KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i a m b
-conduitSource name clientId kafkaAddress topicName = do
+conduitSource :: (MonadIO m, Binary a) =>
+                 KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i a m b
+conduitSource clientId kafkaAddress topicName = do
   env <- createKafkaEnv clientId kafkaAddress
 
-  conduitSourceUsingEnv name env topicName
+  conduitSourceUsingEnv env topicName
 
-conduitSourceUsingEnv :: (MonadLogger m, MonadIO m, Binary a) =>
-                         LogSource -> KafkaEnv -> TopicName -> ConduitT i a m b
-conduitSourceUsingEnv name env topicName = do
+conduitSourceUsingEnv :: (MonadIO m, Binary a) =>
+                         KafkaEnv -> TopicName -> ConduitT i a m b
+conduitSourceUsingEnv env topicName = do
   startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      $logInfoS name "About to fetch blocks"
       items <- runKafkaMUsingEnv env $ fetchItems topicName offset
-      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       forM_ items yield
       return $ offset + fromIntegral (length items)
 
-conduitBatchSource :: (MonadLogger m, MonadIO m, Binary a) =>
-                      LogSource -> KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b
-conduitBatchSource name clientId kafkaAddress topicName = do
+conduitBatchSource :: (MonadIO m, Binary a) =>
+                      KafkaClientId -> KafkaAddress -> TopicName -> ConduitT i [a] m b
+conduitBatchSource clientId kafkaAddress topicName = do
   env <- createKafkaEnv clientId kafkaAddress
 
-  conduitBatchSourceUsingEnv name env topicName
+  conduitBatchSourceUsingEnv env topicName
 
-conduitBatchSourceUsingEnv :: (MonadLogger m, MonadIO m, Binary a) =>
-                              LogSource -> KafkaEnv -> TopicName -> ConduitT i [a] m b
-conduitBatchSourceUsingEnv name env topicName = do
+conduitBatchSourceUsingEnv :: (MonadIO m, Binary a) =>
+                              KafkaEnv -> TopicName -> ConduitT i [a] m b
+conduitBatchSourceUsingEnv env topicName = do
   startingOffset <- runKafkaMUsingEnv env $ execKafka $ getLastOffset LatestTime 0 topicName
 
   flip iterateM_ startingOffset $ \offset -> do
-      $logInfoS name "About to fetch blocks"
       items <- runKafkaMUsingEnv env $ fetchItems topicName offset
-      $logInfoS name . T.pack $ "Fetched " ++ show (length items) ++ " events starting from " ++ show offset
       yield items
       return $ offset + fromIntegral (length items)
 

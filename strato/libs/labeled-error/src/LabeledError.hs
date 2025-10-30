@@ -6,7 +6,6 @@ import qualified Data.ByteString.Base16 as B16
 import Data.Maybe
 import Text.Read
 import Prelude hiding (head, tail)
-import qualified Prelude
 
 read :: Read a => String -> String -> a
 read s x = fromMaybe (error $ "[" ++ s ++ "] read parse error: can't parse '" ++ x ++ "'") . readMaybe $ x
@@ -16,14 +15,14 @@ readEither s = first (const s) . Text.Read.readEither
 
 head :: String -> [a] -> a
 head label [] = error $ "[" ++ label ++ "]: 'head' was called on an empty list"
-head _ x = Prelude.head x
+head _ (x:_) = x
 
 tail :: String -> [a] -> [a]
 tail label [] = error $ "[" ++ label ++ "]: 'tail' was called on an empty list"
-tail _ x = Prelude.tail x
+tail _ (_:xs) = xs
 
 b16Decode :: String -> ByteString -> ByteString
 b16Decode label input =
   case B16.decode input of
     Right val -> val
-    _ -> error $ "[" ++ label ++ "]: 'b16Decode' was called on invalid data"
+    _ -> error $ "[" ++ label ++ "]: 'b16Decode' was called on invalid data: " ++ show input

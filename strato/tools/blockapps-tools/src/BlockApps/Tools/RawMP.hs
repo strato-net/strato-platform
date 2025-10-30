@@ -9,11 +9,16 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Reader
 import qualified Data.NibbleString as N
 import qualified Database.LevelDB as DB
+import SolidVM.Model.Storable
 import Text.Format
 
 formatKV :: (N.NibbleString, RLPObject) -> String
 formatKV (key, val) =
-  format key ++ ":\n  " ++ format (rlpDeserialize $ rlpDecode val)
+  format key ++ ":\n  " ++ decodeAndFormatVal
+  where
+    decodeAndFormatVal = case val of
+      RLPArray _ -> format (rlpDecode val :: BasicValue)
+      _ -> format (rlpDeserialize $ rlpDecode val)
 
 showVals :: MonadIO m => DB.DB -> MP.StateRoot -> m ()
 showVals sdb sr = do
@@ -25,6 +30,6 @@ doit :: String -> MP.StateRoot -> IO ()
 doit filename sr = DB.runResourceT $ do
   sdb <-
     DB.open
-      ("/tmp/.ethereumH/" ++ filename) 
+      filename
       DB.defaultOptions {DB.cacheSize = 1024}
   showVals sdb sr

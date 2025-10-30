@@ -20,12 +20,12 @@ module Blockchain.Wiring
     contextModify',
     contextPut,
     compactContextM,
+    gets
   )
 where
 
 import BlockApps.Init ()
 import BlockApps.Logging
-import BlockApps.X509.Certificate
 import Blockchain.Bagger.BaggerState (BaggerState)
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.ChainDB
@@ -35,18 +35,17 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.SQLDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.Block
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.DataDefs
-import Blockchain.Data.RLP
 import Blockchain.Data.TransactionResult
 import qualified Blockchain.Database.MerklePatricia as MP
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.CodePtr ()
 import Blockchain.Strato.Model.ExtendedWord
 import Blockchain.Strato.Model.Keccak256
 import qualified Blockchain.Strato.RedisBlockDB as RBDB
-import Blockchain.Strato.RedisBlockDB.Models
+import Blockchain.SyncDB
 import qualified Blockchain.TxRunResultCache as TRC
 import Blockchain.VMContext
 import Control.DeepSeq
@@ -60,17 +59,13 @@ import Control.Monad.IO.Class
 import Control.Monad.Reader (ReaderT)
 import qualified Data.ByteString as B
 import Data.Default
-import Data.Either.Extra
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.NibbleString as N
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as Text
 import Data.Traversable (for)
 import qualified Database.LevelDB as DB
 import Debugger
-import SolidVM.Model.Storable
-import Text.Read (readMaybe)
 import UnliftIO
 
 type HasContext m = (Monad m, MonadIO m, AccessibleEnv Context m)
@@ -139,27 +134,27 @@ instance HasContext m => Mod.Modifiable (Maybe DebugSettings) m where
   get _ = gets $ view debugSettings
   put _ ds = modify $ debugSettings .~ ds
 
-instance HasContext m => Mod.Accessible ContextState m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible ContextState (ReaderT Context m) where
   access _ = get
 
-instance HasContext m => Mod.Accessible MemDBs m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible MemDBs (ReaderT Context m) where
   access _ = gets $ view memDBs
 
 instance HasContext m => Mod.Modifiable MemDBs m where
   get _ = gets $ view memDBs
   put _ md = modify $ memDBs .~ md
 
-instance HasContext m => Mod.Accessible IsBlockstanbul m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible IsBlockstanbul (ReaderT Context m) where
   access _ = IsBlockstanbul <$> contextGets _hasBlockstanbul
 
 instance HasContext m => Mod.Modifiable BaggerState m where
   get _ = contextGets _baggerState
   put _ s = contextModify $ baggerState .~ s
 
-instance HasContext m => Mod.Accessible TRC.Cache m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible TRC.Cache (ReaderT Context m) where
   access _ = contextGets _txRunResultsCache
 
-instance HasSQL m => m `Mod.Yields` TransactionResult where
+instance {-# OVERLAPPING #-} HasSQL m => m `Mod.Yields` TransactionResult where
   yield = void . putTransactionResult
 
 vmBlockHashRootKey :: B.ByteString
@@ -215,7 +210,7 @@ instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) 
   insert _ = putAddressState
   delete _ = deleteAddressState
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => A.Selectable Address AddressState m where
+instance {-# OVERLAPPING #-} (MonadLogger m, MonadUnliftIO m) => A.Selectable Address AddressState (ReaderT Context m) where
   select _ = getAddressStateMaybe
 
 instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Maybe Word256 `A.Alters` MP.StateRoot) m where
@@ -246,24 +241,6 @@ instance HasContext m => (Keccak256 `A.Alters` DBCode) m where
   insert _ = genericInsertCodeDB $ getCodeDB
   delete _ = genericDeleteCodeDB $ getCodeDB
 
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => ((Address, T.Text) `A.Selectable` X509CertificateField) m where
-  select _ (k, t) = do
-    let certKey addr = (addr,) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      maybe Nothing (readMaybe . T.unpack . Text.decodeUtf8) <$> A.lookup (A.Proxy) (certKey certAddress t)
-
-instance (MonadLogger m, HasContext m, (MP.StateRoot `A.Alters` MP.NodeData) m) => (Address `A.Selectable` X509Certificate) m where
-  select _ k = do
-    let certKey addr = (addr,) . Text.encodeUtf8
-    mCertAddress <- lookupX509AddrFromCBHash k
-    fmap join . for mCertAddress $ \certAddress -> do
-      mBString <- fmap (rlpDecode . rlpDeserialize) <$> A.lookup (A.Proxy) (certKey certAddress ".certificateString")
-      case mBString of
-        Just (BString bs) -> pure . eitherToMaybe $ bsToCert bs
-        _ -> pure Nothing
-
-
 instance HasContext m => (N.NibbleString `A.Alters` N.NibbleString) m where
   lookup _ = genericLookupHashDB $ getHashDB
   insert _ = genericInsertHashDB $ getHashDB
@@ -286,16 +263,16 @@ instance HasContext m => (Keccak256 `A.Alters` BlockSummary) m where
   insert _ = genericInsertBlockSummaryDB $ getBlockSummaryDB
   delete _ = genericDeleteBlockSummaryDB $ getBlockSummaryDB
 
-instance HasContext m => Mod.Accessible SQLDB m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible SQLDB (ReaderT Context m) where
   access _ = fmap (view (dbs.sqldb)) accessEnv
 
-instance HasContext m => Mod.Accessible RBDB.RedisConnection m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible RBDB.RedisConnection (ReaderT Context m) where
   access _ = fmap (view $ dbs . redisPool) accessEnv
 
-instance (MonadIO m, Mod.Accessible RBDB.RedisConnection m) => Mod.Accessible (Maybe WorldBestBlock) m where
+instance {-# OVERLAPPING #-} MonadIO m => Mod.Accessible (Maybe WorldBestBlock) (ReaderT Context m) where
   access _ = do
-    mRBB <- RBDB.withRedisBlockDB RBDB.getWorldBestBlockInfo
-    for mRBB $ \(RedisBestBlock sha num) ->
+    mRBB <- RBDB.withRedisBlockDB getWorldBestBlockInfo
+    for mRBB $ \(BestBlock sha num) ->
       return . WorldBestBlock $ BestBlock sha num
 
 instance (MonadLogger m, HasContext m) => Mod.Modifiable GasCap m where

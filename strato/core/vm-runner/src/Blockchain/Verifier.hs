@@ -11,12 +11,12 @@ import Blockchain.Data.BlockHeader
 import Blockchain.Data.BlockSummary
 import Blockchain.Data.RLP
 import Blockchain.Data.Transaction
-import Blockchain.Sequencer.Event
+import Blockchain.Model.WrappedBlock
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Event 
 import qualified Control.Monad.Change.Alter as A
-import Data.Maybe (fromMaybe, catMaybes)
+import Data.Maybe (catMaybes)
 
 
 nextGasLimitDelta :: Integer -> Integer
@@ -31,14 +31,6 @@ checkParentChildValidity Block {blockBlockData = c} parentBSum = do
     then Nothing
     else Just $ UnexpectedBlockNumber (BlockDelta (number c) (bSumNumber parentBSum + 1))
 
--- verifyTransactionRoot' :: Block -> (Bool, MP.StateRoot)
--- verifyTransactionRoot' Block {blockBlockData = bd, blockReceiptTransactions = txs} =
---   let tVal = transactionsVerificationValue (otBaseTx <$> txs) in (transactionsRoot bd == tVal, tVal)
-
--- verifyTransactionRoot :: HasStateDB m => Block -> m (Bool, MP.StateRoot)
--- verifyTransactionRoot Block {blockBlockData = bd, blockReceiptTransactions = txs} = do
---   sr <- MP.addAllKVs MP.emptyTriePtr $ zip [(0 :: Integer) ..] $ (otBaseTx <$> txs)
---   return (transactionsRoot bd == sr, sr)
 
 verifyOmmersRoot :: HasStateDB m => Block -> m (Maybe BlockVerificationFailureDetails)
 verifyOmmersRoot Block {blockBlockData = bd, blockBlockUncles = bu} = 
@@ -56,6 +48,5 @@ checkValidity parentBSum b = do
 
 isNonceValid :: (Address `A.Alters` AddressState) f => OutputTx -> f Bool
 isNonceValid ot@OutputTx {otSigner = txAddr} =
-  let base = fromMaybe (otBaseTx ot) (otPrivatePayload ot)
-      tNonce = transactionNonce base
+  let tNonce = transactionNonce $ otBaseTx ot
    in (== tNonce) . addressStateNonce <$> A.lookupWithDefault A.Proxy txAddr

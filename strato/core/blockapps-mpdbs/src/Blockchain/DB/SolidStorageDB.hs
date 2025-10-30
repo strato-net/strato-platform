@@ -23,7 +23,6 @@ import Blockchain.DB.MemAddressStateDB
 import Blockchain.DB.RawStorageDB
 import Blockchain.DB.StateDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.RLP
 import qualified Blockchain.Database.MerklePatricia as MP
 import Blockchain.Strato.Model.Address
 import Control.Monad.Change.Alter (Alters)
@@ -44,18 +43,16 @@ type FullSolidStorage m =
   )
 
 toKey :: Address -> StoragePath -> RawStorageKey
-toKey = curry $ fmap unparsePath
+toKey k v = (k, v)
 
 toVal :: BasicValue -> RawStorageValue
 toVal bv =
-  let v =
-        if isDefault bv
-          then BDefault
-          else bv
-   in rlpSerialize $ rlpEncode v
+  if isDefault bv
+    then BDefault
+    else bv
 
 fromVal :: RawStorageValue -> BasicValue
-fromVal = rlpDecode . rlpDeserialize
+fromVal = id
 
 putSolidStorageKeyVal' :: HasSolidStorageDB m => Address -> StoragePath -> BasicValue -> m ()
 putSolidStorageKeyVal' address key val = do

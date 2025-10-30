@@ -9,12 +9,9 @@ module Blockchain.Data.ExecResults
   )
 where
 
-import BlockApps.X509.Certificate
 import Blockchain.Data.Log
 import Blockchain.Data.Transaction
-import Blockchain.SolidVM.Model
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Validator
 import Blockchain.Stream.Action (Action)
@@ -35,14 +32,9 @@ data ExecResults = ExecResults
     erSuicideList :: S.Set Address,
     erAction :: Maybe Action,
     erException :: Maybe (Either SolidException VMException),
-    erKind :: CodeKind,
     erPragmas :: [(String, String)],
-    erCreator :: String,
-    erAppName :: String,
     erNewValidators :: [Validator],
-    erRemovedValidators :: [Validator],
-    erNewCerts :: [X509Certificate],
-    erRevokedCerts :: [DummyCertRevocation]
+    erRemovedValidators :: [Validator]
   }
   deriving (Eq, Show, Generic)
 
@@ -54,13 +46,15 @@ calculateReturned t er =
    in realRefund + erRemainingTxGas er
 
 evmErrorResults :: Integer -> VMException -> ExecResults
-evmErrorResults remainingGas e = errorResults EVM remainingGas (Right e)
+evmErrorResults remainingGas e = errorResults remainingGas (Right e)
 
 solidvmErrorResults :: SolidException -> ExecResults
-solidvmErrorResults e = errorResults SolidVM 0 (Left e)
+solidvmErrorResults e = errorResults 0 (Left e)
 
-errorResults :: CodeKind -> Integer -> Either SolidException VMException -> ExecResults
-errorResults ck remainingGas e =
+
+
+errorResults :: Integer -> Either SolidException VMException -> ExecResults
+errorResults remainingGas e =
   ExecResults
     { erRemainingTxGas = remainingGas,
       erRefund = 0,
@@ -72,13 +66,8 @@ errorResults ck remainingGas e =
       erSuicideList = S.empty,
       erAction = Nothing,
       erException = Just e,
-      erKind = ck,
       -- , erNewX509Certs = M.empty
       erPragmas = [],
-      erCreator = "",
-      erAppName = "",
       erNewValidators = [],
-      erRemovedValidators = [],
-      erNewCerts = [],
-      erRevokedCerts = []
+      erRemovedValidators = []
     }

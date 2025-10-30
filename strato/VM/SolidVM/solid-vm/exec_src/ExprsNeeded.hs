@@ -2,14 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-import Control.Exception (throw)
 import qualified Data.Map as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
-import SolidVM.CodeCollectionTools
 import SolidVM.Model.CodeCollection
-import SolidVM.Model.SolidString
 import SolidVM.Solidity.Parse.Declarations
 import SolidVM.Solidity.Parse.File
 import SolidVM.Solidity.Parse.ParserTypes
@@ -68,9 +65,7 @@ expressionCrawler = \case
   MemberAccess _ expr _ -> "MemberAccess" : expressionCrawler expr
   FunctionCall _ func args ->
     "FunctionCall" : do
-      expr <- case args of
-        OrderedArgs args' -> func : args'
-        NamedArgs args' -> func : map snd args'
+      expr <- func : args
       expressionCrawler expr
   Unitary _ n expr -> T.pack ("Unitary: " ++ n) : expressionCrawler expr
   Binary _ n lhs rhs ->
@@ -83,10 +78,14 @@ expressionCrawler = \case
       expressionCrawler expr
   BoolLiteral {} -> ["BoolLiteral"]
   HexaLiteral {} -> ["HexaLiteral"]
+  InlineBoundsCheck _ mL mU expr ->
+    let l = maybe "" (T.pack . show) mL
+        u = maybe "" (T.pack . show) mU
+     in ("InlineBoundsCheck (" <> l <> "," <> u <> ")") : expressionCrawler expr
   NumberLiteral {} -> ["NumberLiteral"]
   DecimalLiteral {} -> ["DecimalLiteral"]
   StringLiteral {} -> ["StringLiteral"]
-  AccountLiteral {} -> ["AccountLiteral"]
+  AddressLiteral {} -> ["AddressLiteral"]
   TupleExpression _ subexprs ->
     "TupleExpression" : do
       expr <- catMaybes subexprs
@@ -123,7 +122,7 @@ main = do
     (fn : _) -> return fn
   contents <- readFile filename
   File parsedFile <- either (die . show) return $ runParser solidityFile initialParserState "" contents
-  let namedContracts = [(textToLabel name, either (throw . fst) id $ xabiToContract (textToLabel name) (map textToLabel parents') M.empty xabi) | NamedXabi name (xabi, parents') <- parsedFile]
+  let namedContracts = [(_contractName contr, contr) | FLContract contr <- parsedFile]
       cc = CodeCollection (M.fromList namedContracts) (M.empty) (M.empty) (M.empty) (M.empty) (M.empty) [] []
       typecheck = TC.detector cc
       nodes = codeCollectionCrawler cc

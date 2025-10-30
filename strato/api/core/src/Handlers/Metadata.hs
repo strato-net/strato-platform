@@ -24,31 +24,26 @@ module Handlers.Metadata
 where
 
 import BlockApps.Logging
-import Blockchain.DB.SQLDB
-import Blockchain.Data.DataDefs
+import Blockchain.Model.SyncState
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainMember
 import Blockchain.Strato.Model.Options (computeNetworkID)
-import Blockchain.Strato.Model.Secp256k1 hiding (HasVault (..))
-import Blockchain.Strato.RedisBlockDB (getSyncStatusNow, runStratoRedisIO)
+import Blockchain.Strato.Model.Secp256k1
+import Blockchain.Strato.Model.Validator
+import Blockchain.Strato.RedisBlockDB (runStratoRedisIO)
+import Blockchain.SyncDB (getSyncStatusNow, getBestSequencedBlockInfo)
 import Control.Lens
 import Control.Monad.Change.Modify
-import Control.Monad.Composable.SQL
-import Control.Monad.Composable.Vault
+import Control.Monad.Reader
 import Data.Aeson hiding (Success)
 import Data.Aeson.Casing.Internal (camelCase, dropFPrefix)
 import Data.Map (Map, fromList)
 import Data.Maybe (fromJust, fromMaybe)
 import Data.Swagger hiding (url)
-import qualified Database.Esqueleto.Legacy as E
 import GHC.Generics
-import GHC.Stack
 import qualified LabeledError
-import SQLM
 import Servant
 import Servant.Client
 import qualified Strato.Strato23.API.Types as V
-import Strato.Strato23.Client hiding (verifyPassword)
 import UnliftIO
 
 type UrlMap = Map String String
@@ -56,7 +51,7 @@ type UrlMap = Map String String
 data MetadataResponse = MetadataResponse
   { nodePubKey :: V.PublicKey,
     nodeAddress :: Address,
-    validators :: [ChainMemberParsedSet],
+    validators :: [Validator],
     isSynced :: Bool,
     isVaultPasswordSet :: Bool,
     networkID :: String, -- cuz JSON can't rep integers > 2^53
@@ -69,13 +64,14 @@ type API = "metadata" :> Get '[JSON] MetadataResponse
 getMetaDataClient :: ClientM MetadataResponse
 getMetaDataClient = client (Proxy @API)
 
-server :: (HasVault m, MonadLogger m, HasSQL m, Accessible UrlMap m) => ServerT API m
+server
+  :: ( MonadUnliftIO m
+     , MonadLogger m
+     , Accessible UrlMap m
+     , Accessible V.PublicKey m
+     )
+  => ServerT API m
 server = getMetaData
-
-instance HasSQL m => Accessible [ChainMemberParsedSet] m where
-  access _ = do
-    txrs <- fmap (map E.entityVal) $ sqlQuery . E.select . E.from $ \(a :: E.SqlExpr (E.Entity ValidatorRef)) -> return a
-    pure $ (\(ValidatorRef o u c) -> CommonName o u c True) <$> txrs
 
 instance ToSchema MetadataResponse where
   declareNamedSchema proxy =
@@ -89,7 +85,7 @@ exMetadataRespone =
    in MetadataResponse
         pubKey
         (fromPublicKey pubKey)
-        [CommonName "BlockApps" "Engineering" "Admin" True]
+        [Validator 0xdeadbeef]
         True
         True
         "0"
@@ -108,33 +104,23 @@ metadataSchemaOptions =
 
 getMetaData ::
   ( MonadLogger m,
-    HasVault m,
-    Accessible [ChainMemberParsedSet] m,
-    Accessible UrlMap m,
-    HasSQL m
+    MonadUnliftIO m,
+    Accessible V.PublicKey m,
+    Accessible UrlMap m
   ) =>
   m MetadataResponse
 getMetaData =
   do
-    validators <- access (Proxy @[ChainMemberParsedSet])
+    validators <- fromMaybe [] . fmap bestSequencedBlockValidators <$> runStratoRedisIO getBestSequencedBlockInfo
     isSynced <- checkIsSynced
     V.AddressAndKey a k <- getPubKeyAndAddress
     urlMap <- access (Proxy @UrlMap)
     pure $ MetadataResponse k a validators isSynced True (show computeNetworkID) urlMap
 
-blocVaultWrapper ::
-  (MonadIO m, MonadLogger m, HasVault m, HasCallStack) =>
-  ClientM x ->
-  m x
-blocVaultWrapper client' = do
-  logInfoCS callStack "Querying Vault Wrapper"
-  VaultData url mgr <- access Proxy
-  resultEither <-
-    liftIO $ runClientM client' (mkClientEnv mgr url)
-  either (blocError . VaultWrapperError) return resultEither
+getPubKeyAndAddress :: (MonadLogger m, Accessible V.PublicKey m) => m V.AddressAndKey
+getPubKeyAndAddress = do
+  pub <- access (Proxy @V.PublicKey)
+  pure $ V.AddressAndKey (fromPublicKey pub) pub
 
-getPubKeyAndAddress :: (MonadLogger m, MonadUnliftIO m, HasVault m) => m V.AddressAndKey
-getPubKeyAndAddress = blocVaultWrapper $ getKey Nothing Nothing
-
-checkIsSynced :: (HasSQL m) => m Bool
+checkIsSynced :: MonadIO m => m Bool
 checkIsSynced = fromMaybe False <$> runStratoRedisIO getSyncStatusNow

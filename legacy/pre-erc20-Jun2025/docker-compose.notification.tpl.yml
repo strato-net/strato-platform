@@ -1,0 +1,45 @@
+#notification-server-version:<VERSION>
+#strato-getting-started-min-version:4.6.0
+version: '3'
+services:
+  notification-server:
+    environment:
+    - NODE_ENV=${NODE_ENV}
+    - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    - POSTGRES_SERVER_URL=${POSTGRES_SERVER_URL}
+    - POSTGRES_PORT=${POSTGRES_PORT}
+    - POSTGRES_USER=${POSTGRES_USER}
+    - POSTGRES_DBNAME=${POSTGRES_DBNAME}
+    - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    - KEYCLOAK_AUTH_URL=${KEYCLOAK_AUTH_URL}
+    - MASTER_REALM_CLIENT_ID=${MASTER_REALM_CLIENT_ID}
+    - MASTER_REALM_CLIENT_SECRET=${MASTER_REALM_CLIENT_SECRET}
+    - KEYCLOAK_USER_REALM=${KEYCLOAK_USER_REALM}
+    build: .
+    image: ${NOTIFICATION_SERVER_IMAGE:-<REPO_URL>notification-server:<VERSION>}
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"
+  nginx:
+    depends_on:
+    - notification-server
+    environment:
+    - OAUTH_DISCOVERY_URL=${OAUTH_DISCOVERY_URL}
+    - ssl=${ssl}
+    - sslCertFileType=${sslCertFileType}
+    build: .
+    image: ${NOTIFICATION_SERVER_NGINX_IMAGE:-<REPO_URL>notification-server-nginx:<VERSION>}
+    ports:
+    - ${HTTP_PORT:-80}:80 #TAG_REMOVE_WHEN_SSL_CUSTOM_HTTPS_PORT
+    - ${HTTPS_PORT:-443}:443 #TAG_REMOVE_WHEN_NO_SSL
+    volumes:
+    - ./ssl:/tmp/ssl:ro
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "3"

@@ -33,7 +33,7 @@ dependencies:
   - nibblestring
   - ordered-containers
   - primitive
-  - secp256k1-haskell
+  - blockapps-secp256k1-haskell
   - strato-model
   - text
   - time

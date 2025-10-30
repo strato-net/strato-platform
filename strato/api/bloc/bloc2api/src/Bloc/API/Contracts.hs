@@ -158,6 +158,7 @@ instance ToSample Contract where
           _usings = Map.empty,
           _contractType = ContractType,
           _importedFrom = Nothing,
+          _isContractRecord = False,
           _contractContext = SourceAnnotation (SourcePosition "SimpleStorage.sol" 1 1) (SourcePosition "SimpleStorage.sol" 1 2) ()
         }
 
@@ -245,13 +246,6 @@ type GetContractsDetails =
     :> QueryParam "chainid" ChainId
     :> Get '[JSON] Contract -- change to HTML
 
---instance {-# OVERLAPPING #-} ToSchema GetContractsStateResponses where
---  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
---    & description ?~ "Response to the Get Cotnracts State route"
---    & example ?~ toJSON ex
---    where
---      ex :: GetContractsStateResponses
---      ex = Map.fromList [("willRain", SolidityBool False)]
 
 --------------------------------------------------------------------------------
 
@@ -393,13 +387,6 @@ type GetContractsStatesResponse = Map Address (Map Text SolidityValue)
 instance ToSample GetContractsStatesResponse where
   toSamples _ = noSamples
 
---instance ToSchema GetContractsStatesResponse where
---  declareNamedSchema = pure . pure $ NamedSchema (Just "Get Contract States Response") $ mempty
---    & description ?~ "Response to the Get Cotnracts State route"
---    & example ?~ toJSON ex
---    where
---      ex :: [GetContractsStatesResponse]
---      ex = [Map.fromList [(Address 0xdeadbeef, Map.fromList [("it will rain",SolidityBool False)])]]
 
 --------------------------------------------------------------------------------
 -- POST /contracts/compile

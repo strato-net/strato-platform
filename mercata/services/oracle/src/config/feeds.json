@@ -1,0 +1,19 @@
+{
+  "feeds": [
+    {
+      "name": "crypto-batch",
+      "sources": ["Alchemy", "CoinMarketCap"],
+      "assets": ["ETH", "WBTC", "PAXG"]
+    },
+    {
+      "name": "metals-batch",
+      "sources": ["Metals.dev", "MetalsAPI"],
+      "assets": ["XAU", "XAG"]
+    },
+    {
+      "name": "constant-price",
+      "sources": ["constant"],
+      "assets": ["USDST"]
+    }
+  ]
+} 

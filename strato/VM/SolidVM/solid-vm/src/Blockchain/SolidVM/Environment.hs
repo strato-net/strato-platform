@@ -8,9 +8,9 @@ where
 
 import Blockchain.Data.BlockHeader
 import Blockchain.Strato.Model.Address
+import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Keccak256
-import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Text (Text)
 
 newtype Sender = Sender {unSender :: Address}
 
@@ -20,6 +20,7 @@ data Environment = Environment
     proposer :: Address,
     blockHeader :: BlockHeader,
     txHash :: Keccak256,
-    metadata :: Maybe (M.Map T.Text T.Text),
+    src :: Maybe Code,
+    name :: Maybe Text,
     runningTests :: Bool
   }

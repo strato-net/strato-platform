@@ -18,49 +18,40 @@ module Bloc.Server.TransactionResult
     getBatchBlocTransactionResult',
     getBlocTransactionResult',
     forStateT,
-    constructArgValuesAndSource,
     recurseTRDs,
     TRD (..),
   )
 where
 
--- import qualified Data.Text.Encoding                as Text
 
 import qualified Bloc.API.DeprecatedPostTransaction as Deprecated
 import Bloc.API.TypeWrappers
 import Bloc.API.Users
-import Bloc.Database.Queries
+import Bloc.Database.Queries (getContractByAddress)
 import Bloc.Monad
 import Bloc.Server.Utils
 import BlockApps.Logging
 import BlockApps.Solidity.ArgValue
 import BlockApps.Solidity.Contract ()
 import BlockApps.Solidity.SolidityValue
-import BlockApps.Solidity.Storage
 import BlockApps.Solidity.Type
 import BlockApps.Solidity.Value
 import qualified BlockApps.Solidity.Xabi.Type as Xabi
-import BlockApps.Solidity.XabiContract
 import BlockApps.SolidityVarReader
-import BlockApps.XAbiConverter
-import Blockchain.DB.CodeDB
-import Blockchain.Data.AddressStateDB
+import qualified SolidVM.Model.Type as SVMType
+import Blockchain.Data.AddressStateDB (AddressState)
 import Blockchain.Data.DataDefs
+import Blockchain.DB.CodeDB
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.ChainId
 import Blockchain.Strato.Model.Keccak256
 import Control.Arrow
 import Control.Concurrent
 import Control.Lens hiding (from, ix)
 import Control.Monad
 import qualified Control.Monad.Change.Alter as A
-import Control.Monad.Composable.SQL
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.State.Lazy
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as ByteString
-import qualified Data.ByteString.Base16 as Base16
-import qualified Data.ByteString.Char8 as BC
 import Data.Either
 import Data.Foldable
 import Data.Int (Int32)
@@ -75,10 +66,14 @@ import qualified Data.Text as Text
 import Data.Text.Encoding (encodeUtf8)
 import Data.Traversable
 import Handlers.AccountInfo
+import Handlers.Storage
+import Handlers.Transaction
 import SQLM
 import SolidVM.Model.CodeCollection.Contract
-import SolidVM.Model.CodeCollection.Function
+import SolidVM.Model.CodeCollection.Function (funcVals)
 import SolidVM.Model.CodeCollection.Statement
+import SolidVM.Model.CodeCollection.VarDef (indexedTypeType)
+import SolidVM.Model.SolidString (labelToText, textToLabel)
 import SolidVM.Solidity.Parse.ParserTypes (initialParserState)
 import SolidVM.Solidity.Parse.Statement
 import Text.Format
@@ -107,11 +102,15 @@ emptyBatchState = BatchState Map.empty
 -- when multiple hashes are provided. This is a glass-half-full
 -- function, and if one TX succeeds then the result is a success.
 getBlocTransactionResult' ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadUnliftIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
@@ -130,53 +129,69 @@ getBlocTransactionResult' hashes@(txh : _) resolve =
     else return $ BlocTransactionResult Pending txh Nothing Nothing
 
 getBlocTransactionResult ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   Keccak256 ->
   Bool ->
   m BlocTransactionResult
-getBlocTransactionResult txHash resolve = fmap head $ postBlocTransactionResults Nothing resolve [txHash]
+getBlocTransactionResult txHash resolve = unsafeHead =<< postBlocTransactionResults resolve [txHash]
+  where unsafeHead [] = throwIO $ AnError "getBlocTransactionResult: No results returned"
+        unsafeHead (x:_) = pure x
 
 getBatchBlocTransactionResult' ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
   [Keccak256] ->
   Bool ->
   m [BlocTransactionResult]
 getBatchBlocTransactionResult' hashes resolve =
   if resolve
-    then postBlocTransactionResults Nothing True hashes
+    then postBlocTransactionResults True hashes
     else return $ map (\h -> BlocTransactionResult Pending h Nothing Nothing) hashes
 
 postBlocTransactionResults ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    A.Selectable Keccak256 [TransactionResult] m,
+    A.Selectable TxsFilterParams [RawTransaction] m,
+    MonadLogger m
   ) =>
-  Maybe Text ->
   Bool ->
   [Keccak256] ->
   m [BlocTransactionResult]
-postBlocTransactionResults _ resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
+postBlocTransactionResults resolve hashes = recurseTRDs resolve hashes >>= evalAndReturn
 
 recurseTRDs ::
-  (MonadLogger m, HasSQL m) =>
+  ( MonadIO m
+  , MonadLogger m
+  , A.Selectable Keccak256 [TransactionResult] m
+  , A.Selectable TxsFilterParams [RawTransaction] m
+  ) =>
   Bool ->
   [Keccak256] ->
   m [TRD]
-recurseTRDs resolve hashes = go 0 (toPending hashes)
+recurseTRDs resolve hashes = go (0 :: Integer) (toPending hashes)
   where
-    go :: (MonadLogger m, HasSQL m) => Int -> [TRD] -> m [TRD]
     go num list = do
       let his = map (trdHash &&& trdIndex) list
       statusAndMtxrs <- zip his <$> getBatchBlocTxStatus (map fst his)
@@ -222,37 +237,35 @@ rawTx2PostTx RawTransaction {..} =
     { Deprecated.posttransactionHash = rawTransactionTxHash,
       Deprecated.posttransactionGasLimit = fromInteger rawTransactionGasLimit,
       Deprecated.posttransactionCodeOrData = "", -- this is only for send txs anyway
-      Deprecated.posttransactionGasPrice = fromInteger rawTransactionGasPrice,
       Deprecated.posttransactionTo = rawTransactionToAddress,
       Deprecated.posttransactionFrom = rawTransactionFromAddress,
-      Deprecated.posttransactionValue = Strung $ fromInteger rawTransactionValue,
       Deprecated.posttransactionR = Hex $ fromInteger rawTransactionR,
       Deprecated.posttransactionS = Hex $ fromInteger rawTransactionS,
       Deprecated.posttransactionV = Hex rawTransactionV,
-      Deprecated.posttransactionNonce = fromInteger rawTransactionNonce,
-      Deprecated.posttransactionChainId = ChainId <$> toMaybe 0 rawTransactionChainId,
-      Deprecated.posttransactionMetadata = Map.fromList <$> rawTransactionMetadata
+      Deprecated.posttransactionNonce = fromInteger rawTransactionNonce
     }
 
 evalAndReturn ::
-  ( (Keccak256 `A.Selectable` SourceMap) m,
+  ( MonadIO m,
     HasCodeDB m,
     A.Selectable Address AddressState m,
-    MonadLogger m,
-    HasSQL m
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    MonadLogger m
   ) =>
   [TRD] ->
   m [BlocTransactionResult]
 evalAndReturn list = forStateT emptyBatchState list $
-  \(TRD status txHash i mtxr) -> case status of
+  \(TRD status txHash _ mtxr) -> case status of
     Pending -> return $ BlocTransactionResult Pending txHash Nothing Nothing
     Failure -> return $ BlocTransactionResult Failure txHash (snd <$> mtxr) Nothing
     Success -> case mtxr of
       Nothing -> return $ BlocTransactionResult Pending txHash Nothing Nothing
-      Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCodeOrData) of
-        (Nothing, _) -> contractResult i txHash txr (Map.fromList <$> rawTransactionMetadata)
-        (_, Just bs) | bs == ByteString.empty -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
-        (Just addr, _) -> functionResult i txHash txr (Map.fromList <$> rawTransactionMetadata) addr
+      Just (r@RawTransaction {..}, txr) -> case (rawTransactionToAddress, rawTransactionCode) of
+        (Nothing, _) -> contractResult txHash txr (fromJust rawTransactionContractName)
+        (_, Just _) -> return $ BlocTransactionResult Success txHash (Just txr) (Just . Send $ rawTx2PostTx r)
+        (Just addr, _) -> functionResult txHash txr (fromJust rawTransactionFuncName) addr
 
 nth :: Integer -> Text
 nth n
@@ -262,18 +275,14 @@ nth n
   | otherwise = Text.pack (show $ n + 1) <> "th"
 
 contractResult ::
-  HasSQL m =>
-  Integer ->
+  ( MonadIO m
+  , A.Selectable AccountsFilterParams [AddressStateRef] m
+  ) =>
   Keccak256 ->
   TransactionResult ->
-  Maybe (Map Text Text) ->
+  Text ->
   StateT BatchState m BlocTransactionResult
-contractResult i txHash txResult@TransactionResult {..} mmd = do
-  name <- case mmd of
-    Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-    Just md -> case Map.lookup "name" md of
-      Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-      Just n -> pure n
+contractResult txHash txResult@TransactionResult {..} name = do
   let accountMaybe = listToMaybe transactionResultContractsCreated
   case accountMaybe of
     Nothing -> case transactionResultMessage of
@@ -285,20 +294,19 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
       stratoMsg -> lift . throwIO . UserError $ Text.pack stratoMsg
     Just acct -> do
       -- Checks if account exists in the address state ref table before returning results
-      details <- lift $ go acct name 0
+      details <- lift $ go acct name (0 :: Integer)
       return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Upload details)
   where
-    go :: HasSQL m => Address -> Text -> Integer -> m UploadContractDetails
-    go address name num = do
-      if num >= 100 
+    go address name' num = do
+      if num >= 100
         then throwIO . UserError $ Text.pack $ "Transaction succeeded, but contract was neither created, nor destroyed, num=" ++ show num
         else do
           void . liftIO $ threadDelay 100000
-          addressRefs <- 
-            getAccount' 
+          addressRefs <-
+            getAccount'
               accountsFilterParams
                 { _qaAddress = Just address,
-                  _qaContractName = Just name,
+                  _qaContractName = Just name',
                   _qaIgnoreChain = Just True
                 }
           case addressRefs of
@@ -307,63 +315,83 @@ contractResult i txHash txResult@TransactionResult {..} mmd = do
 
 
 functionResult ::
-  ( A.Selectable Address AddressState m,
+  ( MonadIO m,
     HasCodeDB m,
+    A.Selectable Address AddressState m,
     (Keccak256 `A.Selectable` SourceMap) m,
-    MonadLogger m,
-    HasSQL m
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    MonadLogger m
   ) =>
-  Integer ->
   Keccak256 ->
   TransactionResult ->
-  Maybe (Map Text Text) ->
+  Text ->
   Address ->
   StateT BatchState m BlocTransactionResult
-functionResult i txHash txResult@TransactionResult {..} mmd toAddress = do
-  case transactionResultKind of
-    -- Check if it is a solidVm first
-    -- If it is, we can reduce calls to get Contract
-    Just SolidVM -> case transactionResultMessage of
+functionResult txHash txResult@TransactionResult {..} funcName addr = do
+  case transactionResultMessage of
       "Success!" -> do
         let txResp = transactionResultResponse
-        mFormattedResponse <- convertSvmResultResToVals txResp
-        formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
-        return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
+        -- WORKAROUND: SolidVM's encodeForReturn' returns "0" for both SNULL and
+        -- SReference{} regardless of the actual return type. This loses type
+        -- information, causing incorrect values in API responses:
+        --
+        --   - SNULL with type Bool should return "false" not "0"
+        --   - SNULL with type String should return "" not "0"
+        --   - SNULL with type Address should return "0x0000..." not "0"
+        --
+        -- IDEAL FIX: Modify encodeForReturn' in SolidVM.hs to accept type
+        -- information and encode SNULL/SReference correctly at the VM
+        -- level. This would require:
+        --
+        --   1. Threading type info through the VM execution context
+        --   2. Passing function return types to encodeForReturn'
+        --   3. Pattern matching on (Value, Type) pairs instead of just Value
+        --
+        -- CURRENT FIX: The getReturnTypes: retrieve the function's return types
+        -- from the contract XABI and use them to convert "0" responses to
+        -- properly-typed default values.
+        mReturnTypes <- lift $ getReturnTypes addr funcName
+        mFormattedResponse <- lift $ convertSvmResultResToVals txResp mReturnTypes
+        formattedResponse <- lift $ blocMaybe ("Failed to parse response: "
+                                               <> Text.pack txResp) mFormattedResponse
+        return $ BlocTransactionResult
+                      Success
+                      txHash
+                      (Just txResult)
+                      (Just $ Call formattedResponse)
       stratoMsg -> throwIO $ UserError $ Text.pack stratoMsg
-    -- Note the below can be removed if one day
-    -- EVM is decided to be taken out
-    _ -> do
-      funcName <- case mmd of
-        Nothing -> lift . throwIO . UserError $ "Could not get the metadata of the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-        Just md -> case Map.lookup "funcName" md of
-          Nothing -> lift . throwIO . UserError $ "Could not get the name of the contract for the " <> nth i <> " transaction in the list: " <> Text.pack (format txHash)
-          Just funcName -> pure funcName
-      mxabi <- use $ functionXabiMap . at (toAddress, funcName)
-      contract <- case mxabi of
-        Just contract' -> return contract'
+
+getReturnTypes ::
+  ( MonadIO m,
+    HasCodeDB m,
+    A.Selectable Address AddressState m,
+    (Keccak256 `A.Selectable` SourceMap) m,
+    A.Selectable AccountsFilterParams [AddressStateRef] m,
+    A.Selectable StorageFilterParams [StorageAddress] m,
+    MonadLogger m
+  ) =>
+  Address ->
+  Text ->
+  m (Maybe [SVMType.Type])
+getReturnTypes addr funcName = do
+  -- Fetch contract from database
+  $logDebugS "getReturnTypes" . Text.pack $ "Fetching contract for address: " ++ show addr
+  mContract <- getContractByAddress addr
+  case mContract of
+    Just contract -> do
+      -- Extract return types
+      case Map.lookup (textToLabel funcName) (contract ^. functions) of
+        Just func -> do
+          let returnTypes = map (indexedTypeType . snd) (func ^. funcVals)
+          $logDebugS "getReturnTypes" . Text.pack $ "Found return types: " ++ show returnTypes
+          pure $ Just returnTypes
         Nothing -> do
-          mch <- lift $ fmap addressStateCodeHash <$> A.select (A.Proxy @AddressState) toAddress
-          contract' <- case mch of
-            Nothing -> lift . throwIO . UserError $ "Could not find contract at " <> Text.pack (format toAddress)
-            Just ch ->
-              lift $
-                getContractDetailsByCodeHash ch >>= \case
-                  Left e -> throwIO $ UserError e
-                  Right d -> pure $ snd d
-          functionXabiMap . at (toAddress, funcName) <?= contract'
-      let resultXabiTypes = maybe [] (map (indexedTypeToEvmIndexedType . snd) . _funcVals) . Map.lookup (Text.unpack funcName) $ _functions contract
-          orderedResultIndexedXT = sortOn Xabi.indexedTypeIndex $ catMaybes resultXabiTypes
-      orderedResultTypes <- lift $
-        for orderedResultIndexedXT $ \Xabi.IndexedType {..} ->
-          either (throwIO . UserError . Text.pack) return $
-            xabiTypeToType indexedTypeType
-      let mappedResultTypes = map convertEnumTypeToInt orderedResultTypes
-          txResp = transactionResultResponse
-      -- TODO::(map convertEnumTypeToInt orderedResultTypes) is currenlty a
-      -- workaround for enums
-      mFormattedResponse <- pure $ convertResultResToVals (either (const "") id . Base16.decode $ BC.pack txResp) mappedResultTypes
-      formattedResponse <- lift $ blocMaybe ("Failed to parse response: " <> Text.pack txResp) mFormattedResponse
-      return $ BlocTransactionResult Success txHash (Just txResult) (Just $ Call formattedResponse)
+          $logDebugS "getReturnTypes" . Text.pack $ "Function " ++ Text.unpack funcName ++ " not found in contract"
+          pure Nothing
+    Nothing -> do
+      $logDebugS "getReturnTypes" . Text.pack $ "Contract not found for address: " ++ show addr
+      pure Nothing
 
 convertEnumTypeToInt :: Type -> Type
 convertEnumTypeToInt = \case
@@ -378,15 +406,19 @@ convertResultResToVals byteResp responseTypes =
   map valueToSolidityValue <$> bytestringToValues byteResp responseTypes
 
 -- works for SolidVM only
-convertSvmResultResToVals :: MonadLogger m => String -> m (Maybe [SolidityValue])
-convertSvmResultResToVals resp = do
+convertSvmResultResToVals :: MonadLogger m => String -> Maybe [SVMType.Type] -> m (Maybe [SolidityValue])
+convertSvmResultResToVals resp mReturnTypes = do
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "response: " ++ resp
+  $logDebugS "convertSvmResultResToVals" . Text.pack $ "returnTypes: " ++ show mReturnTypes
   let args = runParser parseArgs initialParserState "" resp
   $logDebugS "convertSvmResultResToVals" . Text.pack $ "args: " ++ show args
   case args of
     Left _ -> pure Nothing
     Right y -> do
-      let values = traverse expressionToValue y
+      let values = case mReturnTypes of
+            Just returnTypes | length y == length returnTypes ->
+              traverse (uncurry expressionToValueWithType) (zip y returnTypes)
+            _ -> traverse expressionToValue y
       $logDebugS "convertSvmResultResToVals" . Text.pack $ "values: " ++ show values
       let solVals = fmap valueToSolidityValue <$> values
       $logDebugS "convertSvmResultResToVals" . Text.pack $ "solVals: " ++ show solVals
@@ -394,34 +426,56 @@ convertSvmResultResToVals resp = do
 
 expressionToValue :: Expression -> Maybe Value
 expressionToValue (NumberLiteral _ n _) = Just $ SimpleValue $ ValueInt False Nothing n
+expressionToValue (AddressLiteral _ n) = Just $ SimpleValue $ ValueAddress n
 expressionToValue (BoolLiteral _ n) = Just $ SimpleValue $ ValueBool n
 expressionToValue (StringLiteral _ n) = Just $ SimpleValue $ ValueString $ Text.pack n
 expressionToValue (DecimalLiteral _ n) = Just $ SimpleValue $ ValueDecimal (encodeUtf8 $ Text.pack $ show $ unwrapDecimal n)
 expressionToValue (ArrayExpression _ n) = ValueArrayFixed (fromIntegral $ length n) <$> traverse expressionToValue n
+expressionToValue (ObjectLiteral _ fields) = do
+  let convertField (key, expr) = do
+        value <- expressionToValue expr
+        pure (labelToText key, value)
+  convertedFields <- traverse convertField (Map.toList fields)
+  pure $ ValueStruct $ Map.fromList convertedFields
 expressionToValue _ = Nothing
 
--- TODO: implement expressionToValue for tuples, arrays, structs, and mappings
---expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
---expressionToValue (ObjectLiteral _ n) = Just $ SMV.SStruct _ n --SStruct _ theMap
+-- Convert expression to value with type information to handle SNULL/SReference
+-- cases (see functionResult for context)
+expressionToValueWithType :: Expression -> SVMType.Type -> Maybe Value
+expressionToValueWithType (NumberLiteral _ 0 _) svmType = Just $ defaultValueForType svmType
+expressionToValueWithType expr _ = expressionToValue expr
 
-constructArgValuesAndSource ::
-  (MonadIO m, MonadLogger m) =>
-  Maybe (Map Text ArgValue) ->
-  Map Text Xabi.IndexedType ->
-  m (ByteString, Text)
-constructArgValuesAndSource args argNamesTypes = do
-  case args of
-    Nothing ->
-      if Map.null argNamesTypes
-        then return (ByteString.empty, "()")
-        else throwIO (UserError "no arguments provided to function.")
-    Just argsMap -> do
-      vals <- getArgValues argsMap argNamesTypes
-      let valsAsText = map valueToText vals
-      return $
-        ( toStorage (ValueArrayFixed (fromIntegral (length vals)) vals),
-          "(" <> Text.intercalate "," valsAsText <> ")"
-        )
+-- Generate appropriate default value based on the expected type
+defaultValueForType :: SVMType.Type -> Value
+defaultValueForType SVMType.Bool = SimpleValue $ ValueBool False
+defaultValueForType (SVMType.Int signed bytes) =
+  SimpleValue $ ValueInt (fromMaybe False signed) (fmap fromIntegral bytes) 0
+defaultValueForType (SVMType.String _) = SimpleValue $ ValueString ""
+defaultValueForType (SVMType.Bytes _ bytes) =
+  SimpleValue $ ValueBytes (fmap fromIntegral bytes) ""
+defaultValueForType (SVMType.Address _) = SimpleValue $ ValueAddress 0
+defaultValueForType SVMType.Decimal = SimpleValue $ ValueDecimal "0"
+defaultValueForType (SVMType.Struct _ _) = ValueStruct Map.empty
+defaultValueForType (SVMType.Enum _ _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+defaultValueForType (SVMType.Array elemType (Just len)) =
+  ValueArrayFixed (fromIntegral len) $
+    replicate (fromIntegral len) (defaultValueForType elemType)
+defaultValueForType (SVMType.Array _ Nothing) =
+  ValueArrayDynamic mempty -- Empty dynamic array
+defaultValueForType (SVMType.Contract _) = SimpleValue $ ValueAddress 0
+defaultValueForType (SVMType.Mapping _ _ _) =
+  ValueStruct Map.empty -- Mappings represented as empty struct
+defaultValueForType (SVMType.UnknownLabel _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+defaultValueForType SVMType.Variadic = SimpleValue $ ValueInt False Nothing 0
+defaultValueForType (SVMType.UserDefined _ actualType) =
+  defaultValueForType actualType
+defaultValueForType (SVMType.Error _ _) =
+  SimpleValue $ ValueInt False (Just 32) 0
+
+-- TODO: implement expressionToValue for tuples and mappings
+--expressionToValue (TupleExpression _ n) = Just $ SMV.STuple $ traverse expressionToValue n -- [SMV.Value]
 
 getArgValues ::
   (MonadIO m, MonadLogger m) =>
@@ -443,7 +497,6 @@ getArgValues argsMap argNamesTypes = do
               Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
               Xabi.Bool -> Right . SimpleType $ TypeBool
               Xabi.Address -> Right . SimpleType $ TypeAddress
-              Xabi.Account -> Right . SimpleType $ TypeAccount
               Xabi.Struct _ name -> Right $ TypeStruct name
               Xabi.Enum _ name _ -> Right $ TypeEnum name
               Xabi.Array ety len ->
@@ -455,7 +508,6 @@ getArgValues argsMap argNamesTypes = do
                       Xabi.Bytes _ b -> Right . SimpleType . TypeBytes $ fmap toInteger b
                       Xabi.Bool -> Right . SimpleType $ TypeBool
                       Xabi.Address -> Right . SimpleType $ TypeAddress
-                      Xabi.Account -> Right . SimpleType $ TypeAccount
                       Xabi.Struct _ name -> Right $ TypeStruct name
                       Xabi.Enum _ name _ -> Right $ TypeEnum name
                       Xabi.Array {} -> Left "Arrays of arrays are not allowed as function arguments"

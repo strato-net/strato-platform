@@ -6,105 +6,157 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Strato.Lite.Rest.Server where
 
-import qualified Blockchain.Data.TXOrigin as Origin
+import Bloc.API
+import Bloc.Monad
+import Bloc.Server
+import BlockApps.Logging
+import Blockchain.Blockstanbul
+import Blockchain.DB.SQLDB
 import Blockchain.Sequencer.Event
+import Blockchain.Sequencer.Monad
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
-import Blockchain.Strato.Model.MicroTime
-import qualified Control.Concurrent.STM.MonadIO as CCS
+import Blockchain.Strato.Model.Host
 import Control.Lens
 import Control.Monad.IO.Class
 import Control.Monad.Reader
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Resource
+import Core.API
+import Data.Aeson (Value)
 import Data.Bifunctor (first)
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (traverse_)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromMaybe)
+import Data.Maybe (catMaybes, listToMaybe)
 import qualified Data.Text as T
-import Data.Traversable (for)
+import SQLM
 import Servant
-import Strato.Lite.Monad
+import Servant.Client
+import Strato.Lite.Base.Filesystem
+import Strato.Lite.Base.Simulator
+import Strato.Lite.Cirrus
+import Strato.Lite.Core
+import Strato.Lite.Simulator hiding (client)
 import Strato.Lite.Rest.Api
 import UnliftIO hiding (Handler)
 
-getNodes :: NetworkManager -> Handler ThreadResultMap
+getNodes :: NetworkManager -> Handler NodeResultMap
 getNodes mgr = liftIO . atomically $ do
   ths <- readTVar $ mgr ^. threads
-  for (ths ^. nodeThreads) $ \a -> do
-    mExp <- pollSTM a
-    pure $ fmap (first show) mExp
-
-getConnections :: NetworkManager -> Handler ThreadResultMap
-getConnections mgr = liftIO . atomically $ do
-  ths <- readTVar $ mgr ^. threads
-  let f (s, c) = "(" <> s <> "," <> c <> ")"
-  fmap (M.mapKeys f) . for (ths ^. connectionThreads) $ \a -> do
-    mExp <- pollSTM a
-    pure $ fmap (first show) mExp
-
-getChainInfo :: NetworkManager -> T.Text -> Handler ThreadResultMap
-getChainInfo mgr nodeLabel = liftIO . atomically $ do
-  ths <- readTVar $ mgr ^. network
-  let theNode = fromMaybe (error "Node not found.") $ M.lookup nodeLabel $ ths ^. nodes
-  ctxt <- (CCS.readTVarSTM . _p2pTestContext) theNode
-  let chainInfo = (Just . Left) $ show $ ctxt ^. chainInfoMap
-      res = M.singleton nodeLabel chainInfo
-  pure $ res
+  net <- readTVar $ mgr ^. network
+  flip M.traverseWithKey (ths ^. nodeThreads) $ \n a -> do
+    mExp <- listToMaybe . catMaybes <$> traverse (fmap (fmap (first show)) . pollSTM) a
+    case net ^. nodes . at n of
+      Nothing -> pure $ NodeStatus "0.0.0.0" 0 0 False mExp
+      Just (s,c) -> do
+        let coreCtx = c ^. corePeerContext
+        mBCtx <- _blockstanbulContext <$> readTVar (coreCtx ^. sequencerContext)
+        let mView = _view <$> mBCtx
+            rNum = maybe 0 (fromIntegral . _round) mView
+            sNum = maybe 0 (fromIntegral . _sequence) mView
+            isVal = maybe False _isValidator mBCtx
+            Host ip = s ^. simulatorPeerIPAddress
+        pure $ NodeStatus ip rNum sNum isVal mExp
 
 getPeers :: NetworkManager -> T.Text -> Handler [T.Text]
 getPeers mgr label = do
   mPeer <- liftIO $ fmap (M.lookup label . _nodes) . readTVarIO $ mgr ^. network
   case mPeer of
     Nothing -> return []
-    Just peer -> do
-      peerMap <- liftIO $ readIORef. stringPPeerMap . _p2pPeerDB $ peer
-      let peers = map T.pack . M.keys $ peerMap
+    Just (peer,_) -> do
+      simCtx <- liftIO . atomically . readTVar $ peer ^. simulatorPeerContext
+      peerMap <- liftIO . readIORef . stringPPeerMap $ simCtx ^. simulatorContextPeerMap
+      let peers = map (\(Host h) -> h) . M.keys $ peerMap
       pure peers
 
 postAddNode :: NetworkManager -> T.Text -> AddNodeParams -> Handler Bool
-postAddNode mgr label (AddNodeParams ip identity bootNodes) =
-  liftIO $ runReaderT (addNode label identity (IPAsText ip) (TCPPort 30303) (UDPPort 30303) (IPAsText <$> bootNodes)) mgr
+postAddNode mgr label (AddNodeParams ip _ bootNodes) =
+  liftIO . runLoggingT . runResourceT $ runReaderT (addSimulatorNode "strato-lite" label (Host ip) (TCPPort 30303) (UDPPort 30303) (Host <$> bootNodes)) mgr
 
 postRemoveNode :: NetworkManager -> T.Text -> Handler Bool
-postRemoveNode mgr label = liftIO $ runReaderT (removeNode label) mgr
-
-postAddConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postAddConnection mgr s c = liftIO $ runReaderT (addConnection s c) mgr
-
-postRemoveConnection :: NetworkManager -> T.Text -> T.Text -> Handler Bool
-postRemoveConnection mgr s c = liftIO $ runReaderT (removeConnection s c) mgr
+postRemoveNode mgr label = liftIO . runLoggingT . runResourceT $ runReaderT (removeSimulatorNode label) mgr
 
 postTimeout :: NetworkManager -> Int -> Handler ()
 postTimeout mgr rn = do
   let ev = TimerFire $ fromIntegral rn
   peers <- liftIO $ fmap (M.elems . _nodes) . readTVarIO $ mgr ^. network
-  liftIO $ traverse_ (postEvent ev) peers
-
-postTx :: NetworkManager -> T.Text -> PostTxParams -> Handler ()
-postTx mgr nodeLabel (PostTxParams tx md) = do
-  mPeer <- liftIO $ fmap (M.lookup nodeLabel . _nodes) . readTVarIO $ mgr ^. network
-  liftIO . for_ mPeer $ \peer -> do
-    ts <- liftIO $ getCurrentMicrotime
-    let signedTx = mkSignedTx (peer ^. p2pPeerPrivKey) tx md
-        ev = UnseqEvent . IETx ts $ IngestTx Origin.API signedTx
-    postEvent ev peer
+  liftIO $ traverse_ (postEvent ev . snd) peers
 
 stratoLiteRestServer :: NetworkManager -> Server StratoLiteRestAPI
 stratoLiteRestServer mgr =
   getNodes mgr
-    :<|> getConnections mgr
-    :<|> getChainInfo mgr
     :<|> getPeers mgr
     :<|> postAddNode mgr
     :<|> postRemoveNode mgr
-    :<|> postAddConnection mgr
-    :<|> postRemoveConnection mgr
     :<|> postTimeout mgr
-    :<|> postTx mgr
 
-stratoLiteRestApp :: NetworkManager -> Application
-stratoLiteRestApp = serve stratoLiteRestAPI . stratoLiteRestServer
+type CirrusAPI = "cirrus" :> "search" :> Capture "contractName" T.Text :> Get '[JSON] Value
+
+type CombinedAPI = "strato-api" :> CoreAPI :<|> "bloc" :> "v2.2" :> BlocAPI
+type NodeAPI = "nodes" :> Capture "nodeLabel" T.Text :> CombinedAPI
+
+type FullAPI = StratoLiteRestAPI :<|> NodeAPI
+
+fullAPI :: Proxy FullAPI
+fullAPI = Proxy
+
+multinodeServer :: NetworkManager -> BlocEnv -> UrlMap -> T.Text -> Server CombinedAPI
+multinodeServer mgr blocEnv urlMap nodeLabel = hoistServer (Proxy :: Proxy CombinedAPI) (convertErrors runM) (coreApiServer :<|> bloc)
+  where
+    convertErrors r x = Handler $ do
+      mNode <- liftIO $ M.lookup nodeLabel . _nodes <$> readTVarIO (mgr ^. network)
+      case mNode of
+        Nothing -> throwE . apiErrorToServantErr . UserError $ "Node " <> nodeLabel <> " not found"
+        Just p -> do
+          y <- liftIO . try . r p $ x `catch` handleRuntimeError `catch` handleApiError
+          case y of
+            Right a -> pure a
+            Left e -> throwE $ apiErrorToServantErr e
+    runM (s,c) f = do
+      simCtx <- liftIO . atomically . readTVar $ s ^. simulatorPeerContext
+      runLoggingT
+        . runResourceT
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runMemPeerDBMUsingEnv (simCtx ^. simulatorContextPeerMap)
+        . flip runReaderT s
+        . flip runReaderT c
+        $ f
+
+cirrusClient :: Client ClientM CirrusAPI
+cirrusClient = client (Proxy @CirrusAPI)
+
+cirrusHandler :: MonadIO m => FilesystemPeer -> T.Text -> m Value
+cirrusHandler fPeer tableName = liftIO $ queryCirrus (fPeer ^. filesystemDBs . cirrusSqlPool) tableName
+
+singleNodeRestServer :: FilesystemPeer -> CorePeer -> BlocEnv -> UrlMap -> Server (CombinedAPI :<|> CirrusAPI)
+singleNodeRestServer fPeer cPeer blocEnv urlMap = hoistServer (Proxy :: Proxy (CombinedAPI :<|> CirrusAPI)) (convertErrors runM) ((coreApiServer :<|> bloc) :<|> cirrusHandler fPeer)
+  where
+    convertErrors r x = Handler $ do
+          y <- liftIO . try . r $ x `catch` handleRuntimeError `catch` handleApiError
+          case y of
+            Right a -> pure a
+            Left e -> throwE $ apiErrorToServantErr e
+    runM f = do
+      runLoggingT
+        . runResourceT
+        . flip runReaderT blocEnv
+        . flip runReaderT urlMap
+        . runMemPeerDBMUsingEnv (fPeer ^. filesystemPeerMap)
+        . flip runReaderT (SQLDB . _ethSqlPool $ _filesystemDBs fPeer)
+        . flip runReaderT fPeer
+        . flip runReaderT cPeer
+        $ f
+
+combinedSimulatorRestServer :: NetworkManager -> BlocEnv -> UrlMap -> Server FullAPI
+combinedSimulatorRestServer mgr blocEnv urlMap = (stratoLiteRestServer mgr) :<|> (multinodeServer mgr blocEnv urlMap)
+
+stratoLiteSimulatorRestApp :: NetworkManager -> BlocEnv -> UrlMap -> Application
+stratoLiteSimulatorRestApp mgr blocEnv = serve fullAPI . combinedSimulatorRestServer mgr blocEnv
