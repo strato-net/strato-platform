@@ -87,7 +87,7 @@ expressionHelper (Binary y "==" _ (BoolLiteral x _)) =
 expressionHelper (Binary _ _ a b) = concat [expressionHelper a, expressionHelper b]
 expressionHelper (PlusPlus _ e) = expressionHelper e
 expressionHelper (MinusMinus _ e) = expressionHelper e
-expressionHelper (NewExpression _ _) = []
+expressionHelper (NewExpression _ _ mSalt) = maybe [] expressionHelper mSalt
 expressionHelper (IndexAccess _ a b) =
   let as = expressionHelper a
       bs = maybe [] expressionHelper b

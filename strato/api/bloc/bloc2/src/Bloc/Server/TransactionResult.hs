@@ -466,7 +466,7 @@ defaultValueForType (SVMType.Array _ Nothing) =
 defaultValueForType (SVMType.Contract _) = SimpleValue $ ValueAddress 0
 defaultValueForType (SVMType.Mapping _ _ _) =
   ValueStruct Map.empty -- Mappings represented as empty struct
-defaultValueForType (SVMType.UnknownLabel _ _) =
+defaultValueForType (SVMType.UnknownLabel _) =
   SimpleValue $ ValueInt False (Just 32) 0
 defaultValueForType SVMType.Variadic = SimpleValue $ ValueInt False Nothing 0
 defaultValueForType (SVMType.UserDefined _ actualType) =
