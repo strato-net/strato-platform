@@ -20,7 +20,6 @@
 module Strato.Lite.Filesystem where
 
 import BlockApps.Logging
-import BlockApps.X509.Keys as X509
 import Blockchain.Data.BlockDB ()
 import qualified Blockchain.Data.DataDefs as DataDefs
 import Blockchain.Data.GenesisInfo
@@ -28,24 +27,19 @@ import Blockchain.Database.MerklePatricia.MPDB
 import Blockchain.DB.BlockSummaryDB
 import Blockchain.DB.CodeDB
 import Blockchain.DB.HashDB
-import Blockchain.GenesisBlocks.Contracts.GovernanceV2
-import Blockchain.GenesisBlocks.HeliumGenesisBlock as Helium
+import Blockchain.Init.Generator (createGenesisInfo)
 import Blockchain.Network
 import Blockchain.Sequencer.DB.DependentBlockDB (DependentBlockDB(..))
 import Blockchain.Strato.Discovery.Data.MemPeerDB
 import Blockchain.Strato.Discovery.Data.Peer
 import Blockchain.Strato.Discovery.UDPServer (connectMe)
-import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Host
 import Blockchain.Strato.Model.Secp256k1
-import Blockchain.Strato.Model.Validator
 import Conduit
 import Control.Lens ((.~))
 import Control.Monad.Reader
-import qualified Data.Aeson as JSON
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC
-import qualified Data.ByteString.Lazy as BL
 import Data.List (isPrefixOf)
 import qualified Data.Map.Strict as M
 import Data.Pool (withResource)
@@ -60,6 +54,7 @@ import Network.Socket as S
 import Strato.Lite.Base
 import Strato.Lite.Base.Filesystem
 import Strato.Lite.Core
+import Strato.Lite.PEM
 import System.Directory
 import System.FilePath
 import UnliftIO
@@ -93,15 +88,7 @@ createFilesystemPeerAndCorePeer ::
   IO (FilesystemPeer, CorePeer)
 createFilesystemPeerAndCorePeer network' privKey name tcpPort udpPort myHost valBehav sock fsDBs logF = do
   bootNodes <- maybe [] (Host . T.pack . webAddress <$>) <$> getParams network'
-  genesisInfo' <- case network' of
-    "helium" -> pure Helium.genesisBlock
-    _ -> do
-      let self = fromPrivateKey privKey
-      pure $ Helium.genesisBlockTemplate Helium.heliumConfig
-        { Helium.hgbc_validators = [Validator self]
-        , Helium.hgbc_admins     = [self]
-        }
-  B.writeFile "genesis.json" . BL.toStrict $ JSON.encode genesisInfo'
+  createGenesisInfo network'
   genesisInfo <- getGenesisInfo
   fsPeer <- createFilesystemPeerIO privKey tcpPort udpPort sock myHost bootNodes fsDBs
   corePeer <- createCorePeer network' (T.unpack name) genesisInfo valBehav logF
@@ -218,7 +205,6 @@ createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBe
   cdb <- openDB "code"
   bsdb <- openDB "block_summary"
   dbdb <- openDB "dependent_blocks"
-  xdb <- openDB "x509"
   cbdb <- openDB "canonical_blocks"
   bdb <- openDB "blocks"
   kvdb <- openDB "kvs"
@@ -228,7 +214,6 @@ createFilesystemNode dir' network' privKeyFile name tcpPort udpPort myHost valBe
         , _codeDB = CodeDB cdb
         , _blockSummaryDB = BlockSummaryDB bsdb
         , _dependentBlockDB = DependentBlockDB dbdb
-        , _x509DB = xdb
         , _canonicalDB = cbdb
         , _blockDB = bdb
         , _kvDB = kvdb

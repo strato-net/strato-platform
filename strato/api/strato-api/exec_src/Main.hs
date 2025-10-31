@@ -23,7 +23,6 @@ import BlockApps.Logging
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
 import Blockchain.Data.AddressStateRef
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.EthConf
 import Blockchain.Model.JsonBlock
@@ -117,12 +116,6 @@ instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address AddressState 
         (Just 0)
 
 instance {-# OVERLAPPING #-} Selectable Address AddressState m => Selectable Address AddressState (ReaderT a m) where
-  select p = lift . select p
-
-instance {-# OVERLAPPING #-} MonadUnliftIO m => Selectable Address Certificate (CirrusM m) where
-  select _ = getX509CertForAccount
-
-instance {-# OVERLAPPING #-} Selectable Address Certificate m => Selectable Address Certificate (ReaderT a m) where
   select p = lift . select p
 
 instance {-# OVERLAPPING #-} MonadUnliftIO m => Accessible V.PublicKey (ReaderT BlocEnv m) where

@@ -36,7 +36,6 @@ import qualified BlockApps.Solidity.Xabi.Type as Xabi
 import BlockApps.Solidity.XabiContract
 import Blockchain.DB.CodeDB
 import Blockchain.Data.AddressStateDB
-import Blockchain.Data.CirrusDefs
 import Blockchain.Data.DataDefs
 import Blockchain.Data.TXOrigin
 import Blockchain.Data.Transaction (Transaction(..), rawTX2TX, transactionHash, transactionTo, partialTransactionHash, txAndTime2RawTX)
@@ -377,7 +376,6 @@ postBlocTransactionParallel ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -401,7 +399,6 @@ postBlocTransaction ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -425,7 +422,6 @@ postBlocTransaction' ::
     A.Selectable AccountsFilterParams [AddressStateRef] m,
     A.Selectable StorageFilterParams [StorageAddress] m,
     A.Selectable Address AddressState m,
-    A.Selectable Address Certificate m,
     A.Selectable Keccak256 [TransactionResult] m,
     A.Selectable TxsFilterParams [RawTransaction] m,
     HasCodeDB m,
@@ -448,16 +444,9 @@ postBlocTransaction' cacheNonce mUseWallet resolve (PostBlocTransactionRequest m
     Just addr' -> return addr'
   walletFlag <- useWalletsByDefault <$> getBlocEnv
   let useWallet = fromMaybe walletFlag mUseWallet
-  userContractAddr <- if useWallet
-    then do
-      let err = CouldNotFind $ Text.concat
-                [ "postBlocTransaction': Couldn't find common name for user address "
-                , Text.pack $ formatAddressWithoutColor addr
-                ]
-      userCert <- maybe (throwIO err) pure =<<
-        A.select (A.Proxy @Certificate) addr
-      pure $ getNewAddressWithSalt_unsafe userRegistry (certificateCommonName userCert) userRegistryHash [SMV.SString $ certificateCommonName userCert]
-    else pure addr
+      userContractAddr = if useWallet
+        then getNewAddressWithSalt_unsafe userRegistry "" userRegistryHash [SMV.SString ""]
+        else addr
   let src' :: ContractPayload -> Maybe SourceMap
       src' p =
         if contractpayloadSrc p == mempty
