@@ -95,7 +95,7 @@ const BridgeIn: React.FC = () => {
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken? false : true;
+  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
 
   // ============================================
   // Balance Hooks
