@@ -78,7 +78,6 @@ import qualified Control.Lens as Lens
 import Control.Monad (forever, join, when)
 import qualified Control.Monad.Change.Alter as A
 import qualified Control.Monad.Change.Modify as Mod
-import Control.Monad.Composable.Identity
 import Control.Monad.Reader
 import qualified Control.Monad.State as State
 import qualified Control.Monad.Trans.State as StateT
@@ -622,9 +621,6 @@ instance {-# OVERLAPPING #-} MonadIO m => ((Host, Keccak256) `A.Alters` (A.Proxy
   lookup _ _   = pure Nothing
   insert _ _ _ = pure ()
   delete _ _   = pure ()
-
-instance {-# OVERLAPPING #-} Mod.Accessible IdentityData (CoreT m) where
-  access _ = error "strato-lite: Accessing IdentityData"
 
 startingCheckpoint :: [Validator] -> Checkpoint
 startingCheckpoint as = def {checkpointValidators = as}

@@ -128,7 +128,6 @@ services:
     - FULL_DEBUG_LOG=${FULL_DEBUG_LOG:-false}
     - gasLimit=${gasLimit}
     - generateKey=${generateKey:-true}
-    # - idServerUrl=${idServerUrl}
     - INSTRUMENTATION=${INSTRUMENTATION:-false}
     - kafkaHost=kafka
     - kafkaPort=9092

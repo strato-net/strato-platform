@@ -189,9 +189,6 @@ function newnode {
   if [ -n "${gasLimit}" ]; then
       gasFlag="--gasLimit=${gasLimit}"
   fi
-  if [ -n "${idServerUrl}" ]; then
-      idServer="--identityServerUrl=${idServerUrl}"
-  fi
   if [ -n "${userRegistryAddress}" ]; then
       urFlag="--userRegistryAddress=${userRegistryAddress}"
   fi
@@ -252,7 +249,6 @@ function newnode {
     "${networkFlag}" \
     "${txsFlag}" \
     "${gasFlag}" \
-    "${idServer}" \
     "${urFlag}" \
     "${ucFlag}" \
     "${ubFlag}" \

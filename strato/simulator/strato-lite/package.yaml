@@ -73,7 +73,6 @@ library:
   - exceptions
   - format
   - hflags
-  - identity-monad
   - lens
   - leveldb-haskell
   - merkle-patricia-db

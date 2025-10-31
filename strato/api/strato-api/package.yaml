@@ -32,7 +32,6 @@ executables:
     - ethereum-discovery
     - format
     - http-types
-    - identity-monad
     - insert-ordered-containers
     - lens
     - monad-alter

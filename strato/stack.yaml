@@ -33,10 +33,6 @@ packages:
 - highway/client
 - highway/server
 
-- identity-provider/api
-#- identity-provider/server
-- identity-provider/client
-
 - indexer/slipstream
 - indexer/strato-index
 
@@ -49,7 +45,6 @@ packages:
 - libs/composable-monads/kafka-monad
 - libs/composable-monads/redis-monad
 - libs/composable-monads/sql-monad
-- libs/composable-monads/identity-monad
 - libs/composable-monads/notification-monad
 - libs/composable-monads/vault-monad
 - libs/ethereum-rlp
@@ -75,7 +70,6 @@ packages:
 - tools/convoke
 - tools/debugger-tools
 - tools/process-monitor
-#- tools/x509-tools
 
 - vault/api
 - vault/client
