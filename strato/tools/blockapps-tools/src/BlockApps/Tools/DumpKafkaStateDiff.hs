@@ -4,7 +4,7 @@
 module BlockApps.Tools.DumpKafkaStateDiff where
 
 import Blockchain.EthConf
-import Blockchain.Stream.Action (Action)
+import Blockchain.Stream.VMEvent
 import Control.Monad.Composable.Kafka
 import Control.Monad.IO.Class
 import Control.Monad.Logger
@@ -12,7 +12,7 @@ import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BL
 import Text.Format
 
-toAction :: BL.ByteString -> Action
+toAction :: BL.ByteString -> VMEvent
 toAction x =
   case JSON.eitherDecode x of
     Left e -> error $ show e
