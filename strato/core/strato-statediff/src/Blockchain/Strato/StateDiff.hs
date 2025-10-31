@@ -66,8 +66,7 @@ data StateDiff = StateDiff
   deriving (Generic)
 
 data StorageDiff (v :: Detail)
-  = EVMDiff (Map Word256 (Diff Word256 v))
-  | SolidVMDiff (Map StoragePath (Diff BasicValue v))
+  = SolidVMDiff (Map StoragePath (Diff BasicValue v))
 
 class (Ord a) => StorableKey a where
   lookupStorageKey :: (MonadLogger m, HasHashDB m, HasCodeDB m) => Key -> m a
@@ -166,7 +165,6 @@ instance Detailed (Diff Keccak256) where
   incrementalToEventual x = Value $ newValue x
 
 instance Detailed StorageDiff where
-  incrementalToEventual (EVMDiff m) = EVMDiff $ Map.map incrementalToEventual m
   incrementalToEventual (SolidVMDiff m) = SolidVMDiff $ Map.map incrementalToEventual m
 
 stateDiff ::

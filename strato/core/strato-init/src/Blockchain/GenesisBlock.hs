@@ -297,7 +297,6 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
 
         storageDiff = case storage d of
           SolidVMDiff m -> A.SolidVMDiff $ Map.map fromDiff m
-          EVMDiff _ -> error "evm state in genesis block isn't supported"
 
 bootstrapIndexer :: OutputBlock -> IO ()
 bootstrapIndexer obGB = do

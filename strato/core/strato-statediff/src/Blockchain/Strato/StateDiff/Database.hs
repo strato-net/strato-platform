@@ -61,7 +61,6 @@ createAccount blockNumber accountDiffs =
         forM (zip accountDiffs addrIDs) $ \(accountDiff, addrID) -> do
           let (_, diff) = accountDiff
           case storage diff of
-            EVMDiff _ -> return []
             SolidVMDiff m ->
               return
                 [ Storage addrID k v
@@ -140,7 +139,6 @@ updateAccount blockNumber account diff = do
           setField balance AddressStateRefBalance $
             [AddressStateRefLatestBlockDataRefNumber =. blockNumber]
       case storage diff of
-        EVMDiff _ -> pure ()
         SolidVMDiff m2 -> sequence_ $ Map.mapWithKey (commitSolidStorage addrID) m2
   where
     setField field sqlField = maybe id (\v -> ((sqlField =. takeIncremental v) :)) $ field diff
