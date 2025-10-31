@@ -186,7 +186,7 @@ export async function initializeSafeForChain(chainId: number) {
     signer: config.safe.safeProposerPrivateKey || "",
     safeAddress: config.safe.address || "",
   });
-  const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId) });
+  const apiKit = new SafeApiKit({ chainId: safeToBigInt(chainId), apiKey: config.safe.apiKey });
 
   return { protocolKit, apiKit };
 }

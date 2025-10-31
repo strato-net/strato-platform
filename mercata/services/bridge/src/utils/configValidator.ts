@@ -109,6 +109,14 @@ export async function validateBridgeConfig(): Promise<boolean> {
     }
   }
 
+  if (config.safe.apiKey) {
+    if (!/^[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+$/.test(config.safe.apiKey)) {
+      errors.push(
+        `Invalid Safe API key format: ${config.safe.apiKey.substring(0, 10)}...`,
+      );
+    }
+  }
+
   // Validate voucher contract address format
   if (config.voucher.contractAddress) {
     if (!/^(0x)?[a-fA-F0-9]{40}$/.test(config.voucher.contractAddress)) {
