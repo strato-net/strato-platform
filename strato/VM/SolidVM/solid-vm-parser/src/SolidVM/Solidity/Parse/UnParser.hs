@@ -138,7 +138,7 @@ unparseVarType (SVMType.String _) = "string"
 unparseVarType (SVMType.Address _) = "address"
 unparseVarType (SVMType.Bytes (Just True) _) = "bytes"
 unparseVarType (SVMType.Bytes Nothing (Just bytes)) = "bytes" <> (show bytes)
-unparseVarType (SVMType.UnknownLabel str _) = labelToString str
+unparseVarType (SVMType.UnknownLabel str) = labelToString str
 unparseVarType (SVMType.Enum _ name _) = labelToString name
 unparseVarType (SVMType.Array t (Just n)) = (unparseVarType t) <> "[" <> show n <> "]"
 unparseVarType (SVMType.Array t Nothing) = (unparseVarType t) <> "[]"
@@ -335,7 +335,7 @@ unparseExpression (FunctionCall _ e args) =
   let shownArgs = List.intercalate "," $ map unparseExpression args
    in unparseExpression e ++ "(" ++ shownArgs ++ ")"
 unparseExpression (Ternary _ x y z) = unparseExpression x ++ "?" ++ unparseExpression y ++ ":" ++ unparseExpression z
-unparseExpression (NewExpression _ x) = "new " ++ unparseVarType x
+unparseExpression (NewExpression _ x mSalt) = "new " ++ unparseVarType x ++ maybe "" unparseExpression mSalt
 unparseExpression (ArrayExpression _ xs) = "[" ++ List.intercalate "," (map unparseExpression xs) ++ "]"
 unparseExpression (ObjectLiteral _ m) = "{" ++ List.intercalate ",\n" [concat ["\t", labelToString k, ":", unparseExpression v] | (k, v) <- Map.toList m] ++ "}"
 

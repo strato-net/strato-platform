@@ -278,7 +278,7 @@ defaultValue _ (SVMType.Address _) = (SAddress 0) False
 defaultValue _ (SVMType.String _) = SString ""
 defaultValue _ (SVMType.Bytes _ _) = SString ""
 defaultValue _ SVMType.Decimal = SDecimal 0
-defaultValue ctract (SVMType.UnknownLabel name _) =
+defaultValue ctract (SVMType.UnknownLabel name) =
   fromMaybe (SContract name 0x0) $
     asum
       [ do
@@ -308,7 +308,7 @@ createDefaultValue _ _ (SVMType.Address _) = return $ (SAddress 0) False
 createDefaultValue _ _ (SVMType.String _) = return $ SString ""
 createDefaultValue _ _ (SVMType.Bytes _ _) = return $ SString ""
 createDefaultValue _ _ SVMType.Decimal = return $ SDecimal 0
-createDefaultValue cc ctract (SVMType.UnknownLabel name _) =
+createDefaultValue cc ctract (SVMType.UnknownLabel name) =
   case (M.lookup name $ CC._enums ctract, M.lookup name $ CC._structs ctract) of
     (Just ((val : _), _), _) -> return $ SEnumVal name val 0x0
     (Nothing, Just sdef) -> do

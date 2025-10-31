@@ -151,7 +151,7 @@ spec = do
             ),
             ( "Nom storage nom = ns[10];",
               SimpleStatement $
-                VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom" Nothing) (Just Storage) "nom" ()] $
+                VariableDefinition [VarDefEntry (Just $ UnknownLabel "Nom") (Just Storage) "nom" ()] $
                   Just $
                     IndexAccess () (Variable () "ns") (Just $ NumberLiteral () 10 Nothing)
             ),
