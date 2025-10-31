@@ -334,7 +334,7 @@ const BridgeIn: React.FC = () => {
       amount,
       parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.externalToken? false : true;
+    const isNative = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
 
     return {
       selectedToken,
