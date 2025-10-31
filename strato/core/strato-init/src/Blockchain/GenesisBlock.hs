@@ -10,7 +10,6 @@
 
 module Blockchain.GenesisBlock
   ( initializeGenesisBlock
-  , populateStorageDBs'
   )
 where
 
