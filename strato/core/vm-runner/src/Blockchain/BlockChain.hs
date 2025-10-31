@@ -311,9 +311,9 @@ sendNewActionMessage b trrs = do
   let bd = obBlockData b
   theMap <- getMemRawStorageBlockDB
 
-  let recombined :: Map Address ActionData
+  let recombined :: Map Address DataDiff
       recombined =
-        fmap (ActionData . SolidVMDiff)
+        fmap (SolidVMDiff)
         $ M.fromListWith M.union
         [ (addr, M.singleton path val)
         | ((addr, path), val) <- M.toList theMap

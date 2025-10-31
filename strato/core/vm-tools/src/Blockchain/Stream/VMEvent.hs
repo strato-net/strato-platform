@@ -19,7 +19,7 @@ import Blockchain.KafkaTopics
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
-import Blockchain.Stream.Action (Delegatecall, ActionData)
+import Blockchain.Stream.Action (Delegatecall, DataDiff)
 import Conduit
 import Control.Monad.Composable.Kafka
 import qualified Data.Aeson as JSON
@@ -40,7 +40,7 @@ data VMEvent
       blockTimestamp :: UTCTime,
       blockNumber :: Integer,
       transactionSender :: Address,
-      actionData :: OMap.OMap Address ActionData,
+      actionData :: OMap.OMap Address DataDiff,
       newCodeCollections :: [(Text, CodeCollection)],
       events :: Seq Event,
       delegatecalls :: Seq Delegatecall

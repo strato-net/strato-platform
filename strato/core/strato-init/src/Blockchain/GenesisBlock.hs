@@ -285,7 +285,7 @@ populateStorageDBs' genesisInfo genesisBlock genesisChainId sr pub = do
                 blockHeaderBlockNumber $ blockHeader genesisBlock,
               VMEVENT.transactionSender = Ad.Address 0,
               VMEVENT.actionData =
-                OMap.singleton (a, A.ActionData storageDiff),
+                OMap.singleton (a, storageDiff),
               VMEVENT.newCodeCollections = [],
               VMEVENT.events = addressEvents,
               VMEVENT.delegatecalls = delegatecalls

@@ -198,6 +198,8 @@ instance Format StoragePath where
       addConditionalDot w@(c1 : _) | isAlpha c1 = "." ++ w
       addConditionalDot w = w
 
+instance JSON.FromJSONKey StoragePath where
+
 instance JSON.FromJSON StoragePath where
   parseJSON (JSON.String v) = return $ either (error . (("malformed StoragePath: " ++ show v ++ "\n") ++)) id $ parsePath $ encodeUtf8 v
   parseJSON v = error $ "wrong format in call to parseJSON for StoragePath: " ++ show v

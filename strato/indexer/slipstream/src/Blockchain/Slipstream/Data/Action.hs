@@ -15,7 +15,7 @@ module Blockchain.Slipstream.Data.Action where
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.Keccak256
-import qualified Blockchain.Stream.Action as Action (ActionData (..), DataDiff (..))
+import qualified Blockchain.Stream.Action as Action (DataDiff (..))
 import qualified Blockchain.Stream.VMEvent as VME
 import Control.DeepSeq
 import Data.Aeson
@@ -62,7 +62,7 @@ instance Binary AggregateEvent where
 
 flatten :: VME.VMEvent -> [AggregateAction]
 flatten VME.NewBlockData{..} = flip map (OMap.assocs actionData) $
-  \(address, Action.ActionData {..}) ->
+  \(address, dataDiffs) ->
     -- It's a Create because I said so
     AggregateAction
           { actionBlockHash = blockHash,
@@ -70,7 +70,7 @@ flatten VME.NewBlockData{..} = flip map (OMap.assocs actionData) $
             actionBlockNumber = blockNumber,
             actionTxSender = transactionSender,
             actionAddress = address,
-            actionStorage = _actionDataStorageDiffs
+            actionStorage = dataDiffs
           }
 flatten _ = []
 
