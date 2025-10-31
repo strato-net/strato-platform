@@ -215,8 +215,26 @@ const TokenInput = ({
 }: TokenInputProps) => {      
   return (
     <div className="bg-gray-50 p-4 rounded-lg">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-col sm:flex-row sm:justify-between mb-2">
         <label className="text-sm text-gray-600 font-semibold">{label}</label>
+        {isFromInput && (
+          <span className={`text-sm mt-1 sm:mt-0 flex gap-1 ${
+            toWei(maxAmountWei) === 0n ? "text-red-600" : "text-gray-600"
+          }`}>
+            Available for swap: <AnimatedNumber 
+              value={maxAmountWei !== "0" ? formatBalance(maxAmountWei, asset?._symbol || "", undefined, 2, 6) : "0"} 
+              isLoading={loading} 
+            />
+            <button
+              type="button"
+              className={`text-blue-600 text-xs ml-2 underline ${toWei(maxAmountWei) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
+              onClick={onMaxClick}
+              disabled={toWei(maxAmountWei) === 0n}
+            >
+              Max
+            </button>
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0 flex flex-col">
@@ -812,23 +830,6 @@ const SwapWidget = () => {
               {fromAsset && (
                 <div className="space-y-2">
                   <div className="text-sm font-semibold text-gray-700">From ({fromAsset._symbol})</div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Available for swap:</span>
-                    <div className="flex items-center gap-2">
-                      <AnimatedNumber 
-                        value={fromAssetAvailableBalance !== "0" ? formatBalance(fromAssetAvailableBalance, fromAsset._symbol || "", undefined, 2, 6) : "0"} 
-                        isLoading={poolLoading} 
-                      />
-                      <button
-                        type="button"
-                        className={`text-blue-600 text-xs underline ${toWei(fromAssetAvailableBalance) === 0n ? "opacity-50 cursor-not-allowed" : ""}`}
-                        onClick={handleMaxClick}
-                        disabled={toWei(fromAssetAvailableBalance) === 0n}
-                      >
-                        Max
-                      </button>
-                    </div>
-                  </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">User Balance:</span>
                     <AnimatedNumber 
