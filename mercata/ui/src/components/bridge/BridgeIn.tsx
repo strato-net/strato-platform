@@ -355,7 +355,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
+      tokenAddress: ctx.isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(ctx.selectedToken.externalToken)
     });
 
     if (!validation.isValid) {
