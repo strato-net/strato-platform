@@ -95,7 +95,7 @@ const BridgeIn: React.FC = () => {
   const activeChainId = selectedNetworkConfig?.chainId;
   const expectedChainId = activeChainId ? parseInt(activeChainId) : null;
   const isCorrectNetwork = isConnected && chainId && expectedChainId && chainId === expectedChainId;
-  const isNativeToken = selectedToken?.externalToken? false : true;
+  const isNativeToken = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
 
   // ============================================
   // Balance Hooks
@@ -334,7 +334,7 @@ const BridgeIn: React.FC = () => {
       amount,
       parseInt(selectedToken.externalDecimals || "18"),
     );
-    const isNative = selectedToken.externalToken? false : true;
+    const isNative = BigInt(selectedToken?.externalToken || "0") === 0n ? true : false;
 
     return {
       selectedToken,
@@ -355,7 +355,7 @@ const BridgeIn: React.FC = () => {
       amount: ctx.amount,
       decimals: ctx.selectedToken.externalDecimals,
       chainId: ctx.activeChainId,
-      tokenAddress: ctx.selectedToken.externalToken? ctx.selectedToken.externalToken : NATIVE_TOKEN_ADDRESS
+      tokenAddress: ctx.isNative ? NATIVE_TOKEN_ADDRESS : ensureHexPrefix(ctx.selectedToken.externalToken)
     });
 
     if (!validation.isValid) {

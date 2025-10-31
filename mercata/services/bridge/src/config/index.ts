@@ -35,6 +35,7 @@ const config = {
     address: process.env.SAFE_ADDRESS,
     safeProposerAddress: process.env.SAFE_PROPOSER_ADDRESS,
     safeProposerPrivateKey: process.env.SAFE_PROPOSER_PRIVATE_KEY,
+    apiKey: process.env.SAFE_API_KEY,
   },
   voucher: {
     contractAddress:

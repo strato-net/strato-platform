@@ -159,7 +159,7 @@ export const confirmWithdrawalBatch = async (
 
     const emailPromises = withdrawals.map(async (withdrawal) => {
       try {
-        await sendEmail(withdrawal.withdrawalId!);
+        await sendEmail(withdrawal.withdrawalId!, withdrawal.externalChainId);
         return "success";
       } catch (emailError) {
         logError("BridgeService", emailError as Error, {
