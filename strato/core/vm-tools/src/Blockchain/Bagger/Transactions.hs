@@ -13,9 +13,7 @@ import Blockchain.Model.WrappedBlock (OutputTx (..))
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Delta
 import Blockchain.Strato.Model.Keccak256 hiding (hash)
-import qualified Blockchain.Stream.Action as Action
 import Control.DeepSeq
-import Control.Lens.Setter (set)
 import qualified Data.Map as M
 import Data.Time.Clock
 import GHC.Generics
@@ -38,7 +36,7 @@ rewriteBlockHash hsh (TxRunResult otx res t before after new) =
   where
     res' = case res of
       Left {} -> res
-      Right er@ExecResults {erAction = mAction} -> Right er {erAction = set Action.blockHash hsh <$> mAction}
+      Right er -> Right er
 
 instance NFData TxRunResult
 

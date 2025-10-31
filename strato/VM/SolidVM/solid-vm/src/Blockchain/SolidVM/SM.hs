@@ -68,7 +68,6 @@ import Blockchain.SolidVM.CodeCollectionDB
 import Blockchain.SolidVM.Exception
 import Blockchain.SolidVM.GasInfo
 import Blockchain.Strato.Model.Address
-import Blockchain.Strato.Model.Class
 import Blockchain.Strato.Model.Code
 import Blockchain.Strato.Model.Event
 import Blockchain.Strato.Model.ExtendedWord
@@ -467,7 +466,7 @@ runSM maybeCode envBefore gi f = do
           { env = envBefore,
             callStack = [],
             _ssMemDBs = csMemDBs,
-            _action = startingAction envBefore,
+            _action = startingAction,
             _gasInfo = gi {_gasLeft = min (_gasLeft gi) gasCap} -- capping the transaction gas limit
           }
   startingStateRef <- newIORef startingState
@@ -501,14 +500,10 @@ pushSender newSender mv = do
   Mod.put (Mod.Proxy @Env.Sender) oldSender
   return $ ret
 
-startingAction :: Env.Environment -> Action
-startingAction env' =
+startingAction :: Action
+startingAction =
   Action.Action
-    { _blockHash = blockHeaderHash $ Env.blockHeader env',
-      _blockTimestamp = blockHeaderTimestamp $ Env.blockHeader env',
-      _blockNumber = blockHeaderBlockNumber $ Env.blockHeader env',
-      _transactionSender = Env.sender env',
-      _newCodeCollections = [],
+    { _newCodeCollections = [],
       _events = Q.empty,
       _delegatecalls = Q.empty
     }

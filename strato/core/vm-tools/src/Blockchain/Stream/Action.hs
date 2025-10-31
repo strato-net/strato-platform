@@ -13,7 +13,6 @@
 
 module Blockchain.Stream.Action (
   Action(..),
-  blockHash,
   newCodeCollections,
   events,
   delegatecalls,
@@ -28,7 +27,6 @@ module Blockchain.Stream.Action (
 import Blockchain.MiscJSON ()
 import Blockchain.Strato.Model.Address
 import Blockchain.Strato.Model.Event
-import Blockchain.Strato.Model.Keccak256
 import Control.DeepSeq
 import Control.Lens hiding ((.=))
 import Control.Monad (liftM2)
@@ -48,7 +46,6 @@ import qualified Data.Map.Strict as M
 import qualified Data.Sequence as S
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time
 import GHC.Generics
 import SolidVM.Model.CodeCollection (CodeCollection)
 import SolidVM.Model.Storable hiding (toList)
@@ -157,11 +154,7 @@ instance FromJSON Delegatecall where
   parseJSON o = fail $ "parseJSON Delegatecall: Expected object, got: " ++ show o
 
 data Action = Action
-  { _blockHash :: Keccak256,
-    _blockTimestamp :: UTCTime,
-    _blockNumber :: Integer,
-    _transactionSender :: Address,
-    _newCodeCollections :: [(Text, CodeCollection)],
+  { _newCodeCollections :: [(Text, CodeCollection)],
     _events :: S.Seq Event,
     _delegatecalls :: S.Seq Delegatecall
   }

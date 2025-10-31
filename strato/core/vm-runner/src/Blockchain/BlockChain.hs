@@ -59,7 +59,7 @@ import Blockchain.Strato.Model.Gas
 import Blockchain.Strato.Model.Keccak256
 import Blockchain.Strato.Model.Options (computeNetworkID)
 import qualified Blockchain.Strato.StateDiff as SD
-import Blockchain.Stream.Action hiding (blockHash)
+import Blockchain.Stream.Action
 import qualified Blockchain.Stream.Action as Action
 import Blockchain.Stream.VMEvent (VMEvent, produceVMEvents)
 import qualified Blockchain.Stream.VMEvent as VMEVENT
