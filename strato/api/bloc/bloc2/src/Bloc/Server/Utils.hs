@@ -41,7 +41,6 @@ import Data.Word
 import Handlers.Transaction
 import Handlers.TransactionResult
 import qualified LabeledError
-import qualified MaybeNamed
 import SQLM
 import Strato.Strato23.API.Types
 import UnliftIO
@@ -56,7 +55,7 @@ maybeTxBatchResult ::
   [Keccak256] ->
   m [Maybe (RawTransaction, TransactionResult)]
 maybeTxBatchResult hashes = do
-  rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams {qtHash = Just h, qtMinGasLimit = Just 1, qtChainId = Just (MaybeNamed.Named "all")}
+  rtxs <- fmap (map (map rtPrimeToRt)) . for hashes $ \h -> getTransaction' txsFilterParams {qtHash = Just h, qtMinGasLimit = Just 1}
   mtxrs <- postBatchTransactionResult hashes
   pure . map (maybeHeads mtxrs) $ (zip hashes rtxs :: [(Keccak256, [RawTransaction])])
   where
