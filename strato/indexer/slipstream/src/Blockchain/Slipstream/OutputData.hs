@@ -971,7 +971,7 @@ insertGlobalEventTableQuery agEv@AggregateEvent {eventEvent = ev} =
       blockHash = T.pack . keccak256ToHex $ eventBlockHash agEv
       blockTimestamp = tshow $ eventBlockTimestamp agEv
       blockNumber = eventBlockNumber agEv
-      transactionSender = eventTxSender agEv
+      transactionSender = Action.evTxSender ev
       eventIdx = eventIndex agEv
 
       attributesMap = ValueMapping $
