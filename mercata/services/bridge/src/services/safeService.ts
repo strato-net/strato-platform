@@ -93,7 +93,7 @@ export const monitorSafeTransactionStatusBatch = async (
 ): Promise<Map<Number, "executed" | "rejected" | "pending">> => {
   if (!withdrawals.length) return new Map();
 
-  const apiKit = new SafeApiKit({ chainId });
+  const apiKit = new SafeApiKit({ chainId, apiKey: config.safe.apiKey });
 
   const results = new Map<Number, "executed" | "rejected" | "pending">();
   

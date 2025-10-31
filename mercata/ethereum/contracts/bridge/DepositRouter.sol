@@ -241,7 +241,7 @@ contract DepositRouter is
     }
 
     function version() external pure virtual returns (string memory) {
-        return "3.0.0";
+        return "1.0.0";
     }
 
     function _authorizeUpgrade(
