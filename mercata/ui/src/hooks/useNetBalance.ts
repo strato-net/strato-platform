@@ -32,7 +32,7 @@ export const useNetBalance = ({
   });
 
   useEffect(() => {
-    if (!tokens || tokens.length === 0) {
+    if ((!tokens || tokens.length === 0) && !cataToken) {
       return;
     }
 
